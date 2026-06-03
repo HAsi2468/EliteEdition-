@@ -1,0 +1,203 @@
+{
+  "info": {
+    "name": "EliteEditionMongo API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "All v1 endpoints for the EliteEditionMongo project",
+    "_postman_id": "e6c2b1a0-4d7f-4c6e-8b7c-9f5a2c3d4e01"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Ping",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/ping",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "auth", "ping"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"Pass1234\",\n  \"role\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"Pass1234\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "auth", "forgot-password"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"NewPass1234\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth/reset-password?token=<reset-token>",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "auth", "reset-password"],
+              "query": [{ "key": "token", "value": "<reset-token>" }]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "users"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/users/:userId",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "users", ":userId"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer <jwt>" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/users/:userId",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "users", ":userId"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer <jwt>" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/users/:userId",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "users", ":userId"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        { "name": "List Products", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/v1/products/list", "host": ["{{baseUrl}}"], "path": ["v1","products","list"] } }, "response": [] },
+        { "name": "Get Orders", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/v1/products/get_orders", "host": ["{{baseUrl}}"], "path": ["v1","products","get_orders"] } }, "response": [] },
+        { "name": "Fetch From API", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/v1/products/fatchFromAPIS", "host": ["{{baseUrl}}"], "path": ["v1","products","fatchFromAPIS"] } }, "response": [] },
+        { "name": "Search by SKU", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/v1/products/get_sku_details?sku=12345", "host": ["{{baseUrl}}"], "path": ["v1","products","get_sku_details"], "query": [{ "key": "sku", "value": "12345" }] } }, "response": [] },
+        { "name": "Sales Report", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/v1/products/report", "host": ["{{baseUrl}}"], "path": ["v1","products","report"] } }, "response": [] },
+        { "name": "Fetch Missing Product", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/v1/products/fetchMissingProduct", "host": ["{{baseUrl}}"], "path": ["v1","products","fetchMissingProduct"] } }, "response": [] }
+      ]
+    },
+    {
+      "name": "Filters",
+      "item": [
+        { "name": "Get Filters", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/v1/filters_value", "host": ["{{baseUrl}}"], "path": ["v1","filters_value"] } }, "response": [] }
+      ]
+    },
+    {
+      "name": "Sales List",
+      "item": [
+        { "name": "Get Data", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/v1/salesList/getData", "host": ["{{baseUrl}}"], "path": ["v1","salesList","getData"] } }, "response": [] },
+        { "name": "Save CSV Data", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/v1/salesList/save", "host": ["{{baseUrl}}"], "path": ["v1","salesList","save"] } }, "response": [] },
+        { "name": "Drop Table", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/v1/salesList/drop", "host": ["{{baseUrl}}"], "path": ["v1","salesList","drop"] } }, "response": [] }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ]
+}

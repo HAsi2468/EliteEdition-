@@ -1,0 +1,487 @@
+{
+  "info": {
+    "_postman_id": "f28237ce-366b-4528-a7ef-8a2a59ec80a4",
+    "name": "UniCommerse ELITE",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "14227032"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "Application/json"
+          },
+          {
+            "key": "username",
+            "value": "oequal"
+          },
+          {
+            "key": "password",
+            "value": "bbb6c41e-0894-458c-aa6a-85dcc0c23412"
+          }
+        ],
+        "url": {
+          "raw": "https://sunshinetrends.unicommerce.com/oauth/token?grant_type=password&client_id=my-trusted-client&username=st.oequalfashion@gmail.com&password=Oequal@123",
+          "protocol": "https",
+          "host": [
+            "sunshinetrends",
+            "unicommerce",
+            "com"
+          ],
+          "path": [
+            "oauth",
+            "token"
+          ],
+          "query": [
+            {
+              "key": "grant_type",
+              "value": "password"
+            },
+            {
+              "key": "client_id",
+              "value": "my-trusted-client"
+            },
+            {
+              "key": "username",
+              "value": "st.oequalfashion@gmail.com"
+            },
+            {
+              "key": "password",
+              "value": "Oequal@123"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "getItemType",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "bearer 4dc15d7e-09c2-4aa8-8831-1fadc46968fd",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"skuCode\":\"AA22210_M\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://eliteedition.unicommerce.com/services/rest/v1/catalog/itemType/get",
+          "protocol": "https",
+          "host": [
+            "eliteedition",
+            "unicommerce",
+            "com"
+          ],
+          "path": [
+            "services",
+            "rest",
+            "v1",
+            "catalog",
+            "itemType",
+            "get"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "getSaleOrder",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "bearer ff460069-8c24-4a68-b179-62de3aa5ee97",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n   \"code\": \"3e42c8cf-fa52-4196-a02e-0afbe68fadc0\",\n  \"paymentDetailRequired\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://eliteedition.unicommerce.com/services/rest/v1/oms/saleorder/get",
+          "protocol": "https",
+          "host": [
+            "eliteedition",
+            "unicommerce",
+            "com"
+          ],
+          "path": [
+            "services",
+            "rest",
+            "v1",
+            "oms",
+            "saleorder",
+            "get"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search Item(s)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "bearer 946d3eaf-849a-4ecd-95b7-2d43bf9b1f65",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n     \"productCode\": \"AA22106_XL\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://eliteedition.unicommerce.com/services/rest/v1/product/itemType/search",
+          "protocol": "https",
+          "host": [
+            "eliteedition",
+            "unicommerce",
+            "com"
+          ],
+          "path": [
+            "services",
+            "rest",
+            "v1",
+            "product",
+            "itemType",
+            "search"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "getInventorySnapshot",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "bearer ff460069-8c24-4a68-b179-62de3aa5ee97",
+            "type": "text"
+          },
+          {
+            "key": "Facility",
+            "value": "Oequal",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n   \"updatedSinceInMinutes\": 480\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://eliteedition.unicommerce.com/services/rest/v1/inventory/inventorySnapshot/get",
+          "protocol": "https",
+          "host": [
+            "eliteedition",
+            "unicommerce",
+            "com"
+          ],
+          "path": [
+            "services",
+            "rest",
+            "v1",
+            "inventory",
+            "inventorySnapshot",
+            "get"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create Export Job",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "bearer 004b89ec-cd74-447e-84c3-737745f04436"
+          },
+          {
+            "key": "Facility",
+            "value": "Oequal"
+          },
+          {
+            "key": "Cookie",
+            "value": "unicommerce=app1"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"exportJobTypeName\":\"Sale Orders\",\"exportColums\":[\"soicode\",\"displayorderCode\",\"reversePickupCode\",\"reversePickupCreatedDate\",\"reversePickupReason\",\"notificationEmail\",\"notificationMobile\",\"requireCustomization\",\"cod\",\"shippingAddressId\",\"category\",\"invoiceCode\",\"invoiceCreated\",\"ewbNo\",\"ewbDate\",\"ewbValidTill\",\"shippingAddressName\",\"shippingAddressLine1\",\"shippingAddressLine2\",\"shippingAddressCity\",\"shippingAddressState\",\"shippingAddressCountry\",\"shippingAddressPincode\",\"shippingAddressPhone\",\"billingAddressId\",\"billingAddressName\",\"billingAddressLine1\",\"billingAddressLine2\",\"billingAddressCity\",\"billingAddressState\",\"billingAddressCountry\",\"billingAddressPincode\",\"billingAddressPhone\",\"shippingMethod\",\"skuCode\",\"channelProductId\",\"itemTypeName\",\"itemTypeColor\",\"itemTypeSize\",\"itemTypeBrand\",\"channel\",\"itemRequireCustomization\",\"giftWrap\",\"giftMessage\",\"hsnCode\",\"maxRetailPrice\",\"totalPrice\",\"sellingPrice\",\"costPrice\",\"prepaidAmount\",\"subtotal\",\"discount\",\"gstTaxTypeCode\",\"cgst\",\"igst\",\"sgst\",\"utgst\",\"cess\",\"cgstrate\",\"igstrate\",\"sgstrate\",\"utgstrate\",\"cessrate\",\"TCSAmount\",\"tax\",\"taxValue\",\"voucherCode\",\"shippingCharges\",\"shippingMethodCharges\",\"cashOnDeliveryCharges\",\"giftWrapCharges\",\"packetNumber\",\"displayOrderDateTime\",\"saleOrderCode\",\"onhold\",\"status\",\"priority\",\"currency\",\"currencyConversionRate\",\"SoiStatus\",\"cancellationReason\",\"shippingProvider\",\"shippingCourier\",\"shippingArrangedBy\",\"ShippingPackageCode\",\"ShippingPackageCreationDate\",\"shippingPackageStatusCode\",\"shippingPackageTypeCode\",\"shippingPackageLength\",\"shippingPackageWidth\",\"shippingPackageHeight\",\"deliveryTime\",\"TrackingNumber\",\"dispatchDate\",\"facility\",\"returnedDate\",\"returnReason\",\"returnRemarks\",\"created\",\"updated\",\"combinationIdentifier\",\"combinationDescription\",\"transferPrice\",\"itemCode\",\"imei\",\"actualWeight\",\"gsttin\",\"Cgsttin\",\"tin\",\"paymentInstrc\",\"fulfillmentTat\",\"ajustmentInSellingPrice\",\"ajustmentInDiscount\",\"storeCredit\",\"irn\",\"acknowledgementNumber\",\"bundleSkuCode\",\"skuName\",\"batchCode\",\"vendorBatchNumber\",\"sellerSkuCode\",\"itemTypeEAN\",\"shippingCourierStatus\",\"shippingTrackingStatus\",\"itemSealId\",\"parentSaleOrderCode\",\"van\",\"styleid\"],\"exportFilters\":[{\"id\":\"addedOn\",\"dateRange\":{\"textRange\":\"TODAY\"}}],\"frequency\":\"ONETIME\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://eliteedition.unicommerce.com/services/rest/v1/export/job/create",
+          "protocol": "https",
+          "host": [
+            "eliteedition",
+            "unicommerce",
+            "com"
+          ],
+          "path": [
+            "services",
+            "rest",
+            "v1",
+            "export",
+            "job",
+            "create"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Export Job status and report",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "bearer ed1f464d-6cb3-4c58-9234-86dd22c61ae0"
+          },
+          {
+            "key": "Cookie",
+            "value": "unicommerce=app1"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n   \"jobCode\": \"66e687b52d712c5e8bc7abf3-8604a5f8fa066ed579601d7fd97a5733\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://eliteedition.unicommerce.com/services/rest/v1/export/job/status",
+          "protocol": "https",
+          "host": [
+            "eliteedition",
+            "unicommerce",
+            "com"
+          ],
+          "path": [
+            "services",
+            "rest",
+            "v1",
+            "export",
+            "job",
+            "status"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Search Return",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "bearer 9f4018d2-38b0-4cf4-a583-39deace6e4f1",
+            "type": "text"
+          },
+          {
+            "key": "Facility",
+            "value": "Oequal",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"returnType\": \"RTO\",\n    \"updatedTo\": \"2025-04-14T23:59:59\",\n    \"updatedFrom\": \"2025-04-14T00:00:00\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://eliteedition.unicommerce.com/services/rest/v1/oms/return/search",
+          "protocol": "https",
+          "host": [
+            "eliteedition",
+            "unicommerce",
+            "com"
+          ],
+          "path": [
+            "services",
+            "rest",
+            "v1",
+            "oms",
+            "return",
+            "search"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get return",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "bearer 6ff9938a-2203-42de-a42f-0531a7ad51c1"
+          },
+          {
+            "key": "Facility",
+            "value": "Oequal"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"shipmentCode\":\"OEQL134671\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://eliteedition.unicommerce.com/services/rest/v1/oms/return/get",
+          "protocol": "https",
+          "host": [
+            "eliteedition",
+            "unicommerce",
+            "com"
+          ],
+          "path": [
+            "services",
+            "rest",
+            "v1",
+            "oms",
+            "return",
+            "get"
+          ]
+        },
+        "description": "Generated from cURL: curl --location 'https://sunshinetrends.unicommerce.com/services/rest/v1/oms/return/get' \\\n--header 'Authorization: bearer 6ff9938a-2203-42de-a42f-0531a7ad51c1' \\\n--header 'Facility: Oequal' \\\n--header 'Content-Type: application/json' \\\n--data '{\n    \"shipmentCode\":\"OEQL134671\"\n}'"
+      },
+      "response": []
+    },
+    {
+      "name": "savefromcsv",
+      "request": {
+        "method": "GET",
+        "header": []
+      },
+      "response": []
+    },
+    {
+      "name": "Get Inventory Snapshot",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://eliteedition.unicommerce.com/services/rest/v1/inventory/inventorySnapshot/get",
+          "protocol": "https",
+          "host": [
+            "eliteedition",
+            "unicommerce",
+            "com"
+          ],
+          "path": [
+            "services",
+            "rest",
+            "v1",
+            "inventory",
+            "inventorySnapshot",
+            "get"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
