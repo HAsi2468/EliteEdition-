@@ -79,7 +79,7 @@ async function createExportJob(accessToken) {
   const primaryBody = {
     exportJobTypeName: 'Sale Orders',
     exportColums: rotatedColumns,
-    exportFilters: [{ id: 'addedOn', dateRange: { textRange: 'LAST_90_DAYS' } }],
+    exportFilters: [{ id: 'addedOn', dateRange: { textRange: 'TODAY' } }],
     /*TODAY, YESTERDAY, LAST_WEEK, LAST_MONTH, THIS_MONTH, LAST_7_DAYS, 
     LAST_30_DAYS,LAST_60_DAYS, LAST_90_DAYS, LAST_QUARTER, THIS_QUARTER*/
     frequency: 'ONETIME',
