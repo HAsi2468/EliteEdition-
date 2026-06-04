@@ -698,17 +698,8 @@ async function fetchMissingProduct(req, res) {
     const querySKU = req.query.itemSKUCode || req.body.itemSKUCode;
     
     if (querySKU) {
-      // Check if product base SKU exists, and whether the variation is present
-      const parts = querySKU.split('_');
-      const baseSku = parts[0];
-      const variation = parts[1];
-      
-      const exists = await db.Product.findOne({ skuCode: baseSku });
-      if (!exists) {
-        missingSKUs = [querySKU];
-      } else if (variation && (!exists.size || !exists.size.includes(variation))) {
-        missingSKUs = [querySKU];
-      }
+      // If a specific SKU code is requested, always fetch and update it to keep it fresh
+      missingSKUs = [querySKU];
     } else {
       // Fallback: Scan database for missing SKUs or sizes
       console.log('Scanning database for missing SKUs...');
