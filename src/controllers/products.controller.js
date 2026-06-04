@@ -736,31 +736,12 @@ async function fetchMissingProduct(req, res) {
       // If a specific SKU code is requested, always fetch and update it to keep it fresh
       missingSKUs = [querySKU];
     } else {
-      // Fallback: Scan database for missing SKUs or sizes
-      console.log('Scanning database for missing SKUs...');
+      // Fallback: Scan database for all unique SKU codes in sale_orders
+      console.log('Scanning database for all unique SKU codes...');
       const salesOrders = await db.SaleOrder.find({}, { itemSKUCode: 1 }).lean();
-      const products = await db.Product.find({}, { skuCode: 1, size: 1 }).lean();
-      
-      const productMap = new Map();
-      products.forEach((p) => {
-        productMap.set(p.skuCode, p.size || []);
-      });
-      
-      const missingSet = new Set();
-      for (const order of salesOrders) {
-        if (!order.itemSKUCode) continue;
-        const parts = order.itemSKUCode.split('_');
-        const baseSku = parts[0];
-        const variation = parts[1];
-        
-        const existingSizes = productMap.get(baseSku);
-        if (!existingSizes) {
-          missingSet.add(order.itemSKUCode);
-        } else if (variation && !existingSizes.includes(variation)) {
-          missingSet.add(order.itemSKUCode);
-        }
-      }
-      missingSKUs = Array.from(missingSet);
+      missingSKUs = [
+        ...new Set(salesOrders.map((order) => order.itemSKUCode).filter(Boolean)),
+      ];
     }
     
     console.log(`Missing SKUs to fetch:`, missingSKUs);
