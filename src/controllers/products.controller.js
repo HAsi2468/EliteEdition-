@@ -639,12 +639,47 @@ const runBackgroundImport = async (missingSKUs, accessToken) => {
       // Fire Search Item(s) API with body { productCode: "ItemSKUCode" }
       const { elements } = await fetchProductData(skuCode, accessToken);
       if (elements && elements.length > 0) {
+        const productInfo = elements[0];
+        
         // Find associated orderDate if possible
         const foundOrder = salesOrders.find(o => o.itemSKUCode === skuCode);
-        elements[0].orderDate = foundOrder ? foundOrder.orderDate : new Date();
+        productInfo.orderDate = foundOrder ? foundOrder.orderDate : new Date();
         
-        allProductsMap.set(skuCode, elements[0]);
+        allProductsMap.set(skuCode, productInfo);
         console.log(`[Background] Successfully fetched details for SKU: ${skuCode}`);
+        
+        // 1. Update matching sale_orders
+        const saleOrderUpdate = {};
+        if (productInfo.name) saleOrderUpdate.itemTypeName = productInfo.name;
+        if (productInfo.color) saleOrderUpdate.itemTypeColor = productInfo.color;
+        if (productInfo.size) saleOrderUpdate.itemTypeSize = productInfo.size;
+        if (productInfo.brand) saleOrderUpdate.itemTypeBrand = productInfo.brand;
+        if (productInfo.price !== undefined && productInfo.price !== null) {
+          saleOrderUpdate.mrp = String(productInfo.price);
+        }
+        if (productInfo.weight !== undefined && productInfo.weight !== null) {
+          saleOrderUpdate.weight = String(productInfo.weight);
+        }
+        
+        if (Object.keys(saleOrderUpdate).length > 0) {
+          const resSO = await db.SaleOrder.updateMany({ itemSKUCode: skuCode }, { $set: saleOrderUpdate });
+          console.log(`[Background] Updated ${resSO.modifiedCount} sale_orders for SKU: ${skuCode}`);
+        }
+        
+        // 2. Update matching salesList
+        const salesListUpdate = {};
+        if (productInfo.color) salesListUpdate.itemTypeColor = productInfo.color;
+        if (productInfo.brand) salesListUpdate.itemTypeBrand = productInfo.brand;
+        if (productInfo.size) salesListUpdate.itemTypeSize = productInfo.size;
+        if (productInfo.imageUrl) salesListUpdate.productImage = productInfo.imageUrl;
+        if (productInfo.price !== undefined && productInfo.price !== null) {
+          salesListUpdate.mrp = String(productInfo.price);
+        }
+        
+        if (Object.keys(salesListUpdate).length > 0) {
+          const resSL = await db.SalesList.updateMany({ itemSKUCode: skuCode }, { $set: salesListUpdate });
+          console.log(`[Background] Updated ${resSL.modifiedCount} salesList entries for SKU: ${skuCode}`);
+        }
       } else {
         console.warn(`[Background] No product elements found for SKU: ${skuCode}`);
       }
