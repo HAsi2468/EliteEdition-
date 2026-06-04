@@ -12,7 +12,9 @@ router.route('/fetchFromAPIS').get(productsController.fetchFromAPIS);
 router.route('/get_sku_details').get(productsController.searchBySku);
 router.route('/report').get(productsController.fetchSalesReport);
 
-router.route('/fetchMissingProduct').get(productsController.fetchMissingProduct)
+router.route('/fetchMissingProduct')
+  .get(productsController.fetchMissingProduct)
+  .post(productsController.fetchMissingProduct);
 // router.route('/update').get(productsController.updateSaleCount);
 // router.route('/delete').get(productsController.deletaAllProduct);
 // router.route('/skim').get(productsController.deleteDuplicateProducts)

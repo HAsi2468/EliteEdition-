@@ -618,112 +618,159 @@ async function deleteDuplicateProducts(req, res) {
   }
 }
 
-async function fetchMissingProduct(req, res) {
-  try {
-    const CHUNK_SIZE = 800; // Define chunk size
-    const splitData = (data, size) => {
-      const chunks = [];
-      for (let i = 0; i < data.length; i += size) {
-        chunks.push(data.slice(i, i + size));
-      }
-      return chunks;
-    };
-
-    console.log('Fetching sales orders...');
-    const salesOrders = await db.SaleOrder.find({}, { itemTypeName: 1, orderDate: 1 }).lean();
-    console.log(`Fetched ${salesOrders.length} sales orders.`);
-
-    console.log('Fetching products...');
-    const products = await db.Product.find({}, { skuCode: 1, size: 1 }).lean();
-    console.log(`Fetched ${products.length} products.`);
-
-    const saleOrderSKUs = [
-      ...new Set(salesOrders.map((order) => order.itemTypeName.split('_')[0])),
-    ];
-    const productSKUs = products.map((product) => product.skuCode);
-
-    const missingSKUs = saleOrderSKUs.filter(
-      (sku) => !productSKUs.includes(sku)
-    );
-    console.log(`Identified ${missingSKUs.length} missing SKUs.`);
-
-    let accessToken;
-    try {
-      console.log('Retrieving access token...');
-      accessToken = await getAccessToken();
-      console.log('Access token retrieved.');
-    } catch (err) {
-      console.error('Failed to retrieve access token:', err);
-      return res.status(500).send('Authentication Error');
+const runBackgroundImport = async (missingSKUs, accessToken) => {
+  const CHUNK_SIZE = 800;
+  const splitData = (data, size) => {
+    const chunks = [];
+    for (let i = 0; i < data.length; i += size) {
+      chunks.push(data.slice(i, i + size));
     }
-
-    const allProductsMap = new Map();
-    const fetchedSize = [];
-    const fetchProductDetails = async () => {
-      console.log('Fetching product details for missing SKUs...');
-      for (const order of salesOrders) {
-        const [skuCode, size] = order.itemTypeName.split('_');
-        if (
-          missingSKUs.includes(skuCode) &&
-          !fetchedSize.includes(`${skuCode}_${size}`)
-        ) {
-          try {
-            fetchedSize.push(`${skuCode}_${size}`);
-            const { elements } = await fetchProductData(
-              `${skuCode}_${size}`,
-              accessToken
-            );
-            if (elements.length > 0) {
-              elements[0].orderDate = salesOrders.find(
-                (e) => e.itemTypeName.split('_')[0] === skuCode
-              ).orderDate;
-              allProductsMap.set(skuCode, elements[0]);
-              console.log(`Fetched product data for ${skuCode}_${size}.`);
-            }
-          } catch (fetchError) {
-            console.error(
-              `Failed to fetch product data for ${skuCode}_${size}:`,
-              fetchError
-            );
-          }
-        }
+    return chunks;
+  };
+  
+  console.log(`[Background] Starting product fetch for ${missingSKUs.length} SKUs...`);
+  const allProductsMap = new Map();
+  
+  // To get orderDate, we can query the order associated with the SKU
+  const salesOrders = await db.SaleOrder.find({ itemSKUCode: { $in: missingSKUs } }, { itemSKUCode: 1, orderDate: 1 }).lean();
+  
+  for (const skuCode of missingSKUs) {
+    try {
+      // Fire Search Item(s) API with body { productCode: "ItemSKUCode" }
+      const { elements } = await fetchProductData(skuCode, accessToken);
+      if (elements && elements.length > 0) {
+        // Find associated orderDate if possible
+        const foundOrder = salesOrders.find(o => o.itemSKUCode === skuCode);
+        elements[0].orderDate = foundOrder ? foundOrder.orderDate : new Date();
+        
+        allProductsMap.set(skuCode, elements[0]);
+        console.log(`[Background] Successfully fetched details for SKU: ${skuCode}`);
+      } else {
+        console.warn(`[Background] No product elements found for SKU: ${skuCode}`);
       }
-    };
-
-    await fetchProductDetails();
-    const transformedProducts = transformProducts(
-      Array.from(allProductsMap.values())
-    );
-    const productChunks = splitData(transformedProducts, CHUNK_SIZE);
-
-    let totalAdded = 0;
-
-    for (const [index, chunk] of productChunks.entries()) {
-      console.log(
-        `Inserting Product chunk ${index + 1}/${productChunks.length}`
-      );
-      const operations = chunk.map((item) => ({
+    } catch (err) {
+      console.error(`[Background] Failed to fetch product details for SKU: ${skuCode}`, err.message);
+    }
+  }
+  
+  if (allProductsMap.size === 0) {
+    console.log('[Background] No new products retrieved to store.');
+    return;
+  }
+  
+  const transformedProducts = transformProducts(Array.from(allProductsMap.values()));
+  const productChunks = splitData(transformedProducts, CHUNK_SIZE);
+  
+  let totalAdded = 0;
+  for (const [index, chunk] of productChunks.entries()) {
+    console.log(`[Background] Inserting chunk ${index + 1}/${productChunks.length}`);
+    const operations = chunk.map((item) => {
+      const { size, color, ...rest } = item;
+      const updateDoc = { $set: rest };
+      
+      if (size && size.length > 0) {
+        updateDoc.$addToSet = updateDoc.$addToSet || {};
+        updateDoc.$addToSet.size = { $each: size };
+      }
+      if (color && color.length > 0) {
+        updateDoc.$addToSet = updateDoc.$addToSet || {};
+        updateDoc.$addToSet.color = { $each: color };
+      }
+      
+      return {
         updateOne: {
           filter: { skuCode: item.skuCode },
-          update: { $set: item },
+          update: updateDoc,
           upsert: true,
         },
-      }));
-      const result = await db.Product.bulkWrite(operations);
-      totalAdded += result.upsertedCount + result.modifiedCount;
-      console.log(`Processed records in chunk ${index + 1}.`);
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
+      };
+    });
+    const result = await db.Product.bulkWrite(operations);
+    totalAdded += result.upsertedCount + result.modifiedCount;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  console.log(`[Background] DB Import Complete! Added/Updated ${totalAdded} products.`);
+};
 
-    res.json({
+async function fetchMissingProduct(req, res) {
+  try {
+    let missingSKUs = [];
+    const querySKU = req.query.itemSKUCode || req.body.itemSKUCode;
+    
+    if (querySKU) {
+      // Check if product base SKU exists, and whether the variation is present
+      const parts = querySKU.split('_');
+      const baseSku = parts[0];
+      const variation = parts[1];
+      
+      const exists = await db.Product.findOne({ skuCode: baseSku });
+      if (!exists) {
+        missingSKUs = [querySKU];
+      } else if (variation && (!exists.size || !exists.size.includes(variation))) {
+        missingSKUs = [querySKU];
+      }
+    } else {
+      // Fallback: Scan database for missing SKUs or sizes
+      console.log('Scanning database for missing SKUs...');
+      const salesOrders = await db.SaleOrder.find({}, { itemSKUCode: 1 }).lean();
+      const products = await db.Product.find({}, { skuCode: 1, size: 1 }).lean();
+      
+      const productMap = new Map();
+      products.forEach((p) => {
+        productMap.set(p.skuCode, p.size || []);
+      });
+      
+      const missingSet = new Set();
+      for (const order of salesOrders) {
+        if (!order.itemSKUCode) continue;
+        const parts = order.itemSKUCode.split('_');
+        const baseSku = parts[0];
+        const variation = parts[1];
+        
+        const existingSizes = productMap.get(baseSku);
+        if (!existingSizes) {
+          missingSet.add(order.itemSKUCode);
+        } else if (variation && !existingSizes.includes(variation)) {
+          missingSet.add(order.itemSKUCode);
+        }
+      }
+      missingSKUs = Array.from(missingSet);
+    }
+    
+    console.log(`Missing SKUs to fetch:`, missingSKUs);
+    
+    if (missingSKUs.length === 0) {
+      return res.json({
+        message: 'No missing products found or specified product variation already exists.',
+        totalMissing: 0,
+        expectedTimeSeconds: 0
+      });
+    }
+    
+    // Calculate expected time: each Unicommerce SKU fetch takes ~0.4s
+    const expectedTimeSeconds = Math.ceil(missingSKUs.length * 0.4);
+    
+    // Retrieve access token to pass to the background function
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      return res.status(500).json({ error: 'Failed to retrieve access token from Unicommerce.' });
+    }
+    
+    // Launch the background process
+    runBackgroundImport(missingSKUs, accessToken).catch((err) => {
+      console.error('Error in background missing product import:', err);
+    });
+    
+    // Respond immediately with the expected duration!
+    return res.json({
+      message: 'Background fetch started.',
       totalMissing: missingSKUs.length,
-      totalProduct: productSKUs.length,
-      storedCsv: saleOrderSKUs.length,
-      totalAdded,
+      missingSKUs,
+      expectedTimeSeconds,
     });
   } catch (error) {
-    logger.error('Error fetching missing products: %o', error);
-    res.status(500).send('Internal Server Error');
+    logger.error('Error in fetchMissingProduct: %o', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 }
 
