@@ -31,6 +31,7 @@ const db = {
   SaleOrder: require('./saleOrder.model'),
   SalesList: require('./salesList.model'),
   Inventory: require('./inventory.model'),
+  Party: require('./party.model'),
   mongoose,
 };
 

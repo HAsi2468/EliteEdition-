@@ -37,6 +37,14 @@ const inventorySchema = new mongoose.Schema(
       required: true,
       default: 0,
     },
+    imageUrl: {
+      type: String,
+      default: '',
+    },
+    skuCode: {
+      type: String,
+      default: '',
+    },
   },
   {
     timestamps: {

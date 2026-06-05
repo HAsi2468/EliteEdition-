@@ -46,7 +46,15 @@ const getOrders = async (
       whereClause.skuCode = { $in: skuArray };
     }
     if (filters) {
+      if (filters.search) {
+        const searchRegex = new RegExp(filters.search, 'i');
+        whereClause.$or = [
+          { skuCode: searchRegex },
+          { description: searchRegex }
+        ];
+      }
       Object.keys(filters).forEach((filterKey) => {
+        if (filterKey === 'search') return;
         const filterValue = filters[filterKey];
         if (filterValue) {
           if (filterKey === 'color' || filterKey === 'size') {
@@ -88,13 +96,26 @@ const getAllProductsList = async (req, res) => {
     sortOrder,
     dateStart,
     dateEnd,
+    search,
   } = req.query;
 
   try {
-    const allData = await getOrders(page, limit, sortField, sortOrder, {
-      start: dateStart,
-      end: dateEnd,
-    });
+    const filters = {};
+    if (search) {
+      filters.search = search;
+    }
+    const allData = await getOrders(
+      page,
+      limit,
+      sortField,
+      sortOrder,
+      {
+        start: dateStart,
+        end: dateEnd,
+      },
+      null,
+      filters
+    );
     res.send(allData);
   } catch (error) {
     res.status(500).send({ message: 'somtheng went wrong' });

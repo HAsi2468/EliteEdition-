@@ -3,7 +3,7 @@ const logger = require('../config/logger');
 
 const createInventory = async (req, res) => {
   try {
-    const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty } = req.body;
+    const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode } = req.body;
     
     if (!party || !itemName || !size) {
       return res.status(400).json({ error: 'Party, Item Name, and Size are required' });
@@ -17,6 +17,8 @@ const createInventory = async (req, res) => {
       salePrice: salePrice || 0.0,
       purchasePrice: purchasePrice || 0.0,
       qty: qty || 0,
+      imageUrl: imageUrl || '',
+      skuCode: skuCode || '',
     });
 
     res.status(201).json(newItem);

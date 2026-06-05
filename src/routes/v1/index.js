@@ -6,6 +6,7 @@ const productRoute = require('./products.route');
 const filtersRoute = require('./filters.route');
 const sleasList = require('./salesList.route');
 const inventoryRoute = require('./inventory.route');
+const partyRoute = require('./party.route');
 const router = express.Router();
 
 router.use('/auth', authRoute);
@@ -15,5 +16,6 @@ router.use('/products', productRoute);
 router.use('/filters_value', filtersRoute);
 router.use('/salesList', sleasList);
 router.use('/inventory', inventoryRoute);
+router.use('/party', partyRoute);
 
 module.exports = router;
