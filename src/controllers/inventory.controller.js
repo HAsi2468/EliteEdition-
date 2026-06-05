@@ -3,6 +3,29 @@ const logger = require('../config/logger');
 
 const createInventory = async (req, res) => {
   try {
+    if (Array.isArray(req.body)) {
+      const itemsToCreate = req.body.map(item => {
+        const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode } = item;
+        if (!party || !itemName || !size) {
+          throw new Error('Party, Item Name, and Size are required for all bulk items');
+        }
+        return {
+          party,
+          itemName,
+          size,
+          currentlyAvailableStock: currentlyAvailableStock || 0,
+          salePrice: salePrice || 0.0,
+          purchasePrice: purchasePrice || 0.0,
+          qty: qty || 0,
+          imageUrl: imageUrl || '',
+          skuCode: skuCode || '',
+        };
+      });
+
+      const createdItems = await db.Inventory.insertMany(itemsToCreate);
+      return res.status(201).json(createdItems);
+    }
+
     const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode } = req.body;
     
     if (!party || !itemName || !size) {
