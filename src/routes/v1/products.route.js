@@ -20,6 +20,7 @@ router.route('/fetchMissingProduct')
   .post(productsController.fetchMissingProduct);
 
 router.route('/:id')
+  .put(productsController.updateProduct)
   .delete(productsController.deleteProduct);
 
 // router.route('/update').get(productsController.updateSaleCount);

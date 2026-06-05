@@ -1009,6 +1009,50 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+const updateProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { skuCode, description, imageUrl, size } = req.body;
+
+    const product = await db.Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    if (skuCode) {
+      const skuClean = skuCode.trim();
+      const existingProduct = await db.Product.findOne({ skuCode: skuClean, _id: { $ne: id } });
+      if (existingProduct) {
+        return res.status(400).json({ error: 'Product with this SKU code already exists' });
+      }
+      product.skuCode = skuClean;
+    }
+
+    if (description !== undefined) {
+      product.description = description;
+    }
+    if (imageUrl !== undefined) {
+      product.imageUrl = imageUrl;
+    }
+
+    if (size !== undefined) {
+      let sizeArray = [];
+      if (Array.isArray(size)) {
+        sizeArray = size;
+      } else if (typeof size === 'string') {
+        sizeArray = size.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      product.size = sizeArray;
+    }
+
+    await product.save();
+    res.json({ ...product.toObject(), id: product._id.toString() });
+  } catch (error) {
+    logger.error('Error updating product: %o', error);
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
+  }
+};
+
 module.exports = {
   getAllProductsList,
   fetchFromAPIS,
@@ -1023,4 +1067,6 @@ module.exports = {
   fetchBrandReport,
   createProduct,
   deleteProduct,
+  updateProduct,
 };
+
