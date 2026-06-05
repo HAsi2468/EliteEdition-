@@ -3,6 +3,8 @@ const productsController = require('../../controllers/products.controller');
 const { getSalseList } = require('../../controllers/salesList.controller');
 
 const router = express.Router();
+router.route('/')
+  .post(productsController.createProduct);
 router.route('/list').get(productsController.getAllProductsList);
 // router.route('/get_orders').get(productsController.getProductsSales);
 router.route('/get_orders').get(getSalseList);

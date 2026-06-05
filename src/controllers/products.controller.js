@@ -961,6 +961,40 @@ async function fetchBrandReport(req, res) {
   }
 }
 
+const createProduct = async (req, res) => {
+  try {
+    const { skuCode, description, imageUrl, size } = req.body;
+
+    if (!skuCode) {
+      return res.status(400).json({ error: 'SKU code is required' });
+    }
+
+    const existingProduct = await db.Product.findOne({ skuCode: skuCode.trim() });
+    if (existingProduct) {
+      return res.status(400).json({ error: 'Product with this SKU code already exists' });
+    }
+
+    let sizeArray = [];
+    if (Array.isArray(size)) {
+      sizeArray = size;
+    } else if (typeof size === 'string') {
+      sizeArray = size.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    const newProduct = await db.Product.create({
+      skuCode: skuCode.trim(),
+      description: description || '',
+      imageUrl: imageUrl || '',
+      size: sizeArray,
+    });
+
+    res.status(201).json({ ...newProduct.toObject(), id: newProduct._id.toString() });
+  } catch (error) {
+    logger.error('Error creating product: %o', error);
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
+  }
+};
+
 module.exports = {
   getAllProductsList,
   fetchFromAPIS,
@@ -973,4 +1007,5 @@ module.exports = {
   updateSaleCount,
   fetchMissingProduct,
   fetchBrandReport,
+  createProduct,
 };
