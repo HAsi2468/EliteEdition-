@@ -183,7 +183,7 @@ function convertKeysV2(jsonData) {
 const transformProducts = (products) => {
   const groupedProducts = {};
 
-  products.forEach(({ skuCode, color, ...product }) => {
+  products.forEach(({ skuCode, color, size, ...product }) => {
     try {
       const [baseSkuCode, variation] = skuCode.split('_');
 
