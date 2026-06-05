@@ -1,4 +1,4 @@
-const httpStatus = require('http-status');
+const httpStatus = require('http-status').default;
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/ApiError');
 const { userService } = require('../services');

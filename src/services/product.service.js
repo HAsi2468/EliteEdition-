@@ -23,6 +23,7 @@ const fetchSalesReportData = async (whereClause) => {
         $group: {
           _id: '$skuName',
           salesCount: { $sum: 1 },
+          itemTypeBrand: { $first: '$itemTypeBrand' },
         },
       },
       {
@@ -30,6 +31,7 @@ const fetchSalesReportData = async (whereClause) => {
           _id: 0,
           skuName: '$_id',
           salesCount: 1,
+          itemTypeBrand: 1,
         },
       },
     ];
@@ -57,6 +59,8 @@ const fetchSalesReportData = async (whereClause) => {
           },
           maxOrderDate: { $max: '$orderDate' },
           salesCount: { $sum: 1 },
+          skuName: { $first: '$skuName' },
+          itemTypeBrand: { $first: '$itemTypeBrand' },
         },
       },
       {
@@ -65,6 +69,8 @@ const fetchSalesReportData = async (whereClause) => {
           itemSKUCode: '$_id',
           sellableAmount: 1,
           salesCount: 1,
+          skuName: 1,
+          itemTypeBrand: 1,
           orderDate: {
             $dateToString: {
               format: '%d/%m/%Y',

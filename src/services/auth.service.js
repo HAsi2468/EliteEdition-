@@ -1,4 +1,4 @@
-const httpStatus = require('http-status');
+const httpStatus = require('http-status').default;
 const userService = require('./user.service');
 const ApiError = require('../utils/ApiError');
 const { decryptData } = require('../utils/auth');

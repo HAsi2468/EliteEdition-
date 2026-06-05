@@ -701,7 +701,16 @@ const runBackgroundImport = async (missingSKUs, accessToken) => {
     console.log(`[Background] Inserting chunk ${index + 1}/${productChunks.length}`);
     const operations = chunk.map((item) => {
       const { size, color, ...rest } = item;
-      const updateDoc = { $set: rest };
+      
+      // Filter out null/undefined values to prevent overwriting existing populated DB fields with nulls
+      const cleanRest = {};
+      for (const key in rest) {
+        if (rest[key] !== null && rest[key] !== undefined) {
+          cleanRest[key] = rest[key];
+        }
+      }
+      
+      const updateDoc = { $set: cleanRest };
       
       if (size && size.length > 0) {
         updateDoc.$addToSet = updateDoc.$addToSet || {};
@@ -781,6 +790,156 @@ async function fetchMissingProduct(req, res) {
   }
 }
 
+async function fetchBrandReport(req, res) {
+  try {
+    const whereClause = buildWhereClause(req.query);
+    
+    // Multi-stage aggregation pipeline
+    const pipeline = [
+      { $match: whereClause },
+      // Step 1: Group by brand, base SKU, and size variation
+      {
+        $group: {
+          _id: {
+            brand: {
+              $cond: {
+                if: { $or: [ { $eq: ["$itemTypeBrand", ""] }, { $eq: [{ $ifNull: ["$itemTypeBrand", null] }, null] } ] },
+                then: "Unknown",
+                else: "$itemTypeBrand"
+              }
+            },
+            baseSku: {
+              $arrayElemAt: [
+                { $split: ["$itemSKUCode", "_"] },
+                0
+              ]
+            },
+            size: {
+              $cond: {
+                if: { $or: [ { $eq: ["$itemTypeSize", ""] }, { $eq: [{ $ifNull: ["$itemTypeSize", null] }, null] } ] },
+                then: "Unknown",
+                else: "$itemTypeSize"
+              }
+            }
+          },
+          quantity: { $sum: { $ifNull: ["$saleCount", 1] } },
+          sellableAmount: {
+            $sum: {
+              $multiply: [
+                { $ifNull: ["$saleCount", 1] },
+                {
+                  $convert: {
+                    input: "$totalPrice",
+                    to: "double",
+                    onError: 0.0,
+                    onNull: 0.0
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      // Step 2: Group by brand and base SKU to collect size variations
+      {
+        $group: {
+          _id: {
+            brand: "$_id.brand",
+            baseSku: "$_id.baseSku"
+          },
+          variations: {
+            $push: {
+              size: "$_id.size",
+              quantity: "$quantity",
+              sellableAmount: "$sellableAmount"
+            }
+          },
+          skuQuantity: { $sum: "$quantity" },
+          skuSellableAmount: { $sum: "$sellableAmount" }
+        }
+      },
+      // Step 3: Group by brand to collect all products/SKUs
+      {
+        $group: {
+          _id: "$_id.brand",
+          products: {
+            $push: {
+              sku: "$_id.baseSku",
+              total: "$skuQuantity",
+              sellableAmount: "$skuSellableAmount",
+              variations: "$variations"
+            }
+          },
+          brandQuantity: { $sum: "$skuQuantity" },
+          brandSellableAmount: { $sum: "$skuSellableAmount" }
+        }
+      },
+      // Step 4: Sort brands alphabetically
+      { $sort: { _id: 1 } }
+    ];
+    
+    const aggregatedBrands = await db.SalesList.aggregate(pipeline);
+    
+    // Gather all base SKUs to fetch product images
+    const baseSkus = [];
+    aggregatedBrands.forEach(b => {
+      b.products.forEach(p => {
+        if (p.sku) baseSkus.push(p.sku);
+      });
+    });
+    
+    const productImagesMap = await fetchProductImages(baseSkus);
+    
+    // Populate image URLs and format final response
+    let totalOrderQuantity = 0;
+    let totalSellableAmount = 0;
+    
+    const formattedBrands = aggregatedBrands.map(b => {
+      totalOrderQuantity += b.brandQuantity;
+      totalSellableAmount += b.brandSellableAmount;
+      
+      return {
+        brand: b._id,
+        totalOrderQuantity: b.brandQuantity,
+        totalSellableAmount: Number(b.brandSellableAmount.toFixed(2)),
+        products: b.products.map(p => {
+          // Sort variations by size code for cleaner presentation
+          p.variations.sort((v1, v2) => v1.size.localeCompare(v2.size));
+          
+          return {
+            sku: p.sku,
+            imageUrl: productImagesMap[p.sku] || null,
+            total: p.total,
+            averageCount: p.total > 0 ? Number((p.total / p.variations.length).toFixed(2)) : 0,
+            sellableAmount: Number(p.sellableAmount.toFixed(2)),
+            variations: p.variations.map(v => ({
+              size: v.size,
+              quantity: v.quantity,
+              sellableAmount: Number(v.sellableAmount.toFixed(2))
+            }))
+          };
+        })
+      };
+    });
+    
+    // Format report date string
+    const reportDate = req.query.dateStart 
+      ? (req.query.dateEnd ? `${req.query.dateStart} to ${req.query.dateEnd}` : req.query.dateStart)
+      : new Date().toISOString().split('T')[0];
+      
+    res.json({
+      reportDate,
+      totalOrderQuantity,
+      totalSellableAmount: Number(totalSellableAmount.toFixed(2)),
+      brands: formattedBrands
+    });
+    
+  } catch (error) {
+    logger.error('Error generating brand report: %o', error);
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
+  }
+}
+
 module.exports = {
   getAllProductsList,
   fetchFromAPIS,
@@ -792,4 +951,5 @@ module.exports = {
   deleteDuplicateProducts,
   updateSaleCount,
   fetchMissingProduct,
+  fetchBrandReport,
 };

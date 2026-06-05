@@ -1,5 +1,5 @@
 const Joi = require('@hapi/joi');
-const httpStatus = require('http-status');
+const httpStatus = require('http-status').default;
 const pick = require('../utils/pick');
 const ApiError = require('../utils/ApiError');
 

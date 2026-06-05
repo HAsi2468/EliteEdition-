@@ -1,4 +1,4 @@
-const httpStatus = require('http-status');
+const httpStatus = require('http-status').default;
 const { getOffset } = require('../utils/query');
 const ApiError = require('../utils/ApiError');
 const { encryptData } = require('../utils/auth');

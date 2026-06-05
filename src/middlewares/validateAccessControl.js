@@ -1,4 +1,4 @@
-const httpStatus = require('http-status');
+const httpStatus = require('http-status').default;
 const { roles } = require('../config/roles');
 const ApiError = require('../utils/ApiError');
 

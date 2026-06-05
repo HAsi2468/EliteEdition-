@@ -194,10 +194,17 @@ const transformProducts = (products) => {
           size: new Set(),
           color: new Set(),
         };
+      } else {
+        // Merge non-null and non-empty properties from other variations
+        for (const key in product) {
+          if (product[key] !== null && product[key] !== undefined && product[key] !== '') {
+            groupedProducts[baseSkuCode][key] = product[key];
+          }
+        }
       }
 
-      groupedProducts[baseSkuCode].size.add(variation);
-      groupedProducts[baseSkuCode].color.add(color);
+      if (variation) groupedProducts[baseSkuCode].size.add(variation);
+      if (color) groupedProducts[baseSkuCode].color.add(color);
     } catch (error) {
       console.debug('Error processing product:', error);
     }
