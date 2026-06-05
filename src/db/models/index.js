@@ -30,6 +30,7 @@ const db = {
   Product: require('./product.model'),
   SaleOrder: require('./saleOrder.model'),
   SalesList: require('./salesList.model'),
+  Inventory: require('./inventory.model'),
   mongoose,
 };
 
