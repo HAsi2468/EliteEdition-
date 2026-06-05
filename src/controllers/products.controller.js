@@ -995,6 +995,20 @@ const createProduct = async (req, res) => {
   }
 };
 
+const deleteProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedProduct = await db.Product.findByIdAndDelete(id);
+    if (!deletedProduct) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    res.json({ message: 'Product deleted successfully', id });
+  } catch (error) {
+    logger.error('Error deleting product: %o', error);
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
+  }
+};
+
 module.exports = {
   getAllProductsList,
   fetchFromAPIS,
@@ -1008,4 +1022,5 @@ module.exports = {
   fetchMissingProduct,
   fetchBrandReport,
   createProduct,
+  deleteProduct,
 };

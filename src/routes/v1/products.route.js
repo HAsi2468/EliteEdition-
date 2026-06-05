@@ -18,6 +18,10 @@ router.route('/brandReport').get(productsController.fetchBrandReport);
 router.route('/fetchMissingProduct')
   .get(productsController.fetchMissingProduct)
   .post(productsController.fetchMissingProduct);
+
+router.route('/:id')
+  .delete(productsController.deleteProduct);
+
 // router.route('/update').get(productsController.updateSaleCount);
 // router.route('/delete').get(productsController.deletaAllProduct);
 // router.route('/skim').get(productsController.deleteDuplicateProducts)
