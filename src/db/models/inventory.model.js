@@ -45,6 +45,10 @@ const inventorySchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    date: {
+      type: Date,
+      default: Date.now,
+    },
   },
   {
     timestamps: {

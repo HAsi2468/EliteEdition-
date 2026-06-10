@@ -27,7 +27,7 @@ const createParty = async (req, res) => {
   }
 };
 
-const getParties = async (req, res) => {
+const getPartys = async (req, res) => {
   try {
     const { search } = req.query;
     const whereClause = {};
@@ -36,13 +36,13 @@ const getParties = async (req, res) => {
       whereClause.name = new RegExp(search, 'i');
     }
 
-    const parties = await db.Party.find(whereClause)
+    const partys = await db.Party.find(whereClause)
       .sort({ name: 1 })
       .lean();
 
-    res.json(parties.map(p => ({ ...p, id: p._id.toString() })));
+    res.json(partys.map(p => ({ ...p, id: p._id.toString() })));
   } catch (error) {
-    logger.error('Error fetching parties: %o', error);
+    logger.error('Error fetching partys: %o', error);
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 };
@@ -96,7 +96,7 @@ const deleteParty = async (req, res) => {
 
 module.exports = {
   createParty,
-  getParties,
+  getPartys,
   updateParty,
   deleteParty,
 };

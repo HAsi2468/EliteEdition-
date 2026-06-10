@@ -5,7 +5,7 @@ const router = express.Router();
 
 router.route('/')
   .post(partyController.createParty)
-  .get(partyController.getParties);
+  .get(partyController.getPartys);
 
 router.route('/:id')
   .put(partyController.updateParty)

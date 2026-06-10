@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const partySchema = new mongoose.Schema(
+const vendorSchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -24,9 +24,9 @@ const partySchema = new mongoose.Schema(
       createdAt: 'created_date_time',
       updatedAt: 'modified_date_time',
     },
-    collection: 'partys',
+    collection: 'vendors',
   }
 );
 
-const Party = mongoose.model('Party', partySchema);
-module.exports = Party;
+const Vendor = mongoose.model('Vendor', vendorSchema);
+module.exports = Vendor;
