@@ -28,12 +28,12 @@ mongoose.connect(config.mongoose.url, {
 const db = {
   user: require('./user.model'),
   Product: require('./product.model'),
+  InventoryProduct: require('./inventoryProduct.model'),
   SaleOrder: require('./saleOrder.model'),
   SalesList: require('./salesList.model'),
   Inventory: require('./inventory.model'),
   Vendor: require('./vendor.model'),
   Party: require('./party.model'),
-  DeliveryPartner: require('./deliveryPartner.model'),
   StockOut: require('./stockOut.model'),
   mongoose,
 };

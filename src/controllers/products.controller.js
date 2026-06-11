@@ -21,7 +21,8 @@ const getOrders = async (
   sortOrder,
   dateRange,
   skuCode = null,
-  filters
+  filters,
+  useInventoryTable = false
 ) => {
   try {
     const offset = (page - 1) * pageSize;
@@ -74,7 +75,8 @@ const getOrders = async (
       });
     }
 
-    const products = await db.Product.find(whereClause)
+    const collection = useInventoryTable ? db.InventoryProduct : db.Product;
+    const products = await collection.find(whereClause)
       .sort(sortClause)
       .skip(offset)
       .limit(limit)
@@ -114,7 +116,8 @@ const getAllProductsList = async (req, res) => {
         end: dateEnd,
       },
       null,
-      filters
+      filters,
+      true // useInventoryTable
     );
     res.send(allData);
   } catch (error) {
@@ -223,20 +226,45 @@ const readFile = async (url, accesstoken) => {
     logger.info(`Inserting Product chunk ${index + 1}/${productChunks.length}`);
     const skus = chunk.map(item => item.skuCode).filter(Boolean);
     logger.info(`Products (SKUs) to process in this chunk: ${skus.slice(0, 5).join(', ')}${skus.length > 5 ? `... (+${skus.length - 5} more)` : ''}`);
-    const operations = chunk.map((item) => ({
+    
+    // 1. Sync exact variations to InventoryProduct
+    const inventoryOperations = chunk.map((item) => ({
       updateOne: {
         filter: { skuCode: item.skuCode },
         update: { $set: item },
         upsert: true,
       },
     }));
-    const res = await db.Product.bulkWrite(operations);
+    await db.InventoryProduct.bulkWrite(inventoryOperations);
+
+    // 2. Sync grouped base SKUs to Product
+    const productOperations = chunk.map((item) => {
+      const baseSku = item.skuCode.split('_')[0];
+      const sizeToPush = item.size && item.size.length > 0 ? item.size[0] : null;
+      
+      const updateDoc = {
+        $setOnInsert: { ...item, skuCode: baseSku, size: [] }
+      };
+      if (sizeToPush) {
+        updateDoc.$addToSet = { size: sizeToPush };
+      }
+
+      return {
+        updateOne: {
+          filter: { skuCode: baseSku },
+          update: updateDoc,
+          upsert: true,
+        },
+      };
+    });
+    const res = await db.Product.bulkWrite(productOperations);
+
     totalProductsStored += (res ? res.upsertedCount + res.modifiedCount : chunk.length);
     if (res) {
       logger.info(`📝 Product Chunk Result: ${res.upsertedCount} newly added (upserted), ${res.modifiedCount} updated (modified)`);
     }
   }
-  logger.info(`📊 Database Status: Stored/Upserted ${totalProductsStored} documents into db.Product.`);
+  logger.info(`📊 Database Status: Stored/Upserted ${totalProductsStored} documents into db.Product and db.InventoryProduct.`);
 
   const elapsedSec = ((Date.now() - bgStartTime) / 1000).toFixed(2);
   logger.info(`[⏱️] Background DB Import completed in ${elapsedSec} seconds!`);
@@ -652,8 +680,8 @@ const runBackgroundImport = async (missingSKUs, accessToken) => {
   console.log(`[Background] Starting product fetch for ${missingSKUs.length} SKUs...`);
   const allProductsMap = new Map();
   
-  // To get orderDate, we can query the order associated with the SKU
-  const salesOrders = await db.SaleOrder.find({ itemSKUCode: { $in: missingSKUs } }, { itemSKUCode: 1, orderDate: 1 }).lean();
+  // To get orderDate and itemTypeName, we query the order associated with the SKU
+  const salesOrders = await db.SaleOrder.find({ itemSKUCode: { $in: missingSKUs } }, { itemSKUCode: 1, orderDate: 1, itemTypeName: 1 }).lean();
   
   for (const skuCode of missingSKUs) {
     try {
@@ -662,14 +690,23 @@ const runBackgroundImport = async (missingSKUs, accessToken) => {
       if (elements && elements.length > 0) {
         const productInfo = elements[0];
         
-        // Find associated orderDate if possible
+        // Find associated order
         const foundOrder = salesOrders.find(o => o.itemSKUCode === skuCode);
         productInfo.orderDate = foundOrder ? foundOrder.orderDate : new Date();
+        
+        // Use itemTypeName for product name if it exists
+        if (foundOrder && foundOrder.itemTypeName) {
+          productInfo.description = foundOrder.itemTypeName;
+        } else if (productInfo.name) {
+          productInfo.description = productInfo.name;
+        }
         
         allProductsMap.set(skuCode, productInfo);
         console.log(`[Background] Successfully fetched details for SKU: ${skuCode}`);
         
         // 1. Update matching sale_orders
+        // COMMENTED OUT as per user request to NOT change sale_order table
+        /*
         const saleOrderUpdate = {};
         if (productInfo.name) saleOrderUpdate.itemTypeName = productInfo.name;
         if (productInfo.color) saleOrderUpdate.itemTypeColor = productInfo.color;
@@ -686,6 +723,7 @@ const runBackgroundImport = async (missingSKUs, accessToken) => {
           const resSO = await db.SaleOrder.updateMany({ itemSKUCode: skuCode }, { $set: saleOrderUpdate });
           console.log(`[Background] Updated ${resSO.modifiedCount} sale_orders for SKU: ${skuCode}`);
         }
+        */
         
         // 2. Update matching salesList
         const salesListUpdate = {};
@@ -966,12 +1004,7 @@ const createProduct = async (req, res) => {
     const { skuCode, description, imageUrl, size } = req.body;
 
     if (!skuCode) {
-      return res.status(400).json({ error: 'SKU code is required' });
-    }
-
-    const existingProduct = await db.Product.findOne({ skuCode: skuCode.trim() });
-    if (existingProduct) {
-      return res.status(400).json({ error: 'Product with this SKU code already exists' });
+      return res.status(400).json({ error: 'skuCode is required' });
     }
 
     let sizeArray = [];
@@ -981,16 +1014,21 @@ const createProduct = async (req, res) => {
       sizeArray = size.split(',').map(s => s.trim()).filter(Boolean);
     }
 
-    const newProduct = await db.Product.create({
+    const newProduct = await db.InventoryProduct.create({
       skuCode: skuCode.trim(),
-      description: description || '',
-      imageUrl: imageUrl || '',
+      description,
+      imageUrl,
       size: sizeArray,
+      enabled: true,
+      skuType: 'GOODS',
     });
 
     res.status(201).json({ ...newProduct.toObject(), id: newProduct._id.toString() });
   } catch (error) {
     logger.error('Error creating product: %o', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ error: 'Product with this skuCode already exists' });
+    }
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 };
@@ -998,11 +1036,11 @@ const createProduct = async (req, res) => {
 const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const deletedProduct = await db.Product.findByIdAndDelete(id);
-    if (!deletedProduct) {
+    const deleted = await db.InventoryProduct.findByIdAndDelete(id);
+    if (!deleted) {
       return res.status(404).json({ error: 'Product not found' });
     }
-    res.json({ message: 'Product deleted successfully', id });
+    res.json({ message: 'Product deleted successfully', id: deleted._id.toString() });
   } catch (error) {
     logger.error('Error deleting product: %o', error);
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
@@ -1014,7 +1052,7 @@ const updateProduct = async (req, res) => {
     const { id } = req.params;
     const { skuCode, description, imageUrl, size } = req.body;
 
-    const product = await db.Product.findById(id);
+    const product = await db.InventoryProduct.findById(id);
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
@@ -1053,6 +1091,78 @@ const updateProduct = async (req, res) => {
   }
 };
 
+const instantSyncFromSaleOrders = async (req, res) => {
+  try {
+    const salesOrders = await db.SaleOrder.aggregate([
+      {
+        $group: {
+          _id: "$itemSKUCode",
+          size: { $first: "$itemTypeSize" },
+          description: { $first: "$itemTypeName" }
+        }
+      }
+    ]);
+
+    let added = 0;
+    let updated = 0;
+
+    for (const order of salesOrders) {
+      if (!order._id) continue;
+      const skuCode = order._id.trim();
+
+      const sizeArray = order.size ? [order.size] : [];
+
+      // 1. Sync to InventoryProduct (Exact Variations)
+      const existingInvProduct = await db.InventoryProduct.findOne({ skuCode });
+      if (existingInvProduct) {
+        let changed = false;
+        if (sizeArray.length > 0 && !existingInvProduct.size.includes(sizeArray[0])) {
+           existingInvProduct.size.push(sizeArray[0]);
+           changed = true;
+        }
+        if (changed) {
+           await existingInvProduct.save();
+        }
+      } else {
+        await db.InventoryProduct.create({
+          skuCode: skuCode,
+          description: order.description || skuCode,
+          size: sizeArray,
+          imageUrl: ""
+        });
+      }
+
+      // 2. Sync to Product (Grouped base SKU)
+      const baseSku = skuCode.split('_')[0];
+      const existingProduct = await db.Product.findOne({ skuCode: baseSku });
+      if (existingProduct) {
+        let changed = false;
+        if (sizeArray.length > 0 && !existingProduct.size.includes(sizeArray[0])) {
+           existingProduct.size.push(sizeArray[0]);
+           changed = true;
+        }
+        if (changed) {
+           await existingProduct.save();
+           updated++;
+        }
+      } else {
+        await db.Product.create({
+          skuCode: baseSku,
+          description: order.description || baseSku,
+          size: sizeArray,
+          imageUrl: ""
+        });
+        added++;
+      }
+    }
+
+    res.json({ message: `Instant Sync Complete. Added: ${added}, Updated: ${updated}`, success: true });
+  } catch (error) {
+    logger.error('Error in instantSyncFromSaleOrders: %o', error);
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
+  }
+};
+
 module.exports = {
   getAllProductsList,
   fetchFromAPIS,
@@ -1068,5 +1178,6 @@ module.exports = {
   createProduct,
   deleteProduct,
   updateProduct,
+  instantSyncFromSaleOrders,
 };
 

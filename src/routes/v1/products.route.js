@@ -19,12 +19,16 @@ router.route('/fetchMissingProduct')
   .get(productsController.fetchMissingProduct)
   .post(productsController.fetchMissingProduct);
 
+router.route('/instantSyncFromSaleOrders')
+  .get(productsController.instantSyncFromSaleOrders)
+  .post(productsController.instantSyncFromSaleOrders);
+
 router.route('/:id')
   .put(productsController.updateProduct)
   .delete(productsController.deleteProduct);
 
 // router.route('/update').get(productsController.updateSaleCount);
-// router.route('/delete').get(productsController.deletaAllProduct);
+router.route('/delete').get(productsController.deletaAllProduct);
 // router.route('/skim').get(productsController.deleteDuplicateProducts)
 
 module.exports = router;

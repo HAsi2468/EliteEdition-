@@ -3,10 +3,10 @@ const logger = require('../config/logger');
 
 const createStockOut = async (req, res) => {
   try {
-    const { skuCode, party, deliveryPartner, qtyOut } = req.body;
+    const { skuCode, party, qtyOut } = req.body;
     
-    if (!skuCode || !party || !deliveryPartner) {
-      return res.status(400).json({ error: 'skuCode, party, and deliveryPartner are required' });
+    if (!skuCode || !party) {
+      return res.status(400).json({ error: 'skuCode and party are required' });
     }
 
     const qty = qtyOut || 1;
@@ -29,7 +29,6 @@ const createStockOut = async (req, res) => {
     const stockOutLog = await db.StockOut.create({
       skuCode,
       party,
-      deliveryPartner,
       qtyOut: qty,
     });
 

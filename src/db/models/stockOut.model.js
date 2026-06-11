@@ -11,10 +11,6 @@ const stockOutSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    deliveryPartner: {
-      type: String,
-      required: true,
-    },
     qtyOut: {
       type: Number,
       required: true,

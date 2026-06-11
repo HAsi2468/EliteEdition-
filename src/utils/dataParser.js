@@ -181,46 +181,13 @@ function convertKeysV2(jsonData) {
   });
 }
 const transformProducts = (products) => {
-  const groupedProducts = {};
-
-  products.forEach(({ skuCode, color, size, ...product }) => {
-    try {
-      const [baseSkuCode, variation] = skuCode.split('_');
-
-      if (!groupedProducts[baseSkuCode]) {
-        groupedProducts[baseSkuCode] = {
-          ...product,
-          skuCode: baseSkuCode,
-          size: new Set(),
-          color: new Set(),
-        };
-      } else {
-        // Merge non-null and non-empty properties from other variations
-        for (const key in product) {
-          if (product[key] !== null && product[key] !== undefined && product[key] !== '') {
-            groupedProducts[baseSkuCode][key] = product[key];
-          }
-        }
-      }
-
-      if (variation) groupedProducts[baseSkuCode].size.add(variation);
-      if (color) groupedProducts[baseSkuCode].color.add(color);
-    } catch (error) {
-      console.debug('Error processing product:', error);
-    }
+  return products.map(({ skuCode, color, size, ...product }) => {
+    return {
+      ...product,
+      skuCode: skuCode,
+      size: size ? [size] : [],
+      color: color ? [color] : [],
+    };
   });
-
-  return Object.values(
-    Object.fromEntries(
-      Object.entries(groupedProducts).map(([key, product]) => [
-        key,
-        {
-          ...product,
-          size: Array.from(product.size),
-          color: Array.from(product.color),
-        },
-      ])
-    )
-  );
 };
 module.exports = { convertKeysToModelFields, transformProducts, convertKeysV2 };
