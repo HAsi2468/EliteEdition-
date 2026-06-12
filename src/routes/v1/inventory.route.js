@@ -5,6 +5,7 @@ const inventoryReportController = require('../../controllers/inventoryReport.con
 const router = express.Router();
 
 router.get('/report', inventoryReportController.getInventoryReport);
+router.get('/report/pdf', inventoryReportController.downloadInventoryReportPdf);
 
 router.route('/')
   .post(inventoryController.createInventory)
