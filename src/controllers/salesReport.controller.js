@@ -39,8 +39,8 @@ const fetchImageBuffer = async (imageUrl) => {
 // Light color palette
 // ─────────────────────────────────────────────────────────────
 const C = {
-  headerBg:     '#1E3A5F',   // deep navy for page header bar
-  headerText:   '#FFFFFF',
+  headerBg:     '#DBEAFE',   // page top banner (light blue)
+  headerText:   '#1E3A8A',   // dark blue text for readability
   tableBg:      '#EFF6FF',   // light blue table header
   tableText:    '#1E40AF',   // indigo table header text
   rowAlt:       '#F0F7FF',   // very light blue alternate row
@@ -72,14 +72,24 @@ const fmtN = (n) => Number(n || 0).toLocaleString('en-IN');
 // ─────────────────────────────────────────────────────────────
 const drawHeader = (doc, title, dateStr, page) => {
   doc.rect(0, 0, PAGE_W, 54).fill(C.headerBg);
+
+  // Logo drawing next to title
+  const path = require('path');
+  const logoPath = path.join(__dirname, 'Logo.png');
+  try {
+    doc.image(logoPath, MARGIN, 11, { width: 32, height: 32 });
+  } catch (err) {
+    logger.warn('Failed to draw logo: %s', err.message);
+  }
+
   doc.fillColor(C.headerText).font('Helvetica-Bold').fontSize(16)
-     .text('ELITE EDITION', MARGIN, 12, { characterSpacing: 0.8 });
-  doc.fillColor('#93C5FD').font('Helvetica').fontSize(9)
-     .text(title, MARGIN, 32);
-  doc.fillColor(C.headerText).font('Helvetica').fontSize(8)
+     .text(title, MARGIN + 42, 19);
+
+  doc.fillColor(C.headerText).font('Helvetica').fontSize(8.5)
      .text(dateStr, MARGIN, 14, { width: CW, align: 'right' });
-  doc.fillColor('#93C5FD').font('Helvetica').fontSize(7.5)
-     .text(`Page ${page}`, MARGIN, 32, { width: CW, align: 'right' });
+  doc.fillColor(C.headerText).font('Helvetica').fontSize(7.5)
+     .text(`Page ${page}`, MARGIN, 34, { width: CW, align: 'right' });
+
   // accent underline
   doc.rect(0, 54, PAGE_W, 2).fill(C.accentBlue);
 };
@@ -155,7 +165,11 @@ const downloadSalesReportPdf = async (req, res) => {
     const dateEndObj   = new Date(dateEnd);
     dateEndObj.setHours(23, 59, 59, 999);
 
+    const { searchCode } = req.query;
     const whereClause = { orderDate: { $gte: dateStartObj, $lte: dateEndObj } };
+    if (searchCode) {
+      whereClause.itemSKUCode = new RegExp(`^${searchCode}`, 'i');
+    }
     logger.info('Generating Sales PDF report %s → %s', dateStart, dateEnd);
 
     const salesData = await fetchSalesReportData(whereClause);
@@ -334,7 +348,11 @@ const downloadBrandReportPdf = async (req, res) => {
     logger.info('Generating Brand PDF report %s → %s', dateStart, dateEnd);
 
     // Aggregation (same as existing fetchBrandReport logic)
+    const { searchCode } = req.query;
     const whereClause = { orderDate: { $gte: dateStartObj, $lte: dateEndObj } };
+    if (searchCode) {
+      whereClause.itemSKUCode = new RegExp(`^${searchCode}`, 'i');
+    }
 
     const pipeline = [
       { $match: whereClause },
