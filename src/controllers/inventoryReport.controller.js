@@ -178,6 +178,29 @@ const downloadInventoryReportPdf = async (req, res) => {
 
     const reportData = await buildReportData(dateStart, dateEnd);
 
+    // Pre-fetch all images concurrently in chunks to optimize network calls
+    const uniqueUrls = new Set();
+    const collectUrls = (section) => {
+      if (section && section.items) {
+        section.items.forEach(item => {
+          if (item.imageUrl) uniqueUrls.add(item.imageUrl);
+        });
+      }
+    };
+    collectUrls(reportData.currentStock);
+    collectUrls(reportData.stockIn);
+    collectUrls(reportData.stockOut);
+
+    const imageCache = {};
+    const urls = Array.from(uniqueUrls);
+    const chunkSize = 20;
+    for (let i = 0; i < urls.length; i += chunkSize) {
+      const chunk = urls.slice(i, i + chunkSize);
+      await Promise.all(chunk.map(async (url) => {
+        imageCache[url] = await fetchImageBuffer(url);
+      }));
+    }
+
     const doc = new PDFDocument({ margin: 30, size: 'A4' });
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -253,7 +276,7 @@ const downloadInventoryReportPdf = async (req, res) => {
 
         // Image
         if (item.imageUrl) {
-          const buffer = await fetchImageBuffer(item.imageUrl);
+          const buffer = imageCache[item.imageUrl];
           if (buffer) {
             try {
               doc.image(buffer, startX + 5, y + 5, { width: 35, height: 30 });
