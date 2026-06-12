@@ -1,0 +1,12 @@
+HTTP/1.1 404 Not Found
+X-Powered-By: Express
+Access-Control-Allow-Origin: *
+Content-Type: application/json; charset=utf-8
+Content-Length: 34
+ETag: W/"22-MnP2DXh+JV9+bkb84v6/bs6Ql8A"
+Vary: Accept-Encoding
+Date: Fri, 12 Jun 2026 08:16:30 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"code":404,"message":"Not found"}
