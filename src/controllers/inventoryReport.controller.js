@@ -37,22 +37,22 @@ const fetchImageBuffer = async (imageUrl) => {
 // Light colour palette (no dark heavy colours)
 // ─────────────────────────────────────────────────────────────
 const C = {
-  headerBg:     '#1E3A5F',   // page top banner (deep navy)
-  headerText:   '#FFFFFF',
+  headerBg:     '#DBEAFE',   // page top banner (light blue)
+  headerText:   '#1E3A8A',   // dark blue text for readability
   accentBlue:   '#3B82F6',
-  tableBg:      '#DBEAFE',   // light blue table header
-  tableText:    '#1E3799',
-  rowAlt:       '#F0F7FF',
+  tableBg:      '#EFF6FF',   // soft blue table header
+  tableText:    '#1E40AF',
+  rowAlt:       '#F8FAFC',   // very light alternate row
   rowNormal:    '#FFFFFF',
-  border:       '#BFDBFE',
+  border:       '#E2E8F0',
   text:         '#1E293B',
   subText:      '#64748B',
   green:        '#16A34A',
   greenBg:      '#DCFCE7',
   red:          '#DC2626',
   redBg:        '#FEE2E2',
-  summaryBg:    '#EFF6FF',
-  sectionBg:    '#DBEAFE',
+  summaryBg:    '#F8FAFC',
+  sectionBg:    '#EFF6FF',
   sectionText:  '#1E40AF',
 };
 
@@ -69,14 +69,24 @@ const fmtN  = (n) => Number(n || 0).toLocaleString('en-IN');
 // ─────────────────────────────────────────────────────────────
 const drawPageHeader = (doc, reportTitle, dateStr, pageNum) => {
   doc.rect(0, 0, PAGE_W, 54).fill(C.headerBg);
+
+  // Logo drawing next to title
+  const path = require('path');
+  const logoPath = path.join(__dirname, 'Logo.png');
+  try {
+    doc.image(logoPath, M, 11, { width: 32, height: 32 });
+  } catch (err) {
+    logger.warn('Failed to draw logo: %s', err.message);
+  }
+
   doc.fillColor(C.headerText).font('Helvetica-Bold').fontSize(16)
-     .text('ELITE EDITION', M, 12, { characterSpacing: 0.8 });
-  doc.fillColor('#93C5FD').font('Helvetica').fontSize(9)
-     .text(reportTitle, M, 32);
+     .text(reportTitle, M + 42, 19);
+
   doc.fillColor(C.headerText).font('Helvetica').fontSize(8.5)
      .text(dateStr, M, 14, { width: CW, align: 'right' });
-  doc.fillColor('#93C5FD').font('Helvetica').fontSize(7.5)
+  doc.fillColor(C.headerText).font('Helvetica').fontSize(7.5)
      .text(`Page ${pageNum}`, M, 34, { width: CW, align: 'right' });
+
   doc.rect(0, 54, PAGE_W, 2).fill(C.accentBlue);
 };
 
@@ -126,23 +136,48 @@ const drawDividers = (doc, y, rowH, cols) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// Draw page footer on all pages
+// Draw page footer on all pages (with temporary margin override to prevent page break)
 // ─────────────────────────────────────────────────────────────
-const drawFooters = (doc, totalPages) => {
+const drawFooters = (doc) => {
   const { start, count } = doc.bufferedPageRange();
+  const oldBottom = doc.page.margins.bottom;
+  doc.page.margins.bottom = 0; // prevent page overflow when writing at bottom
   for (let p = 0; p < count; p++) {
     doc.switchToPage(start + p);
     doc.rect(0, PAGE_H - 26, PAGE_W, 26).fill(C.headerBg);
-    doc.fillColor('#93C5FD').font('Helvetica').fontSize(7.5)
+    doc.fillColor(C.headerText).font('Helvetica-Bold').fontSize(7.5)
        .text(`Elite Edition ERP  •  Generated: ${new Date().toLocaleString('en-IN')}  •  Page ${p + 1} of ${count}`,
          M, PAGE_H - 17, { width: CW, align: 'center' });
   }
+  doc.page.margins.bottom = oldBottom;
 };
 
 // ─────────────────────────────────────────────────────────────
-// Shared columns for all 3 inventory reports
+// Column definitions for different reports
 // ─────────────────────────────────────────────────────────────
-const INV_COLS = [
+const COLS_VALUE = [
+  { label: 'Photo',         w: 38  },
+  { label: 'SKU / Item',    w: 85  },
+  { label: 'Vendor',        w: 65  },
+  { label: 'Sizes & Qty',   w: 85  },
+  { label: 'Total',         w: 30  },
+  { label: 'Pur. (Unit)',   w: 48  },
+  { label: 'Pur. (Total)',  w: 62  },
+  { label: 'Sale (Unit)',   w: 48  },
+  { label: 'Sale (Total)',  w: 62  },
+];
+
+const COLS_INWARD = [
+  { label: 'Photo',         w: 45  },
+  { label: 'SKU / Item',    w: 110 },
+  { label: 'Vendor',        w: 90  },
+  { label: 'Sizes & Qty',   w: 110 },
+  { label: 'Total',         w: 40  },
+  { label: 'Pur. (Unit)',   w: 58  },
+  { label: 'Pur. (Total)',  w: 70  },
+];
+
+const COLS_OUTWARD = [
   { label: 'Photo',         w: 38  },
   { label: 'SKU / Item',    w: 80  },
   { label: 'Vendor',        w: 60  },
@@ -158,7 +193,7 @@ const INV_COLS = [
 // ─────────────────────────────────────────────────────────────
 // Draw a single inventory item row
 // ─────────────────────────────────────────────────────────────
-const drawInventoryRow = (doc, y, item, imgBuf, alt) => {
+const drawInventoryRow = (doc, y, item, imgBuf, alt, cols, type) => {
   const sizesText = (item.sizes || [])
     .sort((a, b) => a.size.localeCompare(b.size))
     .map(s => `${s.size}: ${s.qty}`)
@@ -169,14 +204,15 @@ const drawInventoryRow = (doc, y, item, imgBuf, alt) => {
   doc.rect(M, y, CW, rowH).fill(alt ? C.rowAlt : C.rowNormal);
   doc.moveTo(M, y + rowH).lineTo(M + CW, y + rowH)
      .strokeColor(C.border).lineWidth(0.4).stroke();
-  drawDividers(doc, y, rowH, INV_COLS);
+  drawDividers(doc, y, rowH, cols);
 
   const mid = y + rowH / 2;
   let x = M;
 
-  // Image (width 38)
-  const imgSize = Math.min(rowH - 10, 32);
-  const ix = x + (INV_COLS[0].w - imgSize) / 2;
+  // Photo
+  const colPhoto = cols[0];
+  const imgSize = Math.min(rowH - 10, colPhoto.w - 6);
+  const ix = x + (colPhoto.w - imgSize) / 2;
   const iy = y + (rowH - imgSize) / 2;
   if (imgBuf) {
     try {
@@ -189,56 +225,92 @@ const drawInventoryRow = (doc, y, item, imgBuf, alt) => {
     doc.rect(ix, iy, imgSize, imgSize).fill('#F1F5F9');
     doc.fillColor(C.subText).font('Helvetica').fontSize(6).text('No Photo', ix, iy + imgSize / 2 - 4, { width: imgSize, align: 'center' });
   }
-  x += INV_COLS[0].w;
+  x += colPhoto.w;
 
-  // SKU / Name (width 80)
+  // SKU / Item
+  const colSku = cols[1];
   doc.fillColor(C.tableText).font('Helvetica-Bold').fontSize(7.5)
-     .text(item.sku || '-', x + 4, mid - 10, { width: INV_COLS[1].w - 8, lineBreak: false, ellipsis: true });
+     .text(item.sku || '-', x + 4, mid - 10, { width: colSku.w - 8, lineBreak: false, ellipsis: true });
   if (item.itemName && item.itemName !== item.sku) {
     doc.fillColor(C.subText).font('Helvetica').fontSize(6.5)
-       .text(item.itemName, x + 4, mid + 2, { width: INV_COLS[1].w - 8, lineBreak: false, ellipsis: true });
+       .text(item.itemName, x + 4, mid + 2, { width: colSku.w - 8, lineBreak: false, ellipsis: true });
   }
-  x += INV_COLS[1].w;
+  x += colSku.w;
 
-  // Vendor (width 60)
+  // Vendor
+  const colVendor = cols[2];
   doc.fillColor(C.subText).font('Helvetica').fontSize(7)
-     .text(item.party || '-', x + 4, mid - 5, { width: INV_COLS[2].w - 8, align: 'center' });
-  x += INV_COLS[2].w;
+     .text(item.party || '-', x + 4, mid - 5, { width: colVendor.w - 8, align: 'center' });
+  x += colVendor.w;
 
-  // Sizes (width 80)
+  // Sizes & Qty
+  const colSizes = cols[3];
   doc.fillColor(C.text).font('Helvetica').fontSize(7)
-     .text(sizesText, x + 4, y + 8, { width: INV_COLS[3].w - 8, align: 'center', lineBreak: true });
-  x += INV_COLS[3].w;
+     .text(sizesText, x + 4, y + 8, { width: colSizes.w - 8, align: 'center', lineBreak: true });
+  x += colSizes.w;
 
-  // Total (width 28)
+  // Total
+  const colTotal = cols[4];
   doc.fillColor(C.text).font('Helvetica-Bold').fontSize(9)
-     .text(fmtN(item.total), x + 2, mid - 7, { width: INV_COLS[4].w - 4, align: 'center' });
-  x += INV_COLS[4].w;
+     .text(fmtN(item.total), x + 2, mid - 7, { width: colTotal.w - 4, align: 'center' });
+  x += colTotal.w;
 
-  // Purchase Unit (width 43)
-  doc.fillColor(C.subText).font('Helvetica').fontSize(7.5)
-     .text(fmt(item.purchasePrice), x + 2, mid - 5, { width: INV_COLS[5].w - 4, align: 'center' });
-  x += INV_COLS[5].w;
+  if (type === 'value') {
+    // Pur. (Unit)
+    doc.fillColor(C.subText).font('Helvetica').fontSize(7.5)
+       .text(fmt(item.purchasePrice), x + 2, mid - 5, { width: cols[5].w - 4, align: 'center' });
+    x += cols[5].w;
 
-  // Purchase Total (width 52)
-  doc.fillColor(C.subText).font('Helvetica').fontSize(7.5)
-     .text(fmt(item.totalPurchaseAmount), x + 2, mid - 5, { width: INV_COLS[6].w - 4, align: 'center' });
-  x += INV_COLS[6].w;
+    // Pur. (Total)
+    doc.fillColor(C.subText).font('Helvetica').fontSize(7.5)
+       .text(fmt(item.totalPurchaseAmount), x + 2, mid - 5, { width: cols[6].w - 4, align: 'center' });
+    x += cols[6].w;
 
-  // Sell Unit (width 43)
-  doc.fillColor(C.accentBlue).font('Helvetica-Bold').fontSize(7.5)
-     .text(fmt(item.salePrice), x + 2, mid - 5, { width: INV_COLS[7].w - 4, align: 'center' });
-  x += INV_COLS[7].w;
+    // Sale (Unit)
+    doc.fillColor(C.accentBlue).font('Helvetica-Bold').fontSize(7.5)
+       .text(fmt(item.salePrice), x + 2, mid - 5, { width: cols[7].w - 4, align: 'center' });
+    x += cols[7].w;
 
-  // Sell Total (width 52)
-  doc.fillColor(C.accentBlue).font('Helvetica-Bold').fontSize(7.5)
-     .text(fmt(item.totalSellableAmount), x + 2, mid - 5, { width: INV_COLS[8].w - 4, align: 'center' });
-  x += INV_COLS[8].w;
+    // Sale (Total)
+    doc.fillColor(C.accentBlue).font('Helvetica-Bold').fontSize(7.5)
+       .text(fmt(item.totalSellableAmount), x + 2, mid - 5, { width: cols[8].w - 4, align: 'center' });
+  } 
+  else if (type === 'inward') {
+    // Pur. (Unit)
+    doc.fillColor(C.subText).font('Helvetica').fontSize(7.5)
+       .text(fmt(item.purchasePrice), x + 2, mid - 5, { width: cols[5].w - 4, align: 'center' });
+    x += cols[5].w;
 
-  // Profit (width 47)
-  const profit = item.totalSellableAmount - item.totalPurchaseAmount;
-  doc.fillColor(profit >= 0 ? C.green : C.red).font('Helvetica-Bold').fontSize(7.5)
-     .text(fmt(profit), x + 2, mid - 5, { width: INV_COLS[9].w - 4, align: 'center' });
+    // Pur. (Total)
+    doc.fillColor(C.subText).font('Helvetica').fontSize(7.5)
+       .text(fmt(item.totalPurchaseAmount), x + 2, mid - 5, { width: cols[6].w - 4, align: 'center' });
+  } 
+  else { // outward
+    // Pur. (Unit)
+    doc.fillColor(C.subText).font('Helvetica').fontSize(7.5)
+       .text(fmt(item.purchasePrice), x + 2, mid - 5, { width: cols[5].w - 4, align: 'center' });
+    x += cols[5].w;
+
+    // Pur. (Total)
+    doc.fillColor(C.subText).font('Helvetica').fontSize(7.5)
+       .text(fmt(item.totalPurchaseAmount), x + 2, mid - 5, { width: cols[6].w - 4, align: 'center' });
+    x += cols[6].w;
+
+    // Sale (Unit)
+    doc.fillColor(C.accentBlue).font('Helvetica-Bold').fontSize(7.5)
+       .text(fmt(item.salePrice), x + 2, mid - 5, { width: cols[7].w - 4, align: 'center' });
+    x += cols[7].w;
+
+    // Sale (Total)
+    doc.fillColor(C.accentBlue).font('Helvetica-Bold').fontSize(7.5)
+       .text(fmt(item.totalSellableAmount), x + 2, mid - 5, { width: cols[8].w - 4, align: 'center' });
+    x += cols[8].w;
+
+    // Profit
+    const profit = item.totalSellableAmount - item.totalPurchaseAmount;
+    doc.fillColor(profit >= 0 ? C.green : C.red).font('Helvetica-Bold').fontSize(7.5)
+       .text(fmt(profit), x + 2, mid - 5, { width: cols[9].w - 4, align: 'center' });
+  }
 
   return rowH;
 };
@@ -331,7 +403,7 @@ const buildImageCache = async (items) => {
 // ─────────────────────────────────────────────────────────────
 // Render list of items into PDF, returns final pageNum
 // ─────────────────────────────────────────────────────────────
-const renderItems = (doc, items, imageCache, reportTitle, dateStr, startPageNum) => {
+const renderItems = (doc, items, imageCache, reportTitle, dateStr, startPageNum, cols, type) => {
   let pageNum = startPageNum;
   let y = doc.y;
   let alt = false;
@@ -343,7 +415,7 @@ const renderItems = (doc, items, imageCache, reportTitle, dateStr, startPageNum)
     return pageNum;
   }
 
-  y = drawTableHeader(doc, y, INV_COLS);
+  y = drawTableHeader(doc, y, cols);
 
   for (const item of items) {
     const linesCount = Math.max(1, (item.sizes || []).length);
@@ -357,12 +429,12 @@ const renderItems = (doc, items, imageCache, reportTitle, dateStr, startPageNum)
       doc.fillColor(C.subText).font('Helvetica-Oblique').fontSize(8)
          .text('(continued)', M, y);
       y += 14;
-      y = drawTableHeader(doc, y, INV_COLS);
+      y = drawTableHeader(doc, y, cols);
       alt = false;
     }
 
-    const imgBuf = item.imageUrl ? imageCache[item.imageUrl] : null;
-    y += drawInventoryRow(doc, y, item, imgBuf, alt);
+    const cacheBuf = item.imageUrl ? imageCache[item.imageUrl] : null;
+    y += drawInventoryRow(doc, y, item, cacheBuf, alt, cols, type);
     alt = !alt;
   }
 
@@ -410,8 +482,6 @@ const downloadStockValuePdf = async (req, res) => {
 
     const raw = await db.Inventory.find().lean();
     const { totalQty, totalSell, items } = groupInventoryItems(raw, 'currentlyAvailableStock');
-    const totalPurchase = items.reduce((s, i) => s + i.totalPurchaseAmount, 0);
-    const totalProfit   = totalSell - totalPurchase;
 
     await enrichImages(items);
     const imageCache = await buildImageCache(items);
@@ -429,11 +499,10 @@ const downloadStockValuePdf = async (req, res) => {
       { label: 'Total SKUs',      value: fmtN(items.length) },
       { label: 'Total Stock',     value: fmtN(totalQty) },
       { label: 'Inventory Value', value: fmt(totalSell) },
-      { label: 'Est. Profit',     value: fmt(totalProfit), color: totalProfit >= 0 ? C.green : C.red },
     ]);
     doc.y = y;
 
-    renderItems(doc, items, imageCache, 'Stock Value Report', dateStr, 1);
+    renderItems(doc, items, imageCache, 'Stock Value Report', dateStr, 1, COLS_VALUE, 'value');
     drawFooters(doc);
     doc.end();
     logger.info('Stock Value PDF complete.');
@@ -458,7 +527,7 @@ const downloadStockInwardPdf = async (req, res) => {
     logger.info('Generating Stock Inward PDF %s → %s', dateStart, dateEnd);
 
     const raw = await db.Inventory.find({ created_date_time: { $gte: start, $lte: end } }).lean();
-    const { totalQty, totalSell, items } = groupInventoryItems(raw, 'qty');
+    const { totalQty, items } = groupInventoryItems(raw, 'qty');
     const totalPurchase = items.reduce((s, i) => s + i.totalPurchaseAmount, 0);
 
     await enrichImages(items);
@@ -477,11 +546,10 @@ const downloadStockInwardPdf = async (req, res) => {
       { label: 'SKUs Received',   value: fmtN(items.length) },
       { label: 'Total Units In',  value: fmtN(totalQty) },
       { label: 'Purchase Total',  value: fmt(totalPurchase) },
-      { label: 'Sell Value',      value: fmt(totalSell), color: C.accentBlue },
     ]);
     doc.y = y;
 
-    renderItems(doc, items, imageCache, 'Stock Inward Report', dateStr, 1);
+    renderItems(doc, items, imageCache, 'Stock Inward Report', dateStr, 1, COLS_INWARD, 'inward');
     drawFooters(doc);
     doc.end();
     logger.info('Stock Inward PDF complete.');
@@ -546,7 +614,7 @@ const downloadStockOutwardPdf = async (req, res) => {
     ]);
     doc.y = y;
 
-    renderItems(doc, items, imageCache, 'Stock Outward Report', dateStr, 1);
+    renderItems(doc, items, imageCache, 'Stock Outward Report', dateStr, 1, COLS_OUTWARD, 'outward');
     drawFooters(doc);
     doc.end();
     logger.info('Stock Outward PDF complete.');

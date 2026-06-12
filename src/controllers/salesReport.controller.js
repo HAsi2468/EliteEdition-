@@ -297,13 +297,16 @@ const downloadSalesReportPdf = async (req, res) => {
 
     // Footer on all pages
     const pages = doc.bufferedPageRange();
+    const oldBottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
     for (let p = 0; p < pages.count; p++) {
       doc.switchToPage(pages.start + p);
       doc.rect(0, PAGE_H - 26, PAGE_W, 26).fill(C.headerBg);
-      doc.fillColor('#93C5FD').font('Helvetica').fontSize(7.5)
+      doc.fillColor(C.headerText).font('Helvetica-Bold').fontSize(7.5)
          .text(`Elite Edition ERP  •  Generated: ${new Date().toLocaleString('en-IN')}  •  Page ${p + 1} of ${pages.count}`,
            MARGIN, PAGE_H - 17, { width: CW, align: 'center' });
     }
+    doc.page.margins.bottom = oldBottom;
 
     doc.end();
     logger.info('Sales PDF complete.');
@@ -524,13 +527,16 @@ const downloadBrandReportPdf = async (req, res) => {
 
     // Footer
     const pages = doc.bufferedPageRange();
+    const oldBottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
     for (let p = 0; p < pages.count; p++) {
       doc.switchToPage(pages.start + p);
       doc.rect(0, PAGE_H - 26, PAGE_W, 26).fill(C.headerBg);
-      doc.fillColor('#93C5FD').font('Helvetica').fontSize(7.5)
+      doc.fillColor(C.headerText).font('Helvetica-Bold').fontSize(7.5)
          .text(`Elite Edition ERP  •  Generated: ${new Date().toLocaleString('en-IN')}  •  Page ${p + 1} of ${pages.count}`,
            MARGIN, PAGE_H - 17, { width: CW, align: 'center' });
     }
+    doc.page.margins.bottom = oldBottom;
 
     doc.end();
     logger.info('Brand PDF complete.');
