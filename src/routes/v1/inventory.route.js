@@ -4,8 +4,9 @@ const inventoryReportController = require('../../controllers/inventoryReport.con
 
 const router = express.Router();
 
-router.get('/report', inventoryReportController.getInventoryReport);
-router.get('/report/pdf', inventoryReportController.downloadInventoryReportPdf);
+router.get('/report/stock-value', inventoryReportController.downloadStockValuePdf);
+router.get('/report/stock-inward', inventoryReportController.downloadStockInwardPdf);
+router.get('/report/stock-outward', inventoryReportController.downloadStockOutwardPdf);
 
 router.route('/')
   .post(inventoryController.createInventory)
