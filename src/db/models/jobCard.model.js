@@ -28,7 +28,7 @@ const jobCardSchema = new mongoose.Schema(
     paperType:        { type: String, default: '', trim: true },
     temperature:      { type: String, default: '', trim: true },
     speed:            { type: String, default: '', trim: true },
-    machineName:      { type: String, default: '', trim: true, enum: ['GRANDO', 'PRINTDOT', 'AERO', ''] },
+    machineName:      { type: String, default: '', trim: true, enum: ['GRANDO', 'PRINTDOT', ''] },
     note1:            { type: String, default: '', trim: true },
     note2:            { type: String, default: '', trim: true },
     emergencyNotes:   { type: String, default: '', trim: true },
