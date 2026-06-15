@@ -224,6 +224,17 @@ const COLS_RETURNS = [
   { label: 'Status',    w: 70  },
 ];
 
+const COLS_PRODUCTION = [
+  { label: '#',         w: 25  },
+  { label: 'Date',      w: 60  },
+  { label: 'Job No',    w: 70  },
+  { label: 'Design No', w: 80  },
+  { label: 'Party',     w: 100 },
+  { label: 'Machine',   w: 60  },
+  { label: 'Total Mtr', w: 55  },
+  { label: 'Status',    w: 73  },
+];
+
 // ─────────────────────────────────────────────────────────────
 // Draw a single inventory item row
 // ─────────────────────────────────────────────────────────────
@@ -429,6 +440,91 @@ const renderReturns = (doc, items, reportTitle, dateStr, startPageNum, cols) => 
       y = drawTableHeader(doc, y, cols);
     }
     y += drawReturnRow(doc, y, item, index + 1, alt, cols);
+    alt = !alt;
+  });
+
+  return y;
+};
+
+// ─────────────────────────────────────────────────────────────
+// Draw a single Production item row
+// ─────────────────────────────────────────────────────────────
+const drawProductionRow = (doc, y, item, index, alt, cols) => {
+  const rowH = 26;
+
+  doc.rect(M, y, CW, rowH).fill(alt ? C.rowAlt : C.rowNormal);
+  doc.moveTo(M, y + rowH).lineTo(M + CW, y + rowH)
+     .strokeColor(C.border).lineWidth(0.4).stroke();
+  drawDividers(doc, y, rowH, cols);
+
+  const mid = y + rowH / 2;
+  let x = M;
+
+  // #
+  doc.fillColor(C.text).font('Helvetica').fontSize(8)
+     .text(index.toString(), x + 2, mid - 5, { width: cols[0].w - 4, align: 'center' });
+  x += cols[0].w;
+
+  // Date
+  const dt = item.date || new Date(item.created_date_time).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  doc.fillColor(C.text).font('Helvetica').fontSize(8)
+     .text(dt, x + 2, mid - 5, { width: cols[1].w - 4, align: 'center' });
+  x += cols[1].w;
+
+  // Job No
+  doc.fillColor(C.text).font('Helvetica-Bold').fontSize(8)
+     .text(item.jobNo, x + 4, mid - 5, { width: cols[2].w - 8, align: 'left', lineBreak: false });
+  x += cols[2].w;
+
+  // Design No
+  doc.fillColor(C.subText).font('Helvetica').fontSize(8)
+     .text(item.designNo || '-', x + 4, mid - 5, { width: cols[3].w - 8, align: 'left', lineBreak: false });
+  x += cols[3].w;
+
+  // Party
+  doc.fillColor(C.text).font('Helvetica-Bold').fontSize(8)
+     .text(item.party, x + 4, mid - 5, { width: cols[4].w - 8, align: 'left', lineBreak: false });
+  x += cols[4].w;
+
+  // Machine
+  const machineColor = item.machineName === 'GRANDO' ? '#0b5394' : item.machineName === 'PRINTDOT' ? '#cc0000' : C.text;
+  doc.fillColor(machineColor).font('Helvetica-Bold').fontSize(8)
+     .text(item.machineName || 'N/A', x + 2, mid - 5, { width: cols[5].w - 4, align: 'center' });
+  x += cols[5].w;
+
+  // Total Mtr
+  doc.fillColor(C.accentBlue).font('Helvetica-Bold').fontSize(8)
+     .text(fmt(item.totalMtr), x + 2, mid - 5, { width: cols[6].w - 4, align: 'center' });
+  x += cols[6].w;
+
+  // Status
+  const isDone = item.status === 'Done';
+  doc.fillColor(isDone ? C.green : C.subText).font('Helvetica-Bold').fontSize(7.5)
+     .text(item.status || 'Pending', x + 2, mid - 5, { width: cols[7].w - 4, align: 'center' });
+
+  return rowH;
+};
+
+// ─────────────────────────────────────────────────────────────
+// Render the paginated Production report items
+// ─────────────────────────────────────────────────────────────
+const renderProduction = (doc, items, reportTitle, dateStr, startPageNum, cols) => {
+  let y = doc.y + 15;
+  let alt = false;
+  let pageNum = startPageNum;
+
+  y = drawTableHeader(doc, y, cols);
+
+  items.forEach((item, index) => {
+    const rowH = 26;
+    if (y + rowH > PAGE_H - 45) {
+      doc.addPage();
+      pageNum++;
+      drawPageHeader(doc, reportTitle, dateStr, pageNum);
+      y = 65;
+      y = drawTableHeader(doc, y, cols);
+    }
+    y += drawProductionRow(doc, y, item, index + 1, alt, cols);
     alt = !alt;
   });
 
@@ -813,6 +909,70 @@ const downloadReturnsReportPdf = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────
+// 5. MACHINE PRODUCTION REPORT PDF — job card logging
+// ─────────────────────────────────────────────────────────────
+const downloadMachineProductionReportPdf = async (req, res) => {
+  try {
+    const { dateStart = '', dateEnd = '' } = req.query;
+    const dateStr = dateStart && dateEnd ? `${dateStart}  →  ${dateEnd}` : `All Time Production`;
+    logger.info('Generating Production Report PDF %s → %s', dateStart, dateEnd);
+
+    let query = {};
+    if (dateStart && dateEnd) {
+      query.date = { $gte: dateStart, $lte: dateEnd };
+    }
+
+    const items = await db.JobCard.find(query).sort({ created_date_time: -1 }).lean();
+    
+    let totalMtrs = 0;
+    let grandoMtrs = 0;
+    let printdotMtrs = 0;
+    let completedCards = 0;
+    
+    items.forEach(item => {
+      const mtr = Number(item.totalMtr) || 0;
+      totalMtrs += mtr;
+      if (item.machineName === 'GRANDO') grandoMtrs += mtr;
+      if (item.machineName === 'PRINTDOT') printdotMtrs += mtr;
+      if (item.status === 'Done') completedCards += 1;
+    });
+
+    const doc = new PDFDocument({ margin: M, size: 'A4', bufferPages: true,
+      info: { Title: 'Elite Edition Machine Production Report', Author: 'Elite Edition ERP' }
+    });
+    doc.on('pageAdded', () => drawPunchGuide(doc));
+    drawPunchGuide(doc);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Machine_Production_Report_${dateStart || 'AllTime'}.pdf"`);
+    doc.pipe(res);
+
+    drawPageHeader(doc, 'Machine Production Report', dateStr, 1);
+    let y = 65;
+    y = drawSummaryCards(doc, y, [
+      { label: 'Total Cards / Done', value: `${items.length} / ${completedCards}` },
+      { label: 'GRANDO Mtr',         value: fmt(grandoMtrs), color: '#0b5394' },
+      { label: 'PRINTDOT Mtr',       value: fmt(printdotMtrs), color: '#cc0000' },
+      { label: 'Total Mtr',          value: fmt(totalMtrs), color: C.green },
+    ]);
+    doc.y = y;
+
+    if (items.length === 0) {
+      doc.y += 30;
+      doc.fillColor(C.subText).font('Helvetica-Bold').fontSize(12).text('No production logged for this period.', { align: 'center' });
+    } else {
+      renderProduction(doc, items, 'Machine Production Report', dateStr, 1, COLS_PRODUCTION);
+    }
+    
+    drawFooters(doc);
+    doc.end();
+    logger.info('Production PDF complete.');
+  } catch (err) {
+    logger.error('Production PDF error: %o', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Internal Server Error', details: err.message });
+  }
+};
+
 const getStockValueData = async (req, res) => {
   try {
     const raw = await db.Inventory.find().lean();
@@ -887,6 +1047,7 @@ module.exports = {
   downloadStockInwardPdf,
   downloadStockOutwardPdf,
   downloadReturnsReportPdf,
+  downloadMachineProductionReportPdf,
   getStockValueData,
   getStockInwardData,
   getStockOutwardData,

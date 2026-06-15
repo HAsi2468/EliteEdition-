@@ -8,6 +8,7 @@ router.get('/report/stock-value', inventoryReportController.downloadStockValuePd
 router.get('/report/stock-inward', inventoryReportController.downloadStockInwardPdf);
 router.get('/report/stock-outward', inventoryReportController.downloadStockOutwardPdf);
 router.get('/report/returns', inventoryReportController.downloadReturnsReportPdf);
+router.get('/report/machine-production', inventoryReportController.downloadMachineProductionReportPdf);
 router.get('/report/stock-value-data', inventoryReportController.getStockValueData);
 router.get('/report/stock-inward-data', inventoryReportController.getStockInwardData);
 router.get('/report/stock-outward-data', inventoryReportController.getStockOutwardData);
