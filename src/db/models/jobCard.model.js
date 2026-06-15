@@ -5,6 +5,7 @@ const jobCardSchema = new mongoose.Schema(
     jobNo:            { type: String, required: true, unique: true, trim: true },
     designNo:         { type: String, default: '', trim: true },
     designName:       { type: String, default: '', trim: true },
+    category:         { type: String, default: '', trim: true },
     fabric:           { type: String, default: '', trim: true },
     pcs:              { type: String, default: '', trim: true },
     top:              { type: String, default: '', trim: true },
