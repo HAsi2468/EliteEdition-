@@ -37,6 +37,7 @@ const db = {
   StockOut: require('./stockOut.model'),
   JobCard: require('./jobCard.model'),
   Design: require('./design.model'),
+  MyntraConfig: require('./myntraConfig.model'),
   mongoose,
 };
 

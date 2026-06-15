@@ -13,6 +13,7 @@ const omsRoute = require('./oms.route');
 const jobCardRoute = require('./jobCard.route');
 const designRoute = require('./design.route');
 const analyticsRoute = require('./analytics.route');
+const myntraRoute = require('./myntra.route');
 const router = express.Router();
 
 router.use('/auth', authRoute);
@@ -29,5 +30,6 @@ router.use('/oms', omsRoute);
 router.use('/jobCards', jobCardRoute);
 router.use('/designs', designRoute);
 router.use('/analytics', analyticsRoute);
+router.use('/myntra', myntraRoute);
 
 module.exports = router;
