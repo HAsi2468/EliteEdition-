@@ -101,18 +101,35 @@ const updateJobCard = async (req, res) => {
     if (body.panna && body.pass && body.totalMtr && body.machineName) {
       body.expTime = calcExpTime(body.panna, body.pass, body.totalMtr, body.machineName);
     }
-    // Auto-date fill when printStatus, fusingStatus or deliveryStatus changes to Done
-    if (body.printStatus === 'Printing Done' && !body.printDate) {
+
+    const existingCard = await db.JobCard.findById(req.params.id);
+    if (!existingCard) return res.status(404).json({ error: 'Job card not found' });
+
+    // Determine final tracking states by merging input body with existing DB fields
+    const printStatus = body.printStatus !== undefined ? body.printStatus : existingCard.printStatus;
+    const fusingStatus = body.fusingStatus !== undefined ? body.fusingStatus : existingCard.fusingStatus;
+    const deliveryStatus = body.deliveryStatus !== undefined ? body.deliveryStatus : existingCard.deliveryStatus;
+
+    // Auto-date fill when status changes to Done
+    if (body.printStatus === 'Printing Done' && !body.printDate && !existingCard.printDate) {
       body.printDate = new Date().toISOString().split('T')[0];
     }
-    if (body.fusingStatus === 'Fusing Done' && !body.fusingDate) {
+    if (body.fusingStatus === 'Fusing Done' && !body.fusingDate && !existingCard.fusingDate) {
       body.fusingDate = new Date().toISOString().split('T')[0];
     }
-    if (body.deliveryStatus === 'Delivery Done' && !body.deliveryDate) {
+    if (body.deliveryStatus === 'Delivery Done' && !body.deliveryDate && !existingCard.deliveryDate) {
       body.deliveryDate = new Date().toISOString().split('T')[0];
     }
+
+    // Automatically set job card main status to Done if all tracking is completed
+    if (printStatus === 'Printing Done' && fusingStatus === 'Fusing Done' && deliveryStatus === 'Delivery Done') {
+      body.status = 'Done';
+    } else if (existingCard.status === 'Done' && (printStatus !== 'Printing Done' || fusingStatus !== 'Fusing Done' || deliveryStatus !== 'Delivery Done')) {
+      // Demote to In Progress if it was Done but any tracking status is reverted
+      body.status = 'In Progress';
+    }
+
     const card = await db.JobCard.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true }).lean();
-    if (!card) return res.status(404).json({ error: 'Job card not found' });
     res.json(card);
   } catch (err) {
     logger.error('updateJobCard error: %o', err);
