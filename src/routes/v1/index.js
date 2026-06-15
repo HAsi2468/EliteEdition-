@@ -15,6 +15,7 @@ const designRoute = require('./design.route');
 const analyticsRoute = require('./analytics.route');
 const myntraRoute = require('./myntra.route');
 const returnsRoute = require('./returns.route');
+const printConfigRoute = require('./printConfig.route');
 
 const router = express.Router();
 
@@ -34,5 +35,6 @@ router.use('/designs', designRoute);
 router.use('/analytics', analyticsRoute);
 router.use('/myntra', myntraRoute);
 router.use('/returns', returnsRoute);
+router.use('/print-config', printConfigRoute);
 
 module.exports = router;
