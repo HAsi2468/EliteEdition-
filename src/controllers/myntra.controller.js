@@ -1,7 +1,7 @@
 const httpStatus = require('http-status');
 const axios = require('axios');
 const db = require('../db/models');
-const logger = require('../../config/logger');
+const logger = require('../config/logger');
 
 const MYNTRA_API_URL = 'https://api.pretr.com';
 
