@@ -68,6 +68,29 @@ const fmt = (n) => `${Number(n || 0).toLocaleString('en-IN', { minimumFractionDi
 const fmtN = (n) => Number(n || 0).toLocaleString('en-IN');
 
 // ─────────────────────────────────────────────────────────────
+// Draw punching guide on the left margin
+// ─────────────────────────────────────────────────────────────
+const drawPunchGuide = (doc) => {
+  doc.save();
+  const centerY = PAGE_H / 2;
+  const holeDistance = 226.77; // 80mm standard
+  const marginX = 14; 
+  
+  doc.lineWidth(1).strokeColor('#9ca3af');
+  doc.circle(marginX, centerY - holeDistance / 2, 6).stroke(); // Top hole
+  doc.circle(marginX, centerY + holeDistance / 2, 6).stroke(); // Bottom hole
+  
+  // Center Arrow
+  doc.moveTo(marginX - 6, centerY).lineTo(marginX + 6, centerY).stroke();
+  doc.moveTo(marginX + 2, centerY - 4).lineTo(marginX + 6, centerY).lineTo(marginX + 2, centerY + 4).stroke();
+  
+  // Text
+  doc.fillColor('#9ca3af').font('Helvetica').fontSize(5)
+     .text('PUNCH', marginX - 10, centerY + 8, { width: 20, align: 'center' });
+  doc.restore();
+};
+
+// ─────────────────────────────────────────────────────────────
 // Draw repeating page header
 // ─────────────────────────────────────────────────────────────
 const drawHeader = (doc, title, dateStr, page) => {
@@ -212,6 +235,9 @@ const downloadSalesReportPdf = async (req, res) => {
     const doc = new PDFDocument({ margin: MARGIN, size: 'A4', bufferPages: true,
       info: { Title: `Elite Edition Sales Report ${dateStart}`, Author: 'Elite Edition ERP' }
     });
+
+    doc.on('pageAdded', () => drawPunchGuide(doc));
+    drawPunchGuide(doc);
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Sales_Report_${dateStart}.pdf"`);
@@ -404,6 +430,9 @@ const downloadBrandReportPdf = async (req, res) => {
     const doc = new PDFDocument({ margin: MARGIN, size: 'A4', bufferPages: true,
       info: { Title: `Elite Edition Brand Report ${dateStart}`, Author: 'Elite Edition ERP' }
     });
+
+    doc.on('pageAdded', () => drawPunchGuide(doc));
+    drawPunchGuide(doc);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Brand_Report_${dateStart}.pdf"`);
     doc.pipe(res);
