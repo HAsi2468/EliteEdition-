@@ -24,6 +24,21 @@ const fetchSalesReportData = async (whereClause) => {
           _id: '$skuName',
           salesCount: { $sum: 1 },
           itemTypeBrand: { $first: '$itemTypeBrand' },
+          sellableAmount: {
+            $sum: {
+              $multiply: [
+                { $ifNull: ['$saleCount', 0] },
+                {
+                  $convert: {
+                    input: '$totalPrice',
+                    to: 'double',
+                    onError: 0.0,
+                    onNull: 0.0,
+                  },
+                },
+              ],
+            },
+          },
         },
       },
       {
@@ -32,6 +47,7 @@ const fetchSalesReportData = async (whereClause) => {
           skuName: '$_id',
           salesCount: 1,
           itemTypeBrand: 1,
+          sellableAmount: 1,
         },
       },
     ];
