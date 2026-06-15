@@ -213,6 +213,17 @@ const COLS_OUTWARD = [
   { label: 'Profit',        w: 47  },
 ];
 
+const COLS_RETURNS = [
+  { label: '#',         w: 25  },
+  { label: 'Date',      w: 65  },
+  { label: 'Party',     w: 95  },
+  { label: 'Ref ID',    w: 70  },
+  { label: 'SKU',       w: 80  },
+  { label: 'Qty',       w: 35  },
+  { label: 'Condition', w: 83  },
+  { label: 'Status',    w: 70  },
+];
+
 // ─────────────────────────────────────────────────────────────
 // Draw a single inventory item row
 // ─────────────────────────────────────────────────────────────
@@ -336,6 +347,92 @@ const drawInventoryRow = (doc, y, item, imgBuf, alt, cols, type) => {
   }
 
   return rowH;
+};
+
+// ─────────────────────────────────────────────────────────────
+// Draw a single Return item row
+// ─────────────────────────────────────────────────────────────
+const drawReturnRow = (doc, y, item, index, alt, cols) => {
+  const rowH = 26; // Fixed row height for returns
+
+  doc.rect(M, y, CW, rowH).fill(alt ? C.rowAlt : C.rowNormal);
+  doc.moveTo(M, y + rowH).lineTo(M + CW, y + rowH)
+     .strokeColor(C.border).lineWidth(0.4).stroke();
+  drawDividers(doc, y, rowH, cols);
+
+  const mid = y + rowH / 2;
+  let x = M;
+
+  // #
+  doc.fillColor(C.text).font('Helvetica').fontSize(8)
+     .text(index.toString(), x + 2, mid - 5, { width: cols[0].w - 4, align: 'center' });
+  x += cols[0].w;
+
+  // Date
+  const dt = new Date(item.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  doc.fillColor(C.text).font('Helvetica').fontSize(8)
+     .text(dt, x + 2, mid - 5, { width: cols[1].w - 4, align: 'center' });
+  x += cols[1].w;
+
+  // Party
+  doc.fillColor(C.text).font('Helvetica-Bold').fontSize(8)
+     .text(item.party, x + 4, mid - 5, { width: cols[2].w - 8, align: 'left' });
+  x += cols[2].w;
+
+  // Ref ID
+  doc.fillColor(C.subText).font('Helvetica').fontSize(8)
+     .text(item.referenceId, x + 4, mid - 5, { width: cols[3].w - 8, align: 'left', lineBreak: false });
+  x += cols[3].w;
+
+  // SKU
+  doc.fillColor(C.text).font('Helvetica-Bold').fontSize(8)
+     .text(item.sku, x + 4, mid - 5, { width: cols[4].w - 8, align: 'left', lineBreak: false });
+  x += cols[4].w;
+
+  // Qty
+  doc.fillColor(C.accentBlue).font('Helvetica-Bold').fontSize(8)
+     .text(fmtN(item.quantity), x + 2, mid - 5, { width: cols[5].w - 4, align: 'center' });
+  x += cols[5].w;
+
+  // Condition
+  const condColor = item.condition === 'WRONG_ITEM' || item.condition === 'DAMAGED' ? C.red : (item.condition === 'INTACT' ? C.green : C.subText);
+  doc.fillColor(condColor).font('Helvetica-Bold').fontSize(7.5)
+     .text(item.condition.replace('_', ' '), x + 2, mid - 5, { width: cols[6].w - 4, align: 'center' });
+  x += cols[6].w;
+
+  // Status
+  const statColor = item.status === 'STOCKED_IN' ? C.green : (item.status === 'DISPUTED' ? C.red : C.accentBlue);
+  doc.fillColor(statColor).font('Helvetica-Bold').fontSize(7.5)
+     .text(item.status.replace('_', ' '), x + 2, mid - 5, { width: cols[7].w - 4, align: 'center' });
+
+  return rowH;
+};
+
+// ─────────────────────────────────────────────────────────────
+// Render the paginated Returns report items
+// ─────────────────────────────────────────────────────────────
+const renderReturns = (doc, items, reportTitle, dateStr, startPageNum, cols) => {
+  let y = doc.y + 15;
+  let alt = false;
+  let pageNum = startPageNum;
+
+  // Table header
+  y = drawTableHeader(doc, y, cols);
+
+  items.forEach((item, index) => {
+    const rowH = 26;
+    if (y + rowH > PAGE_H - 45) {
+      doc.addPage();
+      pageNum++;
+      drawPageHeader(doc, reportTitle, dateStr, pageNum);
+      y = 65;
+      y = drawTableHeader(doc, y, cols);
+    }
+    y += drawReturnRow(doc, y, item, index + 1, alt, cols);
+    alt = !alt;
+  });
+
+  return y;
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -653,6 +750,69 @@ const downloadStockOutwardPdf = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────
+// 4. RETURNS REPORT PDF — returns logged in date range
+// ─────────────────────────────────────────────────────────────
+const downloadReturnsReportPdf = async (req, res) => {
+  try {
+    const { dateStart = '', dateEnd = '' } = req.query;
+    const dateStr = dateStart && dateEnd ? `${dateStart}  →  ${dateEnd}` : `All Time Returns`;
+    logger.info('Generating Returns Report PDF %s → %s', dateStart, dateEnd);
+
+    let query = {};
+    if (dateStart && dateEnd) {
+      const start = new Date(dateStart);
+      const end   = new Date(dateEnd);
+      end.setHours(23, 59, 59, 999);
+      query.createdAt = { $gte: start, $lte: end };
+    }
+
+    const items = await db.ReturnRecord.find(query).sort({ createdAt: -1 }).lean();
+    
+    let totalQty = 0;
+    let rtoQty = 0;
+    let customerReturnQty = 0;
+    
+    items.forEach(item => {
+      totalQty += item.quantity;
+      if (item.returnType === 'RTO') rtoQty += item.quantity;
+      if (item.returnType === 'CUSTOMER_RETURN') customerReturnQty += item.quantity;
+    });
+
+    const doc = new PDFDocument({ margin: M, size: 'A4', bufferPages: true,
+      info: { Title: 'Elite Edition Returns Report', Author: 'Elite Edition ERP' }
+    });
+    doc.on('pageAdded', () => drawPunchGuide(doc));
+    drawPunchGuide(doc);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Returns_Report_${dateStart || 'AllTime'}.pdf"`);
+    doc.pipe(res);
+
+    drawPageHeader(doc, 'Returns Log Report', dateStr, 1);
+    let y = 65;
+    y = drawSummaryCards(doc, y, [
+      { label: 'Total Returns',     value: fmtN(items.length) },
+      { label: 'RTO Items',         value: fmtN(rtoQty) },
+      { label: 'Customer Returns',  value: fmtN(customerReturnQty) },
+    ]);
+    doc.y = y;
+
+    if (items.length === 0) {
+      doc.y += 30;
+      doc.fillColor(C.subText).font('Helvetica-Bold').fontSize(12).text('No returns logged for this period.', { align: 'center' });
+    } else {
+      renderReturns(doc, items, 'Returns Log Report', dateStr, 1, COLS_RETURNS);
+    }
+    
+    drawFooters(doc);
+    doc.end();
+    logger.info('Returns PDF complete.');
+  } catch (err) {
+    logger.error('Returns PDF error: %o', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Internal Server Error', details: err.message });
+  }
+};
+
 const getStockValueData = async (req, res) => {
   try {
     const raw = await db.Inventory.find().lean();
@@ -726,6 +886,7 @@ module.exports = {
   downloadStockValuePdf,
   downloadStockInwardPdf,
   downloadStockOutwardPdf,
+  downloadReturnsReportPdf,
   getStockValueData,
   getStockInwardData,
   getStockOutwardData,
