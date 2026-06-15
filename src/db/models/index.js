@@ -38,6 +38,8 @@ const db = {
   JobCard: require('./jobCard.model'),
   Design: require('./design.model'),
   MyntraConfig: require('./myntraConfig.model'),
+  ReturnRecord: require('./returnRecord.model'),
+  PrintConfig: require('./printConfig.model'),
   mongoose,
 };
 
