@@ -7,5 +7,7 @@ router.post('/config', myntraController.saveConfig);
 router.get('/config', myntraController.getConfig);
 router.get('/orders', myntraController.getOrders);
 router.post('/sync-inventory', myntraController.syncInventory);
+router.post('/discount', myntraController.applyDiscount);
+router.post('/order/:orderId/dispatch', myntraController.dispatchOrder);
 
 module.exports = router;

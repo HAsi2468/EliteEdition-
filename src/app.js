@@ -12,6 +12,7 @@ const jwt = require('./config/jwt');
 const { authLimiter } = require('./middlewares/rateLimiter');
 const routes = require('./routes/v1');
 require('./schedule/fetchFromAPISScheduler');
+require('./schedule/myntraScheduler').startMyntraScheduler();
 const { errorConverter, errorHandler } = require('./middlewares/error');
 const ApiError = require('./utils/ApiError');
 const userModel = require('./db/models/user.model');
