@@ -14,6 +14,8 @@ const jobCardRoute = require('./jobCard.route');
 const designRoute = require('./design.route');
 const analyticsRoute = require('./analytics.route');
 const myntraRoute = require('./myntra.route');
+const returnsRoute = require('./returns.route');
+
 const router = express.Router();
 
 router.use('/auth', authRoute);
@@ -31,5 +33,6 @@ router.use('/jobCards', jobCardRoute);
 router.use('/designs', designRoute);
 router.use('/analytics', analyticsRoute);
 router.use('/myntra', myntraRoute);
+router.use('/returns', returnsRoute);
 
 module.exports = router;
