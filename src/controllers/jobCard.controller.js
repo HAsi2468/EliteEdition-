@@ -40,15 +40,21 @@ function calcExpTime(panna, passText, totalMtr, machineName) {
 
 const getAllJobCards = async (req, res) => {
   try {
-    const { status, search, page = 1, limit = 50 } = req.query;
+    const { status, search, page = 1, limit = 50, dateStart, dateEnd } = req.query;
     const filter = {};
     if (status && status !== 'All') filter.status = status;
+    if (dateStart || dateEnd) {
+      filter.date = {};
+      if (dateStart) filter.date.$gte = dateStart;
+      if (dateEnd) filter.date.$lte = dateEnd;
+    }
     if (search) {
       filter.$or = [
         { jobNo: { $regex: search, $options: 'i' } },
         { party: { $regex: search, $options: 'i' } },
         { designNo: { $regex: search, $options: 'i' } },
         { machineName: { $regex: search, $options: 'i' } },
+        { billNo: { $regex: search, $options: 'i' } },
       ];
     }
     const skip = (Number(page) - 1) * Number(limit);
@@ -94,6 +100,16 @@ const updateJobCard = async (req, res) => {
     const body = req.body;
     if (body.panna && body.pass && body.totalMtr && body.machineName) {
       body.expTime = calcExpTime(body.panna, body.pass, body.totalMtr, body.machineName);
+    }
+    // Auto-date fill when printStatus, fusingStatus or deliveryStatus changes to Done
+    if (body.printStatus === 'Printing Done' && !body.printDate) {
+      body.printDate = new Date().toISOString().split('T')[0];
+    }
+    if (body.fusingStatus === 'Fusing Done' && !body.fusingDate) {
+      body.fusingDate = new Date().toISOString().split('T')[0];
+    }
+    if (body.deliveryStatus === 'Delivery Done' && !body.deliveryDate) {
+      body.deliveryDate = new Date().toISOString().split('T')[0];
     }
     const card = await db.JobCard.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true }).lean();
     if (!card) return res.status(404).json({ error: 'Job card not found' });
