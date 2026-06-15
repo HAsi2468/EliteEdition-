@@ -9,6 +9,9 @@ const inventoryRoute = require('./inventory.route');
 const vendorRoute = require('./vendor.route');
 const partyRoute = require('./party.route');
 const stockOutRoute = require('./stockOut.route');
+const omsRoute = require('./oms.route');
+const jobCardRoute = require('./jobCard.route');
+const designRoute = require('./design.route');
 const router = express.Router();
 
 router.use('/auth', authRoute);
@@ -21,5 +24,8 @@ router.use('/inventory', inventoryRoute);
 router.use('/vendor', vendorRoute);
 router.use('/party', partyRoute);
 router.use('/stockOut', stockOutRoute);
+router.use('/oms', omsRoute);
+router.use('/jobCards', jobCardRoute);
+router.use('/designs', designRoute);
 
 module.exports = router;

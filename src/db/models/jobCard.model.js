@@ -1,0 +1,49 @@
+const mongoose = require('mongoose');
+
+const jobCardSchema = new mongoose.Schema(
+  {
+    jobNo:            { type: String, required: true, unique: true, trim: true },
+    designNo:         { type: String, default: '', trim: true },
+    designName:       { type: String, default: '', trim: true },
+    fabric:           { type: String, default: '', trim: true },
+    pcs:              { type: String, default: '', trim: true },
+    top:              { type: String, default: '', trim: true },
+    sleeve:           { type: String, default: '', trim: true },
+    colors:           { type: String, default: '', trim: true },
+    panna:            { type: Number, default: null },
+    consumption:      { type: String, default: '', trim: true },
+    bottom:           { type: String, default: '', trim: true },
+    dupatta:          { type: String, default: '', trim: true },
+    cut:              { type: String, default: '', trim: true },
+    date:             { type: String, default: '', trim: true },
+    pass:             { type: String, default: '', trim: true },
+    allover:          { type: String, default: '', trim: true },
+    pnKm:             { type: String, default: '', trim: true },
+    setCopy:          { type: String, default: '', trim: true },
+    totalMtr:         { type: Number, default: null },
+    party:            { type: String, default: '', trim: true },
+    expTime:          { type: String, default: '' },
+    designer:         { type: String, default: '', trim: true },
+    colourMatching:   { type: String, default: '', trim: true },
+    paperType:        { type: String, default: '', trim: true },
+    temperature:      { type: String, default: '', trim: true },
+    speed:            { type: String, default: '', trim: true },
+    machineName:      { type: String, default: '', trim: true, enum: ['GRANDO', 'PRINTDOT', ''] },
+    note1:            { type: String, default: '', trim: true },
+    note2:            { type: String, default: '', trim: true },
+    emergencyNotes:   { type: String, default: '', trim: true },
+    imageUrl1:        { type: String, default: '', trim: true },
+    imageUrl2:        { type: String, default: '', trim: true },
+    status:           { type: String, default: 'Pending', enum: ['Pending', 'In Progress', 'Done'] },
+  },
+  {
+    timestamps: {
+      createdAt: 'created_date_time',
+      updatedAt: 'modified_date_time',
+    },
+    collection: 'jobCards',
+  }
+);
+
+const JobCard = mongoose.model('JobCard', jobCardSchema);
+module.exports = JobCard;

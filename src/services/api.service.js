@@ -186,10 +186,88 @@ const readFileFromUrl = async (url, accesstoken) => {
     }
   });
 };
+async function getInventorySnapshot(accessToken, skuCodes = []) {
+  const url = 'https://eliteedition.unicommerce.com/services/rest/v1/inventory/inventorySnapshot/get';
+  const body = {};
+  if (skuCodes && skuCodes.length > 0) {
+    body.itemTypeSKUs = skuCodes;
+  } else {
+    body.updatedSinceInMinutes = 1440; // 24 hours
+  }
+  try {
+    const response = await axios.post(url, body, {
+      headers: {
+        Authorization: `bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Facility: 'Oequal',
+        Cookie: 'unicommerce=app1',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error in getInventorySnapshot API call:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+}
+
+async function searchReturns(accessToken, filters = {}) {
+  const url = 'https://eliteedition.unicommerce.com/services/rest/v1/oms/return/search';
+  const now = new Date();
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  
+  const formatUniDate = (d) => d.toISOString().slice(0, 19);
+
+  const body = {
+    returnType: filters.returnType || 'RTO',
+    updatedFrom: filters.updatedFrom || formatUniDate(weekAgo),
+    updatedTo: filters.updatedTo || formatUniDate(now),
+  };
+
+  try {
+    const response = await axios.post(url, body, {
+      headers: {
+        Authorization: `bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Facility: 'Oequal',
+        Cookie: 'unicommerce=app1',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error in searchReturns API call:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+}
+
+async function getSaleOrderLive(accessToken, orderCode) {
+  const url = 'https://eliteedition.unicommerce.com/services/rest/v1/oms/saleorder/get';
+  const body = {
+    code: orderCode,
+    paymentDetailRequired: true,
+  };
+  try {
+    const response = await axios.post(url, body, {
+      headers: {
+        Authorization: `bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Cookie: 'unicommerce=app1',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error in getSaleOrderLive API call:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+}
+
 module.exports = {
   fetchProductData,
   getAccessToken,
   createExportJob,
   checkJobStatus,
   readFileFromUrl,
+  getInventorySnapshot,
+  searchReturns,
+  getSaleOrderLive,
 };
+

@@ -624,9 +624,80 @@ const downloadStockOutwardPdf = async (req, res) => {
   }
 };
 
+const getStockValueData = async (req, res) => {
+  try {
+    const raw = await db.Inventory.find().lean();
+    const { totalQty, totalSell, items } = groupInventoryItems(raw, 'currentlyAvailableStock');
+    await enrichImages(items);
+    res.json({ totalQty, totalSell, items });
+  } catch (err) {
+    logger.error('getStockValueData error: %o', err);
+    res.status(500).json({ error: 'Internal Server Error', details: err.message });
+  }
+};
+
+const getStockInwardData = async (req, res) => {
+  try {
+    const { dateStart, dateEnd } = req.query;
+    if (!dateStart || !dateEnd) return res.status(400).json({ error: 'dateStart and dateEnd are required' });
+
+    const start = new Date(dateStart);
+    const end   = new Date(dateEnd);
+    end.setHours(23, 59, 59, 999);
+
+    const raw = await db.Inventory.find({ created_date_time: { $gte: start, $lte: end } }).lean();
+    const { totalQty, items } = groupInventoryItems(raw, 'qty');
+    const totalPurchase = items.reduce((s, i) => s + i.totalPurchaseAmount, 0);
+    await enrichImages(items);
+    res.json({ totalQty, totalPurchase, items });
+  } catch (err) {
+    logger.error('getStockInwardData error: %o', err);
+    res.status(500).json({ error: 'Internal Server Error', details: err.message });
+  }
+};
+
+const getStockOutwardData = async (req, res) => {
+  try {
+    const { dateStart, dateEnd } = req.query;
+    if (!dateStart || !dateEnd) return res.status(400).json({ error: 'dateStart and dateEnd are required' });
+
+    const start = new Date(dateStart);
+    const end   = new Date(dateEnd);
+    end.setHours(23, 59, 59, 999);
+
+    const stockOutLogs = await db.StockOut.find({ created_date_time: { $gte: start, $lte: end } }).lean();
+    const raw = [];
+    for (const log of stockOutLogs) {
+      const inv = await db.Inventory.findOne({ skuCode: log.skuCode }).lean();
+      raw.push({
+        ...log,
+        itemName:     inv?.itemName     || log.skuCode || 'Unknown',
+        size:         inv?.size         || log.size    || 'N/A',
+        imageUrl:     inv?.imageUrl     || '',
+        salePrice:    inv?.salePrice    || 0,
+        purchasePrice:inv?.purchasePrice|| 0,
+        qty:          log.qtyOut        || 0,
+      });
+    }
+
+    const { totalQty, totalSell, items } = groupInventoryItems(raw, 'qty');
+    const totalPurchase = items.reduce((s, i) => s + i.totalPurchaseAmount, 0);
+    const totalProfit   = totalSell - totalPurchase;
+    await enrichImages(items);
+
+    res.json({ totalQty, totalSell, totalPurchase, totalProfit, items });
+  } catch (err) {
+    logger.error('getStockOutwardData error: %o', err);
+    res.status(500).json({ error: 'Internal Server Error', details: err.message });
+  }
+};
+
 module.exports = {
   getInventoryReport,
   downloadStockValuePdf,
   downloadStockInwardPdf,
   downloadStockOutwardPdf,
+  getStockValueData,
+  getStockInwardData,
+  getStockOutwardData,
 };

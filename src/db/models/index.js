@@ -35,6 +35,8 @@ const db = {
   Vendor: require('./vendor.model'),
   Party: require('./party.model'),
   StockOut: require('./stockOut.model'),
+  JobCard: require('./jobCard.model'),
+  Design: require('./design.model'),
   mongoose,
 };
 
