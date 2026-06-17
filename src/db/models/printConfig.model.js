@@ -28,6 +28,10 @@ const printConfigSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    designers: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,

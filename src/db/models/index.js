@@ -40,6 +40,9 @@ const db = {
   MyntraConfig: require('./myntraConfig.model'),
   ReturnRecord: require('./returnRecord.model'),
   PrintConfig: require('./printConfig.model'),
+  ChatRoom: require('./chat.model').ChatRoom,
+  ChatMessage: require('./chat.model').ChatMessage,
+  Task: require('./task.model').Task,
   mongoose,
 };
 

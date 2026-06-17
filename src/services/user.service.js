@@ -22,7 +22,7 @@ async function getUserById(id) {
 }
 
 async function createUser(req) {
-  const { email, name, password, role } = req.body;
+  const { email, name, password, role, permissions } = req.body;
   // Validate required role field
   if (!role) {
     throw new ApiError(httpStatus.BAD_REQUEST, '`role` is required');
@@ -39,6 +39,7 @@ async function createUser(req) {
     email,
     password: hashedPassword,
     role,
+    permissions: permissions || [],
   });
 
   const createdUser = createdUserDoc.toObject();

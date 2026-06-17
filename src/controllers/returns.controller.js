@@ -37,8 +37,12 @@ const processReturn = async (req, res) => {
     // Here we find the SKU inside the variations array of the InventoryProduct.
     if (status === 'STOCKED_IN') {
       await db.InventoryProduct.updateOne(
-        { "variations.sku": sku },
-        { $inc: { "variations.$.quantity": quantity } }
+        { skuCode: sku },
+        { $inc: { qty: quantity } }
+      );
+      await db.Inventory.updateOne(
+        { skuCode: sku },
+        { $inc: { qty: quantity, currentlyAvailableStock: quantity } }
       );
     }
 
@@ -83,8 +87,12 @@ const markRefinished = async (req, res) => {
 
     // Increment inventory since it's now repacked and fresh
     await db.InventoryProduct.updateOne(
-      { "variations.sku": record.sku },
-      { $inc: { "variations.$.quantity": record.quantity } }
+      { skuCode: record.sku },
+      { $inc: { qty: record.quantity } }
+    );
+    await db.Inventory.updateOne(
+      { skuCode: record.sku },
+      { $inc: { qty: record.quantity, currentlyAvailableStock: record.quantity } }
     );
 
     res.status(httpStatus.OK).send({

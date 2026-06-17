@@ -35,12 +35,16 @@ const updatePrintConfig = async (req, res) => {
       return res.status(httpStatus.BAD_REQUEST).send('Missing action, field, or value');
     }
 
-    const validFields = ['categories', 'passes', 'parties', 'widths', 'fabrics'];
+    const validFields = ['categories', 'passes', 'parties', 'widths', 'fabrics', 'designers'];
     if (!validFields.includes(field)) {
       return res.status(httpStatus.BAD_REQUEST).send('Invalid field');
     }
 
     let config = await getConfig();
+
+    if (!config[field]) {
+      config[field] = [];
+    }
 
     if (action === 'add') {
       if (!config[field].includes(value)) {

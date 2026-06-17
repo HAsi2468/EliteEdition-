@@ -20,6 +20,10 @@ const userSchema = new mongoose.Schema(
 			enum: ['admin', 'user'],
 			default: 'user',
 		},
+		permissions: {
+			type: [String],
+			default: [],
+		},
 		created_date_time: {
 			type: Date,
 			default: Date.now,
