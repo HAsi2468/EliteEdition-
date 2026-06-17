@@ -121,12 +121,13 @@ const updateJobCard = async (req, res) => {
       body.deliveryDate = new Date().toISOString().split('T')[0];
     }
 
-    // Automatically set job card main status to Done if all tracking is completed
+    // Automatically set job card main status based on tracking stages
     if (printStatus === 'Printing Done' && fusingStatus === 'Fusing Done' && deliveryStatus === 'Delivery Done') {
       body.status = 'Done';
-    } else if (existingCard.status === 'Done' && (printStatus !== 'Printing Done' || fusingStatus !== 'Fusing Done' || deliveryStatus !== 'Delivery Done')) {
-      // Demote to In Progress if it was Done but any tracking status is reverted
+    } else if (printStatus === 'Printing Done' || fusingStatus === 'Fusing Done' || deliveryStatus === 'Delivery Done') {
       body.status = 'In Progress';
+    } else {
+      body.status = 'Pending';
     }
 
     const card = await db.JobCard.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true }).lean();
