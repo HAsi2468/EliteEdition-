@@ -35,7 +35,7 @@ const updatePrintConfig = async (req, res) => {
       return res.status(httpStatus.BAD_REQUEST).send('Missing action, field, or value');
     }
 
-    const validFields = ['categories', 'passes', 'parties', 'widths', 'fabrics', 'designers', 'billToOptions', 'shipToOptions', 'machines', 'machine_profile'];
+    const validFields = ['categories', 'passes', 'parties', 'widths', 'fabrics', 'designers', 'billToOptions', 'shipToOptions', 'machines', 'machine_profile', 'temperatures', 'speeds'];
     if (!validFields.includes(field)) {
       return res.status(httpStatus.BAD_REQUEST).send('Invalid field');
     }
