@@ -65,7 +65,7 @@ const createInventory = async (req, res) => {
 const getInventory = async (req, res) => {
   try {
     const { search } = req.query;
-    const whereClause = {};
+    const whereClause = { party: { $ne: 'Uniware Channel Sync' } };
 
     if (search) {
       const searchRegex = new RegExp(search, 'i');
@@ -394,12 +394,14 @@ const syncInventorySnapshot = async (req, res) => {
       });
 
       if (existingItem) {
-        existingItem.currentlyAvailableStock = uniStock;
-        if (existingItem.qty < uniStock) {
-          existingItem.qty = uniStock;
+        if (existingItem.party === 'Uniware Channel Sync') {
+          existingItem.currentlyAvailableStock = uniStock;
+          if (existingItem.qty < uniStock) {
+            existingItem.qty = uniStock;
+          }
+          await existingItem.save();
+          updatedCount++;
         }
-        await existingItem.save();
-        updatedCount++;
       } else {
         // Create new inventory item
         let name = 'Uniware Synced Item';

@@ -1,7 +1,7 @@
 const express = require('express');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const config = require('../../config/config');
 const { ChatRoom, ChatMessage, Task } = require('../../db/models');
 const multer = require('multer');
@@ -44,7 +44,7 @@ router.post('/presign', async (req, res) => {
     });
 
     const fileExtension = fileType.split('/')[1] || 'jpg';
-    const fileName = `uploads/${uuidv4()}.${fileExtension}`;
+    const fileName = `uploads/${crypto.randomUUID()}.${fileExtension}`;
 
     const command = new PutObjectCommand({
       Bucket: config.aws.bucketName,
