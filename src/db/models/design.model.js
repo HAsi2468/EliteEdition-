@@ -15,6 +15,7 @@ const designSchema = new mongoose.Schema(
     category:       { type: String, default: '', trim: true },   // e.g. "SUIT", "DUPATTA"
     imageUrl:       { type: String, default: '', trim: true },   // Main design image
     imageUrl2:      { type: String, default: '', trim: true },   // Optional second image
+    paperType:      { type: String, default: '', trim: true },
     notes:          { type: String, default: '', trim: true },
     status:         { type: String, default: 'Active', enum: ['Active', 'Inactive'] },
     
