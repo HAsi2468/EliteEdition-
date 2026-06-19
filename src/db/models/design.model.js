@@ -8,6 +8,7 @@ const designSchema = new mongoose.Schema(
     fabricName:     { type: String, default: '', trim: true },
     fusingTemp:     { type: String, default: '', trim: true },
     speed:          { type: String, default: '', trim: true },
+    machineProfiles:{ type: Map, of: String, default: {} },
     colors:         { type: String, default: '', trim: true },
     panna:          { type: String, default: '', trim: true },
     pass:           { type: String, default: '', trim: true },

@@ -32,6 +32,32 @@ const printConfigSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    machines: {
+      type: [{
+        name: { type: String, required: true },
+        profiles: { type: [String], default: [] }
+      }],
+      default: [
+        { name: 'GRANDO', profiles: [] },
+        { name: 'PRINTDOT', profiles: [] }
+      ],
+    },
+    billToOptions: {
+      type: [String],
+      default: [],
+    },
+    shipToOptions: {
+      type: [String],
+      default: [],
+    },
+    temperatures: {
+      type: [String],
+      default: [],
+    },
+    speeds: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,

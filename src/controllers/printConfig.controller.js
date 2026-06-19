@@ -29,31 +29,46 @@ const getPrintConfig = async (req, res) => {
 
 const updatePrintConfig = async (req, res) => {
   try {
-    const { action, field, value } = req.body;
+    const { action, field, value, machineName } = req.body;
     
     if (!action || !field || !value) {
       return res.status(httpStatus.BAD_REQUEST).send('Missing action, field, or value');
     }
 
-    const validFields = ['categories', 'passes', 'parties', 'widths', 'fabrics', 'designers'];
+    const validFields = ['categories', 'passes', 'parties', 'widths', 'fabrics', 'designers', 'billToOptions', 'shipToOptions', 'machines', 'machine_profile'];
     if (!validFields.includes(field)) {
       return res.status(httpStatus.BAD_REQUEST).send('Invalid field');
     }
 
     let config = await getConfig();
 
-    if (!config[field]) {
-      config[field] = [];
-    }
-
-    if (action === 'add') {
-      if (!config[field].includes(value)) {
-        config[field].push(value);
+    if (field === 'machines') {
+      if (action === 'add') {
+        const exists = config.machines.find(m => m.name === value);
+        if (!exists) config.machines.push({ name: value, profiles: [] });
+      } else if (action === 'remove') {
+        config.machines = config.machines.filter(m => m.name !== value);
       }
-    } else if (action === 'remove') {
-      config[field] = config[field].filter(item => item !== value);
+    } else if (field === 'machine_profile') {
+      if (!machineName) return res.status(httpStatus.BAD_REQUEST).send('Missing machineName');
+      const machine = config.machines.find(m => m.name === machineName);
+      if (!machine) return res.status(httpStatus.BAD_REQUEST).send('Machine not found');
+      
+      if (action === 'add') {
+        if (!machine.profiles.includes(value)) machine.profiles.push(value);
+      } else if (action === 'remove') {
+        machine.profiles = machine.profiles.filter(p => p !== value);
+      }
     } else {
-      return res.status(httpStatus.BAD_REQUEST).send('Invalid action (use add or remove)');
+      if (!config[field]) config[field] = [];
+      
+      if (action === 'add') {
+        if (!config[field].includes(value)) config[field].push(value);
+      } else if (action === 'remove') {
+        config[field] = config[field].filter(item => item !== value);
+      } else {
+        return res.status(httpStatus.BAD_REQUEST).send('Invalid action (use add or remove)');
+      }
     }
 
     await config.save();

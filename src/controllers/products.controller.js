@@ -677,73 +677,58 @@ const runBackgroundImport = async (missingSKUs, accessToken) => {
     return chunks;
   };
   
-  console.log(`[Background] Starting product fetch for ${missingSKUs.length} SKUs...`);
   const allProductsMap = new Map();
-  
-  // To get orderDate and itemTypeName, we query the order associated with the SKU
-  const salesOrders = await db.SaleOrder.find({ itemSKUCode: { $in: missingSKUs } }, { itemSKUCode: 1, orderDate: 1, itemTypeName: 1 }).lean();
-  
-  for (const skuCode of missingSKUs) {
+  const isBulkSync = !missingSKUs || missingSKUs.length === 0;
+
+  if (!isBulkSync) {
+    console.log(`[Background] Starting product fetch for ${missingSKUs.length} SKUs...`);
+    const salesOrders = await db.SaleOrder.find({ itemSKUCode: { $in: missingSKUs } }, { itemSKUCode: 1, orderDate: 1, itemTypeName: 1 }).lean();
+    
+    for (const skuCode of missingSKUs) {
+      try {
+        const { elements } = await fetchProductData(skuCode, accessToken);
+        if (elements && elements.length > 0) {
+          const productInfo = elements[0];
+          const foundOrder = salesOrders.find(o => o.itemSKUCode === skuCode);
+          productInfo.orderDate = foundOrder ? foundOrder.orderDate : new Date();
+          if (foundOrder && foundOrder.itemTypeName) {
+            productInfo.description = foundOrder.itemTypeName;
+          } else if (productInfo.name) {
+            productInfo.description = productInfo.name;
+          }
+          allProductsMap.set(skuCode, productInfo);
+        }
+      } catch (err) {
+        console.error(`[Background] Failed to fetch product details for SKU: ${skuCode}`, err.message);
+      }
+    }
+  } else {
+    console.log(`[Background] Starting bulk product fetch for ALL available products in Uniware...`);
     try {
-      // Fire Search Item(s) API with body { productCode: "ItemSKUCode" }
-      const { elements } = await fetchProductData(skuCode, accessToken);
-      if (elements && elements.length > 0) {
-        const productInfo = elements[0];
-        
-        // Find associated order
-        const foundOrder = salesOrders.find(o => o.itemSKUCode === skuCode);
-        productInfo.orderDate = foundOrder ? foundOrder.orderDate : new Date();
-        
-        // Use itemTypeName for product name if it exists
-        if (foundOrder && foundOrder.itemTypeName) {
-          productInfo.description = foundOrder.itemTypeName;
-        } else if (productInfo.name) {
-          productInfo.description = productInfo.name;
+      const axios = require('axios');
+      const response = await axios.post(
+        'https://eliteedition.unicommerce.com/services/rest/v1/product/itemType/search',
+        {},
+        {
+          headers: {
+            Authorization: `bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            Cookie: 'unicommerce=app1',
+          },
         }
-        
-        allProductsMap.set(skuCode, productInfo);
-        console.log(`[Background] Successfully fetched details for SKU: ${skuCode}`);
-        
-        // 1. Update matching sale_orders
-        // COMMENTED OUT as per user request to NOT change sale_order table
-        /*
-        const saleOrderUpdate = {};
-        if (productInfo.name) saleOrderUpdate.itemTypeName = productInfo.name;
-        if (productInfo.color) saleOrderUpdate.itemTypeColor = productInfo.color;
-        if (productInfo.size) saleOrderUpdate.itemTypeSize = productInfo.size;
-        if (productInfo.brand) saleOrderUpdate.itemTypeBrand = productInfo.brand;
-        if (productInfo.price !== undefined && productInfo.price !== null) {
-          saleOrderUpdate.mrp = String(productInfo.price);
-        }
-        if (productInfo.weight !== undefined && productInfo.weight !== null) {
-          saleOrderUpdate.weight = String(productInfo.weight);
-        }
-        
-        if (Object.keys(saleOrderUpdate).length > 0) {
-          const resSO = await db.SaleOrder.updateMany({ itemSKUCode: skuCode }, { $set: saleOrderUpdate });
-          console.log(`[Background] Updated ${resSO.modifiedCount} sale_orders for SKU: ${skuCode}`);
-        }
-        */
-        
-        // 2. Update matching salesList
-        const salesListUpdate = {};
-        if (productInfo.color) salesListUpdate.itemTypeColor = productInfo.color;
-        if (productInfo.brand) salesListUpdate.itemTypeBrand = productInfo.brand;
-        if (productInfo.size) salesListUpdate.itemTypeSize = productInfo.size;
-        if (productInfo.imageUrl) salesListUpdate.productImage = productInfo.imageUrl;
-        if (productInfo.price !== undefined && productInfo.price !== null) {
-          salesListUpdate.mrp = String(productInfo.price);
-        }
-        
-        if (Object.keys(salesListUpdate).length > 0) {
-          const resSL = await db.SalesList.updateMany({ itemSKUCode: skuCode }, { $set: salesListUpdate });
-          console.log(`[Background] Updated ${resSL.modifiedCount} salesList entries for SKU: ${skuCode}`);
-        }
-      } else {
-        console.warn(`[Background] No product elements found for SKU: ${skuCode}`);
+      );
+      if (response.data && response.data.elements) {
+        response.data.elements.forEach((productInfo) => {
+          if (productInfo.skuCode) {
+            productInfo.orderDate = new Date();
+            if (productInfo.name) productInfo.description = productInfo.name;
+            allProductsMap.set(productInfo.skuCode, productInfo);
+          }
+        });
+        console.log(`[Background] Successfully fetched ${allProductsMap.size} products from Uniware.`);
       }
     } catch (err) {
-      console.error(`[Background] Failed to fetch product details for SKU: ${skuCode}`, err.message);
+      console.error(`[Background] Failed to bulk fetch products from Uniware:`, err.message);
     }
   }
   
@@ -755,13 +740,28 @@ const runBackgroundImport = async (missingSKUs, accessToken) => {
   const transformedProducts = transformProducts(Array.from(allProductsMap.values()));
   const productChunks = splitData(transformedProducts, CHUNK_SIZE);
   
-  let totalAdded = 0;
+  let totalAddedProduct = 0;
+  let totalAddedInventory = 0;
+  
   for (const [index, chunk] of productChunks.entries()) {
     console.log(`[Background] Inserting chunk ${index + 1}/${productChunks.length}`);
+    
+    // 1. Sync exact variations to InventoryProduct
+    const inventoryOperations = chunk.map((item) => ({
+      updateOne: {
+        filter: { skuCode: item.skuCode },
+        update: { $set: item },
+        upsert: true,
+      },
+    }));
+    const invResult = await db.InventoryProduct.bulkWrite(inventoryOperations);
+    totalAddedInventory += invResult.upsertedCount + invResult.modifiedCount;
+
+    // 2. Sync grouped base SKUs to Product
     const operations = chunk.map((item) => {
+      const baseSku = item.skuCode.split('_')[0];
       const { size, color, ...rest } = item;
       
-      // Filter out null/undefined values to prevent overwriting existing populated DB fields with nulls
       const cleanRest = {};
       for (const key in rest) {
         if (rest[key] !== null && rest[key] !== undefined) {
@@ -769,7 +769,9 @@ const runBackgroundImport = async (missingSKUs, accessToken) => {
         }
       }
       
-      const updateDoc = { $set: cleanRest };
+      delete cleanRest.skuCode; // Ensure exact skuCode doesn't override baseSku
+      
+      const updateDoc = { $set: cleanRest, $setOnInsert: { skuCode: baseSku } };
       
       if (size && size.length > 0) {
         updateDoc.$addToSet = updateDoc.$addToSet || {};
@@ -782,28 +784,29 @@ const runBackgroundImport = async (missingSKUs, accessToken) => {
       
       return {
         updateOne: {
-          filter: { skuCode: item.skuCode },
+          filter: { skuCode: baseSku },
           update: updateDoc,
           upsert: true,
         },
       };
     });
     const result = await db.Product.bulkWrite(operations);
-    totalAdded += result.upsertedCount + result.modifiedCount;
+    totalAddedProduct += result.upsertedCount + result.modifiedCount;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
-  console.log(`[Background] DB Import Complete! Added/Updated ${totalAdded} products.`);
+  console.log(`[Background] DB Import Complete! Added/Updated ${totalAddedProduct} grouped products and ${totalAddedInventory} exact inventory variants.`);
 };
 
 async function fetchMissingProduct(req, res) {
   try {
     let missingSKUs = [];
     const querySKU = req.query.itemSKUCode || req.body.itemSKUCode;
+    const isBulkSync = req.query.bulk === 'true' || req.body.bulk === true || !querySKU;
     
     if (querySKU) {
       // If a specific SKU code is requested, always fetch and update it to keep it fresh
       missingSKUs = [querySKU];
-    } else {
+    } else if (!isBulkSync) {
       // Fallback: Scan database for all unique SKU codes in sale_orders
       console.log('Scanning database for all unique SKU codes...');
       const salesOrders = await db.SaleOrder.find({}, { itemSKUCode: 1 }).lean();
@@ -812,37 +815,44 @@ async function fetchMissingProduct(req, res) {
       ];
     }
     
-    console.log(`Missing SKUs to fetch:`, missingSKUs);
-    
-    if (missingSKUs.length === 0) {
-      return res.json({
-        message: 'No missing products found or specified product variation already exists.',
-        totalMissing: 0,
-        expectedTimeSeconds: 0
-      });
-    }
-    
-    // Calculate expected time: each Unicommerce SKU fetch takes ~0.4s
-    const expectedTimeSeconds = Math.ceil(missingSKUs.length * 0.4);
-    
-    // Retrieve access token to pass to the background function
     const accessToken = await getAccessToken();
     if (!accessToken) {
       return res.status(500).json({ error: 'Failed to retrieve access token from Unicommerce.' });
     }
     
-    // Launch the background process
-    runBackgroundImport(missingSKUs, accessToken).catch((err) => {
-      console.error('Error in background missing product import:', err);
-    });
+    let expectedTimeSeconds = 0;
     
-    // Respond immediately with the expected duration!
-    return res.json({
-      message: 'Background fetch started.',
-      totalMissing: missingSKUs.length,
-      missingSKUs,
-      expectedTimeSeconds,
-    });
+    if (isBulkSync) {
+      console.log('Triggering bulk product sync from Unicommerce...');
+      expectedTimeSeconds = 5; // Bulk fetch is fast
+      runBackgroundImport([], accessToken).catch((err) => {
+        console.error('Error in background missing product import:', err);
+      });
+      return res.json({
+        message: 'Background bulk fetch started.',
+        totalMissing: 'ALL',
+        expectedTimeSeconds,
+      });
+    } else {
+      console.log(`Missing SKUs to fetch:`, missingSKUs);
+      if (missingSKUs.length === 0) {
+        return res.json({
+          message: 'No missing products found or specified product variation already exists.',
+          totalMissing: 0,
+          expectedTimeSeconds: 0
+        });
+      }
+      expectedTimeSeconds = Math.ceil(missingSKUs.length * 0.4);
+      runBackgroundImport(missingSKUs, accessToken).catch((err) => {
+        console.error('Error in background missing product import:', err);
+      });
+      return res.json({
+        message: 'Background fetch started.',
+        totalMissing: missingSKUs.length,
+        missingSKUs,
+        expectedTimeSeconds,
+      });
+    }
   } catch (error) {
     logger.error('Error in fetchMissingProduct: %o', error);
     res.status(500).json({ error: 'Internal Server Error' });
