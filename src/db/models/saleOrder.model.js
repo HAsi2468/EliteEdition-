@@ -205,5 +205,11 @@ const saleOrderSchema = new mongoose.Schema(
 	}
 );
 
+saleOrderSchema.index({ saleOrderItemCode: 1 });
+saleOrderSchema.index({ displayOrderCode: 1 });
+saleOrderSchema.index({ itemSKUCode: 1 });
+saleOrderSchema.index({ orderDate: 1 });
+saleOrderSchema.index({ addedOn: -1 });
+
 const SaleOrder = mongoose.model('SaleOrder', saleOrderSchema);
 module.exports = SaleOrder;

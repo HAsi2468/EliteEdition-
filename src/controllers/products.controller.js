@@ -157,11 +157,18 @@ const readFile = async (url, accesstoken) => {
   for (const [index, chunk] of dataChunks.entries()) {
     logger.info(`Processing SaleOrder chunk ${index + 1}/${dataChunks.length}`);
     const orderCodes = chunk.map(item => item.saleOrderCode || item.displayorderCode).filter(Boolean);
-    logger.info(`SaleOrders to insert in this chunk: ${orderCodes.slice(0, 5).join(', ')}${orderCodes.length > 5 ? `... (+${orderCodes.length - 5} more)` : ''}`);
-    const res = await db.SaleOrder.insertMany(chunk);
-    totalSaleOrdersStored += (res ? res.length : chunk.length);
+    logger.info(`SaleOrders to process in this chunk: ${orderCodes.slice(0, 5).join(', ')}${orderCodes.length > 5 ? `... (+${orderCodes.length - 5} more)` : ''}`);
+    const operations = chunk.map((item) => ({
+      updateOne: {
+        filter: { saleOrderItemCode: item.saleOrderItemCode },
+        update: { $set: item },
+        upsert: true,
+      },
+    }));
+    const res = await db.SaleOrder.bulkWrite(operations);
+    totalSaleOrdersStored += (res ? res.upsertedCount + res.modifiedCount : chunk.length);
   }
-  logger.info(`📊 Database Status: Stored/Inserted ${totalSaleOrdersStored} documents into db.SaleOrder.`);
+  logger.info(`📊 Database Status: Stored/Upserted ${totalSaleOrdersStored} documents into db.SaleOrder.`);
 
   // Process chunks for SalesList with updates
   for (const [index, chunk] of dataChunks.entries()) {
@@ -242,8 +249,9 @@ const readFile = async (url, accesstoken) => {
       const baseSku = item.skuCode.split('_')[0];
       const sizeToPush = item.size && item.size.length > 0 ? item.size[0] : null;
       
+      const { size, ...itemWithoutSize } = item;
       const updateDoc = {
-        $setOnInsert: { ...item, skuCode: baseSku, size: [] }
+        $setOnInsert: { ...itemWithoutSize, skuCode: baseSku }
       };
       if (sizeToPush) {
         updateDoc.$addToSet = { size: sizeToPush };
@@ -329,7 +337,8 @@ const fetchFromAPIS = async (req, res) => {
       return res.json({ message: 'Mock fetchFromAPIS result (no token)', data: [] });
     }
 
-    const jobResult = await createExportJob(accessToken);
+    const dateRangeText = req?.query?.dateRangeText || 'TODAY';
+    const jobResult = await createExportJob(accessToken, dateRangeText);
     if (!jobResult || jobResult.error) {
       const errMsg = (jobResult && jobResult.error) || 'Failed to create export job';
       logger.error('Export job creation error: %s', errMsg);
@@ -342,6 +351,8 @@ const fetchFromAPIS = async (req, res) => {
       try {
         const statusRes = await checkJobStatus(accessToken, jobCode);
         logger.info(`Current job status: ${statusRes ? statusRes.status : 'unknown'}`);
+        console.log('statusRes payload:', JSON.stringify(statusRes, null, 2));
+        
         if (statusRes && (statusRes.status === 'COMPLETE' || statusRes.status === 'COMPLETED' || (statusRes.successful && (statusRes.filePath || statusRes.downloadUrl)))) {
           const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(2);
           console.log(`✅ Export job completed in ${elapsedSec} seconds`);
@@ -1103,6 +1114,21 @@ const updateProduct = async (req, res) => {
 
 const instantSyncFromSaleOrders = async (req, res) => {
   try {
+    const { getAccessToken, fetchEntireCatalog } = require('../services/api.service');
+    const token = await getAccessToken();
+    if (!token) {
+      return res.status(500).json({ error: 'Failed to get Unicommerce access token' });
+    }
+    
+    // Fetch rich product details from Unicommerce catalog
+    const catalogItems = await fetchEntireCatalog(token);
+    // Create a map for quick lookup
+    const catalogMap = new Map();
+    for (const item of catalogItems) {
+      if (item.skuCode) catalogMap.set(item.skuCode.trim(), item);
+    }
+
+    // Get active SKUs from SaleOrders
     const salesOrders = await db.SaleOrder.aggregate([
       {
         $group: {
@@ -1119,8 +1145,11 @@ const instantSyncFromSaleOrders = async (req, res) => {
     for (const order of salesOrders) {
       if (!order._id) continue;
       const skuCode = order._id.trim();
-
       const sizeArray = order.size ? [order.size] : [];
+      
+      // Get rich details from catalog if available, otherwise fallback to SaleOrder info
+      const item = catalogMap.get(skuCode) || {};
+      const description = item.name || order.description || skuCode;
 
       // 1. Sync to InventoryProduct (Exact Variations)
       const existingInvProduct = await db.InventoryProduct.findOne({ skuCode });
@@ -1130,15 +1159,36 @@ const instantSyncFromSaleOrders = async (req, res) => {
            existingInvProduct.size.push(sizeArray[0]);
            changed = true;
         }
+        // Update basic details if missing or default, respecting user custom modifications
+        if (!existingInvProduct.description && item.name) {
+           existingInvProduct.description = item.name;
+           changed = true;
+        }
+        if (!existingInvProduct.imageUrl && item.imageUrl) {
+           existingInvProduct.imageUrl = item.imageUrl;
+           changed = true;
+        }
+        if ((!existingInvProduct.color || existingInvProduct.color.length === 0) && item.color) {
+           existingInvProduct.color = [item.color];
+           changed = true;
+        }
+        if (!existingInvProduct.brand && item.brand) {
+           existingInvProduct.brand = item.brand;
+           changed = true;
+        }
         if (changed) {
            await existingInvProduct.save();
         }
       } else {
         await db.InventoryProduct.create({
           skuCode: skuCode,
-          description: order.description || skuCode,
+          description: description,
           size: sizeArray,
-          imageUrl: ""
+          color: item.color ? [item.color] : [],
+          brand: item.brand || null,
+          imageUrl: item.imageUrl || "",
+          price: item.price || null,
+          categoryName: item.categoryName || null,
         });
       }
 
@@ -1151,6 +1201,14 @@ const instantSyncFromSaleOrders = async (req, res) => {
            existingProduct.size.push(sizeArray[0]);
            changed = true;
         }
+        if (!existingProduct.description && item.name) {
+           existingProduct.description = item.name;
+           changed = true;
+        }
+        if (!existingProduct.imageUrl && item.imageUrl) {
+           existingProduct.imageUrl = item.imageUrl;
+           changed = true;
+        }
         if (changed) {
            await existingProduct.save();
            updated++;
@@ -1158,17 +1216,17 @@ const instantSyncFromSaleOrders = async (req, res) => {
       } else {
         await db.Product.create({
           skuCode: baseSku,
-          description: order.description || baseSku,
+          description: description,
           size: sizeArray,
-          imageUrl: ""
+          imageUrl: item.imageUrl || ""
         });
         added++;
       }
     }
 
-    res.json({ message: `Instant Sync Complete. Added: ${added}, Updated: ${updated}`, success: true });
+    res.json({ message: `Sync Complete. Processed ${salesOrders.length} active SKUs. Base Added: ${added}, Base Updated: ${updated}`, success: true });
   } catch (error) {
-    logger.error('Error in instantSyncFromSaleOrders: %o', error);
+    logger.error('Error in instantSyncFromSaleOrders (Catalog Sync): %o', error);
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 };

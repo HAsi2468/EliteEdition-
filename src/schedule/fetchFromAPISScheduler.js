@@ -80,4 +80,28 @@ async function runJob() {
 // Initialize the scheduler
 scheduleHourlyFetch();
 
+// -------------------------------------------------------------
+// NIGHTLY SCHEDULE (2:15 AM)
+// Fetches data for 'YESTERDAY' to ensure complete end-of-day data is retrieved
+// -------------------------------------------------------------
+const cron = require('node-cron');
+
+cron.schedule('15 2 * * *', async () => {
+  try {
+    console.log('[🕛] Running NIGHTLY fetchFromAPIS job for YESTERDAY data (2:15 AM)');
+    const fakeReq = { query: { dateRangeText: 'YESTERDAY' } };
+    const fakeRes = {
+      status: (code) => ({
+        json: (payload) => console.log('[✅] NIGHTLY fetchFromAPIS responded', code, payload),
+        send: (payload) => console.log('[✅] NIGHTLY fetchFromAPIS responded', code, payload)
+      }),
+      json: (payload) => console.log('[✅] NIGHTLY fetchFromAPIS responded', payload),
+      send: (payload) => console.log('[✅] NIGHTLY fetchFromAPIS responded', payload)
+    };
+    await fetchFromAPIS(fakeReq, fakeRes);
+  } catch (err) {
+    console.error('[❌] NIGHTLY fetchFromAPIS failed:', err);
+  }
+});
+
 module.exports = {};

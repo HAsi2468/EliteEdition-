@@ -3,6 +3,13 @@ const productsController = require('../../controllers/products.controller');
 const { getSalseList } = require('../../controllers/salesList.controller');
 
 const router = express.Router();
+
+router.get('/clear-sales', async (req, res) => {
+  const db = require('../../db/models');
+  await db.SaleOrder.deleteMany({});
+  res.json({ success: true, message: 'SaleOrder collection cleared.' });
+});
+
 router.route('/')
   .post(productsController.createProduct);
 router.route('/list').get(productsController.getAllProductsList);

@@ -34,6 +34,28 @@ async function fetchProductData(skuCode, token) {
   }
 }
 
+async function fetchEntireCatalog(token) {
+  console.log('[fetchEntireCatalog] Starting full catalog sync...');
+  try {
+    const response = await axios.post(
+      'https://eliteedition.unicommerce.com/services/rest/v1/product/itemType/search',
+      {},
+      {
+        headers: {
+          Authorization: `bearer ${token}`,
+          'Content-Type': 'application/json',
+          Cookie: 'unicommerce=app3',
+        },
+      }
+    );
+    console.log('[fetchEntireCatalog] Success. Total Elements:', response.data.totalElements || response.data.elements?.length);
+    return response.data.elements || [];
+  } catch (error) {
+    console.error('[fetchEntireCatalog] Error fetching full catalog:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+}
+
 async function getAccessToken() {
   const tokenUrl = 'https://eliteedition.unicommerce.com/oauth/token';
   const payload = new URLSearchParams({
@@ -65,7 +87,7 @@ async function getAccessToken() {
   }
 }
 
-async function createExportJob(accessToken) {
+async function createExportJob(accessToken, dateRangeText = 'TODAY') {
   const createJobUrl =
     'https://eliteedition.unicommerce.com/services/rest/v1/export/job/create';
 
@@ -79,7 +101,7 @@ async function createExportJob(accessToken) {
   const primaryBody = {
     exportJobTypeName: 'Sale Orders',
     exportColums: rotatedColumns,
-    exportFilters: [{ id: 'addedOn', dateRange: { textRange: 'TODAY' } }],
+    exportFilters: [{ id: 'addedOn', dateRange: { textRange: dateRangeText } }],
     /*TODAY, YESTERDAY, LAST_WEEK, LAST_MONTH, THIS_MONTH, LAST_7_DAYS, 
     LAST_30_DAYS,LAST_60_DAYS, LAST_90_DAYS, LAST_QUARTER, THIS_QUARTER*/
     frequency: 'ONETIME',
@@ -262,6 +284,7 @@ async function getSaleOrderLive(accessToken, orderCode) {
 
 module.exports = {
   fetchProductData,
+  fetchEntireCatalog,
   getAccessToken,
   createExportJob,
   checkJobStatus,

@@ -1,0 +1,24 @@
+name: Deploy Node.js Backend to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to AWS EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.AWS_HOST }}
+          username: ${{ secrets.AWS_USERNAME }}
+          key: ${{ secrets.AWS_SSH_KEY }}
+          script: |
+            cd ${{ secrets.AWS_TARGET_DIR }}
+            git pull origin main
+            npm install
+            # Restart PM2 or the Node server (adjust the app name if needed)
+            pm2 restart all || npm start
