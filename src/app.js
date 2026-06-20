@@ -62,8 +62,14 @@ const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // send back a 404 error for any unknown api request
-app.use((req, res, next) => {
+app.use('/v1', (req, res, next) => {
 	next(new ApiError(httpStatus.NOT_FOUND, 'Not found'));
+});
+
+// Serve frontend website
+app.use(express.static(path.join(__dirname, '../../elite_edition_website_dist')));
+app.get('*', (req, res) => {
+	res.sendFile(path.join(__dirname, '../../elite_edition_website_dist/index.html'));
 });
 
 // convert error to ApiError, if needed
