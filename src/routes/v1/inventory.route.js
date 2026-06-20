@@ -24,4 +24,8 @@ router.route('/:id')
   .put(inventoryController.updateInventory)
   .delete(inventoryController.deleteInventory);
 
+router.get('/party/:sku', inventoryController.getPartyBySku);
+
 module.exports = router;
+
+

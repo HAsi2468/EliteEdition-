@@ -5,7 +5,7 @@ const logger = require('../config/logger');
 // Helper: build date-range filter
 // ─────────────────────────────────────────────────────────────
 const buildDateFilter = (dateStart, dateEnd) => {
-  const filter = {};
+  const filter = { saleOrderStatus: { $ne: 'CANCELLED' } };
   if (dateStart || dateEnd) {
     filter.orderDate = {};
     if (dateStart) filter.orderDate.$gte = new Date(dateStart);
@@ -385,6 +385,7 @@ const getDeadStockReport = async (req, res) => {
 
     // Get last sale date for each SKU
     const lastSaleAgg = await db.SaleOrder.aggregate([
+      { $match: { saleOrderStatus: { $ne: 'CANCELLED' } } },
       {
         $group: {
           _id: '$itemSKUCode',
@@ -470,7 +471,7 @@ const getLostRevenueEstimate = async (req, res) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const velocityAgg = await db.SaleOrder.aggregate([
-      { $match: { orderDate: { $gte: thirtyDaysAgo } } },
+      { $match: { orderDate: { $gte: thirtyDaysAgo }, saleOrderStatus: { $ne: 'CANCELLED' } } },
       {
         $addFields: {
           priceNum: { $toDouble: { $ifNull: ['$totalPrice', '0'] } },

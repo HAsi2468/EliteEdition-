@@ -442,6 +442,22 @@ const syncInventorySnapshot = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 };
+// Get party name by SKU (used by Returns & RTO UI)
+async function getPartyBySku(req, res) {
+  try {
+    const { sku } = req.params;
+    logger.info(`[INVENTORY] Fetch party for SKU: ${sku}`);
+    const record = await db.Inventory.findOne({ skuCode: sku }, 'party');
+    if (!record) {
+      logger.warn(`[INVENTORY] No record found for SKU: ${sku}`);
+      return res.status(404).json({ error: 'SKU not found' });
+    }
+    res.json({ party: record.party });
+  } catch (error) {
+    logger.error('[INVENTORY] Error fetching party by SKU: %o', error);
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
+  }
+}
 
 module.exports = {
   createInventory,
@@ -450,4 +466,5 @@ module.exports = {
   deleteInventory,
   getInventorySnapshot,
   syncInventorySnapshot,
+  getPartyBySku,
 };

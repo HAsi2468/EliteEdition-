@@ -23,6 +23,7 @@ const router = express.Router();
 
 router.use('/auth', authRoute);
 router.use('/users', userRoute);
+router.use('/upload', require('./upload.route'));
 router.use('/docs', docsRoute);
 router.use('/products', productRoute);
 router.use('/filters_value', filtersRoute);

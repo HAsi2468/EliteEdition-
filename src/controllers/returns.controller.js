@@ -4,7 +4,14 @@ const logger = require('../config/logger');
 
 const processReturn = async (req, res) => {
   try {
-    const { party, returnType, referenceId, sku, quantity, condition, notes } = req.body;
+    const { returnType, referenceId, sku, quantity, condition, notes } = req.body;
+  // Retrieve party name from inventory based on SKU
+  const inventoryRecord = await db.Inventory.findOne({ skuCode: sku });
+  if (!inventoryRecord) {
+    return res.status(httpStatus.BAD_REQUEST).send('Inventory record not found for given SKU');
+  }
+  const party = inventoryRecord.party;
+
 
     if (!party || !returnType || !referenceId || !sku || !quantity || !condition) {
       return res.status(httpStatus.BAD_REQUEST).send('Missing required fields');

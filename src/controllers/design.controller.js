@@ -3,10 +3,11 @@ const logger = require('../config/logger');
 
 const getAll = async (req, res) => {
   try {
-    const { search, category, status, page = 1, limit = 50 } = req.query;
+    const { search, category, colors, status, page = 1, limit = 50 } = req.query;
     const filter = {};
     if (status && status !== 'All') filter.status = status;
     if (category && category !== 'All') filter.category = category;
+    if (colors && colors !== 'All') filter.colors = { $regex: colors, $options: 'i' };
     if (search) {
       filter.$or = [
         { designName:     { $regex: search, $options: 'i' } },
@@ -14,6 +15,7 @@ const getAll = async (req, res) => {
         { fabricName:     { $regex: search, $options: 'i' } },
         { colourMatching: { $regex: search, $options: 'i' } },
         { category:       { $regex: search, $options: 'i' } },
+        { colors:         { $regex: search, $options: 'i' } },
       ];
     }
     const skip = (Number(page) - 1) * Number(limit);

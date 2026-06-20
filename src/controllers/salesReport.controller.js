@@ -189,7 +189,7 @@ const downloadSalesReportPdf = async (req, res) => {
     dateEndObj.setHours(23, 59, 59, 999);
 
     const { searchCode } = req.query;
-    const whereClause = { orderDate: { $gte: dateStartObj, $lte: dateEndObj } };
+    const whereClause = { orderDate: { $gte: dateStartObj, $lte: dateEndObj }, saleOrderStatus: { $ne: 'CANCELLED' } };
     if (searchCode) {
       whereClause.itemSKUCode = new RegExp(`^${searchCode}`, 'i');
     }
@@ -418,7 +418,7 @@ const downloadBrandReportPdf = async (req, res) => {
 
     // Aggregation
     const { searchCode } = req.query;
-    const whereClause = { orderDate: { $gte: dateStartObj, $lte: dateEndObj } };
+    const whereClause = { orderDate: { $gte: dateStartObj, $lte: dateEndObj }, saleOrderStatus: { $ne: 'CANCELLED' } };
     if (searchCode) {
       whereClause.itemSKUCode = new RegExp(`^${searchCode}`, 'i');
     }
