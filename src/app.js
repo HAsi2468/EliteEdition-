@@ -68,6 +68,10 @@ app.use('/v1', (req, res, next) => {
 
 // Serve frontend website
 app.use(express.static(path.join(__dirname, '../../elite_edition_website_dist')));
+
+// Serve design images
+app.use('/designs', express.static(path.join(__dirname, '../../elite_edition_images')));
+
 app.get('*', (req, res) => {
 	res.sendFile(path.join(__dirname, '../../elite_edition_website_dist/index.html'));
 });
