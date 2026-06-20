@@ -1273,10 +1273,12 @@ module.exports = {
   },
   updateSaleCount,
   fetchMissingProduct,
+  fetchSalesReport,
   fetchBrandReport,
   createProduct,
   deleteProduct,
   updateProduct,
   instantSyncFromSaleOrders,
 };
+
 
