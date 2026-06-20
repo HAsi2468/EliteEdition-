@@ -130,9 +130,21 @@ const readFile = async (url, accesstoken) => {
   logger.info('[⏱️] Starting background CSV download and DB import...');
   logger.debug('readFile ~ url: %s', url);
 
-  // Fetch and format the data
-  const formattedData = await readFileFromUrl(url, accesstoken);
-  logger.info(`Fetched ${formattedData ? formattedData.length : 0} items from CSV.`);
+  // Fetch CSV data from the provided URL
+  const rawData = await readFileFromUrl(url, accesstoken);
+  // If the fetch fails or returns empty, log a warning
+  if (!rawData || rawData.length === 0) {
+    logger.warn('No CSV data retrieved from URL: %s', url);
+  }
+  // Validate rows – ensure each has a SKU code; otherwise log and skip
+  const formattedData = rawData.filter((row) => {
+    if (!row.itemSKUCode) {
+      logger.warn('Skipping CSV row missing itemSKUCode: %j', row);
+      return false;
+    }
+    return true;
+  });
+  logger.info(`CSV import: ${rawData.length} rows fetched, ${formattedData.length} rows will be processed after validation.`);
 
   // Process the data in chunks
   const CHUNK_SIZE = 800; // Define chunk size
@@ -273,6 +285,10 @@ const readFile = async (url, accesstoken) => {
     }
   }
   logger.info(`📊 Database Status: Stored/Upserted ${totalProductsStored} documents into db.Product and db.InventoryProduct.`);
+  // Detailed summary of import results
+  logger.info(`SaleOrder – upserted/modified: ${totalSaleOrdersStored}`);
+  logger.info(`SalesList – upserted/modified: ${totalSalesListStored}`);
+  logger.info(`Products – upserted/modified: ${totalProductsStored}`);
 
   const elapsedSec = ((Date.now() - bgStartTime) / 1000).toFixed(2);
   logger.info(`[⏱️] Background DB Import completed in ${elapsedSec} seconds!`);
@@ -538,7 +554,7 @@ const getProductsSales = async (req, res) => {
 // Sales report
 const buildWhereClause = (query) => {
   const { dateStart, dateEnd, searchCode } = query;
-  const whereClause = {};
+  const whereClause = { saleOrderStatus: { $ne: 'CANCELLED' } };
 
   if (dateStart) {
     const dateStartObj = new Date(dateStart);
@@ -1233,13 +1249,28 @@ const instantSyncFromSaleOrders = async (req, res) => {
 
 module.exports = {
   getAllProductsList,
-  fetchFromAPIS,
-  getProductsSales,
+  readFile,
   deletaAllProduct,
   searchBySku,
-  fetchSalesReport,
+  fetchFromAPIS,
+  getProductsSales,
   skimHO,
   deleteDuplicateProducts,
+  runBackgroundImport,
+  // Admin helper to force a CSV import on demand
+  reimportCsv: async (req, res) => {
+    try {
+      const { url, dateRangeText } = req.query;
+      if (!url) return res.status(400).json({ error: 'Missing csv url' });
+      const token = await getAccessToken();
+      // Directly invoke the background import logic without polling
+      await readFile(url, token);
+      res.json({ message: 'CSV reimport triggered', url });
+    } catch (err) {
+      logger.error('reimportCsv error: %o', err);
+      res.status(500).json({ error: err.message });
+    }
+  },
   updateSaleCount,
   fetchMissingProduct,
   fetchBrandReport,
