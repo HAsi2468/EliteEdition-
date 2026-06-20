@@ -20,15 +20,17 @@ const SPEED_PRINTDOT = {
 };
 
 function calcExpTime(panna, passText, totalMtr, machineName) {
-  const match = passText.toString().match(/\d+/);
-  const pass = match ? Number(match[0]) : null;
-  if (!panna || !pass || !totalMtr) return '';
+  const pannaMatch = String(panna || '').match(/\d+/);
+  const pannaNum = pannaMatch ? Number(pannaMatch[0]) : null;
+  const passMatch = String(passText || '').match(/\d+/);
+  const pass = passMatch ? Number(passMatch[0]) : null;
+  if (!pannaNum || !pass || !totalMtr) return '';
 
-  const table = machineName === 'GRANDO' ? SPEED_GRANDO : machineName === 'PRINTDOT' ? SPEED_PRINTDOT : null;
-  if (!table) return '';
-  if (!table[panna] || !table[panna][pass]) return '';
+  const mName = String(machineName || '').trim().toUpperCase();
+  const table = mName === 'GRANDO' ? SPEED_GRANDO : mName === 'PRINTDOT' ? SPEED_PRINTDOT : null;
+  if (!table || !table[pannaNum] || !table[pannaNum][pass]) return '';
 
-  const speed = table[panna][pass];
+  const speed = table[pannaNum][pass];
   const time = Number(totalMtr) / speed;
   let hours = Math.floor(time);
   let minutes = Math.round((time - hours) * 60);
@@ -154,4 +156,47 @@ const calcExpTimeEndpoint = async (req, res) => {
   res.json({ expTime: calcExpTime(panna, pass, totalMtr, machineName) });
 };
 
-module.exports = { getAllJobCards, getJobCard, createJobCard, updateJobCard, deleteJobCard, calcExpTimeEndpoint };
+// ─── GET NEXT JOB CARD NUMBER ────────────────────────────────────────────────
+const getNextJobCardNumber = async (req, res) => {
+  try {
+    const config = await db.PrintConfig.findOne({ isConfig: true });
+    const startingNo = config && config.startingJobNo ? config.startingJobNo : 1;
+
+    const cards = await db.JobCard.find({}, { jobNo: 1 }).lean();
+    let maxNo = startingNo - 1;
+
+    cards.forEach(c => {
+      if (!c.jobNo) return;
+      const num = Number(c.jobNo);
+      if (!isNaN(num)) {
+        if (num > maxNo) {
+          maxNo = num;
+        }
+      } else {
+        const match = String(c.jobNo).match(/(\d+)/);
+        if (match) {
+          const parsed = Number(match[1]);
+          if (!isNaN(parsed) && parsed > maxNo) {
+            maxNo = parsed;
+          }
+        }
+      }
+    });
+
+    const nextNo = maxNo + 1;
+    res.json({ nextJobNo: `JOB NO.- ${nextNo}` });
+  } catch (err) {
+    logger.error('getNextJobCardNumber error: %o', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+module.exports = { 
+  getAllJobCards, 
+  getJobCard, 
+  createJobCard, 
+  updateJobCard, 
+  deleteJobCard, 
+  calcExpTimeEndpoint,
+  getNextJobCardNumber
+};

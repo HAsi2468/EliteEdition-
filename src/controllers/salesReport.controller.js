@@ -273,7 +273,7 @@ const downloadSalesReportPdf = async (req, res) => {
     const SIMPLE_COLS = [
       { label: 'Photo',       w: 52  },
       { label: 'SKU',         w: 110 },
-      { label: 'Sizes & Qty', w: 150 },
+      { label: 'Sizes & Qty', w: 90 },
       { label: 'Orders',      w: 55  },
       { label: 'Revenue',     w: 78  },
       { label: 'Avg',         w: 78  },
@@ -306,20 +306,26 @@ const downloadSalesReportPdf = async (req, res) => {
       const rowH = Math.max(50, numLines * 10 + 20);
 
       if (y + rowH > PAGE_H - MARGIN - 28) {
-        doc.addPage();
-        pageNum++;
-        drawHeader(doc, 'Sales Report (continued)', dateStr, pageNum);
-        y = 65;
-        y = drawTableHeader(doc, y, SIMPLE_COLS);
-        alt = false;
+        // Only add a new page if there is remaining data to render
+        if (y + rowH > PAGE_H - MARGIN - 28) {
+          // Only add a new page if there is another product after this one
+          if (prod !== products[products.length - 1]) {
+            doc.addPage();
+            pageNum++;
+            drawHeader(doc, 'Sales Report (continued)', dateStr, pageNum);
+            y = 65;
+            y = drawTableHeader(doc, y, SIMPLE_COLS);
+            alt = false;
+          }
+        }
       }
 
-      // row bg
-      doc.rect(MARGIN, y, CW, rowH).fill(alt ? C.rowAlt : C.rowNormal);
-      // bottom border
-      doc.moveTo(MARGIN, y + rowH).lineTo(MARGIN + CW, y + rowH)
-         .strokeColor(C.border).lineWidth(0.4).stroke();
-      drawDividers(doc, MARGIN, y, rowH, SIMPLE_COLS);
+       // Row background – moved font settings outside loop for speed
+       doc.rect(MARGIN, y, CW, rowH).fill(alt ? C.rowAlt : C.rowNormal);
+       // Bottom border
+       doc.moveTo(MARGIN, y + rowH).lineTo(MARGIN + CW, y + rowH)
+          .strokeColor(C.border).lineWidth(0.4).stroke();
+       drawDividers(doc, MARGIN, y, rowH, SIMPLE_COLS);
 
       const mid = y + rowH / 2;
       let x = MARGIN;
@@ -347,8 +353,10 @@ const downloadSalesReportPdf = async (req, res) => {
       x += SIMPLE_COLS[1].w;
 
       // Sizes
-      doc.fillColor(C.text).font('Helvetica').fontSize(8)
-         .text(sizesText, x + 4, y + 10, { width: SIMPLE_COLS[2].w - 8, lineBreak: true });
+      doc.fillColor(C.text).font('Helvetica').fontSize(8);
+      const sizesHeight = doc.heightOfString(sizesText, { width: SIMPLE_COLS[2].w - 8, align: 'center' });
+      const sizesY = y + (rowH - sizesHeight) / 2;
+      doc.text(sizesText, x + 4, sizesY, { width: SIMPLE_COLS[2].w - 8, align: 'center', lineBreak: true });
       x += SIMPLE_COLS[2].w;
 
       // Orders
@@ -486,7 +494,7 @@ const downloadBrandReportPdf = async (req, res) => {
     const SIMPLE_COLS = [
       { label: 'Photo',       w: 52  },
       { label: 'SKU',         w: 110 },
-      { label: 'Sizes & Qty', w: 150 },
+      { label: 'Sizes & Qty', w: 90 },
       { label: 'Orders',      w: 55  },
       { label: 'Revenue',     w: 78  },
       { label: 'Avg',         w: 78  },
@@ -584,8 +592,10 @@ const downloadBrandReportPdf = async (req, res) => {
         x += SIMPLE_COLS[1].w;
 
         // Sizes
-        doc.fillColor(C.text).font('Helvetica').fontSize(8)
-           .text(sizesText, x + 4, y + 10, { width: SIMPLE_COLS[2].w - 8, lineBreak: true });
+        doc.fillColor(C.text).font('Helvetica').fontSize(8);
+        const sizesHeight = doc.heightOfString(sizesText, { width: SIMPLE_COLS[2].w - 8, align: 'center' });
+        const sizesY = y + (rowH - sizesHeight) / 2;
+        doc.text(sizesText, x + 4, sizesY, { width: SIMPLE_COLS[2].w - 8, align: 'center', lineBreak: true });
         x += SIMPLE_COLS[2].w;
 
         // Total

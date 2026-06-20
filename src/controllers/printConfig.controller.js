@@ -35,7 +35,7 @@ const updatePrintConfig = async (req, res) => {
       return res.status(httpStatus.BAD_REQUEST).send('Missing action, field, or value');
     }
 
-    const validFields = ['categories', 'passes', 'parties', 'widths', 'fabrics', 'designers', 'paperTypes', 'billToOptions', 'shipToOptions', 'machines', 'machine_profile', 'temperatures', 'speeds'];
+    const validFields = ['categories', 'passes', 'parties', 'widths', 'fabrics', 'designers', 'paperTypes', 'billToOptions', 'shipToOptions', 'machines', 'machine_profile', 'temperatures', 'speeds', 'startingJobNo'];
     if (!validFields.includes(field)) {
       return res.status(httpStatus.BAD_REQUEST).send('Invalid field');
     }
@@ -59,6 +59,8 @@ const updatePrintConfig = async (req, res) => {
       } else if (action === 'remove') {
         machine.profiles = machine.profiles.filter(p => p !== value);
       }
+    } else if (field === 'startingJobNo') {
+      config.startingJobNo = Number(value) || 1;
     } else {
       if (!config[field]) config[field] = [];
       

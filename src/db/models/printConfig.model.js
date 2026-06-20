@@ -62,6 +62,10 @@ const printConfigSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    startingJobNo: {
+      type: Number,
+      default: 1,
+    },
   },
   {
     timestamps: true,
