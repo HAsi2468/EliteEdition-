@@ -8,6 +8,7 @@ const getElitePrintReports = async (req, res) => {
   try {
     const { dateStart, dateEnd } = req.query;
 
+    // Match stage for JobCard (which uses String format "YYYY-MM-DD" for `date`)
     const matchStage = {};
     if (dateStart || dateEnd) {
       matchStage.date = {};
@@ -15,17 +16,29 @@ const getElitePrintReports = async (req, res) => {
       if (dateEnd) matchStage.date.$lte = dateEnd;
     }
 
+    // Match stage for Design (which uses Date object `created_date_time`)
+    const designMatchStage = {};
+    if (dateStart || dateEnd) {
+      designMatchStage.created_date_time = {};
+      if (dateStart) {
+        designMatchStage.created_date_time.$gte = new Date(dateStart + "T00:00:00.000Z");
+      }
+      if (dateEnd) {
+        designMatchStage.created_date_time.$lte = new Date(dateEnd + "T23:59:59.999Z");
+      }
+    }
+
     // 1. Designer Creative Output Report (from Design Collection)
     const designerCreativeOutput = await Design.aggregate([
-      { $match: matchStage },
+      { $match: { ...designMatchStage, designerName: { $exists: true, $ne: "" } } },
       { $group: { _id: "$designerName", count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
 
     // 2. Color Matching Efficiency Log (from Design Collection)
     const colorMatchingEfficiency = await Design.aggregate([
-      { $match: matchStage },
-      { $group: { _id: "$designerName", count: { $sum: 1 } } },
+      { $match: { ...designMatchStage, colourMatching: { $exists: true, $ne: "" } } },
+      { $group: { _id: "$colourMatching", count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
 
@@ -46,8 +59,14 @@ const getElitePrintReports = async (req, res) => {
     ]);
 
     // 4. Fusing Operator Throughput
+    const fusingMatchStage = { fusingStatus: "Fusing Done" };
+    if (dateStart || dateEnd) {
+      fusingMatchStage.fusingDate = {};
+      if (dateStart) fusingMatchStage.fusingDate.$gte = dateStart;
+      if (dateEnd) fusingMatchStage.fusingDate.$lte = dateEnd;
+    }
     const fusingThroughput = await JobCard.aggregate([
-      { $match: { fusingStatus: "Done" } },
+      { $match: fusingMatchStage },
       {
         $group: {
           _id: "$fusingDate",
@@ -87,8 +106,14 @@ const getElitePrintReports = async (req, res) => {
 
     // 6. Production Deadline Adherence
     // Time difference between target expTime and actual deliveryDate grouped by status
+    const deliveryMatchStage = { deliveryDate: { $exists: true, $ne: "" } };
+    if (dateStart || dateEnd) {
+      deliveryMatchStage.deliveryDate = {};
+      if (dateStart) deliveryMatchStage.deliveryDate.$gte = dateStart;
+      if (dateEnd) deliveryMatchStage.deliveryDate.$lte = dateEnd;
+    }
     const deadlineAdherence = await JobCard.aggregate([
-      { $match: { deliveryDate: { $exists: true, $ne: "" } } },
+      { $match: deliveryMatchStage },
       {
         $group: {
           _id: "$status",
