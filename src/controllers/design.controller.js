@@ -20,7 +20,7 @@ const getAll = async (req, res) => {
     }
     const skip = (Number(page) - 1) * Number(limit);
     const [docs, total] = await Promise.all([
-      db.Design.find(filter).sort({ created_date_time: -1 }).skip(skip).limit(Number(limit)).lean(),
+      db.Design.find(filter).collation({ locale: "en_US", numericOrdering: true }).sort({ designName: 1 }).skip(skip).limit(Number(limit)).lean(),
       db.Design.countDocuments(filter),
     ]);
     res.json({ data: docs, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
