@@ -8,11 +8,9 @@ const buildDateFilter = (dateStart, dateEnd) => {
   const filter = { saleOrderStatus: { $ne: 'CANCELLED' } };
   if (dateStart || dateEnd) {
     filter.orderDate = {};
-    if (dateStart) filter.orderDate.$gte = new Date(dateStart);
+    if (dateStart) filter.orderDate.$gte = new Date(dateStart + "T00:00:00");
     if (dateEnd) {
-      const end = new Date(dateEnd);
-      end.setHours(23, 59, 59, 999);
-      filter.orderDate.$lte = end;
+      filter.orderDate.$lte = new Date(dateEnd + "T23:59:59.999");
     }
   }
   return filter;

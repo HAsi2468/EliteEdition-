@@ -184,9 +184,8 @@ const downloadSalesReportPdf = async (req, res) => {
       return res.status(400).json({ error: 'dateStart and dateEnd are required' });
     }
 
-    const dateStartObj = new Date(dateStart);
-    const dateEndObj   = new Date(dateEnd);
-    dateEndObj.setHours(23, 59, 59, 999);
+    const dateStartObj = new Date(dateStart + "T00:00:00");
+    const dateEndObj   = new Date(dateEnd + "T23:59:59.999");
 
     const { searchCode } = req.query;
     const whereClause = { orderDate: { $gte: dateStartObj, $lte: dateEndObj }, saleOrderStatus: { $ne: 'CANCELLED' } };
