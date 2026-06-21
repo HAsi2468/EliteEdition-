@@ -39,6 +39,10 @@ const fabricTransactionSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    partyName: {
+      type: String,
+      trim: true,
+    },
     notes: {
       type: String,
       trim: true,
