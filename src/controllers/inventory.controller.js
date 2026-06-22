@@ -64,8 +64,12 @@ const createInventory = async (req, res) => {
 
 const getInventory = async (req, res) => {
   try {
-    const { search } = req.query;
-    const whereClause = { party: { $ne: 'Uniware Channel Sync' } };
+    const { search, excludeUniware } = req.query;
+    const whereClause = {};
+
+    if (excludeUniware === 'true') {
+      whereClause.party = { $ne: 'Uniware Channel Sync' };
+    }
 
     if (search) {
       const searchRegex = new RegExp(search, 'i');
