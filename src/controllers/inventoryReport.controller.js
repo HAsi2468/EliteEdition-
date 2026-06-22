@@ -670,8 +670,8 @@ const getInventoryReport = async (req, res) => {
     const end   = new Date(dateEnd);
     end.setHours(23, 59, 59, 999);
 
-    const currentStockRaw = await db.Inventory.find().lean();
-    const stockInRaw  = await db.Inventory.find({ created_date_time: { $gte: start, $lte: end } }).lean();
+    const currentStockRaw = await db.Inventory.find({ party: { $ne: 'Uniware Channel Sync' } }).lean();
+    const stockInRaw  = await db.Inventory.find({ created_date_time: { $gte: start, $lte: end }, party: { $ne: 'Uniware Channel Sync' } }).lean();
     const stockOutLogs = await db.StockOut.find({ created_date_time: { $gte: start, $lte: end } }).lean();
 
     const stockOutRaw = [];
@@ -696,7 +696,7 @@ const downloadStockValuePdf = async (req, res) => {
     const dateStr = dateStart && dateEnd ? `${dateStart}  →  ${dateEnd}` : `As of ${new Date().toLocaleDateString('en-IN')}`;
     logger.info('Generating Stock Value PDF');
 
-    const raw = await db.Inventory.find().lean();
+    const raw = await db.Inventory.find({ party: { $ne: 'Uniware Channel Sync' } }).lean();
     const { totalQty, totalSell, items } = groupInventoryItems(raw, 'currentlyAvailableStock');
 
     await enrichImages(items);
@@ -744,7 +744,7 @@ const downloadStockInwardPdf = async (req, res) => {
     const dateStr = `${dateStart}  →  ${dateEnd}`;
     logger.info('Generating Stock Inward PDF %s → %s', dateStart, dateEnd);
 
-    const raw = await db.Inventory.find({ created_date_time: { $gte: start, $lte: end } }).lean();
+    const raw = await db.Inventory.find({ created_date_time: { $gte: start, $lte: end }, party: { $ne: 'Uniware Channel Sync' } }).lean();
     const { totalQty, items } = groupInventoryItems(raw, 'qty');
     const totalPurchase = items.reduce((s, i) => s + i.totalPurchaseAmount, 0);
 
@@ -975,7 +975,7 @@ const downloadMachineProductionReportPdf = async (req, res) => {
 
 const getStockValueData = async (req, res) => {
   try {
-    const raw = await db.Inventory.find().lean();
+    const raw = await db.Inventory.find({ party: { $ne: 'Uniware Channel Sync' } }).lean();
     const { totalQty, totalSell, items } = groupInventoryItems(raw, 'currentlyAvailableStock');
     await enrichImages(items);
     res.json({ totalQty, totalSell, items });
@@ -994,7 +994,7 @@ const getStockInwardData = async (req, res) => {
     const end   = new Date(dateEnd);
     end.setHours(23, 59, 59, 999);
 
-    const raw = await db.Inventory.find({ created_date_time: { $gte: start, $lte: end } }).lean();
+    const raw = await db.Inventory.find({ created_date_time: { $gte: start, $lte: end }, party: { $ne: 'Uniware Channel Sync' } }).lean();
     const { totalQty, items } = groupInventoryItems(raw, 'qty');
     const totalPurchase = items.reduce((s, i) => s + i.totalPurchaseAmount, 0);
     await enrichImages(items);

@@ -67,7 +67,7 @@ const getInventory = async (req, res) => {
     const { search, excludeUniware } = req.query;
     const whereClause = {};
 
-    if (excludeUniware === 'true') {
+    if (excludeUniware !== 'false') {
       whereClause.party = { $ne: 'Uniware Channel Sync' };
     }
 
