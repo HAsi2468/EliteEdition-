@@ -33,6 +33,7 @@ const db = {
   SalesList: require('./salesList.model'),
   Inventory: require('./inventory.model'),
   Vendor: require('./vendor.model'),
+  FabricVendor: require('./fabricVendor.model'),
   Party: require('./party.model'),
   StockOut: require('./stockOut.model'),
   JobCard: require('./jobCard.model'),
