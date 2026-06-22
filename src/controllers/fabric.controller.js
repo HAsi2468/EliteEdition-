@@ -30,7 +30,7 @@ const createInward = async (req, res) => {
 // Create a new OUTWARD transaction
 const createOutward = async (req, res) => {
   try {
-    const { jobNo, fabricQuality, qty, date, notes } = req.body;
+    const { jobNo, partyName, fabricQuality, qty, date, notes } = req.body;
     
     if (!fabricQuality || qty == null || qty <= 0) {
       return res.status(400).json({ success: false, error: 'Fabric Quality and a valid Quantity (>0) are required.' });
@@ -39,6 +39,7 @@ const createOutward = async (req, res) => {
     const transaction = new FabricTransaction({
       type: 'OUTWARD',
       jobNo,
+      partyName,
       fabricQuality,
       qty,
       date: date ? new Date(date) : new Date(),
