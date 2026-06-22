@@ -23,6 +23,12 @@ router.get('/lot-ledger', fabricController.getLotLedger);
 // Download fabric ledger PDF
 router.get('/report/pdf', fabricController.downloadLedgerPdf);
 
+// Get stock grouped by fabricQuality + panna
+router.get('/stock-panna', fabricController.getStockByPanna);
+
+// Get fabric requirement from in-progress job cards
+router.get('/requirement', fabricController.getFabricRequirement);
+
 // Delete a transaction by ID
 router.delete('/:id', fabricController.deleteTransaction);
 

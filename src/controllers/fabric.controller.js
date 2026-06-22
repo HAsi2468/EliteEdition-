@@ -277,6 +277,127 @@ const downloadLedgerPdf = async (req, res) => {
   }
 };
 
+// Get stock grouped by fabricQuality + panna
+const getStockByPanna = async (req, res) => {
+  try {
+    const pipeline = [
+      {
+        $group: {
+          _id: { fabricQuality: '$fabricQuality', panna: { $ifNull: ['$panna', 'Unknown'] } },
+          totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+          totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } },
+          lotCount: { $addToSet: '$lotNo' }
+        }
+      },
+      {
+        $project: {
+          fabricQuality: '$_id.fabricQuality',
+          panna: '$_id.panna',
+          totalInward: 1,
+          totalOutward: 1,
+          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
+          lotCount: { $size: { $filter: { input: '$lotCount', cond: { $ne: ['$$this', null] } } } },
+          _id: 0
+        }
+      },
+      { $sort: { fabricQuality: 1, panna: 1 } }
+    ];
+
+    const result = await FabricTransaction.aggregate(pipeline);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    console.error('Error fetching panna-wise stock:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Get fabric requirement from in-progress job cards
+const getFabricRequirement = async (req, res) => {
+  try {
+    const JobCard = require('../db/models/jobCard.model');
+
+    // Fetch all In Progress job cards that have fabric info
+    const jobs = await JobCard.find({
+      status: 'In Progress',
+      fabric: { $ne: '' }
+    }).lean();
+
+    // Group requirement by fabric + panna
+    const requirementMap = {};
+    for (const job of jobs) {
+      const fabric = (job.fabric || '').trim();
+      const panna = (job.panna || '').trim() || 'Unknown';
+      if (!fabric) continue;
+
+      // totalMtr is the main fabric needed in meters
+      const mtrNeeded = parseFloat(job.totalMtr) || 0;
+
+      const key = `${fabric}|||${panna}`;
+      if (!requirementMap[key]) {
+        requirementMap[key] = {
+          fabricQuality: fabric,
+          panna,
+          totalMtrRequired: 0,
+          jobs: []
+        };
+      }
+      requirementMap[key].totalMtrRequired += mtrNeeded;
+      requirementMap[key].jobs.push({
+        jobNo: job.jobNo,
+        party: job.party,
+        pcs: job.pcs,
+        totalMtr: mtrNeeded,
+        date: job.date
+      });
+    }
+
+    // Now get current stock grouped by fabric+panna for comparison
+    const stockPipeline = [
+      {
+        $group: {
+          _id: { fabricQuality: '$fabricQuality', panna: { $ifNull: ['$panna', 'Unknown'] } },
+          totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+          totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } }
+        }
+      },
+      {
+        $project: {
+          fabricQuality: '$_id.fabricQuality',
+          panna: '$_id.panna',
+          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
+          _id: 0
+        }
+      }
+    ];
+    const stockData = await FabricTransaction.aggregate(stockPipeline);
+
+    // Build stock lookup map (case-insensitive)
+    const stockMap = {};
+    for (const s of stockData) {
+      const key = `${s.fabricQuality.toLowerCase().trim()}|||${(s.panna || 'Unknown').trim()}`;
+      stockMap[key] = s.currentStock;
+    }
+
+    // Enrich requirement with stock info
+    const result = Object.values(requirementMap).map(req => {
+      const lookupKey = `${req.fabricQuality.toLowerCase().trim()}|||${req.panna.trim()}`;
+      const currentStock = stockMap[lookupKey] || 0;
+      return {
+        ...req,
+        currentStock,
+        shortfall: Math.max(0, req.totalMtrRequired - currentStock),
+        status: currentStock >= req.totalMtrRequired ? 'Sufficient' :
+                currentStock > 0 ? 'Short' : 'No Stock'
+      };
+    }).sort((a, b) => a.fabricQuality.localeCompare(b.fabricQuality));
+
+    res.status(200).json({ success: true, data: result, totalJobs: jobs.length });
+  } catch (error) {
+    console.error('Error calculating fabric requirement:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   createInward,
   createOutward,
@@ -285,5 +406,7 @@ module.exports = {
   getLotStock,
   deleteTransaction,
   getLotLedger,
-  downloadLedgerPdf
+  downloadLedgerPdf,
+  getStockByPanna,
+  getFabricRequirement
 };
