@@ -42,7 +42,7 @@ function calcExpTime(panna, passText, totalMtr, machineName) {
 
 const getAllJobCards = async (req, res) => {
   try {
-    const { status, search, page = 1, limit = 50, dateStart, dateEnd } = req.query;
+    const { status, search, page = 1, limit = 50, dateStart, dateEnd, sortBy } = req.query;
     const filter = {};
     if (status && status !== 'All') filter.status = status;
     if (dateStart || dateEnd) {
@@ -60,10 +60,67 @@ const getAllJobCards = async (req, res) => {
       ];
     }
     const skip = (Number(page) - 1) * Number(limit);
-    const [cards, total] = await Promise.all([
-      db.JobCard.find(filter).sort({ created_date_time: -1 }).skip(skip).limit(Number(limit)).lean(),
-      db.JobCard.countDocuments(filter),
-    ]);
+    const total = await db.JobCard.countDocuments(filter);
+
+    let cards;
+    if (sortBy === 'urgency') {
+      const pipeline = [
+        { $match: filter },
+        {
+          $addFields: {
+            statusScore: {
+              $cond: [
+                { $eq: ["$status", "Pending"] },
+                100,
+                { $cond: [{ $eq: ["$status", "In Progress"] }, 50, 0] }
+              ]
+            },
+            emergencyScore: {
+              $cond: [
+                { $and: ["$emergencyNotes", { $ne: ["$emergencyNotes", ""] }] },
+                200,
+                0
+              ]
+            },
+            dateParsed: {
+              $cond: [
+                { $and: ["$date", { $ne: ["$date", ""] }] },
+                { $dateFromString: { dateString: "$date" } },
+                new Date()
+              ]
+            }
+          }
+        },
+        {
+          $addFields: {
+            ageDays: {
+              $divide: [
+                { $subtract: [new Date(), "$dateParsed"] },
+                1000 * 60 * 60 * 24
+              ]
+            }
+          }
+        },
+        {
+          $addFields: {
+            urgencyScore: {
+              $add: [
+                "$statusScore",
+                "$emergencyScore",
+                { $multiply: ["$ageDays", 10] }
+              ]
+            }
+          }
+        },
+        { $sort: { urgencyScore: -1, created_date_time: -1 } },
+        { $skip: skip },
+        { $limit: Number(limit) }
+      ];
+      cards = await db.JobCard.aggregate(pipeline);
+    } else {
+      cards = await db.JobCard.find(filter).sort({ created_date_time: -1 }).skip(skip).limit(Number(limit)).lean();
+    }
+
     res.json({ data: cards, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
   } catch (err) {
     logger.error('getAllJobCards error: %o', err);

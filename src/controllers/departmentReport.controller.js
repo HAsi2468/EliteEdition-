@@ -1,4 +1,5 @@
-const { JobCard, Design } = require('../db/models');
+const { JobCard, Design, RawMaterialTransaction } = require('../db/models');
+const FabricTransaction = require('../db/models/fabricTransaction.model');
 
 /**
  * GET /api/reports/elite-print
@@ -78,8 +79,6 @@ const getElitePrintReports = async (req, res) => {
     ]);
 
     // 5. Fabric Consumption Variance
-    // Theoretical consumption = pcs * consumption
-    // Compare with printMtr
     const fabricConsumptionVariance = await JobCard.aggregate([
       { $match: matchStage },
       {
@@ -105,7 +104,6 @@ const getElitePrintReports = async (req, res) => {
     ]);
 
     // 6. Production Deadline Adherence
-    // Time difference between target expTime and actual deliveryDate grouped by status
     const deliveryMatchStage = { deliveryDate: { $exists: true, $ne: "" } };
     if (dateStart || dateEnd) {
       deliveryMatchStage.deliveryDate = {};
@@ -123,6 +121,226 @@ const getElitePrintReports = async (req, res) => {
       }
     ]);
 
+    // ─── NEW SMART INSIGHTS ───
+
+    // 7. Top 5 Designs by printed volume
+    const topDesigns = await JobCard.aggregate([
+      { $match: { ...matchStage, designName: { $exists: true, $ne: "" } } },
+      {
+        $group: {
+          _id: "$designName",
+          totalMtr: { $sum: { $convert: { input: "$printMtr", to: "double", onError: 0, onNull: 0 } } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { totalMtr: -1 } },
+      { $limit: 5 }
+    ]);
+
+    // 8. Busiest Parties
+    const busiestParties = await JobCard.aggregate([
+      { $match: { ...matchStage, party: { $exists: true, $ne: "" } } },
+      {
+        $group: {
+          _id: "$party",
+          totalMtr: { $sum: { $convert: { input: "$printMtr", to: "double", onError: 0, onNull: 0 } } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { totalMtr: -1 } },
+      { $limit: 5 }
+    ]);
+
+    // 9. Fabric Trends
+    const fabricTrends = await JobCard.aggregate([
+      { $match: { ...matchStage, fabric: { $exists: true, $ne: "" } } },
+      {
+        $group: {
+          _id: "$fabric",
+          totalMtr: { $sum: { $convert: { input: "$printMtr", to: "double", onError: 0, onNull: 0 } } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { totalMtr: -1 } }
+    ]);
+
+    // 10. Average print-to-delivery days
+    const printToDelivery = await JobCard.aggregate([
+      {
+        $match: {
+          ...matchStage,
+          printDate: { $exists: true, $ne: "" },
+          deliveryDate: { $exists: true, $ne: "" }
+        }
+      },
+      {
+        $project: {
+          daysDiff: {
+            $divide: [
+              {
+                $subtract: [
+                  { $dateFromString: { dateString: "$deliveryDate" } },
+                  { $dateFromString: { dateString: "$printDate" } }
+                ]
+              },
+              1000 * 60 * 60 * 24
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          avgDays: { $avg: "$daysDiff" },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // 11. Bottleneck Stage Analysis
+    const stageTimes = await JobCard.aggregate([
+      { $match: matchStage },
+      {
+        $project: {
+          dateObj: { $cond: { if: { $and: ["$date", { $ne: ["$date", ""] }] }, then: { $dateFromString: { dateString: "$date" } }, else: null } },
+          printDateObj: { $cond: { if: { $and: ["$printDate", { $ne: ["$printDate", ""] }] }, then: { $dateFromString: { dateString: "$printDate" } }, else: null } },
+          fusingDateObj: { $cond: { if: { $and: ["$fusingDate", { $ne: ["$fusingDate", ""] }] }, then: { $dateFromString: { dateString: "$fusingDate" } }, else: null } },
+          deliveryDateObj: { $cond: { if: { $and: ["$deliveryDate", { $ne: ["$deliveryDate", ""] }] }, then: { $dateFromString: { dateString: "$deliveryDate" } }, else: null } },
+        }
+      },
+      {
+        $project: {
+          printDuration: { $cond: { if: { $and: ["$dateObj", "$printDateObj"] }, then: { $subtract: ["$printDateObj", "$dateObj"] }, else: null } },
+          fusingDuration: { $cond: { if: { $and: ["$printDateObj", "$fusingDateObj"] }, then: { $subtract: ["$fusingDateObj", "$printDateObj"] }, else: null } },
+          deliveryDuration: { $cond: { if: { $and: ["$fusingDateObj", "$deliveryDateObj"] }, then: { $subtract: ["$deliveryDateObj", "$fusingDateObj"] }, else: null } },
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          avgPrintHrs: { $avg: { $divide: ["$printDuration", 1000 * 60 * 60] } },
+          avgFusingHrs: { $avg: { $divide: ["$fusingDuration", 1000 * 60 * 60] } },
+          avgDeliveryHrs: { $avg: { $divide: ["$deliveryDuration", 1000 * 60 * 60] } },
+        }
+      }
+    ]);
+    const avgTimes = stageTimes[0] || {};
+    const bottleneck = {
+      avgPrintHrs: avgTimes.avgPrintHrs ? Number(avgTimes.avgPrintHrs.toFixed(1)) : 0,
+      avgFusingHrs: avgTimes.avgFusingHrs ? Number(avgTimes.avgFusingHrs.toFixed(1)) : 0,
+      avgDeliveryHrs: avgTimes.avgDeliveryHrs ? Number(avgTimes.avgDeliveryHrs.toFixed(1)) : 0
+    };
+
+    // Delayed Job Cards (not Done, older than 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+    const delayedCards = await JobCard.find({
+      status: { $ne: "Done" },
+      date: { $lte: sevenDaysAgoStr }
+    }).select("jobNo designName party status date expTime").sort({ date: 1 }).limit(10).lean();
+
+    // 12. Fabric Demand Forecasting
+    const fabricStockPipeline = [
+      {
+        $group: {
+          _id: '$fabricQuality',
+          totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+          totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } }
+        }
+      },
+      {
+        $project: {
+          fabricQuality: '$_id',
+          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
+          _id: 0
+        }
+      }
+    ];
+    const fabricStockList = await FabricTransaction.aggregate(fabricStockPipeline);
+    const fabricStockMap = {};
+    fabricStockList.forEach(s => {
+      fabricStockMap[s.fabricQuality] = s.currentStock;
+    });
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+    const fabricConsumption = await JobCard.aggregate([
+      {
+        $match: {
+          printDate: { $gte: thirtyDaysAgoStr },
+          printStatus: "Printing Done"
+        }
+      },
+      {
+        $group: {
+          _id: "$fabric",
+          totalMtr: { $sum: { $convert: { input: "$printMtr", to: "double", onError: 0, onNull: 0 } } }
+        }
+      }
+    ]);
+
+    const fabricForecasts = fabricConsumption.map(fc => {
+      const dailyAvg = fc.totalMtr / 30;
+      const currentStock = fabricStockMap[fc._id] || 0;
+      const demand7Days = dailyAvg * 7;
+      const demand30Days = dailyAvg * 30;
+      const status = currentStock >= demand7Days ? 'Safe' : 'Shortage';
+      return {
+        fabricQuality: fc._id,
+        currentStock: Number(currentStock.toFixed(1)),
+        demand7Days: Number(demand7Days.toFixed(1)),
+        demand30Days: Number(demand30Days.toFixed(1)),
+        status
+      };
+    });
+
+    const forecastFabrics = new Set(fabricForecasts.map(f => f.fabricQuality));
+    fabricStockList.forEach(s => {
+      if (!forecastFabrics.has(s.fabricQuality)) {
+        fabricForecasts.push({
+          fabricQuality: s.fabricQuality,
+          currentStock: Number(s.currentStock.toFixed(1)),
+          demand7Days: 0,
+          demand30Days: 0,
+          status: 'Safe'
+        });
+      }
+    });
+
+    // 13. Low Stock Alerts
+    const rawMaterialStockPipeline = [
+      {
+        $group: {
+          _id: '$materialName',
+          totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+          totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } },
+          unit: { $first: '$unit' }
+        }
+      },
+      {
+        $project: {
+          materialName: '$_id',
+          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
+          unit: 1,
+          _id: 0
+        }
+      }
+    ];
+    const rawMaterialStockList = await RawMaterialTransaction.aggregate(rawMaterialStockPipeline);
+
+    const lowStockFabrics = fabricStockList
+      .filter(s => s.currentStock <= 5)
+      .map(s => ({ item: s.fabricQuality, type: 'Fabric', qty: Number(s.currentStock.toFixed(1)), unit: 'mtr' }));
+
+    const lowStockRawMaterials = rawMaterialStockList
+      .filter(s => s.currentStock <= 5)
+      .map(s => ({ item: s.materialName, type: 'Raw Material', qty: Number(s.currentStock.toFixed(1)), unit: s.unit || 'rolls' }));
+
+    const lowStockAlerts = [...lowStockFabrics, ...lowStockRawMaterials];
+
     res.json({
       success: true,
       data: {
@@ -131,7 +349,17 @@ const getElitePrintReports = async (req, res) => {
         machineMeterage,
         fusingThroughput,
         fabricConsumptionVariance,
-        deadlineAdherence
+        deadlineAdherence,
+        
+        // Smart metrics
+        topDesigns,
+        busiestParties,
+        fabricTrends,
+        avgPrintToDelivery: printToDelivery[0] ? Number(printToDelivery[0].avgDays.toFixed(1)) : 0,
+        bottleneck,
+        delayedCards,
+        fabricForecasts,
+        lowStockAlerts
       }
     });
 
