@@ -1,6 +1,18 @@
 const FabricTransaction = require('../db/models/fabricTransaction.model');
 const PDFDocument = require('pdfkit');
 
+// Normalize functions to merge matching fabric and panna widths (e.g. 58" and 58)
+const normalizePanna = (val) => {
+  if (val === null || val === undefined) return 'Unknown';
+  let clean = String(val).trim().replace(/['"]/g, '');
+  return clean || 'Unknown';
+};
+
+const normalizeFabric = (val) => {
+  if (!val) return '';
+  return String(val).trim().toUpperCase();
+};
+
 // Create a new INWARD transaction
 const createInward = async (req, res) => {
   try {
@@ -362,8 +374,8 @@ const getFabricRequirement = async (req, res) => {
     // Group requirement by fabric + panna
     const requirementMap = {};
     for (const job of jobs) {
-      const fabric = String(job.fabric || '').trim();
-      const panna = String(job.panna ?? '').trim() || 'Unknown';
+      const fabric = normalizeFabric(job.fabric);
+      const panna = normalizePanna(job.panna);
       if (!fabric) continue;
 
       // totalMtr is the main fabric needed in meters
@@ -408,17 +420,19 @@ const getFabricRequirement = async (req, res) => {
     ];
     const stockData = await FabricTransaction.aggregate(stockPipeline);
 
-    // Build stock lookup map (case-insensitive)
+    // Build stock lookup map (case-insensitive & normalized)
     const stockMap = {};
     for (const s of stockData) {
-      const key = `${String(s.fabricQuality || '').toLowerCase().trim()}|||${String(s.panna ?? 'Unknown').trim()}`;
+      const fabric = normalizeFabric(s.fabricQuality);
+      const panna = normalizePanna(s.panna);
+      const key = `${fabric}|||${panna}`;
       stockMap[key] = s.currentStock;
     }
 
     // Enrich requirement with stock info
     const result = Object.values(requirementMap).map(req => {
-      const lookupKey = `${String(req.fabricQuality || '').toLowerCase().trim()}|||${String(req.panna ?? '').trim()}`;
-      const currentStock = stockMap[lookupKey] || 0;
+      const key = `${req.fabricQuality}|||${req.panna}`;
+      const currentStock = stockMap[key] || 0;
       return {
         ...req,
         currentStock,
