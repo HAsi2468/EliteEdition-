@@ -110,7 +110,7 @@ const getLotStock = async (req, res) => {
     const { fabricQuality } = req.query;
     const matchStage = {};
     if (fabricQuality) {
-      matchStage.fabricQuality = fabricQuality;
+      matchStage.fabricQuality = new RegExp(`^${fabricQuality.trim()}$`, 'i');
     }
 
     const pipeline = [
