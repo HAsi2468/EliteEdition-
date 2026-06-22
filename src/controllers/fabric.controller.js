@@ -362,8 +362,8 @@ const getFabricRequirement = async (req, res) => {
     // Group requirement by fabric + panna
     const requirementMap = {};
     for (const job of jobs) {
-      const fabric = (job.fabric || '').trim();
-      const panna = (job.panna || '').trim() || 'Unknown';
+      const fabric = String(job.fabric || '').trim();
+      const panna = String(job.panna ?? '').trim() || 'Unknown';
       if (!fabric) continue;
 
       // totalMtr is the main fabric needed in meters
@@ -411,13 +411,13 @@ const getFabricRequirement = async (req, res) => {
     // Build stock lookup map (case-insensitive)
     const stockMap = {};
     for (const s of stockData) {
-      const key = `${s.fabricQuality.toLowerCase().trim()}|||${(s.panna || 'Unknown').trim()}`;
+      const key = `${String(s.fabricQuality || '').toLowerCase().trim()}|||${String(s.panna ?? 'Unknown').trim()}`;
       stockMap[key] = s.currentStock;
     }
 
     // Enrich requirement with stock info
     const result = Object.values(requirementMap).map(req => {
-      const lookupKey = `${req.fabricQuality.toLowerCase().trim()}|||${req.panna.trim()}`;
+      const lookupKey = `${String(req.fabricQuality || '').toLowerCase().trim()}|||${String(req.panna ?? '').trim()}`;
       const currentStock = stockMap[lookupKey] || 0;
       return {
         ...req,
