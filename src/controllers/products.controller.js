@@ -177,7 +177,7 @@ const readFile = async (url, accesstoken) => {
         upsert: true,
       },
     }));
-    const res = await db.SaleOrder.bulkWrite(operations);
+    const res = await db.SaleOrder.bulkWrite(operations, { ordered: false });
     totalSaleOrdersStored += (res ? res.upsertedCount + res.modifiedCount : chunk.length);
   }
   logger.info(`📊 Database Status: Stored/Upserted ${totalSaleOrdersStored} documents into db.SaleOrder.`);
@@ -195,7 +195,7 @@ const readFile = async (url, accesstoken) => {
         upsert: true,
       },
     }));
-    const res = await db.SalesList.bulkWrite(operations);
+    const res = await db.SalesList.bulkWrite(operations, { ordered: false });
     totalSalesListStored += (res ? res.upsertedCount + res.modifiedCount : chunk.length);
     if (res) {
       logger.info(`📝 SalesList Chunk Result: ${res.upsertedCount} newly added (upserted), ${res.modifiedCount} updated (modified)`);
@@ -254,7 +254,7 @@ const readFile = async (url, accesstoken) => {
         upsert: true,
       },
     }));
-    await db.InventoryProduct.bulkWrite(inventoryOperations);
+    await db.InventoryProduct.bulkWrite(inventoryOperations, { ordered: false });
 
     // 2. Sync grouped base SKUs to Product
     const productOperations = chunk.map((item) => {
@@ -277,7 +277,7 @@ const readFile = async (url, accesstoken) => {
         },
       };
     });
-    const res = await db.Product.bulkWrite(productOperations);
+    const res = await db.Product.bulkWrite(productOperations, { ordered: false });
 
     totalProductsStored += (res ? res.upsertedCount + res.modifiedCount : chunk.length);
     if (res) {
@@ -557,10 +557,8 @@ const buildWhereClause = (query) => {
   const whereClause = { saleOrderStatus: { $ne: 'CANCELLED' } };
 
   if (dateStart) {
-    const dateStartObj = new Date(dateStart);
-    const dateEndObj = dateEnd ? new Date(dateEnd) : new Date(dateStart);
-    const startOfDay = new Date(dateStartObj.setHours(0, 59, 0, 0));
-    const endOfDay = new Date(dateEndObj.setHours(23, 59, 59, 999));
+    const startOfDay = new Date(dateStart + "T00:00:00");
+    const endOfDay = new Date((dateEnd || dateStart) + "T23:59:59.999");
     whereClause.orderDate = {
       $gte: startOfDay,
       $lte: endOfDay,
@@ -781,7 +779,7 @@ const runBackgroundImport = async (missingSKUs, accessToken) => {
         upsert: true,
       },
     }));
-    const invResult = await db.InventoryProduct.bulkWrite(inventoryOperations);
+    const invResult = await db.InventoryProduct.bulkWrite(inventoryOperations, { ordered: false });
     totalAddedInventory += invResult.upsertedCount + invResult.modifiedCount;
 
     // 2. Sync grouped base SKUs to Product
@@ -817,7 +815,7 @@ const runBackgroundImport = async (missingSKUs, accessToken) => {
         },
       };
     });
-    const result = await db.Product.bulkWrite(operations);
+    const result = await db.Product.bulkWrite(operations, { ordered: false });
     totalAddedProduct += result.upsertedCount + result.modifiedCount;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }

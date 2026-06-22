@@ -5,6 +5,8 @@ const saleOrderSchema = new mongoose.Schema(
 		saleOrderItemCode: {
 			type: String,
 			default: null,
+			unique: true,
+			sparse: true,
 		},
 		displayOrderCode: {
 			type: String,

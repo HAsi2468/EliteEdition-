@@ -86,9 +86,9 @@ scheduleHourlyFetch();
 // -------------------------------------------------------------
 const cron = require('node-cron');
 
-cron.schedule('15 2 * * *', async () => {
+cron.schedule('10 0 * * *', async () => {
   try {
-    console.log('[🕛] Running NIGHTLY fetchFromAPIS job for YESTERDAY data (2:15 AM)');
+    console.log('[🕛] Running NIGHTLY fetchFromAPIS job for YESTERDAY data (12:10 AM)');
     const fakeReq = { query: { dateRangeText: 'YESTERDAY' } };
     const fakeRes = {
       status: (code) => ({

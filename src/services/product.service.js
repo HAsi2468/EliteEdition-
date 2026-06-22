@@ -5,12 +5,38 @@ const getProducts = async (skuCodes) => {
 };
 
 const fetchProductImages = async (skuCodes) => {
-  const products = await getProducts(skuCodes);
-  return products.reduce((acc, product) => {
+  const regexes = skuCodes.filter(Boolean).map(s => new RegExp('^' + s + '(_|$)', 'i'));
+  
+  // 1. Query InventoryProduct for matching SKUs
+  const invProducts = await db.InventoryProduct.find({
+    skuCode: { $in: regexes },
+    imageUrl: { $exists: true, $nin: [null, ''] }
+  }).lean();
+
+  const acc = {};
+  
+  // 2. Map base SKU from InventoryProduct (e.g. 266_XL -> 266)
+  invProducts.forEach(product => {
     const baseSku = product.skuCode ? product.skuCode.split('_')[0] : '';
-    acc[baseSku] = product.imageUrl;
-    return acc;
-  }, {});
+    if (baseSku && !acc[baseSku]) {
+      acc[baseSku] = product.imageUrl;
+    }
+  });
+
+  // 3. Fallback to Product collection for any missing base SKUs
+  const products = await db.Product.find({
+    skuCode: { $in: skuCodes },
+    imageUrl: { $exists: true, $nin: [null, ''] }
+  }).lean();
+
+  products.forEach(product => {
+    const baseSku = product.skuCode ? product.skuCode.split('_')[0] : '';
+    if (baseSku && !acc[baseSku]) {
+      acc[baseSku] = product.imageUrl;
+    }
+  });
+
+  return acc;
 };
 
 const fetchSalesReportData = async (whereClause) => {

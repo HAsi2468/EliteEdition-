@@ -215,8 +215,9 @@ const downloadSalesReportPdf = async (req, res) => {
 
     // Fetch images
     const baseSkus = products.map(p => p._id).filter(Boolean);
+    const regexes = baseSkus.map(s => new RegExp('^' + s + '(_|$)', 'i'));
     const productDocs = await db.InventoryProduct.find({
-      skuCode: { $in: baseSkus.flatMap(s => [s, ...baseSkus.filter(x => x.startsWith(s))]) },
+      skuCode: { $in: regexes },
       imageUrl: { $exists: true, $nin: [null, ''] }
     }).lean();
 
@@ -408,9 +409,8 @@ const downloadBrandReportPdf = async (req, res) => {
       return res.status(400).json({ error: 'dateStart and dateEnd are required' });
     }
 
-    const dateStartObj = new Date(dateStart);
-    const dateEndObj   = new Date(dateEnd);
-    dateEndObj.setHours(23, 59, 59, 999);
+    const dateStartObj = new Date(dateStart + "T00:00:00");
+    const dateEndObj   = new Date(dateEnd + "T23:59:59.999");
     const dateStr = `${dateStart}  →  ${dateEnd}`;
 
     logger.info('Generating Brand PDF report %s → %s', dateStart, dateEnd);
@@ -447,7 +447,11 @@ const downloadBrandReportPdf = async (req, res) => {
 
     // Fetch images
     const allBaseSkus = brands.flatMap(b => b.products.map(p => p.sku)).filter(Boolean);
-    const productDocs = await db.InventoryProduct.find({ imageUrl: { $nin: [null, ''] } }).lean();
+    const regexes = allBaseSkus.map(s => new RegExp('^' + s + '(_|$)', 'i'));
+    const productDocs = await db.InventoryProduct.find({
+      skuCode: { $in: regexes },
+      imageUrl: { $exists: true, $nin: [null, ''] }
+    }).lean();
     const skuImageMap = {};
     productDocs.forEach(p => {
       const base = (p.skuCode || '').split('_')[0];
