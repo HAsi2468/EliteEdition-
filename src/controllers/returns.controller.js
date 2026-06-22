@@ -5,12 +5,19 @@ const logger = require('../config/logger');
 const processReturn = async (req, res) => {
   try {
     const { returnType, referenceId, sku, quantity, condition, notes } = req.body;
-  // Retrieve party name from inventory based on SKU
+  // Retrieve party name from inventory based on SKU, fallback to product catalog
+  let party = '';
   const inventoryRecord = await db.Inventory.findOne({ skuCode: sku });
-  if (!inventoryRecord) {
-    return res.status(httpStatus.BAD_REQUEST).send('Inventory record not found for given SKU');
+  if (inventoryRecord) {
+    party = inventoryRecord.party;
+  } else {
+    const catalogRecord = await db.InventoryProduct.findOne({ skuCode: sku });
+    if (catalogRecord) {
+      party = catalogRecord.brand || 'Uniware Channel Sync';
+    } else {
+      return res.status(httpStatus.BAD_REQUEST).send('Inventory or Catalog record not found for given SKU');
+    }
   }
-  const party = inventoryRecord.party;
 
 
     if (!party || !returnType || !referenceId || !sku || !quantity || !condition) {
@@ -47,10 +54,13 @@ const processReturn = async (req, res) => {
         { skuCode: sku },
         { $inc: { qty: quantity } }
       );
-      await db.Inventory.updateOne(
-        { skuCode: sku },
-        { $inc: { qty: quantity, currentlyAvailableStock: quantity } }
-      );
+      const inventoryExists = await db.Inventory.findOne({ skuCode: sku });
+      if (inventoryExists) {
+        await db.Inventory.updateOne(
+          { skuCode: sku },
+          { $inc: { qty: quantity, currentlyAvailableStock: quantity } }
+        );
+      }
     }
 
     res.status(httpStatus.CREATED).send({
@@ -97,10 +107,13 @@ const markRefinished = async (req, res) => {
       { skuCode: record.sku },
       { $inc: { qty: record.quantity } }
     );
-    await db.Inventory.updateOne(
-      { skuCode: record.sku },
-      { $inc: { qty: record.quantity, currentlyAvailableStock: record.quantity } }
-    );
+    const inventoryExists = await db.Inventory.findOne({ skuCode: record.sku });
+    if (inventoryExists) {
+      await db.Inventory.updateOne(
+        { skuCode: record.sku },
+        { $inc: { qty: record.quantity, currentlyAvailableStock: record.quantity } }
+      );
+    }
 
     res.status(httpStatus.OK).send({
       message: 'Item refinished and stocked in successfully',

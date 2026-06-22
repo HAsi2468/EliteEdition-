@@ -360,7 +360,6 @@ const syncInventorySnapshot = async (req, res) => {
     }
 
     let updatedCount = 0;
-    let createdCount = 0;
 
     for (const snap of snapshots) {
       const sku = (snap.itemTypeSKU || '').toUpperCase();
@@ -368,105 +367,21 @@ const syncInventorySnapshot = async (req, res) => {
 
       const uniStock = snap.inventory || 0;
 
-      // Extract base SKU and size
-      let baseSku = sku;
-      let size = 'N/A';
-      if (sku.includes('_')) {
-        const parts = sku.split('_');
-        baseSku = parts[0];
-        size = parts[1];
-      }
-
-      // Check if we have an existing inventory item matching baseSku and size
-      const existingItem = await db.Inventory.findOne({
-        $or: [
-          { skuCode: baseSku, size: size },
-          { skuCode: sku }
-        ]
-      });
-
-      // Get rich details from InventoryProduct catalog
-      const catalogItem = catalogMap[sku] || {};
-      const name = catalogItem.description || catalogItem.name || 'Uniware Synced Item';
-      const purchasePrice = catalogItem.basePrice || (catalogItem.price ? catalogItem.price * 0.6 : 299);
-      const salePrice = catalogItem.price || 599;
-      const imageUrl = catalogItem.imageUrl || '';
-
-      if (existingItem) {
-        existingItem.currentlyAvailableStock = uniStock;
-        existingItem.qty = Math.max(existingItem.qty, uniStock);
-        existingItem.itemName = name;
-        existingItem.purchasePrice = purchasePrice;
-        existingItem.salePrice = salePrice;
-        existingItem.imageUrl = imageUrl;
-        if (existingItem.party === 'Uniware Channel Sync' || !existingItem.party) {
-          existingItem.party = 'Uniware Channel Sync';
-        }
-        await existingItem.save();
-        updatedCount++;
-      } else {
-        // Create new inventory item
-        await db.Inventory.create({
-          party: 'Uniware Channel Sync',
-          itemName: name,
-          size: size,
-          currentlyAvailableStock: uniStock,
-          qty: uniStock,
-          purchasePrice,
-          salePrice,
-          imageUrl,
-          skuCode: baseSku,
-          date: new Date()
-        });
-        createdCount++;
-      }
+      // Update snapshot details in the product catalog (InventoryProduct)
+      await db.InventoryProduct.updateOne(
+        { skuCode: sku },
+        { $set: { inventorySnapshots: snap } }
+      );
+      updatedCount++;
     }
 
-    // Make sure all catalogItems have a record in db.Inventory (even if stock is 0 and no snapshot was returned)
-    for (const catalogItem of catalogItems) {
-      const sku = (catalogItem.skuCode || '').toUpperCase();
-      if (!sku) continue;
-
-      let baseSku = sku;
-      let size = 'N/A';
-      if (sku.includes('_')) {
-        const parts = sku.split('_');
-        baseSku = parts[0];
-        size = parts[1];
-      }
-
-      const existingItem = await db.Inventory.findOne({
-        $or: [
-          { skuCode: baseSku, size: size },
-          { skuCode: sku }
-        ]
-      });
-
-      if (!existingItem) {
-        const name = catalogItem.description || catalogItem.name || 'Uniware Synced Item';
-        const purchasePrice = catalogItem.basePrice || (catalogItem.price ? catalogItem.price * 0.6 : 299);
-        const salePrice = catalogItem.price || 599;
-        const imageUrl = catalogItem.imageUrl || '';
-
-        await db.Inventory.create({
-          party: 'Uniware Channel Sync',
-          itemName: name,
-          size: size,
-          currentlyAvailableStock: 0,
-          qty: 0,
-          purchasePrice,
-          salePrice,
-          imageUrl,
-          skuCode: baseSku,
-          date: new Date()
-        });
-        createdCount++;
-      }
-    }
+    // Clean up any existing Uniware Channel Sync records from local physical inventory
+    const deleteRes = await db.Inventory.deleteMany({ party: 'Uniware Channel Sync' });
+    logger.info(`[INVENTORY] Cleaned up ${deleteRes.deletedCount} Uniware Channel Sync records from db.Inventory.`);
 
     res.json({
       success: true,
-      message: `Database stock synchronized with Uniware. Updated ${updatedCount} items, created ${createdCount} items.`
+      message: `Product catalog synced with Uniware inventory snapshots. Updated ${updatedCount} catalog items. Cleaned up ${deleteRes.deletedCount} old inventory records.`
     });
 
   } catch (error) {

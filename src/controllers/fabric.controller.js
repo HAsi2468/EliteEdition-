@@ -52,6 +52,42 @@ const createOutward = async (req, res) => {
     });
 
     await transaction.save();
+
+    // Smart Automation: Sync Outward with Tracking Job Card
+    if (jobNo) {
+      try {
+        const JobCard = require('../db/models/jobCard.model');
+        const jobCard = await JobCard.findOne({ jobNo: jobNo.trim() });
+        if (jobCard) {
+          let updated = false;
+          // Auto-progress status if pending
+          if (jobCard.status === 'Pending') {
+            jobCard.status = 'In Progress';
+            updated = true;
+          }
+          // Log lot allocation details in job notes
+          const syncNote = `[Fabric Sync] Issued ${qty} mtr from Lot #${lotNo || 'N/A'}`;
+          if (!jobCard.note1) {
+            jobCard.note1 = syncNote;
+            updated = true;
+          } else if (!jobCard.note2) {
+            jobCard.note2 = syncNote;
+            updated = true;
+          } else if (!jobCard.note1.includes(syncNote) && !jobCard.note2.includes(syncNote)) {
+            jobCard.note1 = `${jobCard.note1} | ${syncNote}`;
+            updated = true;
+          }
+          
+          if (updated) {
+            await jobCard.save();
+            console.log(`Auto-synced Fabric Outward for Job No ${jobNo}: status set to In Progress.`);
+          }
+        }
+      } catch (jobErr) {
+        console.error(`Failed to auto-sync with Job Card:`, jobErr.message);
+      }
+    }
+
     res.status(201).json({ success: true, data: transaction });
   } catch (error) {
     console.error('Error creating outward fabric transaction:', error);
@@ -312,14 +348,14 @@ const getStockByPanna = async (req, res) => {
   }
 };
 
-// Get fabric requirement from in-progress job cards
+// Get fabric requirement from pending and in-progress job cards
 const getFabricRequirement = async (req, res) => {
   try {
     const JobCard = require('../db/models/jobCard.model');
 
-    // Fetch all In Progress job cards that have fabric info
+    // Fetch all Pending and In Progress job cards that have fabric info
     const jobs = await JobCard.find({
-      status: 'In Progress',
+      status: { $in: ['Pending', 'In Progress'] },
       fabric: { $ne: '' }
     }).lean();
 
