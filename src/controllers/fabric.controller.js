@@ -1,4 +1,5 @@
 const FabricTransaction = require('../db/models/fabricTransaction.model');
+const PDFDocument = require('pdfkit');
 
 // Create a new INWARD transaction
 const createInward = async (req, res) => {
@@ -154,10 +155,135 @@ const getLotStock = async (req, res) => {
   }
 };
 
+// Delete a single transaction by ID
+const deleteTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const record = await FabricTransaction.findByIdAndDelete(id);
+    if (!record) {
+      return res.status(404).json({ success: false, error: 'Transaction not found.' });
+    }
+    res.status(200).json({ success: true, message: 'Transaction deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting fabric transaction:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Get lot-wise stock ledger for a specific fabric
+const getLotLedger = async (req, res) => {
+  try {
+    const { fabricQuality } = req.query;
+    const matchStage = {};
+    if (fabricQuality) {
+      matchStage.fabricQuality = new RegExp(`^${fabricQuality.trim()}$`, 'i');
+    }
+    // Fetch all transactions sorted by lot and date
+    const transactions = await FabricTransaction.find(matchStage).sort({ lotNo: 1, date: 1 });
+    res.status(200).json({ success: true, data: transactions });
+  } catch (error) {
+    console.error('Error fetching lot ledger:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Generate Fabric Ledger PDF
+const downloadLedgerPdf = async (req, res) => {
+  try {
+    const { dateStart, dateEnd, fabricQuality } = req.query;
+
+    const matchStage = {};
+    if (dateStart || dateEnd) {
+      matchStage.date = {};
+      if (dateStart) matchStage.date.$gte = new Date(dateStart);
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        matchStage.date.$lte = end;
+      }
+    }
+    if (fabricQuality) {
+      matchStage.fabricQuality = new RegExp(`^${fabricQuality.trim()}$`, 'i');
+    }
+
+    const transactions = await FabricTransaction.find(matchStage).sort({ date: 1 });
+
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=fabric-ledger.pdf');
+    doc.pipe(res);
+
+    // Header
+    doc.fontSize(18).font('Helvetica-Bold').text('Elite Digital Print — Fabric Ledger', { align: 'center' });
+    doc.moveDown(0.3);
+    const dateLabel = dateStart || dateEnd
+      ? `Period: ${dateStart || 'Start'} to ${dateEnd || 'Today'}`
+      : 'All Transactions';
+    doc.fontSize(10).font('Helvetica').text(dateLabel, { align: 'center' });
+    if (fabricQuality) {
+      doc.text(`Fabric: ${fabricQuality}`, { align: 'center' });
+    }
+    doc.moveDown(1);
+
+    // Table header
+    const colX = [40, 90, 155, 230, 310, 380, 430, 490];
+    const headers = ['Date', 'Lot #', 'Type', 'Challan/Job', 'Fabric Quality', 'Vendor/Party', 'Panna', 'Qty'];
+    doc.fontSize(8).font('Helvetica-Bold');
+    headers.forEach((h, i) => doc.text(h, colX[i], doc.y, { width: colX[i + 1] ? colX[i + 1] - colX[i] - 2 : 70, continued: i < headers.length - 1 }));
+    doc.moveDown(0.5);
+    doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+    doc.moveDown(0.4);
+
+    // Rows
+    doc.font('Helvetica').fontSize(7.5);
+    let totalIn = 0, totalOut = 0;
+    for (const t of transactions) {
+      const y = doc.y;
+      if (y > 750) { doc.addPage(); }
+      const isIn = t.type === 'INWARD';
+      if (isIn) totalIn += t.qty; else totalOut += t.qty;
+      const row = [
+        new Date(t.date).toLocaleDateString('en-IN'),
+        t.lotNo ? `#${t.lotNo}` : '-',
+        t.type,
+        isIn ? (t.challanNo || '-') : (t.jobNo || '-'),
+        t.fabricQuality || '-',
+        isIn ? (t.vendorName || '-') : (t.partyName || '-'),
+        t.panna || '-',
+        `${isIn ? '+' : '-'}${t.qty}`
+      ];
+      row.forEach((cell, i) => {
+        doc.fillColor(isIn ? '#1a472a' : '#7f1d1d').text(String(cell), colX[i], doc.y, {
+          width: colX[i + 1] ? colX[i + 1] - colX[i] - 2 : 70,
+          continued: i < row.length - 1
+        });
+      });
+      doc.fillColor('black').moveDown(0.6);
+    }
+
+    // Summary
+    doc.moveDown(1);
+    doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+    doc.moveDown(0.5);
+    doc.font('Helvetica-Bold').fontSize(9);
+    doc.text(`Total Inward: +${totalIn} mtr`, 40);
+    doc.text(`Total Outward: -${totalOut} mtr`);
+    doc.text(`Net Stock: ${totalIn - totalOut} mtr`);
+
+    doc.end();
+  } catch (error) {
+    console.error('Error generating fabric ledger PDF:', error);
+    if (!res.headersSent) res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   createInward,
   createOutward,
   getTransactions,
   getStockOverview,
-  getLotStock
+  getLotStock,
+  deleteTransaction,
+  getLotLedger,
+  downloadLedgerPdf
 };
