@@ -14,4 +14,7 @@ router.get('/transactions', fabricController.getTransactions);
 // Get stock overview grouped by fabric quality
 router.get('/stock', fabricController.getStockOverview);
 
+// Get lot stock
+router.get('/lot-stock', fabricController.getLotStock);
+
 module.exports = router;
