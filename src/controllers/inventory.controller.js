@@ -303,29 +303,40 @@ const syncInventorySnapshot = async (req, res) => {
   try {
     logger.info('[INVENTORY] Syncing local database stock with Uniware snapshot...');
     
-    // Fetch all local inventory items
-    const localItems = await db.Inventory.find({}).lean();
-    
-    // Fetch products catalog for details
-    const productsCatalog = await db.Product.find({}).lean();
+    // Fetch all catalog items from InventoryProduct (which represents the complete catalog variations)
+    const catalogItems = await db.InventoryProduct.find({}).lean();
+    const skuCodes = catalogItems.map(item => item.skuCode).filter(Boolean);
+
+    // Map catalog items by full SKU for detailed information mapping (description, price, image)
     const catalogMap = {};
-    productsCatalog.forEach(p => {
+    catalogItems.forEach(p => {
       if (p.skuCode) {
         catalogMap[p.skuCode.toUpperCase()] = p;
       }
     });
 
-    const skuCodes = [...new Set(localItems.map(item => item.skuCode).filter(Boolean))];
-    
     let snapshots = [];
     
     try {
       const token = await getAccessToken();
-      if (token) {
-        const uniResponse = await fetchSnapshot(token, skuCodes);
-        if (uniResponse && uniResponse.successful && uniResponse.inventorySnapshots) {
-          snapshots = uniResponse.inventorySnapshots;
+      if (token && skuCodes.length > 0) {
+        // Chunk requests to avoid URL/payload length issues in Unicommerce APIs
+        const CHUNK_SIZE = 100;
+        const chunks = [];
+        for (let i = 0; i < skuCodes.length; i += CHUNK_SIZE) {
+          chunks.push(skuCodes.slice(i, i + CHUNK_SIZE));
         }
+
+        logger.info(`[INVENTORY] Querying Uniware snapshots for ${skuCodes.length} SKUs in ${chunks.length} chunks...`);
+        for (let idx = 0; idx < chunks.length; idx++) {
+          const chunk = chunks[idx];
+          const uniResponse = await fetchSnapshot(token, chunk);
+          if (uniResponse && uniResponse.successful && uniResponse.inventorySnapshots) {
+            snapshots.push(...uniResponse.inventorySnapshots);
+          }
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        logger.info(`[INVENTORY] Total snapshots fetched: ${snapshots.length}`);
       }
     } catch (apiErr) {
       logger.error('[INVENTORY] Sync error calling snapshot API: %s', apiErr.message);
@@ -333,35 +344,12 @@ const syncInventorySnapshot = async (req, res) => {
     
     // Fallback Mock data if empty
     if (snapshots.length === 0) {
-      snapshots = localItems.map(item => {
-        if (!item.skuCode) return null;
-        const dbStock = item.currentlyAvailableStock || 0;
-        let simUniStock = dbStock;
-        
-        let sku = item.skuCode;
-        if (!sku.includes('_') && item.size) {
-          sku = `${sku}_${item.size}`;
-        }
-        
+      logger.warn('[INVENTORY] Uniware snapshot empty, generating mock fallback for all catalog items...');
+      snapshots = catalogItems.map(item => {
+        const sku = item.skuCode;
         const hash = sku.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        if (hash % 7 === 0) {
-          simUniStock = Math.max(0, dbStock - 3);
-        } else if (hash % 11 === 0) {
-          simUniStock = dbStock + 5;
-        }
         return {
           itemTypeSKU: sku,
-          inventory: simUniStock
-        };
-      }).filter(Boolean);
-    }
-
-    // If snapshots are still empty (e.g. no products or local items), pull from product catalog directly
-    if (snapshots.length === 0 && productsCatalog.length > 0) {
-      snapshots = productsCatalog.slice(0, 15).map(p => {
-        const hash = p.skuCode.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        return {
-          itemTypeSKU: p.skuCode,
           inventory: (hash % 15) + 2
         };
       });
@@ -393,35 +381,75 @@ const syncInventorySnapshot = async (req, res) => {
         ]
       });
 
+      // Get rich details from InventoryProduct catalog
+      const catalogItem = catalogMap[sku] || {};
+      const name = catalogItem.description || catalogItem.name || 'Uniware Synced Item';
+      const purchasePrice = catalogItem.basePrice || (catalogItem.price ? catalogItem.price * 0.6 : 299);
+      const salePrice = catalogItem.price || 599;
+      const imageUrl = catalogItem.imageUrl || '';
+
       if (existingItem) {
-        if (existingItem.party === 'Uniware Channel Sync') {
-          existingItem.currentlyAvailableStock = uniStock;
-          if (existingItem.qty < uniStock) {
-            existingItem.qty = uniStock;
-          }
-          await existingItem.save();
-          updatedCount++;
+        existingItem.currentlyAvailableStock = uniStock;
+        existingItem.qty = Math.max(existingItem.qty, uniStock);
+        existingItem.itemName = name;
+        existingItem.purchasePrice = purchasePrice;
+        existingItem.salePrice = salePrice;
+        existingItem.imageUrl = imageUrl;
+        if (existingItem.party === 'Uniware Channel Sync' || !existingItem.party) {
+          existingItem.party = 'Uniware Channel Sync';
         }
+        await existingItem.save();
+        updatedCount++;
       } else {
         // Create new inventory item
-        let name = 'Uniware Synced Item';
-        let purchasePrice = 299;
-        let salePrice = 599;
-        let imageUrl = '';
-
-        if (catalogMap[sku]) {
-          name = catalogMap[sku].description || name;
-          purchasePrice = catalogMap[sku].basePrice || purchasePrice;
-          salePrice = catalogMap[sku].price || salePrice;
-          imageUrl = catalogMap[sku].imageUrl || imageUrl;
-        }
-
         await db.Inventory.create({
           party: 'Uniware Channel Sync',
           itemName: name,
           size: size,
           currentlyAvailableStock: uniStock,
           qty: uniStock,
+          purchasePrice,
+          salePrice,
+          imageUrl,
+          skuCode: baseSku,
+          date: new Date()
+        });
+        createdCount++;
+      }
+    }
+
+    // Make sure all catalogItems have a record in db.Inventory (even if stock is 0 and no snapshot was returned)
+    for (const catalogItem of catalogItems) {
+      const sku = (catalogItem.skuCode || '').toUpperCase();
+      if (!sku) continue;
+
+      let baseSku = sku;
+      let size = 'N/A';
+      if (sku.includes('_')) {
+        const parts = sku.split('_');
+        baseSku = parts[0];
+        size = parts[1];
+      }
+
+      const existingItem = await db.Inventory.findOne({
+        $or: [
+          { skuCode: baseSku, size: size },
+          { skuCode: sku }
+        ]
+      });
+
+      if (!existingItem) {
+        const name = catalogItem.description || catalogItem.name || 'Uniware Synced Item';
+        const purchasePrice = catalogItem.basePrice || (catalogItem.price ? catalogItem.price * 0.6 : 299);
+        const salePrice = catalogItem.price || 599;
+        const imageUrl = catalogItem.imageUrl || '';
+
+        await db.Inventory.create({
+          party: 'Uniware Channel Sync',
+          itemName: name,
+          size: size,
+          currentlyAvailableStock: 0,
+          qty: 0,
           purchasePrice,
           salePrice,
           imageUrl,
