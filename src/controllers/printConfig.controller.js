@@ -11,8 +11,12 @@ const getConfig = async () => {
       categories: ['Cotton', 'Polyester', 'Silk'],
       passes: ['1 Pass', '2 Pass'],
       parties: ['Wholesale'],
-      widths: ['44 inch', '58 inch']
+      widths: ['44 inch', '58 inch'],
+      rawMaterials: ['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink']
     });
+  } else if (!config.rawMaterials || config.rawMaterials.length === 0) {
+    config.rawMaterials = ['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'];
+    await config.save();
   }
   return config;
 };
@@ -35,7 +39,7 @@ const updatePrintConfig = async (req, res) => {
       return res.status(httpStatus.BAD_REQUEST).send('Missing action, field, or value');
     }
 
-    const validFields = ['categories', 'passes', 'parties', 'widths', 'fabrics', 'designers', 'paperTypes', 'billToOptions', 'shipToOptions', 'machines', 'machine_profile', 'temperatures', 'speeds', 'startingJobNo'];
+    const validFields = ['categories', 'passes', 'parties', 'widths', 'fabrics', 'designers', 'paperTypes', 'billToOptions', 'shipToOptions', 'machines', 'machine_profile', 'temperatures', 'speeds', 'startingJobNo', 'rawMaterials'];
     if (!validFields.includes(field)) {
       return res.status(httpStatus.BAD_REQUEST).send('Invalid field');
     }

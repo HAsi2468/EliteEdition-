@@ -43,5 +43,6 @@ router.use('/department-reports', departmentReportRoute);
 router.use('/workspace', chatTaskRoute);
 router.use('/fabric-vendors', require('./fabricVendor.route'));
 router.use('/fabric', require('./fabric.route'));
+router.use('/raw-materials', require('./rawMaterial.route'));
 
 module.exports = router;
