@@ -49,6 +49,25 @@ const rawMaterialTransactionSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    // Dynamic specifications
+    panna: {
+      type: String,
+      trim: true,
+    },
+    paperQuality: {
+      type: String,
+      trim: true,
+    },
+    color: {
+      type: String,
+      trim: true,
+    },
+    canSize: {
+      type: Number,
+    },
+    metersPerRoll: {
+      type: Number,
+    },
   },
   {
     timestamps: true,

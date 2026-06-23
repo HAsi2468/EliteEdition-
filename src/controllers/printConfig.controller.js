@@ -12,11 +12,42 @@ const getConfig = async () => {
       passes: ['1 Pass', '2 Pass'],
       parties: ['Wholesale'],
       widths: ['44 inch', '58 inch'],
-      rawMaterials: ['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink']
+      rawMaterials: ['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'],
+      sublimationPanna: ['44', '60', '64'],
+      sublimationQualities: ['70 GSM', '80 GSM', '90 GSM'],
+      butterPanna: ['44', '60'],
+      inkColors: ['C', 'M', 'Y', 'K', 'C.S.'],
+      inkCanSizes: ['1 Ltr', '5 Ltr', '10 Ltr']
     });
-  } else if (!config.rawMaterials || config.rawMaterials.length === 0) {
-    config.rawMaterials = ['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'];
-    await config.save();
+  } else {
+    let changed = false;
+    if (!config.rawMaterials || config.rawMaterials.length === 0) {
+      config.rawMaterials = ['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'];
+      changed = true;
+    }
+    if (!config.sublimationPanna || config.sublimationPanna.length === 0) {
+      config.sublimationPanna = ['44', '60', '64'];
+      changed = true;
+    }
+    if (!config.sublimationQualities || config.sublimationQualities.length === 0) {
+      config.sublimationQualities = ['70 GSM', '80 GSM', '90 GSM'];
+      changed = true;
+    }
+    if (!config.butterPanna || config.butterPanna.length === 0) {
+      config.butterPanna = ['44', '60'];
+      changed = true;
+    }
+    if (!config.inkColors || config.inkColors.length === 0) {
+      config.inkColors = ['C', 'M', 'Y', 'K', 'C.S.'];
+      changed = true;
+    }
+    if (!config.inkCanSizes || config.inkCanSizes.length === 0) {
+      config.inkCanSizes = ['1 Ltr', '5 Ltr', '10 Ltr'];
+      changed = true;
+    }
+    if (changed) {
+      await config.save();
+    }
   }
   return config;
 };
@@ -39,7 +70,12 @@ const updatePrintConfig = async (req, res) => {
       return res.status(httpStatus.BAD_REQUEST).send('Missing action, field, or value');
     }
 
-    const validFields = ['categories', 'passes', 'parties', 'widths', 'fabrics', 'designers', 'paperTypes', 'billToOptions', 'shipToOptions', 'machines', 'machine_profile', 'temperatures', 'speeds', 'startingJobNo', 'rawMaterials'];
+    const validFields = [
+      'categories', 'passes', 'parties', 'widths', 'fabrics', 'designers',
+      'paperTypes', 'billToOptions', 'shipToOptions', 'machines',
+      'machine_profile', 'temperatures', 'speeds', 'startingJobNo', 'rawMaterials',
+      'sublimationPanna', 'sublimationQualities', 'butterPanna', 'inkColors', 'inkCanSizes'
+    ];
     if (!validFields.includes(field)) {
       return res.status(httpStatus.BAD_REQUEST).send('Invalid field');
     }

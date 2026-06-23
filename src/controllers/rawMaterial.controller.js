@@ -1,10 +1,33 @@
 const RawMaterialTransaction = require('../db/models/rawMaterialTransaction.model');
 const PDFDocument = require('pdfkit');
 
+const formatMaterialDetails = (t) => {
+  if (!t.materialName) return '-';
+  const nameLower = t.materialName.toLowerCase();
+  if (nameLower.includes('sublimation')) {
+    const details = [];
+    if (t.panna) details.push(`Panna: ${t.panna}`);
+    if (t.paperQuality) details.push(`Qual: ${t.paperQuality}`);
+    if (t.metersPerRoll) details.push(`${t.metersPerRoll}m`);
+    return details.length > 0 ? `${t.materialName} (${details.join(', ')})` : t.materialName;
+  } else if (nameLower.includes('butter')) {
+    const details = [];
+    if (t.panna) details.push(`Panna: ${t.panna}`);
+    if (t.metersPerRoll) details.push(`${t.metersPerRoll}m`);
+    return details.length > 0 ? `${t.materialName} (${details.join(', ')})` : t.materialName;
+  } else if (nameLower.includes('ink')) {
+    const details = [];
+    if (t.color) details.push(t.color);
+    if (t.canSize) details.push(`${t.canSize} Ltr`);
+    return details.length > 0 ? `${t.materialName} - ${details.join(' ')}` : t.materialName;
+  }
+  return t.materialName;
+};
+
 // Create a new INWARD transaction
 const createInward = async (req, res) => {
   try {
-    const { challanNo, vendorName, materialName, qty, unit, date, notes } = req.body;
+    const { challanNo, vendorName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll } = req.body;
     
     if (!materialName || qty == null || qty < 0) {
       return res.status(400).json({ success: false, error: 'Material Name and a valid Quantity are required.' });
@@ -18,7 +41,12 @@ const createInward = async (req, res) => {
       qty,
       unit: unit || 'Rolls',
       date: date ? new Date(date) : new Date(),
-      notes
+      notes,
+      panna,
+      paperQuality,
+      color,
+      canSize,
+      metersPerRoll
     });
 
     await transaction.save();
@@ -32,7 +60,7 @@ const createInward = async (req, res) => {
 // Create a new OUTWARD transaction
 const createOutward = async (req, res) => {
   try {
-    const { jobNo, partyName, materialName, qty, unit, date, notes } = req.body;
+    const { jobNo, partyName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll } = req.body;
     
     if (!materialName || qty == null || qty <= 0) {
       return res.status(400).json({ success: false, error: 'Material Name and a valid Quantity (>0) are required.' });
@@ -46,7 +74,12 @@ const createOutward = async (req, res) => {
       qty,
       unit: unit || 'Rolls',
       date: date ? new Date(date) : new Date(),
-      notes
+      notes,
+      panna,
+      paperQuality,
+      color,
+      canSize,
+      metersPerRoll
     });
 
     await transaction.save();
@@ -74,7 +107,14 @@ const getStockOverview = async (req, res) => {
     const pipeline = [
       {
         $group: {
-          _id: '$materialName',
+          _id: {
+            materialName: '$materialName',
+            panna: '$panna',
+            paperQuality: '$paperQuality',
+            color: '$color',
+            canSize: '$canSize',
+            metersPerRoll: '$metersPerRoll'
+          },
           totalInward: {
             $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] }
           },
@@ -86,7 +126,12 @@ const getStockOverview = async (req, res) => {
       },
       {
         $project: {
-          materialName: '$_id',
+          materialName: '$_id.materialName',
+          panna: '$_id.panna',
+          paperQuality: '$_id.paperQuality',
+          color: '$_id.color',
+          canSize: '$_id.canSize',
+          metersPerRoll: '$_id.metersPerRoll',
           totalInward: 1,
           totalOutward: 1,
           currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
@@ -95,7 +140,7 @@ const getStockOverview = async (req, res) => {
         }
       },
       {
-        $sort: { materialName: 1 }
+        $sort: { materialName: 1, panna: 1, paperQuality: 1, color: 1 }
       }
     ];
 
@@ -181,7 +226,7 @@ const downloadLedgerPdf = async (req, res) => {
         new Date(t.date).toLocaleDateString('en-IN'),
         t.type,
         isIn ? (t.challanNo || '-') : (t.jobNo || '-'),
-        t.materialName || '-',
+        formatMaterialDetails(t),
         isIn ? (t.vendorName || '-') : (t.partyName || '-'),
         `${isIn ? '+' : '-'}${t.qty}`,
         t.unit || '-'

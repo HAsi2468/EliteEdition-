@@ -314,7 +314,14 @@ const getElitePrintReports = async (req, res) => {
     const rawMaterialStockPipeline = [
       {
         $group: {
-          _id: '$materialName',
+          _id: {
+            materialName: '$materialName',
+            panna: '$panna',
+            paperQuality: '$paperQuality',
+            color: '$color',
+            canSize: '$canSize',
+            metersPerRoll: '$metersPerRoll'
+          },
           totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
           totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } },
           unit: { $first: '$unit' }
@@ -322,7 +329,12 @@ const getElitePrintReports = async (req, res) => {
       },
       {
         $project: {
-          materialName: '$_id',
+          materialName: '$_id.materialName',
+          panna: '$_id.panna',
+          paperQuality: '$_id.paperQuality',
+          color: '$_id.color',
+          canSize: '$_id.canSize',
+          metersPerRoll: '$_id.metersPerRoll',
           currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
           unit: 1,
           _id: 0
@@ -337,7 +349,23 @@ const getElitePrintReports = async (req, res) => {
 
     const lowStockRawMaterials = rawMaterialStockList
       .filter(s => s.currentStock <= 5)
-      .map(s => ({ item: s.materialName, type: 'Raw Material', qty: Number(s.currentStock.toFixed(1)), unit: s.unit || 'rolls' }));
+      .map(s => {
+        const details = [];
+        const nameLower = (s.materialName || '').toLowerCase();
+        if (nameLower.includes('sublimation')) {
+          if (s.panna) details.push(`Panna: ${s.panna}`);
+          if (s.paperQuality) details.push(`Qual: ${s.paperQuality}`);
+          if (s.metersPerRoll) details.push(`${s.metersPerRoll}m`);
+        } else if (nameLower.includes('butter')) {
+          if (s.panna) details.push(`Panna: ${s.panna}`);
+          if (s.metersPerRoll) details.push(`${s.metersPerRoll}m`);
+        } else if (nameLower.includes('ink')) {
+          if (s.color) details.push(s.color);
+          if (s.canSize) details.push(`${s.canSize} Ltr`);
+        }
+        const formattedName = details.length > 0 ? `${s.materialName} (${details.join(', ')})` : s.materialName;
+        return { item: formattedName, type: 'Raw Material', qty: Number(s.currentStock.toFixed(1)), unit: s.unit || 'rolls' };
+      });
 
     const lowStockAlerts = [...lowStockFabrics, ...lowStockRawMaterials];
 

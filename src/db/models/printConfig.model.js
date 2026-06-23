@@ -70,6 +70,26 @@ const printConfigSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    sublimationPanna: {
+      type: [String],
+      default: [],
+    },
+    sublimationQualities: {
+      type: [String],
+      default: [],
+    },
+    butterPanna: {
+      type: [String],
+      default: [],
+    },
+    inkColors: {
+      type: [String],
+      default: [],
+    },
+    inkCanSizes: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,
