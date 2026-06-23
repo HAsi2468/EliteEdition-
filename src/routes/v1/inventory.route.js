@@ -17,6 +17,8 @@ router.route('/')
   .post(inventoryController.createInventory)
   .get(inventoryController.getInventory);
 
+router.post('/bulk-inward', inventoryController.bulkInward);
+
 router.route('/inventorySnapshot/get').get(inventoryController.getInventorySnapshot);
 router.route('/inventorySnapshot/sync').post(inventoryController.syncInventorySnapshot);
 

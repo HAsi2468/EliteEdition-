@@ -389,6 +389,118 @@ const syncInventorySnapshot = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 };
+
+const bulkInward = async (req, res) => {
+  try {
+    const items = req.body;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: 'Body must be an array of inward items' });
+    }
+
+    logger.info(`[INVENTORY] Bulk inward request — ${items.length} items`);
+
+    const results = {
+      updated: 0,
+      created: 0,
+      errors: []
+    };
+
+    for (const item of items) {
+      try {
+        const { skuCode, qty, purchasePrice, salePrice, party, itemName, size, imageUrl } = item;
+        if (!skuCode) {
+          throw new Error('SKU Code is required for all inward items');
+        }
+        const inwardQty = Number(qty) || 0;
+        if (inwardQty <= 0) {
+          throw new Error(`Invalid quantity ${qty} for SKU ${skuCode}`);
+        }
+
+        // 1. Check if SKU exists in db.Inventory
+        let inventoryItem = await db.Inventory.findOne({ skuCode: skuCode.trim() });
+        if (inventoryItem) {
+          // Increment stock
+          inventoryItem.qty += inwardQty;
+          inventoryItem.currentlyAvailableStock += inwardQty;
+          if (purchasePrice !== undefined && purchasePrice !== null && !isNaN(Number(purchasePrice))) {
+            inventoryItem.purchasePrice = Number(purchasePrice);
+          }
+          if (salePrice !== undefined && salePrice !== null && !isNaN(Number(salePrice))) {
+            inventoryItem.salePrice = Number(salePrice);
+          }
+          if (party) {
+            inventoryItem.party = party.trim();
+          }
+          if (itemName) {
+            inventoryItem.itemName = itemName.trim();
+          }
+          if (size) {
+            inventoryItem.size = size.trim();
+          }
+          await inventoryItem.save();
+          results.updated++;
+        } else {
+          // Create new record
+          // Look up in InventoryProduct if not fully populated
+          let resolvedItemName = itemName;
+          let resolvedSize = size;
+          let resolvedImageUrl = imageUrl || '';
+          let resolvedPurchasePrice = purchasePrice || 0;
+          let resolvedSalePrice = salePrice || 0;
+          let resolvedParty = party || 'Bulk Inward';
+
+          const catalogProduct = await db.InventoryProduct.findOne({ skuCode: skuCode.trim() });
+          if (catalogProduct) {
+            resolvedItemName = resolvedItemName || catalogProduct.description || skuCode;
+            resolvedSize = resolvedSize || (catalogProduct.size && catalogProduct.size[0]) || 'N/A';
+            resolvedImageUrl = resolvedImageUrl || catalogProduct.imageUrl || '';
+            resolvedPurchasePrice = purchasePrice !== undefined && purchasePrice !== null ? purchasePrice : (catalogProduct.basePrice || 0);
+            resolvedSalePrice = salePrice !== undefined && salePrice !== null ? salePrice : (catalogProduct.price || 0);
+            resolvedParty = resolvedParty || catalogProduct.brand || 'Uniware';
+          } else {
+            resolvedItemName = resolvedItemName || skuCode;
+            resolvedSize = resolvedSize || (skuCode.includes('_') ? skuCode.split('_')[1] : 'N/A');
+          }
+
+          await db.Inventory.create({
+            skuCode: skuCode.trim(),
+            itemName: resolvedItemName,
+            size: resolvedSize,
+            qty: inwardQty,
+            currentlyAvailableStock: inwardQty,
+            purchasePrice: Number(resolvedPurchasePrice) || 0.0,
+            salePrice: Number(resolvedSalePrice) || 0.0,
+            party: resolvedParty,
+            imageUrl: resolvedImageUrl,
+            date: new Date()
+          });
+          results.created++;
+        }
+
+        // 2. Also increment the Unicommerce/Uniware Product catalog quantity if exists
+        await db.InventoryProduct.updateOne(
+          { skuCode: skuCode.trim() },
+          { $inc: { qty: inwardQty } }
+        );
+
+      } catch (err) {
+        logger.error(`Error processing bulk inward item: %o`, err);
+        results.errors.push({ skuCode: item.skuCode, error: err.message });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Bulk inward processed. Created: ${results.created}, Updated: ${results.updated}, Errors: ${results.errors.length}`,
+      results
+    });
+
+  } catch (error) {
+    logger.error('[INVENTORY] Bulk inward failed: %o', error);
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
+  }
+};
+
 // Get party name by SKU (used by Returns & RTO UI)
 async function getPartyBySku(req, res) {
   try {
@@ -413,5 +525,6 @@ module.exports = {
   deleteInventory,
   getInventorySnapshot,
   syncInventorySnapshot,
+  bulkInward,
   getPartyBySku,
 };

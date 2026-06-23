@@ -27,6 +27,32 @@ const formatMaterialDetails = (t) => {
 // Create a new INWARD transaction
 const createInward = async (req, res) => {
   try {
+    if (Array.isArray(req.body)) {
+      const docs = req.body.map(item => {
+        const { challanNo, vendorName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll } = item;
+        if (!materialName || qty == null || qty < 0) {
+          throw new Error('Material Name and a valid Quantity are required.');
+        }
+        return {
+          type: 'INWARD',
+          challanNo,
+          vendorName,
+          materialName,
+          qty,
+          unit: unit || 'Rolls',
+          date: date ? new Date(date) : new Date(),
+          notes,
+          panna,
+          paperQuality,
+          color,
+          canSize,
+          metersPerRoll
+        };
+      });
+      const transactions = await RawMaterialTransaction.insertMany(docs);
+      return res.status(201).json({ success: true, data: transactions });
+    }
+
     const { challanNo, vendorName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll } = req.body;
     
     if (!materialName || qty == null || qty < 0) {
@@ -60,6 +86,32 @@ const createInward = async (req, res) => {
 // Create a new OUTWARD transaction
 const createOutward = async (req, res) => {
   try {
+    if (Array.isArray(req.body)) {
+      const docs = req.body.map(item => {
+        const { jobNo, partyName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll } = item;
+        if (!materialName || qty == null || qty <= 0) {
+          throw new Error('Material Name and a valid Quantity (>0) are required.');
+        }
+        return {
+          type: 'OUTWARD',
+          jobNo,
+          partyName,
+          materialName,
+          qty,
+          unit: unit || 'Rolls',
+          date: date ? new Date(date) : new Date(),
+          notes,
+          panna,
+          paperQuality,
+          color,
+          canSize,
+          metersPerRoll
+        };
+      });
+      const transactions = await RawMaterialTransaction.insertMany(docs);
+      return res.status(201).json({ success: true, data: transactions });
+    }
+
     const { jobNo, partyName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll } = req.body;
     
     if (!materialName || qty == null || qty <= 0) {
