@@ -60,7 +60,7 @@ const fabricTransactionSchema = new mongoose.Schema(
 
 // Auto-increment logic for INWARD lotNo
 fabricTransactionSchema.pre('save', async function () {
-  if (this.isNew && this.type === 'INWARD') {
+  if (this.isNew && this.type === 'INWARD' && !this.lotNo) {
     const lastTransaction = await this.constructor.findOne({ type: 'INWARD' }, 'lotNo').sort({ lotNo: -1 });
     this.lotNo = lastTransaction && lastTransaction.lotNo ? lastTransaction.lotNo + 1 : 1;
   }

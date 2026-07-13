@@ -22,6 +22,7 @@ const io = new Server(server, {
   }
 });
 setupSockets(io);
+app.set('socketio', io);
 
 const port = 3001; // forced port to avoid conflict
 server.listen(port, '0.0.0.0', () => {

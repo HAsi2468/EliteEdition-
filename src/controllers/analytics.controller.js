@@ -564,10 +564,127 @@ const getLostRevenueEstimate = async (req, res) => {
   }
 };
 
+const getReturnsBrandReport = async (req, res) => {
+  try {
+    const { dateStart, dateEnd } = req.query;
+    
+    // 1. Pickup Report Match
+    const matchPickup = {
+      reversePickupCreatedDate: { $ne: null, $exists: true, $ne: "" }
+    };
+    if (dateStart || dateEnd) {
+      if (dateStart) matchPickup.reversePickupCreatedDate.$gte = `${dateStart} 00:00:00`;
+      if (dateEnd) matchPickup.reversePickupCreatedDate.$lte = `${dateEnd} 23:59:59`;
+    }
+
+    // 2. Physical Return Match
+    const matchPhysical = {
+      reversePickupCreatedDate: { $ne: null, $exists: true, $ne: "" },
+      returnDate: { $ne: null, $exists: true, $ne: "" }
+    };
+    if (dateStart || dateEnd) {
+      if (dateStart) matchPhysical.returnDate = { $gte: `${dateStart} 00:00:00` };
+      if (dateEnd) {
+        if (!matchPhysical.returnDate) matchPhysical.returnDate = {};
+        matchPhysical.returnDate.$lte = `${dateEnd} 23:59:59`;
+      }
+    }
+
+    const buildPipeline = (matchStage) => [
+      { $match: matchStage },
+      { $group: {
+          _id: {
+            brand: { $cond: { if: { $or: [{ $eq: ['$itemTypeBrand', ''] }, { $eq: [{ $ifNull: ['$itemTypeBrand', null] }, null] }] }, then: 'Unknown', else: '$itemTypeBrand' } },
+            baseSku: { $arrayElemAt: [{ $split: ['$itemSKUCode', '_'] }, 0] },
+            size: { $cond: { if: { $or: [{ $eq: ['$itemTypeSize', ''] }, { $eq: [{ $ifNull: ['$itemTypeSize', null] }, null] }] }, then: 'N/A', else: '$itemTypeSize' } }
+          },
+          quantity: { $sum: { $ifNull: ['$saleCount', 1] } },
+          sellableAmount: { $sum: { $multiply: [{ $ifNull: ['$saleCount', 1] }, { $convert: { input: '$totalPrice', to: 'double', onError: 0, onNull: 0 } }] } }
+      }},
+      { $group: {
+          _id: { brand: '$_id.brand', baseSku: '$_id.baseSku' },
+          variations: { $push: { size: '$_id.size', quantity: '$quantity', sellableAmount: '$sellableAmount' } },
+          skuQty: { $sum: '$quantity' },
+          skuAmt: { $sum: '$sellableAmount' }
+      }},
+      { $group: {
+          _id: '$_id.brand',
+          products: { $push: { sku: '$_id.baseSku', total: '$skuQty', sellableAmount: '$skuAmt', variations: '$variations' } },
+          brandQty: { $sum: '$skuQty' },
+          brandAmt: { $sum: '$skuAmt' }
+      }},
+      { $sort: { brandQty: -1 } }
+    ];
+
+    const [resultsPickup, resultsPhysical] = await Promise.all([
+      db.SaleOrder.aggregate(buildPipeline(matchPickup)),
+      db.SaleOrder.aggregate(buildPipeline(matchPhysical))
+    ]);
+
+    // Gather all SKUs to fetch images
+    const allBaseSkus = [
+      ...resultsPickup.flatMap(b => b.products.map(p => p.sku)),
+      ...resultsPhysical.flatMap(b => b.products.map(p => p.sku))
+    ].filter(Boolean);
+    const uniqueBaseSkus = [...new Set(allBaseSkus)];
+    const regexes = uniqueBaseSkus.map(s => new RegExp('^' + s + '(_|$)', 'i'));
+
+    const productDocs = await db.InventoryProduct.find({
+      skuCode: { $in: regexes },
+      imageUrl: { $exists: true, $nin: [null, ''] }
+    }).lean();
+
+    const skuImageMap = {};
+    productDocs.forEach(p => {
+      const base = (p.skuCode || '').split('_')[0];
+      if (base && !skuImageMap[base] && p.imageUrl) skuImageMap[base] = p.imageUrl;
+    });
+
+    const productDocs2 = await db.Product.find({ skuCode: { $in: uniqueBaseSkus }, imageUrl: { $nin: [null, ''] } }).lean();
+    productDocs2.forEach(p => {
+      if (p.skuCode && p.imageUrl && !skuImageMap[p.skuCode]) skuImageMap[p.skuCode] = p.imageUrl;
+    });
+
+    const formatData = (results) => results.map(row => ({
+      brand: row._id || 'Unknown Brand',
+      totalOrderQuantity: row.brandQty,
+      totalSellableAmount: row.brandAmt,
+      products: row.products.map(p => ({
+        sku: p.sku,
+        total: p.total,
+        sellableAmount: p.sellableAmount,
+        imageUrl: skuImageMap[p.sku] || null,
+        variations: p.variations
+      }))
+    }));
+
+    const formattedPickup = formatData(resultsPickup);
+    const formattedPhysical = formatData(resultsPhysical);
+
+    res.json({
+      success: true,
+      pickupReport: {
+        brands: formattedPickup,
+        totalOrderQuantity: formattedPickup.reduce((s, b) => s + b.totalOrderQuantity, 0),
+        totalSellableAmount: formattedPickup.reduce((s, b) => s + b.totalSellableAmount, 0)
+      },
+      physicalReport: {
+        brands: formattedPhysical,
+        totalOrderQuantity: formattedPhysical.reduce((s, b) => s + b.totalOrderQuantity, 0),
+        totalSellableAmount: formattedPhysical.reduce((s, b) => s + b.totalSellableAmount, 0)
+      }
+    });
+  } catch (error) {
+    logger.error('Returns brand report error: %o', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getVariantAnalytics,
   getDemographicsAnalytics,
   getTimeHeatmapData,
   getDeadStockReport,
   getLostRevenueEstimate,
+  getReturnsBrandReport,
 };

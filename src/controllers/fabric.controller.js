@@ -449,6 +449,199 @@ const getFabricRequirement = async (req, res) => {
   }
 };
 
+const importStock = async (req, res) => {
+  try {
+    const rows = req.body;
+    if (!Array.isArray(rows)) {
+      return res.status(400).json({ success: false, error: 'Request body must be an array of rows.' });
+    }
+
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const endOfPrevMonth = new Date(startOfMonth.getTime() - 1000);
+    const createdTransactions = [];
+
+    for (const row of rows) {
+      const fabricQuality = String(row.fabricQuality || '').trim().toUpperCase();
+      const panna = String(row.panna || '').trim();
+
+      if (!fabricQuality) continue;
+
+      // Find all transactions for this fabric + panna
+      const query = {
+        fabricQuality: new RegExp(`^${fabricQuality}$`, 'i')
+      };
+      if (panna) {
+        query.panna = new RegExp(`^${panna}$`, 'i');
+      } else {
+        query.panna = { $in: [null, '', undefined] };
+      }
+
+      const txs = await FabricTransaction.find(query);
+
+      let dbOpeningStock = 0;
+      let dbInward = 0;
+      let dbOutward = 0;
+
+      txs.forEach(t => {
+        const tDate = new Date(t.date);
+        const isPrev = tDate < startOfMonth;
+        const isAdj = t.notes && t.notes.includes('Adjustment');
+
+        if (isPrev) {
+          if (t.type === 'INWARD') dbOpeningStock += t.qty;
+          else dbOpeningStock -= t.qty;
+        } else {
+          if (t.type === 'INWARD') {
+            if (!isAdj) dbInward += t.qty;
+          } else {
+            if (!isAdj) dbOutward += t.qty;
+          }
+        }
+      });
+
+      const csvOpening = (row.openingStock !== undefined && row.openingStock !== null && row.openingStock !== '') ? parseFloat(row.openingStock) : null;
+      const csvInward = (row.inwardQty !== undefined && row.inwardQty !== null && row.inwardQty !== '') ? parseFloat(row.inwardQty) : null;
+      const csvOutward = (row.outwardQty !== undefined && row.outwardQty !== null && row.outwardQty !== '') ? parseFloat(row.outwardQty) : null;
+      const csvCurrent = (row.currentStock !== undefined && row.currentStock !== null && row.currentStock !== '') ? parseFloat(row.currentStock) : null;
+
+      // Extract metadata fields
+      const txDate = row.date ? new Date(row.date) : null;
+      const challanNo = row.challanNo || undefined;
+      const vendorName = row.vendorName || undefined;
+      const jobNo = row.jobNo || undefined;
+      const partyName = row.partyName || undefined;
+      const notes = row.notes || undefined;
+
+      // Adjust Opening Stock
+      if (csvOpening !== null && !isNaN(csvOpening)) {
+        const diff = csvOpening - dbOpeningStock;
+        if (Math.abs(diff) > 0.01) {
+          const t = new FabricTransaction({
+            type: diff > 0 ? 'INWARD' : 'OUTWARD',
+            fabricQuality,
+            panna,
+            qty: Math.abs(diff),
+            date: txDate || endOfPrevMonth,
+            notes: notes || 'CSV Opening Stock Adjustment',
+            challanNo,
+            vendorName: diff > 0 ? vendorName : undefined,
+            jobNo: diff < 0 ? jobNo : undefined,
+            partyName: diff < 0 ? partyName : undefined
+          });
+          await t.save();
+          createdTransactions.push(t);
+          dbOpeningStock = csvOpening;
+        }
+      }
+
+      // Adjust Inward
+      if (csvInward !== null && !isNaN(csvInward)) {
+        const diff = csvInward - dbInward;
+        if (Math.abs(diff) > 0.01) {
+          const t = new FabricTransaction({
+            type: diff > 0 ? 'INWARD' : 'OUTWARD',
+            fabricQuality,
+            panna,
+            qty: Math.abs(diff),
+            date: txDate || new Date(),
+            notes: notes || 'CSV Inward Adjustment',
+            challanNo,
+            vendorName: diff > 0 ? vendorName : undefined,
+            jobNo: diff < 0 ? jobNo : undefined,
+            partyName: diff < 0 ? partyName : undefined
+          });
+          await t.save();
+          createdTransactions.push(t);
+          dbInward = csvInward;
+        }
+      }
+
+      // Adjust Outward
+      if (csvOutward !== null && !isNaN(csvOutward)) {
+        const diff = csvOutward - dbOutward;
+        if (Math.abs(diff) > 0.01) {
+          const t = new FabricTransaction({
+            type: diff > 0 ? 'OUTWARD' : 'INWARD',
+            fabricQuality,
+            panna,
+            qty: Math.abs(diff),
+            date: txDate || new Date(),
+            notes: notes || 'CSV Outward Adjustment',
+            challanNo,
+            vendorName: diff < 0 ? vendorName : undefined,
+            jobNo: diff > 0 ? jobNo : undefined,
+            partyName: diff > 0 ? partyName : undefined
+          });
+          await t.save();
+          createdTransactions.push(t);
+          dbOutward = csvOutward;
+        }
+      }
+
+      // Adjust Current Stock if it still doesn't match
+      if (csvCurrent !== null && !isNaN(csvCurrent)) {
+        const computedCurrent = dbOpeningStock + dbInward - dbOutward;
+        const diff = csvCurrent - computedCurrent;
+        if (Math.abs(diff) > 0.01) {
+          const t = new FabricTransaction({
+            type: diff > 0 ? 'INWARD' : 'OUTWARD',
+            fabricQuality,
+            panna,
+            qty: Math.abs(diff),
+            date: txDate || new Date(),
+            notes: notes || 'CSV Current Stock Adjustment',
+            challanNo,
+            vendorName: diff > 0 ? vendorName : undefined,
+            jobNo: diff < 0 ? jobNo : undefined,
+            partyName: diff < 0 ? partyName : undefined
+          });
+          await t.save();
+          createdTransactions.push(t);
+        }
+      }
+    }
+
+    res.status(200).json({ success: true, message: `Stock import completed. Created ${createdTransactions.length} adjustment records.`, count: createdTransactions.length });
+  } catch (error) {
+    console.error('Error in importStock:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Update a transaction by ID
+const updateTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { challanNo, vendorName, fabricQuality, panna, qty, date, notes, jobNo, partyName, lotNo } = req.body;
+
+    const transaction = await FabricTransaction.findById(id);
+    if (!transaction) {
+      return res.status(404).json({ success: false, error: 'Transaction not found.' });
+    }
+
+    // Update fields
+    if (challanNo !== undefined) transaction.challanNo = challanNo;
+    if (vendorName !== undefined) transaction.vendorName = vendorName;
+    if (fabricQuality !== undefined) transaction.fabricQuality = fabricQuality;
+    if (panna !== undefined) transaction.panna = panna;
+    if (qty !== undefined) transaction.qty = qty;
+    if (date !== undefined) transaction.date = new Date(date);
+    if (notes !== undefined) transaction.notes = notes;
+    if (jobNo !== undefined) transaction.jobNo = jobNo;
+    if (partyName !== undefined) transaction.partyName = partyName;
+    if (lotNo !== undefined) transaction.lotNo = lotNo ? Number(lotNo) : undefined;
+
+    await transaction.save();
+    res.status(200).json({ success: true, data: transaction });
+  } catch (error) {
+    console.error('Error updating fabric transaction:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   createInward,
   createOutward,
@@ -456,8 +649,10 @@ module.exports = {
   getStockOverview,
   getLotStock,
   deleteTransaction,
+  updateTransaction,
   getLotLedger,
   downloadLedgerPdf,
   getStockByPanna,
-  getFabricRequirement
+  getFabricRequirement,
+  importStock
 };

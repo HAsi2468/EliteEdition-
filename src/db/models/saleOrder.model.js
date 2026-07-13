@@ -200,6 +200,18 @@ const saleOrderSchema = new mongoose.Schema(
 			type: String,
 			default: null,
 		},
+		returnDate: {
+			type: String,
+			default: null,
+		},
+		returnReason: {
+			type: String,
+			default: null,
+		},
+		returnRemarks: {
+			type: String,
+			default: null,
+		},
 	},
 	{
 		timestamps: true,

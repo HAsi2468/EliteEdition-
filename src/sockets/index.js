@@ -13,6 +13,12 @@ const setupSockets = (io) => {
       console.log(`Socket ${socket.id} joined room ${roomId}`);
     });
 
+    // Register user to their personal socket channel for direct messaging notifications
+    socket.on('register-user', (userId) => {
+      socket.join(`user_${userId}`);
+      console.log(`Socket ${socket.id} joined personal room user_${userId}`);
+    });
+
     // Handle sending a standard text message
     socket.on('send-message', async (data) => {
       try {
@@ -26,7 +32,7 @@ const setupSockets = (io) => {
           type: 'text'
         });
 
-        const populatedMessage = await ChatMessage.findById(newMessage._id).populate('senderId', 'username email');
+        const populatedMessage = await ChatMessage.findById(newMessage._id).populate('senderId', 'name email');
 
         // Broadcast to everyone in the room (including sender)
         io.to(roomId).emit('receive-message', populatedMessage);
@@ -63,17 +69,17 @@ const setupSockets = (io) => {
 
           // 3. Populate and broadcast the interactive card
           const populatedMessage = await ChatMessage.findById(newMessage._id)
-            .populate('senderId', 'username email')
+            .populate('senderId', 'name email')
             .populate({
               path: 'taskId',
-              populate: { path: 'assignees', select: 'username email' }
+              populate: { path: 'assignees', select: 'name email' }
             });
 
           io.to(roomId).emit('receive-message', populatedMessage);
         }
         
         // Emit a separate event for the global Kanban board to update live
-        const fullyPopulatedTask = await Task.findById(newTask._id).populate('assignees', 'username email');
+        const fullyPopulatedTask = await Task.findById(newTask._id).populate('assignees', 'name email');
         io.emit('task-updated', fullyPopulatedTask);
       } catch (error) {
         console.error('Error creating task from chat:', error);
@@ -89,12 +95,43 @@ const setupSockets = (io) => {
           taskId,
           { status: newStatus },
           { new: true }
-        ).populate('assignees', 'username email');
+        ).populate('assignees', 'name email');
 
         // Broadcast to everyone so their UI flips the status color
         io.emit('task-updated', updatedTask);
       } catch (error) {
         console.error('Error updating task status:', error);
+      }
+    });
+
+    // Handle updating full task details
+    socket.on('update-task-details', async (data) => {
+      try {
+        const { taskId, title, description, priority, assignees, dueDate } = data;
+
+        const updatedTask = await Task.findByIdAndUpdate(
+          taskId,
+          { title, description, priority, assignees, dueDate },
+          { new: true }
+        ).populate('assignees', 'name email');
+
+        // Broadcast updated task details to all connected clients
+        io.emit('task-updated', updatedTask);
+      } catch (error) {
+        console.error('Error updating task details:', error);
+      }
+    });
+
+    // Handle deleting a task
+    socket.on('delete-task', async (data) => {
+      try {
+        const { taskId } = data;
+        await Task.findByIdAndDelete(taskId);
+
+        // Broadcast deletion event to all connected clients
+        io.emit('task-deleted', taskId);
+      } catch (error) {
+        console.error('Error deleting task:', error);
       }
     });
 

@@ -18,6 +18,7 @@ router.route('/fetchFromAPIS').get(productsController.fetchFromAPIS);
 router.route('/get_sku_details').get(productsController.searchBySku);
 router.route('/report').get(productsController.fetchSalesReport);
 router.route('/brandReport').get(productsController.fetchBrandReport);
+router.route('/brandReportHourWise').get(productsController.fetchBrandReportHourWise);
 
 router.route('/fetchMissingProduct')
   .get(productsController.fetchMissingProduct)

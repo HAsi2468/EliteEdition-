@@ -15,6 +15,12 @@ router.get('/report/pdf', (req, res) => {
   if (req.query.type === 'brand') {
     return salesReportController.downloadBrandReportPdf(req, res);
   }
+  if (req.query.type === 'brand-hourly') {
+    return salesReportController.downloadBrandReportHourWisePdf(req, res);
+  }
+  if (req.query.type === 'returns-analysis') {
+    return salesReportController.downloadReturnsBrandReportPdf(req, res);
+  }
   return salesReportController.downloadSalesReportPdf(req, res);
 });
 

@@ -1,0 +1,1896 @@
+[
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 232,
+    "vendorName": "FABTEX",
+    "fabricQuality": "REYON",
+    "challanNo": "172",
+    "qty": 370.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 366.0,
+        "jobNo": "403",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 233,
+    "vendorName": "OZONE",
+    "fabricQuality": "SUDARSHAN",
+    "challanNo": "",
+    "qty": 120.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 116.5,
+        "jobNo": "404",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 234,
+    "vendorName": "OZONE",
+    "fabricQuality": "SUDARSHAN",
+    "challanNo": "280",
+    "qty": 1544.6999999999998,
+    "date": "2026-06-15",
+    "outwards": []
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 235,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "172",
+    "qty": 942.25,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 940.0,
+        "jobNo": "419",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 236,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CEMBRIC",
+    "challanNo": "172",
+    "qty": 1212.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 1280.0,
+        "jobNo": "418",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 236,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "173",
+    "qty": 2024.75,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 198.25,
+        "jobNo": "419",
+        "notes": ""
+      },
+      {
+        "qty": 619.25,
+        "jobNo": "420",
+        "notes": ""
+      },
+      {
+        "qty": 607.5,
+        "jobNo": "421",
+        "notes": ""
+      },
+      {
+        "qty": 604.5,
+        "jobNo": "424",
+        "notes": ""
+      },
+      {
+        "qty": 5.0,
+        "jobNo": "425",
+        "notes": ""
+      },
+      {
+        "qty": 291.0,
+        "jobNo": "426",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 237,
+    "vendorName": "OZONE",
+    "fabricQuality": "MALAY",
+    "challanNo": "1991",
+    "qty": 1016.5,
+    "date": "2026-06-15",
+    "outwards": []
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 237,
+    "vendorName": "OZONE",
+    "fabricQuality": "POWDER",
+    "challanNo": "1991",
+    "qty": 1035.0,
+    "date": "2026-06-15",
+    "outwards": []
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 238,
+    "vendorName": "FABTEX",
+    "fabricQuality": "MAL 58\"",
+    "challanNo": "174",
+    "qty": 761.75,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 448.0,
+        "jobNo": "430",
+        "notes": ""
+      },
+      {
+        "qty": 175.0,
+        "jobNo": "14",
+        "notes": ""
+      },
+      {
+        "qty": 275.0,
+        "jobNo": "13",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 239,
+    "vendorName": "FABTEX",
+    "fabricQuality": "LAICRA",
+    "challanNo": "174",
+    "qty": 277.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 259.0,
+        "jobNo": "429",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 240,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "175",
+    "qty": 2079.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 31.75,
+        "jobNo": "431",
+        "notes": ""
+      },
+      {
+        "qty": 387.0,
+        "jobNo": "436",
+        "notes": ""
+      },
+      {
+        "qty": 287.25,
+        "jobNo": "447",
+        "notes": ""
+      },
+      {
+        "qty": 620.25,
+        "jobNo": "449",
+        "notes": ""
+      },
+      {
+        "qty": 428.0,
+        "jobNo": "450",
+        "notes": ""
+      },
+      {
+        "qty": 320.0,
+        "jobNo": "452",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 241,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CEMBRIC",
+    "challanNo": "175",
+    "qty": 303.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 266.0,
+        "jobNo": "428",
+        "notes": ""
+      },
+      {
+        "qty": 37.0,
+        "jobNo": "",
+        "notes": "RETURN"
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 242,
+    "vendorName": "FABTEX",
+    "fabricQuality": "REYON",
+    "challanNo": "175",
+    "qty": 52.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 52.5,
+        "jobNo": "433",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 243,
+    "vendorName": "MAHAGAURI",
+    "fabricQuality": "LINEN 58",
+    "challanNo": "25",
+    "qty": 1018.25,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 706.0,
+        "jobNo": "439",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 243,
+    "vendorName": "MAHAGAURI",
+    "fabricQuality": "LINEN 36",
+    "challanNo": "25",
+    "qty": 922.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 812.0,
+        "jobNo": "440",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 244,
+    "vendorName": "FABTEX",
+    "fabricQuality": "MAL 58\"",
+    "challanNo": "176",
+    "qty": 1710.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 312.0,
+        "jobNo": "442",
+        "notes": ""
+      },
+      {
+        "qty": 406.75,
+        "jobNo": "15",
+        "notes": ""
+      },
+      {
+        "qty": 878.75,
+        "jobNo": "457",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 245,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CEMBRIC",
+    "challanNo": "177",
+    "qty": 550.25,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 466.75,
+        "jobNo": "448",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 246,
+    "vendorName": "FABTEX",
+    "fabricQuality": "REYON",
+    "challanNo": "177",
+    "qty": 148.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 142.25,
+        "jobNo": "447",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 247,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "178",
+    "qty": 2539.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 522.25,
+        "jobNo": "452",
+        "notes": ""
+      },
+      {
+        "qty": 1211.0,
+        "jobNo": "455",
+        "notes": ""
+      },
+      {
+        "qty": 800.0,
+        "jobNo": "456",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 248,
+    "vendorName": "OZONE",
+    "fabricQuality": "SUDARSHAN",
+    "challanNo": "2285",
+    "qty": 766.25,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 388.0,
+        "jobNo": "469",
+        "notes": ""
+      },
+      {
+        "qty": 193.5,
+        "jobNo": "470",
+        "notes": ""
+      },
+      {
+        "qty": 169.0,
+        "jobNo": "529",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 249,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "179",
+    "qty": 2303.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 526.5,
+        "jobNo": "456",
+        "notes": ""
+      },
+      {
+        "qty": 1265.5,
+        "jobNo": "459",
+        "notes": ""
+      },
+      {
+        "qty": 630.25,
+        "jobNo": "463",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 250,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 44\"",
+    "challanNo": "180",
+    "qty": 104.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 101.5,
+        "jobNo": "458",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 251,
+    "vendorName": "OEQUAL",
+    "fabricQuality": "JHOOTH",
+    "challanNo": "",
+    "qty": 557.2,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 520.25,
+        "jobNo": "471",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 252,
+    "vendorName": "ELITE",
+    "fabricQuality": "MAL 58\"",
+    "challanNo": "728",
+    "qty": 2657.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 223.75,
+        "jobNo": "460",
+        "notes": ""
+      },
+      {
+        "qty": 650.5,
+        "jobNo": "16",
+        "notes": ""
+      },
+      {
+        "qty": 100.5,
+        "jobNo": "17",
+        "notes": ""
+      },
+      {
+        "qty": 184.25,
+        "jobNo": "19",
+        "notes": ""
+      },
+      {
+        "qty": 224.75,
+        "jobNo": "468",
+        "notes": ""
+      },
+      {
+        "qty": 177.5,
+        "jobNo": "479",
+        "notes": ""
+      },
+      {
+        "qty": 337.0,
+        "jobNo": "20",
+        "notes": ""
+      },
+      {
+        "qty": 413.25,
+        "jobNo": "21",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 253,
+    "vendorName": "ELITE",
+    "fabricQuality": "REYON",
+    "challanNo": "728",
+    "qty": 71.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 68.25,
+        "jobNo": "454",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 254,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "180",
+    "qty": 2876.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 599.25,
+        "jobNo": "465",
+        "notes": ""
+      },
+      {
+        "qty": 347.5,
+        "jobNo": "464",
+        "notes": ""
+      },
+      {
+        "qty": 252.75,
+        "jobNo": "484",
+        "notes": ""
+      },
+      {
+        "qty": 422.0,
+        "jobNo": "485",
+        "notes": ""
+      },
+      {
+        "qty": 364.75,
+        "jobNo": "486",
+        "notes": ""
+      },
+      {
+        "qty": 377.0,
+        "jobNo": "487",
+        "notes": ""
+      },
+      {
+        "qty": 504.75,
+        "jobNo": "488",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 255,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 44\"",
+    "challanNo": "183",
+    "qty": 257.75,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 254.5,
+        "jobNo": "466",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 256,
+    "vendorName": "FABTEX",
+    "fabricQuality": "SUMMER COOL",
+    "challanNo": "183",
+    "qty": 753.75,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 175.0,
+        "jobNo": "526",
+        "notes": ""
+      },
+      {
+        "qty": 75.75,
+        "jobNo": "543",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 257,
+    "vendorName": "FABTEX",
+    "fabricQuality": "SUMMER COOL",
+    "challanNo": "182",
+    "qty": 2350.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 629.5,
+        "jobNo": "473",
+        "notes": ""
+      },
+      {
+        "qty": 325.25,
+        "jobNo": "475",
+        "notes": ""
+      },
+      {
+        "qty": 1063.5,
+        "jobNo": "474",
+        "notes": ""
+      },
+      {
+        "qty": 33.0,
+        "jobNo": "498",
+        "notes": ""
+      },
+      {
+        "qty": 300.0,
+        "jobNo": "526",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 258,
+    "vendorName": "ELITE",
+    "fabricQuality": "CEMBRIC",
+    "challanNo": "730",
+    "qty": 160.75,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 154.25,
+        "jobNo": "477",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 259,
+    "vendorName": "ELITE",
+    "fabricQuality": "LINEN FLEX",
+    "challanNo": "320",
+    "qty": 663.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 371.75,
+        "jobNo": "472",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 260,
+    "vendorName": "ELITE",
+    "fabricQuality": "CEMBRIC",
+    "challanNo": "740",
+    "qty": 161.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 155.0,
+        "jobNo": "477",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 261,
+    "vendorName": "FABTEX",
+    "fabricQuality": "REYON",
+    "challanNo": "184",
+    "qty": 178.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 94.0,
+        "jobNo": "476",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 262,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CEMBRIC",
+    "challanNo": "185",
+    "qty": 2020.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 1243.0,
+        "jobNo": "480",
+        "notes": ""
+      },
+      {
+        "qty": 22.5,
+        "jobNo": "490",
+        "notes": ""
+      },
+      {
+        "qty": 697.0,
+        "jobNo": "493",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 263,
+    "vendorName": "OZONE",
+    "fabricQuality": "WHITE JHOOTH",
+    "challanNo": "2447",
+    "qty": 26.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 25.5,
+        "jobNo": "483",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 264,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "186",
+    "qty": 2346.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 460.75,
+        "jobNo": "491",
+        "notes": ""
+      },
+      {
+        "qty": 753.5,
+        "jobNo": "495",
+        "notes": ""
+      },
+      {
+        "qty": 193.0,
+        "jobNo": "496",
+        "notes": ""
+      },
+      {
+        "qty": 58.0,
+        "jobNo": "502",
+        "notes": ""
+      },
+      {
+        "qty": 834.8199999999999,
+        "jobNo": "508",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 265,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 44\"",
+    "challanNo": "186",
+    "qty": 353.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 313.75,
+        "jobNo": "487",
+        "notes": ""
+      },
+      {
+        "qty": 17.0,
+        "jobNo": "510",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 266,
+    "vendorName": "OZONE",
+    "fabricQuality": "POWDER",
+    "challanNo": "2568",
+    "qty": 3139.25,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 3229.75,
+        "jobNo": "",
+        "notes": "RETURN"
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 267,
+    "vendorName": "OZONE",
+    "fabricQuality": "SUDARSHAN",
+    "challanNo": "2551",
+    "qty": 1005.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 336.0,
+        "jobNo": "529",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 268,
+    "vendorName": "ELITE",
+    "fabricQuality": "MAL 58\"",
+    "challanNo": "801",
+    "qty": 2216.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 830.5,
+        "jobNo": "501",
+        "notes": ""
+      },
+      {
+        "qty": 571.0,
+        "jobNo": "494",
+        "notes": ""
+      },
+      {
+        "qty": 240.25,
+        "jobNo": "492",
+        "notes": ""
+      },
+      {
+        "qty": 653.75,
+        "jobNo": "505",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 269,
+    "vendorName": "ELITE",
+    "fabricQuality": "REYON",
+    "challanNo": "807805",
+    "qty": 158.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 146.75,
+        "jobNo": "499",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 270,
+    "vendorName": "ELITE",
+    "fabricQuality": "CREPE 44\"",
+    "challanNo": "806",
+    "qty": 910.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 861.75,
+        "jobNo": "500",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 271,
+    "vendorName": "ELITE",
+    "fabricQuality": "CEMBRIC",
+    "challanNo": "805",
+    "qty": 335.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 306.25,
+        "jobNo": "503",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 272,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "187",
+    "qty": 986.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 966.0,
+        "jobNo": "508",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 273,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CEMBRIC",
+    "challanNo": "188",
+    "qty": 2073.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 1977.25,
+        "jobNo": "509",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 274,
+    "vendorName": "ELITE",
+    "fabricQuality": "MAL 58\"",
+    "challanNo": "809",
+    "qty": 1008.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 466.5,
+        "jobNo": "519",
+        "notes": ""
+      },
+      {
+        "qty": 223.5,
+        "jobNo": "520",
+        "notes": ""
+      },
+      {
+        "qty": 525.0,
+        "jobNo": "361",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 275,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "189",
+    "qty": 1419.25,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 599.5,
+        "jobNo": "508",
+        "notes": ""
+      },
+      {
+        "qty": 821.25,
+        "jobNo": "511",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 276,
+    "vendorName": "ELITE",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "810",
+    "qty": 156.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 148.0,
+        "jobNo": "506",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 277,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "190",
+    "qty": 1998.25,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 1246.25,
+        "jobNo": "515",
+        "notes": ""
+      },
+      {
+        "qty": 629.25,
+        "jobNo": "517",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 278,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 44\"",
+    "challanNo": "190",
+    "qty": 363.75,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 358.0,
+        "jobNo": "507",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 279,
+    "vendorName": "OZONE",
+    "fabricQuality": "MALAY",
+    "challanNo": "2704",
+    "qty": 219.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 65.0,
+        "jobNo": "514",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 280,
+    "vendorName": "ELITE",
+    "fabricQuality": "MAL 58\"",
+    "challanNo": "818",
+    "qty": 2330.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 500.0,
+        "jobNo": "512",
+        "notes": ""
+      },
+      {
+        "qty": 439.0,
+        "jobNo": "522",
+        "notes": ""
+      },
+      {
+        "qty": 508.5,
+        "jobNo": "523",
+        "notes": ""
+      },
+      {
+        "qty": 505.0,
+        "jobNo": "537",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 281,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 44\"",
+    "challanNo": "191",
+    "qty": 363.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 352.5,
+        "jobNo": "534",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 282,
+    "vendorName": "ELITE",
+    "fabricQuality": "MAL 58\"",
+    "challanNo": "823",
+    "qty": 1070.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 1032.25,
+        "jobNo": "524",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 283,
+    "vendorName": "ELITE",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "820",
+    "qty": 2129.5,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 1218.75,
+        "jobNo": "518",
+        "notes": ""
+      },
+      {
+        "qty": 559.0,
+        "jobNo": "519",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 284,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "192",
+    "qty": 2555.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 2545.5,
+        "jobNo": "528",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 285,
+    "vendorName": "FABTEX",
+    "fabricQuality": "REYON",
+    "challanNo": "192",
+    "qty": 249.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 359.25,
+        "jobNo": "527",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 286,
+    "vendorName": "FABTEX",
+    "fabricQuality": "REYON",
+    "challanNo": "195",
+    "qty": 134.75,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 3.0,
+        "jobNo": "536",
+        "notes": ""
+      },
+      {
+        "qty": 7.0,
+        "jobNo": "539",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 287,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 44\"",
+    "challanNo": "533",
+    "qty": 1109.25,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 1094.5,
+        "jobNo": "533",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 289,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "193",
+    "qty": 934.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 915.0,
+        "jobNo": "532",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 290,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "196",
+    "qty": 2345.75,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 386.0,
+        "jobNo": "532",
+        "notes": ""
+      },
+      {
+        "qty": 686.5,
+        "jobNo": "541",
+        "notes": ""
+      },
+      {
+        "qty": 603.25,
+        "jobNo": "545",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JUN-2026",
+    "type": "INWARD",
+    "lotNo": 291,
+    "vendorName": "ELITE",
+    "fabricQuality": "MAL 58\"",
+    "challanNo": "832",
+    "qty": 2601.0,
+    "date": "2026-06-15",
+    "outwards": [
+      {
+        "qty": 1603.0,
+        "jobNo": "548",
+        "notes": ""
+      },
+      {
+        "qty": 793.0,
+        "jobNo": "549",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 292,
+    "vendorName": "OZONE ",
+    "fabricQuality": "ARMANI 44\"",
+    "challanNo": "2854",
+    "qty": 96.0,
+    "date": "2026-07-15",
+    "outwards": []
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 293,
+    "vendorName": "ELITE",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "838",
+    "qty": 1479.0,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 1345.0,
+        "jobNo": "546",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 294,
+    "vendorName": "ELITE",
+    "fabricQuality": "MAL 58\"",
+    "challanNo": "838",
+    "qty": 1062.25,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 404.0,
+        "jobNo": "552",
+        "notes": ""
+      },
+      {
+        "qty": 579.25,
+        "jobNo": "561",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 295,
+    "vendorName": "ELITE",
+    "fabricQuality": "MAL 58\"",
+    "challanNo": "839",
+    "qty": 1516.0,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 590.0,
+        "jobNo": "562",
+        "notes": ""
+      },
+      {
+        "qty": 989.0,
+        "jobNo": "564",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 296,
+    "vendorName": "OZONE ",
+    "fabricQuality": "JHOOTH",
+    "challanNo": "2908",
+    "qty": 2838.25,
+    "date": "2026-07-15",
+    "outwards": []
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 297,
+    "vendorName": "OZONE ",
+    "fabricQuality": "SUDARSHAN",
+    "challanNo": "2909",
+    "qty": 1142.25,
+    "date": "2026-07-15",
+    "outwards": []
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 298,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "198",
+    "qty": 2430.0,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 1860.0,
+        "jobNo": "550",
+        "notes": ""
+      },
+      {
+        "qty": 521.0,
+        "jobNo": "551",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 299,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "199",
+    "qty": 2539.5,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 741.75,
+        "jobNo": "551",
+        "notes": ""
+      },
+      {
+        "qty": 1746.5,
+        "jobNo": "553",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 300,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "200",
+    "qty": 2197.5,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 173.0,
+        "jobNo": "553",
+        "notes": ""
+      },
+      {
+        "qty": 1173.75,
+        "jobNo": "554",
+        "notes": ""
+      },
+      {
+        "qty": 941.0,
+        "jobNo": "556",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 301,
+    "vendorName": "FABTEX",
+    "fabricQuality": "REYON",
+    "challanNo": "197",
+    "qty": 41.0,
+    "date": "2026-07-15",
+    "outwards": []
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 302,
+    "vendorName": "ELITE",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "843",
+    "qty": 2807.75,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 1290.5,
+        "jobNo": "555",
+        "notes": ""
+      },
+      {
+        "qty": 1136.25,
+        "jobNo": "556",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 303,
+    "vendorName": "ELITE",
+    "fabricQuality": "CEMBRIK ",
+    "challanNo": "844",
+    "qty": 626.0,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 601.25,
+        "jobNo": "558",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 304,
+    "vendorName": "ELITE",
+    "fabricQuality": "CEMBRIK ",
+    "challanNo": "845",
+    "qty": 1208.75,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 457.5,
+        "jobNo": "560",
+        "notes": ""
+      },
+      {
+        "qty": 189.75,
+        "jobNo": "559",
+        "notes": ""
+      },
+      {
+        "qty": 260.75,
+        "jobNo": "565",
+        "notes": ""
+      },
+      {
+        "qty": 327.75,
+        "jobNo": "560",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 305,
+    "vendorName": "AVSAR",
+    "fabricQuality": "MAL 58\"",
+    "challanNo": "200",
+    "qty": 4832.25,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 291.25,
+        "jobNo": "571",
+        "notes": ""
+      },
+      {
+        "qty": 630.5,
+        "jobNo": "580",
+        "notes": ""
+      },
+      {
+        "qty": 815.5,
+        "jobNo": "581",
+        "notes": ""
+      },
+      {
+        "qty": 577.75,
+        "jobNo": "582",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 306,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 44\"",
+    "challanNo": "201",
+    "qty": 1079.0,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 548.25,
+        "jobNo": "568",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 307,
+    "vendorName": "FABTEX",
+    "fabricQuality": "REYON",
+    "challanNo": "202",
+    "qty": 111.5,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 114.0,
+        "jobNo": "567",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 308,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "203",
+    "qty": 2204.5,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 702.0,
+        "jobNo": "570",
+        "notes": ""
+      },
+      {
+        "qty": 754.5,
+        "jobNo": "569",
+        "notes": ""
+      },
+      {
+        "qty": 379.25,
+        "jobNo": "572",
+        "notes": ""
+      },
+      {
+        "qty": 280.75,
+        "jobNo": "574",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 309,
+    "vendorName": "ELITE",
+    "fabricQuality": "CEMBRIK ",
+    "challanNo": "902",
+    "qty": 62.25,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 54.0,
+        "jobNo": "566",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 310,
+    "vendorName": "YAMUNAJI",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "204",
+    "qty": 1315.5,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 1289.0,
+        "jobNo": "574",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 311,
+    "vendorName": "YAMUNAJI",
+    "fabricQuality": "CREPE 44\"",
+    "challanNo": "204",
+    "qty": 1487.75,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 743.75,
+        "jobNo": "576",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 312,
+    "vendorName": "YAMUNAJI",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "205",
+    "qty": 2586.0,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 1591.5,
+        "jobNo": "573",
+        "notes": ""
+      },
+      {
+        "qty": 943.0,
+        "jobNo": "574",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 313,
+    "vendorName": "FABTEX",
+    "fabricQuality": "CEMBRIK ",
+    "challanNo": "206",
+    "qty": 1753.0,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 1758.0,
+        "jobNo": "575",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 314,
+    "vendorName": "YAMUNAJI",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "206",
+    "qty": 305.25,
+    "date": "2026-07-15",
+    "outwards": []
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 315,
+    "vendorName": "YAMUNAJI",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "208",
+    "qty": 1550.25,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 704.25,
+        "jobNo": "577",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 316,
+    "vendorName": "YAMUNAJI",
+    "fabricQuality": "CEMBRIK ",
+    "challanNo": "208",
+    "qty": 50.0,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 16.0,
+        "jobNo": "578",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 317,
+    "vendorName": "YAMUNAJI",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "207",
+    "qty": 2395.0,
+    "date": "2026-07-15",
+    "outwards": []
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 318,
+    "vendorName": "YAMUNAJI",
+    "fabricQuality": "REYON",
+    "challanNo": "207",
+    "qty": 98.0,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 97.25,
+        "jobNo": "579",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 319,
+    "vendorName": "ELITE",
+    "fabricQuality": "MAL 58\"",
+    "challanNo": "907",
+    "qty": 2445.25,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 199.25,
+        "jobNo": "583",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 320,
+    "vendorName": "AVSAR",
+    "fabricQuality": "CREPE 58\"",
+    "challanNo": "212",
+    "qty": 993.75,
+    "date": "2026-07-15",
+    "outwards": [
+      {
+        "qty": 975.0,
+        "jobNo": "577",
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "sheet": "JULY-2026",
+    "type": "INWARD",
+    "lotNo": 321,
+    "vendorName": "ELITE",
+    "fabricQuality": "REYON",
+    "challanNo": "908",
+    "qty": 2198.0,
+    "date": "2026-07-15",
+    "outwards": []
+  }
+]

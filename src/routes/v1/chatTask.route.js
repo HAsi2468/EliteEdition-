@@ -92,13 +92,13 @@ router.get('/rooms', async (req, res) => {
     if (userId) {
       query = {
         $or: [
-          { type: { $ne: 'direct' } }, // Match 'group' or undefined
-          { type: 'direct', members: userId }
+          { members: userId }, // Match any room where user is a member
+          { type: { $ne: 'direct' }, $or: [ { members: { $exists: false } }, { members: { $size: 0 } } ] } // Match public group rooms
         ]
       };
     }
 
-    const rooms = await ChatRoom.find(query).populate('members', 'username email');
+    const rooms = await ChatRoom.find(query).populate('members', 'name email');
     res.json({ success: true, data: rooms });
   } catch (error) {
     console.error(error);
@@ -111,7 +111,18 @@ router.post('/rooms', async (req, res) => {
   try {
     const { name, type, members } = req.body;
     const room = await ChatRoom.create({ name, type, members });
-    res.json({ success: true, data: room });
+    const populatedRoom = await ChatRoom.findById(room._id).populate('members', 'name email');
+    
+    // Broadcast room-created notification to all members' personal channels
+    const io = req.app.get('socketio');
+    if (io && populatedRoom.members) {
+      populatedRoom.members.forEach(member => {
+        const memId = member._id || member;
+        io.to(`user_${memId}`).emit('room-created', populatedRoom);
+      });
+    }
+
+    res.json({ success: true, data: populatedRoom });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Server Error' });
@@ -122,13 +133,41 @@ router.post('/rooms', async (req, res) => {
 router.get('/rooms/:roomId/messages', async (req, res) => {
   try {
     const messages = await ChatMessage.find({ roomId: req.params.roomId })
-      .populate('senderId', 'username email')
+      .populate('senderId', 'name email')
       .populate({
         path: 'taskId',
-        populate: { path: 'assignees', select: 'username email' }
+        populate: { path: 'assignees', select: 'name email' }
       })
       .sort({ createdAt: 1 }); // Oldest first for chat timeline
     res.json({ success: true, data: messages });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
+// Send a message to a room via HTTP (e.g. for sharing reports)
+router.post('/rooms/:roomId/messages', async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { senderId, content } = req.body;
+    
+    const newMessage = await ChatMessage.create({
+      roomId,
+      senderId,
+      content,
+      type: 'text'
+    });
+    
+    const populatedMessage = await ChatMessage.findById(newMessage._id).populate('senderId', 'name email');
+    
+    // Broadcast message via socket if Socket.io is attached to req.app
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(roomId).emit('receive-message', populatedMessage);
+    }
+    
+    res.json({ success: true, data: populatedMessage });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Server Error' });
@@ -139,7 +178,7 @@ router.get('/rooms/:roomId/messages', async (req, res) => {
 router.get('/tasks', async (req, res) => {
   try {
     const tasks = await Task.find()
-      .populate('assignees', 'username email')
+      .populate('assignees', 'name email')
       .sort({ createdAt: -1 });
     res.json({ success: true, data: tasks });
   } catch (error) {

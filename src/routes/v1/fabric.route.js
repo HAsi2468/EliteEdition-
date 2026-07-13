@@ -8,6 +8,9 @@ router.post('/inward', fabricController.createInward);
 // Create new OUTWARD transaction
 router.post('/outward', fabricController.createOutward);
 
+// Import stock ledger data from CSV (JSON array)
+router.post('/import-stock', fabricController.importStock);
+
 // Get all transactions
 router.get('/transactions', fabricController.getTransactions);
 
@@ -28,6 +31,9 @@ router.get('/stock-panna', fabricController.getStockByPanna);
 
 // Get fabric requirement from in-progress job cards
 router.get('/requirement', fabricController.getFabricRequirement);
+
+// Update a transaction by ID
+router.put('/:id', fabricController.updateTransaction);
 
 // Delete a transaction by ID
 router.delete('/:id', fabricController.deleteTransaction);

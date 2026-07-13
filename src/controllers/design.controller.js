@@ -3,7 +3,7 @@ const logger = require('../config/logger');
 
 const getAll = async (req, res) => {
   try {
-    const { search, category, colors, status, page = 1, limit = 50 } = req.query;
+    const { search, category, colors, status, page = 1, limit = 50, sortBy, sortOrder } = req.query;
     const filter = {};
     if (status && status !== 'All') filter.status = status;
     if (category && category !== 'All') filter.category = category;
@@ -19,8 +19,13 @@ const getAll = async (req, res) => {
       ];
     }
     const skip = (Number(page) - 1) * Number(limit);
+    let sort = { designName: 1 };
+    if (sortBy) {
+      const order = sortOrder === 'desc' ? -1 : 1;
+      sort = { [sortBy]: order };
+    }
     const [docs, total] = await Promise.all([
-      db.Design.find(filter).collation({ locale: "en_US", numericOrdering: true }).sort({ designName: 1 }).skip(skip).limit(Number(limit)).lean(),
+      db.Design.find(filter).collation({ locale: "en_US", numericOrdering: true }).sort(sort).skip(skip).limit(Number(limit)).lean(),
       db.Design.countDocuments(filter),
     ]);
     res.json({ data: docs, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });

@@ -245,7 +245,7 @@ const downloadSalesReportPdf = async (req, res) => {
     // Totals
     const totalOrders  = products.reduce((s, r) => s + r.qty, 0);
     const totalAmount  = products.reduce((s, r) => s + r.amt, 0);
-    const dateStr = `${dateStart}  →  ${dateEnd}`;
+    const dateStr = `${dateStart}  to  ${dateEnd}`;
 
     const doc = new PDFDocument({ margin: MARGIN, size: 'A4', bufferPages: true,
       info: { Title: `Elite Edition Sales Report ${dateStart}`, Author: 'Elite Edition ERP' }
@@ -380,16 +380,14 @@ const downloadSalesReportPdf = async (req, res) => {
 
     // Footer on all pages
     const pages = doc.bufferedPageRange();
-    const oldBottom = doc.page.margins.bottom;
-    doc.page.margins.bottom = 0;
     for (let p = 0; p < pages.count; p++) {
       doc.switchToPage(pages.start + p);
+      doc.page.margins.bottom = 0;
       doc.rect(0, PAGE_H - 26, PAGE_W, 26).fill(C.headerBg);
       doc.fillColor(C.headerText).font('Helvetica-Bold').fontSize(7.5)
          .text(`Elite Edition ERP  •  Generated: ${new Date().toLocaleString('en-IN')}  •  Page ${p + 1} of ${pages.count}`,
            MARGIN, PAGE_H - 17, { width: CW, align: 'center' });
     }
-    doc.page.margins.bottom = oldBottom;
 
     doc.end();
     logger.info('Sales PDF complete.');
@@ -411,7 +409,7 @@ const downloadBrandReportPdf = async (req, res) => {
 
     const dateStartObj = new Date(dateStart + "T00:00:00");
     const dateEndObj   = new Date(dateEnd + "T23:59:59.999");
-    const dateStr = `${dateStart}  →  ${dateEnd}`;
+    const dateStr = `${dateStart}  to  ${dateEnd}`;
 
     logger.info('Generating Brand PDF report %s → %s', dateStart, dateEnd);
 
@@ -624,16 +622,14 @@ const downloadBrandReportPdf = async (req, res) => {
 
     // Footer
     const pages = doc.bufferedPageRange();
-    const oldBottom = doc.page.margins.bottom;
-    doc.page.margins.bottom = 0;
     for (let p = 0; p < pages.count; p++) {
       doc.switchToPage(pages.start + p);
+      doc.page.margins.bottom = 0;
       doc.rect(0, PAGE_H - 26, PAGE_W, 26).fill(C.headerBg);
       doc.fillColor(C.headerText).font('Helvetica-Bold').fontSize(7.5)
          .text(`Elite Edition ERP  •  Generated: ${new Date().toLocaleString('en-IN')}  •  Page ${p + 1} of ${pages.count}`,
            MARGIN, PAGE_H - 17, { width: CW, align: 'center' });
     }
-    doc.page.margins.bottom = oldBottom;
 
     doc.end();
     logger.info('Brand PDF complete.');
@@ -643,4 +639,661 @@ const downloadBrandReportPdf = async (req, res) => {
   }
 };
 
-module.exports = { downloadSalesReportPdf, downloadBrandReportPdf };
+const downloadBrandReportHourWisePdf = async (req, res) => {
+  try {
+    const { dateStart, dateEnd } = req.query;
+    if (!dateStart || !dateEnd) {
+      return res.status(400).json({ error: 'dateStart and dateEnd are required' });
+    }
+
+    const dateStartObj = new Date(dateStart + "T00:00:00");
+    const dateEndObj   = new Date(dateEnd + "T23:59:59.999");
+    const dateStr = `${dateStart}  to  ${dateEnd}`;
+
+    logger.info('Generating Brand Hourly PDF report %s → %s', dateStart, dateEnd);
+
+    // Aggregation
+    const { searchCode } = req.query;
+    const whereClause = { orderDate: { $gte: dateStartObj, $lte: dateEndObj }, saleOrderStatus: { $ne: 'CANCELLED' } };
+    if (searchCode) {
+      whereClause.itemSKUCode = new RegExp(`^${searchCode}`, 'i');
+    }
+
+    const pipeline = [
+      { $match: whereClause },
+      {
+        $group: {
+          _id: {
+            hour: {
+              $hour: {
+                date: "$orderDate",
+                timezone: "Asia/Kolkata"
+              }
+            },
+            brand: {
+              $cond: {
+                if: { $or: [ { $eq: ["$itemTypeBrand", ""] }, { $eq: [{ $ifNull: ["$itemTypeBrand", null] }, null] } ] },
+                then: "Unknown",
+                else: "$itemTypeBrand"
+              }
+            },
+            baseSku: {
+              $arrayElemAt: [
+                { $split: ["$itemSKUCode", "_"] },
+                0
+              ]
+            },
+            size: {
+              $cond: {
+                if: { $or: [ { $eq: ["$itemTypeSize", ""] }, { $eq: [{ $ifNull: ["$itemTypeSize", null] }, null] } ] },
+                then: "Unknown",
+                else: "$itemTypeSize"
+              }
+            }
+          },
+          quantity: { $sum: { $ifNull: ["$saleCount", 1] } },
+          sellableAmount: {
+            $sum: {
+              $multiply: [
+                { $ifNull: ["$saleCount", 1] },
+                {
+                  $convert: {
+                    input: "$totalPrice",
+                    to: "double",
+                    onError: 0.0,
+                    onNull: 0.0
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      // Group by hour, brand, and baseSku to collect variations
+      {
+        $group: {
+          _id: {
+            hour: "$_id.hour",
+            brand: "$_id.brand",
+            baseSku: "$_id.baseSku"
+          },
+          variations: {
+            $push: {
+              size: "$_id.size",
+              quantity: "$quantity",
+              sellableAmount: "$sellableAmount"
+            }
+          },
+          productQty: { $sum: "$quantity" },
+          productAmt: { $sum: "$sellableAmount" }
+        }
+      },
+      // Group by hour and brand to collect products
+      {
+        $group: {
+          _id: {
+            hour: "$_id.hour",
+            brand: "$_id.brand"
+          },
+          products: {
+            $push: {
+              sku: "$_id.baseSku",
+              qty: "$productQty",
+              amt: "$productAmt",
+              variations: "$variations"
+            }
+          },
+          brandQty: { $sum: "$productQty" },
+          brandAmt: { $sum: "$productAmt" }
+        }
+      },
+      // Group by hour to collect brands
+      {
+        $group: {
+          _id: "$_id.hour",
+          brands: {
+            $push: {
+              brandName: "$_id.brand",
+              brandQuantity: "$brandQty",
+              brandSellableAmount: "$brandAmt",
+              products: "$products"
+            }
+          },
+          hourQuantity: { $sum: "$brandQty" },
+          hourSellableAmount: { $sum: "$brandAmt" }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ];
+
+    const aggregatedHours = await db.SaleOrder.aggregate(pipeline);
+
+    // Fetch images
+    const allBaseSkus = [];
+    aggregatedHours.forEach(h => {
+      h.brands.forEach(b => {
+        b.products.forEach(p => {
+          if (p.sku) allBaseSkus.push(p.sku);
+        });
+      });
+    });
+
+    const regexes = allBaseSkus.map(s => new RegExp('^' + s + '(_|$)', 'i'));
+    const productDocs = await db.InventoryProduct.find({
+      skuCode: { $in: regexes },
+      imageUrl: { $exists: true, $nin: [null, ''] }
+    }).lean();
+    const skuImageMap = {};
+    productDocs.forEach(p => {
+      const base = (p.skuCode || '').split('_')[0];
+      if (base && !skuImageMap[base] && p.imageUrl) skuImageMap[base] = p.imageUrl;
+    });
+    const productDocs2 = await db.Product.find({ skuCode: { $in: allBaseSkus }, imageUrl: { $nin: [null, ''] } }).lean();
+    productDocs2.forEach(p => { if (p.skuCode && p.imageUrl && !skuImageMap[p.skuCode]) skuImageMap[p.skuCode] = p.imageUrl; });
+
+    const uniqueUrls = [...new Set(Object.values(skuImageMap).filter(Boolean))];
+    const imageCache = {};
+    const CHUNK = 8;
+    for (let i = 0; i < uniqueUrls.length; i += CHUNK) {
+      await Promise.all(uniqueUrls.slice(i, i + CHUNK).map(async url => {
+        imageCache[url] = await fetchImageBuffer(url);
+      }));
+    }
+
+    const totalQty = aggregatedHours.reduce((s, h) => s + h.hourQuantity, 0);
+    const totalAmt = aggregatedHours.reduce((s, h) => s + h.hourSellableAmount, 0);
+
+    const doc = new PDFDocument({ margin: MARGIN, size: 'A4', bufferPages: true,
+      info: { Title: `Elite Edition Hourly Brand Report ${dateStart}`, Author: 'Elite Edition ERP' }
+    });
+
+    doc.on('pageAdded', () => drawPunchGuide(doc));
+    drawPunchGuide(doc);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Brand_Hourly_Report_${dateStart}.pdf"`);
+    doc.pipe(res);
+
+    let pageNum = 1;
+    drawHeader(doc, 'Hourly Brand Report', dateStr, pageNum);
+
+    let y = 65;
+    y = drawSummaryCards(doc, y, [
+      { label: 'Active Hours', value: fmtN(aggregatedHours.length) },
+      { label: 'Total SKUs',   value: fmtN(allBaseSkus.length) },
+      { label: 'Total Orders', value: fmtN(totalQty) },
+      { label: 'Total Revenue',value: fmt(totalAmt) },
+    ]);
+
+    // Draw Peak Activity Window details banner on top of the PDF (Classic Blue theme, no emojis)
+    let peakHourBlock = null;
+    let maxHourQty = 0;
+    for (const hb of aggregatedHours) {
+      if (hb.hourQuantity > maxHourQty) {
+        maxHourQty = hb.hourQuantity;
+        peakHourBlock = hb;
+      }
+    }
+
+    if (peakHourBlock) {
+      const peakHour = peakHourBlock._id;
+      const peakHourLabel = `${peakHour.toString().padStart(2, '0')}:00 - ${(peakHour + 1).toString().padStart(2, '0')}:00`;
+      const peakQty = peakHourBlock.hourQuantity;
+      const peakAmt = peakHourBlock.hourSellableAmount;
+
+      let peakTopBrand = null;
+      let maxBrandQty = 0;
+      for (const b of peakHourBlock.brands) {
+        if (b.brandQuantity > maxBrandQty) {
+          maxBrandQty = b.brandQuantity;
+          peakTopBrand = b;
+        }
+      }
+
+      const boxH = 46;
+      doc.rect(MARGIN, y, CW, boxH).fill('#EFF6FF');
+      doc.rect(MARGIN, y, CW, boxH).strokeColor('#BFDBFE').lineWidth(1).stroke();
+      doc.rect(MARGIN, y, 4, boxH).fill('#3B82F6');
+
+      doc.fillColor('#1E3A8A').font('Helvetica-Bold').fontSize(8)
+         .text('PEAK ACTIVITY WINDOW', MARGIN + 12, y + 8);
+
+      doc.fillColor('#1E3A8A').font('Helvetica-Bold').fontSize(14)
+         .text(peakHourLabel, MARGIN + 12, y + 20);
+
+      doc.fillColor('#6B7280').font('Helvetica').fontSize(7.5)
+         .text('ORDERS', MARGIN + 150, y + 8);
+      doc.fillColor('#1E3A8A').font('Helvetica-Bold').fontSize(12)
+         .text(`${fmtN(peakQty)} pcs`, MARGIN + 150, y + 18);
+
+      doc.fillColor('#6B7280').font('Helvetica').fontSize(7.5)
+         .text('REVENUE', MARGIN + 240, y + 8);
+      doc.fillColor('#3B82F6').font('Helvetica-Bold').fontSize(12)
+         .text(fmt(peakAmt), MARGIN + 240, y + 18);
+
+      if (peakTopBrand) {
+        doc.fillColor('#6B7280').font('Helvetica').fontSize(7.5)
+           .text('TOP BRAND', MARGIN + 350, y + 8);
+        doc.fillColor('#1E40AF').font('Helvetica-Bold').fontSize(11)
+           .text(peakTopBrand.brandName, MARGIN + 350, y + 18);
+        doc.fillColor('#6B7280').font('Helvetica').fontSize(7.5)
+           .text(`${fmtN(peakTopBrand.brandQuantity)} pcs · ${fmt(peakTopBrand.brandSellableAmount)}`, MARGIN + 350, y + 30);
+      }
+
+      y += boxH + 12;
+    }
+
+    const SIMPLE_COLS = [
+      { label: 'Photo',       w: 52  },
+      { label: 'SKU',         w: 110 },
+      { label: 'Sizes & Qty', w: 90 },
+      { label: 'Orders',      w: 55  },
+      { label: 'Revenue',     w: 78  },
+      { label: 'Avg',         w: 78  },
+    ];
+    
+    const sizeOrder = ['XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
+
+    for (const hourBlock of aggregatedHours) {
+      const h = hourBlock._id;
+      const hourLabel = `${h.toString().padStart(2, '0')}:00 - ${(h + 1).toString().padStart(2, '0')}:00`;
+
+      // Hour Title banner (reverted to original blue style)
+      const hourH = 24;
+      if (y + hourH + 50 > PAGE_H - MARGIN - 28) {
+        doc.addPage();
+        pageNum++;
+        drawHeader(doc, 'Hourly Brand Report (continued)', dateStr, pageNum);
+        y = 65;
+      }
+
+      doc.rect(MARGIN, y, CW, hourH).fill('#EFF6FF');
+      doc.rect(MARGIN, y, 4, hourH).fill('#3B82F6');
+      doc.fillColor('#1E3A8A').font('Helvetica-Bold').fontSize(10)
+         .text(`Hour Window: ${hourLabel}`, MARGIN + 10, y + 7);
+      doc.fillColor(C.subText).font('Helvetica').fontSize(8.5)
+         .text(`Qty: ${fmtN(hourBlock.hourQuantity)}  Revenue: ${fmt(hourBlock.hourSellableAmount)}`, MARGIN, y + 8, { width: CW - 8, align: 'right' });
+      y += hourH + 8;
+
+      // Draw each brand in this hour
+      for (const brand of hourBlock.brands) {
+        const brandH = 20;
+        if (y + brandH + 60 > PAGE_H - MARGIN - 28) {
+          doc.addPage();
+          pageNum++;
+          drawHeader(doc, 'Hourly Brand Report (continued)', dateStr, pageNum);
+          y = 65;
+        }
+
+        doc.rect(MARGIN, y, CW, brandH).fill(C.sectionBg);
+        doc.fillColor(C.sectionText).font('Helvetica-Bold').fontSize(9)
+           .text(`Brand: ${brand.brandName}`, MARGIN + 10, y + 6);
+        doc.fillColor(C.subText).font('Helvetica').fontSize(8)
+           .text(`Orders: ${fmtN(brand.brandQuantity)}   Revenue: ${fmt(brand.brandSellableAmount)}`, MARGIN, y + 6, { width: CW - 8, align: 'right' });
+        y += brandH + 4;
+
+        y = drawTableHeader(doc, y, SIMPLE_COLS);
+
+        let alt = false;
+        for (const prod of brand.products) {
+          const imgUrl = skuImageMap[prod.sku];
+          const imgBuf = imgUrl ? imageCache[imgUrl] : null;
+          
+          const sortedVariations = (prod.variations || []).sort((a, b) => {
+            let sa = (a.size || '').toUpperCase().trim().replace('XXL', '2XL').replace('XXXL', '3XL');
+            let sb = (b.size || '').toUpperCase().trim().replace('XXL', '2XL').replace('XXXL', '3XL');
+            let ia = sizeOrder.indexOf(sa);
+            let ib = sizeOrder.indexOf(sb);
+            if (ia === -1 && ib === -1) return (a.size || '').localeCompare(b.size || '');
+            if (ia === -1) return 1;
+            if (ib === -1) return -1;
+            return ia - ib;
+          });
+          
+          const sizesText = sortedVariations.map(v => `${(v.size || '').toUpperCase()}: ${v.quantity}`).join('\n');
+          const numLines = Math.max(1, sortedVariations.length);
+          const rowH = Math.max(50, numLines * 10 + 20);
+
+          if (y + rowH > PAGE_H - MARGIN - 28) {
+            doc.addPage();
+            pageNum++;
+            drawHeader(doc, 'Hourly Brand Report (continued)', dateStr, pageNum);
+            y = 65;
+            doc.fillColor(C.subText).font('Helvetica-Oblique').fontSize(8)
+               .text(`Hour: ${hourLabel} — Brand: ${brand.brandName} (continued)`, MARGIN, y);
+            y += 12;
+            y = drawTableHeader(doc, y, SIMPLE_COLS);
+            alt = false;
+          }
+
+          doc.rect(MARGIN, y, CW, rowH).fill(alt ? C.rowAlt : C.rowNormal);
+          doc.moveTo(MARGIN, y + rowH).lineTo(MARGIN + CW, y + rowH).strokeColor(C.border).lineWidth(0.4).stroke();
+          drawDividers(doc, MARGIN, y, rowH, SIMPLE_COLS);
+
+          const mid = y + rowH / 2;
+          let x = MARGIN;
+
+          // Photo
+          const imgSize = Math.min(rowH - 10, 40);
+          const ix = x + (SIMPLE_COLS[0].w - imgSize) / 2;
+          const iy = y + (rowH - imgSize) / 2;
+          if (imgBuf) {
+            try {
+              doc.rect(ix - 1, iy - 1, imgSize + 2, imgSize + 2).strokeColor(C.border).lineWidth(0.5).stroke();
+              doc.image(imgBuf, ix, iy, { width: imgSize, height: imgSize, cover: [imgSize, imgSize] });
+            } catch (_) {
+              doc.rect(ix, iy, imgSize, imgSize).fill('#F1F5F9');
+            }
+          } else {
+            doc.rect(ix, iy, imgSize, imgSize).fill('#F1F5F9');
+            doc.fillColor(C.subText).font('Helvetica').fontSize(5).text('No Photo', ix, iy + imgSize / 2 - 3, { width: imgSize, align: 'center' });
+          }
+          x += SIMPLE_COLS[0].w;
+
+          // SKU (Reverted to blue)
+          doc.fillColor(C.tableText).font('Helvetica-Bold').fontSize(9)
+             .text(prod.sku || '-', x + 3, mid - 5, { width: SIMPLE_COLS[1].w - 6, align: 'center', lineBreak: false, ellipsis: true });
+          x += SIMPLE_COLS[1].w;
+
+          // Sizes
+          doc.fillColor(C.text).font('Helvetica').fontSize(8);
+          const sizesHeight = doc.heightOfString(sizesText, { width: SIMPLE_COLS[2].w - 8, align: 'center' });
+          const sizesY = y + (rowH - sizesHeight) / 2;
+          doc.text(sizesText, x + 4, sizesY, { width: SIMPLE_COLS[2].w - 8, align: 'center', lineBreak: true });
+          x += SIMPLE_COLS[2].w;
+
+          // Total Orders
+          doc.fillColor(C.text).font('Helvetica-Bold').fontSize(10)
+             .text(fmtN(prod.qty), x + 2, mid - 7, { width: SIMPLE_COLS[3].w - 4, align: 'center' });
+          x += SIMPLE_COLS[3].w;
+
+          // Revenue (Reverted to blue)
+          doc.fillColor(C.accentBlue).font('Helvetica-Bold').fontSize(8)
+             .text(fmt(prod.amt), x + 2, mid - 5, { width: SIMPLE_COLS[4].w - 4, align: 'center' });
+          x += SIMPLE_COLS[4].w;
+
+          // Avg (Grey)
+          const avgAmt = prod.qty > 0 ? prod.amt / prod.qty : 0;
+          doc.fillColor(C.subText).font('Helvetica').fontSize(8)
+             .text(fmt(avgAmt), x + 2, mid - 5, { width: SIMPLE_COLS[5].w - 4, align: 'center' });
+
+          y += rowH;
+          alt = !alt;
+        }
+        y += 10; // gap after table
+      }
+      y += 12; // gap between hour blocks
+    }
+
+    // Footer
+    const pages = doc.bufferedPageRange();
+    for (let p = 0; p < pages.count; p++) {
+      doc.switchToPage(pages.start + p);
+      doc.page.margins.bottom = 0;
+      doc.rect(0, PAGE_H - 26, PAGE_W, 26).fill(C.headerBg);
+      doc.fillColor(C.headerText).font('Helvetica-Bold').fontSize(7.5)
+         .text(`Elite Edition ERP  •  Generated: ${new Date().toLocaleString('en-IN')}  •  Page ${p + 1} of ${pages.count}`,
+           MARGIN, PAGE_H - 17, { width: CW, align: 'center' });
+    }
+
+    doc.end();
+    logger.info('Hourly Brand PDF complete.');
+  } catch (err) {
+    logger.error('Hourly Brand PDF error: %o', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Internal Server Error', details: err.message });
+  }
+};
+
+const downloadReturnsBrandReportPdf = async (req, res) => {
+  try {
+    const { dateStart, dateEnd, subType = 'pickup' } = req.query;
+    if (!dateStart || !dateEnd) {
+      return res.status(400).json({ error: 'dateStart and dateEnd are required' });
+    }
+
+    const dateStr = `${dateStart}  to  ${dateEnd}`;
+    logger.info('Generating Returns PDF report %s → %s (subType: %s)', dateStart, dateEnd, subType);
+
+    let match;
+    let reportTitle = 'Returns Brand Report (Pickup Date)';
+    if (subType === 'physical') {
+      reportTitle = 'Returns Brand Report (Physical Return Date)';
+      match = {
+        reversePickupCreatedDate: { $ne: null, $exists: true, $ne: "" },
+        returnDate: { $ne: null, $exists: true, $ne: "" }
+      };
+      if (dateStart) match.returnDate = { $gte: `${dateStart} 00:00:00` };
+      if (dateEnd) {
+        if (!match.returnDate) match.returnDate = {};
+        match.returnDate.$lte = `${dateEnd} 23:59:59`;
+      }
+    } else {
+      match = {
+        reversePickupCreatedDate: { $ne: null, $exists: true, $ne: "" }
+      };
+      if (dateStart) match.reversePickupCreatedDate = { $gte: `${dateStart} 00:00:00` };
+      if (dateEnd) {
+        if (!match.reversePickupCreatedDate) match.reversePickupCreatedDate = {};
+        match.reversePickupCreatedDate.$lte = `${dateEnd} 23:59:59`;
+      }
+    }
+
+    const pipeline = [
+      { $match: match },
+      { $group: {
+          _id: { brand: { $cond: { if: { $or: [{ $eq: ['$itemTypeBrand', ''] }, { $eq: [{ $ifNull: ['$itemTypeBrand', null] }, null] }] }, then: 'Unknown', else: '$itemTypeBrand' } }, baseSku: { $arrayElemAt: [{ $split: ['$itemSKUCode', '_'] }, 0] }, size: { $cond: { if: { $or: [{ $eq: ['$itemTypeSize', ''] }, { $eq: [{ $ifNull: ['$itemTypeSize', null] }, null] }] }, then: 'N/A', else: '$itemTypeSize' } } },
+          quantity: { $sum: { $ifNull: ['$saleCount', 1] } },
+          sellableAmount: { $sum: { $multiply: [{ $ifNull: ['$saleCount', 1] }, { $convert: { input: '$totalPrice', to: 'double', onError: 0, onNull: 0 } }] } }
+      }},
+      { $group: {
+          _id: { brand: '$_id.brand', baseSku: '$_id.baseSku' },
+          variations: { $push: { size: '$_id.size', quantity: '$quantity', sellableAmount: '$sellableAmount' } },
+          skuQty: { $sum: '$quantity' },
+          skuAmt: { $sum: '$sellableAmount' }
+      }},
+      { $group: {
+          _id: '$_id.brand',
+          products: { $push: { sku: '$_id.baseSku', qty: '$skuQty', amt: '$skuAmt', variations: '$variations' } },
+          brandQty: { $sum: '$skuQty' },
+          brandAmt: { $sum: '$skuAmt' }
+      }}
+    ];
+
+    const brands = await db.SaleOrder.aggregate(pipeline);
+
+    // Fetch images
+    const allBaseSkus = brands.flatMap(b => b.products.map(p => p.sku)).filter(Boolean);
+    const regexes = allBaseSkus.map(s => new RegExp('^' + s + '(_|$)', 'i'));
+    const productDocs = await db.InventoryProduct.find({
+      skuCode: { $in: regexes },
+      imageUrl: { $exists: true, $nin: [null, ''] }
+    }).lean();
+    const skuImageMap = {};
+    productDocs.forEach(p => {
+      const base = (p.skuCode || '').split('_')[0];
+      if (base && !skuImageMap[base] && p.imageUrl) skuImageMap[base] = p.imageUrl;
+    });
+    const productDocs2 = await db.Product.find({ skuCode: { $in: allBaseSkus }, imageUrl: { $nin: [null, ''] } }).lean();
+    productDocs2.forEach(p => { if (p.skuCode && p.imageUrl && !skuImageMap[p.skuCode]) skuImageMap[p.skuCode] = p.imageUrl; });
+
+    const uniqueUrls = [...new Set(Object.values(skuImageMap).filter(Boolean))];
+    const imageCache = {};
+    const CHUNK = 8;
+    for (let i = 0; i < uniqueUrls.length; i += CHUNK) {
+      await Promise.all(uniqueUrls.slice(i, i + CHUNK).map(async url => {
+        imageCache[url] = await fetchImageBuffer(url);
+      }));
+    }
+
+    const totalQty = brands.reduce((s, b) => s + b.brandQty, 0);
+    const totalAmt = brands.reduce((s, b) => s + b.brandAmt, 0);
+
+    const doc = new PDFDocument({ margin: MARGIN, size: 'A4', bufferPages: true,
+      info: { Title: `Elite Edition ${reportTitle} ${dateStart}`, Author: 'Elite Edition ERP' }
+    });
+
+    doc.on('pageAdded', () => drawPunchGuide(doc));
+    drawPunchGuide(doc);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Returns_Brand_Report_${dateStart}.pdf"`);
+    doc.pipe(res);
+
+    let pageNum = 1;
+    drawHeader(doc, reportTitle, dateStr, pageNum);
+
+    let y = 65;
+    y = drawSummaryCards(doc, y, [
+      { label: 'Returned Brands', value: fmtN(brands.length) },
+      { label: 'Total Returns',   value: fmtN(totalQty) },
+      { label: 'Return Valuation',value: fmt(totalAmt) },
+    ]);
+
+    const SIMPLE_COLS = [
+      { label: 'Photo',       w: 52  },
+      { label: 'SKU',         w: 110 },
+      { label: 'Sizes & Qty', w: 90 },
+      { label: 'Qty',         w: 55  },
+      { label: 'Valuation',   w: 78  },
+      { label: 'Avg Price',   w: 78  },
+    ];
+    
+    const sizeOrder = ['XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
+
+    brands.sort((a, b) => b.brandQty - a.brandQty);
+
+    for (const brand of brands) {
+      const brandH = 28;
+      if (y + brandH + 60 > PAGE_H - MARGIN - 28) {
+        doc.addPage();
+        pageNum++;
+        drawHeader(doc, `${reportTitle} (continued)`, dateStr, pageNum);
+        y = 65;
+      }
+
+      // Brand section banner
+      doc.rect(MARGIN, y, CW, brandH).fill(C.sectionBg);
+      doc.rect(MARGIN, y, 4, brandH).fill(C.accentBlue);
+      doc.fillColor(C.sectionText).font('Helvetica-Bold').fontSize(11)
+         .text(brand._id || 'Unknown', MARGIN + 10, y + 8);
+      
+      doc.fillColor(C.subText).font('Helvetica').fontSize(8)
+         .text(`Returned Qty: ${fmtN(brand.brandQty)}   Valuation: ${fmt(brand.brandAmt)}`, MARGIN, y + 10, { width: CW - 8, align: 'right' });
+      y += brandH + 4;
+
+      y = drawTableHeader(doc, y, SIMPLE_COLS);
+
+      brand.products.sort((a, b) => b.qty - a.qty);
+
+      let alt = false;
+      for (const prod of brand.products) {
+        const imgUrl = skuImageMap[prod.sku];
+        const imgBuf = imgUrl ? imageCache[imgUrl] : null;
+        
+        const sortedVariations = (prod.variations || []).sort((a, b) => {
+          let sa = (a.size || '').toUpperCase().trim().replace('XXL', '2XL').replace('XXXL', '3XL');
+          let sb = (b.size || '').toUpperCase().trim().replace('XXL', '2XL').replace('XXXL', '3XL');
+          let ia = sizeOrder.indexOf(sa);
+          let ib = sizeOrder.indexOf(sb);
+          if (ia === -1 && ib === -1) return (a.size || '').localeCompare(b.size || '');
+          if (ia === -1) return 1;
+          if (ib === -1) return -1;
+          return ia - ib;
+        });
+        
+        const sizesText = sortedVariations.map(v => `${(v.size || '').toUpperCase()}: ${v.quantity}`).join('\n');
+        const numLines = Math.max(1, sortedVariations.length);
+        const rowH = Math.max(50, numLines * 10 + 20);
+
+        if (y + rowH > PAGE_H - MARGIN - 28) {
+          doc.addPage();
+          pageNum++;
+          drawHeader(doc, `${reportTitle} (continued)`, dateStr, pageNum);
+          y = 65;
+          doc.fillColor(C.subText).font('Helvetica-Oblique').fontSize(8)
+             .text(`Brand: ${brand._id} (continued)`, MARGIN, y);
+          y += 12;
+          y = drawTableHeader(doc, y, SIMPLE_COLS);
+          alt = false;
+        }
+
+        doc.rect(MARGIN, y, CW, rowH).fill(alt ? C.rowAlt : C.rowNormal);
+        doc.moveTo(MARGIN, y + rowH).lineTo(MARGIN + CW, y + rowH).strokeColor(C.border).lineWidth(0.4).stroke();
+        drawDividers(doc, MARGIN, y, rowH, SIMPLE_COLS);
+
+        const mid = y + rowH / 2;
+        let x = MARGIN;
+
+        // Photo
+        const imgSize = Math.min(rowH - 10, 40);
+        const ix = x + (SIMPLE_COLS[0].w - imgSize) / 2;
+        const iy = y + (rowH - imgSize) / 2;
+        if (imgBuf) {
+          try {
+            doc.rect(ix - 1, iy - 1, imgSize + 2, imgSize + 2).strokeColor(C.border).lineWidth(0.5).stroke();
+            doc.image(imgBuf, ix, iy, { width: imgSize, height: imgSize, cover: [imgSize, imgSize] });
+          } catch (_) {
+            doc.rect(ix, iy, imgSize, imgSize).fill('#F1F5F9');
+          }
+        } else {
+          doc.rect(ix, iy, imgSize, imgSize).fill('#F1F5F9');
+          doc.fillColor(C.subText).font('Helvetica').fontSize(5).text('No Photo', ix, iy + imgSize / 2 - 3, { width: imgSize, align: 'center' });
+        }
+        x += SIMPLE_COLS[0].w;
+
+        // SKU
+        doc.fillColor(C.tableText).font('Helvetica-Bold').fontSize(9)
+           .text(prod.sku || '-', x + 3, mid - 5, { width: SIMPLE_COLS[1].w - 6, align: 'center', lineBreak: false, ellipsis: true });
+        x += SIMPLE_COLS[1].w;
+
+        // Sizes
+        doc.fillColor(C.text).font('Helvetica').fontSize(8);
+        const sizesHeight = doc.heightOfString(sizesText, { width: SIMPLE_COLS[2].w - 8, align: 'center' });
+        const sizesY = y + (rowH - sizesHeight) / 2;
+        doc.text(sizesText, x + 4, sizesY, { width: SIMPLE_COLS[2].w - 8, align: 'center', lineBreak: true });
+        x += SIMPLE_COLS[2].w;
+
+        // Total
+        doc.fillColor(C.text).font('Helvetica-Bold').fontSize(10)
+           .text(fmtN(prod.qty), x + 2, mid - 7, { width: SIMPLE_COLS[3].w - 4, align: 'center' });
+        x += SIMPLE_COLS[3].w;
+
+        // Revenue / Valuation
+        doc.fillColor(C.accentBlue).font('Helvetica-Bold').fontSize(8)
+           .text(fmt(prod.amt), x + 2, mid - 5, { width: SIMPLE_COLS[4].w - 4, align: 'center' });
+        x += SIMPLE_COLS[4].w;
+
+        // Avg
+        const avgAmt = prod.qty > 0 ? prod.amt / prod.qty : 0;
+        doc.fillColor(C.subText).font('Helvetica').fontSize(8)
+           .text(fmt(avgAmt), x + 2, mid - 5, { width: SIMPLE_COLS[5].w - 4, align: 'center' });
+
+        y += rowH;
+        alt = !alt;
+      }
+      y += 12; // gap between brands
+    }
+
+    // Footer
+    const pages = doc.bufferedPageRange();
+    for (let p = 0; p < pages.count; p++) {
+      doc.switchToPage(pages.start + p);
+      doc.page.margins.bottom = 0;
+      doc.rect(0, PAGE_H - 26, PAGE_W, 26).fill(C.headerBg);
+      doc.fillColor(C.headerText).font('Helvetica-Bold').fontSize(7.5)
+         .text(`Elite Edition ERP  •  Generated: ${new Date().toLocaleString('en-IN')}  •  Page ${p + 1} of ${pages.count}`,
+           MARGIN, PAGE_H - 17, { width: CW, align: 'center' });
+    }
+
+    doc.end();
+    logger.info('Returns Brand PDF complete.');
+  } catch (err) {
+    logger.error('Returns Brand PDF error: %o', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Internal Server Error', details: err.message });
+  }
+};
+
+module.exports = {
+  downloadSalesReportPdf,
+  downloadBrandReportPdf,
+  downloadBrandReportHourWisePdf,
+  downloadReturnsBrandReportPdf,
+};

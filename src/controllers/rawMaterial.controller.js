@@ -308,11 +308,263 @@ const downloadLedgerPdf = async (req, res) => {
   }
 };
 
+const importStock = async (req, res) => {
+  try {
+    const rows = req.body;
+    if (!Array.isArray(rows)) {
+      return res.status(400).json({ success: false, error: 'Request body must be an array of rows.' });
+    }
+
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const endOfPrevMonth = new Date(startOfMonth.getTime() - 1000);
+    const createdTransactions = [];
+
+    for (const row of rows) {
+      const materialName = String(row.materialName || '').trim();
+      if (!materialName) continue;
+
+      const panna = String(row.panna || '').trim();
+      const paperQuality = String(row.paperQuality || '').trim();
+      const color = String(row.color || '').trim();
+      const canSize = row.canSize !== undefined && row.canSize !== null && row.canSize !== '' ? parseFloat(row.canSize) : null;
+      const metersPerRoll = row.metersPerRoll !== undefined && row.metersPerRoll !== null && row.metersPerRoll !== '' ? parseFloat(row.metersPerRoll) : null;
+
+      // Construct a query to match exact material specifications
+      const query = {
+        materialName: new RegExp(`^${materialName}$`, 'i')
+      };
+
+      if (panna) {
+        query.panna = new RegExp(`^${panna}$`, 'i');
+      } else {
+        query.panna = { $in: [null, '', undefined] };
+      }
+
+      if (paperQuality) {
+        query.paperQuality = new RegExp(`^${paperQuality}$`, 'i');
+      } else {
+        query.paperQuality = { $in: [null, '', undefined] };
+      }
+
+      if (color) {
+        query.color = new RegExp(`^${color}$`, 'i');
+      } else {
+        query.color = { $in: [null, '', undefined] };
+      }
+
+      if (canSize !== null && !isNaN(canSize)) {
+        query.canSize = canSize;
+      } else {
+        query.canSize = { $in: [null, undefined] };
+      }
+
+      if (metersPerRoll !== null && !isNaN(metersPerRoll)) {
+        query.metersPerRoll = metersPerRoll;
+      } else {
+        query.metersPerRoll = { $in: [null, undefined] };
+      }
+
+      const txs = await RawMaterialTransaction.find(query);
+
+      let dbOpeningStock = 0;
+      let dbInward = 0;
+      let dbOutward = 0;
+      let dbUnit = 'Rolls'; // default
+
+      txs.forEach(t => {
+        const tDate = new Date(t.date);
+        const isPrev = tDate < startOfMonth;
+        const isAdj = t.notes && t.notes.includes('Adjustment');
+
+        if (t.unit) dbUnit = t.unit;
+
+        if (isPrev) {
+          if (t.type === 'INWARD') dbOpeningStock += t.qty;
+          else dbOpeningStock -= t.qty;
+        } else {
+          if (t.type === 'INWARD') {
+            if (!isAdj) dbInward += t.qty;
+          } else {
+            if (!isAdj) dbOutward += t.qty;
+          }
+        }
+      });
+
+      const csvOpening = (row.openingStock !== undefined && row.openingStock !== null && row.openingStock !== '') ? parseFloat(row.openingStock) : null;
+      const csvInward = (row.inwardQty !== undefined && row.inwardQty !== null && row.inwardQty !== '') ? parseFloat(row.inwardQty) : null;
+      const csvOutward = (row.outwardQty !== undefined && row.outwardQty !== null && row.outwardQty !== '') ? parseFloat(row.outwardQty) : null;
+      const csvCurrent = (row.currentStock !== undefined && row.currentStock !== null && row.currentStock !== '') ? parseFloat(row.currentStock) : null;
+
+      // Extract metadata fields
+      const txDate = row.date ? new Date(row.date) : null;
+      const challanNo = row.challanNo || undefined;
+      const vendorName = row.vendorName || undefined;
+      const jobNo = row.jobNo || undefined;
+      const partyName = row.partyName || undefined;
+      const notes = row.notes || undefined;
+
+      // Adjust Opening Stock
+      if (csvOpening !== null && !isNaN(csvOpening)) {
+        const diff = csvOpening - dbOpeningStock;
+        if (Math.abs(diff) > 0.01) {
+          const t = new RawMaterialTransaction({
+            type: diff > 0 ? 'INWARD' : 'OUTWARD',
+            materialName,
+            panna,
+            paperQuality,
+            color,
+            canSize,
+            metersPerRoll,
+            unit: dbUnit,
+            qty: Math.abs(diff),
+            date: txDate || endOfPrevMonth,
+            notes: notes || 'CSV Opening Stock Adjustment',
+            challanNo,
+            vendorName: diff > 0 ? vendorName : undefined,
+            jobNo: diff < 0 ? jobNo : undefined,
+            partyName: diff < 0 ? partyName : undefined
+          });
+          await t.save();
+          createdTransactions.push(t);
+          dbOpeningStock = csvOpening;
+        }
+      }
+
+      // Adjust Inward
+      if (csvInward !== null && !isNaN(csvInward)) {
+        const diff = csvInward - dbInward;
+        if (Math.abs(diff) > 0.01) {
+          const t = new RawMaterialTransaction({
+            type: diff > 0 ? 'INWARD' : 'OUTWARD',
+            materialName,
+            panna,
+            paperQuality,
+            color,
+            canSize,
+            metersPerRoll,
+            unit: dbUnit,
+            qty: Math.abs(diff),
+            date: txDate || new Date(),
+            notes: notes || 'CSV Inward Adjustment',
+            challanNo,
+            vendorName: diff > 0 ? vendorName : undefined,
+            jobNo: diff < 0 ? jobNo : undefined,
+            partyName: diff < 0 ? partyName : undefined
+          });
+          await t.save();
+          createdTransactions.push(t);
+          dbInward = csvInward;
+        }
+      }
+
+      // Adjust Outward
+      if (csvOutward !== null && !isNaN(csvOutward)) {
+        const diff = csvOutward - dbOutward;
+        if (Math.abs(diff) > 0.01) {
+          const t = new RawMaterialTransaction({
+            type: diff > 0 ? 'OUTWARD' : 'INWARD',
+            materialName,
+            panna,
+            paperQuality,
+            color,
+            canSize,
+            metersPerRoll,
+            unit: dbUnit,
+            qty: Math.abs(diff),
+            date: txDate || new Date(),
+            notes: notes || 'CSV Outward Adjustment',
+            challanNo,
+            vendorName: diff < 0 ? vendorName : undefined,
+            jobNo: diff > 0 ? jobNo : undefined,
+            partyName: diff > 0 ? partyName : undefined
+          });
+          await t.save();
+          createdTransactions.push(t);
+          dbOutward = csvOutward;
+        }
+      }
+
+      // Adjust Current Stock if it still doesn't match
+      if (csvCurrent !== null && !isNaN(csvCurrent)) {
+        const computedCurrent = dbOpeningStock + dbInward - dbOutward;
+        const diff = csvCurrent - computedCurrent;
+        if (Math.abs(diff) > 0.01) {
+          const t = new RawMaterialTransaction({
+            type: diff > 0 ? 'INWARD' : 'OUTWARD',
+            materialName,
+            panna,
+            paperQuality,
+            color,
+            canSize,
+            metersPerRoll,
+            unit: dbUnit,
+            qty: Math.abs(diff),
+            date: txDate || new Date(),
+            notes: notes || 'CSV Current Stock Adjustment',
+            challanNo,
+            vendorName: diff > 0 ? vendorName : undefined,
+            jobNo: diff < 0 ? jobNo : undefined,
+            partyName: diff < 0 ? partyName : undefined
+          });
+          await t.save();
+          createdTransactions.push(t);
+        }
+      }
+    }
+
+    res.status(200).json({ success: true, message: `Raw Material stock import completed. Created ${createdTransactions.length} adjustment records.`, count: createdTransactions.length });
+  } catch (error) {
+    console.error('Error in importStock for raw materials:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Update a transaction by ID
+const updateTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { challanNo, vendorName, materialName, panna, qty, date, notes, jobNo, partyName, paperQuality, color, canSize, metersPerRoll, unit } = req.body;
+
+    const RawMaterialTransaction = require('../db/models/rawMaterialTransaction.model');
+    const transaction = await RawMaterialTransaction.findById(id);
+    if (!transaction) {
+      return res.status(404).json({ success: false, error: 'Transaction not found.' });
+    }
+
+    // Update fields
+    if (challanNo !== undefined) transaction.challanNo = challanNo;
+    if (vendorName !== undefined) transaction.vendorName = vendorName;
+    if (materialName !== undefined) transaction.materialName = materialName;
+    if (panna !== undefined) transaction.panna = panna;
+    if (qty !== undefined) transaction.qty = qty;
+    if (date !== undefined) transaction.date = new Date(date);
+    if (notes !== undefined) transaction.notes = notes;
+    if (jobNo !== undefined) transaction.jobNo = jobNo;
+    if (partyName !== undefined) transaction.partyName = partyName;
+    if (paperQuality !== undefined) transaction.paperQuality = paperQuality;
+    if (color !== undefined) transaction.color = color;
+    if (canSize !== undefined) transaction.canSize = canSize ? Number(canSize) : undefined;
+    if (metersPerRoll !== undefined) transaction.metersPerRoll = metersPerRoll ? Number(metersPerRoll) : undefined;
+    if (unit !== undefined) transaction.unit = unit;
+
+    await transaction.save();
+    res.status(200).json({ success: true, data: transaction });
+  } catch (error) {
+    console.error('Error updating raw material transaction:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   createInward,
   createOutward,
   getTransactions,
   getStockOverview,
   deleteTransaction,
-  downloadLedgerPdf
+  updateTransaction,
+  downloadLedgerPdf,
+  importStock
 };

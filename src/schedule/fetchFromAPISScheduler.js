@@ -1,107 +1,50 @@
 // src/schedule/fetchFromAPISScheduler.js
 /**
- * Hourly scheduler for fetchFromAPIS using native timers with countdown logger
+ * Cron scheduler for fetchFromAPIS
  */
+const cron = require('node-cron');
 const { fetchFromAPIS } = require('../controllers/products.controller');
 
-let nextRunTime = null;
-
-function getNextScheduledTime() {
-  const now = new Date();
-  const minutes = now.getMinutes();
-  let next = new Date(now);
-  next.setMinutes(55, 0, 0);
-  if (minutes >= 55) {
-    next.setHours(next.getHours() + 1);
-  }
-  return next;
-}
-
-function startCountdownLogger() {
-  setInterval(() => {
-    if (!nextRunTime) return;
-    const now = new Date();
-    const diffMs = nextRunTime - now;
-    if (diffMs > 0) {
-      const diffSeconds = Math.round(diffMs / 1000);
-      const minutes = Math.floor(diffSeconds / 60);
-      const seconds = diffSeconds % 60;
-      console.log(`[⏱️] NEXT AUTOMATIC API RUN IN: ${minutes} minutes and ${seconds} seconds (at ${nextRunTime.toLocaleTimeString()})`);
-    } else {
-      console.log(`[⏱️] NEXT AUTOMATIC API RUN IS IMMINENT (firing now...)`);
-    }
-  }, 60 * 1000); // Log every 1 minute
-}
-
-function scheduleHourlyFetch() {
-  nextRunTime = getNextScheduledTime();
-  const now = new Date();
-  const delay = nextRunTime - now;
-
-  const diffSeconds = Math.round(delay / 1000);
-  const minutes = Math.floor(diffSeconds / 60);
-  const seconds = diffSeconds % 60;
-  console.log(`[🕒] Scheduling first fetchFromAPIS in ${minutes} minutes and ${seconds} seconds (Next run: ${nextRunTime.toLocaleTimeString()})`);
-
-  setTimeout(async () => {
-    // Set next run time before executing job, to ensure correct countdown tracking
-    nextRunTime = new Date(Date.now() + 60 * 60 * 1000);
-    await runJob();
-
-    // After first execution, repeat every hour
-    setInterval(async () => {
-      nextRunTime = new Date(Date.now() + 60 * 60 * 1000);
-      await runJob();
-    }, 60 * 60 * 1000);
-  }, delay);
-
-  // Start the countdown logger to print remaining time every minute
-  startCountdownLogger();
-}
-
-async function runJob() {
+// 1. Hourly Sync for TODAY (Every hour at the 55th minute)
+cron.schedule('55 * * * *', async () => {
   try {
-    console.log('[🕛] Running hourly fetchFromAPIS job');
-    const fakeReq = {};
+    console.log('[🕛] Running HOURLY fetchFromAPIS job for TODAY data (At 55th minute)');
+    const fakeReq = { query: { dateRangeText: 'TODAY' } };
     const fakeRes = {
       status: (code) => ({
-        json: (payload) => console.log('[✅] fetchFromAPIS responded', code, payload),
-        send: (payload) => console.log('[✅] fetchFromAPIS responded', code, payload)
+        json: (payload) => console.log('[✅] HOURLY fetchFromAPIS responded', code, payload),
+        send: (payload) => console.log('[✅] HOURLY fetchFromAPIS responded', code, payload)
       }),
-      json: (payload) => console.log('[✅] fetchFromAPIS responded', payload),
-      send: (payload) => console.log('[✅] fetchFromAPIS responded', payload)
+      json: (payload) => console.log('[✅] HOURLY fetchFromAPIS responded', payload),
+      send: (payload) => console.log('[✅] HOURLY fetchFromAPIS responded', payload)
     };
     await fetchFromAPIS(fakeReq, fakeRes);
   } catch (err) {
-    console.error('[❌] Hourly fetchFromAPIS failed:', err);
-  }
-}
-
-// Initialize the scheduler
-scheduleHourlyFetch();
-
-// -------------------------------------------------------------
-// NIGHTLY SCHEDULE (2:15 AM)
-// Fetches data for 'YESTERDAY' to ensure complete end-of-day data is retrieved
-// -------------------------------------------------------------
-const cron = require('node-cron');
-
-cron.schedule('10 0 * * *', async () => {
-  try {
-    console.log('[🕛] Running NIGHTLY fetchFromAPIS job for YESTERDAY data (12:10 AM)');
-    const fakeReq = { query: { dateRangeText: 'YESTERDAY' } };
-    const fakeRes = {
-      status: (code) => ({
-        json: (payload) => console.log('[✅] NIGHTLY fetchFromAPIS responded', code, payload),
-        send: (payload) => console.log('[✅] NIGHTLY fetchFromAPIS responded', code, payload)
-      }),
-      json: (payload) => console.log('[✅] NIGHTLY fetchFromAPIS responded', payload),
-      send: (payload) => console.log('[✅] NIGHTLY fetchFromAPIS responded', payload)
-    };
-    await fetchFromAPIS(fakeReq, fakeRes);
-  } catch (err) {
-    console.error('[❌] NIGHTLY fetchFromAPIS failed:', err);
+    console.error('[❌] HOURLY fetchFromAPIS failed:', err);
   }
 });
+
+// 2. 2-Hourly Sync for LAST_90_DAYS (Every 2 hours at the 10th minute)
+cron.schedule('10 */2 * * *', async () => {
+  try {
+    console.log('[🕛] Running periodic fetchFromAPIS job for LAST_90_DAYS data (Every 2 hours at 10th minute)');
+    const fakeReq = { query: { dateRangeText: 'LAST_90_DAYS' } };
+    const fakeRes = {
+      status: (code) => ({
+        json: (payload) => console.log('[✅] Periodic fetchFromAPIS responded', code, payload),
+        send: (payload) => console.log('[✅] Periodic fetchFromAPIS responded', code, payload)
+      }),
+      json: (payload) => console.log('[✅] Periodic fetchFromAPIS responded', payload),
+      send: (payload) => console.log('[✅] Periodic fetchFromAPIS responded', payload)
+    };
+    await fetchFromAPIS(fakeReq, fakeRes);
+  } catch (err) {
+    console.error('[❌] Periodic fetchFromAPIS failed:', err);
+  }
+});
+
+console.log('[🕒] Schedulers initialized for fetchFromAPIS:');
+console.log('      - Hourly TODAY Sync (cron: 55 * * * *)');
+console.log('      - 2-hourly LAST_90_DAYS Sync (cron: 10 */2 * * * starting at 12:10 AM)');
 
 module.exports = {};
