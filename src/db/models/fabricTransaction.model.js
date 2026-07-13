@@ -51,6 +51,13 @@ const fabricTransactionSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    // Fusing shortage percentage (how much fabric reduces during fusing)
+    shortagePct: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: null,
+    },
   },
   {
     timestamps: true,

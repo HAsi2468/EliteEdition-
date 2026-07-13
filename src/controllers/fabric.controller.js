@@ -16,7 +16,7 @@ const normalizeFabric = (val) => {
 // Create a new INWARD transaction
 const createInward = async (req, res) => {
   try {
-    const { challanNo, vendorName, fabricQuality, panna, qty, date, notes } = req.body;
+    const { challanNo, vendorName, fabricQuality, panna, qty, date, notes, shortagePct } = req.body;
     
     if (!fabricQuality || qty == null || qty < 0) {
       return res.status(400).json({ success: false, error: 'Fabric Quality and a valid Quantity are required.' });
@@ -30,7 +30,8 @@ const createInward = async (req, res) => {
       panna,
       qty,
       date: date ? new Date(date) : new Date(),
-      notes
+      notes,
+      shortagePct: shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null,
     });
 
     await transaction.save();
@@ -615,7 +616,7 @@ const importStock = async (req, res) => {
 const updateTransaction = async (req, res) => {
   try {
     const { id } = req.params;
-    const { challanNo, vendorName, fabricQuality, panna, qty, date, notes, jobNo, partyName, lotNo } = req.body;
+    const { challanNo, vendorName, fabricQuality, panna, qty, date, notes, jobNo, partyName, lotNo, shortagePct } = req.body;
 
     const transaction = await FabricTransaction.findById(id);
     if (!transaction) {
@@ -633,6 +634,7 @@ const updateTransaction = async (req, res) => {
     if (jobNo !== undefined) transaction.jobNo = jobNo;
     if (partyName !== undefined) transaction.partyName = partyName;
     if (lotNo !== undefined) transaction.lotNo = lotNo ? Number(lotNo) : undefined;
+    if (shortagePct !== undefined) transaction.shortagePct = shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null;
 
     await transaction.save();
     res.status(200).json({ success: true, data: transaction });
