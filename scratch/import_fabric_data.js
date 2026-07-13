@@ -71,28 +71,17 @@ async function run() {
 
     // Create Outward Transactions
     for (const out of item.outwards) {
-      let resolvedParty = '';
-      if (out.jobNo) {
-        const jobTrim = out.jobNo.trim();
-        if (jobCardCache[jobTrim] !== undefined) {
-          resolvedParty = jobCardCache[jobTrim];
-        } else {
-          const jc = await JobCard.findOne({ jobNo: jobTrim });
-          resolvedParty = jc && jc.party ? jc.party : '';
-          jobCardCache[jobTrim] = resolvedParty;
-        }
-      }
-
       const outwardTx = new FabricTransaction({
         type: 'OUTWARD',
         lotNo: item.lotNo,
         fabricQuality: fabricQuality,
         panna: panna,
         qty: out.qty,
-        jobNo: out.jobNo,
+        jobNo: '-',
+        challanNo: out.jobNo || '',
         notes: out.notes || `Imported from Fabric.numbers (${item.sheet})`,
         date: new Date(item.date), // Match Inward date
-        partyName: resolvedParty
+        partyName: '-'
       });
 
       await outwardTx.save();
