@@ -1418,20 +1418,16 @@ export default function FabricInventoryPanel() {
                   <th>Party</th>
                   <th>Lot No</th>
                   <th>Fabric</th>
-                  <th>Shortage %</th>
                   <th>Job No</th>
-                  <th>Design No</th>
-                  <th>Colour</th>
                   <th>Panna</th>
                   <th>Total TP</th>
                   <th>Total Mtr</th>
-                  <th>Notes</th>
                   <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {challans.length === 0 && (
-                  <tr><td colSpan={14} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No challans found. Click "New Challan" to create one.</td></tr>
+                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No challans found. Click "New Challan" to create one.</td></tr>
                 )}
                 {challans.map(ch => (
                   <tr key={ch._id}>
@@ -1440,14 +1436,10 @@ export default function FabricInventoryPanel() {
                     <td>{ch.partyName || '—'}</td>
                     <td>{ch.lotNo != null ? `#${ch.lotNo}` : '—'}</td>
                     <td>{ch.fabricName || '—'}</td>
-                    <td>{ch.shortagePct != null ? `${ch.shortagePct}%` : '—'}</td>
                     <td style={{ color: 'var(--primary)' }}>{ch.jobNo || '—'}</td>
-                    <td>{ch.designNo || '—'}</td>
-                    <td>{ch.colour || '—'}</td>
                     <td>{ch.panna || '—'}</td>
                     <td style={{ textAlign: 'center', fontWeight: 600 }}>{ch.totalTp}</td>
                     <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--success)' }}>{ch.totalMtr} mtr</td>
-                    <td>{ch.notes || ''}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <button className="btn-icon" title="Download PDF" style={{ color: 'var(--success)', marginRight: '0.5rem' }} onClick={() => handleDownloadChallanPdf(ch._id, ch.challanNo)}>
                         <FileDown size={15} />
