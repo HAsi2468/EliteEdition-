@@ -694,39 +694,42 @@ export default function FabricInventoryPanel() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
       {/* Header & Navigation */}
-      <div className="glass-panel" style={{ display: 'flex', gap: '1rem', padding: '0.75rem', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', flex: 1 }}>
+      <div className="glass-panel" style={{ display: 'flex', gap: '1rem', padding: '0.75rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', overflowX: 'auto' }}>
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}
-              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+              style={{ padding: '0.5rem 1.1rem', fontSize: '0.85rem', flexShrink: 0 }}
             >
               <tab.icon size={16} />
               {tab.label}
             </button>
           ))}
         </div>
-        <button onClick={handleExportCsv} className="btn-secondary" title="Download Fabric Stock CSV" style={{ gap: '0.4rem' }}>
-          <FileDown size={16} /> Export CSV
-        </button>
-        <button onClick={() => fileInputRef.current && fileInputRef.current.click()} className="btn-secondary" title="Upload Fabric Stock CSV" style={{ gap: '0.4rem' }}>
-          <ArrowDownToLine size={16} /> Import CSV
-        </button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleImportCsv}
-          accept=".csv"
-          style={{ display: 'none' }}
-        />
-        <button onClick={() => setIsPdfFilterOpen(true)} className="btn-secondary" title="Download Ledger PDF" style={{ gap: '0.4rem' }}>
-          <FileDown size={16} /> PDF Report
-        </button>
-        <button onClick={fetchData} className="btn-icon" title="Refresh Data">
-          <RefreshCw size={18} className={loading ? 'spin-loader' : ''} />
-        </button>
+
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={handleExportCsv} className="btn-secondary" title="Download Fabric Stock CSV" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0 }}>
+            <FileDown size={16} /> Export CSV
+          </button>
+          <button onClick={() => fileInputRef.current && fileInputRef.current.click()} className="btn-secondary" title="Upload Fabric Stock CSV" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0 }}>
+            <ArrowDownToLine size={16} /> Import CSV
+          </button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportCsv}
+            accept=".csv"
+            style={{ display: 'none' }}
+          />
+          <button onClick={() => setIsPdfFilterOpen(true)} className="btn-secondary" title="Download Ledger PDF" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0 }}>
+            <FileDown size={16} /> PDF Report
+          </button>
+          <button onClick={fetchData} className="btn-icon" title="Refresh Data" style={{ padding: '0.5rem', flexShrink: 0 }}>
+            <RefreshCw size={18} className={loading ? 'spin-loader' : ''} />
+          </button>
+        </div>
       </div>
 
       {error && <div style={{ color: 'red', padding: '1rem', background: '#ffebeb', borderRadius: '8px' }}>{error}</div>}
