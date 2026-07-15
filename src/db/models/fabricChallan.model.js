@@ -27,7 +27,8 @@ const fabricChallanSchema = new mongoose.Schema(
 
     // Lot details (auto-filled from Inward lot)
     lotNo: {
-      type: Number,
+      type: String,
+      default: '',
     },
     vendorChallanNo: {
       type: String,

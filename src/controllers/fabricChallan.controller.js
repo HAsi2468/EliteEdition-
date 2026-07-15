@@ -72,7 +72,7 @@ const createChallan = async (req, res) => {
     const challan = new FabricChallan({
       date: date ? new Date(date) : new Date(),
       partyName: partyName || '',
-      lotNo: lotNo ? parseInt(lotNo) : undefined,
+      lotNo: lotNo ? String(lotNo) : '',
       vendorChallanNo: vendorChallanNo || '',
       fabricName: fabricName || '',
       shortagePct: shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null,
@@ -150,7 +150,7 @@ const updateChallan = async (req, res) => {
 
     if (date !== undefined) challan.date = new Date(date);
     if (partyName !== undefined) challan.partyName = partyName;
-    if (lotNo !== undefined) challan.lotNo = lotNo ? parseInt(lotNo) : undefined;
+    if (lotNo !== undefined) challan.lotNo = lotNo ? String(lotNo) : '';
     if (vendorChallanNo !== undefined) challan.vendorChallanNo = vendorChallanNo;
     if (fabricName !== undefined) challan.fabricName = fabricName;
     if (shortagePct !== undefined) challan.shortagePct = shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null;

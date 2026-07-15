@@ -32,6 +32,7 @@ export default function FabricInventoryPanel() {
   const [editingChallan, setEditingChallan] = useState(null);
   const [challanLotLoading, setChallanLotLoading] = useState(false);
   const [challanDeleteTarget, setChallanDeleteTarget] = useState(null);
+  const [availableLots, setAvailableLots] = useState([]);
   const emptyTpRows = () => [{ tpNo: 1, tpMeter: '' }];
   const [challanForm, setChallanForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -471,12 +472,15 @@ export default function FabricInventoryPanel() {
   };
 
   // ── Challan helpers ────────────────────────────────────────────────────
-  const resetChallanForm = () => setChallanForm({
-    date: new Date().toISOString().split('T')[0],
-    partyName: '', lotNo: '', vendorChallanNo: '', fabricName: '', shortagePct: '',
-    jobNo: '', designNo: '', colour: '', panna: '',
-    tpDetails: emptyTpRows(), notes: '',
-  });
+  const resetChallanForm = () => {
+    setAvailableLots([]);
+    setChallanForm({
+      date: new Date().toISOString().split('T')[0],
+      partyName: '', lotNo: '', vendorChallanNo: '', fabricName: '', shortagePct: '',
+      jobNo: '', designNo: '', colour: '', panna: '',
+      tpDetails: emptyTpRows(), notes: '',
+    });
+  };
 
   const fetchChallans = async () => {
     try {
@@ -497,9 +501,14 @@ export default function FabricInventoryPanel() {
   const handleChallanLotChange = async (val) => {
     setChallanForm(prev => ({ ...prev, lotNo: val }));
     if (!val) return;
+
+    // Extract first number if contains commas/spaces/symbols
+    const cleanLot = String(val).split(/[,\s&]+/)[0];
+    if (!cleanLot) return;
+
     setChallanLotLoading(true);
     try {
-      const res = await api.getFabricLotInfo(val);
+      const res = await api.getFabricLotInfo(cleanLot);
       if (res.success && res.data) {
         setChallanForm(prev => ({
           ...prev,
@@ -516,8 +525,8 @@ export default function FabricInventoryPanel() {
     }
   };
 
-  // When Job No changes — auto-fill design, colour, panna
-  const handleChallanJobChange = (val) => {
+  // When Job No changes — auto-fill design, colour, panna, fabric
+  const handleChallanJobChange = async (val) => {
     setChallanForm(prev => ({ ...prev, jobNo: val }));
     const job = inProgressJobCards.find(j => j.jobNo === val);
     if (job) {
@@ -527,7 +536,22 @@ export default function FabricInventoryPanel() {
         designNo: job.designNo || prev.designNo,
         colour: job.colors || prev.colour,
         panna: job.panna || prev.panna,
+        fabricName: job.fabric || prev.fabricName,
       }));
+
+      // Fetch lot numbers that have this fabric
+      if (job.fabric) {
+        try {
+          const res = await api.getFabricLotStock({ fabricQuality: job.fabric });
+          if (res.success && res.data) {
+            setAvailableLots(res.data);
+          }
+        } catch (e) {
+          console.warn('Failed to fetch lot stock for fabric', e);
+        }
+      }
+    } else {
+      setAvailableLots([]);
     }
   };
 
@@ -606,6 +630,15 @@ export default function FabricInventoryPanel() {
       tpDetails: tpRows,
       notes: c.notes || '',
     });
+
+    if (c.fabricName) {
+      api.getFabricLotStock({ fabricQuality: c.fabricName }).then(res => {
+        if (res.success && res.data) setAvailableLots(res.data);
+      }).catch(() => {});
+    } else {
+      setAvailableLots([]);
+    }
+
     setIsChallanOpen(true);
   };
 
@@ -1472,61 +1505,21 @@ export default function FabricInventoryPanel() {
                 </div>
               </div>
 
-              {/* Divider: Lot Details */}
-              <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lot Details</span>
-              </div>
-
-              {/* Row 2: Lot No + Vendor Challan No */}
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Lot No {challanLotLoading && <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Loading…</span>}</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={challanForm.lotNo}
-                    onChange={e => handleChallanLotChange(e.target.value)}
-                    onBlur={e => e.target.value && handleChallanLotChange(e.target.value)}
-                    style={inputStyle}
-                    placeholder="Enter lot number…"
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Vendor Challan No <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-filled)</span></label>
-                  <input type="text" value={challanForm.vendorChallanNo} onChange={e => setChallanForm({ ...challanForm, vendorChallanNo: e.target.value })} style={inputStyle} placeholder="Auto-filled from lot…" />
-                </div>
-              </div>
-
-              {/* Row 3: Fabric Name + Shortage */}
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 2 }}>
-                  <label style={labelStyle}>Fabric Name <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-filled)</span></label>
-                  <input type="text" list="challan-fabrics" value={challanForm.fabricName} onChange={e => setChallanForm({ ...challanForm, fabricName: e.target.value })} style={inputStyle} placeholder="Auto-filled from lot…" />
-                  <datalist id="challan-fabrics">
-                    {fabricsList.map((f, i) => <option key={i} value={f} />)}
-                  </datalist>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Shortage %</label>
-                  <input type="number" step="0.01" min="0" max="100" value={challanForm.shortagePct} onChange={e => setChallanForm({ ...challanForm, shortagePct: e.target.value })} style={inputStyle} placeholder="e.g. 3.5" />
-                </div>
-              </div>
-
               {/* Divider: Job Details */}
               <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Job Details</span>
               </div>
 
-              {/* Row 4: Job No */}
+              {/* Row 2: Job No */}
               <div>
-                <label style={labelStyle}>Job No <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-fills design, colour, panna)</span></label>
+                <label style={labelStyle}>Job No <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-fills design, colour, panna, fabric)</span></label>
                 <input type="text" list="challan-jobs" value={challanForm.jobNo} onChange={e => handleChallanJobChange(e.target.value)} style={inputStyle} placeholder="Select or type job no…" />
                 <datalist id="challan-jobs">
                   {inProgressJobCards.map(j => <option key={j._id} value={j.jobNo}>{j.jobNo} — {j.party}</option>)}
                 </datalist>
               </div>
 
-              {/* Row 5: Design + Colour + Panna */}
+              {/* Row 3: Design + Colour + Panna */}
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Design No <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-filled)</span></label>
@@ -1544,6 +1537,96 @@ export default function FabricInventoryPanel() {
                   </datalist>
                 </div>
               </div>
+
+              {/* Divider: Lot Details */}
+              <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lot Details</span>
+              </div>
+
+              {/* Row 4: Lot No + Vendor Challan No */}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Lot No {challanLotLoading && <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Loading…</span>}</label>
+                  <input
+                    type="text"
+                    value={challanForm.lotNo}
+                    onChange={e => handleChallanLotChange(e.target.value)}
+                    style={inputStyle}
+                    placeholder="e.g. 320, 321"
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Vendor Challan No <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-filled)</span></label>
+                  <input type="text" value={challanForm.vendorChallanNo} onChange={e => setChallanForm({ ...challanForm, vendorChallanNo: e.target.value })} style={inputStyle} placeholder="Auto-filled from lot…" />
+                </div>
+              </div>
+
+              {/* Row 5: Fabric Name + Shortage */}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 2 }}>
+                  <label style={labelStyle}>Fabric Name <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-filled)</span></label>
+                  <input type="text" list="challan-fabrics" value={challanForm.fabricName} onChange={e => setChallanForm({ ...challanForm, fabricName: e.target.value })} style={inputStyle} placeholder="Auto-filled from lot…" />
+                  <datalist id="challan-fabrics">
+                    {fabricsList.map((f, i) => <option key={i} value={f} />)}
+                  </datalist>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Shortage %</label>
+                  <input type="number" step="0.01" min="0" max="100" value={challanForm.shortagePct} onChange={e => setChallanForm({ ...challanForm, shortagePct: e.target.value })} style={inputStyle} placeholder="e.g. 3.5" />
+                </div>
+              </div>
+
+              {/* Available Lots helper info */}
+              {availableLots.length > 0 && (
+                <div style={{
+                  background: 'rgba(56, 189, 248, 0.05)',
+                  border: '1px solid rgba(56, 189, 248, 0.2)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '0.6rem 0.8rem',
+                  fontSize: '0.78rem',
+                  color: 'var(--text-primary)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem',
+                  marginTop: '0.25rem'
+                }}>
+                  <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)' }}>
+                    <Layers size={14} /> Available Lots in Inward Stock for "{challanForm.fabricName}":
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    {availableLots.map((lot, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          const currentLots = challanForm.lotNo ? String(challanForm.lotNo).split(/[,\s&]+/).map(x => x.trim()).filter(Boolean) : [];
+                          if (!currentLots.includes(String(lot.lotNo))) {
+                            const newLots = [...currentLots, String(lot.lotNo)].join(', ');
+                            handleChallanLotChange(newLots);
+                          }
+                        }}
+                        className="btn-secondary"
+                        style={{
+                          padding: '0.2rem 0.5rem',
+                          fontSize: '0.72rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          borderRadius: '4px',
+                          border: '1px solid var(--border-light)',
+                          background: 'rgba(255, 255, 255, 0.03)'
+                        }}
+                        title="Click to add this lot to your selection"
+                      >
+                        <strong>Lot #{lot.lotNo}</strong> ({lot.panna} Panna) — <span style={{ color: 'var(--success)' }}>{lot.currentStock} mtr</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    * Click the lot buttons above to add multiple lot numbers to the field.
+                  </div>
+                </div>
+              )}
 
               {/* Divider: TP Details */}
               <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
