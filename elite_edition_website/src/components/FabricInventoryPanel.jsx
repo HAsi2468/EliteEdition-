@@ -32,7 +32,7 @@ export default function FabricInventoryPanel() {
   const [editingChallan, setEditingChallan] = useState(null);
   const [challanLotLoading, setChallanLotLoading] = useState(false);
   const [challanDeleteTarget, setChallanDeleteTarget] = useState(null);
-  const emptyTpRows = () => Array.from({ length: 4 }, (_, i) => ({ tpNo: i + 1, tpMeter: '' }));
+  const emptyTpRows = () => [{ tpNo: 1, tpMeter: '' }];
   const [challanForm, setChallanForm] = useState({
     date: new Date().toISOString().split('T')[0],
     partyName: '',

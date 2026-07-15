@@ -288,9 +288,16 @@ const downloadChallanPdf = async (req, res) => {
     doc.fillColor('#1e293b').fontSize(10).font('Helvetica-Bold')
       .text('TP MACHINE DETAILS (ROLLER METRES)', M + 16, tpSectionY, { lineBreak: false });
 
-    // TP table grid layout (3 parallel columns to fit 20 values beautifully on single page)
-    const totalTps = 20;
-    const tpColsCount = 3;
+    // Filter active TP details (meter > 0)
+    const activeTps = (challan.tpDetails || [])
+      .filter(tp => tp.tpMeter != null && parseFloat(tp.tpMeter) > 0);
+
+    // Dynamic columns count depending on active rows:
+    // If <= 5 rows, we print 1 single column
+    // If <= 10 rows, we print 2 columns
+    // Else, we print 3 columns
+    const activeCount = activeTps.length;
+    const tpColsCount = activeCount === 0 ? 1 : activeCount <= 5 ? 1 : activeCount <= 10 ? 2 : 3;
     const tpColWidth = (PW - 2 * M) / tpColsCount;
     const tpRowHeight = 22;
     const tableHeaderHeight = 22;
@@ -309,39 +316,38 @@ const downloadChallanPdf = async (req, res) => {
       doc.text('METRES', x + tpColWidth * 0.35, tpTableStartY + 6, { width: tpColWidth * 0.65, align: 'center' });
     }
 
-    // Populate TP values up to 20 entries
-    const tpMap = {};
-    if (challan.tpDetails && Array.isArray(challan.tpDetails)) {
-      challan.tpDetails.forEach(tp => {
-        tpMap[tp.tpNo] = tp.tpMeter;
-      });
-    }
+    const rowsPerCol = Math.ceil(activeCount / tpColsCount);
 
-    const rowsPerCol = Math.ceil(totalTps / tpColsCount); // 20 / 3 = 7 rows per column (except last which has 6)
+    if (activeCount === 0) {
+      const x = M;
+      const y = tpTableStartY + tableHeaderHeight;
+      doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(x, y, PW - 2 * M, tpRowHeight).stroke();
+      doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Oblique')
+        .text('No active TP details entered.', x, y + 6, { width: PW - 2 * M, align: 'center' });
+    } else {
+      for (let i = 0; i < activeCount; i++) {
+        const tp = activeTps[i];
+        const colIndex = i % tpColsCount;
+        const rowIndex = Math.floor(i / tpColsCount);
 
-    for (let i = 0; i < totalTps; i++) {
-      const tpNo = i + 1;
-      const colIndex = i % tpColsCount;
-      const rowIndex = Math.floor(i / tpColsCount);
+        const x = M + colIndex * tpColWidth;
+        const y = tpTableStartY + tableHeaderHeight + rowIndex * tpRowHeight;
 
-      const x = M + colIndex * tpColWidth;
-      const y = tpTableStartY + tableHeaderHeight + rowIndex * tpRowHeight;
+        // Draw cell border
+        doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(x, y, tpColWidth, tpRowHeight).stroke();
 
-      // Draw cell border
-      doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(x, y, tpColWidth, tpRowHeight).stroke();
+        const val = `${parseFloat(tp.tpMeter).toFixed(3)} mtr`;
 
-      // Centered cell values
-      const val = tpMap[tpNo] != null ? `${parseFloat(tpMap[tpNo]).toFixed(3)} mtr` : '—';
-
-      doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
-        .text(String(tpNo), x, y + 6, { width: tpColWidth * 0.35, align: 'center' });
-      
-      doc.fillColor('#0f172a').fontSize(10).font('Helvetica')
-        .text(val, x + tpColWidth * 0.35, y + 6, { width: tpColWidth * 0.65, align: 'center' });
+        doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
+          .text(String(tp.tpNo), x, y + 6, { width: tpColWidth * 0.35, align: 'center' });
+        
+        doc.fillColor('#0f172a').fontSize(10).font('Helvetica')
+          .text(val, x + tpColWidth * 0.35, y + 6, { width: tpColWidth * 0.65, align: 'center' });
+      }
     }
 
     // ─── Summary Section ───
-    const summaryStartY = tpTableStartY + tableHeaderHeight + rowsPerCol * tpRowHeight + 15;
+    const summaryStartY = tpTableStartY + tableHeaderHeight + (activeCount > 0 ? rowsPerCol * tpRowHeight : tpRowHeight) + 15;
     const summaryColWidth = (PW - 2 * M) / 2;
 
     // Draw total cards
