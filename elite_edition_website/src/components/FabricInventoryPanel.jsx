@@ -4,7 +4,8 @@ import CatalogManagerModal from './CatalogManagerModal';
 import {
   RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
   Layers, Database, Settings, Trash2, FileDown, Search, X,
-  AlertTriangle, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Edit, FileText
+  AlertTriangle, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Edit, FileText,
+  Check, Plus
 } from 'lucide-react';
 
 export default function FabricInventoryPanel() {
@@ -525,7 +526,7 @@ export default function FabricInventoryPanel() {
     }
   };
 
-  // When Job No changes — auto-fill design, colour, panna, fabric
+  // When Job No changes — auto-fill design, colour, panna, fabric, party
   const handleChallanJobChange = async (val) => {
     setChallanForm(prev => ({ ...prev, jobNo: val }));
     const job = inProgressJobCards.find(j => j.jobNo === val);
@@ -537,6 +538,7 @@ export default function FabricInventoryPanel() {
         colour: job.colors || prev.colour,
         panna: job.panna || prev.panna,
         fabricName: job.fabric || prev.fabricName,
+        partyName: job.party || prev.partyName,
       }));
 
       // Fetch lot numbers that have this fabric
@@ -723,6 +725,26 @@ export default function FabricInventoryPanel() {
     { id: 'challan', label: 'Challan', icon: FileText },
     { id: 'requirement', label: 'Fabric Requirement', icon: AlertTriangle },
   ];
+
+  // Parse lot numbers from the comma-separated lotNo field
+  const parseSelectedLots = (lotNoStr) => {
+    if (!lotNoStr) return [];
+    return String(lotNoStr)
+      .split(/[,\s&]+/)
+      .map(x => x.trim())
+      .filter(Boolean);
+  };
+
+  const selectedLotsList = parseSelectedLots(challanForm.lotNo);
+
+  // Calculate sum of available meters from the selected lots
+  const selectedLotsTotalStock = selectedLotsList.reduce((sum, lotNo) => {
+    const lotStockItem = availableLots.find(l => String(l.lotNo) === lotNo);
+    return sum + (lotStockItem ? lotStockItem.currentStock : 0);
+  }, 0);
+
+  const activeJob = inProgressJobCards.find(j => j.jobNo === challanForm.jobNo);
+  const jobMtrNeeded = activeJob ? parseFloat(activeJob.totalMtr) || 0 : 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
@@ -1568,54 +1590,112 @@ export default function FabricInventoryPanel() {
                 </div>
               </div>
 
-              {/* Available Lots helper info */}
-              {availableLots.length > 0 && (
+              {/* Smart Lot Selection & Stock Tracker */}
+              {challanForm.jobNo && (
                 <div style={{
-                  background: 'rgba(56, 189, 248, 0.05)',
-                  border: '1px solid rgba(56, 189, 248, 0.2)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '0.6rem 0.8rem',
-                  fontSize: '0.78rem',
-                  color: 'var(--text-primary)',
+                  background: 'rgba(30, 41, 59, 0.7)',
+                  border: '1px solid var(--border-light)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '1rem',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '0.4rem',
+                  gap: '0.75rem',
                   marginTop: '0.25rem'
                 }}>
-                  <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)' }}>
-                    <Layers size={14} /> Available Lots in Inward Stock for "{challanForm.fabricName}":
+                  {/* Job Requirement Info */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      Job Requirement: <strong>{jobMtrNeeded > 0 ? `${jobMtrNeeded} mtr` : 'Not specified'}</strong>
+                    </span>
+                    {jobMtrNeeded > 0 && (
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '4px',
+                        background: selectedLotsTotalStock >= jobMtrNeeded ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: selectedLotsTotalStock >= jobMtrNeeded ? '#10b981' : '#f87171'
+                      }}>
+                        {selectedLotsTotalStock >= jobMtrNeeded ? '✓ Stock Sufficient' : '⚠️ Need More Stock'}
+                      </span>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                    {availableLots.map((lot, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          const currentLots = challanForm.lotNo ? String(challanForm.lotNo).split(/[,\s&]+/).map(x => x.trim()).filter(Boolean) : [];
-                          if (!currentLots.includes(String(lot.lotNo))) {
-                            const newLots = [...currentLots, String(lot.lotNo)].join(', ');
-                            handleChallanLotChange(newLots);
-                          }
-                        }}
-                        className="btn-secondary"
-                        style={{
-                          padding: '0.2rem 0.5rem',
-                          fontSize: '0.72rem',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.3rem',
-                          borderRadius: '4px',
-                          border: '1px solid var(--border-light)',
-                          background: 'rgba(255, 255, 255, 0.03)'
-                        }}
-                        title="Click to add this lot to your selection"
-                      >
-                        <strong>Lot #{lot.lotNo}</strong> ({lot.panna} Panna) — <span style={{ color: 'var(--success)' }}>{lot.currentStock} mtr</span>
-                      </button>
-                    ))}
+
+                  {/* Stock Progress Bar */}
+                  {jobMtrNeeded > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <div style={{ height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${Math.min(100, (selectedLotsTotalStock / jobMtrNeeded) * 100)}%`,
+                          background: selectedLotsTotalStock >= jobMtrNeeded ? 'var(--success)' : 'var(--primary)',
+                          transition: 'width 0.3s ease'
+                        }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        <span>Selected Lot Stock: {selectedLotsTotalStock.toFixed(2)} mtr</span>
+                        <span>{((selectedLotsTotalStock / jobMtrNeeded) * 100).toFixed(0)}% of required</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Available Lot Buttons Grid */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.6rem' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                      Available Inward Lots for "{challanForm.fabricName}":
+                    </div>
+                    {availableLots.length === 0 ? (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        No inward stock found with this fabric.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        {availableLots.map((lot, idx) => {
+                          const isSelected = selectedLotsList.includes(String(lot.lotNo));
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                let newLots;
+                                if (isSelected) {
+                                  // Remove the lot
+                                  newLots = selectedLotsList.filter(l => l !== String(lot.lotNo)).join(', ');
+                                } else {
+                                  // Add the lot
+                                  newLots = [...selectedLotsList, String(lot.lotNo)].join(', ');
+                                }
+                                handleChallanLotChange(newLots);
+                              }}
+                              className={isSelected ? "btn-primary" : "btn-secondary"}
+                              style={{
+                                padding: '0.3rem 0.6rem',
+                                fontSize: '0.74rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                borderRadius: '4px',
+                                border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-light)',
+                                background: isSelected ? 'rgba(14, 165, 233, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                                color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
+                                transition: 'all 0.2s'
+                              }}
+                              title={isSelected ? "Click to deselect lot" : "Click to select lot"}
+                            >
+                              {isSelected ? <Check size={12} /> : <Plus size={12} />}
+                              <span>Lot #{lot.lotNo}</span>
+                              <span style={{ opacity: 0.6, fontSize: '0.68rem' }}>({lot.panna} Panna)</span>
+                              <span style={{ color: isSelected ? 'inherit' : 'var(--success)', fontWeight: 700 }}>
+                                {lot.currentStock}m
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    * Click the lot buttons above to add multiple lot numbers to the field.
+                    * Click the lot buttons above to toggle selections and verify stock sufficiency.
                   </div>
                 </div>
               )}
