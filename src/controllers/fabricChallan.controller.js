@@ -189,6 +189,203 @@ const deleteChallan = async (req, res) => {
   }
 };
 
+// ── GET /fabric-challan/:id/pdf ───────────────────────────────────────────
+const downloadChallanPdf = async (req, res) => {
+  try {
+    const PDFDocument = require('pdfkit');
+    const path = require('path');
+    const fs = require('fs');
+
+    const challan = await FabricChallan.findById(req.params.id).lean();
+    if (!challan) {
+      return res.status(404).json({ error: 'Challan not found' });
+    }
+
+    // PDF document with custom margins
+    const doc = new PDFDocument({ margin: 28, size: 'A4', autoFirstPage: true });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Challan_${challan.challanNo || 'preview'}.pdf"`);
+    doc.pipe(res);
+
+    // Page boundaries
+    const PW = 595, PH = 842, M = 28;
+
+    // Draw nice outer card border
+    doc.strokeColor('#c8d4e0').lineWidth(1).rect(M, M, PW - 2 * M, PH - 2 * M).stroke();
+
+    // Premium dark header bar
+    doc.rect(M, M, PW - 2 * M, 52).fill('#0f172a');
+    doc.fillColor('#ffffff').fontSize(21).font('Helvetica-Bold')
+      .text('ELITE EDITION', M, M + 12, { width: PW - 2 * M, align: 'center', lineBreak: false });
+    doc.fillColor('#38bdf8').fontSize(10).font('Helvetica-Bold').letterSpacing(1)
+      .text('FABRIC CHALLAN', M, M + 34, { width: PW - 2 * M, align: 'center', lineBreak: false });
+
+    // Header info: Challan Number & Date
+    doc.rect(M, M + 52, PW - 2 * M, 28).fill('#1e293b');
+    doc.fillColor('#ffffff').fontSize(12).font('Helvetica-Bold')
+      .text(`CHALLAN NO: #${challan.challanNo}`, M + 16, M + 60, { width: 250, lineBreak: false });
+    
+    const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {
+      day: '2-digit', month: '2-digit', year: 'numeric'
+    }) : '—';
+    doc.fillColor('#94a3b8').fontSize(10).font('Helvetica-Bold')
+      .text(`DATE: ${formattedDate}`, M, M + 61, { width: PW - 2 * M - 16, align: 'right', lineBreak: false });
+
+    // Watermark/Default logo in background with low opacity
+    const logoPath = path.join(__dirname, 'Logo.png');
+    if (fs.existsSync(logoPath)) {
+      doc.save();
+      doc.opacity(0.04);
+      doc.image(logoPath, (PW - 300) / 2, (PH - 300) / 2, { width: 300, height: 300 });
+      doc.restore();
+    }
+
+    // Grid details block layout
+    const startY = M + 95;
+    const colWidth = (PW - 2 * M) / 2;
+    const itemHeight = 36;
+
+    // Helper to print centered details key-value pair with premium design
+    function renderField(label, value, colIndex, rowIndex) {
+      const x = M + colIndex * colWidth;
+      const y = startY + rowIndex * itemHeight;
+
+      // Draw subtle cell boundaries
+      doc.strokeColor('#e2e8f0').lineWidth(0.5)
+        .rect(x, y, colWidth, itemHeight).stroke();
+
+      // Label (centered)
+      doc.fillColor('#8896a4').fontSize(8.5).font('Helvetica-Bold')
+        .text(label.toUpperCase(), x, y + 6, { width: colWidth, align: 'center', lineBreak: false });
+
+      // Value (centered + font size +2)
+      doc.fillColor('#0d1729').fontSize(11).font('Helvetica')
+        .text(String(value || '—'), x, y + 18, { width: colWidth, align: 'center', lineBreak: false });
+    }
+
+    // Fill metadata fields (Left / Right grid cells)
+    const fields = [
+      { label: 'Party Name', val: challan.partyName },
+      { label: 'Lot No.', val: challan.lotNo ? `#${challan.lotNo}` : '—' },
+      { label: 'Vendor Challan No.', val: challan.vendorChallanNo },
+      { label: 'Fabric Name', val: challan.fabricName },
+      { label: 'Shortage (%)', val: challan.shortagePct != null ? `${challan.shortagePct}%` : '—' },
+      { label: 'Job No.', val: challan.jobNo },
+      { label: 'Design No.', val: challan.designNo },
+      { label: 'Colour', val: challan.colour },
+      { label: 'Panna (Width)', val: challan.panna },
+      { label: 'Created By', val: challan.createdBy }
+    ];
+
+    fields.forEach((field, i) => {
+      const colIndex = i % 2;
+      const rowIndex = Math.floor(i / 2);
+      renderField(field.label, field.val, colIndex, rowIndex);
+    });
+
+    // ─── TP Details section ───
+    const tpSectionY = startY + 5 * itemHeight + 15;
+    doc.fillColor('#1e293b').fontSize(10).font('Helvetica-Bold')
+      .text('TP MACHINE DETAILS (ROLLER METRES)', M + 16, tpSectionY, { lineBreak: false });
+
+    // TP table grid layout (3 parallel columns to fit 20 values beautifully on single page)
+    const totalTps = 20;
+    const tpColsCount = 3;
+    const tpColWidth = (PW - 2 * M) / tpColsCount;
+    const tpRowHeight = 22;
+    const tableHeaderHeight = 22;
+    const tpTableStartY = tpSectionY + 16;
+
+    // Draw TP Table Headers
+    for (let c = 0; c < tpColsCount; c++) {
+      const x = M + c * tpColWidth;
+      // Header background
+      doc.rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).fill('#f8fafc');
+      doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).stroke();
+      
+      // Header text (centered)
+      doc.fillColor('#475569').fontSize(9).font('Helvetica-Bold')
+        .text('TP NO.', x, tpTableStartY + 6, { width: tpColWidth * 0.35, align: 'center' });
+      doc.text('METRES', x + tpColWidth * 0.35, tpTableStartY + 6, { width: tpColWidth * 0.65, align: 'center' });
+    }
+
+    // Populate TP values up to 20 entries
+    const tpMap = {};
+    if (challan.tpDetails && Array.isArray(challan.tpDetails)) {
+      challan.tpDetails.forEach(tp => {
+        tpMap[tp.tpNo] = tp.tpMeter;
+      });
+    }
+
+    const rowsPerCol = Math.ceil(totalTps / tpColsCount); // 20 / 3 = 7 rows per column (except last which has 6)
+
+    for (let i = 0; i < totalTps; i++) {
+      const tpNo = i + 1;
+      const colIndex = i % tpColsCount;
+      const rowIndex = Math.floor(i / tpColsCount);
+
+      const x = M + colIndex * tpColWidth;
+      const y = tpTableStartY + tableHeaderHeight + rowIndex * tpRowHeight;
+
+      // Draw cell border
+      doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(x, y, tpColWidth, tpRowHeight).stroke();
+
+      // Centered cell values
+      const val = tpMap[tpNo] != null ? `${parseFloat(tpMap[tpNo]).toFixed(3)} mtr` : '—';
+
+      doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
+        .text(String(tpNo), x, y + 6, { width: tpColWidth * 0.35, align: 'center' });
+      
+      doc.fillColor('#0f172a').fontSize(10).font('Helvetica')
+        .text(val, x + tpColWidth * 0.35, y + 6, { width: tpColWidth * 0.65, align: 'center' });
+    }
+
+    // ─── Summary Section ───
+    const summaryStartY = tpTableStartY + tableHeaderHeight + rowsPerCol * tpRowHeight + 15;
+    const summaryColWidth = (PW - 2 * M) / 2;
+
+    // Draw total cards
+    // Left: Total TP
+    doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(M, summaryStartY, summaryColWidth, 42).stroke();
+    doc.fillColor('#64748b').fontSize(8.5).font('Helvetica-Bold')
+      .text('TOTAL ACTIVE TP MACHINES', M, summaryStartY + 8, { width: summaryColWidth, align: 'center' });
+    doc.fillColor('#0ea5e9').fontSize(14).font('Helvetica-Bold')
+      .text(String(challan.totalTp || 0), M, summaryStartY + 20, { width: summaryColWidth, align: 'center' });
+
+    // Right: Total Metres
+    doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(M + summaryColWidth, summaryStartY, summaryColWidth, 42).stroke();
+    doc.fillColor('#64748b').fontSize(8.5).font('Helvetica-Bold')
+      .text('TOTAL CHALLAN METRES', M + summaryColWidth, summaryStartY + 8, { width: summaryColWidth, align: 'center' });
+    doc.fillColor('#10b981').fontSize(14).font('Helvetica-Bold')
+      .text(`${parseFloat(challan.totalMtr || 0).toFixed(3)} mtr`, M + summaryColWidth, summaryStartY + 20, { width: summaryColWidth, align: 'center' });
+
+    // Notes area
+    const notesY = summaryStartY + 54;
+    doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(M, notesY, PW - 2 * M, 34).stroke();
+    doc.fillColor('#8896a4').fontSize(8.5).font('Helvetica-Bold')
+      .text('NOTES / REMARKS', M + 12, notesY + 5, { width: PW - 2 * M - 24 });
+    doc.fillColor('#0f172a').fontSize(10).font('Helvetica')
+      .text(challan.notes || 'No remarks provided.', M + 12, notesY + 16, { width: PW - 2 * M - 24 });
+
+    // Signatures footer at the bottom
+    const sigY = PH - M - 60;
+    doc.moveTo(M + 30, sigY).lineTo(M + 160, sigY).strokeColor('#94a3b8').lineWidth(0.5).stroke();
+    doc.fillColor('#64748b').fontSize(9).font('Helvetica')
+      .text('PREPARED BY', M + 30, sigY + 5, { width: 130, align: 'center' });
+
+    doc.moveTo(PW - M - 160, sigY).lineTo(PW - M - 30, sigY).strokeColor('#94a3b8').lineWidth(0.5).stroke();
+    doc.fillColor('#64748b').fontSize(9).font('Helvetica')
+      .text('AUTHORIZED SIGNATORY', PW - M - 160, sigY + 5, { width: 130, align: 'center' });
+
+    doc.end();
+  } catch (err) {
+    console.error('Error downloading challan PDF:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
+};
+
 module.exports = {
   createChallan,
   getChallans,
@@ -196,4 +393,6 @@ module.exports = {
   deleteChallan,
   getNextChallanNo,
   getLotInfo,
+  downloadChallanPdf,
 };
+

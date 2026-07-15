@@ -20,4 +20,7 @@ router.put('/:id', c.updateChallan);
 // Delete a challan
 router.delete('/:id', c.deleteChallan);
 
+// Download single challan PDF
+router.get('/:id/pdf', c.downloadChallanPdf);
+
 module.exports = router;

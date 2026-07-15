@@ -620,6 +620,14 @@ export default function FabricInventoryPanel() {
     }
   };
 
+  const handleDownloadChallanPdf = async (id, challanNo) => {
+    try {
+      await api.downloadFabricChallanPdf(id, challanNo);
+    } catch (err) {
+      alert('Failed to download PDF: ' + err.message);
+    }
+  };
+
   // Filtered transaction lists
   const inwardTx = transactions.filter(t => {
     if (t.type !== 'INWARD') return false;
@@ -1405,6 +1413,9 @@ export default function FabricInventoryPanel() {
                     <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--success)' }}>{ch.totalMtr} mtr</td>
                     <td>{ch.notes || ''}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
+                      <button className="btn-icon" title="Download PDF" style={{ color: 'var(--success)', marginRight: '0.5rem' }} onClick={() => handleDownloadChallanPdf(ch._id, ch.challanNo)}>
+                        <FileDown size={15} />
+                      </button>
                       <button className="btn-icon" title="Edit" style={{ color: 'var(--primary)', marginRight: '0.5rem' }} onClick={() => startEditChallan(ch)}>
                         <Edit size={15} />
                       </button>

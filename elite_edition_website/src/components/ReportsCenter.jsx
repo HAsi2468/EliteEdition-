@@ -29,11 +29,7 @@ export default function ReportsCenter({ department }) {
     if (department === 'elite-online') return 'sales';
     return 'smart-dashboard';
   }); 
-  const [dateStart, setDateStart] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return d.toISOString().split('T')[0];
-  });
+  const [dateStart, setDateStart] = useState(() => new Date().toISOString().split('T')[0]);
   const [dateEnd, setDateEnd] = useState(() => new Date().toISOString().split('T')[0]);
   const [searchCode, setSearchCode] = useState('');
   

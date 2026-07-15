@@ -892,6 +892,23 @@ export const api = {
     return request(`/fabric-challan/${id}`, { method: 'DELETE' });
   },
 
+  async downloadFabricChallanPdf(id, challanNo) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const response = await fetch(`${baseUrl}/fabric-challan/${id}/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate challan PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Challan_${challanNo || 'preview'}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+  },
+
   async getNextChallanNo() {
     return request('/fabric-challan/next-no');
   },
