@@ -282,21 +282,23 @@ const downloadChallanPdf = async (req, res) => {
     const gridItemHeight = 30;
 
     // Helper to print centered details key-value pair with premium design
-    function renderField(label, value, colIndex, rowIndex) {
+    // Helper to print centered details key-value pair with premium design
+    function renderField(label, value, colIndex, rowIndex, colSpan = 1) {
+      const currentWidth = colWidth * colSpan;
       const x = M + colIndex * colWidth;
       const y = gridStartY + rowIndex * gridItemHeight;
 
       // Draw subtle cell boundaries
       doc.strokeColor('#cbd5e1').lineWidth(0.5)
-        .rect(x, y, colWidth, gridItemHeight).stroke();
+        .rect(x, y, currentWidth, gridItemHeight).stroke();
 
       // Label (left padded, small font)
       doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold')
-        .text(label.toUpperCase(), x + 10, y + 4, { width: colWidth - 20, align: 'left', lineBreak: false });
+        .text(label.toUpperCase(), x + 10, y + 4, { width: currentWidth - 20, align: 'left', lineBreak: false });
 
       // Value (left padded, bold, slightly larger)
       doc.fillColor('#0f172a').fontSize(9.5).font('Helvetica-Bold')
-        .text(String(value || '—'), x + 10, y + 15, { width: colWidth - 20, align: 'left', lineBreak: false });
+        .text(String(value || '—'), x + 10, y + 15, { width: currentWidth - 20, align: 'left', lineBreak: false });
     }
 
     // Fetch associated job card details for Bill to & Ship to
@@ -316,21 +318,24 @@ const downloadChallanPdf = async (req, res) => {
 
     // Fill metadata fields (Left / Right grid cells)
     const gridFields = [
-      // 1st Column (col index 0)
+      // Row 0
       { label: 'Job No.', val: challan.jobNo, col: 0, row: 0 },
-      { label: 'Design No.', val: challan.designNo, col: 0, row: 1 },
-      { label: 'Colour', val: challan.colour, col: 0, row: 2 },
-      { label: 'Fabric', val: challan.fabricName, col: 0, row: 3 },
-      
-      // 2nd Column (col index 1)
       { label: 'Lot No.', val: challan.lotNo ? `#${challan.lotNo}` : '—', col: 1, row: 0 },
+
+      // Row 1
+      { label: 'Design No.', val: challan.designNo, col: 0, row: 1 },
       { label: 'Vendor Challan', val: challan.vendorChallanNo, col: 1, row: 1 },
+
+      // Row 2
+      { label: 'Colour', val: challan.colour, col: 0, row: 2 },
       { label: 'Panno', val: challan.panna, col: 1, row: 2 },
-      { label: 'Shortage (%)', val: challan.shortagePct != null ? `${challan.shortagePct}%` : '—', col: 1, row: 3 }
+
+      // Row 3 (Full width)
+      { label: 'Fabric', val: challan.fabricName, col: 0, row: 3, span: 2 }
     ];
 
     gridFields.forEach(f => {
-      renderField(f.label, f.val, f.col, f.row);
+      renderField(f.label, f.val, f.col, f.row, f.span || 1);
     });
 
     // Row 4: Bill To and Ship To (spanning full width split in half)

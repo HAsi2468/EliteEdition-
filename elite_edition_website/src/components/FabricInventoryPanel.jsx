@@ -498,29 +498,48 @@ export default function FabricInventoryPanel() {
 
   useEffect(() => { fetchChallans(); }, [challanDateStart, challanDateEnd, challanSearch]);
 
-  // When Lot No changes — auto-fill vendor challan, fabric, shortage, panna
+  // When Lot No changes — auto-fill vendor challans, fabric, shortage, panna
   const handleChallanLotChange = async (val) => {
     setChallanForm(prev => ({ ...prev, lotNo: val }));
     if (!val) return;
 
-    // Extract first number if contains commas/spaces/symbols
-    const cleanLot = String(val).split(/[,\s&]+/)[0];
-    if (!cleanLot) return;
+    // Parse list of lot numbers
+    const lotsList = String(val)
+      .split(/[,\s&]+/)
+      .map(x => x.trim())
+      .filter(Boolean);
+
+    if (lotsList.length === 0) return;
 
     setChallanLotLoading(true);
     try {
-      const res = await api.getFabricLotInfo(cleanLot);
-      if (res.success && res.data) {
+      // Fetch details for all selected lots concurrently
+      const promises = lotsList.map(lot => api.getFabricLotInfo(lot).catch(() => null));
+      const results = await Promise.all(promises);
+
+      const validResults = results.filter(r => r && r.success && r.data);
+      if (validResults.length > 0) {
+        // Collect all vendor challans
+        const vendorChallans = validResults
+          .map(r => r.data.vendorChallanNo)
+          .filter(Boolean);
+        
+        // Remove duplicates and join with commas
+        const uniqueChallans = [...new Set(vendorChallans)].join(', ');
+
+        // Collect fabricName, shortage, panna from first valid response
+        const first = validResults[0].data;
+
         setChallanForm(prev => ({
           ...prev,
-          vendorChallanNo: res.data.vendorChallanNo || prev.vendorChallanNo,
-          fabricName: res.data.fabricName || prev.fabricName,
-          shortagePct: res.data.shortagePct != null ? String(res.data.shortagePct) : prev.shortagePct,
-          panna: prev.panna || res.data.panna || '',
+          vendorChallanNo: uniqueChallans || prev.vendorChallanNo,
+          fabricName: first.fabricName || prev.fabricName,
+          shortagePct: first.shortagePct != null ? String(first.shortagePct) : prev.shortagePct,
+          panna: prev.panna || first.panna || '',
         }));
       }
     } catch (e) {
-      // lot not found — no-op
+      console.warn('Failed to fetch multiple lot info', e);
     } finally {
       setChallanLotLoading(false);
     }
