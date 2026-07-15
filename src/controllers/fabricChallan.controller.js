@@ -428,14 +428,17 @@ const downloadChallanPdf = async (req, res) => {
       .text(challan.notes || 'No remarks provided.', M + 12, notesY + 16, { width: PW - 2 * M - 24 });
 
     // Signatures footer at the bottom
-    const sigY = PH - M - 60;
-    doc.moveTo(M + 30, sigY).lineTo(M + 160, sigY).strokeColor('#94a3b8').lineWidth(0.5).stroke();
-    doc.fillColor('#64748b').fontSize(9).font('Helvetica')
-      .text('RECEIVER SIGN', M + 30, sigY + 5, { width: 130, align: 'center' });
+    const sigLineY = PH - M - 45;
+    
+    // Left: Receiver Signature
+    doc.moveTo(M + 30, sigLineY).lineTo(M + 160, sigLineY).strokeColor('#94a3b8').lineWidth(0.5).stroke();
+    doc.fillColor('#64748b').fontSize(9).font('Helvetica-Bold')
+      .text('RECEIVER SIGNATURE', M + 30, sigLineY + 5, { width: 130, align: 'center' });
 
-    doc.moveTo(PW - M - 160, sigY).lineTo(PW - M - 30, sigY).strokeColor('#94a3b8').lineWidth(0.5).stroke();
-    doc.fillColor('#64748b').fontSize(9).font('Helvetica')
-      .text('AUTHORIZED SIGNATORY', PW - M - 160, sigY + 5, { width: 130, align: 'center' });
+    // Right: Authorized Signature
+    doc.moveTo(PW - M - 160, sigLineY).lineTo(PW - M - 30, sigLineY).strokeColor('#94a3b8').lineWidth(0.5).stroke();
+    doc.fillColor('#64748b').fontSize(9).font('Helvetica-Bold')
+      .text('AUTHORIZED SIGNATURE', PW - M - 160, sigLineY + 5, { width: 130, align: 'center' });
 
     doc.end();
   } catch (err) {
