@@ -161,7 +161,38 @@ const getLotStock = async (req, res) => {
     const { fabricQuality } = req.query;
     const matchStage = {};
     if (fabricQuality) {
-      matchStage.fabricQuality = new RegExp(`^${fabricQuality.trim()}$`, 'i');
+      const clean = fabricQuality.trim().toUpperCase();
+      const candidates = [clean];
+      
+      if (clean.includes('SUDAR')) {
+        candidates.push('SUDARSHAN');
+        candidates.push('SUDARSUN');
+      }
+      if (clean.includes('SUMM')) {
+        candidates.push('SUMMER COOL');
+        candidates.push('SUMMAR COOL');
+      }
+      if (clean.includes('CREP') || clean.includes('CREPE')) {
+        candidates.push('CREPE');
+        candidates.push('FRENCH CREP');
+        candidates.push('FRENCH CREPE');
+      }
+      if (clean.includes('MAL')) {
+        candidates.push('MAL');
+        candidates.push('POLY MAL');
+      }
+      if (clean.includes('REYON') || clean.includes('RAYON')) {
+        candidates.push('REYON');
+        candidates.push('RAYON');
+      }
+      if (clean.includes('CEMBRIC') || clean.includes('CEMBRIK')) {
+        candidates.push('CEMBRIC');
+        candidates.push('CEMBRIK');
+      }
+
+      matchStage.fabricQuality = {
+        $in: candidates.map(c => new RegExp(`^${c}$`, 'i'))
+      };
     }
 
     const pipeline = [
