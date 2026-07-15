@@ -217,8 +217,8 @@ const downloadChallanPdf = async (req, res) => {
     doc.rect(M, M, PW - 2 * M, 52).fill('#0f172a');
     doc.fillColor('#ffffff').fontSize(21).font('Helvetica-Bold')
       .text('ELITE EDITION', M, M + 12, { width: PW - 2 * M, align: 'center', lineBreak: false });
-    doc.fillColor('#38bdf8').fontSize(10).font('Helvetica-Bold').letterSpacing(1)
-      .text('FABRIC CHALLAN', M, M + 34, { width: PW - 2 * M, align: 'center', lineBreak: false });
+    doc.fillColor('#38bdf8').fontSize(10).font('Helvetica-Bold')
+      .text('FABRIC CHALLAN', M, M + 34, { width: PW - 2 * M, align: 'center', lineBreak: false, characterSpacing: 1 });
 
     // Header info: Challan Number & Date
     doc.rect(M, M + 52, PW - 2 * M, 28).fill('#1e293b');
