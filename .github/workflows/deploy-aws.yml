@@ -1,4 +1,4 @@
-name: Deploy Node.js Backend to AWS EC2
+name: Deploy Node.js Backend + Frontend to AWS EC2
 
 on:
   push:
@@ -10,7 +10,31 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to AWS EC2
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Build Frontend
+        working-directory: elite_edition_website
+        run: |
+          npm install
+          npm run build
+
+      - name: Upload Frontend dist to EC2
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.AWS_HOST }}
+          username: ${{ secrets.AWS_USERNAME }}
+          key: ${{ secrets.AWS_SSH_KEY }}
+          source: "elite_edition_website/dist/."
+          target: "/home/ubuntu/elite_edition_website_dist"
+          strip_components: 2
+
+      - name: Deploy Backend to AWS EC2
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.AWS_HOST }}
@@ -20,5 +44,4 @@ jobs:
             cd ${{ secrets.AWS_TARGET_DIR }}
             git pull origin main
             npm install
-            # Restart PM2 or the Node server (adjust the app name if needed)
             pm2 restart all || npm start
