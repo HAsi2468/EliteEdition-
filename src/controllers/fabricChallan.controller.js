@@ -204,7 +204,7 @@ const downloadChallanPdf = async (req, res) => {
     // PDF document with custom margins
     const doc = new PDFDocument({ margin: 28, size: 'A4', autoFirstPage: true });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Challan_${challan.challanNo || 'preview'}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="Challan_EDP_${challan.challanNo || 'preview'}.pdf"`);
     doc.pipe(res);
 
     // Page boundaries
@@ -265,7 +265,7 @@ const downloadChallanPdf = async (req, res) => {
     doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
       .text('Challan No.:', PW - M - 160, startY + 7, { width: 90, align: 'right', lineBreak: false });
     doc.fillColor('#dc2626').fontSize(12).font('Helvetica-Bold') // Premium Red
-      .text(challan.challanNo || '—', PW - M - 65, startY + 5, { width: 60, align: 'left', lineBreak: false });
+      .text('EDP-' + (challan.challanNo || '—'), PW - M - 65, startY + 5, { width: 60, align: 'left', lineBreak: false });
 
     // Draw Date (Right aligned, below Challan No)
     doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
@@ -408,8 +408,8 @@ const downloadChallanPdf = async (req, res) => {
     // Left: Total TP
     doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(M, summaryStartY, summaryColWidth, 42).stroke();
     doc.fillColor('#64748b').fontSize(8.5).font('Helvetica-Bold')
-      .text('TOTAL ACTIVE TP MACHINES', M, summaryStartY + 8, { width: summaryColWidth, align: 'center' });
-    doc.fillColor('#0ea5e9').fontSize(14).font('Helvetica-Bold')
+      .text('TOTAL CHALLAN TP', M, summaryStartY + 8, { width: summaryColWidth, align: 'center' });
+    doc.fillColor('#10b981').fontSize(14).font('Helvetica-Bold')
       .text(String(challan.totalTp || 0), M, summaryStartY + 20, { width: summaryColWidth, align: 'center' });
 
     // Right: Total Metres

@@ -1453,7 +1453,7 @@ export default function FabricInventoryPanel() {
                 )}
                 {challans.map(ch => (
                   <tr key={ch._id}>
-                    <td><span style={{ fontWeight: 700, color: 'var(--primary)' }}>#{ch.challanNo}</span></td>
+                    <td><span style={{ fontWeight: 700, color: 'var(--primary)' }}>EDP-{ch.challanNo}</span></td>
                     <td>{new Date(ch.date).toLocaleDateString()}</td>
                     <td>{ch.partyName || '—'}</td>
                     <td>{ch.lotNo != null ? `#${ch.lotNo}` : '—'}</td>
@@ -1470,7 +1470,7 @@ export default function FabricInventoryPanel() {
                         <Edit size={15} />
                       </button>
                       {isAdmin && (
-                        <button className="btn-icon" title="Delete" style={{ color: 'var(--danger)' }} onClick={() => setChallanDeleteTarget({ id: ch._id, label: `Challan #${ch.challanNo}` })}>
+                        <button className="btn-icon" title="Delete" style={{ color: 'var(--danger)' }} onClick={() => setChallanDeleteTarget({ id: ch._id, label: `Challan EDP-${ch.challanNo}` })}>
                           <Trash2 size={15} />
                         </button>
                       )}
@@ -1501,7 +1501,7 @@ export default function FabricInventoryPanel() {
       {isChallanOpen && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div className="glass-panel" style={{ width: '640px', padding: '2rem', maxHeight: '92vh', overflowY: 'auto' }}>
-            <h2 style={{ marginBottom: '1.5rem' }}>{editingChallan ? `Edit Challan #${editingChallan.challanNo}` : 'New Fabric Challan'}</h2>
+            <h2 style={{ marginBottom: '1.5rem' }}>{editingChallan ? `Edit Challan EDP-${editingChallan.challanNo}` : 'New Fabric Challan'}</h2>
             <form onSubmit={handleChallanSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
               {/* Row 1: Date + Party */}
