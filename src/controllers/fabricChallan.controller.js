@@ -213,54 +213,90 @@ const downloadChallanPdf = async (req, res) => {
     // Draw nice outer card border
     doc.strokeColor('#c8d4e0').lineWidth(1).rect(M, M, PW - 2 * M, PH - 2 * M).stroke();
 
-    // Premium dark header bar
-    doc.rect(M, M, PW - 2 * M, 52).fill('#0f172a');
-    doc.fillColor('#ffffff').fontSize(21).font('Helvetica-Bold')
-      .text('ELITE EDITION', M, M + 12, { width: PW - 2 * M, align: 'center', lineBreak: false });
-    doc.fillColor('#38bdf8').fontSize(10).font('Helvetica-Bold')
-      .text('FABRIC CHALLAN', M, M + 34, { width: PW - 2 * M, align: 'center', lineBreak: false, characterSpacing: 1 });
+    // Top header metadata matching physical paper pad
+    doc.fillColor('#475569').fontSize(7.5).font('Helvetica')
+      .text('Subject to SURAT Jurisdiction', M + 12, M + 8, { lineBreak: false });
+    doc.fillColor('#475569').fontSize(7.5).font('Helvetica-Bold')
+      .text('|| Shree Ganeshay Namah ||', M, M + 8, { width: PW - 2 * M, align: 'center', lineBreak: false });
+    doc.fillColor('#475569').fontSize(7.5).font('Helvetica')
+      .text('Mo. +91 99098 66667', M, M + 8, { width: PW - 2 * M - 12, align: 'right', lineBreak: false });
 
-    // Header info: Challan Number & Date
-    doc.rect(M, M + 52, PW - 2 * M, 28).fill('#1e293b');
-    doc.fillColor('#ffffff').fontSize(12).font('Helvetica-Bold')
-      .text(`CHALLAN NO: #${challan.challanNo}`, M + 16, M + 60, { width: 250, lineBreak: false });
-    
+    // Subtle header divider
+    doc.strokeColor('#e2e8f0').lineWidth(0.5)
+      .moveTo(M, M + 18).lineTo(PW - M, M + 18).stroke();
+
+    // Centered Company Logo (Elite Digital Prints)
+    const logoPath = path.join(__dirname, 'Logo.png');
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, (PW - 160) / 2, M + 22, { width: 160 });
+    }
+
+    // Company Address centered below logo
+    doc.fillColor('#64748b').fontSize(8.5).font('Helvetica')
+      .text('Pankhudi, siddheswar Soc opposite mahan resedency, punagam, Surat.', M, M + 128, { width: PW - 2 * M, align: 'center', lineBreak: false });
+
+    // Header bottom boundary line
+    doc.strokeColor('#cbd5e1').lineWidth(0.8)
+      .moveTo(M, M + 142).lineTo(PW - M, M + 142).stroke();
+
     const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {
       day: '2-digit', month: '2-digit', year: 'numeric'
     }) : '—';
-    doc.fillColor('#94a3b8').fontSize(10).font('Helvetica-Bold')
-      .text(`DATE: ${formattedDate}`, M, M + 61, { width: PW - 2 * M - 16, align: 'right', lineBreak: false });
 
     // Watermark/Default logo in background with low opacity
-    const logoPath = path.join(__dirname, 'Logo.png');
     if (fs.existsSync(logoPath)) {
       doc.save();
-      doc.opacity(0.04);
+      doc.opacity(0.02);
       doc.image(logoPath, (PW - 300) / 2, (PH - 300) / 2, { width: 300, height: 300 });
       doc.restore();
     }
 
-    // Grid details block layout
-    const startY = M + 95;
+    // M/s & Challan Details Header Row
+    const startY = M + 146;
     const colWidth = (PW - 2 * M) / 2;
-    const itemHeight = 36;
+
+    // Draw M/s: Party Name (Left aligned)
+    doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
+      .text('M/s:', M + 12, startY + 7, { lineBreak: false });
+    doc.fillColor('#0f172a').fontSize(11.5).font('Helvetica-Bold')
+      .text(challan.partyName || '—', M + 42, startY + 5, { lineBreak: false });
+      
+    // Draw Challan No in Bold Red (Right aligned)
+    doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
+      .text('Challan No.:', PW - M - 160, startY + 7, { width: 90, align: 'right', lineBreak: false });
+    doc.fillColor('#dc2626').fontSize(12).font('Helvetica-Bold') // Premium Red
+      .text(challan.challanNo || '—', PW - M - 65, startY + 5, { width: 60, align: 'left', lineBreak: false });
+
+    // Draw Date (Right aligned, below Challan No)
+    doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
+      .text('Date:', PW - M - 160, startY + 21, { width: 90, align: 'right', lineBreak: false });
+    doc.fillColor('#0f172a').fontSize(10).font('Helvetica-Bold')
+      .text(formattedDate, PW - M - 65, startY + 21, { width: 60, align: 'left', lineBreak: false });
+
+    // Divider line below M/s Row
+    doc.strokeColor('#cbd5e1').lineWidth(0.6)
+      .moveTo(M, startY + 36).lineTo(PW - M, startY + 36).stroke();
+
+    // Metadata Grid Layout starting below M/s row
+    const gridStartY = startY + 36;
+    const gridItemHeight = 30;
 
     // Helper to print centered details key-value pair with premium design
     function renderField(label, value, colIndex, rowIndex) {
       const x = M + colIndex * colWidth;
-      const y = startY + rowIndex * itemHeight;
+      const y = gridStartY + rowIndex * gridItemHeight;
 
       // Draw subtle cell boundaries
-      doc.strokeColor('#e2e8f0').lineWidth(0.5)
-        .rect(x, y, colWidth, itemHeight).stroke();
+      doc.strokeColor('#cbd5e1').lineWidth(0.5)
+        .rect(x, y, colWidth, gridItemHeight).stroke();
 
-      // Label (centered)
-      doc.fillColor('#8896a4').fontSize(8.5).font('Helvetica-Bold')
-        .text(label.toUpperCase(), x, y + 6, { width: colWidth, align: 'center', lineBreak: false });
+      // Label (left padded, small font)
+      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold')
+        .text(label.toUpperCase(), x + 10, y + 4, { width: colWidth - 20, align: 'left', lineBreak: false });
 
-      // Value (centered + font size +2)
-      doc.fillColor('#0d1729').fontSize(11).font('Helvetica')
-        .text(String(value || '—'), x, y + 18, { width: colWidth, align: 'center', lineBreak: false });
+      // Value (left padded, bold, slightly larger)
+      doc.fillColor('#0f172a').fontSize(9.5).font('Helvetica-Bold')
+        .text(String(value || '—'), x + 10, y + 15, { width: colWidth - 20, align: 'left', lineBreak: false });
     }
 
     // Fetch associated job card details for Bill to & Ship to
@@ -281,16 +317,16 @@ const downloadChallanPdf = async (req, res) => {
     // Fill metadata fields (Left / Right grid cells)
     const gridFields = [
       // 1st Column (col index 0)
-      { label: 'Party Name', val: challan.partyName, col: 0, row: 0 },
-      { label: 'Job No.', val: challan.jobNo, col: 0, row: 1 },
-      { label: 'Design No.', val: challan.designNo, col: 0, row: 2 },
-      { label: 'Colour', val: challan.colour, col: 0, row: 3 },
+      { label: 'Job No.', val: challan.jobNo, col: 0, row: 0 },
+      { label: 'Design No.', val: challan.designNo, col: 0, row: 1 },
+      { label: 'Colour', val: challan.colour, col: 0, row: 2 },
+      { label: 'Fabric', val: challan.fabricName, col: 0, row: 3 },
       
       // 2nd Column (col index 1)
       { label: 'Lot No.', val: challan.lotNo ? `#${challan.lotNo}` : '—', col: 1, row: 0 },
       { label: 'Vendor Challan', val: challan.vendorChallanNo, col: 1, row: 1 },
       { label: 'Panno', val: challan.panna, col: 1, row: 2 },
-      { label: 'Fabric', val: challan.fabricName, col: 1, row: 3 }
+      { label: 'Shortage (%)', val: challan.shortagePct != null ? `${challan.shortagePct}%` : '—', col: 1, row: 3 }
     ];
 
     gridFields.forEach(f => {
@@ -302,7 +338,7 @@ const downloadChallanPdf = async (req, res) => {
     renderField('Ship to', shipTo, 1, 4);
 
     // ─── TP Details section ───
-    const tpSectionY = startY + 5 * itemHeight + 15;
+    const tpSectionY = gridStartY + 5 * gridItemHeight + 15;
     doc.fillColor('#1e293b').fontSize(10).font('Helvetica-Bold')
       .text('TP Details', M + 16, tpSectionY, { lineBreak: false });
 
