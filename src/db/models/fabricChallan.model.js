@@ -71,7 +71,7 @@ const fabricChallanSchema = new mongoose.Schema(
     tpDetails: {
       type: [tpDetailSchema],
       default: [],
-      validate: [arr => arr.length <= 20, 'Maximum 20 TP entries allowed'],
+      validate: [arr => arr.length <= 30, 'Maximum 30 TP entries allowed'],
     },
 
     // Computed totals

@@ -568,7 +568,7 @@ export default function FabricInventoryPanel() {
 
   const addTpRow = () => {
     setChallanForm(prev => {
-      if (prev.tpDetails.length >= 20) return prev;
+      if (prev.tpDetails.length >= 30) return prev;
       const nextNo = prev.tpDetails.length + 1;
       return { ...prev, tpDetails: [...prev.tpDetails, { tpNo: nextNo, tpMeter: '' }] };
     });
@@ -1703,7 +1703,7 @@ export default function FabricInventoryPanel() {
               {/* Divider: TP Details */}
               <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TP Details</span>
-                <button type="button" className="btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.78rem' }} onClick={addTpRow} disabled={challanForm.tpDetails.length >= 20}>
+                <button type="button" className="btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.78rem' }} onClick={addTpRow} disabled={challanForm.tpDetails.length >= 30}>
                   <PlusCircle size={13} /> Add TP Row
                 </button>
               </div>

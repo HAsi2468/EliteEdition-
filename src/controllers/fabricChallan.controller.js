@@ -263,30 +263,48 @@ const downloadChallanPdf = async (req, res) => {
         .text(String(value || '—'), x, y + 18, { width: colWidth, align: 'center', lineBreak: false });
     }
 
+    // Fetch associated job card details for Bill to & Ship to
+    let billTo = '—';
+    let shipTo = '—';
+    if (challan.jobNo) {
+      try {
+        const job = await JobCard.findOne({ jobNo: challan.jobNo });
+        if (job) {
+          billTo = job.billTo || '—';
+          shipTo = job.shipTo || '—';
+        }
+      } catch (e) {
+        console.warn('Failed to find job card info', e);
+      }
+    }
+
     // Fill metadata fields (Left / Right grid cells)
-    const fields = [
-      { label: 'Party Name', val: challan.partyName },
-      { label: 'Lot No.', val: challan.lotNo ? `#${challan.lotNo}` : '—' },
-      { label: 'Vendor Challan No.', val: challan.vendorChallanNo },
-      { label: 'Fabric Name', val: challan.fabricName },
-      { label: 'Shortage (%)', val: challan.shortagePct != null ? `${challan.shortagePct}%` : '—' },
-      { label: 'Job No.', val: challan.jobNo },
-      { label: 'Design No.', val: challan.designNo },
-      { label: 'Colour', val: challan.colour },
-      { label: 'Panna (Width)', val: challan.panna },
-      { label: 'Created By', val: challan.createdBy }
+    const gridFields = [
+      // 1st Column (col index 0)
+      { label: 'Party Name', val: challan.partyName, col: 0, row: 0 },
+      { label: 'Job No.', val: challan.jobNo, col: 0, row: 1 },
+      { label: 'Design No.', val: challan.designNo, col: 0, row: 2 },
+      { label: 'Colour', val: challan.colour, col: 0, row: 3 },
+      
+      // 2nd Column (col index 1)
+      { label: 'Lot No.', val: challan.lotNo ? `#${challan.lotNo}` : '—', col: 1, row: 0 },
+      { label: 'Vendor Challan', val: challan.vendorChallanNo, col: 1, row: 1 },
+      { label: 'Panno', val: challan.panna, col: 1, row: 2 },
+      { label: 'Fabric', val: challan.fabricName, col: 1, row: 3 }
     ];
 
-    fields.forEach((field, i) => {
-      const colIndex = i % 2;
-      const rowIndex = Math.floor(i / 2);
-      renderField(field.label, field.val, colIndex, rowIndex);
+    gridFields.forEach(f => {
+      renderField(f.label, f.val, f.col, f.row);
     });
+
+    // Row 4: Bill To and Ship To (spanning full width split in half)
+    renderField('Bill to', billTo, 0, 4);
+    renderField('Ship to', shipTo, 1, 4);
 
     // ─── TP Details section ───
     const tpSectionY = startY + 5 * itemHeight + 15;
     doc.fillColor('#1e293b').fontSize(10).font('Helvetica-Bold')
-      .text('TP MACHINE DETAILS (ROLLER METRES)', M + 16, tpSectionY, { lineBreak: false });
+      .text('TP Details', M + 16, tpSectionY, { lineBreak: false });
 
     // Filter active TP details (meter > 0)
     const activeTps = (challan.tpDetails || [])
@@ -377,7 +395,7 @@ const downloadChallanPdf = async (req, res) => {
     const sigY = PH - M - 60;
     doc.moveTo(M + 30, sigY).lineTo(M + 160, sigY).strokeColor('#94a3b8').lineWidth(0.5).stroke();
     doc.fillColor('#64748b').fontSize(9).font('Helvetica')
-      .text('PREPARED BY', M + 30, sigY + 5, { width: 130, align: 'center' });
+      .text('RECEIVER SIGN', M + 30, sigY + 5, { width: 130, align: 'center' });
 
     doc.moveTo(PW - M - 160, sigY).lineTo(PW - M - 30, sigY).strokeColor('#94a3b8').lineWidth(0.5).stroke();
     doc.fillColor('#64748b').fontSize(9).font('Helvetica')
