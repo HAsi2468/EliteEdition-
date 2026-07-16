@@ -233,13 +233,13 @@ const downloadChallanPdf = async (req, res) => {
       doc.image(logoPath, (PW - 140) / 2, M + 15, { width: 140 });
     }
 
-    // Company Address centered below logo (placed at M + 80 to prevent overlap with logo bottom)
+    // Company Address centered below logo
     doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica-Bold')
-      .text('GROUND FLOOR, PLOT NO-B/37, Siddheshwar Society, Puna Kumbariya Road, NR. KALAPUL, Punagam, Surat, Surat, Gujarat, 395010', M, M + 80, { width: PW - 2 * M, align: 'center', lineBreak: false });
+      .text('GROUND FLOOR, PLOT NO-B/37, Siddheshwar Society, Puna Kumbariya Road, NR. KALAPUL, Punagam, Surat, Surat, Gujarat, 395010', M, M + 66, { width: PW - 2 * M, align: 'center', lineBreak: false });
 
-    // Header bottom boundary line (moved down to M + 106 to prevent address text overlap)
+    // Header bottom boundary line
     doc.strokeColor('#0000ff').lineWidth(0.8)
-      .moveTo(M, M + 106).lineTo(PW - M, M + 106).stroke();
+      .moveTo(M, M + 90).lineTo(PW - M, M + 90).stroke();
 
     const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {
       day: '2-digit', month: '2-digit', year: 'numeric'
@@ -254,7 +254,7 @@ const downloadChallanPdf = async (req, res) => {
     }
 
     // M/s & Challan Details Header Row
-    const startY = M + 110;
+    const startY = M + 94;
 
     // Draw M/s: Party Name (Left aligned)
     doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
