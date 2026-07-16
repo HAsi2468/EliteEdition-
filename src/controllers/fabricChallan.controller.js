@@ -229,7 +229,37 @@ const downloadChallanPdf = async (req, res) => {
     doc.strokeColor('#0000ff').lineWidth(0.5)
       .moveTo(ML, MR + 14).lineTo(PW - MR, MR + 14).stroke();
 
-    const logoPath = path.join(__dirname, 'Logo.png');
+    let billTo = challan.billTo || '';
+    let shipTo = challan.shipTo || '';
+    if (!billTo || !shipTo) {
+      if (challan.jobNo) {
+        try {
+          const job = await JobCard.findOne({ jobNo: challan.jobNo });
+          if (job) {
+            if (!billTo) billTo = job.billTo || '';
+            if (!shipTo) shipTo = job.shipTo || '';
+          }
+        } catch (e) {
+          console.warn('Failed to find job card info', e);
+        }
+      }
+    }
+    if (!billTo) billTo = '—';
+    if (!shipTo) shipTo = '—';
+
+    let selectedLogoName = 'Logo_previous.png';
+    const checkBillTo = billTo.toLowerCase();
+    const checkShipTo = shipTo.toLowerCase();
+    const checkParty = (challan.partyName || '').toLowerCase();
+    if (
+      checkBillTo.includes('elite digital') ||
+      checkShipTo.includes('elite digital') ||
+      checkParty.includes('elite digital')
+    ) {
+      selectedLogoName = 'Logo.png';
+    }
+
+    const logoPath = path.join(__dirname, selectedLogoName);
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, ML + (contentWidth - 140) / 2, MR + 16, { width: 140 });
     }
@@ -281,24 +311,6 @@ const downloadChallanPdf = async (req, res) => {
       doc.fillColor('#0f172a').fontSize(12.5).font('Helvetica-Bold')
         .text(String(value || '—'), x + 10, y + 17, { width: width - 20, align: 'left', lineBreak: false });
     }
-
-    let billTo = challan.billTo || '';
-    let shipTo = challan.shipTo || '';
-    if (!billTo || !shipTo) {
-      if (challan.jobNo) {
-        try {
-          const job = await JobCard.findOne({ jobNo: challan.jobNo });
-          if (job) {
-            if (!billTo) billTo = job.billTo || '';
-            if (!shipTo) shipTo = job.shipTo || '';
-          }
-        } catch (e) {
-          console.warn('Failed to find job card info', e);
-        }
-      }
-    }
-    if (!billTo) billTo = '—';
-    if (!shipTo) shipTo = '—';
 
     const billStartY = startY + 28;
     const halfWidth = contentWidth / 2;
