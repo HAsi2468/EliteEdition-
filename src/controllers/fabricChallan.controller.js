@@ -317,14 +317,16 @@ const downloadChallanPdf = async (req, res) => {
     const colWidth4 = (PW - 2 * M) / 4;
 
     // Row 0 of Grid (startY)
+    // Row 0 of Grid (startY)
     renderField('Job No.', challan.jobNo, M, gridStartY, colWidth4, 28);
-    renderField('Lot No.', challan.lotNo ? `#${challan.lotNo}` : '—', M + colWidth4, gridStartY, colWidth4, 28);
-    renderField('Design No.', challan.designNo, M + colWidth4 * 2, gridStartY, colWidth4, 28);
+    renderField('Design No.', challan.designNo, M + colWidth4, gridStartY, colWidth4, 28);
+    renderField('Lot No.', challan.lotNo ? `#${challan.lotNo}` : '—', M + colWidth4 * 2, gridStartY, colWidth4, 28);
     renderField('Panno', challan.panna, M + colWidth4 * 3, gridStartY, colWidth4, 28);
 
     // Row 1 of Grid (gridStartY + 28)
     renderField('Colour', challan.colour, M, gridStartY + 28, colWidth4, 28);
-    renderField('Fabric', challan.fabricName, M + colWidth4, gridStartY + 28, colWidth4 * 3, 28);
+    renderField('Fabric', challan.fabricName, M + colWidth4, gridStartY + 28, colWidth4 * 2, 28);
+    renderField('Vendor Challan', challan.vendorChallanNo, M + colWidth4 * 3, gridStartY + 28, colWidth4, 28);
 
     // ─── TP Details section ───
     const tpSectionY = gridStartY + 56 + 15;
