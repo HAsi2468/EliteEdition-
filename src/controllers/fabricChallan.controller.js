@@ -212,34 +212,34 @@ const downloadChallanPdf = async (req, res) => {
     // Page boundaries
     const PW = 595, PH = 842, M = 28;
 
-    // Draw nice outer card border
-    doc.strokeColor('#c8d4e0').lineWidth(1).rect(M, M, PW - 2 * M, PH - 2 * M).stroke();
+    // Draw nice outer card border in pure blue
+    doc.strokeColor('#0000ff').lineWidth(1).rect(M, M, PW - 2 * M, PH - 2 * M).stroke();
 
     // Top header metadata matching physical paper pad
-    doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
+    doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica')
       .text('Subject to SURAT Jurisdiction', M + 12, M + 4, { lineBreak: false });
-    doc.fillColor('#475569').fontSize(8.5).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica-Bold')
       .text('|| Shree Ganeshay Namah ||', M, M + 4, { width: PW - 2 * M, align: 'center', lineBreak: false });
-    doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
+    doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica')
       .text('Mo. +91 99098 66667', M, M + 4, { width: PW - 2 * M - 12, align: 'right', lineBreak: false });
 
     // Subtle header divider
-    doc.strokeColor('#cbd5e1').lineWidth(0.5)
-      .moveTo(M, M + 14).lineTo(PW - M, M + 14).stroke();
+    doc.strokeColor('#0000ff').lineWidth(0.5)
+      .moveTo(M, M + 12).lineTo(PW - M, M + 12).stroke();
 
-    // Centered Company Logo (Elite Digital Prints) - with 5 mm (14pt) margin top and bottom
+    // Centered Company Logo (Elite Digital Prints) - placed tightly 3pt below divider
     const logoPath = path.join(__dirname, 'Logo.png');
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, (PW - 140) / 2, M + 28, { width: 140 });
+      doc.image(logoPath, (PW - 140) / 2, M + 15, { width: 140 });
     }
 
-    // Company Address centered below logo
-    doc.fillColor('#64748b').fontSize(8.5).font('Helvetica-Bold')
-      .text('GROUND FLOOR, PLOT NO-B/37, Siddheshwar Society, Puna Kumbariya Road, NR. KALAPUL, Punagam, Surat, Surat, Gujarat, 395010', M, M + 102, { width: PW - 2 * M, align: 'center', lineBreak: false });
+    // Company Address centered below logo (placed at M + 80 to prevent overlap with logo bottom)
+    doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica-Bold')
+      .text('GROUND FLOOR, PLOT NO-B/37, Siddheshwar Society, Puna Kumbariya Road, NR. KALAPUL, Punagam, Surat, Surat, Gujarat, 395010', M, M + 80, { width: PW - 2 * M, align: 'center', lineBreak: false });
 
-    // Header bottom boundary line
-    doc.strokeColor('#cbd5e1').lineWidth(0.8)
-      .moveTo(M, M + 116).lineTo(PW - M, M + 116).stroke();
+    // Header bottom boundary line (moved down to M + 106 to prevent address text overlap)
+    doc.strokeColor('#0000ff').lineWidth(0.8)
+      .moveTo(M, M + 106).lineTo(PW - M, M + 106).stroke();
 
     const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {
       day: '2-digit', month: '2-digit', year: 'numeric'
@@ -254,38 +254,38 @@ const downloadChallanPdf = async (req, res) => {
     }
 
     // M/s & Challan Details Header Row
-    const startY = M + 120;
+    const startY = M + 110;
 
     // Draw M/s: Party Name (Left aligned)
-    doc.fillColor('#64748b').fontSize(10.5).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
       .text('M/s:', M + 12, startY + 6, { lineBreak: false });
     doc.fillColor('#0f172a').fontSize(12.5).font('Helvetica-Bold')
       .text(challan.partyName || '—', M + 42, startY + 4, { lineBreak: false });
       
     // Draw Challan No in Bold Red (Right aligned)
-    doc.fillColor('#64748b').fontSize(10.5).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
       .text('Ch.no.:', PW - M - 160, startY + 6, { width: 90, align: 'right', lineBreak: false });
     doc.fillColor('#dc2626').fontSize(13).font('Helvetica-Bold') // Premium Red
       .text('EDP-' + (challan.challanNo || '—'), PW - M - 65, startY + 4, { width: 60, align: 'left', lineBreak: false });
 
     // Draw Date (Right aligned, below Challan No)
-    doc.fillColor('#64748b').fontSize(10.5).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
       .text('Date:', PW - M - 160, startY + 17, { width: 90, align: 'right', lineBreak: false });
     doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold')
       .text(formattedDate, PW - M - 65, startY + 17, { width: 60, align: 'left', lineBreak: false });
 
     // Divider line below M/s Row
-    doc.strokeColor('#cbd5e1').lineWidth(0.6)
+    doc.strokeColor('#0000ff').lineWidth(0.6)
       .moveTo(M, startY + 28).lineTo(PW - M, startY + 28).stroke();
 
-    // Helper to print details key-value pair with premium design (font size increased +1)
+    // Helper to print details key-value pair with premium design (borders & labels in #0000ff)
     function renderField(label, value, x, y, width, height) {
       // Draw subtle cell boundaries
-      doc.strokeColor('#cbd5e1').lineWidth(0.5)
+      doc.strokeColor('#0000ff').lineWidth(0.5)
         .rect(x, y, width, height).stroke();
 
       // Label (left padded, small font)
-      doc.fillColor('#64748b').fontSize(8.5).font('Helvetica-Bold')
+      doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica-Bold')
         .text(label.toUpperCase(), x + 10, y + 4, { width: width - 20, align: 'left', lineBreak: false });
 
       // Value (left padded, bold, slightly larger)
@@ -331,7 +331,7 @@ const downloadChallanPdf = async (req, res) => {
 
     // ─── TP Details section ───
     const tpSectionY = gridStartY + 56 + 12;
-    doc.fillColor('#1e293b').fontSize(11).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(11).font('Helvetica-Bold')
       .text('TP Details', M + 16, tpSectionY, { lineBreak: false });
 
     // Filter active TP details (meter > 0)
@@ -354,10 +354,10 @@ const downloadChallanPdf = async (req, res) => {
       const x = M + c * tpColWidth;
       // Header background
       doc.rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).fill('#f8fafc');
-      doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).stroke();
+      doc.strokeColor('#0000ff').lineWidth(0.5).rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).stroke();
       
       // Header text (centered) (font size increased +1)
-      doc.fillColor('#475569').fontSize(10).font('Helvetica-Bold')
+      doc.fillColor('#0000ff').fontSize(10).font('Helvetica-Bold')
         .text('TP NO.', x, tpTableStartY + 6, { width: tpColWidth * 0.35, align: 'center' });
       doc.text('METRES', x + tpColWidth * 0.35, tpTableStartY + 6, { width: tpColWidth * 0.65, align: 'center' });
     }
@@ -367,8 +367,8 @@ const downloadChallanPdf = async (req, res) => {
     if (activeCount === 0) {
       const x = M;
       const y = tpTableStartY + tableHeaderHeight;
-      doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(x, y, PW - 2 * M, tpRowHeight).stroke();
-      doc.fillColor('#64748b').fontSize(10.5).font('Helvetica-Oblique')
+      doc.strokeColor('#0000ff').lineWidth(0.5).rect(x, y, PW - 2 * M, tpRowHeight).stroke();
+      doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Oblique')
         .text('No active TP details entered.', x, y + 6, { width: PW - 2 * M, align: 'center' });
     } else {
       for (let i = 0; i < activeCount; i++) {
@@ -379,12 +379,12 @@ const downloadChallanPdf = async (req, res) => {
         const x = M + colIndex * tpColWidth;
         const y = tpTableStartY + tableHeaderHeight + rowIndex * tpRowHeight;
 
-        // Draw cell border
-        doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(x, y, tpColWidth, tpRowHeight).stroke();
+        // Draw cell border in pure blue
+        doc.strokeColor('#0000ff').lineWidth(0.5).rect(x, y, tpColWidth, tpRowHeight).stroke();
 
         const val = `${parseFloat(tp.tpMeter).toFixed(3)} mtr`;
 
-        doc.fillColor('#64748b').fontSize(10.5).font('Helvetica-Bold')
+        doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
           .text(String(tp.tpNo), x, y + 6, { width: tpColWidth * 0.35, align: 'center' });
         
         doc.fillColor('#0f172a').fontSize(11).font('Helvetica')
@@ -396,49 +396,49 @@ const downloadChallanPdf = async (req, res) => {
     const summaryStartY = tpTableStartY + tableHeaderHeight + (activeCount > 0 ? rowsPerCol * tpRowHeight : tpRowHeight) + 15;
     const summaryColWidth3 = (PW - 2 * M) / 3;
 
-    // Draw total cards (font sizes increased +1)
+    // Draw total cards in pure blue
     // Left: Total TP
-    doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(M, summaryStartY, summaryColWidth3, 42).stroke();
-    doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
+    doc.strokeColor('#0000ff').lineWidth(0.5).rect(M, summaryStartY, summaryColWidth3, 42).stroke();
+    doc.fillColor('#0000ff').fontSize(9.5).font('Helvetica-Bold')
       .text('TOTAL CHALLAN TP', M, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
     doc.fillColor('#10b981').fontSize(15).font('Helvetica-Bold')
       .text(String(challan.totalTp || 0), M, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
 
     // Center: Expected PCS
-    doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(M + summaryColWidth3, summaryStartY, summaryColWidth3, 42).stroke();
-    doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
+    doc.strokeColor('#0000ff').lineWidth(0.5).rect(M + summaryColWidth3, summaryStartY, summaryColWidth3, 42).stroke();
+    doc.fillColor('#0000ff').fontSize(9.5).font('Helvetica-Bold')
       .text('EXPECTED PCS', M + summaryColWidth3, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
     doc.fillColor('#10b981').fontSize(15).font('Helvetica-Bold')
       .text(String(challan.pcs || 0), M + summaryColWidth3, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
 
     // Right: Total Metres
-    doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(M + summaryColWidth3 * 2, summaryStartY, summaryColWidth3, 42).stroke();
-    doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
+    doc.strokeColor('#0000ff').lineWidth(0.5).rect(M + summaryColWidth3 * 2, summaryStartY, summaryColWidth3, 42).stroke();
+    doc.fillColor('#0000ff').fontSize(9.5).font('Helvetica-Bold')
       .text('TOTAL CHALLAN METRES', M + summaryColWidth3 * 2, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
     doc.fillColor('#10b981').fontSize(15).font('Helvetica-Bold')
       .text(`${parseFloat(challan.totalMtr || 0).toFixed(3)} mtr`, M + summaryColWidth3 * 2, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
 
-    // Notes area (font sizes increased +1)
+    // Notes area in pure blue
     if (challan.notes && challan.notes.trim()) {
       const notesY = summaryStartY + 54;
-      doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(M, notesY, PW - 2 * M, 34).stroke();
-      doc.fillColor('#8896a4').fontSize(9.5).font('Helvetica-Bold')
+      doc.strokeColor('#0000ff').lineWidth(0.5).rect(M, notesY, PW - 2 * M, 34).stroke();
+      doc.fillColor('#0000ff').fontSize(9.5).font('Helvetica-Bold')
         .text('NOTES / REMARKS', M + 12, notesY + 5, { width: PW - 2 * M - 24 });
       doc.fillColor('#0f172a').fontSize(11).font('Helvetica')
         .text(challan.notes, M + 12, notesY + 16, { width: PW - 2 * M - 24 });
     }
 
-    // Signatures footer at the bottom (font size increased +1)
+    // Signatures footer at the bottom in pure blue
     const sigLineY = PH - M - 45;
     
     // Left: Receiver Signature
-    doc.moveTo(M + 30, sigLineY).lineTo(M + 160, sigLineY).strokeColor('#94a3b8').lineWidth(0.5).stroke();
-    doc.fillColor('#64748b').fontSize(10).font('Helvetica-Bold')
+    doc.moveTo(M + 30, sigLineY).lineTo(M + 160, sigLineY).strokeColor('#0000ff').lineWidth(0.5).stroke();
+    doc.fillColor('#0000ff').fontSize(10).font('Helvetica-Bold')
       .text('RECEIVER SIGNATURE', M + 30, sigLineY + 5, { width: 130, align: 'center' });
 
     // Right: Authorized Signature
-    doc.moveTo(PW - M - 160, sigLineY).lineTo(PW - M - 30, sigLineY).strokeColor('#94a3b8').lineWidth(0.5).stroke();
-    doc.fillColor('#64748b').fontSize(10).font('Helvetica-Bold')
+    doc.moveTo(PW - M - 160, sigLineY).lineTo(PW - M - 30, sigLineY).strokeColor('#0000ff').lineWidth(0.5).stroke();
+    doc.fillColor('#0000ff').fontSize(10).font('Helvetica-Bold')
       .text('AUTHORIZED SIGNATURE', PW - M - 160, sigLineY + 5, { width: 130, align: 'center' });
 
     doc.end();
