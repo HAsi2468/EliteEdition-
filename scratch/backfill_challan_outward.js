@@ -24,6 +24,16 @@ function computeRawMeters(totalMtr, shortagePct) {
   return parseFloat((mtr * (1 + pct / 100)).toFixed(3));
 }
 
+function parseLotNo(lotStr) {
+  if (!lotStr) return undefined;
+  const match = String(lotStr).match(/\d+/);
+  if (match) {
+    const val = parseInt(match[0], 10);
+    return isNaN(val) ? undefined : val;
+  }
+  return undefined;
+}
+
 async function run() {
   await mongoose.connect(MONGO_URI);
   console.log('✅ Connected to MongoDB');
@@ -54,7 +64,7 @@ async function run() {
       type: 'OUTWARD',
       fabricQuality: challan.fabricName,
       panna: challan.panna || '',
-      lotNo: challan.lotNo ? Number(challan.lotNo) : undefined,
+      lotNo: parseLotNo(challan.lotNo),
       qty: rawMtr,
       date: challan.date,
       jobNo: challan.jobNo || '',

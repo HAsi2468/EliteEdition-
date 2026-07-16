@@ -64,6 +64,17 @@ function computeRawMeters(totalMtr, shortagePct) {
   return parseFloat((mtr * (1 + pct / 100)).toFixed(3));
 }
 
+// ── Helper: safely extract first lot number from a lot string ──────────────
+function parseLotNo(lotStr) {
+  if (!lotStr) return undefined;
+  const match = String(lotStr).match(/\d+/);
+  if (match) {
+    const val = parseInt(match[0], 10);
+    return isNaN(val) ? undefined : val;
+  }
+  return undefined;
+}
+
 // ── POST /fabric-challan ───────────────────────────────────────────────────
 const createChallan = async (req, res) => {
   try {
@@ -110,7 +121,7 @@ const createChallan = async (req, res) => {
           type: 'OUTWARD',
           fabricQuality: fabricName,
           panna: panna || '',
-          lotNo: lotNo ? Number(lotNo) : undefined,
+          lotNo: parseLotNo(lotNo),
           qty: rawMtr,
           date: challan.date,
           jobNo: jobNo || '',
@@ -224,7 +235,7 @@ const updateChallan = async (req, res) => {
           type: 'OUTWARD',
           fabricQuality: challan.fabricName,
           panna: challan.panna || '',
-          lotNo: challan.lotNo ? Number(challan.lotNo) : undefined,
+          lotNo: parseLotNo(challan.lotNo),
           qty: rawMtr,
           date: challan.date,
           jobNo: challan.jobNo || '',
