@@ -1288,7 +1288,39 @@ export default function FabricInventoryPanel() {
                       <td>{t.lotNo ? `#${t.lotNo}` : '-'}</td>
                       <td>{t.panna || '-'}</td>
                       <td style={{ color: 'var(--danger)', fontWeight: 600 }}>-{t.qty}</td>
-                      <td>{t.notes}</td>
+                      <td>
+                        {(() => {
+                          const notes = t.notes || '';
+                          if (notes.startsWith('Auto: EDP-') || notes.startsWith('Auto: Job ')) {
+                            const parts = notes.split('|');
+                            if (parts.length >= 2) {
+                              const header = parts[0].trim();
+                              const formula = parts[1].trim();
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                  <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.8rem' }}>
+                                    {header}
+                                  </span>
+                                  <span style={{ 
+                                    fontSize: '0.72rem', 
+                                    color: 'var(--success)', 
+                                    background: 'rgba(16, 185, 129, 0.08)', 
+                                    border: '1px solid rgba(16, 185, 129, 0.15)',
+                                    padding: '2px 6px', 
+                                    borderRadius: '4px', 
+                                    display: 'inline-block',
+                                    marginTop: '2px',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    {formula}
+                                  </span>
+                                </div>
+                              );
+                            }
+                          }
+                          return t.notes || '—';
+                        })()}
+                      </td>
                       <td>
                         <button
                           className="btn-icon"
