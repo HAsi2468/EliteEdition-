@@ -55,6 +55,15 @@ const getLotInfo = async (req, res) => {
   }
 };
 
+// ── Helper: compute raw meters from fresh meters + shortage % ──────────────
+function computeRawMeters(totalMtr, shortagePct) {
+  const mtr = parseFloat(totalMtr) || 0;
+  const pct = parseFloat(shortagePct) || 0;
+  // Raw = fresh meters + shortage
+  // e.g. 100 mtr + 5% shortage = 105 raw meters consumed from stock
+  return parseFloat((mtr * (1 + pct / 100)).toFixed(3));
+}
+
 // ── POST /fabric-challan ───────────────────────────────────────────────────
 const createChallan = async (req, res) => {
   try {
@@ -92,6 +101,31 @@ const createChallan = async (req, res) => {
     });
 
     await challan.save();
+
+    // ── Auto-create OUTWARD fabric transaction using raw meters ──────────────
+    if (fabricName && totalMtr > 0) {
+      try {
+        const rawMtr = computeRawMeters(totalMtr, challan.shortagePct);
+        const outwardTx = new FabricTransaction({
+          type: 'OUTWARD',
+          fabricQuality: fabricName,
+          panna: panna || '',
+          lotNo: lotNo ? Number(lotNo) : undefined,
+          qty: rawMtr,
+          date: challan.date,
+          jobNo: jobNo || '',
+          partyName: partyName || '',
+          challanNo: 'EDP-' + challan.challanNo,
+          notes: `Auto: EDP-${challan.challanNo} | Fresh=${totalMtr}m + ${challan.shortagePct || 0}% shortage = ${rawMtr}m raw`,
+        });
+        await outwardTx.save();
+        challan.fabricOutwardId = outwardTx._id;
+        await challan.save();
+      } catch (txErr) {
+        console.error('Warning: Failed to auto-create fabric outward:', txErr.message);
+      }
+    }
+
     res.status(201).json({ success: true, data: challan });
   } catch (error) {
     console.error('Error creating fabric challan:', error);
@@ -177,6 +211,35 @@ const updateChallan = async (req, res) => {
     }
 
     await challan.save();
+
+    // ── Sync OUTWARD fabric transaction: delete old, create new ──────────────
+    try {
+      if (challan.fabricOutwardId) {
+        await FabricTransaction.findByIdAndDelete(challan.fabricOutwardId);
+        challan.fabricOutwardId = null;
+      }
+      if (challan.fabricName && challan.totalMtr > 0) {
+        const rawMtr = computeRawMeters(challan.totalMtr, challan.shortagePct);
+        const outwardTx = new FabricTransaction({
+          type: 'OUTWARD',
+          fabricQuality: challan.fabricName,
+          panna: challan.panna || '',
+          lotNo: challan.lotNo ? Number(challan.lotNo) : undefined,
+          qty: rawMtr,
+          date: challan.date,
+          jobNo: challan.jobNo || '',
+          partyName: challan.partyName || '',
+          challanNo: 'EDP-' + challan.challanNo,
+          notes: `Auto: EDP-${challan.challanNo} | Fresh=${challan.totalMtr}m + ${challan.shortagePct || 0}% shortage = ${rawMtr}m raw`,
+        });
+        await outwardTx.save();
+        challan.fabricOutwardId = outwardTx._id;
+        await challan.save();
+      }
+    } catch (txErr) {
+      console.error('Warning: Failed to sync fabric outward on update:', txErr.message);
+    }
+
     res.json({ success: true, data: challan });
   } catch (error) {
     console.error('Error updating fabric challan:', error);
@@ -187,11 +250,22 @@ const updateChallan = async (req, res) => {
 // ── DELETE /fabric-challan/:id ─────────────────────────────────────────────
 const deleteChallan = async (req, res) => {
   try {
-    const deleted = await FabricChallan.findByIdAndDelete(req.params.id);
-    if (!deleted) {
+    const challan = await FabricChallan.findById(req.params.id);
+    if (!challan) {
       return res.status(404).json({ success: false, error: 'Challan not found' });
     }
-    res.json({ success: true, message: 'Challan deleted' });
+
+    // Remove the linked outward fabric transaction first
+    if (challan.fabricOutwardId) {
+      try {
+        await FabricTransaction.findByIdAndDelete(challan.fabricOutwardId);
+      } catch (txErr) {
+        console.error('Warning: Failed to delete linked fabric outward:', txErr.message);
+      }
+    }
+
+    await FabricChallan.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Challan and linked fabric outward deleted' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

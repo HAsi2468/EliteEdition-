@@ -108,6 +108,12 @@ const fabricChallanSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    // Reference to the auto-created fabric outward transaction
+    fabricOutwardId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'FabricTransaction',
+      default: null,
+    },
   },
   {
     timestamps: true,
