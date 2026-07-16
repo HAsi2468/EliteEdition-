@@ -327,8 +327,7 @@ const downloadChallanPdf = async (req, res) => {
     // Row 1 of Grid (gridStartY + 28)
     renderField('Colour', challan.colour, M, gridStartY + 28, colWidth4, 28);
     renderField('Fabric', challan.fabricName, M + colWidth4, gridStartY + 28, colWidth4, 28);
-    renderField('Vendor Challan', challan.vendorChallanNo, M + colWidth4 * 2, gridStartY + 28, colWidth4, 28);
-    renderField('Expected PCS', challan.pcs || 0, M + colWidth4 * 3, gridStartY + 28, colWidth4, 28);
+    renderField('Vendor Challan', challan.vendorChallanNo, M + colWidth4 * 2, gridStartY + 28, colWidth4 * 2, 28);
 
     // ─── TP Details section ───
     const tpSectionY = gridStartY + 56 + 12;
@@ -395,22 +394,29 @@ const downloadChallanPdf = async (req, res) => {
 
     // ─── Summary Section ───
     const summaryStartY = tpTableStartY + tableHeaderHeight + (activeCount > 0 ? rowsPerCol * tpRowHeight : tpRowHeight) + 15;
-    const summaryColWidth = (PW - 2 * M) / 2;
+    const summaryColWidth3 = (PW - 2 * M) / 3;
 
     // Draw total cards
     // Left: Total TP
-    doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(M, summaryStartY, summaryColWidth, 42).stroke();
+    doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(M, summaryStartY, summaryColWidth3, 42).stroke();
     doc.fillColor('#64748b').fontSize(8.5).font('Helvetica-Bold')
-      .text('TOTAL CHALLAN TP', M, summaryStartY + 8, { width: summaryColWidth, align: 'center' });
+      .text('TOTAL CHALLAN TP', M, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
     doc.fillColor('#10b981').fontSize(14).font('Helvetica-Bold')
-      .text(String(challan.totalTp || 0), M, summaryStartY + 20, { width: summaryColWidth, align: 'center' });
+      .text(String(challan.totalTp || 0), M, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
+
+    // Center: Expected PCS
+    doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(M + summaryColWidth3, summaryStartY, summaryColWidth3, 42).stroke();
+    doc.fillColor('#64748b').fontSize(8.5).font('Helvetica-Bold')
+      .text('EXPECTED PCS', M + summaryColWidth3, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
+    doc.fillColor('#10b981').fontSize(14).font('Helvetica-Bold')
+      .text(String(challan.pcs || 0), M + summaryColWidth3, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
 
     // Right: Total Metres
-    doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(M + summaryColWidth, summaryStartY, summaryColWidth, 42).stroke();
+    doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(M + summaryColWidth3 * 2, summaryStartY, summaryColWidth3, 42).stroke();
     doc.fillColor('#64748b').fontSize(8.5).font('Helvetica-Bold')
-      .text('TOTAL CHALLAN METRES', M + summaryColWidth, summaryStartY + 8, { width: summaryColWidth, align: 'center' });
+      .text('TOTAL CHALLAN METRES', M + summaryColWidth3 * 2, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
     doc.fillColor('#10b981').fontSize(14).font('Helvetica-Bold')
-      .text(`${parseFloat(challan.totalMtr || 0).toFixed(3)} mtr`, M + summaryColWidth, summaryStartY + 20, { width: summaryColWidth, align: 'center' });
+      .text(`${parseFloat(challan.totalMtr || 0).toFixed(3)} mtr`, M + summaryColWidth3 * 2, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
 
     // Notes area
     if (challan.notes && challan.notes.trim()) {
