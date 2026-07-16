@@ -1504,7 +1504,7 @@ export default function FabricInventoryPanel() {
                     <td style={{ color: 'var(--primary)' }}>{ch.jobNo || '—'}</td>
                     <td>{ch.panna || '—'}</td>
                     <td style={{ textAlign: 'center', fontWeight: 600 }}>{ch.totalTp}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--success)' }}>{ch.totalMtr} mtr</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--success)' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <button className="btn-icon" title="Download PDF" style={{ color: 'var(--success)', marginRight: '0.5rem' }} onClick={() => handleDownloadChallanPdf(ch._id, ch.challanNo)}>
                         <FileDown size={15} />
@@ -1789,7 +1789,7 @@ export default function FabricInventoryPanel() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Meters</span>
-                  <div style={{ fontWeight: 800, fontSize: '1.4rem', color: 'var(--success)' }}>{challanTotalMtr.toFixed(3)} mtr</div>
+                  <div style={{ fontWeight: 800, fontSize: '1.4rem', color: 'var(--success)' }}>{challanTotalMtr.toFixed(2)} mtr</div>
                 </div>
               </div>
 

@@ -203,97 +203,79 @@ const downloadChallanPdf = async (req, res) => {
       return res.status(404).json({ error: 'Challan not found' });
     }
 
-    // PDF document with custom margins
     const doc = new PDFDocument({ margin: 28, size: 'A4', autoFirstPage: true });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Challan_EDP_${challan.challanNo || 'preview'}.pdf"`);
     doc.pipe(res);
 
-    // Page boundaries
-    const PW = 595, PH = 842, M = 28;
+    const PW = 595, PH = 842, ML = 45, MR = 28;
+    const contentWidth = PW - ML - MR;
 
-    // Draw nice outer card border in pure blue
-    doc.strokeColor('#0000ff').lineWidth(1).rect(M, M, PW - 2 * M, PH - 2 * M).stroke();
+    doc.strokeColor('#0000ff').lineWidth(1).rect(ML, MR, contentWidth, PH - 2 * MR).stroke();
 
-    // Top header metadata matching physical paper pad
     doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica')
-      .text('Subject to SURAT Jurisdiction', M + 12, M + 4, { lineBreak: false });
+      .text('Subject to SURAT Jurisdiction', ML + 12, MR + 4, { lineBreak: false });
     doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica-Bold')
-      .text('|| Shree Ganeshay Namah ||', M, M + 4, { width: PW - 2 * M, align: 'center', lineBreak: false });
+      .text('|| Shree Ganeshay Namah ||', ML, MR + 4, { width: contentWidth, align: 'center', lineBreak: false });
     doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica')
-      .text('Mo. +91 99098 66667', M, M + 4, { width: PW - 2 * M - 12, align: 'right', lineBreak: false });
+      .text('Mo. +91 99098 66667', ML, MR + 4, { width: contentWidth - 12, align: 'right', lineBreak: false });
 
-    // Subtle header divider
     doc.strokeColor('#0000ff').lineWidth(0.5)
-      .moveTo(M, M + 12).lineTo(PW - M, M + 12).stroke();
+      .moveTo(ML, MR + 12).lineTo(PW - MR, MR + 12).stroke();
 
-    // Centered Company Logo (Elite Digital Prints) - placed tightly 3pt below divider
     const logoPath = path.join(__dirname, 'Logo.png');
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, (PW - 140) / 2, M + 15, { width: 140 });
+      doc.image(logoPath, ML + (contentWidth - 140) / 2, MR + 15, { width: 140 });
     }
 
-    // Company Address centered below logo
     doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica-Bold')
-      .text('GROUND FLOOR, PLOT NO-B/37, Siddheshwar Society, Puna Kumbariya Road, NR. KALAPUL, Punagam, Surat, Surat, Gujarat, 395010', M, M + 66, { width: PW - 2 * M, align: 'center', lineBreak: false });
+      .text('GROUND FLOOR, PLOT NO-B/37, Siddheshwar Society, Puna Kumbariya Road, NR. KALAPUL, Punagam, Surat, Surat, Gujarat, 395010', ML, MR + 66, { width: contentWidth, align: 'center', lineBreak: false });
 
-    // Header bottom boundary line
     doc.strokeColor('#0000ff').lineWidth(0.8)
-      .moveTo(M, M + 90).lineTo(PW - M, M + 90).stroke();
+      .moveTo(ML, MR + 90).lineTo(PW - MR, MR + 90).stroke();
 
     const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {
       day: '2-digit', month: '2-digit', year: 'numeric'
     }) : '—';
 
-    // Watermark/Default logo in background with low opacity
     if (fs.existsSync(logoPath)) {
       doc.save();
       doc.opacity(0.02);
-      doc.image(logoPath, (PW - 300) / 2, (PH - 300) / 2, { width: 300, height: 300 });
+      doc.image(logoPath, ML + (contentWidth - 300) / 2, (PH - 300) / 2, { width: 300, height: 300 });
       doc.restore();
     }
 
-    // M/s & Challan Details Header Row
-    const startY = M + 94;
+    const startY = MR + 94;
 
-    // Draw M/s: Party Name (Left aligned)
     doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
-      .text('M/s:', M + 12, startY + 6, { lineBreak: false });
+      .text('M/s:', ML + 12, startY + 6, { lineBreak: false });
     doc.fillColor('#0f172a').fontSize(12.5).font('Helvetica-Bold')
-      .text(challan.partyName || '—', M + 42, startY + 4, { lineBreak: false });
+      .text(challan.partyName || '—', ML + 42, startY + 4, { lineBreak: false });
       
-    // Draw Challan No in Bold Red (Right aligned)
     doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
-      .text('Ch.no.:', PW - M - 160, startY + 6, { width: 90, align: 'right', lineBreak: false });
-    doc.fillColor('#dc2626').fontSize(13).font('Helvetica-Bold') // Premium Red
-      .text('EDP-' + (challan.challanNo || '—'), PW - M - 65, startY + 4, { width: 60, align: 'left', lineBreak: false });
+      .text('Ch.no.:', PW - MR - 160, startY + 6, { width: 90, align: 'right', lineBreak: false });
+    doc.fillColor('#dc2626').fontSize(13).font('Helvetica-Bold')
+      .text('EDP-' + (challan.challanNo || '—'), PW - MR - 65, startY + 4, { width: 60, align: 'left', lineBreak: false });
 
-    // Draw Date (Right aligned, below Challan No)
     doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
-      .text('Date:', PW - M - 160, startY + 17, { width: 90, align: 'right', lineBreak: false });
+      .text('Date:', PW - MR - 160, startY + 17, { width: 90, align: 'right', lineBreak: false });
     doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold')
-      .text(formattedDate, PW - M - 65, startY + 17, { width: 60, align: 'left', lineBreak: false });
+      .text(formattedDate, PW - MR - 65, startY + 17, { width: 60, align: 'left', lineBreak: false });
 
-    // Divider line below M/s Row
     doc.strokeColor('#0000ff').lineWidth(0.6)
-      .moveTo(M, startY + 28).lineTo(PW - M, startY + 28).stroke();
+      .moveTo(ML, startY + 28).lineTo(PW - MR, startY + 28).stroke();
 
-    // Helper to print details key-value pair with premium design (borders & labels in #0000ff)
     function renderField(label, value, x, y, width, height) {
-      // Draw subtle cell boundaries
       doc.strokeColor('#0000ff').lineWidth(0.5)
         .rect(x, y, width, height).stroke();
 
-      // Label (left padded, small font)
       doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica-Bold')
         .text(label.toUpperCase(), x + 10, y + 4, { width: width - 20, align: 'left', lineBreak: false });
 
-      // Value (left padded, bold, slightly larger)
       doc.fillColor('#0f172a').fontSize(10.5).font('Helvetica-Bold')
         .text(String(value || '—'), x + 10, y + 14, { width: width - 20, align: 'left', lineBreak: false });
     }
 
-    // Fetch associated job card details for Bill to & Ship to
     let billTo = '—';
     let shipTo = '—';
     if (challan.jobNo) {
@@ -308,55 +290,42 @@ const downloadChallanPdf = async (req, res) => {
       }
     }
 
-    // Row 1: Bill To and Ship To (spanning full width split in half)
     const billStartY = startY + 28;
-    const halfWidth = (PW - 2 * M) / 2;
-    renderField('Bill to', billTo, M, billStartY, halfWidth, 28);
-    renderField('Ship to', shipTo, M + halfWidth, billStartY, halfWidth, 28);
+    const halfWidth = contentWidth / 2;
+    renderField('Bill to', billTo, ML, billStartY, halfWidth, 28);
+    renderField('Ship to', shipTo, ML + halfWidth, billStartY, halfWidth, 28);
 
-    // Row 2 & 3: Metadata Grid Layout starting below Bill to / Ship to row in 4 columns
     const gridStartY = billStartY + 28;
-    const colWidth4 = (PW - 2 * M) / 4;
+    const colWidth4 = contentWidth / 4;
 
-    // Row 0 of Grid (startY)
-    renderField('Job No.', challan.jobNo, M, gridStartY, colWidth4, 28);
-    renderField('Design No.', challan.designNo, M + colWidth4, gridStartY, colWidth4, 28);
-    renderField('Lot No.', challan.lotNo ? `#${challan.lotNo}` : '—', M + colWidth4 * 2, gridStartY, colWidth4, 28);
-    renderField('Panno', challan.panna, M + colWidth4 * 3, gridStartY, colWidth4, 28);
+    renderField('Job No.', challan.jobNo, ML, gridStartY, colWidth4, 28);
+    renderField('Design No.', challan.designNo, ML + colWidth4, gridStartY, colWidth4, 28);
+    renderField('Lot No.', challan.lotNo ? `#${challan.lotNo}` : '—', ML + colWidth4 * 2, gridStartY, colWidth4, 28);
+    renderField('Panno', challan.panna, ML + colWidth4 * 3, gridStartY, colWidth4, 28);
 
-    // Row 1 of Grid (gridStartY + 28)
-    renderField('Colour', challan.colour, M, gridStartY + 28, colWidth4, 28);
-    renderField('Fabric', challan.fabricName, M + colWidth4, gridStartY + 28, colWidth4, 28);
-    renderField('Vendor Challan', challan.vendorChallanNo, M + colWidth4 * 2, gridStartY + 28, colWidth4 * 2, 28);
+    renderField('Colour', challan.colour, ML, gridStartY + 28, colWidth4, 28);
+    renderField('Fabric', challan.fabricName, ML + colWidth4, gridStartY + 28, colWidth4, 28);
+    renderField('Vendor Challan', challan.vendorChallanNo, ML + colWidth4 * 2, gridStartY + 28, colWidth4 * 2, 28);
 
-    // ─── TP Details section ───
     const tpSectionY = gridStartY + 56 + 12;
     doc.fillColor('#0000ff').fontSize(11).font('Helvetica-Bold')
-      .text('TP Details', M + 16, tpSectionY, { lineBreak: false });
+      .text('TP Details', ML + 16, tpSectionY, { lineBreak: false });
 
-    // Filter active TP details (meter > 0)
     const activeTps = (challan.tpDetails || [])
       .filter(tp => tp.tpMeter != null && parseFloat(tp.tpMeter) > 0);
 
-    // Dynamic columns count depending on active rows:
-    // If <= 5 rows, we print 1 single column
-    // If <= 10 rows, we print 2 columns
-    // Else, we print 3 columns
     const activeCount = activeTps.length;
     const tpColsCount = activeCount === 0 ? 1 : activeCount <= 5 ? 1 : activeCount <= 10 ? 2 : 3;
-    const tpColWidth = (PW - 2 * M) / tpColsCount;
+    const tpColWidth = contentWidth / tpColsCount;
     const tpRowHeight = 22;
     const tableHeaderHeight = 22;
     const tpTableStartY = tpSectionY + 16;
 
-    // Draw TP Table Headers
     for (let c = 0; c < tpColsCount; c++) {
-      const x = M + c * tpColWidth;
-      // Header background
+      const x = ML + c * tpColWidth;
       doc.rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).fill('#f8fafc');
       doc.strokeColor('#0000ff').lineWidth(0.5).rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).stroke();
       
-      // Header text (centered) (font size increased +1)
       doc.fillColor('#0000ff').fontSize(10).font('Helvetica-Bold')
         .text('TP NO.', x, tpTableStartY + 6, { width: tpColWidth * 0.35, align: 'center' });
       doc.text('METRES', x + tpColWidth * 0.35, tpTableStartY + 6, { width: tpColWidth * 0.65, align: 'center' });
@@ -365,24 +334,23 @@ const downloadChallanPdf = async (req, res) => {
     const rowsPerCol = Math.ceil(activeCount / tpColsCount);
 
     if (activeCount === 0) {
-      const x = M;
+      const x = ML;
       const y = tpTableStartY + tableHeaderHeight;
-      doc.strokeColor('#0000ff').lineWidth(0.5).rect(x, y, PW - 2 * M, tpRowHeight).stroke();
+      doc.strokeColor('#0000ff').lineWidth(0.5).rect(x, y, contentWidth, tpRowHeight).stroke();
       doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Oblique')
-        .text('No active TP details entered.', x, y + 6, { width: PW - 2 * M, align: 'center' });
+        .text('No active TP details entered.', x, y + 6, { width: contentWidth, align: 'center' });
     } else {
       for (let i = 0; i < activeCount; i++) {
         const tp = activeTps[i];
         const colIndex = i % tpColsCount;
         const rowIndex = Math.floor(i / tpColsCount);
 
-        const x = M + colIndex * tpColWidth;
+        const x = ML + colIndex * tpColWidth;
         const y = tpTableStartY + tableHeaderHeight + rowIndex * tpRowHeight;
 
-        // Draw cell border in pure blue
         doc.strokeColor('#0000ff').lineWidth(0.5).rect(x, y, tpColWidth, tpRowHeight).stroke();
 
-        const val = `${parseFloat(tp.tpMeter).toFixed(3)} mtr`;
+        const val = `${parseFloat(tp.tpMeter).toFixed(2)} mtr`;
 
         doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
           .text(String(tp.tpNo), x, y + 6, { width: tpColWidth * 0.35, align: 'center' });
@@ -392,54 +360,47 @@ const downloadChallanPdf = async (req, res) => {
       }
     }
 
-    // ─── Summary Section ───
     const summaryStartY = tpTableStartY + tableHeaderHeight + (activeCount > 0 ? rowsPerCol * tpRowHeight : tpRowHeight) + 15;
-    const summaryColWidth3 = (PW - 2 * M) / 3;
+    const summaryColWidth3 = contentWidth / 3;
 
-    // Draw total cards in pure blue
-    // Left: Total TP
-    doc.strokeColor('#0000ff').lineWidth(0.5).rect(M, summaryStartY, summaryColWidth3, 42).stroke();
+    doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML, summaryStartY, summaryColWidth3, 42).stroke();
     doc.fillColor('#0000ff').fontSize(9.5).font('Helvetica-Bold')
-      .text('TOTAL CHALLAN TP', M, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
+      .text('TOTAL CHALLAN TP', ML, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
     doc.fillColor('#10b981').fontSize(15).font('Helvetica-Bold')
-      .text(String(challan.totalTp || 0), M, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
+      .text(String(challan.totalTp || 0), ML, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
 
-    // Center: Expected PCS
-    doc.strokeColor('#0000ff').lineWidth(0.5).rect(M + summaryColWidth3, summaryStartY, summaryColWidth3, 42).stroke();
+    doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML + summaryColWidth3, summaryStartY, summaryColWidth3, 42).stroke();
     doc.fillColor('#0000ff').fontSize(9.5).font('Helvetica-Bold')
-      .text('EXPECTED PCS', M + summaryColWidth3, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
+      .text('EXPECTED PCS', ML + summaryColWidth3, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
     doc.fillColor('#10b981').fontSize(15).font('Helvetica-Bold')
-      .text(String(challan.pcs || 0), M + summaryColWidth3, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
+      .text(String(challan.pcs || 0), ML + summaryColWidth3, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
 
-    // Right: Total Metres
-    doc.strokeColor('#0000ff').lineWidth(0.5).rect(M + summaryColWidth3 * 2, summaryStartY, summaryColWidth3, 42).stroke();
+    doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML + summaryColWidth3 * 2, summaryStartY, summaryColWidth3, 42).stroke();
     doc.fillColor('#0000ff').fontSize(9.5).font('Helvetica-Bold')
-      .text('TOTAL CHALLAN METRES', M + summaryColWidth3 * 2, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
+      .text('TOTAL CHALLAN METRES', ML + summaryColWidth3 * 2, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
     doc.fillColor('#10b981').fontSize(15).font('Helvetica-Bold')
-      .text(`${parseFloat(challan.totalMtr || 0).toFixed(3)} mtr`, M + summaryColWidth3 * 2, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
+      .text(`${parseFloat(challan.totalMtr || 0).toFixed(2)} mtr`, ML + summaryColWidth3 * 2, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
 
-    // Notes area in pure blue
     if (challan.notes && challan.notes.trim()) {
       const notesY = summaryStartY + 54;
-      doc.strokeColor('#0000ff').lineWidth(0.5).rect(M, notesY, PW - 2 * M, 34).stroke();
+      doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML, notesY, contentWidth, 34).stroke();
       doc.fillColor('#0000ff').fontSize(9.5).font('Helvetica-Bold')
-        .text('NOTES / REMARKS', M + 12, notesY + 5, { width: PW - 2 * M - 24 });
+        .text('NOTES / REMARKS', ML + 12, notesY + 5, { width: contentWidth - 24 });
       doc.fillColor('#0f172a').fontSize(11).font('Helvetica')
-        .text(challan.notes, M + 12, notesY + 16, { width: PW - 2 * M - 24 });
+        .text(challan.notes, ML + 12, notesY + 16, { width: contentWidth - 24 });
     }
 
-    // Signatures footer at the bottom in pure blue
-    const sigLineY = PH - M - 45;
+    const sigLineY = PH - MR - 45;
     
     // Left: Receiver Signature
-    doc.moveTo(M + 30, sigLineY).lineTo(M + 160, sigLineY).strokeColor('#0000ff').lineWidth(0.5).stroke();
+    doc.moveTo(ML + 30, sigLineY).lineTo(ML + 160, sigLineY).strokeColor('#0000ff').lineWidth(0.5).stroke();
     doc.fillColor('#0000ff').fontSize(10).font('Helvetica-Bold')
-      .text('RECEIVER SIGNATURE', M + 30, sigLineY + 5, { width: 130, align: 'center' });
+      .text('RECEIVER SIGNATURE', ML + 30, sigLineY + 5, { width: 130, align: 'center' });
 
     // Right: Authorized Signature
-    doc.moveTo(PW - M - 160, sigLineY).lineTo(PW - M - 30, sigLineY).strokeColor('#0000ff').lineWidth(0.5).stroke();
+    doc.moveTo(PW - MR - 160, sigLineY).lineTo(PW - MR - 30, sigLineY).strokeColor('#0000ff').lineWidth(0.5).stroke();
     doc.fillColor('#0000ff').fontSize(10).font('Helvetica-Bold')
-      .text('AUTHORIZED SIGNATURE', PW - M - 160, sigLineY + 5, { width: 130, align: 'center' });
+      .text('AUTHORIZED SIGNATURE', PW - MR - 160, sigLineY + 5, { width: 130, align: 'center' });
 
     doc.end();
   } catch (err) {
