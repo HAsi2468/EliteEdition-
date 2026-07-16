@@ -408,8 +408,8 @@ const downloadChallanPdf = async (req, res) => {
 
     const logoPath = path.join(__dirname, selectedLogoName);
     if (fs.existsSync(logoPath)) {
-      // Put more space before/after logo (top shifted to MR + 24, width set to 130)
-      doc.image(logoPath, ML + (contentWidth - 130) / 2, MR + 24, { width: 130 });
+      // Symmetrical spacing above/below logo (top shifted to MR + 29, width set to 130)
+      doc.image(logoPath, ML + (contentWidth - 130) / 2, MR + 29, { width: 130 });
     }
 
     // Vector map pin drawing helper
@@ -433,18 +433,18 @@ const downloadChallanPdf = async (req, res) => {
     const startX = ML + (contentWidth - textWidth) / 2;
     
     // Draw map pin icon 8 points left of center text
-    drawMapPin(doc, startX - 8, MR + 90 + 7);
-    doc.text(addressText, startX, MR + 90, { lineBreak: false });
+    drawMapPin(doc, startX - 8, MR + 79 + 7);
+    doc.text(addressText, startX, MR + 79, { lineBreak: false });
 
     // Underline below address
     doc.strokeColor('#0000ff').lineWidth(0.8)
-      .moveTo(ML, MR + 106).lineTo(PW - MR, MR + 106).stroke();
+      .moveTo(ML, MR + 94).lineTo(PW - MR, MR + 94).stroke();
 
     const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {
       day: '2-digit', month: '2-digit', year: 'numeric'
     }) : '—';
 
-    const startY = MR + 110;
+    const startY = MR + 98;
 
     doc.fillColor('#0000ff').fontSize(12.5).font('Helvetica-Bold')
       .text('M/s:', ML + 12, startY + 6, { lineBreak: false });
