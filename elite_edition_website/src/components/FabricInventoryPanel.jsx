@@ -498,6 +498,19 @@ export default function FabricInventoryPanel() {
 
   useEffect(() => { fetchChallans(); }, [challanDateStart, challanDateEnd, challanSearch]);
 
+  const getVendorShortForm = (name) => {
+    if (!name) return '';
+    const u = name.toUpperCase().trim();
+    if (u.includes('AVSAR')) return 'AV';
+    if (u.includes('ELITE')) return 'EL';
+    if (u.includes('FABTEX')) return 'FT';
+    if (u.includes('MAHAGAURI')) return 'MG';
+    if (u.includes('OEQUAL') || u.includes('OE')) return 'OE';
+    if (u.includes('OZONE')) return 'OZ';
+    if (u.includes('YAMUNAJI')) return 'YM';
+    return u.substring(0, 2);
+  };
+
   // When Lot No changes — auto-fill vendor challans, fabric, shortage, panna
   const handleChallanLotChange = async (val) => {
     setChallanForm(prev => ({ ...prev, lotNo: val }));
@@ -519,9 +532,18 @@ export default function FabricInventoryPanel() {
 
       const validResults = results.filter(r => r && r.success && r.data);
       if (validResults.length > 0) {
-        // Collect all vendor challans
+        // Collect all vendor challans with their vendor short prefix
         const vendorChallans = validResults
-          .map(r => r.data.vendorChallanNo)
+          .map(r => {
+            const shortName = getVendorShortForm(r.data.vendorName);
+            const vNo = r.data.vendorChallanNo;
+            if (shortName && vNo) {
+              // Avoid duplicate prepending if already prefixed
+              if (vNo.toUpperCase().startsWith(shortName + '-')) return vNo;
+              return `${shortName}-${vNo}`;
+            }
+            return vNo;
+          })
           .filter(Boolean);
         
         // Remove duplicates and join with commas
@@ -1454,7 +1476,7 @@ export default function FabricInventoryPanel() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Challan No</th>
+                  <th>Ch.no.</th>
                   <th>Date</th>
                   <th>Party</th>
                   <th>Lot No</th>

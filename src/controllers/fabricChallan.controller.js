@@ -215,29 +215,29 @@ const downloadChallanPdf = async (req, res) => {
 
     // Top header metadata matching physical paper pad
     doc.fillColor('#475569').fontSize(7.5).font('Helvetica')
-      .text('Subject to SURAT Jurisdiction', M + 12, M + 8, { lineBreak: false });
+      .text('Subject to SURAT Jurisdiction', M + 12, M + 6, { lineBreak: false });
     doc.fillColor('#475569').fontSize(7.5).font('Helvetica-Bold')
-      .text('|| Shree Ganeshay Namah ||', M, M + 8, { width: PW - 2 * M, align: 'center', lineBreak: false });
+      .text('|| Shree Ganeshay Namah ||', M, M + 6, { width: PW - 2 * M, align: 'center', lineBreak: false });
     doc.fillColor('#475569').fontSize(7.5).font('Helvetica')
-      .text('Mo. +91 99098 66667', M, M + 8, { width: PW - 2 * M - 12, align: 'right', lineBreak: false });
+      .text('Mo. +91 99098 66667', M, M + 6, { width: PW - 2 * M - 12, align: 'right', lineBreak: false });
 
     // Subtle header divider
-    doc.strokeColor('#e2e8f0').lineWidth(0.5)
-      .moveTo(M, M + 18).lineTo(PW - M, M + 18).stroke();
+    doc.strokeColor('#cbd5e1').lineWidth(0.5)
+      .moveTo(M, M + 15).lineTo(PW - M, M + 15).stroke();
 
-    // Centered Company Logo (Elite Digital Prints)
+    // Centered Company Logo (Elite Digital Prints) - with reduced space
     const logoPath = path.join(__dirname, 'Logo.png');
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, (PW - 160) / 2, M + 22, { width: 160 });
+      doc.image(logoPath, (PW - 140) / 2, M + 17, { width: 140 });
     }
 
     // Company Address centered below logo
-    doc.fillColor('#64748b').fontSize(8.5).font('Helvetica')
-      .text('Pankhudi, siddheswar Soc opposite mahan resedency, punagam, Surat.', M, M + 128, { width: PW - 2 * M, align: 'center', lineBreak: false });
+    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold')
+      .text('GROUND FLOOR, PLOT NO-B/37, Siddheshwar Society, Puna Kumbariya Road, NR. KALAPUL, Punagam, Surat, Surat, Gujarat, 395010', M, M + 112, { width: PW - 2 * M, align: 'center', lineBreak: false });
 
     // Header bottom boundary line
     doc.strokeColor('#cbd5e1').lineWidth(0.8)
-      .moveTo(M, M + 142).lineTo(PW - M, M + 142).stroke();
+      .moveTo(M, M + 124).lineTo(PW - M, M + 124).stroke();
 
     const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {
       day: '2-digit', month: '2-digit', year: 'numeric'
@@ -252,53 +252,43 @@ const downloadChallanPdf = async (req, res) => {
     }
 
     // M/s & Challan Details Header Row
-    const startY = M + 146;
-    const colWidth = (PW - 2 * M) / 2;
+    const startY = M + 128;
 
     // Draw M/s: Party Name (Left aligned)
     doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
-      .text('M/s:', M + 12, startY + 7, { lineBreak: false });
+      .text('M/s:', M + 12, startY + 6, { lineBreak: false });
     doc.fillColor('#0f172a').fontSize(11.5).font('Helvetica-Bold')
-      .text(challan.partyName || '—', M + 42, startY + 5, { lineBreak: false });
+      .text(challan.partyName || '—', M + 42, startY + 4, { lineBreak: false });
       
     // Draw Challan No in Bold Red (Right aligned)
     doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
-      .text('Challan No.:', PW - M - 160, startY + 7, { width: 90, align: 'right', lineBreak: false });
+      .text('Ch.no.:', PW - M - 160, startY + 6, { width: 90, align: 'right', lineBreak: false });
     doc.fillColor('#dc2626').fontSize(12).font('Helvetica-Bold') // Premium Red
-      .text('EDP-' + (challan.challanNo || '—'), PW - M - 65, startY + 5, { width: 60, align: 'left', lineBreak: false });
+      .text('EDP-' + (challan.challanNo || '—'), PW - M - 65, startY + 4, { width: 60, align: 'left', lineBreak: false });
 
     // Draw Date (Right aligned, below Challan No)
     doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
-      .text('Date:', PW - M - 160, startY + 21, { width: 90, align: 'right', lineBreak: false });
+      .text('Date:', PW - M - 160, startY + 17, { width: 90, align: 'right', lineBreak: false });
     doc.fillColor('#0f172a').fontSize(10).font('Helvetica-Bold')
-      .text(formattedDate, PW - M - 65, startY + 21, { width: 60, align: 'left', lineBreak: false });
+      .text(formattedDate, PW - M - 65, startY + 17, { width: 60, align: 'left', lineBreak: false });
 
     // Divider line below M/s Row
     doc.strokeColor('#cbd5e1').lineWidth(0.6)
-      .moveTo(M, startY + 36).lineTo(PW - M, startY + 36).stroke();
+      .moveTo(M, startY + 28).lineTo(PW - M, startY + 28).stroke();
 
-    // Metadata Grid Layout starting below M/s row
-    const gridStartY = startY + 36;
-    const gridItemHeight = 30;
-
-    // Helper to print centered details key-value pair with premium design
-    // Helper to print centered details key-value pair with premium design
-    function renderField(label, value, colIndex, rowIndex, colSpan = 1) {
-      const currentWidth = colWidth * colSpan;
-      const x = M + colIndex * colWidth;
-      const y = gridStartY + rowIndex * gridItemHeight;
-
+    // Helper to print details key-value pair with premium design
+    function renderField(label, value, x, y, width, height) {
       // Draw subtle cell boundaries
       doc.strokeColor('#cbd5e1').lineWidth(0.5)
-        .rect(x, y, currentWidth, gridItemHeight).stroke();
+        .rect(x, y, width, height).stroke();
 
       // Label (left padded, small font)
       doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold')
-        .text(label.toUpperCase(), x + 10, y + 4, { width: currentWidth - 20, align: 'left', lineBreak: false });
+        .text(label.toUpperCase(), x + 10, y + 4, { width: width - 20, align: 'left', lineBreak: false });
 
       // Value (left padded, bold, slightly larger)
       doc.fillColor('#0f172a').fontSize(9.5).font('Helvetica-Bold')
-        .text(String(value || '—'), x + 10, y + 15, { width: currentWidth - 20, align: 'left', lineBreak: false });
+        .text(String(value || '—'), x + 10, y + 14, { width: width - 20, align: 'left', lineBreak: false });
     }
 
     // Fetch associated job card details for Bill to & Ship to
@@ -316,34 +306,28 @@ const downloadChallanPdf = async (req, res) => {
       }
     }
 
-    // Fill metadata fields (Left / Right grid cells)
-    const gridFields = [
-      // Row 0
-      { label: 'Job No.', val: challan.jobNo, col: 0, row: 0 },
-      { label: 'Lot No.', val: challan.lotNo ? `#${challan.lotNo}` : '—', col: 1, row: 0 },
+    // Row 1: Bill To and Ship To (spanning full width split in half)
+    const billStartY = startY + 28;
+    const halfWidth = (PW - 2 * M) / 2;
+    renderField('Bill to', billTo, M, billStartY, halfWidth, 28);
+    renderField('Ship to', shipTo, M + halfWidth, billStartY, halfWidth, 28);
 
-      // Row 1
-      { label: 'Design No.', val: challan.designNo, col: 0, row: 1 },
-      { label: 'Vendor Challan', val: challan.vendorChallanNo, col: 1, row: 1 },
+    // Row 2 & 3: Metadata Grid Layout starting below Bill to / Ship to row in 4 columns
+    const gridStartY = billStartY + 28;
+    const colWidth4 = (PW - 2 * M) / 4;
 
-      // Row 2
-      { label: 'Colour', val: challan.colour, col: 0, row: 2 },
-      { label: 'Panno', val: challan.panna, col: 1, row: 2 },
+    // Row 0 of Grid (startY)
+    renderField('Job No.', challan.jobNo, M, gridStartY, colWidth4, 28);
+    renderField('Lot No.', challan.lotNo ? `#${challan.lotNo}` : '—', M + colWidth4, gridStartY, colWidth4, 28);
+    renderField('Design No.', challan.designNo, M + colWidth4 * 2, gridStartY, colWidth4, 28);
+    renderField('Panno', challan.panna, M + colWidth4 * 3, gridStartY, colWidth4, 28);
 
-      // Row 3 (Full width)
-      { label: 'Fabric', val: challan.fabricName, col: 0, row: 3, span: 2 }
-    ];
-
-    gridFields.forEach(f => {
-      renderField(f.label, f.val, f.col, f.row, f.span || 1);
-    });
-
-    // Row 4: Bill To and Ship To (spanning full width split in half)
-    renderField('Bill to', billTo, 0, 4);
-    renderField('Ship to', shipTo, 1, 4);
+    // Row 1 of Grid (gridStartY + 28)
+    renderField('Colour', challan.colour, M, gridStartY + 28, colWidth4, 28);
+    renderField('Fabric', challan.fabricName, M + colWidth4, gridStartY + 28, colWidth4 * 3, 28);
 
     // ─── TP Details section ───
-    const tpSectionY = gridStartY + 5 * gridItemHeight + 15;
+    const tpSectionY = gridStartY + 56 + 15;
     doc.fillColor('#1e293b').fontSize(10).font('Helvetica-Bold')
       .text('TP Details', M + 16, tpSectionY, { lineBreak: false });
 
