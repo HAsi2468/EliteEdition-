@@ -444,13 +444,6 @@ const downloadChallanPdf = async (req, res) => {
       day: '2-digit', month: '2-digit', year: 'numeric'
     }) : '—';
 
-    if (fs.existsSync(logoPath)) {
-      doc.save();
-      doc.opacity(0.10);
-      doc.image(logoPath, ML + (contentWidth - 300) / 2, (PH - 300) / 2, { width: 300, height: 300 });
-      doc.restore();
-    }
-
     const startY = MR + 110;
 
     doc.fillColor('#0000ff').fontSize(12.5).font('Helvetica-Bold')
