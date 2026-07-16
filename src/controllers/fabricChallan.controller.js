@@ -334,6 +334,18 @@ const deleteChallan = async (req, res) => {
       }
     }
 
+    // Failsafe: delete any outward transaction that matches this challan no (e.g. EDP-1)
+    if (challan.challanNo) {
+      try {
+        await FabricTransaction.deleteMany({
+          type: 'OUTWARD',
+          challanNo: 'EDP-' + challan.challanNo
+        });
+      } catch (txErr) {
+        console.error('Warning: Failsafe deletion of outward transactions failed:', txErr.message);
+      }
+    }
+
     await FabricChallan.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'Challan and linked fabric outward deleted' });
   } catch (error) {

@@ -659,7 +659,7 @@ export default function FabricInventoryPanel() {
         totalTp: challanTotalTp,
         tpDetails: challanForm.tpDetails
           .filter(r => r.tpMeter !== '' && r.tpMeter != null)
-          .map(r => ({ tpNo: Number(r.tpNo), tpMeter: parseFloat(r.tpMeter) || 0 })),
+          .map(r => ({ tpNo: Number(r.tpNo), tpMeter: parseFloat(r.tpMeter) || 0, lotNo: r.lotNo || '' })),
       };
       if (editingChallan) {
         await api.updateFabricChallan(editingChallan._id, payload);
@@ -669,7 +669,7 @@ export default function FabricInventoryPanel() {
       setIsChallanOpen(false);
       setEditingChallan(null);
       resetChallanForm();
-      fetchChallans();
+      fetchData();
     } catch (err) {
       alert(err.message);
     } finally {
@@ -716,7 +716,7 @@ export default function FabricInventoryPanel() {
     try {
       await api.deleteFabricChallan(challanDeleteTarget.id);
       setChallanDeleteTarget(null);
-      fetchChallans();
+      fetchData();
     } catch (err) {
       alert('Failed to delete challan: ' + err.message);
     }
