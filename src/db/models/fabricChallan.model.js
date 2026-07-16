@@ -83,6 +83,10 @@ const fabricChallanSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    pcs: {
+      type: Number,
+      default: 0,
+    },
 
     notes: {
       type: String,

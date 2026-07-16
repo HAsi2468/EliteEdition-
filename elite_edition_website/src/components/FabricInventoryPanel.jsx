@@ -46,6 +46,7 @@ export default function FabricInventoryPanel() {
     designNo: '',
     colour: '',
     panna: '',
+    pcs: '',
     tpDetails: emptyTpRows(),
     notes: '',
   });
@@ -478,7 +479,7 @@ export default function FabricInventoryPanel() {
     setChallanForm({
       date: new Date().toISOString().split('T')[0],
       partyName: '', lotNo: '', vendorChallanNo: '', fabricName: '', shortagePct: '',
-      jobNo: '', designNo: '', colour: '', panna: '',
+      jobNo: '', designNo: '', colour: '', panna: '', pcs: '',
       tpDetails: emptyTpRows(), notes: '',
     });
   };
@@ -670,6 +671,7 @@ export default function FabricInventoryPanel() {
       designNo: c.designNo || '',
       colour: c.colour || '',
       panna: c.panna || '',
+      pcs: c.pcs != null ? String(c.pcs) : '',
       tpDetails: tpRows,
       notes: c.notes || '',
     });
@@ -1598,9 +1600,9 @@ export default function FabricInventoryPanel() {
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lot Details</span>
               </div>
 
-              {/* Row 4: Lot No + Vendor Challan No */}
+              {/* Row 4: Lot No + Vendor Challan No + PCS */}
               <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1.2 }}>
                   <label style={labelStyle}>Lot No {challanLotLoading && <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Loading…</span>}</label>
                   <input
                     type="text"
@@ -1610,9 +1612,13 @@ export default function FabricInventoryPanel() {
                     placeholder="e.g. 320, 321"
                   />
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1.2 }}>
                   <label style={labelStyle}>Vendor Challan No <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-filled)</span></label>
                   <input type="text" value={challanForm.vendorChallanNo} onChange={e => setChallanForm({ ...challanForm, vendorChallanNo: e.target.value })} style={inputStyle} placeholder="Auto-filled from lot…" />
+                </div>
+                <div style={{ flex: 0.8 }}>
+                  <label style={labelStyle}>PCS</label>
+                  <input type="number" min="0" value={challanForm.pcs} onChange={e => setChallanForm({ ...challanForm, pcs: e.target.value })} style={inputStyle} placeholder="Expected pcs" />
                 </div>
               </div>
 

@@ -62,7 +62,7 @@ const createChallan = async (req, res) => {
       date, partyName,
       lotNo, vendorChallanNo, fabricName, shortagePct,
       jobNo, designNo, colour, panna,
-      tpDetails,
+      tpDetails, pcs,
       notes, createdBy,
     } = req.body;
 
@@ -83,6 +83,7 @@ const createChallan = async (req, res) => {
       tpDetails: details,
       totalMtr,
       totalTp,
+      pcs: pcs !== '' && pcs != null ? parseInt(pcs) : 0,
       notes: notes || '',
       createdBy: createdBy || '',
     });
@@ -140,7 +141,7 @@ const updateChallan = async (req, res) => {
       date, partyName,
       lotNo, vendorChallanNo, fabricName, shortagePct,
       jobNo, designNo, colour, panna,
-      tpDetails, notes,
+      tpDetails, pcs, notes,
     } = req.body;
 
     const challan = await FabricChallan.findById(id);
@@ -158,6 +159,7 @@ const updateChallan = async (req, res) => {
     if (designNo !== undefined) challan.designNo = designNo;
     if (colour !== undefined) challan.colour = colour;
     if (panna !== undefined) challan.panna = panna;
+    if (pcs !== undefined) challan.pcs = pcs !== '' && pcs != null ? parseInt(pcs) : 0;
     if (notes !== undefined) challan.notes = notes;
 
     if (tpDetails !== undefined) {
@@ -215,29 +217,29 @@ const downloadChallanPdf = async (req, res) => {
 
     // Top header metadata matching physical paper pad
     doc.fillColor('#475569').fontSize(7.5).font('Helvetica')
-      .text('Subject to SURAT Jurisdiction', M + 12, M + 6, { lineBreak: false });
+      .text('Subject to SURAT Jurisdiction', M + 12, M + 4, { lineBreak: false });
     doc.fillColor('#475569').fontSize(7.5).font('Helvetica-Bold')
-      .text('|| Shree Ganeshay Namah ||', M, M + 6, { width: PW - 2 * M, align: 'center', lineBreak: false });
+      .text('|| Shree Ganeshay Namah ||', M, M + 4, { width: PW - 2 * M, align: 'center', lineBreak: false });
     doc.fillColor('#475569').fontSize(7.5).font('Helvetica')
-      .text('Mo. +91 99098 66667', M, M + 6, { width: PW - 2 * M - 12, align: 'right', lineBreak: false });
+      .text('Mo. +91 99098 66667', M, M + 4, { width: PW - 2 * M - 12, align: 'right', lineBreak: false });
 
     // Subtle header divider
     doc.strokeColor('#cbd5e1').lineWidth(0.5)
-      .moveTo(M, M + 15).lineTo(PW - M, M + 15).stroke();
+      .moveTo(M, M + 12).lineTo(PW - M, M + 12).stroke();
 
-    // Centered Company Logo (Elite Digital Prints) - with reduced space
+    // Centered Company Logo (Elite Digital Prints) - tighter spacing with cropped aspect ratio
     const logoPath = path.join(__dirname, 'Logo.png');
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, (PW - 140) / 2, M + 17, { width: 140 });
+      doc.image(logoPath, (PW - 140) / 2, M + 14, { width: 140 });
     }
 
     // Company Address centered below logo
     doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold')
-      .text('GROUND FLOOR, PLOT NO-B/37, Siddheshwar Society, Puna Kumbariya Road, NR. KALAPUL, Punagam, Surat, Surat, Gujarat, 395010', M, M + 112, { width: PW - 2 * M, align: 'center', lineBreak: false });
+      .text('GROUND FLOOR, PLOT NO-B/37, Siddheshwar Society, Puna Kumbariya Road, NR. KALAPUL, Punagam, Surat, Surat, Gujarat, 395010', M, M + 77, { width: PW - 2 * M, align: 'center', lineBreak: false });
 
     // Header bottom boundary line
     doc.strokeColor('#cbd5e1').lineWidth(0.8)
-      .moveTo(M, M + 124).lineTo(PW - M, M + 124).stroke();
+      .moveTo(M, M + 87).lineTo(PW - M, M + 87).stroke();
 
     const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {
       day: '2-digit', month: '2-digit', year: 'numeric'
@@ -252,7 +254,7 @@ const downloadChallanPdf = async (req, res) => {
     }
 
     // M/s & Challan Details Header Row
-    const startY = M + 128;
+    const startY = M + 91;
 
     // Draw M/s: Party Name (Left aligned)
     doc.fillColor('#64748b').fontSize(9.5).font('Helvetica-Bold')
@@ -317,7 +319,6 @@ const downloadChallanPdf = async (req, res) => {
     const colWidth4 = (PW - 2 * M) / 4;
 
     // Row 0 of Grid (startY)
-    // Row 0 of Grid (startY)
     renderField('Job No.', challan.jobNo, M, gridStartY, colWidth4, 28);
     renderField('Design No.', challan.designNo, M + colWidth4, gridStartY, colWidth4, 28);
     renderField('Lot No.', challan.lotNo ? `#${challan.lotNo}` : '—', M + colWidth4 * 2, gridStartY, colWidth4, 28);
@@ -325,11 +326,12 @@ const downloadChallanPdf = async (req, res) => {
 
     // Row 1 of Grid (gridStartY + 28)
     renderField('Colour', challan.colour, M, gridStartY + 28, colWidth4, 28);
-    renderField('Fabric', challan.fabricName, M + colWidth4, gridStartY + 28, colWidth4 * 2, 28);
-    renderField('Vendor Challan', challan.vendorChallanNo, M + colWidth4 * 3, gridStartY + 28, colWidth4, 28);
+    renderField('Fabric', challan.fabricName, M + colWidth4, gridStartY + 28, colWidth4, 28);
+    renderField('Vendor Challan', challan.vendorChallanNo, M + colWidth4 * 2, gridStartY + 28, colWidth4, 28);
+    renderField('Expected PCS', challan.pcs || 0, M + colWidth4 * 3, gridStartY + 28, colWidth4, 28);
 
     // ─── TP Details section ───
-    const tpSectionY = gridStartY + 56 + 15;
+    const tpSectionY = gridStartY + 56 + 12;
     doc.fillColor('#1e293b').fontSize(10).font('Helvetica-Bold')
       .text('TP Details', M + 16, tpSectionY, { lineBreak: false });
 
@@ -411,12 +413,14 @@ const downloadChallanPdf = async (req, res) => {
       .text(`${parseFloat(challan.totalMtr || 0).toFixed(3)} mtr`, M + summaryColWidth, summaryStartY + 20, { width: summaryColWidth, align: 'center' });
 
     // Notes area
-    const notesY = summaryStartY + 54;
-    doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(M, notesY, PW - 2 * M, 34).stroke();
-    doc.fillColor('#8896a4').fontSize(8.5).font('Helvetica-Bold')
-      .text('NOTES / REMARKS', M + 12, notesY + 5, { width: PW - 2 * M - 24 });
-    doc.fillColor('#0f172a').fontSize(10).font('Helvetica')
-      .text(challan.notes || 'No remarks provided.', M + 12, notesY + 16, { width: PW - 2 * M - 24 });
+    if (challan.notes && challan.notes.trim()) {
+      const notesY = summaryStartY + 54;
+      doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(M, notesY, PW - 2 * M, 34).stroke();
+      doc.fillColor('#8896a4').fontSize(8.5).font('Helvetica-Bold')
+        .text('NOTES / REMARKS', M + 12, notesY + 5, { width: PW - 2 * M - 24 });
+      doc.fillColor('#0f172a').fontSize(10).font('Helvetica')
+        .text(challan.notes, M + 12, notesY + 16, { width: PW - 2 * M - 24 });
+    }
 
     // Signatures footer at the bottom
     const sigLineY = PH - M - 45;
