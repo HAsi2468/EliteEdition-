@@ -1675,6 +1675,9 @@ export default function FabricInventoryPanel() {
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Shortage %</label>
                   <input type="number" step="0.01" min="0" max="100" value={challanForm.shortagePct} onChange={e => setChallanForm({ ...challanForm, shortagePct: e.target.value })} style={inputStyle} placeholder="e.g. 3.5" />
+                  <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: 'var(--success)', fontWeight: '600' }}>
+                    Row Meters: {(challanTotalMtr * (1 + (parseFloat(challanForm.shortagePct) || 0) / 100)).toFixed(2)} mtr
+                  </div>
                 </div>
               </div>
 
