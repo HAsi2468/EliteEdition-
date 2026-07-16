@@ -276,10 +276,10 @@ const downloadChallanPdf = async (req, res) => {
         .rect(x, y, width, height).stroke();
 
       doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
-        .text(label.toUpperCase(), x + 10, y + 4, { width: width - 20, align: 'left', lineBreak: false });
+        .text(label.toUpperCase(), x + 10, y + 5, { width: width - 20, align: 'left', lineBreak: false });
 
       doc.fillColor('#0f172a').fontSize(12.5).font('Helvetica-Bold')
-        .text(String(value || '—'), x + 10, y + 14, { width: width - 20, align: 'left', lineBreak: false });
+        .text(String(value || '—'), x + 10, y + 17, { width: width - 20, align: 'left', lineBreak: false });
     }
 
     let billTo = challan.billTo || '';
@@ -302,22 +302,22 @@ const downloadChallanPdf = async (req, res) => {
 
     const billStartY = startY + 28;
     const halfWidth = contentWidth / 2;
-    renderField('Bill to', billTo, ML, billStartY, halfWidth, 28);
-    renderField('Ship to', shipTo, ML + halfWidth, billStartY, halfWidth, 28);
+    renderField('Bill to', billTo, ML, billStartY, halfWidth, 34);
+    renderField('Ship to', shipTo, ML + halfWidth, billStartY, halfWidth, 34);
 
-    const gridStartY = billStartY + 28;
+    const gridStartY = billStartY + 34;
     const colWidth4 = contentWidth / 4;
 
-    renderField('Job No.', challan.jobNo, ML, gridStartY, colWidth4, 28);
-    renderField('Design No.', challan.designNo, ML + colWidth4, gridStartY, colWidth4, 28);
-    renderField('Lot No.', challan.lotNo ? `#${challan.lotNo}` : '—', ML + colWidth4 * 2, gridStartY, colWidth4, 28);
-    renderField('Panno', challan.panna, ML + colWidth4 * 3, gridStartY, colWidth4, 28);
+    renderField('Job No.', challan.jobNo, ML, gridStartY, colWidth4, 34);
+    renderField('Design No.', challan.designNo, ML + colWidth4, gridStartY, colWidth4, 34);
+    renderField('Lot No.', challan.lotNo ? `#${challan.lotNo}` : '—', ML + colWidth4 * 2, gridStartY, colWidth4, 34);
+    renderField('Panno', challan.panna, ML + colWidth4 * 3, gridStartY, colWidth4, 34);
 
-    renderField('Colour', challan.colour, ML, gridStartY + 28, colWidth4, 28);
-    renderField('Fabric', challan.fabricName, ML + colWidth4, gridStartY + 28, colWidth4, 28);
-    renderField('Vendor Challan', challan.vendorChallanNo, ML + colWidth4 * 2, gridStartY + 28, colWidth4 * 2, 28);
+    renderField('Colour', challan.colour, ML, gridStartY + 34, colWidth4, 34);
+    renderField('Fabric', challan.fabricName, ML + colWidth4, gridStartY + 34, colWidth4, 34);
+    renderField('Vendor Challan', challan.vendorChallanNo, ML + colWidth4 * 2, gridStartY + 34, colWidth4 * 2, 34);
 
-    const tpSectionY = gridStartY + 56 + 12;
+    const tpSectionY = gridStartY + 68 + 12;
     doc.fillColor('#0000ff').fontSize(13).font('Helvetica-Bold')
       .text('TP Details', ML + 16, tpSectionY, { lineBreak: false });
 
@@ -327,8 +327,8 @@ const downloadChallanPdf = async (req, res) => {
     const activeCount = activeTps.length;
     const tpColsCount = activeCount === 0 ? 1 : activeCount <= 5 ? 1 : activeCount <= 10 ? 2 : 3;
     const tpColWidth = contentWidth / tpColsCount;
-    const tpRowHeight = 22;
-    const tableHeaderHeight = 22;
+    const tpRowHeight = 26;
+    const tableHeaderHeight = 26;
     const tpTableStartY = tpSectionY + 16;
 
     for (let c = 0; c < tpColsCount; c++) {
@@ -337,8 +337,8 @@ const downloadChallanPdf = async (req, res) => {
       doc.strokeColor('#0000ff').lineWidth(0.5).rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).stroke();
       
       doc.fillColor('#0000ff').fontSize(12).font('Helvetica-Bold')
-        .text('TP NO.', x, tpTableStartY + 6, { width: tpColWidth * 0.35, align: 'center' });
-      doc.text('METRES', x + tpColWidth * 0.35, tpTableStartY + 6, { width: tpColWidth * 0.65, align: 'center' });
+        .text('TP NO.', x, tpTableStartY + 7, { width: tpColWidth * 0.35, align: 'center' });
+      doc.text('METRES', x + tpColWidth * 0.35, tpTableStartY + 7, { width: tpColWidth * 0.65, align: 'center' });
     }
 
     const rowsPerCol = Math.ceil(activeCount / tpColsCount);
@@ -348,7 +348,7 @@ const downloadChallanPdf = async (req, res) => {
       const y = tpTableStartY + tableHeaderHeight;
       doc.strokeColor('#0000ff').lineWidth(0.5).rect(x, y, contentWidth, tpRowHeight).stroke();
       doc.fillColor('#0000ff').fontSize(12.5).font('Helvetica-Oblique')
-        .text('No active TP details entered.', x, y + 6, { width: contentWidth, align: 'center' });
+        .text('No active TP details entered.', x, y + 7, { width: contentWidth, align: 'center' });
     } else {
       for (let i = 0; i < activeCount; i++) {
         const tp = activeTps[i];
@@ -363,46 +363,45 @@ const downloadChallanPdf = async (req, res) => {
         const val = `${parseFloat(tp.tpMeter).toFixed(2)} mtr`;
 
         doc.fillColor('#0000ff').fontSize(12.5).font('Helvetica-Bold')
-          .text(String(tp.tpNo), x, y + 6, { width: tpColWidth * 0.35, align: 'center' });
+          .text(String(tp.tpNo), x, y + 7, { width: tpColWidth * 0.35, align: 'center' });
         
         doc.fillColor('#0f172a').fontSize(13).font('Helvetica')
-          .text(val, x + tpColWidth * 0.35, y + 6, { width: tpColWidth * 0.65, align: 'center' });
+          .text(val, x + tpColWidth * 0.35, y + 7, { width: tpColWidth * 0.65, align: 'center' });
       }
     }
 
     const summaryStartY = tpTableStartY + tableHeaderHeight + (activeCount > 0 ? rowsPerCol * tpRowHeight : tpRowHeight) + 15;
     const summaryColWidth3 = contentWidth / 3;
 
-    doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML, summaryStartY, summaryColWidth3, 42).stroke();
+    doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML, summaryStartY, summaryColWidth3, 48).stroke();
     doc.fillColor('#0000ff').fontSize(11.5).font('Helvetica-Bold')
       .text('TOTAL CHALLAN TP', ML, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
     doc.fillColor('#10b981').fontSize(17).font('Helvetica-Bold')
-      .text(String(challan.totalTp || 0), ML, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
+      .text(String(challan.totalTp || 0), ML, summaryStartY + 23, { width: summaryColWidth3, align: 'center' });
 
-    doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML + summaryColWidth3, summaryStartY, summaryColWidth3, 42).stroke();
+    doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML + summaryColWidth3, summaryStartY, summaryColWidth3, 48).stroke();
     doc.fillColor('#0000ff').fontSize(11.5).font('Helvetica-Bold')
       .text('EXPECTED PCS', ML + summaryColWidth3, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
     doc.fillColor('#10b981').fontSize(17).font('Helvetica-Bold')
-      .text(String(challan.pcs || 0), ML + summaryColWidth3, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
+      .text(String(challan.pcs || 0), ML + summaryColWidth3, summaryStartY + 23, { width: summaryColWidth3, align: 'center' });
 
-    doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML + summaryColWidth3 * 2, summaryStartY, summaryColWidth3, 42).stroke();
+    doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML + summaryColWidth3 * 2, summaryStartY, summaryColWidth3, 48).stroke();
     doc.fillColor('#0000ff').fontSize(11.5).font('Helvetica-Bold')
       .text('TOTAL CHALLAN METRES', ML + summaryColWidth3 * 2, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
     doc.fillColor('#10b981').fontSize(17).font('Helvetica-Bold')
-      .text(`${parseFloat(challan.totalMtr || 0).toFixed(2)} mtr`, ML + summaryColWidth3 * 2, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
+      .text(`${parseFloat(challan.totalMtr || 0).toFixed(2)} mtr`, ML + summaryColWidth3 * 2, summaryStartY + 23, { width: summaryColWidth3, align: 'center' });
 
     if (challan.notes && challan.notes.trim()) {
-      const notesY = summaryStartY + 54;
-      doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML, notesY, contentWidth, 34).stroke();
+      const notesY = summaryStartY + 60;
+      doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML, notesY, contentWidth, 42).stroke();
       doc.fillColor('#0000ff').fontSize(11.5).font('Helvetica-Bold')
-        .text('NOTES / REMARKS', ML + 12, notesY + 5, { width: contentWidth - 24 });
+        .text('NOTES / REMARKS', ML + 12, notesY + 6, { width: contentWidth - 24 });
       doc.fillColor('#0f172a').fontSize(13).font('Helvetica')
-        .text(challan.notes, ML + 12, notesY + 16, { width: contentWidth - 24 });
+        .text(challan.notes, ML + 12, notesY + 20, { width: contentWidth - 24 });
     }
 
     const sigLineY = PH - MR - 45;
     
-    // Left: Receiver Signature
     doc.moveTo(ML + 30, sigLineY).lineTo(ML + 160, sigLineY).strokeColor('#0000ff').lineWidth(0.5).stroke();
     doc.fillColor('#0000ff').fontSize(12).font('Helvetica-Bold')
       .text('RECEIVER SIGNATURE', ML + 30, sigLineY + 5, { width: 130, align: 'center' });
