@@ -87,6 +87,16 @@ const fabricChallanSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    billTo: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    shipTo: {
+      type: String,
+      trim: true,
+      default: '',
+    },
 
     notes: {
       type: String,

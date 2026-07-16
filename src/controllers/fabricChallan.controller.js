@@ -64,6 +64,7 @@ const createChallan = async (req, res) => {
       jobNo, designNo, colour, panna,
       tpDetails, pcs,
       notes, createdBy,
+      billTo, shipTo,
     } = req.body;
 
     const details = Array.isArray(tpDetails) ? tpDetails : [];
@@ -84,6 +85,8 @@ const createChallan = async (req, res) => {
       totalMtr,
       totalTp,
       pcs: pcs !== '' && pcs != null ? parseInt(pcs) : 0,
+      billTo: billTo || '',
+      shipTo: shipTo || '',
       notes: notes || '',
       createdBy: createdBy || '',
     });
@@ -142,6 +145,7 @@ const updateChallan = async (req, res) => {
       lotNo, vendorChallanNo, fabricName, shortagePct,
       jobNo, designNo, colour, panna,
       tpDetails, pcs, notes,
+      billTo, shipTo,
     } = req.body;
 
     const challan = await FabricChallan.findById(id);
@@ -160,6 +164,8 @@ const updateChallan = async (req, res) => {
     if (colour !== undefined) challan.colour = colour;
     if (panna !== undefined) challan.panna = panna;
     if (pcs !== undefined) challan.pcs = pcs !== '' && pcs != null ? parseInt(pcs) : 0;
+    if (billTo !== undefined) challan.billTo = billTo;
+    if (shipTo !== undefined) challan.shipTo = shipTo;
     if (notes !== undefined) challan.notes = notes;
 
     if (tpDetails !== undefined) {
@@ -276,19 +282,23 @@ const downloadChallanPdf = async (req, res) => {
         .text(String(value || '—'), x + 10, y + 14, { width: width - 20, align: 'left', lineBreak: false });
     }
 
-    let billTo = '—';
-    let shipTo = '—';
-    if (challan.jobNo) {
-      try {
-        const job = await JobCard.findOne({ jobNo: challan.jobNo });
-        if (job) {
-          billTo = job.billTo || '—';
-          shipTo = job.shipTo || '—';
+    let billTo = challan.billTo || '';
+    let shipTo = challan.shipTo || '';
+    if (!billTo || !shipTo) {
+      if (challan.jobNo) {
+        try {
+          const job = await JobCard.findOne({ jobNo: challan.jobNo });
+          if (job) {
+            if (!billTo) billTo = job.billTo || '';
+            if (!shipTo) shipTo = job.shipTo || '';
+          }
+        } catch (e) {
+          console.warn('Failed to find job card info', e);
         }
-      } catch (e) {
-        console.warn('Failed to find job card info', e);
       }
     }
+    if (!billTo) billTo = '—';
+    if (!shipTo) shipTo = '—';
 
     const billStartY = startY + 28;
     const halfWidth = contentWidth / 2;

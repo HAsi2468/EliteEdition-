@@ -34,6 +34,9 @@ export default function FabricInventoryPanel() {
   const [challanLotLoading, setChallanLotLoading] = useState(false);
   const [challanDeleteTarget, setChallanDeleteTarget] = useState(null);
   const [availableLots, setAvailableLots] = useState([]);
+  const [billToOptions, setBillToOptions] = useState([]);
+  const [shipToOptions, setShipToOptions] = useState([]);
+
   const emptyTpRows = () => [{ tpNo: 1, tpMeter: '' }];
   const [challanForm, setChallanForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -47,6 +50,8 @@ export default function FabricInventoryPanel() {
     colour: '',
     panna: '',
     pcs: '',
+    billTo: '',
+    shipTo: '',
     tpDetails: emptyTpRows(),
     notes: '',
   });
@@ -310,6 +315,8 @@ export default function FabricInventoryPanel() {
 
       if (cfg && cfg.parties) setPartiesList(cfg.parties);
       if (cfg && cfg.widths) setWidthsList(cfg.widths);
+      if (cfg && cfg.billToOptions) setBillToOptions(cfg.billToOptions);
+      if (cfg && cfg.shipToOptions) setShipToOptions(cfg.shipToOptions);
 
       try {
         const jRes = await api.getJobCards({ status: 'In Progress', limit: 200 });
@@ -568,7 +575,7 @@ export default function FabricInventoryPanel() {
     }
   };
 
-  // When Job No changes — auto-fill design, colour, panna, fabric, party
+  // When Job No changes — auto-fill design, colour, panna, fabric, party, billTo, shipTo
   const handleChallanJobChange = async (val) => {
     setChallanForm(prev => ({ ...prev, jobNo: val }));
     const job = inProgressJobCards.find(j => j.jobNo === val);
@@ -581,6 +588,8 @@ export default function FabricInventoryPanel() {
         panna: job.panna || prev.panna,
         fabricName: job.fabric || prev.fabricName,
         partyName: job.party || prev.partyName,
+        billTo: job.billTo || prev.billTo || '',
+        shipTo: job.shipTo || prev.shipTo || '',
       }));
 
       // Fetch lot numbers that have this fabric
@@ -672,6 +681,8 @@ export default function FabricInventoryPanel() {
       colour: c.colour || '',
       panna: c.panna || '',
       pcs: c.pcs != null ? String(c.pcs) : '',
+      billTo: c.billTo || '',
+      shipTo: c.shipTo || '',
       tpDetails: tpRows,
       notes: c.notes || '',
     });
@@ -1592,6 +1603,36 @@ export default function FabricInventoryPanel() {
                   <datalist id="challan-widths">
                     {widthsList.map((w, i) => <option key={i} value={w} />)}
                   </datalist>
+                </div>
+              </div>
+
+              {/* Row 3.5: Bill To & Ship To (Dropdowns from Setting tab) */}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Bill To</label>
+                  <select
+                    value={challanForm.billTo}
+                    onChange={e => setChallanForm({ ...challanForm, billTo: e.target.value })}
+                    style={inputStyle}
+                  >
+                    <option value="">-- Select Bill To --</option>
+                    {billToOptions.map((opt, i) => (
+                      <option key={i} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Ship To</label>
+                  <select
+                    value={challanForm.shipTo}
+                    onChange={e => setChallanForm({ ...challanForm, shipTo: e.target.value })}
+                    style={inputStyle}
+                  >
+                    <option value="">-- Select Ship To --</option>
+                    {shipToOptions.map((opt, i) => (
+                      <option key={i} value={opt}>{opt}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
