@@ -403,7 +403,10 @@ const downloadChallanPdf = async (req, res) => {
 
     renderField('Colour', challan.colour, ML, gridStartY + 34, colWidth4, 34);
     renderField('Fabric', challan.fabricName, ML + colWidth4, gridStartY + 34, colWidth4, 34);
-    renderField('Vendor Challan', challan.vendorChallanNo, ML + colWidth4 * 2, gridStartY + 34, colWidth4 * 2, 34);
+    renderField('Vendor Challan', challan.vendorChallanNo, ML + colWidth4 * 2, gridStartY + 34, colWidth4, 34);
+    
+    const calculatedRawMtr = computeRawMeters(challan.totalMtr, challan.shortagePct).toFixed(2);
+    renderField('Shortage / Row Mtr', `${challan.shortagePct != null ? challan.shortagePct + '%' : '—'} / ${calculatedRawMtr}m`, ML + colWidth4 * 3, gridStartY + 34, colWidth4, 34);
 
     const tpSectionY = gridStartY + 68 + 12;
     doc.fillColor('#0000ff').fontSize(13).font('Helvetica-Bold')
