@@ -95,7 +95,7 @@ const drawPageHeader = (doc, reportTitle, dateStr, pageNum) => {
 
   // Logo drawing next to title
   const path = require('path');
-  const logoPath = path.join(__dirname, 'Logo.png');
+  const logoPath = path.join(__dirname, 'Logo_previous.png');
   try {
     doc.image(logoPath, M, 11, { width: 32, height: 32 });
   } catch (err) {

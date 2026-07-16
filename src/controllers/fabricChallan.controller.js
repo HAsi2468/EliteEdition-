@@ -247,16 +247,16 @@ const downloadChallanPdf = async (req, res) => {
     if (!billTo) billTo = '—';
     if (!shipTo) shipTo = '—';
 
-    let selectedLogoName = 'Logo_previous.png';
+    let selectedLogoName = 'Logo.png'; // default: black EDP logo
     const checkBillTo = billTo.toLowerCase();
     const checkShipTo = shipTo.toLowerCase();
     const checkParty = (challan.partyName || '').toLowerCase();
     if (
-      checkBillTo.includes('elite digital') ||
-      checkShipTo.includes('elite digital') ||
-      checkParty.includes('elite digital')
+      !checkBillTo.includes('elite digital') &&
+      !checkShipTo.includes('elite digital') &&
+      !checkParty.includes('elite digital')
     ) {
-      selectedLogoName = 'Logo.png';
+      selectedLogoName = 'Logo_previous.png'; // gold logo for other departments
     }
 
     const logoPath = path.join(__dirname, selectedLogoName);
