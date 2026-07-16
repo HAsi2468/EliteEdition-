@@ -521,14 +521,22 @@ export default function FabricInventoryPanel() {
 
   // When Lot No changes — auto-fill vendor challans, fabric, shortage, panna
   const handleChallanLotChange = async (val) => {
-    setChallanForm(prev => ({ ...prev, lotNo: val }));
-    if (!val) return;
-
-    // Parse list of lot numbers
     const lotsList = String(val)
       .split(/[,\s&]+/)
       .map(x => x.trim())
       .filter(Boolean);
+    const defaultLot = lotsList[0] || '';
+
+    setChallanForm(prev => {
+      const updatedTps = prev.tpDetails.map(tp => {
+        if (!tp.lotNo || !lotsList.includes(tp.lotNo)) {
+          return { ...tp, lotNo: defaultLot };
+        }
+        return tp;
+      });
+      return { ...prev, lotNo: val, tpDetails: updatedTps };
+    });
+    if (!val) return;
 
     if (lotsList.length === 0) return;
 
@@ -621,7 +629,12 @@ export default function FabricInventoryPanel() {
     setChallanForm(prev => {
       if (prev.tpDetails.length >= 30) return prev;
       const nextNo = prev.tpDetails.length + 1;
-      return { ...prev, tpDetails: [...prev.tpDetails, { tpNo: nextNo, tpMeter: '' }] };
+      const lots = String(prev.lotNo || '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      const defaultLot = lots[0] || '';
+      return { ...prev, tpDetails: [...prev.tpDetails, { tpNo: nextNo, tpMeter: '', lotNo: defaultLot }] };
     });
   };
 
@@ -1833,28 +1846,44 @@ export default function FabricInventoryPanel() {
 
               {/* TP Rows */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 32px', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, paddingLeft: '0.25rem' }}>
-                  <span>TP No.</span><span>TP Meter (mtr)</span><span></span>
+                <div style={{ display: 'grid', gridTemplateColumns: '60px 120px 1fr 32px', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, paddingLeft: '0.25rem' }}>
+                  <span>TP No.</span><span>Lot No</span><span>TP Meter (mtr)</span><span></span>
                 </div>
-                {challanForm.tpDetails.map((row, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 32px', gap: '0.5rem', alignItems: 'center' }}>
-                    <div style={{ ...inputStyle, textAlign: 'center', fontWeight: 700, color: 'var(--primary)', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {row.tpNo}
+                {(() => {
+                  const currentLots = String(challanForm.lotNo || '')
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(s => s.length > 0);
+                  return challanForm.tpDetails.map((row, idx) => (
+                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '60px 120px 1fr 32px', gap: '0.5rem', alignItems: 'center' }}>
+                      <div style={{ ...inputStyle, textAlign: 'center', fontWeight: 700, color: 'var(--primary)', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {row.tpNo}
+                      </div>
+                      <select
+                        value={row.lotNo || ''}
+                        onChange={e => updateTpRow(idx, 'lotNo', e.target.value)}
+                        style={inputStyle}
+                      >
+                        <option value="">-- Select --</option>
+                        {currentLots.map(lot => (
+                          <option key={lot} value={lot}>Lot #{lot}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        value={row.tpMeter}
+                        onChange={e => updateTpRow(idx, 'tpMeter', e.target.value)}
+                        style={inputStyle}
+                        placeholder="0.000"
+                      />
+                      <button type="button" onClick={() => removeTpRow(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0.2rem', display: 'flex', alignItems: 'center' }}>
+                        <X size={15} />
+                      </button>
                     </div>
-                    <input
-                      type="number"
-                      step="0.001"
-                      min="0"
-                      value={row.tpMeter}
-                      onChange={e => updateTpRow(idx, 'tpMeter', e.target.value)}
-                      style={inputStyle}
-                      placeholder="0.000"
-                    />
-                    <button type="button" onClick={() => removeTpRow(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0.2rem', display: 'flex', alignItems: 'center' }}>
-                      <X size={15} />
-                    </button>
-                  </div>
-                ))}
+                  ));
+                })()}
               </div>
 
               {/* Totals summary */}

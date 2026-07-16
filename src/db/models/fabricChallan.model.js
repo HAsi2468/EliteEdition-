@@ -4,6 +4,7 @@ const tpDetailSchema = new mongoose.Schema(
   {
     tpNo: { type: Number, required: true },
     tpMeter: { type: Number, default: 0 },
+    lotNo: { type: String, default: '' },
   },
   { _id: false }
 );
@@ -108,12 +109,11 @@ const fabricChallanSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
-    // Reference to the auto-created fabric outward transaction
-    fabricOutwardId: {
+    // References to the auto-created fabric outward transactions (lot-wise)
+    fabricOutwardIds: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'FabricTransaction',
-      default: null,
-    },
+    }],
   },
   {
     timestamps: true,

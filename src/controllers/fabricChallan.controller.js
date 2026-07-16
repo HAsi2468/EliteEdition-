@@ -113,27 +113,48 @@ const createChallan = async (req, res) => {
 
     await challan.save();
 
-    // ── Auto-create OUTWARD fabric transaction using raw meters ──────────────
+    // ── Auto-create OUTWARD fabric transactions (lot-wise) ──────────────
     if (fabricName && totalMtr > 0) {
       try {
-        const rawMtr = computeRawMeters(totalMtr, challan.shortagePct);
-        const outwardTx = new FabricTransaction({
-          type: 'OUTWARD',
-          fabricQuality: fabricName,
-          panna: panna || '',
-          lotNo: parseLotNo(lotNo),
-          qty: rawMtr,
-          date: challan.date,
-          jobNo: jobNo || '',
-          partyName: partyName || '',
-          challanNo: 'EDP-' + challan.challanNo,
-          notes: `Auto: EDP-${challan.challanNo} | Fresh=${totalMtr}m + ${challan.shortagePct || 0}% shortage = ${rawMtr}m raw`,
-        });
-        await outwardTx.save();
-        challan.fabricOutwardId = outwardTx._id;
+        // Group tpDetails by lotNo
+        const lotGroups = {};
+        for (const tp of details) {
+          const m = parseFloat(tp.tpMeter) || 0;
+          if (m > 0) {
+            // If row has lotNo, use it, otherwise fall back to parent lotNo
+            let itemLot = (tp.lotNo || '').trim();
+            if (!itemLot) {
+              itemLot = (lotNo || '').trim();
+            }
+            if (!lotGroups[itemLot]) {
+              lotGroups[itemLot] = 0;
+            }
+            lotGroups[itemLot] += m;
+          }
+        }
+
+        const createdTxIds = [];
+        for (const [lot, groupMtr] of Object.entries(lotGroups)) {
+          const rawMtr = computeRawMeters(groupMtr, challan.shortagePct);
+          const outwardTx = new FabricTransaction({
+            type: 'OUTWARD',
+            fabricQuality: fabricName,
+            panna: panna || '',
+            lotNo: parseLotNo(lot),
+            qty: rawMtr,
+            date: challan.date,
+            jobNo: jobNo || '',
+            partyName: partyName || '',
+            challanNo: 'EDP-' + challan.challanNo,
+            notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Fresh=${groupMtr}m + ${challan.shortagePct || 0}% shortage = ${rawMtr}m raw`,
+          });
+          await outwardTx.save();
+          createdTxIds.push(outwardTx._id);
+        }
+        challan.fabricOutwardIds = createdTxIds;
         await challan.save();
       } catch (txErr) {
-        console.error('Warning: Failed to auto-create fabric outward:', txErr.message);
+        console.error('Warning: Failed to auto-create fabric outward transactions:', txErr.message);
       }
     }
 
@@ -223,32 +244,61 @@ const updateChallan = async (req, res) => {
 
     await challan.save();
 
-    // ── Sync OUTWARD fabric transaction: delete old, create new ──────────────
+    // ── Sync OUTWARD fabric transactions: delete old, create new ──────────────
     try {
+      // Delete old single outward link if exists (backwards compatibility)
       if (challan.fabricOutwardId) {
         await FabricTransaction.findByIdAndDelete(challan.fabricOutwardId);
         challan.fabricOutwardId = null;
       }
+      // Delete all old lot-wise outward links
+      if (challan.fabricOutwardIds && challan.fabricOutwardIds.length > 0) {
+        for (const txId of challan.fabricOutwardIds) {
+          await FabricTransaction.findByIdAndDelete(txId);
+        }
+        challan.fabricOutwardIds = [];
+      }
+
       if (challan.fabricName && challan.totalMtr > 0) {
-        const rawMtr = computeRawMeters(challan.totalMtr, challan.shortagePct);
-        const outwardTx = new FabricTransaction({
-          type: 'OUTWARD',
-          fabricQuality: challan.fabricName,
-          panna: challan.panna || '',
-          lotNo: parseLotNo(challan.lotNo),
-          qty: rawMtr,
-          date: challan.date,
-          jobNo: challan.jobNo || '',
-          partyName: challan.partyName || '',
-          challanNo: 'EDP-' + challan.challanNo,
-          notes: `Auto: EDP-${challan.challanNo} | Fresh=${challan.totalMtr}m + ${challan.shortagePct || 0}% shortage = ${rawMtr}m raw`,
-        });
-        await outwardTx.save();
-        challan.fabricOutwardId = outwardTx._id;
+        // Group tpDetails by lotNo
+        const lotGroups = {};
+        for (const tp of challan.tpDetails) {
+          const m = parseFloat(tp.tpMeter) || 0;
+          if (m > 0) {
+            let itemLot = (tp.lotNo || '').trim();
+            if (!itemLot) {
+              itemLot = (challan.lotNo || '').trim();
+            }
+            if (!lotGroups[itemLot]) {
+              lotGroups[itemLot] = 0;
+            }
+            lotGroups[itemLot] += m;
+          }
+        }
+
+        const createdTxIds = [];
+        for (const [lot, groupMtr] of Object.entries(lotGroups)) {
+          const rawMtr = computeRawMeters(groupMtr, challan.shortagePct);
+          const outwardTx = new FabricTransaction({
+            type: 'OUTWARD',
+            fabricQuality: challan.fabricName,
+            panna: challan.panna || '',
+            lotNo: parseLotNo(lot),
+            qty: rawMtr,
+            date: challan.date,
+            jobNo: challan.jobNo || '',
+            partyName: challan.partyName || '',
+            challanNo: 'EDP-' + challan.challanNo,
+            notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Fresh=${groupMtr}m + ${challan.shortagePct || 0}% shortage = ${rawMtr}m raw`,
+          });
+          await outwardTx.save();
+          createdTxIds.push(outwardTx._id);
+        }
+        challan.fabricOutwardIds = createdTxIds;
         await challan.save();
       }
     } catch (txErr) {
-      console.error('Warning: Failed to sync fabric outward on update:', txErr.message);
+      console.error('Warning: Failed to sync fabric outward transactions on update:', txErr.message);
     }
 
     res.json({ success: true, data: challan });
@@ -266,12 +316,21 @@ const deleteChallan = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Challan not found' });
     }
 
-    // Remove the linked outward fabric transaction first
+    // Remove the linked outward fabric transactions first
     if (challan.fabricOutwardId) {
       try {
         await FabricTransaction.findByIdAndDelete(challan.fabricOutwardId);
       } catch (txErr) {
         console.error('Warning: Failed to delete linked fabric outward:', txErr.message);
+      }
+    }
+    if (challan.fabricOutwardIds && challan.fabricOutwardIds.length > 0) {
+      for (const txId of challan.fabricOutwardIds) {
+        try {
+          await FabricTransaction.findByIdAndDelete(txId);
+        } catch (txErr) {
+          console.error('Warning: Failed to delete linked fabric outward:', txErr.message);
+        }
       }
     }
 
