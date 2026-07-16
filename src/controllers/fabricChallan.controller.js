@@ -219,26 +219,26 @@ const downloadChallanPdf = async (req, res) => {
 
     doc.strokeColor('#0000ff').lineWidth(1).rect(ML, MR, contentWidth, PH - 2 * MR).stroke();
 
-    doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica')
+    doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica')
       .text('Subject to SURAT Jurisdiction', ML + 12, MR + 4, { lineBreak: false });
-    doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
       .text('|| Shree Ganeshay Namah ||', ML, MR + 4, { width: contentWidth, align: 'center', lineBreak: false });
-    doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica')
+    doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica')
       .text('Mo. +91 99098 66667', ML, MR + 4, { width: contentWidth - 12, align: 'right', lineBreak: false });
 
     doc.strokeColor('#0000ff').lineWidth(0.5)
-      .moveTo(ML, MR + 12).lineTo(PW - MR, MR + 12).stroke();
+      .moveTo(ML, MR + 14).lineTo(PW - MR, MR + 14).stroke();
 
     const logoPath = path.join(__dirname, 'Logo.png');
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, ML + (contentWidth - 140) / 2, MR + 15, { width: 140 });
+      doc.image(logoPath, ML + (contentWidth - 140) / 2, MR + 16, { width: 140 });
     }
 
-    doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica-Bold')
-      .text('GROUND FLOOR, PLOT NO-B/37, Siddheshwar Society, Puna Kumbariya Road, NR. KALAPUL, Punagam, Surat, Surat, Gujarat, 395010', ML, MR + 66, { width: contentWidth, align: 'center', lineBreak: false });
+    doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
+      .text('GROUND FLOOR, PLOT NO-B/37, Siddheshwar Society, Puna Kumbariya Road, NR. KALAPUL, Punagam, Surat, Surat, Gujarat, 395010', ML, MR + 60, { width: contentWidth, align: 'center', lineBreak: false });
 
     doc.strokeColor('#0000ff').lineWidth(0.8)
-      .moveTo(ML, MR + 90).lineTo(PW - MR, MR + 90).stroke();
+      .moveTo(ML, MR + 88).lineTo(PW - MR, MR + 88).stroke();
 
     const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {
       day: '2-digit', month: '2-digit', year: 'numeric'
@@ -251,21 +251,21 @@ const downloadChallanPdf = async (req, res) => {
       doc.restore();
     }
 
-    const startY = MR + 94;
+    const startY = MR + 92;
 
-    doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(12.5).font('Helvetica-Bold')
       .text('M/s:', ML + 12, startY + 6, { lineBreak: false });
-    doc.fillColor('#0f172a').fontSize(12.5).font('Helvetica-Bold')
+    doc.fillColor('#0f172a').fontSize(14.5).font('Helvetica-Bold')
       .text(challan.partyName || '—', ML + 42, startY + 4, { lineBreak: false });
       
-    doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(12.5).font('Helvetica-Bold')
       .text('Ch.no.:', PW - MR - 160, startY + 6, { width: 90, align: 'right', lineBreak: false });
-    doc.fillColor('#dc2626').fontSize(13).font('Helvetica-Bold')
+    doc.fillColor('#dc2626').fontSize(15).font('Helvetica-Bold')
       .text('EDP-' + (challan.challanNo || '—'), PW - MR - 65, startY + 4, { width: 60, align: 'left', lineBreak: false });
 
-    doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(12.5).font('Helvetica-Bold')
       .text('Date:', PW - MR - 160, startY + 17, { width: 90, align: 'right', lineBreak: false });
-    doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold')
+    doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold')
       .text(formattedDate, PW - MR - 65, startY + 17, { width: 60, align: 'left', lineBreak: false });
 
     doc.strokeColor('#0000ff').lineWidth(0.6)
@@ -275,10 +275,10 @@ const downloadChallanPdf = async (req, res) => {
       doc.strokeColor('#0000ff').lineWidth(0.5)
         .rect(x, y, width, height).stroke();
 
-      doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica-Bold')
+      doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
         .text(label.toUpperCase(), x + 10, y + 4, { width: width - 20, align: 'left', lineBreak: false });
 
-      doc.fillColor('#0f172a').fontSize(10.5).font('Helvetica-Bold')
+      doc.fillColor('#0f172a').fontSize(12.5).font('Helvetica-Bold')
         .text(String(value || '—'), x + 10, y + 14, { width: width - 20, align: 'left', lineBreak: false });
     }
 
@@ -318,7 +318,7 @@ const downloadChallanPdf = async (req, res) => {
     renderField('Vendor Challan', challan.vendorChallanNo, ML + colWidth4 * 2, gridStartY + 28, colWidth4 * 2, 28);
 
     const tpSectionY = gridStartY + 56 + 12;
-    doc.fillColor('#0000ff').fontSize(11).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(13).font('Helvetica-Bold')
       .text('TP Details', ML + 16, tpSectionY, { lineBreak: false });
 
     const activeTps = (challan.tpDetails || [])
@@ -336,7 +336,7 @@ const downloadChallanPdf = async (req, res) => {
       doc.rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).fill('#f8fafc');
       doc.strokeColor('#0000ff').lineWidth(0.5).rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).stroke();
       
-      doc.fillColor('#0000ff').fontSize(10).font('Helvetica-Bold')
+      doc.fillColor('#0000ff').fontSize(12).font('Helvetica-Bold')
         .text('TP NO.', x, tpTableStartY + 6, { width: tpColWidth * 0.35, align: 'center' });
       doc.text('METRES', x + tpColWidth * 0.35, tpTableStartY + 6, { width: tpColWidth * 0.65, align: 'center' });
     }
@@ -347,7 +347,7 @@ const downloadChallanPdf = async (req, res) => {
       const x = ML;
       const y = tpTableStartY + tableHeaderHeight;
       doc.strokeColor('#0000ff').lineWidth(0.5).rect(x, y, contentWidth, tpRowHeight).stroke();
-      doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Oblique')
+      doc.fillColor('#0000ff').fontSize(12.5).font('Helvetica-Oblique')
         .text('No active TP details entered.', x, y + 6, { width: contentWidth, align: 'center' });
     } else {
       for (let i = 0; i < activeCount; i++) {
@@ -362,10 +362,10 @@ const downloadChallanPdf = async (req, res) => {
 
         const val = `${parseFloat(tp.tpMeter).toFixed(2)} mtr`;
 
-        doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
+        doc.fillColor('#0000ff').fontSize(12.5).font('Helvetica-Bold')
           .text(String(tp.tpNo), x, y + 6, { width: tpColWidth * 0.35, align: 'center' });
         
-        doc.fillColor('#0f172a').fontSize(11).font('Helvetica')
+        doc.fillColor('#0f172a').fontSize(13).font('Helvetica')
           .text(val, x + tpColWidth * 0.35, y + 6, { width: tpColWidth * 0.65, align: 'center' });
       }
     }
@@ -374,29 +374,29 @@ const downloadChallanPdf = async (req, res) => {
     const summaryColWidth3 = contentWidth / 3;
 
     doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML, summaryStartY, summaryColWidth3, 42).stroke();
-    doc.fillColor('#0000ff').fontSize(9.5).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(11.5).font('Helvetica-Bold')
       .text('TOTAL CHALLAN TP', ML, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
-    doc.fillColor('#10b981').fontSize(15).font('Helvetica-Bold')
+    doc.fillColor('#10b981').fontSize(17).font('Helvetica-Bold')
       .text(String(challan.totalTp || 0), ML, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
 
     doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML + summaryColWidth3, summaryStartY, summaryColWidth3, 42).stroke();
-    doc.fillColor('#0000ff').fontSize(9.5).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(11.5).font('Helvetica-Bold')
       .text('EXPECTED PCS', ML + summaryColWidth3, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
-    doc.fillColor('#10b981').fontSize(15).font('Helvetica-Bold')
+    doc.fillColor('#10b981').fontSize(17).font('Helvetica-Bold')
       .text(String(challan.pcs || 0), ML + summaryColWidth3, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
 
     doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML + summaryColWidth3 * 2, summaryStartY, summaryColWidth3, 42).stroke();
-    doc.fillColor('#0000ff').fontSize(9.5).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(11.5).font('Helvetica-Bold')
       .text('TOTAL CHALLAN METRES', ML + summaryColWidth3 * 2, summaryStartY + 8, { width: summaryColWidth3, align: 'center' });
-    doc.fillColor('#10b981').fontSize(15).font('Helvetica-Bold')
+    doc.fillColor('#10b981').fontSize(17).font('Helvetica-Bold')
       .text(`${parseFloat(challan.totalMtr || 0).toFixed(2)} mtr`, ML + summaryColWidth3 * 2, summaryStartY + 20, { width: summaryColWidth3, align: 'center' });
 
     if (challan.notes && challan.notes.trim()) {
       const notesY = summaryStartY + 54;
       doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML, notesY, contentWidth, 34).stroke();
-      doc.fillColor('#0000ff').fontSize(9.5).font('Helvetica-Bold')
+      doc.fillColor('#0000ff').fontSize(11.5).font('Helvetica-Bold')
         .text('NOTES / REMARKS', ML + 12, notesY + 5, { width: contentWidth - 24 });
-      doc.fillColor('#0f172a').fontSize(11).font('Helvetica')
+      doc.fillColor('#0f172a').fontSize(13).font('Helvetica')
         .text(challan.notes, ML + 12, notesY + 16, { width: contentWidth - 24 });
     }
 
@@ -404,12 +404,12 @@ const downloadChallanPdf = async (req, res) => {
     
     // Left: Receiver Signature
     doc.moveTo(ML + 30, sigLineY).lineTo(ML + 160, sigLineY).strokeColor('#0000ff').lineWidth(0.5).stroke();
-    doc.fillColor('#0000ff').fontSize(10).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(12).font('Helvetica-Bold')
       .text('RECEIVER SIGNATURE', ML + 30, sigLineY + 5, { width: 130, align: 'center' });
 
     // Right: Authorized Signature
     doc.moveTo(PW - MR - 160, sigLineY).lineTo(PW - MR - 30, sigLineY).strokeColor('#0000ff').lineWidth(0.5).stroke();
-    doc.fillColor('#0000ff').fontSize(10).font('Helvetica-Bold')
+    doc.fillColor('#0000ff').fontSize(12).font('Helvetica-Bold')
       .text('AUTHORIZED SIGNATURE', PW - MR - 160, sigLineY + 5, { width: 130, align: 'center' });
 
     doc.end();
