@@ -451,15 +451,17 @@ const downloadChallanPdf = async (req, res) => {
     doc.fillColor('#0f172a').fontSize(14.5).font('Helvetica-Bold')
       .text(challan.partyName || '—', ML + 42, startY + 4, { lineBreak: false });
       
+    // Date: DD/MM/YYYY
     doc.fillColor('#0000ff').fontSize(12.5).font('Helvetica-Bold')
-      .text('Ch.no.:', PW - MR - 175, startY + 6, { width: 90, align: 'right', lineBreak: false });
-    doc.fillColor('#dc2626').fontSize(15).font('Helvetica-Bold')
-      .text('EDP-' + (challan.challanNo || '—'), PW - MR - 80, startY + 4, { width: 80, align: 'left', lineBreak: false });
-
-    doc.fillColor('#0000ff').fontSize(12.5).font('Helvetica-Bold')
-      .text('Date:', PW - MR - 175, startY + 17, { width: 90, align: 'right', lineBreak: false });
+      .text('Date:', PW - MR - 260, startY + 6, { width: 45, align: 'right', lineBreak: false });
     doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold')
-      .text(formattedDate, PW - MR - 80, startY + 17, { width: 80, align: 'left', lineBreak: false });
+      .text(formattedDate, PW - MR - 210, startY + 6, { width: 80, align: 'left', lineBreak: false });
+
+    // Ch.no.: EDP-XXX
+    doc.fillColor('#0000ff').fontSize(12.5).font('Helvetica-Bold')
+      .text('Ch.no.:', PW - MR - 120, startY + 6, { width: 55, align: 'right', lineBreak: false });
+    doc.fillColor('#dc2626').fontSize(14.5).font('Helvetica-Bold')
+      .text('EDP-' + (challan.challanNo || '—'), PW - MR - 60, startY + 4, { width: 60, align: 'left', lineBreak: false });
 
     doc.strokeColor('#0000ff').lineWidth(0.6)
       .moveTo(ML, startY + 28).lineTo(PW - MR, startY + 28).stroke();
