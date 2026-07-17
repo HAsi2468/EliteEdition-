@@ -568,13 +568,26 @@ const downloadChallanPdf = async (req, res) => {
     doc.fillColor('#10b981').fontSize(17).font('Helvetica-Bold')
       .text(`${parseFloat(challan.totalMtr || 0).toFixed(2)} mtr`, ML + summaryColWidth3 * 2, summaryStartY + 23, { width: summaryColWidth3, align: 'center' });
 
-    if (challan.notes && challan.notes.trim()) {
+    const hasNotes = !!(challan.notes && challan.notes.trim());
+    const hasPcs = !!(challan.pcs);
+
+    if (hasNotes || hasPcs) {
       const notesY = summaryStartY + 60;
       doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML, notesY, contentWidth, 42).stroke();
       doc.fillColor('#0000ff').fontSize(11.5).font('Helvetica-Bold')
         .text('NOTES / REMARKS', ML + 12, notesY + 6, { width: contentWidth - 24 });
-      doc.fillColor('#0f172a').fontSize(13).font('Helvetica')
-        .text(challan.notes, ML + 12, notesY + 20, { width: contentWidth - 24 });
+      
+      let textToPrint = challan.notes || '';
+      if (hasPcs) {
+        if (textToPrint) {
+          textToPrint += '   (Expected Pcs: ' + challan.pcs + ')';
+        } else {
+          textToPrint += 'Expected Pcs: ' + challan.pcs;
+        }
+      }
+
+      doc.fillColor('#0f172a').fontSize(12).font('Helvetica')
+        .text(textToPrint, ML + 12, notesY + 20, { width: contentWidth - 24 });
     }
 
     const sigLineY = PH - MR - 45;
