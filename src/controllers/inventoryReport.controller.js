@@ -93,17 +93,17 @@ const drawPunchGuide = (doc) => {
 const drawPageHeader = (doc, reportTitle, dateStr, pageNum) => {
   doc.rect(0, 0, PAGE_W, 54).fill(C.headerBg);
 
-  // Logo drawing next to title
+  // Logo drawing next to title (increased size to 44x44, placed at y = 5)
   const path = require('path');
   const logoPath = path.join(__dirname, 'Logo_previous.png');
   try {
-    doc.image(logoPath, M, 11, { width: 32, height: 32 });
+    doc.image(logoPath, M, 5, { width: 44, height: 44 });
   } catch (err) {
     logger.warn('Failed to draw logo: %s', err.message);
   }
 
   doc.fillColor(C.headerText).font('Helvetica-Bold').fontSize(16)
-     .text(reportTitle, M + 42, 19);
+     .text(reportTitle, M + 54, 19);
 
   doc.fillColor(C.headerText).font('Helvetica').fontSize(8.5)
      .text(dateStr, M, 14, { width: CW, align: 'right' });
