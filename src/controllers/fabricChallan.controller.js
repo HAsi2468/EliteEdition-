@@ -427,7 +427,7 @@ const downloadChallanPdf = async (req, res) => {
       d.restore();
     };
 
-    const addressText = 'G.F., PLOT NO-B/37, Siddheshwar Soc., Puna Kumbariya Road, NR. KALAPUL, Punagam, Surat';
+    const addressText = 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, NR. KALAPUL, Punagam, Surat';
     doc.fillColor('#0000ff').fontSize(10).font('Helvetica-Bold');
     const textWidth = doc.widthOfString(addressText);
     const startX = ML + (contentWidth - textWidth) / 2;
