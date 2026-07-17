@@ -1308,25 +1308,29 @@ export default function FabricInventoryPanel() {
                             const parts = notes.split('|');
                             if (parts.length >= 2) {
                               const header = parts[0].trim();
-                              const formula = parts[1].trim();
+                              const badges = parts.slice(1).map(p => p.trim());
                               return (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
                                   <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.8rem' }}>
                                     {header}
                                   </span>
-                                  <span style={{ 
-                                    fontSize: '0.72rem', 
-                                    color: 'var(--success)', 
-                                    background: 'rgba(16, 185, 129, 0.08)', 
-                                    border: '1px solid rgba(16, 185, 129, 0.15)',
-                                    padding: '2px 6px', 
-                                    borderRadius: '4px', 
-                                    display: 'inline-block',
-                                    marginTop: '2px',
-                                    whiteSpace: 'nowrap'
-                                  }}>
-                                    {formula}
-                                  </span>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                    {badges.map((badge, bIdx) => (
+                                      <span key={bIdx} style={{ 
+                                        fontSize: '0.72rem', 
+                                        color: bIdx === 0 ? 'var(--primary-light)' : 'var(--success)', 
+                                        background: bIdx === 0 ? 'rgba(14, 165, 233, 0.08)' : 'rgba(16, 185, 129, 0.08)', 
+                                        border: bIdx === 0 ? '1px solid rgba(14, 165, 233, 0.15)' : '1px solid rgba(16, 185, 129, 0.15)',
+                                        padding: '2px 6px', 
+                                        borderRadius: '4px', 
+                                        display: 'inline-block',
+                                        marginTop: '2px',
+                                        whiteSpace: 'nowrap'
+                                      }}>
+                                        {badge}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
                               );
                             }
