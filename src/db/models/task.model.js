@@ -42,6 +42,19 @@ const taskSchema = new mongoose.Schema(
         type: String, // Storing secure URL strings from object storage
       },
     ],
+    checklist: [
+      {
+        text: { type: String, required: true },
+        completed: { type: Boolean, default: false }
+      }
+    ],
+    comments: [
+      {
+        text: { type: String, required: true },
+        sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        createdAt: { type: Date, default: Date.now }
+      }
+    ],
   },
   {
     timestamps: true,

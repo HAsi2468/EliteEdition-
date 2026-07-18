@@ -28,6 +28,16 @@ const Workspace = ({ currentUser }) => {
   const [showCreateRoomModal, setShowCreateRoomModal] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
   const [newRoomMembers, setNewRoomMembers] = useState([]); // Array of user IDs to add to new group room
+  
+  // Advanced Features States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [replyToMessage, setReplyToMessage] = useState(null);
+  const [typingUsers, setTypingUsers] = useState({});
+  const [taskSearchQuery, setTaskSearchQuery] = useState('');
+  const typingTimeoutRef = useRef(null);
+  const isTypingRef = useRef(false);
+  const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [newCommentText, setNewCommentText] = useState('');
 
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -186,6 +196,9 @@ const Workspace = ({ currentUser }) => {
     if (!socket || !activeRoom) return;
     socket.emit('join-room', activeRoom._id);
 
+    // Reset typing status on channel switch
+    setTypingUsers({});
+
     const loadMessages = async () => {
       try {
         const res = await api.getRoomMessages(activeRoom._id);
@@ -202,6 +215,29 @@ const Workspace = ({ currentUser }) => {
         setMessages((prev) => [...prev, message]);
         scrollToBottom();
       }
+    };
+
+    const handleUserTyping = ({ roomId, username, isTyping }) => {
+      if (roomId === activeRoom._id) {
+        setTypingUsers(prev => {
+          const copy = { ...prev };
+          if (isTyping) {
+            copy[username] = true;
+          } else {
+            delete copy[username];
+          }
+          return copy;
+        });
+      }
+    };
+
+    const handleReactionUpdated = ({ messageId, reactions }) => {
+      setMessages((prev) => prev.map(msg => {
+        if (msg._id === messageId) {
+          return { ...msg, reactions };
+        }
+        return msg;
+      }));
     };
 
     const handleTaskUpdated = (updatedTask) => {
@@ -233,11 +269,15 @@ const Workspace = ({ currentUser }) => {
     socket.on('receive-message', handleReceiveMessage);
     socket.on('task-updated', handleTaskUpdated);
     socket.on('task-deleted', handleTaskDeleted);
+    socket.on('user-typing', handleUserTyping);
+    socket.on('message-reaction-updated', handleReactionUpdated);
 
     return () => {
       socket.off('receive-message', handleReceiveMessage);
       socket.off('task-updated', handleTaskUpdated);
       socket.off('task-deleted', handleTaskDeleted);
+      socket.off('user-typing', handleUserTyping);
+      socket.off('message-reaction-updated', handleReactionUpdated);
     };
   }, [socket, activeRoom]);
 
@@ -365,15 +405,56 @@ const Workspace = ({ currentUser }) => {
     }, 100);
   };
 
+  const handleInputChange = (e) => {
+    setNewMessage(e.target.value);
+    
+    if (!socket || !activeRoom) return;
+
+    if (!isTypingRef.current) {
+      isTypingRef.current = true;
+      socket.emit('typing', {
+        roomId: activeRoom._id,
+        username: currentUser.name || currentUser.username,
+        isTyping: true
+      });
+    }
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      isTypingRef.current = false;
+      socket.emit('typing', {
+        roomId: activeRoom._id,
+        username: currentUser.name || currentUser.username,
+        isTyping: false
+      });
+    }, 1500);
+  };
+
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !activeRoom || !socket) return;
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    isTypingRef.current = false;
+    socket.emit('typing', {
+      roomId: activeRoom._id,
+      username: currentUser.name || currentUser.username,
+      isTyping: false
+    });
+
     socket.emit('send-message', {
       roomId: activeRoom._id,
       senderId: currentUser._id,
-      content: newMessage
+      content: newMessage,
+      replyTo: replyToMessage ? replyToMessage._id : null
     });
     setNewMessage('');
+    setReplyToMessage(null);
   };
 
   const handleImageUpload = async (e) => {
@@ -390,8 +471,10 @@ const Workspace = ({ currentUser }) => {
       socket.emit('send-message', {
         roomId: activeRoom._id,
         senderId: currentUser._id,
-        content: fileUrl
+        content: fileUrl,
+        replyTo: replyToMessage ? replyToMessage._id : null
       });
+      setReplyToMessage(null);
       
     } catch (error) {
       console.error('Image upload failed', error);
@@ -400,6 +483,51 @@ const Workspace = ({ currentUser }) => {
       setIsUploading(false);
       e.target.value = null;
     }
+  };
+
+  const handleToggleReaction = (messageId, emoji) => {
+    if (!socket || !activeRoom) return;
+    socket.emit('toggle-reaction', {
+      messageId,
+      emoji,
+      userId: currentUser._id,
+      roomId: activeRoom._id
+    });
+  };
+
+  const toggleChecklistItem = (index) => {
+    const updatedChecklist = [...editTask.checklist];
+    updatedChecklist[index].completed = !updatedChecklist[index].completed;
+    setEditTask({ ...editTask, checklist: updatedChecklist });
+  };
+
+  const deleteChecklistItem = (index) => {
+    const updatedChecklist = editTask.checklist.filter((_, idx) => idx !== index);
+    setEditTask({ ...editTask, checklist: updatedChecklist });
+  };
+
+  const addChecklistItem = () => {
+    if (!newChecklistItem.trim()) return;
+    const newItem = { text: newChecklistItem.trim(), completed: false };
+    setEditTask({
+      ...editTask,
+      checklist: [...(editTask.checklist || []), newItem]
+    });
+    setNewChecklistItem('');
+  };
+
+  const addComment = () => {
+    if (!newCommentText.trim()) return;
+    const newComment = {
+      text: newCommentText.trim(),
+      sender: currentUser,
+      createdAt: new Date().toISOString()
+    };
+    setEditTask({
+      ...editTask,
+      comments: [...(editTask.comments || []), newComment]
+    });
+    setNewCommentText('');
   };
 
   const handleCreateTaskSubmit = (e) => {
@@ -442,7 +570,9 @@ const Workspace = ({ currentUser }) => {
       description: editTask.description,
       priority: editTask.priority,
       assignees: editTask.assigneeId ? [editTask.assigneeId] : [],
-      dueDate: editTask.dueDate || undefined
+      dueDate: editTask.dueDate || undefined,
+      checklist: editTask.checklist || [],
+      comments: editTask.comments || []
     });
     setEditTask(null);
   };
@@ -529,8 +659,9 @@ const Workspace = ({ currentUser }) => {
     },
     modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(3, 7, 18, 0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(5px)' },
     modalContent: { width: '450px', backgroundColor: '#161b26', border: '1px solid var(--border-light, rgba(255,255,255,0.08))', borderRadius: '16px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4)', color: 'var(--text-primary)' },
+    modalContentLarge: { width: '800px', maxWidth: '90%', backgroundColor: '#161b26', border: '1px solid var(--border-light, rgba(255,255,255,0.08))', borderRadius: '16px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4)', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflowY: 'auto' },
     kanbanContainer: { display: 'flex', gap: '20px', height: '100%', overflowX: 'auto', paddingBottom: '20px' },
-    kanbanColumn: { flex: '1', minWidth: '300px', backgroundColor: 'var(--bg-card, #161b26)', borderRadius: '12px', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid var(--border-light)' },
+    kanbanColumn: { flex: '1', minWidth: '300px', backgroundColor: 'rgba(22, 27, 38, 0.65)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.08)' },
     kanbanColHeader: { padding: '15px 20px', fontWeight: 'bold', fontSize: '1rem', borderBottom: '1px solid var(--border-light)', backgroundColor: 'rgba(0,0,0,0.02)' },
     kanbanColBody: { padding: '15px', display: 'flex', flexDirection: 'column', gap: '15px', overflowY: 'auto', flex: 1 }
   };
@@ -555,10 +686,32 @@ const Workspace = ({ currentUser }) => {
           description: task.description || '',
           priority: task.priority || 'medium',
           assigneeId,
-          dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
+          dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
+          checklist: task.checklist || [],
+          comments: task.comments || []
         });
       }}
-      style={{ backgroundColor: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-light)', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', cursor: 'grab', userSelect: 'none' }}
+      style={{
+        backgroundColor: 'var(--bg-main, #0b0f19)',
+        borderRadius: '12px',
+        border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
+        borderLeft: `4px solid ${
+          task.priority === 'high' ? '#ef4444' : task.priority === 'medium' ? '#f59e0b' : '#10b981'
+        }`,
+        boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+        cursor: 'grab',
+        userSelect: 'none',
+        transition: 'all 0.2s',
+        marginBottom: '12px'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'none';
+        e.currentTarget.style.boxShadow = '0 2px 5px rgba(0,0,0,0.05)';
+      }}
     >
       <div style={wsStyles.taskCard.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -572,6 +725,11 @@ const Workspace = ({ currentUser }) => {
         {task.dueDate && (
           <div style={{ marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
             📅 Due: {new Date(task.dueDate).toLocaleDateString()}
+          </div>
+        )}
+        {task.checklist && task.checklist.length > 0 && (
+          <div style={{ marginTop: '10px', fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            ☑️ {task.checklist.filter(item => item.completed).length}/{task.checklist.length} Checklist
           </div>
         )}
       </div>
@@ -594,11 +752,18 @@ const Workspace = ({ currentUser }) => {
     </div>
   );
 
+  const escapeRegExp = (string) => {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  };
+
   const filteredTasks = boardTasks.filter(t => {
     if (taskFilter === 'my-tasks') {
-      return t.assignees?.some(a => a._id === currentUser._id);
+      if (!t.assignees?.some(a => a._id === currentUser._id)) return false;
     }
-    return true; // 'all-tasks'
+    if (taskSearchQuery.trim()) {
+      return t.title.toLowerCase().includes(taskSearchQuery.toLowerCase());
+    }
+    return true;
   });
 
   const groupRooms = rooms.filter(r => r.type !== 'direct');
@@ -607,6 +772,19 @@ const Workspace = ({ currentUser }) => {
   // Message content formatter for Markdown & Download Links
   const renderMessageContent = (content) => {
     if (!content) return null;
+
+    const highlightText = (text) => {
+      if (!searchQuery.trim()) return text;
+      const regex = new RegExp(`(${escapeRegExp(searchQuery)})`, 'gi');
+      const parts = text.split(regex);
+      return parts.map((part, index) => 
+        regex.test(part) ? (
+          <mark key={index} style={{ background: '#facc15', color: '#111827', padding: '0 2px', borderRadius: '2px' }}>{part}</mark>
+        ) : (
+          part
+        )
+      );
+    };
 
     const formatLine = (line) => {
       const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -669,9 +847,9 @@ const Workspace = ({ currentUser }) => {
         const boldParts = part.split(boldRegex);
         return boldParts.map((subPart, subIndex) => {
           if (subIndex % 2 === 1) {
-            return <strong key={subIndex} style={{ color: 'var(--text-primary, #ffffff)' }}>{subPart}</strong>;
+            return <strong key={subIndex} style={{ color: 'var(--text-primary, #ffffff)' }}>{highlightText(subPart)}</strong>;
           }
-          return subPart;
+          return highlightText(subPart);
         });
       });
     };
@@ -800,6 +978,30 @@ const Workspace = ({ currentUser }) => {
                       {activeRoom.type === 'direct' ? <Users size={24} color="var(--primary)" /> : <Hash size={24} color="var(--primary)" />}
                       <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{getActiveRoomName()}</h3>
                     </div>
+                    {/* Chat Search input */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '250px' }}>
+                      <input 
+                        type="text" 
+                        placeholder="Search messages..." 
+                        value={searchQuery} 
+                        onChange={(e) => setSearchQuery(e.target.value)} 
+                        style={{
+                          width: '100%',
+                          padding: '6px 12px',
+                          borderRadius: '16px',
+                          border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
+                          backgroundColor: 'var(--bg-input, #0b0f19)',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.85rem',
+                          outline: 'none'
+                        }} 
+                      />
+                      {searchQuery && (
+                        <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginLeft: '-30px', marginRight: '10px' }}>
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Messages */}
@@ -807,80 +1009,313 @@ const Workspace = ({ currentUser }) => {
                     {messages.length === 0 ? (
                       <div style={{ margin: 'auto', color: 'var(--text-secondary)' }}>No messages in this channel yet.</div>
                     ) : (
-                      messages.map(msg => {
-                        const isMine = msg.senderId?._id === currentUser._id;
-                        const isTask = msg.type === 'task-card';
-                        
-                        return (
-                          <div key={msg._id} style={{ display: 'flex', flexDirection: 'column' }}>
-                            <div style={wsStyles.messageSender(isMine && !isTask)}>
-                              <span>{msg.senderId?.name || msg.senderId?.username || 'System'}</span>
-                              <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                            </div>
-                            
-                            <div 
-                              style={wsStyles.messageBubble(isMine, isTask)}
-                              onMouseEnter={() => !isTask && setHoveredMessageId(msg._id)}
-                              onMouseLeave={() => !isTask && setHoveredMessageId(null)}
-                            >
-                              {/* TASK CARD RENDERING in CHAT */}
-                              {isTask && msg.taskId ? (
-                                <div>
-                                  <div style={wsStyles.taskCard.header}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <CheckSquare size={16} color="var(--primary)" />
-                                      <strong style={{ color: 'var(--text-primary)' }}>{msg.taskId.title}</strong>
+                      (() => {
+                        const filteredMessages = messages.filter(msg => {
+                          if (!searchQuery.trim()) return true;
+                          return msg.content && msg.content.toLowerCase().includes(searchQuery.toLowerCase());
+                        });
+
+                        if (filteredMessages.length === 0) {
+                          return <div style={{ margin: 'auto', color: 'var(--text-secondary)' }}>No matching messages found.</div>;
+                        }
+
+                        return filteredMessages.map(msg => {
+                          const isMine = msg.senderId?._id === currentUser._id;
+                          const isTask = msg.type === 'task-card';
+                          
+                          return (
+                            <div key={msg._id} id={`msg-${msg._id}`} style={{ display: 'flex', flexDirection: 'column', transition: 'background-color 0.5s ease', borderRadius: '8px' }}>
+                              <div style={wsStyles.messageSender(isMine && !isTask)}>
+                                <span>{msg.senderId?.name || msg.senderId?.username || 'System'}</span>
+                                <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                              
+                              <div 
+                                style={wsStyles.messageBubble(isMine, isTask)}
+                                onMouseEnter={() => !isTask && setHoveredMessageId(msg._id)}
+                                onMouseLeave={() => !isTask && setHoveredMessageId(null)}
+                              >
+                                {/* TASK CARD RENDERING in CHAT */}
+                                {isTask && msg.taskId ? (
+                                  <div>
+                                    <div style={wsStyles.taskCard.header}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <CheckSquare size={16} color="var(--primary)" />
+                                        <strong style={{ color: 'var(--text-primary)' }}>{msg.taskId.title}</strong>
+                                      </div>
+                                      <span style={wsStyles.taskCard.priorityBadge(msg.taskId.priority)}>{msg.taskId.priority}</span>
                                     </div>
-                                    <span style={wsStyles.taskCard.priorityBadge(msg.taskId.priority)}>{msg.taskId.priority}</span>
+                                    <div style={wsStyles.taskCard.body}>
+                                      {renderDescription(msg.taskId.description)}
+                                      {msg.taskId.dueDate && (
+                                        <div style={{ marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          📅 Due: {new Date(msg.taskId.dueDate).toLocaleDateString()}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div style={wsStyles.taskCard.footer}>
+                                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                        Assigned to: {msg.taskId.assignees?.length > 0 ? msg.taskId.assignees.map(a => a.name || a.username).join(', ') : 'Unassigned'}
+                                      </span>
+                                      <select 
+                                        value={msg.taskId.status} 
+                                        onChange={(e) => updateTaskStatus(msg.taskId._id, e.target.value)}
+                                        style={wsStyles.taskCard.statusSelect(msg.taskId.status)}
+                                      >
+                                        <option value="To Do">To Do</option>
+                                        <option value="In Progress">In Progress</option>
+                                        <option value="Done">Done</option>
+                                      </select>
+                                    </div>
                                   </div>
-                                  <div style={wsStyles.taskCard.body}>
-                                    {renderDescription(msg.taskId.description)}
-                                    {msg.taskId.dueDate && (
-                                      <div style={{ marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        📅 Due: {new Date(msg.taskId.dueDate).toLocaleDateString()}
+                                ) : (
+                                  // STANDARD TEXT RENDERING
+                                  <>
+                                    {/* Quoted Reply Display */}
+                                    {msg.replyTo && (
+                                      <div style={{
+                                        padding: '8px 12px',
+                                        backgroundColor: isMine ? 'rgba(0,0,0,0.15)' : 'var(--bg-main)',
+                                        borderLeft: '3px solid var(--primary)',
+                                        borderRadius: '4px',
+                                        marginBottom: '8px',
+                                        fontSize: '0.8rem',
+                                        color: 'var(--text-secondary)',
+                                        maxWidth: '100%',
+                                        cursor: 'pointer'
+                                      }}
+                                      onClick={() => {
+                                        const el = document.getElementById(`msg-${msg.replyTo._id || msg.replyTo}`);
+                                        if (el) {
+                                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                          el.style.backgroundColor = 'rgba(56, 189, 248, 0.15)';
+                                          setTimeout(() => {
+                                            el.style.backgroundColor = '';
+                                          }, 1500);
+                                        }
+                                      }}
+                                      >
+                                        <div style={{ fontWeight: 'bold', color: 'var(--primary)', marginBottom: '2px' }}>
+                                          {msg.replyTo.senderId?.name || msg.replyTo.senderId?.username || 'User'}
+                                        </div>
+                                        <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          {msg.replyTo.content}
+                                        </div>
                                       </div>
                                     )}
-                                  </div>
-                                  <div style={wsStyles.taskCard.footer}>
-                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                                      Assigned to: {msg.taskId.assignees?.length > 0 ? msg.taskId.assignees.map(a => a.name || a.username).join(', ') : 'Unassigned'}
-                                    </span>
-                                    <select 
-                                      value={msg.taskId.status} 
-                                      onChange={(e) => updateTaskStatus(msg.taskId._id, e.target.value)}
-                                      style={wsStyles.taskCard.statusSelect(msg.taskId.status)}
-                                    >
-                                      <option value="To Do">To Do</option>
-                                      <option value="In Progress">In Progress</option>
-                                      <option value="Done">Done</option>
-                                    </select>
-                                  </div>
-                                </div>
-                              ) : (
-                                // STANDARD TEXT RENDERING
-                                <>
-                                  {msg.content.startsWith('http') && (msg.content.includes('.s3.') || msg.content.includes('/uploads/')) ? (
-                                    <img src={msg.content} alt="Attachment" style={{ maxWidth: '100%', borderRadius: '8px' }} />
-                                  ) : (
-                                    renderMessageContent(msg.content)
-                                  )}
-                                  {hoveredMessageId === msg._id && !isTask && (
-                                    <button style={wsStyles.createTaskChip} onClick={() => setTaskModalMsg(msg)}>
-                                      <CheckSquare size={12} /> Create Task
-                                    </button>
-                                  )}
-                                </>
-                              )}
+
+                                    {/* Message Body */}
+                                    {msg.content.startsWith('http') && (msg.content.includes('.s3.') || msg.content.includes('/uploads/')) ? (
+                                      <img src={msg.content} alt="Attachment" style={{ maxWidth: '100%', borderRadius: '8px' }} />
+                                    ) : (
+                                      renderMessageContent(msg.content)
+                                    )}
+
+                                    {/* Hover Action Bar */}
+                                    {hoveredMessageId === msg._id && !isTask && (
+                                      <div style={{
+                                        position: 'absolute',
+                                        top: '-24px',
+                                        right: isMine ? '0px' : 'auto',
+                                        left: !isMine ? '0px' : 'auto',
+                                        backgroundColor: '#1f2937',
+                                        border: '1px solid rgba(255,255,255,0.08)',
+                                        borderRadius: '16px',
+                                        padding: '2px 8px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        boxShadow: '0 4px 6px rgba(0,0,0,0.15)',
+                                        zIndex: 10
+                                      }}>
+                                        {['👍', '❤️', '🔥', '👏', '😂', '😮'].map(emoji => (
+                                          <button 
+                                            key={emoji}
+                                            type="button"
+                                            onClick={() => handleToggleReaction(msg._id, emoji)}
+                                            style={{
+                                              background: 'none',
+                                              border: 'none',
+                                              cursor: 'pointer',
+                                              fontSize: '1rem',
+                                              padding: '2px',
+                                              transition: 'transform 0.1s',
+                                            }}
+                                            onMouseEnter={(e) => e.target.style.transform = 'scale(1.3)'}
+                                            onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                                          >
+                                            {emoji}
+                                          </button>
+                                        ))}
+                                        <div style={{ width: '1px', height: '12px', backgroundColor: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />
+                                        <button 
+                                          type="button"
+                                          onClick={() => setReplyToMessage(msg)}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            color: 'var(--text-secondary)',
+                                            fontSize: '0.75rem',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '2px'
+                                          }}
+                                        >
+                                          Reply
+                                        </button>
+                                        <button 
+                                          type="button"
+                                          onClick={() => setTaskModalMsg(msg)}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            color: 'var(--text-secondary)',
+                                            fontSize: '0.75rem',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '2px'
+                                          }}
+                                        >
+                                          Task
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    {/* Emojis Reactions List */}
+                                    {msg.reactions && msg.reactions.length > 0 && (
+                                      <div style={{
+                                        display: 'flex',
+                                        flexWrap: 'wrap',
+                                        gap: '4px',
+                                        marginTop: '6px',
+                                        justifyContent: isMine ? 'flex-end' : 'flex-start'
+                                      }}>
+                                        {Object.entries(
+                                          msg.reactions.reduce((acc, r) => {
+                                            acc[r.emoji] = acc[r.emoji] || [];
+                                            acc[r.emoji].push(r);
+                                            return acc;
+                                          }, {})
+                                        ).map(([emoji, reacts]) => {
+                                          const hasReacted = reacts.some(r => String(r.user?._id || r.user) === String(currentUser._id));
+                                          return (
+                                            <button
+                                              key={emoji}
+                                              type="button"
+                                              onClick={() => handleToggleReaction(msg._id, emoji)}
+                                              style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                backgroundColor: hasReacted ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                                                border: `1px solid ${hasReacted ? 'var(--primary)' : 'rgba(255,255,255,0.08)'}`,
+                                                borderRadius: '12px',
+                                                padding: '2px 8px',
+                                                fontSize: '0.75rem',
+                                                cursor: 'pointer',
+                                                color: hasReacted ? '#60a5fa' : 'var(--text-secondary)',
+                                                transition: 'all 0.2s',
+                                              }}
+                                              title={reacts.map(r => r.user?.name || r.user?.username || 'Unknown').join(', ')}
+                                            >
+                                              <span>{emoji}</span>
+                                              <span>{reacts.length}</span>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })
+                          );
+                        });
+                      })()
                     )}
+
+                    {/* Typing Indicators */}
+                    {Object.keys(typingUsers).length > 0 && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 16px',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.8rem',
+                        alignSelf: 'flex-start'
+                      }}>
+                        <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+                          <span style={{
+                            width: '6px',
+                            height: '6px',
+                            backgroundColor: 'var(--text-secondary)',
+                            borderRadius: '50%',
+                            display: 'inline-block',
+                            animation: 'bounce 1.4s infinite ease-in-out both'
+                          }} />
+                          <span style={{
+                            width: '6px',
+                            height: '6px',
+                            backgroundColor: 'var(--text-secondary)',
+                            borderRadius: '50%',
+                            display: 'inline-block',
+                            animation: 'bounce 1.4s infinite ease-in-out both',
+                            animationDelay: '0.2s'
+                          }} />
+                          <span style={{
+                            width: '6px',
+                            height: '6px',
+                            backgroundColor: 'var(--text-secondary)',
+                            borderRadius: '50%',
+                            display: 'inline-block',
+                            animation: 'bounce 1.4s infinite ease-in-out both',
+                            animationDelay: '0.4s'
+                          }} />
+                        </div>
+                        <span>
+                          {Object.keys(typingUsers).join(', ')} {Object.keys(typingUsers).length === 1 ? 'is' : 'are'} typing...
+                        </span>
+                      </div>
+                    )}
+
                     <div ref={messagesEndRef} />
                   </div>
 
                   {/* Input Bar */}
                   <div style={wsStyles.inputArea}>
+                    {replyToMessage && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 16px',
+                        backgroundColor: 'var(--bg-card, #161b26)',
+                        borderBottom: '1px solid var(--border-light, rgba(255,255,255,0.08))',
+                        borderTopLeftRadius: '12px',
+                        borderTopRightRadius: '12px',
+                        marginBottom: '8px',
+                      }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 'bold' }}>
+                            Replying to {replyToMessage.senderId?.name || replyToMessage.senderId?.username || 'System'}
+                          </span>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '400px' }}>
+                            {replyToMessage.content}
+                          </span>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={() => setReplyToMessage(null)} 
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    )}
+
                     <form onSubmit={handleSendMessage} style={wsStyles.inputForm}>
                       <button 
                         type="button" 
@@ -897,7 +1332,7 @@ const Workspace = ({ currentUser }) => {
                         style={{ display: 'none' }} 
                         onChange={handleImageUpload} 
                       />
-                      <input type="text" placeholder={`Message #${activeRoom.name}...`} value={newMessage} onChange={(e) => setNewMessage(e.target.value)} style={wsStyles.inputField} />
+                      <input type="text" placeholder={`Message #${activeRoom.name}...`} value={newMessage} onChange={handleInputChange} style={wsStyles.inputField} />
                       <button type="submit" style={wsStyles.sendBtn} disabled={!newMessage.trim() || isUploading}><Send size={18} /></button>
                     </form>
                   </div>
@@ -928,9 +1363,27 @@ const Workspace = ({ currentUser }) => {
                 </button>
               </div>
 
-              <button onClick={() => setTaskModalMsg({ isStandalone: true, content: '' })} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: 'white', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Plus size={18} /> Create New Task
-              </button>
+              <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                <input 
+                  type="text" 
+                  placeholder="Filter tasks by title..." 
+                  value={taskSearchQuery}
+                  onChange={(e) => setTaskSearchQuery(e.target.value)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
+                    backgroundColor: 'var(--bg-input, #0b0f19)',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                    fontSize: '0.9rem',
+                    width: '220px'
+                  }}
+                />
+                <button onClick={() => setTaskModalMsg({ isStandalone: true, content: '' })} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: 'white', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Plus size={18} /> Create New Task
+                </button>
+              </div>
             </div>
              <div style={wsStyles.kanbanContainer}>
               {/* To Do Column */}
@@ -1055,49 +1508,133 @@ const Workspace = ({ currentUser }) => {
       {/* Task Details & Edit Modal */}
       {editTask && (
         <div style={wsStyles.modalOverlay}>
-          <div style={wsStyles.modalContent}>
+          <div style={wsStyles.modalContentLarge}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h3 style={{ margin: 0 }}>Task Details</h3>
               <button onClick={() => setEditTask(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
             </div>
             
-            <form onSubmit={handleEditTaskSubmit}>
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Task Title</label>
-                <input required type="text" value={editTask.title} onChange={e => setEditTask({...editTask, title: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }} />
-              </div>
+            <form onSubmit={handleEditTaskSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                {/* Left Side: Standard fields */}
+                <div style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Task Title</label>
+                    <input required type="text" value={editTask.title} onChange={e => setEditTask({...editTask, title: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }} />
+                  </div>
 
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Description</label>
-                <textarea value={editTask.description} onChange={e => setEditTask({...editTask, description: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none', minHeight: '80px', resize: 'vertical' }}></textarea>
-              </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Description</label>
+                    <textarea value={editTask.description} onChange={e => setEditTask({...editTask, description: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none', minHeight: '120px', resize: 'vertical' }}></textarea>
+                  </div>
 
-              <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Priority</label>
-                  <select value={editTask.priority} onChange={e => setEditTask({...editTask, priority: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }}>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </select>
+                  <div style={{ display: 'flex', gap: '15px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Priority</label>
+                      <select value={editTask.priority} onChange={e => setEditTask({...editTask, priority: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }}>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Due Date</label>
+                      <input type="date" value={editTask.dueDate} onChange={e => setEditTask({...editTask, dueDate: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Assign To</label>
+                    <select value={editTask.assigneeId} onChange={e => setEditTask({...editTask, assigneeId: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }}>
+                      <option value="">Unassigned</option>
+                      {allUsers.map(u => (
+                        <option key={u._id} value={u._id}>{u.name || u.username} ({u.email})</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Due Date</label>
-                  <input type="date" value={editTask.dueDate} onChange={e => setEditTask({...editTask, dueDate: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }} />
+
+                {/* Right Side: Checklist & Comments */}
+                <div style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Checklist */}
+                  <div style={{ border: '1px solid var(--border-light)', borderRadius: '12px', padding: '16px', backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                    <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}><CheckSquare size={16} color="var(--primary)" /> Checklist</h4>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto', marginBottom: '12px' }}>
+                      {editTask.checklist && editTask.checklist.length > 0 ? (
+                        editTask.checklist.map((item, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1, fontSize: '0.85rem' }}>
+                              <input type="checkbox" checked={item.completed} onChange={() => toggleChecklistItem(idx)} />
+                              <span style={{ textDecoration: item.completed ? 'line-through' : 'none', color: item.completed ? 'var(--text-secondary)' : 'var(--text-primary)' }}>{item.text}</span>
+                            </label>
+                            <button type="button" onClick={() => deleteChecklistItem(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 0 }}><X size={14} /></button>
+                          </div>
+                        ))
+                      ) : (
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No checklist items yet.</span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input 
+                        type="text" 
+                        placeholder="Add item..." 
+                        value={newChecklistItem} 
+                        onChange={(e) => setNewChecklistItem(e.target.value)} 
+                        style={{ flex: 1, padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}
+                      />
+                      <button 
+                        type="button" 
+                        onClick={addChecklistItem} 
+                        style={{ padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', backgroundColor: 'var(--primary)', color: '#0b0f19', fontWeight: 'bold', border: 'none' }}
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Comments */}
+                  <div style={{ border: '1px solid var(--border-light)', borderRadius: '12px', padding: '16px', backgroundColor: 'rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', height: '240px' }}>
+                    <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}><MessageSquare size={16} color="var(--primary)" /> Comments</h4>
+                    
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', marginBottom: '12px', paddingRight: '4px' }}>
+                      {editTask.comments && editTask.comments.length > 0 ? (
+                        editTask.comments.map((c, idx) => (
+                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '2px', backgroundColor: 'var(--bg-main)', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                              <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{c.sender?.name || c.sender?.username || 'User'}</span>
+                              <span>{new Date(c.createdAt).toLocaleDateString()} {new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-primary)', wordBreak: 'break-word' }}>{c.text}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 'auto' }}>No comments yet.</span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input 
+                        type="text" 
+                        placeholder="Write a comment..." 
+                        value={newCommentText} 
+                        onChange={(e) => setNewCommentText(e.target.value)} 
+                        style={{ flex: 1, padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}
+                      />
+                      <button 
+                        type="button" 
+                        onClick={addComment} 
+                        style={{ padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', backgroundColor: 'var(--primary)', color: '#0b0f19', fontWeight: 'bold', border: 'none' }}
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Assign To</label>
-                <select value={editTask.assigneeId} onChange={e => setEditTask({...editTask, assigneeId: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }}>
-                  <option value="">Unassigned</option>
-                  {allUsers.map(u => (
-                    <option key={u._id} value={u._id}>{u.name || u.username} ({u.email})</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-light)', paddingTop: '15px', marginTop: '10px' }}>
                 <button type="button" onClick={handleDeleteTask} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--danger)', backgroundColor: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontWeight: 'bold' }}>Delete Task</button>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button type="button" onClick={() => setEditTask(null)} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>Cancel</button>
