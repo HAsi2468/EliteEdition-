@@ -243,6 +243,72 @@ const setupSockets = (io) => {
       }
     });
 
+    // Handle message editing
+    socket.on('edit-message', async (data) => {
+      try {
+        const { messageId, newContent, roomId } = data;
+        await ChatMessage.findByIdAndUpdate(messageId, {
+          content: newContent,
+          isEdited: true
+        });
+        io.to(roomId).emit('message-edited', { messageId, newContent });
+      } catch (error) {
+        console.error('Error editing message:', error);
+      }
+    });
+
+    // Handle message soft deletion
+    socket.on('delete-message', async (data) => {
+      try {
+        const { messageId, roomId } = data;
+        await ChatMessage.findByIdAndUpdate(messageId, {
+          content: 'This message was deleted',
+          isDeleted: true,
+          attachment: null
+        });
+        io.to(roomId).emit('message-deleted', { messageId });
+      } catch (error) {
+        console.error('Error deleting message:', error);
+      }
+    });
+
+    // Handle toggling pin status
+    socket.on('toggle-pin-message', async (data) => {
+      try {
+        const { messageId, roomId } = data;
+        const msg = await ChatMessage.findById(messageId);
+        if (!msg) return;
+        msg.isPinned = !msg.isPinned;
+        await msg.save();
+        io.to(roomId).emit('message-pin-updated', { messageId, isPinned: msg.isPinned });
+      } catch (error) {
+        console.error('Error pinning message:', error);
+      }
+    });
+
+    // Handle updating room settings (name, members list, archiving)
+    socket.on('update-room-settings', async (data) => {
+      try {
+        const { roomId, name, isArchived, members } = data;
+        const room = await ChatRoom.findById(roomId);
+        if (!room) return;
+        if (name !== undefined) room.name = name;
+        if (isArchived !== undefined) room.isArchived = isArchived;
+        if (members !== undefined) room.members = members;
+        await room.save();
+        
+        const populatedRoom = await ChatRoom.findById(roomId).populate('members', 'name email');
+        
+        // Broadcast to everyone in the room
+        io.to(roomId).emit('room-settings-updated', populatedRoom);
+        
+        // Also notify all users globally to update sidebar
+        io.emit('global-room-updated', populatedRoom);
+      } catch (error) {
+        console.error('Error updating room settings:', error);
+      }
+    });
+
     // Handle marking room messages as read
     socket.on('read-room-messages', async (data) => {
       try {

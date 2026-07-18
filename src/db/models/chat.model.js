@@ -17,6 +17,10 @@ const chatRoomSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    isArchived: {
+      type: Boolean,
+      default: false
+    },
   },
   {
     timestamps: true,
@@ -79,6 +83,18 @@ const chatMessageSchema = new mongoose.Schema(
         default: []
       }
     ],
+    isEdited: {
+      type: Boolean,
+      default: false
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false
+    },
+    isPinned: {
+      type: Boolean,
+      default: false
+    },
   },
   {
     timestamps: true,

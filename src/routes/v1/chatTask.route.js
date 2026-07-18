@@ -94,9 +94,10 @@ router.get('/rooms', async (req, res) => {
   try {
     const { userId } = req.query;
     
-    let query = {};
+    let query = { isArchived: { $ne: true } };
     if (userId) {
       query = {
+        isArchived: { $ne: true },
         $or: [
           { members: userId }, // Match any room where user is a member
           { type: { $ne: 'direct' }, $or: [ { members: { $exists: false } }, { members: { $size: 0 } } ] } // Match public group rooms

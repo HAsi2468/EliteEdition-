@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../contexts/SocketContext';
 import { api } from '../services/api';
-import { MessageSquare, Send, Users, Hash, Plus, CheckSquare, X, ImagePlus, Loader2, Paperclip } from 'lucide-react';
+import { MessageSquare, Send, Users, Hash, Plus, CheckSquare, X, ImagePlus, Loader2, Paperclip, Mic, Pin, Trash2, Edit2, Settings, Volume2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 
 const Workspace = ({ currentUser }) => {
@@ -48,6 +48,17 @@ const Workspace = ({ currentUser }) => {
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Advanced Voice, Edit, Pin, Settings States
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [audioChunks, setAudioChunks] = useState([]);
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [showPinsDrawer, setShowPinsDrawer] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsRoomName, setSettingsRoomName] = useState('');
+  const [settingsRoomMembers, setSettingsRoomMembers] = useState([]);
+  const [settingsRoomArchived, setSettingsRoomArchived] = useState(false);
 
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -314,6 +325,30 @@ const Workspace = ({ currentUser }) => {
         }));
       }
     };
+    const handleMessageEdited = ({ messageId, newContent }) => {
+      setMessages(prev => prev.map(msg => 
+        msg._id === messageId ? { ...msg, content: newContent, isEdited: true } : msg
+      ));
+    };
+
+    const handleMessageDeleted = ({ messageId }) => {
+      setMessages(prev => prev.map(msg => 
+        msg._id === messageId ? { ...msg, content: 'This message was deleted', isDeleted: true, attachment: null } : msg
+      ));
+    };
+
+    const handleMessagePinUpdated = ({ messageId, isPinned }) => {
+      setMessages(prev => prev.map(msg => 
+        msg._id === messageId ? { ...msg, isPinned } : msg
+      ));
+    };
+
+    const handleRoomSettingsUpdated = (updatedRoom) => {
+      if (activeRoom && activeRoom._id === updatedRoom._id) {
+        setActiveRoom(updatedRoom);
+      }
+      setRooms(prev => prev.map(r => r._id === updatedRoom._id ? updatedRoom : r));
+    };
 
     socket.on('receive-message', handleReceiveMessage);
     socket.on('task-updated', handleTaskUpdated);
@@ -321,6 +356,10 @@ const Workspace = ({ currentUser }) => {
     socket.on('user-typing', handleUserTyping);
     socket.on('message-reaction-updated', handleReactionUpdated);
     socket.on('room-messages-read', handleRoomMessagesRead);
+    socket.on('message-edited', handleMessageEdited);
+    socket.on('message-deleted', handleMessageDeleted);
+    socket.on('message-pin-updated', handleMessagePinUpdated);
+    socket.on('room-settings-updated', handleRoomSettingsUpdated);
 
     return () => {
       socket.off('receive-message', handleReceiveMessage);
@@ -329,6 +368,10 @@ const Workspace = ({ currentUser }) => {
       socket.off('user-typing', handleUserTyping);
       socket.off('message-reaction-updated', handleReactionUpdated);
       socket.off('room-messages-read', handleRoomMessagesRead);
+      socket.off('message-edited', handleMessageEdited);
+      socket.off('message-deleted', handleMessageDeleted);
+      socket.off('message-pin-updated', handleMessagePinUpdated);
+      socket.off('room-settings-updated', handleRoomSettingsUpdated);
     };
   }, [socket, activeRoom]);
 
@@ -486,11 +529,32 @@ const Workspace = ({ currentUser }) => {
       });
     };
 
+    const handleGlobalRoomUpdated = (updatedRoom) => {
+      if (updatedRoom.isArchived) {
+        setRooms(prev => prev.filter(r => r._id !== updatedRoom._id));
+        if (activeRoomRef.current && activeRoomRef.current._id === updatedRoom._id) {
+          setActiveRoom(null);
+        }
+      } else {
+        const isMember = updatedRoom.members?.some(m => (m._id || m) === userId);
+        if (isMember) {
+          setRooms(prev => {
+            const exists = prev.some(r => r._id === updatedRoom._id);
+            if (exists) {
+              return prev.map(r => r._id === updatedRoom._id ? updatedRoom : r);
+            }
+            return [...prev, updatedRoom];
+          });
+        }
+      }
+    };
+
     socket.on('receive-message', handleReceiveMessageNotify);
     socket.on('task-updated', handleTaskUpdatedNotify);
     socket.on('room-created', handleRoomCreated);
     socket.on('presence-sync', handlePresenceSync);
     socket.on('mention-notification', handleMentionNotification);
+    socket.on('global-room-updated', handleGlobalRoomUpdated);
 
     return () => {
       socket.off('receive-message', handleReceiveMessageNotify);
@@ -498,6 +562,7 @@ const Workspace = ({ currentUser }) => {
       socket.off('room-created', handleRoomCreated);
       socket.off('presence-sync', handlePresenceSync);
       socket.off('mention-notification', handleMentionNotification);
+      socket.off('global-room-updated', handleGlobalRoomUpdated);
     };
   }, [socket, currentUser]);
 
@@ -523,6 +588,30 @@ const Workspace = ({ currentUser }) => {
 
   const renderAttachment = (att) => {
     if (!att || !att.fileUrl) return null;
+    
+    const isAudio = att.fileType?.startsWith('audio/') || att.fileName?.match(/\.(webm|ogg|wav|mp3|m4a)$/i);
+    if (isAudio) {
+      return (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px',
+          padding: '10px 14px',
+          borderRadius: '8px',
+          backgroundColor: 'rgba(0,0,0,0.15)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          maxWidth: '300px',
+          marginTop: '6px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            <Volume2 size={16} color="var(--primary)" />
+            <span>Voice Memo</span>
+          </div>
+          <audio controls src={att.fileUrl} style={{ width: '100%', height: '32px', outline: 'none' }} />
+        </div>
+      );
+    }
+
     const isImage = att.fileType?.startsWith('image/') || att.fileUrl?.match(/\.(jpg|jpeg|png|gif)$/i);
     if (isImage) {
       return <img src={att.fileUrl} alt={att.fileName} style={{ maxWidth: '100%', borderRadius: '8px', maxHeight: '300px', objectFit: 'contain', marginTop: '6px' }} />;
@@ -770,6 +859,103 @@ const Workspace = ({ currentUser }) => {
     }, 1500);
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+      
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      
+      recorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: 'audio/webm' });
+        await uploadAndSendFile(file);
+      };
+      
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Failed to start voice note recording', err);
+      alert('Could not access microphone.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(t => t.stop());
+      setIsRecording(false);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stream.getTracks().forEach(t => t.stop());
+      setIsRecording(false);
+      setAudioChunks([]);
+    }
+  };
+
+  const deleteMessage = (messageId) => {
+    if (!window.confirm('Are you sure you want to delete this message?')) return;
+    if (socket && activeRoom) {
+      socket.emit('delete-message', { messageId, roomId: activeRoom._id });
+    }
+  };
+
+  const editMessageInitiate = (msg) => {
+    setEditingMessageId(msg._id);
+    setNewMessage(msg.content);
+    setTimeout(() => {
+      document.getElementById('chat-input-field')?.focus();
+    }, 20);
+  };
+
+  const cancelEditing = () => {
+    setEditingMessageId(null);
+    setNewMessage('');
+  };
+
+  const togglePinMessage = (messageId) => {
+    if (socket && activeRoom) {
+      socket.emit('toggle-pin-message', { messageId, roomId: activeRoom._id });
+    }
+  };
+
+  const openRoomSettings = () => {
+    if (!activeRoom) return;
+    setSettingsRoomName(activeRoom.name || '');
+    setSettingsRoomMembers(activeRoom.members?.map(m => m._id || m) || []);
+    setSettingsRoomArchived(activeRoom.isArchived || false);
+    setShowSettingsModal(true);
+  };
+
+  const saveRoomSettings = () => {
+    if (socket && activeRoom) {
+      socket.emit('update-room-settings', {
+        roomId: activeRoom._id,
+        name: settingsRoomName,
+        isArchived: settingsRoomArchived,
+        members: settingsRoomMembers
+      });
+      setShowSettingsModal(false);
+    }
+  };
+
+  const handleSettingsMemberToggle = (userId) => {
+    setSettingsRoomMembers(prev => {
+      const exists = prev.includes(userId);
+      if (exists) {
+        return prev.filter(id => id !== userId);
+      }
+      return [...prev, userId];
+    });
+  };
+
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !activeRoom || !socket) return;
@@ -784,12 +970,21 @@ const Workspace = ({ currentUser }) => {
       isTyping: false
     });
 
-    socket.emit('send-message', {
-      roomId: activeRoom._id,
-      senderId: currentUser._id,
-      content: newMessage,
-      replyTo: replyToMessage ? replyToMessage._id : null
-    });
+    if (editingMessageId) {
+      socket.emit('edit-message', {
+        messageId: editingMessageId,
+        newContent: newMessage,
+        roomId: activeRoom._id
+      });
+      setEditingMessageId(null);
+    } else {
+      socket.emit('send-message', {
+        roomId: activeRoom._id,
+        senderId: currentUser._id,
+        content: newMessage,
+        replyTo: replyToMessage ? replyToMessage._id : null
+      });
+    }
     setNewMessage('');
     setReplyToMessage(null);
   };
@@ -1030,53 +1225,89 @@ const Workspace = ({ currentUser }) => {
     return `"${desc}"`;
   };
 
-  const renderKanbanCard = (task) => (
-    <div 
-      key={task._id} 
-      draggable={true}
-      onDragStart={() => setDraggedTaskId(task._id)}
-      onClick={() => {
-        const assigneeId = task.assignees && task.assignees[0] ? task.assignees[0]._id : '';
-        setEditTask({
-          _id: task._id,
-          title: task.title,
-          description: task.description || '',
-          priority: task.priority || 'medium',
-          assigneeId,
-          dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
-          checklist: task.checklist || [],
-          comments: task.comments || []
-        });
-      }}
-      style={{
-        backgroundColor: 'var(--bg-main, #0b0f19)',
-        borderRadius: '12px',
-        border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-        borderLeft: `4px solid ${
-          task.priority === 'high' ? '#ef4444' : task.priority === 'medium' ? '#f59e0b' : '#10b981'
-        }`,
-        boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-        cursor: 'grab',
-        userSelect: 'none',
-        transition: 'all 0.2s',
-        marginBottom: '12px'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.15)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'none';
-        e.currentTarget.style.boxShadow = '0 2px 5px rgba(0,0,0,0.05)';
-      }}
-    >
-      <div style={wsStyles.taskCard.header}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <CheckSquare size={16} color="var(--primary)" />
-          <strong style={{ color: 'var(--text-primary)' }}>{task.title}</strong>
+  const getDueDateAlertStyle = (task) => {
+    if (!task.dueDate || task.status === 'Done') return {};
+    const dueTime = new Date(task.dueDate).getTime();
+    const nowTime = new Date().getTime();
+    const diffMs = dueTime - nowTime;
+    const diffHrs = diffMs / (1000 * 60 * 60);
+    
+    if (diffMs < 0) {
+      return { border: '1.5px solid #ef4444', boxShadow: '0 0 10px rgba(239, 68, 68, 0.3)' };
+    } else if (diffHrs <= 24) {
+      return { border: '1.5px solid #f59e0b', boxShadow: '0 0 10px rgba(245, 158, 11, 0.3)' };
+    }
+    return {};
+  };
+
+  const renderKanbanCard = (task) => {
+    const alertStyle = getDueDateAlertStyle(task);
+    return (
+      <div 
+        key={task._id} 
+        draggable={true}
+        onDragStart={() => setDraggedTaskId(task._id)}
+        onClick={() => {
+          const assigneeId = task.assignees && task.assignees[0] ? task.assignees[0]._id : '';
+          setEditTask({
+            _id: task._id,
+            title: task.title,
+            description: task.description || '',
+            priority: task.priority || 'medium',
+            assigneeId,
+            dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
+            checklist: task.checklist || [],
+            comments: task.comments || []
+          });
+        }}
+        style={{
+          backgroundColor: 'var(--bg-main, #0b0f19)',
+          borderRadius: '12px',
+          border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
+          borderLeft: `4px solid ${
+            task.priority === 'high' ? '#ef4444' : task.priority === 'medium' ? '#f59e0b' : '#10b981'
+          }`,
+          boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+          cursor: 'grab',
+          userSelect: 'none',
+          transition: 'all 0.25s ease',
+          marginBottom: '12px',
+          ...alertStyle
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-3px) scale(1.01)';
+          if (!alertStyle.border) {
+            e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.25)';
+            e.currentTarget.style.borderColor = 'var(--primary)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'none';
+          e.currentTarget.style.boxShadow = alertStyle.boxShadow || '0 2px 5px rgba(0,0,0,0.05)';
+          e.currentTarget.style.borderColor = alertStyle.border ? '#ef4444' : 'var(--border-light, rgba(255,255,255,0.08))';
+        }}
+      >
+        <div style={wsStyles.taskCard.header}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CheckSquare size={16} color="var(--primary)" />
+            <strong style={{ color: 'var(--text-primary)' }}>{task.title}</strong>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={wsStyles.taskCard.priorityBadge(task.priority)}>{task.priority}</span>
+            {task.dueDate && task.status !== 'Done' && (() => {
+              const dueTime = new Date(task.dueDate).getTime();
+              const nowTime = new Date().getTime();
+              const diffMs = dueTime - nowTime;
+              const diffHrs = diffMs / (1000 * 60 * 60);
+              if (diffMs < 0) {
+                return <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold', backgroundColor: '#ef4444', color: 'white' }}>Overdue</span>;
+              } else if (diffHrs <= 24) {
+                return <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold', backgroundColor: '#f59e0b', color: '#0b0f19' }}>Due Soon</span>;
+              }
+              return null;
+            })()}
+          </div>
         </div>
-        <span style={wsStyles.taskCard.priorityBadge(task.priority)}>{task.priority}</span>
-      </div>
       <div style={wsStyles.taskCard.body}>
         {renderDescription(task.description)}
         {task.dueDate && (
@@ -1107,7 +1338,8 @@ const Workspace = ({ currentUser }) => {
         </select>
       </div>
     </div>
-  );
+    );
+  };
 
   const escapeRegExp = (string) => {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1364,8 +1596,9 @@ const Workspace = ({ currentUser }) => {
               onDrop={handleDrop}
             >
               {activeRoom ? (
-                <>
-                  {isDragging && (
+                <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden' }}>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', position: 'relative' }}>
+                    {isDragging && (
                     <div style={{
                       position: 'absolute',
                       inset: 0,
@@ -1390,27 +1623,66 @@ const Workspace = ({ currentUser }) => {
                       {activeRoom.type === 'direct' ? <Users size={24} color="var(--primary)" /> : <Hash size={24} color="var(--primary)" />}
                       <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{getActiveRoomName()}</h3>
                     </div>
-                    {/* Chat Search input */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '250px' }}>
-                      <input 
-                        type="text" 
-                        placeholder="Search messages..." 
-                        value={searchQuery} 
-                        onChange={(e) => setSearchQuery(e.target.value)} 
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                      {/* Chat Search input */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '220px' }}>
+                        <input 
+                          type="text" 
+                          placeholder="Search messages..." 
+                          value={searchQuery} 
+                          onChange={(e) => setSearchQuery(e.target.value)} 
+                          style={{
+                            width: '100%',
+                            padding: '6px 12px',
+                            borderRadius: '16px',
+                            border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
+                            backgroundColor: 'var(--bg-input, #0b0f19)',
+                            color: 'var(--text-primary)',
+                            fontSize: '0.85rem',
+                            outline: 'none'
+                          }} 
+                        />
+                        {searchQuery && (
+                          <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginLeft: '-30px', marginRight: '10px' }}>
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* Pinned Messages Button */}
+                      <button
+                        onClick={() => setShowPinsDrawer(prev => !prev)}
                         style={{
-                          width: '100%',
-                          padding: '6px 12px',
-                          borderRadius: '16px',
-                          border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-                          backgroundColor: 'var(--bg-input, #0b0f19)',
-                          color: 'var(--text-primary)',
-                          fontSize: '0.85rem',
-                          outline: 'none'
-                        }} 
-                      />
-                      {searchQuery && (
-                        <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginLeft: '-30px', marginRight: '10px' }}>
-                          <X size={14} />
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: showPinsDrawer ? '#facc15' : 'var(--text-secondary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '0.85rem'
+                        }}
+                        title="Pinned Messages"
+                      >
+                        <Pin size={18} fill={showPinsDrawer ? '#facc15' : 'none'} />
+                      </button>
+                      
+                      {/* Room settings gear (only for group channels) */}
+                      {activeRoom.type !== 'direct' && (
+                        <button
+                          onClick={openRoomSettings}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--text-secondary)',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                          title="Channel Settings"
+                        >
+                          <Settings size={18} />
                         </button>
                       )}
                     </div>
@@ -1502,6 +1774,20 @@ const Workspace = ({ currentUser }) => {
                                 ) : (
                                   // STANDARD TEXT RENDERING
                                   <>
+                                    {msg.isPinned && (
+                                      <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        fontSize: '0.7rem',
+                                        color: '#facc15',
+                                        marginBottom: '6px',
+                                        fontWeight: 'bold'
+                                      }}>
+                                        <Pin size={10} fill="#facc15" /> Pinned
+                                      </div>
+                                    )}
+
                                     {/* Quoted Reply Display */}
                                     {msg.replyTo && (
                                       <div style={{
@@ -1536,13 +1822,21 @@ const Workspace = ({ currentUser }) => {
                                     )}
 
                                     {/* Message Body */}
-                                    {msg.attachment ? (
-                                      renderAttachment(msg.attachment)
-                                    ) : msg.content.startsWith('http') && (msg.content.includes('.s3.') || msg.content.includes('/uploads/')) && (msg.content.endsWith('.png') || msg.content.endsWith('.jpg') || msg.content.endsWith('.jpeg') || msg.content.endsWith('.gif') || msg.content.includes('image')) ? (
-                                      <img src={msg.content} alt="Attachment" style={{ maxWidth: '100%', borderRadius: '8px' }} />
-                                    ) : (
-                                      renderMessageContent(msg.content)
-                                    )}
+                                    <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap' }}>
+                                      {msg.attachment ? (
+                                        renderAttachment(msg.attachment)
+                                      ) : msg.content.startsWith('http') && (msg.content.includes('.s3.') || msg.content.includes('/uploads/')) && (msg.content.endsWith('.png') || msg.content.endsWith('.jpg') || msg.content.endsWith('.jpeg') || msg.content.endsWith('.gif') || msg.content.includes('image')) ? (
+                                        <img src={msg.content} alt="Attachment" style={{ maxWidth: '100%', borderRadius: '8px' }} />
+                                      ) : (
+                                        renderMessageContent(msg.content)
+                                      )}
+                                      
+                                      {msg.isEdited && (
+                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted, #8892a4)', marginLeft: '6px', fontStyle: 'italic', alignSelf: 'flex-end', marginBottom: '2px' }} title="Edited">
+                                          (edited)
+                                        </span>
+                                      )}
+                                    </div>
 
                                     {/* Hover Action Bar */}
                                     {hoveredMessageId === msg._id && !isTask && (
@@ -1613,6 +1907,58 @@ const Workspace = ({ currentUser }) => {
                                         >
                                           Task
                                         </button>
+                                        <button 
+                                          type="button"
+                                          onClick={() => togglePinMessage(msg._id)}
+                                          style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            color: msg.isPinned ? '#facc15' : 'var(--text-secondary)',
+                                            fontSize: '0.75rem',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '2px'
+                                          }}
+                                        >
+                                          <Pin size={12} fill={msg.isPinned ? '#facc15' : 'none'} /> Pin
+                                        </button>
+                                        {isMine && !msg.isDeleted && (
+                                          <>
+                                            <button 
+                                              type="button"
+                                              onClick={() => editMessageInitiate(msg)}
+                                              style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                color: 'var(--text-secondary)',
+                                                fontSize: '0.75rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '2px'
+                                              }}
+                                            >
+                                              <Edit2 size={12} /> Edit
+                                            </button>
+                                            <button 
+                                              type="button"
+                                              onClick={() => deleteMessage(msg._id)}
+                                              style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                color: '#ef4444',
+                                                fontSize: '0.75rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '2px'
+                                              }}
+                                            >
+                                              <Trash2 size={12} /> Delete
+                                            </button>
+                                          </>
+                                        )}
                                       </div>
                                     )}
 
@@ -1788,6 +2134,69 @@ const Workspace = ({ currentUser }) => {
                       </div>
                     )}
 
+                    {editingMessageId && (
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '8px 12px',
+                        backgroundColor: 'rgba(234, 179, 8, 0.1)',
+                        borderLeft: '3px solid #eab308',
+                        borderRadius: '4px',
+                        marginBottom: '8px',
+                      }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#eab308', fontWeight: 'bold' }}>
+                            Editing Message
+                          </span>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                            Press Esc or click X to cancel
+                          </span>
+                        </div>
+                        <button 
+                          type="button" 
+                          onClick={cancelEditing} 
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    )}
+
+                    {isRecording && (
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '10px 16px',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderRadius: '8px',
+                        marginBottom: '8px',
+                        border: '1px solid rgba(239, 68, 68, 0.2)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div className="pulse-red" style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#ef4444' }}></div>
+                          <span style={{ fontSize: '0.9rem', color: '#ef4444', fontWeight: 'bold' }}>Recording Voice Note...</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <button 
+                            type="button" 
+                            onClick={stopRecording} 
+                            style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', backgroundColor: '#ef4444', color: 'white', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.8rem' }}
+                          >
+                            Send
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={cancelRecording} 
+                            style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)', backgroundColor: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8rem' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <form onSubmit={handleSendMessage} style={wsStyles.inputForm}>
                       <button 
                         type="button" 
@@ -1807,16 +2216,107 @@ const Workspace = ({ currentUser }) => {
                       <input 
                         id="chat-input-field" 
                         type="text" 
-                        placeholder={`Message #${activeRoom.name}...`} 
+                        placeholder={editingMessageId ? "Edit your message..." : `Message #${activeRoom.name}...`} 
                         value={newMessage} 
                         onChange={handleInputChange} 
                         style={wsStyles.inputField} 
                         autoComplete="off"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            if (editingMessageId) cancelEditing();
+                          }
+                        }}
                       />
+                      
+                      {!editingMessageId && (
+                        <button
+                          type="button"
+                          onClick={startRecording}
+                          style={{
+                            ...wsStyles.sendBtn,
+                            backgroundColor: 'var(--bg-input, #0b0f19)',
+                            color: 'var(--text-secondary)',
+                            border: '1px solid var(--border-light)',
+                            marginRight: '8px'
+                          }}
+                          title="Record voice memo"
+                        >
+                          <Mic size={18} />
+                        </button>
+                      )}
+                      
                       <button type="submit" style={wsStyles.sendBtn} disabled={!newMessage.trim() || isUploading}><Send size={18} /></button>
                     </form>
                   </div>
-                </>
+                </div>
+
+                {/* Right portion: Pinned messages drawer */}
+                  {showPinsDrawer && (
+                    <div style={{
+                      width: '320px',
+                      borderLeft: '1px solid var(--border-light, rgba(255,255,255,0.08))',
+                      backgroundColor: 'var(--bg-card, #161b26)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      height: '100%',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        padding: '16px',
+                        borderBottom: '1px solid var(--border-light, rgba(255,255,255,0.08))',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}>
+                        <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#facc15', fontSize: '1rem' }}>
+                          <Pin size={16} fill="#facc15" /> Pinned Messages
+                        </h4>
+                        <button 
+                          onClick={() => setShowPinsDrawer(false)} 
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                      
+                      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {messages.filter(msg => msg.isPinned).length === 0 ? (
+                          <div style={{ margin: 'auto', color: 'var(--text-secondary)', textAlign: 'center', fontSize: '0.9rem' }}>
+                            No pinned messages in this room.
+                          </div>
+                        ) : (
+                          messages.filter(msg => msg.isPinned).map(msg => (
+                            <div key={msg._id} className="glass-panel" style={{
+                              padding: '12px',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
+                              backgroundColor: 'rgba(255,255,255,0.02)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                                  {msg.senderId?.name || msg.senderId?.username || 'User'}
+                                </span>
+                                <button
+                                  onClick={() => togglePinMessage(msg._id)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.75rem' }}
+                                  title="Unpin"
+                                >
+                                  Unpin
+                                </button>
+                              </div>
+                              <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                                {msg.attachment ? renderAttachment(msg.attachment) : msg.content}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div style={{ margin: 'auto', color: 'var(--text-secondary)' }}>Select a channel to start messaging.</div>
               )}
@@ -1869,7 +2369,12 @@ const Workspace = ({ currentUser }) => {
             <div style={wsStyles.kanbanContainer}>
               {/* To Do Column */}
               <div 
-                style={wsStyles.kanbanColumn}
+                style={{
+                  ...wsStyles.kanbanColumn,
+                  border: draggedTaskId ? '2px dashed rgba(56, 189, 248, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  boxShadow: draggedTaskId ? '0 0 15px rgba(56, 189, 248, 0.05)' : 'none',
+                  transition: 'all 0.25s ease'
+                }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => {
                   if (draggedTaskId) {
@@ -1886,7 +2391,12 @@ const Workspace = ({ currentUser }) => {
 
               {/* In Progress Column */}
               <div 
-                style={wsStyles.kanbanColumn}
+                style={{
+                  ...wsStyles.kanbanColumn,
+                  border: draggedTaskId ? '2px dashed rgba(56, 189, 248, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  boxShadow: draggedTaskId ? '0 0 15px rgba(56, 189, 248, 0.05)' : 'none',
+                  transition: 'all 0.25s ease'
+                }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => {
                   if (draggedTaskId) {
@@ -1903,7 +2413,12 @@ const Workspace = ({ currentUser }) => {
 
               {/* Done Column */}
               <div 
-                style={wsStyles.kanbanColumn}
+                style={{
+                  ...wsStyles.kanbanColumn,
+                  border: draggedTaskId ? '2px dashed rgba(56, 189, 248, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  boxShadow: draggedTaskId ? '0 0 15px rgba(56, 189, 248, 0.05)' : 'none',
+                  transition: 'all 0.25s ease'
+                }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => {
                   if (draggedTaskId) {
@@ -2157,6 +2672,60 @@ const Workspace = ({ currentUser }) => {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <button type="button" onClick={() => setShowCreateRoomModal(false)} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>Cancel</button>
                 <button type="submit" style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: '#0b0f19', cursor: 'pointer', fontWeight: 'bold' }}>Create Room</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Group Settings Modal */}
+      {showSettingsModal && activeRoom && (
+        <div style={wsStyles.modalOverlay}>
+          <div style={wsStyles.modalContent}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Settings size={20} /> Channel Settings
+              </h3>
+              <button onClick={() => setShowSettingsModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
+            </div>
+            
+            <form onSubmit={(e) => { e.preventDefault(); saveRoomSettings(); }}>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Channel Name</label>
+                <input required type="text" value={settingsRoomName} onChange={e => setSettingsRoomName(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }} />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', marginBottom: '15px' }}>
+                <div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>Archive Channel</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Archived channels are hidden from the sidebar.</div>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={settingsRoomArchived}
+                  onChange={(e) => setSettingsRoomArchived(e.target.checked)}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Select Members</label>
+                <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: 'var(--bg-main)' }}>
+                  {otherUsers.map(u => {
+                    const isMember = settingsRoomMembers.includes(u._id);
+                    return (
+                      <label key={u._id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                        <input type="checkbox" checked={isMember} onChange={() => handleSettingsMemberToggle(u._id)} />
+                        <span>{u.name || u.username} ({u.email})</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button type="button" onClick={() => setShowSettingsModal(false)} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: '#0b0f19', cursor: 'pointer', fontWeight: 'bold' }}>Save Changes</button>
               </div>
             </form>
           </div>
