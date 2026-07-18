@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSocket } from '../contexts/SocketContext';
 import { api } from '../services/api';
-import { MessageSquare, Send, Users, Hash, Plus, CheckSquare, X, ImagePlus, Loader2 } from 'lucide-react';
+import { MessageSquare, Send, Users, Hash, Plus, CheckSquare, X, ImagePlus, Loader2, Paperclip } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 
 const Workspace = ({ currentUser }) => {
@@ -39,6 +39,16 @@ const Workspace = ({ currentUser }) => {
   const [newChecklistItem, setNewChecklistItem] = useState('');
   const [newCommentText, setNewCommentText] = useState('');
 
+  // Enterprise Enhancements States
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [unreadCounts, setUnreadCounts] = useState({});
+  const [mentionSearch, setMentionSearch] = useState('');
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionCursorIndex, setMentionCursorIndex] = useState(-1);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
   
@@ -66,19 +76,42 @@ const Workspace = ({ currentUser }) => {
     localStorage.setItem('elite_chat_last_read', JSON.stringify(updated));
   };
 
-  const isRoomUnread = (room) => {
-    if (activeRoom && activeRoom._id === room._id) return false;
-    const lastRead = lastReadTimes[room._id];
-    if (!lastRead) return true; // Default to unread for new rooms/messages
-    return new Date(room.updatedAt || room.createdAt) > new Date(lastRead);
-  };
+  // Initial unread counts setup
+  useEffect(() => {
+    if (rooms.length > 0) {
+      const initial = {};
+      rooms.forEach(r => {
+        const lastRead = lastReadTimes[r._id];
+        const hasNew = !lastRead || new Date(r.updatedAt || r.createdAt) > new Date(lastRead);
+        if (hasNew && (!activeRoom || activeRoom._id !== r._id)) {
+          initial[r._id] = 1;
+        }
+      });
+      setUnreadCounts(prev => ({ ...initial, ...prev }));
+    }
+  }, [rooms]);
 
   // Mark room as read when activeRoom changes
   useEffect(() => {
     if (activeRoom) {
       markRoomAsRead(activeRoom._id);
+      setUnreadCounts(prev => ({
+        ...prev,
+        [activeRoom._id]: 0
+      }));
+      setHasMoreMessages(true);
+      if (socket) {
+        socket.emit('read-room-messages', { roomId: activeRoom._id, userId: currentUser._id });
+      }
     }
-  }, [activeRoom]);
+  }, [activeRoom, socket]);
+
+  // Emit read receipt when new messages are appended to active room
+  useEffect(() => {
+    if (activeRoom && socket && messages.length > 0) {
+      socket.emit('read-room-messages', { roomId: activeRoom._id, userId: currentUser._id });
+    }
+  }, [activeRoom, socket, messages.length]);
 
   const [workspaceTab, setWorkspaceTab] = useState('chat'); // 'chat' or 'tasks'
   const [boardTasks, setBoardTasks] = useState([]);
@@ -266,11 +299,28 @@ const Workspace = ({ currentUser }) => {
       setMessages((prev) => prev.filter(msg => !msg.taskId || (msg.taskId._id !== taskId && msg.taskId !== taskId)));
     };
 
+    const handleRoomMessagesRead = ({ roomId, userId }) => {
+      if (activeRoom && activeRoom._id === roomId) {
+        setMessages((prev) => prev.map(msg => {
+          const isSender = String(msg.senderId?._id || msg.senderId) === String(userId);
+          const hasRead = msg.readBy?.includes(userId);
+          if (!isSender && !hasRead) {
+            return {
+              ...msg,
+              readBy: [...(msg.readBy || []), userId]
+            };
+          }
+          return msg;
+        }));
+      }
+    };
+
     socket.on('receive-message', handleReceiveMessage);
     socket.on('task-updated', handleTaskUpdated);
     socket.on('task-deleted', handleTaskDeleted);
     socket.on('user-typing', handleUserTyping);
     socket.on('message-reaction-updated', handleReactionUpdated);
+    socket.on('room-messages-read', handleRoomMessagesRead);
 
     return () => {
       socket.off('receive-message', handleReceiveMessage);
@@ -278,6 +328,7 @@ const Workspace = ({ currentUser }) => {
       socket.off('task-deleted', handleTaskDeleted);
       socket.off('user-typing', handleUserTyping);
       socket.off('message-reaction-updated', handleReactionUpdated);
+      socket.off('room-messages-read', handleRoomMessagesRead);
     };
   }, [socket, activeRoom]);
 
@@ -292,6 +343,29 @@ const Workspace = ({ currentUser }) => {
   useEffect(() => {
     roomsRef.current = rooms;
   }, [rooms]);
+
+  const playNotificationSound = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+      osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1);
+      
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+    } catch (err) {
+      console.warn('Audio notification failed:', err);
+    }
+  };
 
   // Notifications Effect for Messages & Tasks
   useEffect(() => {
@@ -321,6 +395,15 @@ const Workspace = ({ currentUser }) => {
           return r;
         });
       });
+
+      // Increment unread counters if not active
+      if (!isMine && !isActive) {
+        const targetRoomId = message.roomId?._id || message.roomId;
+        setUnreadCounts(prev => ({
+          ...prev,
+          [targetRoomId]: (prev[targetRoomId] || 0) + 1
+        }));
+      }
 
       if (!isMine && (!isActive || document.hidden)) {
         const senderName = message.senderId?.name || message.senderId?.username || 'Someone';
@@ -388,14 +471,33 @@ const Workspace = ({ currentUser }) => {
       }
     };
 
+    const handlePresenceSync = (userIds) => {
+      setOnlineUsers(userIds);
+    };
+
+    const handleMentionNotification = ({ roomId, senderName, content }) => {
+      playNotificationSound();
+      showToast(`Mentioned by ${senderName}`, content, () => {
+        const matchedRoom = roomsRef.current.find(r => r._id === roomId || r._id === roomId?._id);
+        if (matchedRoom) {
+          setActiveRoom(matchedRoom);
+          setWorkspaceTab('chat');
+        }
+      });
+    };
+
     socket.on('receive-message', handleReceiveMessageNotify);
     socket.on('task-updated', handleTaskUpdatedNotify);
     socket.on('room-created', handleRoomCreated);
+    socket.on('presence-sync', handlePresenceSync);
+    socket.on('mention-notification', handleMentionNotification);
 
     return () => {
       socket.off('receive-message', handleReceiveMessageNotify);
       socket.off('task-updated', handleTaskUpdatedNotify);
       socket.off('room-created', handleRoomCreated);
+      socket.off('presence-sync', handlePresenceSync);
+      socket.off('mention-notification', handleMentionNotification);
     };
   }, [socket, currentUser]);
 
@@ -405,9 +507,244 @@ const Workspace = ({ currentUser }) => {
     }, 100);
   };
 
-  const handleInputChange = (e) => {
-    setNewMessage(e.target.value);
+  const renderReadReceipt = (msg) => {
+    const isMine = msg.senderId?._id === currentUser._id;
+    if (!isMine) return null;
     
+    const readers = (msg.readBy || []).filter(id => String(id._id || id) !== String(currentUser._id));
+    const isRead = readers.length > 0;
+    
+    return (
+      <span style={{ fontSize: '0.75rem', marginLeft: '6px', color: isRead ? '#38bdf8' : 'var(--text-muted, #8892a4)', display: 'inline-flex', alignItems: 'center' }} title={isRead ? `Read` : 'Sent'}>
+        {isRead ? '✓✓' : '✓'}
+      </span>
+    );
+  };
+
+  const renderAttachment = (att) => {
+    if (!att || !att.fileUrl) return null;
+    const isImage = att.fileType?.startsWith('image/') || att.fileUrl?.match(/\.(jpg|jpeg|png|gif)$/i);
+    if (isImage) {
+      return <img src={att.fileUrl} alt={att.fileName} style={{ maxWidth: '100%', borderRadius: '8px', maxHeight: '300px', objectFit: 'contain', marginTop: '6px' }} />;
+    }
+    
+    const isPdf = att.fileType === 'application/pdf' || att.fileName?.endsWith('.pdf');
+    const isExcel = att.fileType?.includes('sheet') || att.fileType?.includes('excel') || att.fileName?.endsWith('.xlsx') || att.fileName?.endsWith('.xls');
+    
+    let icon = '📄';
+    let color = '#38bdf8';
+    if (isPdf) {
+      icon = '📕';
+      color = '#ef4444';
+    } else if (isExcel) {
+      icon = '📗';
+      color = '#10b981';
+    }
+    
+    const sizeStr = att.fileSize ? ` (${(att.fileSize / 1024).toFixed(1)} KB)` : '';
+    
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '12px',
+        borderRadius: '8px',
+        backgroundColor: 'rgba(0,0,0,0.15)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        maxWidth: '320px',
+        marginTop: '6px'
+      }}>
+        <span style={{ fontSize: '2rem' }}>{icon}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={att.fileName}>
+            {att.fileName}
+          </span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+            {sizeStr || 'Document'}
+          </span>
+          <a 
+            href={att.fileUrl} 
+            download={att.fileName}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: '0.8rem', color: color, textDecoration: 'underline', marginTop: '4px', fontWeight: 'bold' }}
+          >
+            Download Attachment
+          </a>
+        </div>
+      </div>
+    );
+  };
+
+  const insertMention = (user) => {
+    const username = user.username || user.name.replace(/\s+/g, '');
+    const before = newMessage.substring(0, mentionCursorIndex);
+    // Calculate exact slice after cursor. Since we typed @query, query length is mentionSearch.length
+    const after = newMessage.substring(mentionCursorIndex + mentionSearch.length + 1);
+    const newVal = `${before}@${username} ${after}`;
+    setNewMessage(newVal);
+    setShowMentionDropdown(false);
+    setTimeout(() => {
+      document.getElementById('chat-input-field')?.focus();
+    }, 20);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && activeRoom) {
+      await uploadAndSendFile(file);
+    }
+  };
+
+  const handleScroll = async (e) => {
+    const el = e.target;
+    if (el.scrollTop === 0 && hasMoreMessages && !isLoadingMore && messages.length > 0) {
+      setIsLoadingMore(true);
+      const oldestMsgId = messages[0]._id;
+      try {
+        const res = await api.getRoomMessages(activeRoom._id, oldestMsgId);
+        if (res.data) {
+          if (res.data.length < 50) {
+            setHasMoreMessages(false);
+          }
+          const prevHeight = el.scrollHeight;
+          setMessages(prev => [...res.data, ...prev]);
+          
+          setTimeout(() => {
+            el.scrollTop = el.scrollHeight - prevHeight;
+          }, 50);
+        }
+      } catch (error) {
+        console.error('Failed to load older messages', error);
+      } finally {
+        setIsLoadingMore(false);
+      }
+    }
+  };
+  const renderKanbanDashboard = () => {
+    const tasksToAnalyze = boardTasks.filter(task => {
+      const matchesSearch = taskSearchQuery.trim() ? task.title?.toLowerCase().includes(taskSearchQuery.toLowerCase()) : true;
+      if (taskFilter === 'my-tasks') {
+        const isMine = task.assignees?.some(a => a._id === currentUser._id);
+        return isMine && matchesSearch;
+      }
+      return matchesSearch;
+    });
+
+    const todoCount = tasksToAnalyze.filter(t => t.status === 'To Do').length;
+    const progressCount = tasksToAnalyze.filter(t => t.status === 'In Progress').length;
+    const doneCount = tasksToAnalyze.filter(t => t.status === 'Done').length;
+    const total = todoCount + progressCount + doneCount;
+    const completedPct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+    
+    const highPriorityCount = tasksToAnalyze.filter(t => t.priority === 'high').length;
+    const mediumPriorityCount = tasksToAnalyze.filter(t => t.priority === 'medium').length;
+    const lowPriorityCount = tasksToAnalyze.filter(t => t.priority === 'low').length;
+    
+    return (
+      <div style={{
+        display: 'flex',
+        gap: '20px',
+        marginBottom: '20px',
+        flexWrap: 'wrap',
+      }}>
+        <div className="glass-panel" style={{ flex: 1, minWidth: '240px', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-card, #161b26)', display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div style={{
+            position: 'relative',
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            background: `conic-gradient(var(--primary, #3b82f6) ${completedPct}%, rgba(255,255,255,0.05) ${completedPct}% 100%)`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <div style={{
+              width: '46px',
+              height: '46px',
+              borderRadius: '50%',
+              backgroundColor: '#161b26',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.85rem',
+              fontWeight: 'bold',
+              color: 'var(--primary, #3b82f6)'
+            }}>
+              {completedPct}%
+            </div>
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Completion Rate</h4>
+            <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+              {doneCount} / {total} Completed
+            </span>
+          </div>
+        </div>
+        
+        <div className="glass-panel" style={{ flex: 1, minWidth: '240px', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-card, #161b26)', display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'center' }}>
+          <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Priority Breakdown</h4>
+          <div style={{ display: 'flex', gap: '12px', fontSize: '0.85rem' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#ef4444', fontWeight: 'bold' }}>
+              🔴 High: {highPriorityCount}
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#f59e0b', fontWeight: 'bold' }}>
+              🟡 Med: {mediumPriorityCount}
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#10b981', fontWeight: 'bold' }}>
+              🟢 Low: {lowPriorityCount}
+            </span>
+          </div>
+        </div>
+        
+        <div className="glass-panel" style={{ flex: 1, minWidth: '240px', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-card, #161b26)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+            <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Pending Tasks</h4>
+            <span style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#f59e0b' }}>
+              {todoCount + progressCount}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-end' }}>
+            <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Total Tasks</h4>
+            <span style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+              {total}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setNewMessage(val);
+    
+    // Mentions detection
+    const cursor = e.target.selectionStart || 0;
+    const textBeforeCursor = val.substring(0, cursor);
+    const lastAt = textBeforeCursor.lastIndexOf('@');
+    
+    if (lastAt !== -1 && !textBeforeCursor.substring(lastAt).includes(' ')) {
+      const query = textBeforeCursor.substring(lastAt + 1);
+      setMentionSearch(query);
+      setShowMentionDropdown(true);
+      setMentionCursorIndex(lastAt);
+    } else {
+      setShowMentionDropdown(false);
+    }
+
     if (!socket || !activeRoom) return;
 
     if (!isTypingRef.current) {
@@ -457,32 +794,52 @@ const Workspace = ({ currentUser }) => {
     setReplyToMessage(null);
   };
 
-  const handleImageUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file || !activeRoom) return;
-
+  const uploadAndSendFile = async (file) => {
+    if (!file || !activeRoom || !socket) return;
     setIsUploading(true);
     try {
-      const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
-      const compressedFile = await imageCompression(file, options);
-      const uploadRes = await api.uploadChatImage(compressedFile);
+      let fileToUpload = file;
+      const isImg = file.type?.startsWith('image/') || file.name?.match(/\.(jpg|jpeg|png|gif)$/i);
+      
+      if (isImg) {
+        try {
+          const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+          fileToUpload = await imageCompression(file, options);
+        } catch (e) {
+          console.warn('Image compression failed, using original file', e);
+        }
+      }
+
+      const uploadRes = await api.uploadChatFile(fileToUpload);
       const fileUrl = uploadRes.fileUrl;
 
       socket.emit('send-message', {
         roomId: activeRoom._id,
         senderId: currentUser._id,
-        content: fileUrl,
-        replyTo: replyToMessage ? replyToMessage._id : null
+        content: isImg ? fileUrl : `Sent a file: ${file.name}`,
+        replyTo: replyToMessage ? replyToMessage._id : null,
+        attachment: {
+          fileName: uploadRes.fileName || file.name,
+          fileType: uploadRes.fileType || file.type,
+          fileUrl: fileUrl,
+          fileSize: uploadRes.fileSize || file.size
+        }
       });
       setReplyToMessage(null);
-      
     } catch (error) {
-      console.error('Image upload failed', error);
-      alert('Failed to upload image. Please make sure AWS credentials are set up.');
+      console.error('File upload failed', error);
+      alert('Failed to upload file.');
     } finally {
       setIsUploading(false);
-      e.target.value = null;
     }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await uploadAndSendFile(file);
+    }
+    e.target.value = null;
   };
 
   const handleToggleReaction = (messageId, emoji) => {
@@ -774,16 +1131,32 @@ const Workspace = ({ currentUser }) => {
     if (!content) return null;
 
     const highlightText = (text) => {
-      if (!searchQuery.trim()) return text;
-      const regex = new RegExp(`(${escapeRegExp(searchQuery)})`, 'gi');
-      const parts = text.split(regex);
-      return parts.map((part, index) => 
-        regex.test(part) ? (
-          <mark key={index} style={{ background: '#facc15', color: '#111827', padding: '0 2px', borderRadius: '2px' }}>{part}</mark>
-        ) : (
-          part
-        )
-      );
+      if (!text) return text;
+      const mentionRegex = /(@\w+)/g;
+      const searchRegex = searchQuery.trim() ? new RegExp(`(${escapeRegExp(searchQuery)})`, 'gi') : null;
+      
+      let parts = [text];
+      if (searchRegex) {
+        parts = text.split(searchRegex);
+      }
+      
+      return parts.flatMap((part, index) => {
+        if (searchRegex && searchRegex.test(part)) {
+          return <mark key={`search-${index}`} style={{ background: '#facc15', color: '#111827', padding: '0 2px', borderRadius: '2px' }}>{part}</mark>;
+        }
+        
+        const subParts = part.split(mentionRegex);
+        return subParts.map((sub, idx) => {
+          if (sub.match(mentionRegex)) {
+            return (
+              <span key={`mention-${index}-${idx}`} style={{ color: '#38bdf8', fontWeight: 'bold', backgroundColor: 'rgba(56, 189, 248, 0.1)', padding: '0 4px', borderRadius: '4px' }}>
+                {sub}
+              </span>
+            );
+          }
+          return sub;
+        });
+      });
     };
 
     const formatLine = (line) => {
@@ -922,15 +1295,19 @@ const Workspace = ({ currentUser }) => {
                   {groupRooms.map(room => (
                     <div key={room._id} style={wsStyles.roomItem(activeRoom?._id === room._id)} onClick={() => setActiveRoom(room)}>
                       <Hash size={18} /><span>{room.name}</span>
-                      {isRoomUnread(room) && (
+                      {unreadCounts[room._id] > 0 && (
                         <div style={{
                           marginLeft: 'auto',
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
+                          padding: '2px 6px',
+                          borderRadius: '10px',
+                          fontSize: '0.7rem',
+                          fontWeight: 'bold',
                           backgroundColor: 'var(--danger, #ef4444)',
+                          color: 'white',
                           boxShadow: '0 0 6px var(--danger)'
-                        }} />
+                        }}>
+                          {unreadCounts[room._id]}
+                        </div>
                       )}
                     </div>
                   ))}
@@ -947,19 +1324,30 @@ const Workspace = ({ currentUser }) => {
                     // Check if a DM room exists for this user to mark active state
                     const existingRoom = rooms.find(r => r.type === 'direct' && r.members?.some(m => (m._id || m) === user._id));
                     const isActive = existingRoom && activeRoom?._id === existingRoom._id;
+                    const isOnline = onlineUsers.includes(user._id);
                     return (
                       <div key={user._id} style={wsStyles.roomItem(isActive)} onClick={() => handleUserDMClick(user)}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--success)' }}></div>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: isOnline ? 'var(--success, #34d399)' : '#4b5563',
+                          boxShadow: isOnline ? '0 0 6px var(--success)' : 'none'
+                        }}></div>
                         <span>{user.name || user.username}</span>
-                        {existingRoom && isRoomUnread(existingRoom) && (
+                        {existingRoom && unreadCounts[existingRoom._id] > 0 && (
                           <div style={{
                             marginLeft: 'auto',
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
+                            padding: '2px 6px',
+                            borderRadius: '10px',
+                            fontSize: '0.7rem',
+                            fontWeight: 'bold',
                             backgroundColor: 'var(--danger, #ef4444)',
+                            color: 'white',
                             boxShadow: '0 0 6px var(--danger)'
-                          }} />
+                          }}>
+                            {unreadCounts[existingRoom._id]}
+                          </div>
                         )}
                       </div>
                     );
@@ -969,9 +1357,33 @@ const Workspace = ({ currentUser }) => {
             </div>
 
             {/* Right Area: Chat Stream */}
-            <div style={wsStyles.chatArea}>
+            <div 
+              style={{ ...wsStyles.chatArea, position: 'relative' }}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
               {activeRoom ? (
                 <>
+                  {isDragging && (
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                      border: '2px dashed var(--primary)',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 100,
+                      backdropFilter: 'blur(4px)',
+                      pointerEvents: 'none'
+                    }}>
+                      <span style={{ fontSize: '3rem', marginBottom: '10px' }}>📥</span>
+                      <h3 style={{ margin: 0, color: 'var(--primary)' }}>Drop file to upload to chat</h3>
+                    </div>
+                  )}
                   {/* Header */}
                   <div style={wsStyles.header}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1005,7 +1417,7 @@ const Workspace = ({ currentUser }) => {
                   </div>
 
                   {/* Messages */}
-                  <div style={wsStyles.messageList}>
+                  <div style={wsStyles.messageList} onScroll={handleScroll}>
                     {messages.length === 0 ? (
                       <div style={{ margin: 'auto', color: 'var(--text-secondary)' }}>No messages in this channel yet.</div>
                     ) : (
@@ -1027,7 +1439,10 @@ const Workspace = ({ currentUser }) => {
                             <div key={msg._id} id={`msg-${msg._id}`} style={{ display: 'flex', flexDirection: 'column', transition: 'background-color 0.5s ease', borderRadius: '8px' }}>
                               <div style={wsStyles.messageSender(isMine && !isTask)}>
                                 <span>{msg.senderId?.name || msg.senderId?.username || 'System'}</span>
-                                <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  {renderReadReceipt(msg)}
+                                </span>
                               </div>
                               
                               <div 
@@ -1037,22 +1452,38 @@ const Workspace = ({ currentUser }) => {
                               >
                                 {/* TASK CARD RENDERING in CHAT */}
                                 {isTask && msg.taskId ? (
-                                  <div>
-                                    <div style={wsStyles.taskCard.header}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <CheckSquare size={16} color="var(--primary)" />
-                                        <strong style={{ color: 'var(--text-primary)' }}>{msg.taskId.title}</strong>
-                                      </div>
-                                      <span style={wsStyles.taskCard.priorityBadge(msg.taskId.priority)}>{msg.taskId.priority}</span>
-                                    </div>
-                                    <div style={wsStyles.taskCard.body}>
-                                      {renderDescription(msg.taskId.description)}
-                                      {msg.taskId.dueDate && (
-                                        <div style={{ marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                          📅 Due: {new Date(msg.taskId.dueDate).toLocaleDateString()}
-                                        </div>
-                                      )}
-                                    </div>
+                                   <div>
+                                     <div style={wsStyles.taskCard.header}>
+                                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                         <CheckSquare size={16} color="var(--primary)" />
+                                         <strong 
+                                           onClick={() => setEditTask(msg.taskId)} 
+                                           style={{ color: 'var(--text-primary)', cursor: 'pointer', textDecoration: 'underline' }}
+                                           title="Click to edit task details"
+                                         >
+                                           {msg.taskId.title}
+                                         </strong>
+                                       </div>
+                                       <span style={wsStyles.taskCard.priorityBadge(msg.taskId.priority)}>{msg.taskId.priority}</span>
+                                     </div>
+                                     <div style={wsStyles.taskCard.body}>
+                                       {renderDescription(msg.taskId.description)}
+                                       {msg.taskId.dueDate && (
+                                         <div style={{ marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                           📅 Due: {new Date(msg.taskId.dueDate).toLocaleDateString()}
+                                         </div>
+                                       )}
+                                       {msg.taskId.checklist && msg.taskId.checklist.length > 0 && (
+                                         <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                           📋 {msg.taskId.checklist.filter(c => c.completed).length} / {msg.taskId.checklist.length} Checklist Items
+                                         </div>
+                                       )}
+                                       {msg.taskId.comments && msg.taskId.comments.length > 0 && (
+                                         <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                           💬 {msg.taskId.comments.length} Comments
+                                         </div>
+                                       )}
+                                     </div>
                                     <div style={wsStyles.taskCard.footer}>
                                       <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                                         Assigned to: {msg.taskId.assignees?.length > 0 ? msg.taskId.assignees.map(a => a.name || a.username).join(', ') : 'Unassigned'}
@@ -1105,7 +1536,9 @@ const Workspace = ({ currentUser }) => {
                                     )}
 
                                     {/* Message Body */}
-                                    {msg.content.startsWith('http') && (msg.content.includes('.s3.') || msg.content.includes('/uploads/')) ? (
+                                    {msg.attachment ? (
+                                      renderAttachment(msg.attachment)
+                                    ) : msg.content.startsWith('http') && (msg.content.includes('.s3.') || msg.content.includes('/uploads/')) && (msg.content.endsWith('.png') || msg.content.endsWith('.jpg') || msg.content.endsWith('.jpeg') || msg.content.endsWith('.gif') || msg.content.includes('image')) ? (
                                       <img src={msg.content} alt="Attachment" style={{ maxWidth: '100%', borderRadius: '8px' }} />
                                     ) : (
                                       renderMessageContent(msg.content)
@@ -1316,23 +1749,70 @@ const Workspace = ({ currentUser }) => {
                       </div>
                     )}
 
+                    {showMentionDropdown && otherUsers.filter(u => (u.name || u.username || '').toLowerCase().includes(mentionSearch.toLowerCase())).length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '80px',
+                        left: '20px',
+                        backgroundColor: '#1f2937',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '8px',
+                        maxHeight: '150px',
+                        overflowY: 'auto',
+                        width: '220px',
+                        zIndex: 1000,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                        display: 'flex',
+                        flexDirection: 'column'
+                      }}>
+                        {otherUsers
+                          .filter(u => (u.name || u.username || '').toLowerCase().includes(mentionSearch.toLowerCase()))
+                          .map(u => (
+                            <div 
+                              key={u._id} 
+                              onClick={() => insertMention(u)}
+                              style={{
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                fontSize: '0.85rem',
+                                color: 'var(--text-primary)',
+                                borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+                                transition: 'background-color 0.15s'
+                              }}
+                              onMouseEnter={e => e.target.style.backgroundColor = 'rgba(56, 189, 248, 0.15)'}
+                              onMouseLeave={e => e.target.style.backgroundColor = 'transparent'}
+                            >
+                              @{u.username || u.name}
+                            </div>
+                          ))}
+                      </div>
+                    )}
+
                     <form onSubmit={handleSendMessage} style={wsStyles.inputForm}>
                       <button 
                         type="button" 
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isUploading}
                         style={{ ...wsStyles.sendBtn, backgroundColor: 'var(--bg-input, #0b0f19)', color: 'var(--text-secondary)', border: '1px solid var(--border-light)' }}
+                        title="Upload file or image"
                       >
-                        {isUploading ? <Loader2 size={18} className="animate-spin" /> : <ImagePlus size={18} />}
+                        {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Paperclip size={18} />}
                       </button>
                       <input 
                         type="file" 
-                        accept="image/*" 
                         ref={fileInputRef} 
                         style={{ display: 'none' }} 
                         onChange={handleImageUpload} 
                       />
-                      <input type="text" placeholder={`Message #${activeRoom.name}...`} value={newMessage} onChange={handleInputChange} style={wsStyles.inputField} />
+                      <input 
+                        id="chat-input-field" 
+                        type="text" 
+                        placeholder={`Message #${activeRoom.name}...`} 
+                        value={newMessage} 
+                        onChange={handleInputChange} 
+                        style={wsStyles.inputField} 
+                        autoComplete="off"
+                      />
                       <button type="submit" style={wsStyles.sendBtn} disabled={!newMessage.trim() || isUploading}><Send size={18} /></button>
                     </form>
                   </div>
@@ -1383,9 +1863,10 @@ const Workspace = ({ currentUser }) => {
                 <button onClick={() => setTaskModalMsg({ isStandalone: true, content: '' })} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: 'white', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Plus size={18} /> Create New Task
                 </button>
-              </div>
+             </div>
             </div>
-             <div style={wsStyles.kanbanContainer}>
+            {renderKanbanDashboard()}
+            <div style={wsStyles.kanbanContainer}>
               {/* To Do Column */}
               <div 
                 style={wsStyles.kanbanColumn}

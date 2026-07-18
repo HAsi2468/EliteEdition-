@@ -669,8 +669,9 @@ export const api = {
     });
   },
 
-  async getRoomMessages(roomId) {
-    return request(`/workspace/rooms/${roomId}/messages`);
+  async getRoomMessages(roomId, before = '') {
+    const query = before ? `?before=${before}` : '';
+    return request(`/workspace/rooms/${roomId}/messages${query}`);
   },
 
   async sendRoomMessage(roomId, data) {
@@ -691,13 +692,17 @@ export const api = {
     });
   },
 
-  async uploadChatImage(file) {
+  async uploadChatFile(file) {
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append('file', file);
     return request('/workspace/upload', {
       method: 'POST',
       body: formData,
-    }, true); // Note: we need a way to skip JSON headers for FormData
+    }, true);
+  },
+
+  async uploadChatImage(file) {
+    return this.uploadChatFile(file);
   },
 
   // Fabric Inventory

@@ -69,7 +69,7 @@ router.post('/presign', async (req, res) => {
 });
 
 // Mock Upload Route
-router.post('/upload', upload.single('image'), (req, res) => {
+router.post('/upload', upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
@@ -77,10 +77,16 @@ router.post('/upload', upload.single('image'), (req, res) => {
     const host = req.get('host');
     const protocol = req.protocol;
     const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
-    res.json({ success: true, fileUrl });
+    res.json({ 
+      success: true, 
+      fileUrl,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+      fileType: req.file.mimetype
+    });
   } catch (error) {
     console.error('Error handling mock upload:', error);
-    res.status(500).json({ success: false, message: 'Failed to upload image' });
+    res.status(500).json({ success: false, message: 'Failed to upload file' });
   }
 });
 
@@ -129,16 +135,41 @@ router.post('/rooms', async (req, res) => {
   }
 });
 
-// Get chat history for a room
+// Get chat history for a room (with cursor-based pagination)
 router.get('/rooms/:roomId/messages', async (req, res) => {
   try {
-    const messages = await ChatMessage.find({ roomId: req.params.roomId })
+    const { limit = 50, before } = req.query;
+    const query = { roomId: req.params.roomId };
+    
+    if (before) {
+      query._id = { $lt: before };
+    }
+
+    const limitVal = parseInt(limit, 10);
+
+    const messages = await ChatMessage.find(query)
       .populate('senderId', 'name email')
       .populate({
-        path: 'taskId',
-        populate: { path: 'assignees', select: 'name email' }
+        path: 'reactions.user',
+        select: 'name username email'
       })
-      .sort({ createdAt: 1 }); // Oldest first for chat timeline
+      .populate({
+        path: 'replyTo',
+        populate: { path: 'senderId', select: 'name email' }
+      })
+      .populate({
+        path: 'taskId',
+        populate: [
+          { path: 'assignees', select: 'name email' },
+          { path: 'comments.sender', select: 'name username email' }
+        ]
+      })
+      .sort({ createdAt: -1 }) // Newest first for cursor limit query
+      .limit(limitVal);
+
+    // Reverse to return chronological order (oldest first)
+    messages.reverse();
+
     res.json({ success: true, data: messages });
   } catch (error) {
     console.error(error);

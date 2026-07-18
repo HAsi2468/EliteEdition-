@@ -1,5 +1,10 @@
 const { ChatMessage, Task, User } = require('../db/models');
 
+const activeUsers = new Map(); // socket.id -> userId
+const getOnlineUserIds = () => {
+  return Array.from(new Set(activeUsers.values()));
+};
+
 const setupSockets = (io) => {
   // Middleware for Socket Auth can go here
   // io.use((socket, next) => { ... });
@@ -17,35 +22,66 @@ const setupSockets = (io) => {
     socket.on('register-user', (userId) => {
       socket.join(`user_${userId}`);
       console.log(`Socket ${socket.id} joined personal room user_${userId}`);
+      activeUsers.set(socket.id, userId);
+      socket.userId = userId;
+      io.emit('presence-sync', getOnlineUserIds());
     });
 
-    // Handle sending a standard text message (supports quoted replies)
+    // Handle sending a standard text message (supports quoted replies, attachments, mentions)
     socket.on('send-message', async (data) => {
       try {
-        const { roomId, senderId, content, replyTo } = data;
+        const { roomId, senderId, content, replyTo, attachment } = data;
         
+        // Parse mentions
+        const mentionRegex = /@(\w+)/g;
+        const matches = [...content.matchAll(mentionRegex)];
+        const usernames = matches.map(m => m[1]);
+        const mentions = [];
+        if (usernames.length > 0) {
+          const matchedUsers = await User.find({ username: { $in: usernames } });
+          matchedUsers.forEach(u => mentions.push(u._id));
+        }
+
         // Save message to MongoDB
         const newMessage = await ChatMessage.create({
           roomId,
           senderId,
           content,
           replyTo: replyTo || null,
-          type: 'text'
+          type: 'text',
+          attachment: attachment || undefined,
+          mentions: mentions,
+          readBy: [senderId]
         });
 
         const populatedMessage = await ChatMessage.findById(newMessage._id)
-          .populate('senderId', 'name email')
+          .populate('senderId', 'name username email')
           .populate({
             path: 'reactions.user',
             select: 'name username email'
           })
           .populate({
             path: 'replyTo',
-            populate: { path: 'senderId', select: 'name email' }
-          });
+            populate: { path: 'senderId', select: 'name username email' }
+          })
+          .populate('mentions', 'name username email');
 
         // Broadcast to everyone in the room (including sender)
         io.to(roomId).emit('receive-message', populatedMessage);
+
+        // Emit direct notification to each mentioned user
+        if (mentions.length > 0) {
+          mentions.forEach(uId => {
+            if (String(uId) !== String(senderId)) {
+              io.to(`user_${uId}`).emit('mention-notification', {
+                roomId,
+                senderName: populatedMessage.senderId.name || populatedMessage.senderId.username,
+                content: content,
+                messageId: newMessage._id
+              });
+            }
+          });
+        }
       } catch (error) {
         console.error('Error saving message:', error);
       }
@@ -124,7 +160,7 @@ const setupSockets = (io) => {
 
           // 3. Populate and broadcast the interactive card
           const populatedMessage = await ChatMessage.findById(newMessage._id)
-            .populate('senderId', 'name email')
+            .populate('senderId', 'name username email')
             .populate({
               path: 'reactions.user',
               select: 'name username email'
@@ -138,7 +174,7 @@ const setupSockets = (io) => {
             })
             .populate({
               path: 'replyTo',
-              populate: { path: 'senderId', select: 'name email' }
+              populate: { path: 'senderId', select: 'name username email' }
             });
 
           io.to(roomId).emit('receive-message', populatedMessage);
@@ -207,8 +243,24 @@ const setupSockets = (io) => {
       }
     });
 
+    // Handle marking room messages as read
+    socket.on('read-room-messages', async (data) => {
+      try {
+        const { roomId, userId } = data;
+        await ChatMessage.updateMany(
+          { roomId, senderId: { $ne: userId }, readBy: { $ne: userId } },
+          { $addToSet: { readBy: userId } }
+        );
+        io.to(roomId).emit('room-messages-read', { roomId, userId });
+      } catch (error) {
+        console.error('Error marking messages as read:', error);
+      }
+    });
+
     socket.on('disconnect', () => {
       console.log(`User disconnected from socket: ${socket.id}`);
+      activeUsers.delete(socket.id);
+      io.emit('presence-sync', getOnlineUserIds());
     });
   });
 };

@@ -59,6 +59,26 @@ const chatMessageSchema = new mongoose.Schema(
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
       }
     ],
+    attachment: {
+      fileName: { type: String },
+      fileType: { type: String },
+      fileUrl: { type: String },
+      fileSize: { type: Number }
+    },
+    readBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: []
+      }
+    ],
+    mentions: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: []
+      }
+    ],
   },
   {
     timestamps: true,
