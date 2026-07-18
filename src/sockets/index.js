@@ -134,7 +134,7 @@ const setupSockets = (io) => {
     // Handle creating a task directly from the chat stream
     socket.on('create-task-from-chat', async (data) => {
       try {
-        const { roomId, senderId, content, title, priority, assignees, dueDate, replyTo } = data;
+        const { roomId, senderId, content, title, priority, assignees, dueDate, replyTo, tags, subTasks, actorId } = data;
 
         // 1. Save the Task to MongoDB
         const newTask = await Task.create({
@@ -145,6 +145,13 @@ const setupSockets = (io) => {
           originRoomId: roomId || undefined,
           assignees: assignees || [],
           dueDate: dueDate || undefined,
+          tags: tags || [],
+          subTasks: subTasks || [],
+          activityLogs: actorId ? [{
+            user: actorId,
+            action: 'Task created',
+            details: 'Initialized task fields'
+          }] : []
         });
 
         if (roomId) {
@@ -169,7 +176,10 @@ const setupSockets = (io) => {
               path: 'taskId',
               populate: [
                 { path: 'assignees', select: 'name email' },
-                { path: 'comments.sender', select: 'name username email' }
+                { path: 'comments.sender', select: 'name username email' },
+                { path: 'timeLogs.user', select: 'name username email' },
+                { path: 'activityLogs.user', select: 'name username email' },
+                { path: 'subTasks.assignee', select: 'name email' }
               ]
             })
             .populate({
@@ -183,7 +193,10 @@ const setupSockets = (io) => {
         // Emit a separate event for the global Kanban board to update live
         const fullyPopulatedTask = await Task.findById(newTask._id)
           .populate('assignees', 'name email')
-          .populate('comments.sender', 'name username email');
+          .populate('comments.sender', 'name username email')
+          .populate('timeLogs.user', 'name username email')
+          .populate('activityLogs.user', 'name username email')
+          .populate('subTasks.assignee', 'name email');
         io.emit('task-updated', fullyPopulatedTask);
       } catch (error) {
         console.error('Error creating task from chat:', error);
@@ -193,13 +206,29 @@ const setupSockets = (io) => {
     // Handle updating a task status interactively from inside the chat card
     socket.on('update-task-status', async (data) => {
       try {
-        const { taskId, newStatus } = data;
+        const { taskId, newStatus, actorId } = data;
+        
+        const updateObj = { status: newStatus };
+        if (actorId) {
+          updateObj.$push = {
+            activityLogs: {
+              user: actorId,
+              action: 'Status updated',
+              details: `Status changed to ${newStatus}`
+            }
+          };
+        }
         
         const updatedTask = await Task.findByIdAndUpdate(
           taskId,
-          { status: newStatus },
+          updateObj,
           { new: true }
-        ).populate('assignees', 'name email').populate('comments.sender', 'name username email');
+        )
+        .populate('assignees', 'name email')
+        .populate('comments.sender', 'name username email')
+        .populate('timeLogs.user', 'name username email')
+        .populate('activityLogs.user', 'name username email')
+        .populate('subTasks.assignee', 'name email');
 
         // Broadcast to everyone so their UI flips the status color
         io.emit('task-updated', updatedTask);
@@ -211,17 +240,26 @@ const setupSockets = (io) => {
     // Handle updating full task details (including checklist and comments)
     socket.on('update-task-details', async (data) => {
       try {
-        const { taskId, title, description, priority, assignees, dueDate, checklist, comments } = data;
+        const { taskId, title, description, priority, assignees, dueDate, checklist, comments, tags, subTasks, timeLogs, activityLogs } = data;
 
         const updateFields = { title, description, priority, assignees, dueDate };
         if (checklist !== undefined) updateFields.checklist = checklist;
         if (comments !== undefined) updateFields.comments = comments;
+        if (tags !== undefined) updateFields.tags = tags;
+        if (subTasks !== undefined) updateFields.subTasks = subTasks;
+        if (timeLogs !== undefined) updateFields.timeLogs = timeLogs;
+        if (activityLogs !== undefined) updateFields.activityLogs = activityLogs;
 
         const updatedTask = await Task.findByIdAndUpdate(
           taskId,
           updateFields,
           { new: true }
-        ).populate('assignees', 'name email').populate('comments.sender', 'name username email');
+        )
+        .populate('assignees', 'name email')
+        .populate('comments.sender', 'name username email')
+        .populate('timeLogs.user', 'name username email')
+        .populate('activityLogs.user', 'name username email')
+        .populate('subTasks.assignee', 'name email');
 
         // Broadcast updated task details to all connected clients
         io.emit('task-updated', updatedTask);

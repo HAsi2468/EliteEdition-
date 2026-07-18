@@ -55,6 +55,35 @@ const taskSchema = new mongoose.Schema(
         createdAt: { type: Date, default: Date.now }
       }
     ],
+    tags: [
+      {
+        text: { type: String, required: true },
+        color: { type: String, default: '#3b82f6' }
+      }
+    ],
+    subTasks: [
+      {
+        title: { type: String, required: true },
+        completed: { type: Boolean, default: false },
+        assignee: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+      }
+    ],
+    timeLogs: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        hours: { type: Number, required: true },
+        description: { type: String },
+        createdAt: { type: Date, default: Date.now }
+      }
+    ],
+    activityLogs: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        action: { type: String, required: true },
+        details: { type: String },
+        createdAt: { type: Date, default: Date.now }
+      }
+    ],
   },
   {
     timestamps: true,

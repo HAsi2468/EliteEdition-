@@ -60,6 +60,19 @@ const Workspace = ({ currentUser }) => {
   const [settingsRoomMembers, setSettingsRoomMembers] = useState([]);
   const [settingsRoomArchived, setSettingsRoomArchived] = useState(false);
 
+  // Gantt, Audit, Timer, Tags Task Board states
+  const [activeTimerTaskId, setActiveTimerTaskId] = useState(null);
+  const [timerSeconds, setTimerSeconds] = useState(0);
+  const [taskDetailTab, setTaskDetailTab] = useState('details');
+  const [newTagText, setNewTagText] = useState('');
+  const [newTagColor, setNewTagColor] = useState('#3b82f6');
+  const [newSubTaskTitle, setNewSubTaskTitle] = useState('');
+  const [newSubTaskAssignee, setNewSubTaskAssignee] = useState('');
+  const [manualLogHours, setManualLogHours] = useState('');
+  const [manualLogDesc, setManualLogDesc] = useState('');
+  const [workspaceTaskTab, setWorkspaceTaskTab] = useState('board');
+  const [selectedFilterTags, setSelectedFilterTags] = useState([]);
+
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
   
@@ -565,6 +578,25 @@ const Workspace = ({ currentUser }) => {
       socket.off('global-room-updated', handleGlobalRoomUpdated);
     };
   }, [socket, currentUser]);
+
+  const timerIntervalRef = useRef(null);
+
+  useEffect(() => {
+    if (activeTimerTaskId) {
+      timerIntervalRef.current = setInterval(() => {
+        setTimerSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    }
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [activeTimerTaskId]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -1082,6 +1114,174 @@ const Workspace = ({ currentUser }) => {
     setNewCommentText('');
   };
 
+  const addTag = () => {
+    if (!newTagText.trim()) return;
+    const newTag = { text: newTagText.trim(), color: newTagColor };
+    const updatedTags = [...(editTask.tags || []), newTag];
+    
+    const newActivity = {
+      user: currentUser._id,
+      action: 'Tag added',
+      details: `Added tag "${newTagText}"`,
+      createdAt: new Date().toISOString()
+    };
+    
+    setEditTask({
+      ...editTask,
+      tags: updatedTags,
+      activityLogs: [...(editTask.activityLogs || []), newActivity]
+    });
+    setNewTagText('');
+  };
+
+  const removeTag = (index) => {
+    const removedTag = editTask.tags[index];
+    const updatedTags = editTask.tags.filter((_, idx) => idx !== index);
+    
+    const newActivity = {
+      user: currentUser._id,
+      action: 'Tag removed',
+      details: `Removed tag "${removedTag.text}"`,
+      createdAt: new Date().toISOString()
+    };
+    
+    setEditTask({
+      ...editTask,
+      tags: updatedTags,
+      activityLogs: [...(editTask.activityLogs || []), newActivity]
+    });
+  };
+
+  const addSubTask = () => {
+    if (!newSubTaskTitle.trim()) return;
+    const assigneeObj = allUsers.find(u => u._id === newSubTaskAssignee) || null;
+    const newSub = {
+      title: newSubTaskTitle.trim(),
+      completed: false,
+      assignee: assigneeObj
+    };
+    
+    const newActivity = {
+      user: currentUser._id,
+      action: 'Sub-task added',
+      details: `Added sub-task "${newSubTaskTitle}"` + (assigneeObj ? ` assigned to ${assigneeObj.name || assigneeObj.username}` : ''),
+      createdAt: new Date().toISOString()
+    };
+
+    setEditTask({
+      ...editTask,
+      subTasks: [...(editTask.subTasks || []), newSub],
+      activityLogs: [...(editTask.activityLogs || []), newActivity]
+    });
+    setNewSubTaskTitle('');
+    setNewSubTaskAssignee('');
+  };
+
+  const toggleSubTask = (index) => {
+    const updatedSubs = [...(editTask.subTasks || [])];
+    const sub = updatedSubs[index];
+    sub.completed = !sub.completed;
+    
+    const newActivity = {
+      user: currentUser._id,
+      action: sub.completed ? 'Sub-task completed' : 'Sub-task uncompleted',
+      details: `Marked sub-task "${sub.title}" as ${sub.completed ? 'completed' : 'uncompleted'}`,
+      createdAt: new Date().toISOString()
+    };
+
+    setEditTask({
+      ...editTask,
+      subTasks: updatedSubs,
+      activityLogs: [...(editTask.activityLogs || []), newActivity]
+    });
+  };
+
+  const deleteSubTask = (index) => {
+    const sub = editTask.subTasks[index];
+    const updatedSubs = editTask.subTasks.filter((_, idx) => idx !== index);
+    
+    const newActivity = {
+      user: currentUser._id,
+      action: 'Sub-task deleted',
+      details: `Deleted sub-task "${sub.title}"`,
+      createdAt: new Date().toISOString()
+    };
+
+    setEditTask({
+      ...editTask,
+      subTasks: updatedSubs,
+      activityLogs: [...(editTask.activityLogs || []), newActivity]
+    });
+  };
+
+  const addManualTimeLog = () => {
+    const hoursVal = parseFloat(manualLogHours);
+    if (isNaN(hoursVal) || hoursVal <= 0) {
+      alert('Please enter a valid number of hours.');
+      return;
+    }
+    
+    const newLog = {
+      user: { _id: currentUser._id, name: currentUser.name, username: currentUser.username, email: currentUser.email },
+      hours: hoursVal,
+      description: manualLogDesc.trim() || 'Logged manually',
+      createdAt: new Date().toISOString()
+    };
+
+    const newActivity = {
+      user: currentUser._id,
+      action: 'Time logged',
+      details: `Manually logged ${hoursVal} hours: "${manualLogDesc.trim() || 'Logged manually'}"`,
+      createdAt: new Date().toISOString()
+    };
+
+    setEditTask({
+      ...editTask,
+      timeLogs: [...(editTask.timeLogs || []), newLog],
+      activityLogs: [...(editTask.activityLogs || []), newActivity]
+    });
+    setManualLogHours('');
+    setManualLogDesc('');
+  };
+
+  const startStopwatch = (taskId) => {
+    if (activeTimerTaskId) {
+      alert("A stopwatch is already running on another task! Stop it first.");
+      return;
+    }
+    setActiveTimerTaskId(taskId);
+    setTimerSeconds(0);
+  };
+
+  const stopStopwatchAndLog = (logDescription = '') => {
+    if (!activeTimerTaskId || !editTask) return;
+    
+    const loggedHours = parseFloat((timerSeconds / 3600).toFixed(4));
+    
+    const newLog = {
+      user: { _id: currentUser._id, name: currentUser.name, username: currentUser.username, email: currentUser.email },
+      hours: loggedHours,
+      description: logDescription || 'Logged via stopwatch',
+      createdAt: new Date().toISOString()
+    };
+    
+    const newActivity = {
+      user: currentUser._id,
+      action: 'Time logged',
+      details: `Logged ${loggedHours} hours via stopwatch: "${logDescription || 'Logged via stopwatch'}"`,
+      createdAt: new Date().toISOString()
+    };
+
+    setEditTask(prev => ({
+      ...prev,
+      timeLogs: [...(prev.timeLogs || []), newLog],
+      activityLogs: [...(prev.activityLogs || []), newActivity]
+    }));
+
+    setActiveTimerTaskId(null);
+    setTimerSeconds(0);
+  };
+
   const handleCreateTaskSubmit = (e) => {
     e.preventDefault();
     if (!taskTitle.trim()) return;
@@ -1093,7 +1293,10 @@ const Workspace = ({ currentUser }) => {
       title: taskTitle,
       priority: taskPriority,
       assignees: taskAssignee ? [taskAssignee] : [],
-      dueDate: taskDueDate || undefined
+      dueDate: taskDueDate || undefined,
+      actorId: currentUser._id,
+      tags: [],
+      subTasks: []
     });
     
     setTaskModalMsg(null);
@@ -1109,7 +1312,7 @@ const Workspace = ({ currentUser }) => {
   };
 
   const updateTaskStatus = (taskId, newStatus) => {
-    socket.emit('update-task-status', { taskId, newStatus });
+    socket.emit('update-task-status', { taskId, newStatus, actorId: currentUser._id });
   };
 
   const handleEditTaskSubmit = (e) => {
@@ -1124,7 +1327,11 @@ const Workspace = ({ currentUser }) => {
       assignees: editTask.assigneeId ? [editTask.assigneeId] : [],
       dueDate: editTask.dueDate || undefined,
       checklist: editTask.checklist || [],
-      comments: editTask.comments || []
+      comments: editTask.comments || [],
+      tags: editTask.tags || [],
+      subTasks: editTask.subTasks || [],
+      timeLogs: editTask.timeLogs || [],
+      activityLogs: editTask.activityLogs || []
     });
     setEditTask(null);
   };
@@ -1240,6 +1447,147 @@ const Workspace = ({ currentUser }) => {
     return {};
   };
 
+  const renderGanttView = () => {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+    const monthName = today.toLocaleString('default', { month: 'long' });
+    
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+    return (
+      <div className="glass-panel" style={{ padding: '20px', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid var(--border-light, rgba(255,255,255,0.08))', flex: 1, backgroundColor: 'rgba(22, 27, 38, 0.65)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', marginBottom: '20px' }}>
+        <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: 'var(--primary)' }}>📅 Gantt Timeline - {monthName} {currentYear}</h3>
+        
+        <div style={{ overflowX: 'auto', flex: 1 }}>
+          <div style={{ minWidth: `${300 + daysInMonth * 40}px` }}>
+            {/* Timeline Header Row */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-light, rgba(255,255,255,0.08))', paddingBottom: '8px', fontWeight: 'bold' }}>
+              <div style={{ width: '250px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Task Details</div>
+              <div style={{ display: 'flex', flex: 1 }}>
+                {daysArray.map(day => {
+                  const isToday = day === today.getDate();
+                  return (
+                    <div key={day} style={{ width: '40px', textAlign: 'center', fontSize: '0.75rem', color: isToday ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: isToday ? 'bold' : 'normal' }}>
+                      {day}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Tasks Rows */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+              {filteredTasks.length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>No tasks match the filter rules.</div>
+              ) : (
+                filteredTasks.map(task => {
+                  const taskCreated = new Date(task.createdAt);
+                  const startDay = taskCreated.getMonth() === currentMonth ? taskCreated.getDate() : 1;
+                  
+                  let endDay = daysInMonth;
+                  if (task.dueDate) {
+                    const taskDue = new Date(task.dueDate);
+                    if (taskDue.getMonth() === currentMonth) {
+                      endDay = taskDue.getDate();
+                    }
+                  } else {
+                    endDay = startDay;
+                  }
+                  
+                  const spanStart = Math.max(1, startDay);
+                  const spanEnd = Math.max(spanStart, Math.min(daysInMonth, endDay));
+                  const colSpan = (spanEnd - spanStart) + 1;
+                  
+                  const leftOffsetPercent = ((spanStart - 1) / daysInMonth) * 100;
+                  const widthPercent = (colSpan / daysInMonth) * 100;
+                  
+                  const priorityColor = task.priority === 'high' ? '#ef4444' : task.priority === 'medium' ? '#f59e0b' : '#10b981';
+
+                  return (
+                    <div key={task._id} style={{ display: 'flex', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                      {/* Task Info Column */}
+                      <div 
+                        onClick={() => {
+                          const assigneeId = task.assignees && task.assignees[0] ? task.assignees[0]._id : '';
+                          setEditTask({
+                            _id: task._id,
+                            title: task.title,
+                            description: task.description || '',
+                            priority: task.priority || 'medium',
+                            assigneeId,
+                            dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
+                            checklist: task.checklist || [],
+                            comments: task.comments || [],
+                            tags: task.tags || [],
+                            subTasks: task.subTasks || [],
+                            timeLogs: task.timeLogs || [],
+                            activityLogs: task.activityLogs || []
+                          });
+                        }}
+                        style={{ width: '250px', paddingRight: '15px', cursor: 'pointer' }}
+                      >
+                        <div style={{ fontWeight: 'bold', fontSize: '0.85rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={task.title}>
+                          {task.title}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ color: priorityColor }}>● {task.priority}</span>
+                          <span>({task.status})</span>
+                        </div>
+                      </div>
+
+                      {/* Gantt Timeline Bar */}
+                      <div style={{ display: 'flex', flex: 1, position: 'relative', height: '24px', backgroundColor: 'rgba(255,255,255,0.01)', borderRadius: '4px' }}>
+                        <div 
+                          style={{
+                            position: 'absolute',
+                            left: `${leftOffsetPercent}%`,
+                            width: `${widthPercent}%`,
+                            height: '100%',
+                            backgroundColor: priorityColor,
+                            borderRadius: '4px',
+                            opacity: 0.85,
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '0 8px',
+                            boxShadow: `0 0 10px ${priorityColor}44`,
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => {
+                            const assigneeId = task.assignees && task.assignees[0] ? task.assignees[0]._id : '';
+                            setEditTask({
+                              _id: task._id,
+                              title: task.title,
+                              description: task.description || '',
+                              priority: task.priority || 'medium',
+                              assigneeId,
+                              dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
+                              checklist: task.checklist || [],
+                              comments: task.comments || [],
+                              tags: task.tags || [],
+                              subTasks: task.subTasks || [],
+                              timeLogs: task.timeLogs || [],
+                              activityLogs: task.activityLogs || []
+                            });
+                          }}
+                        >
+                          <span style={{ fontSize: '0.7rem', color: '#0b0f19', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {task.title}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderKanbanCard = (task) => {
     const alertStyle = getDueDateAlertStyle(task);
     return (
@@ -1257,7 +1605,11 @@ const Workspace = ({ currentUser }) => {
             assigneeId,
             dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
             checklist: task.checklist || [],
-            comments: task.comments || []
+            comments: task.comments || [],
+            tags: task.tags || [],
+            subTasks: task.subTasks || [],
+            timeLogs: task.timeLogs || [],
+            activityLogs: task.activityLogs || []
           });
         }}
         style={{
@@ -1309,17 +1661,51 @@ const Workspace = ({ currentUser }) => {
           </div>
         </div>
       <div style={wsStyles.taskCard.body}>
+        {task.tags && task.tags.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
+            {task.tags.map((tag, idx) => (
+              <span 
+                key={idx} 
+                style={{ 
+                  padding: '2px 6px', 
+                  borderRadius: '4px', 
+                  fontSize: '0.7rem', 
+                  fontWeight: 'bold', 
+                  backgroundColor: tag.color || '#3b82f6', 
+                  color: '#ffffff',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}
+              >
+                {tag.text}
+              </span>
+            ))}
+          </div>
+        )}
+        
         {renderDescription(task.description)}
         {task.dueDate && (
           <div style={{ marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
             📅 Due: {new Date(task.dueDate).toLocaleDateString()}
           </div>
         )}
-        {task.checklist && task.checklist.length > 0 && (
-          <div style={{ marginTop: '10px', fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            ☑️ {task.checklist.filter(item => item.completed).length}/{task.checklist.length} Checklist
-          </div>
-        )}
+        
+        {(() => {
+          const totalItems = (task.checklist?.length || 0) + (task.subTasks?.length || 0);
+          if (totalItems === 0) return null;
+          const completedItems = (task.checklist?.filter(c => c.completed).length || 0) + (task.subTasks?.filter(s => s.completed).length || 0);
+          const pct = Math.round((completedItems / totalItems) * 100);
+          return (
+            <div style={{ marginTop: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                <span>📋 Progress</span>
+                <span>{completedItems}/{totalItems} ({pct}%)</span>
+              </div>
+              <div style={{ height: '6px', borderRadius: '3px', backgroundColor: 'rgba(255,255,255,0.05)', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.02)' }}>
+                <div style={{ height: '100%', width: `${pct}%`, backgroundColor: pct === 100 ? '#10b981' : 'var(--primary)', transition: 'width 0.3s ease', borderRadius: '3px' }} />
+              </div>
+            </div>
+          );
+        })()}
       </div>
       <div style={wsStyles.taskCard.footer}>
         <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
@@ -1348,6 +1734,9 @@ const Workspace = ({ currentUser }) => {
   const filteredTasks = boardTasks.filter(t => {
     if (taskFilter === 'my-tasks') {
       if (!t.assignees?.some(a => a._id === currentUser._id)) return false;
+    }
+    if (selectedFilterTags.length > 0) {
+      if (!t.tags?.some(tag => selectedFilterTags.includes(tag.text))) return false;
     }
     if (taskSearchQuery.trim()) {
       return t.title.toLowerCase().includes(taskSearchQuery.toLowerCase());
@@ -2327,20 +2716,39 @@ const Workspace = ({ currentUser }) => {
         {/* Task Board Tab */}
         {workspaceTab === 'tasks' && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-              <div style={{ display: 'flex', gap: '10px', backgroundColor: 'var(--bg-card, #161b26)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                <button 
-                  onClick={() => setTaskFilter('my-tasks')} 
-                  style={{ padding: '6px 12px', borderRadius: '4px', border: 'none', background: taskFilter === 'my-tasks' ? 'var(--primary)' : 'transparent', color: taskFilter === 'my-tasks' ? 'white' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 'bold' }}
-                >
-                  My Tasks
-                </button>
-                <button 
-                  onClick={() => setTaskFilter('all-tasks')} 
-                  style={{ padding: '6px 12px', borderRadius: '4px', border: 'none', background: taskFilter === 'all-tasks' ? 'var(--primary)' : 'transparent', color: taskFilter === 'all-tasks' ? 'white' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 'bold' }}
-                >
-                  All Tasks
-                </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '15px' }}>
+              <div style={{ display: 'flex', gap: '15px' }}>
+                {/* Scope Filters */}
+                <div style={{ display: 'flex', gap: '4px', backgroundColor: 'var(--bg-card, #161b26)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                  <button 
+                    onClick={() => setTaskFilter('my-tasks')} 
+                    style={{ padding: '6px 12px', borderRadius: '4px', border: 'none', background: taskFilter === 'my-tasks' ? 'var(--primary)' : 'transparent', color: taskFilter === 'my-tasks' ? 'white' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    My Tasks
+                  </button>
+                  <button 
+                    onClick={() => setTaskFilter('all-tasks')} 
+                    style={{ padding: '6px 12px', borderRadius: '4px', border: 'none', background: taskFilter === 'all-tasks' ? 'var(--primary)' : 'transparent', color: taskFilter === 'all-tasks' ? 'white' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    All Tasks
+                  </button>
+                </div>
+
+                {/* View Type Toggle */}
+                <div style={{ display: 'flex', gap: '4px', backgroundColor: 'var(--bg-card, #161b26)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                  <button 
+                    onClick={() => setWorkspaceTaskTab('board')} 
+                    style={{ padding: '6px 12px', borderRadius: '4px', border: 'none', background: workspaceTaskTab === 'board' ? 'var(--primary)' : 'transparent', color: workspaceTaskTab === 'board' ? 'white' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    📋 Board View
+                  </button>
+                  <button 
+                    onClick={() => setWorkspaceTaskTab('timeline')} 
+                    style={{ padding: '6px 12px', borderRadius: '4px', border: 'none', background: workspaceTaskTab === 'timeline' ? 'var(--primary)' : 'transparent', color: workspaceTaskTab === 'timeline' ? 'white' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    📅 Gantt Timeline
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
@@ -2365,74 +2773,138 @@ const Workspace = ({ currentUser }) => {
                 </button>
              </div>
             </div>
+
+            {/* Tags Multi-Filter Row */}
+            {(() => {
+              const uniqueTags = [];
+              boardTasks.forEach(task => {
+                (task.tags || []).forEach(tag => {
+                  if (!uniqueTags.some(t => t.text === tag.text)) {
+                    uniqueTags.push(tag);
+                  }
+                });
+              });
+              
+              if (uniqueTags.length === 0) return null;
+              
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '15px', padding: '10px 16px', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light, rgba(255,255,255,0.08))' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>🏷️ Filter by Tags:</span>
+                  {uniqueTags.map((tag, idx) => {
+                    const isSelected = selectedFilterTags.includes(tag.text);
+                    return (
+                      <button 
+                        key={idx} 
+                        type="button"
+                        onClick={() => {
+                          setSelectedFilterTags(prev => 
+                            prev.includes(tag.text) 
+                              ? prev.filter(t => t !== tag.text) 
+                              : [...prev, tag.text]
+                          );
+                        }}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold',
+                          border: '1px solid',
+                          borderColor: tag.color,
+                          backgroundColor: isSelected ? tag.color : 'transparent',
+                          color: isSelected ? '#ffffff' : tag.color,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          boxShadow: isSelected ? `0 0 8px ${tag.color}` : 'none'
+                        }}
+                      >
+                        {tag.text} {isSelected ? '✓' : ''}
+                      </button>
+                    );
+                  })}
+                  {selectedFilterTags.length > 0 && (
+                    <button 
+                      type="button" 
+                      onClick={() => setSelectedFilterTags([])}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+
             {renderKanbanDashboard()}
-            <div style={wsStyles.kanbanContainer}>
-              {/* To Do Column */}
-              <div 
-                style={{
-                  ...wsStyles.kanbanColumn,
-                  border: draggedTaskId ? '2px dashed rgba(56, 189, 248, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
-                  boxShadow: draggedTaskId ? '0 0 15px rgba(56, 189, 248, 0.05)' : 'none',
-                  transition: 'all 0.25s ease'
-                }}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => {
-                  if (draggedTaskId) {
-                    updateTaskStatus(draggedTaskId, 'To Do');
-                    setDraggedTaskId(null);
-                  }
-                }}
-              >
-                <div style={wsStyles.kanbanColHeader}>To Do <span style={{ color: 'var(--text-secondary)', fontWeight: 'normal', fontSize: '0.8rem', marginLeft: '10px' }}>{filteredTasks.filter(t => t.status === 'To Do').length}</span></div>
-                <div style={wsStyles.kanbanColBody}>
-                  {filteredTasks.filter(t => t.status === 'To Do').map(renderKanbanCard)}
+            
+            {workspaceTaskTab === 'timeline' ? renderGanttView() : (
+              <div style={wsStyles.kanbanContainer}>
+                {/* To Do Column */}
+                <div 
+                  style={{
+                    ...wsStyles.kanbanColumn,
+                    border: draggedTaskId ? '2px dashed rgba(56, 189, 248, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
+                    boxShadow: draggedTaskId ? '0 0 15px rgba(56, 189, 248, 0.05)' : 'none',
+                    transition: 'all 0.25s ease'
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    if (draggedTaskId) {
+                      updateTaskStatus(draggedTaskId, 'To Do');
+                      setDraggedTaskId(null);
+                    }
+                  }}
+                >
+                  <div style={wsStyles.kanbanColHeader}>To Do <span style={{ color: 'var(--text-secondary)', fontWeight: 'normal', fontSize: '0.8rem', marginLeft: '10px' }}>{filteredTasks.filter(t => t.status === 'To Do').length}</span></div>
+                  <div style={wsStyles.kanbanColBody}>
+                    {filteredTasks.filter(t => t.status === 'To Do').map(renderKanbanCard)}
+                  </div>
                 </div>
-              </div>
 
-              {/* In Progress Column */}
-              <div 
-                style={{
-                  ...wsStyles.kanbanColumn,
-                  border: draggedTaskId ? '2px dashed rgba(56, 189, 248, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
-                  boxShadow: draggedTaskId ? '0 0 15px rgba(56, 189, 248, 0.05)' : 'none',
-                  transition: 'all 0.25s ease'
-                }}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => {
-                  if (draggedTaskId) {
-                    updateTaskStatus(draggedTaskId, 'In Progress');
-                    setDraggedTaskId(null);
-                  }
-                }}
-              >
-                <div style={wsStyles.kanbanColHeader}>In Progress <span style={{ color: 'var(--text-secondary)', fontWeight: 'normal', fontSize: '0.8rem', marginLeft: '10px' }}>{filteredTasks.filter(t => t.status === 'In Progress').length}</span></div>
-                <div style={wsStyles.kanbanColBody}>
-                  {filteredTasks.filter(t => t.status === 'In Progress').map(renderKanbanCard)}
+                {/* In Progress Column */}
+                <div 
+                  style={{
+                    ...wsStyles.kanbanColumn,
+                    border: draggedTaskId ? '2px dashed rgba(56, 189, 248, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
+                    boxShadow: draggedTaskId ? '0 0 15px rgba(56, 189, 248, 0.05)' : 'none',
+                    transition: 'all 0.25s ease'
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    if (draggedTaskId) {
+                      updateTaskStatus(draggedTaskId, 'In Progress');
+                      setDraggedTaskId(null);
+                    }
+                  }}
+                >
+                  <div style={wsStyles.kanbanColHeader}>In Progress <span style={{ color: 'var(--text-secondary)', fontWeight: 'normal', fontSize: '0.8rem', marginLeft: '10px' }}>{filteredTasks.filter(t => t.status === 'In Progress').length}</span></div>
+                  <div style={wsStyles.kanbanColBody}>
+                    {filteredTasks.filter(t => t.status === 'In Progress').map(renderKanbanCard)}
+                  </div>
                 </div>
-              </div>
 
-              {/* Done Column */}
-              <div 
-                style={{
-                  ...wsStyles.kanbanColumn,
-                  border: draggedTaskId ? '2px dashed rgba(56, 189, 248, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
-                  boxShadow: draggedTaskId ? '0 0 15px rgba(56, 189, 248, 0.05)' : 'none',
-                  transition: 'all 0.25s ease'
-                }}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => {
-                  if (draggedTaskId) {
-                    updateTaskStatus(draggedTaskId, 'Done');
-                    setDraggedTaskId(null);
-                  }
-                }}
-              >
-                <div style={wsStyles.kanbanColHeader}>Done <span style={{ color: 'var(--text-secondary)', fontWeight: 'normal', fontSize: '0.8rem', marginLeft: '10px' }}>{filteredTasks.filter(t => t.status === 'Done').length}</span></div>
-                <div style={wsStyles.kanbanColBody}>
-                  {filteredTasks.filter(t => t.status === 'Done').map(renderKanbanCard)}
+                {/* Done Column */}
+                <div 
+                  style={{
+                    ...wsStyles.kanbanColumn,
+                    border: draggedTaskId ? '2px dashed rgba(56, 189, 248, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
+                    boxShadow: draggedTaskId ? '0 0 15px rgba(56, 189, 248, 0.05)' : 'none',
+                    transition: 'all 0.25s ease'
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    if (draggedTaskId) {
+                      updateTaskStatus(draggedTaskId, 'Done');
+                      setDraggedTaskId(null);
+                    }
+                  }}
+                >
+                  <div style={wsStyles.kanbanColHeader}>Done <span style={{ color: 'var(--text-secondary)', fontWeight: 'normal', fontSize: '0.8rem', marginLeft: '10px' }}>{filteredTasks.filter(t => t.status === 'Done').length}</span></div>
+                  <div style={wsStyles.kanbanColBody}>
+                    {filteredTasks.filter(t => t.status === 'Done').map(renderKanbanCard)}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -2505,14 +2977,63 @@ const Workspace = ({ currentUser }) => {
       {editTask && (
         <div style={wsStyles.modalOverlay}>
           <div style={wsStyles.modalContentLarge}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
               <h3 style={{ margin: 0 }}>Task Details</h3>
               <button onClick={() => setEditTask(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
             </div>
             
+            {/* Modal Tabs Header */}
+            <div style={{ display: 'flex', gap: '15px', borderBottom: '1px solid var(--border-light)', marginBottom: '20px', paddingBottom: '10px' }}>
+              <button 
+                type="button"
+                onClick={() => setTaskDetailTab('details')}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: taskDetailTab === 'details' ? 'var(--primary)' : 'var(--text-secondary)', 
+                  fontWeight: 'bold', 
+                  cursor: 'pointer',
+                  borderBottom: taskDetailTab === 'details' ? '2px solid var(--primary)' : 'none',
+                  paddingBottom: '5px'
+                }}
+              >
+                📋 Details & Sub-Tasks
+              </button>
+              <button 
+                type="button"
+                onClick={() => setTaskDetailTab('time')}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: taskDetailTab === 'time' ? 'var(--primary)' : 'var(--text-secondary)', 
+                  fontWeight: 'bold', 
+                  cursor: 'pointer',
+                  borderBottom: taskDetailTab === 'time' ? '2px solid var(--primary)' : 'none',
+                  paddingBottom: '5px'
+                }}
+              >
+                ⏱️ Time Sheets
+              </button>
+              <button 
+                type="button"
+                onClick={() => setTaskDetailTab('history')}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: taskDetailTab === 'history' ? 'var(--primary)' : 'var(--text-secondary)', 
+                  fontWeight: 'bold', 
+                  cursor: 'pointer',
+                  borderBottom: taskDetailTab === 'history' ? '2px solid var(--primary)' : 'none',
+                  paddingBottom: '5px'
+                }}
+              >
+                📜 Activity History
+              </button>
+            </div>
+            
             <form onSubmit={handleEditTaskSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-                {/* Left Side: Standard fields */}
+                {/* Left Side: Standard fields (Always visible in Details/Time/History tabs to maintain context) */}
                 <div style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Task Title</label>
@@ -2550,84 +3071,307 @@ const Workspace = ({ currentUser }) => {
                   </div>
                 </div>
 
-                {/* Right Side: Checklist & Comments */}
-                <div style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  {/* Checklist */}
-                  <div style={{ border: '1px solid var(--border-light)', borderRadius: '12px', padding: '16px', backgroundColor: 'rgba(0,0,0,0.1)' }}>
-                    <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}><CheckSquare size={16} color="var(--primary)" /> Checklist</h4>
-                    
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto', marginBottom: '12px' }}>
-                      {editTask.checklist && editTask.checklist.length > 0 ? (
-                        editTask.checklist.map((item, idx) => (
-                          <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1, fontSize: '0.85rem' }}>
-                              <input type="checkbox" checked={item.completed} onChange={() => toggleChecklistItem(idx)} />
-                              <span style={{ textDecoration: item.completed ? 'line-through' : 'none', color: item.completed ? 'var(--text-secondary)' : 'var(--text-primary)' }}>{item.text}</span>
-                            </label>
-                            <button type="button" onClick={() => deleteChecklistItem(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 0 }}><X size={14} /></button>
-                          </div>
-                        ))
-                      ) : (
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No checklist items yet.</span>
-                      )}
+                {/* Right Side: Tab Contents */}
+                {taskDetailTab === 'details' && (
+                  <div style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {/* Tags / Labels */}
+                    <div style={{ border: '1px solid var(--border-light)', borderRadius: '12px', padding: '16px', backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>🏷️ Tags / Labels</h4>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                        {(editTask.tags || []).length > 0 ? (
+                          editTask.tags.map((tag, idx) => (
+                            <span key={idx} style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', backgroundColor: tag.color || '#3b82f6', color: 'white', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
+                              {tag.text}
+                              <button type="button" onClick={() => removeTag(idx)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: 0, fontWeight: 'bold', fontSize: '0.85rem' }}>×</button>
+                            </span>
+                          ))
+                        ) : (
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No tags added yet.</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input 
+                          type="text" 
+                          placeholder="Add new tag..." 
+                          value={newTagText} 
+                          onChange={(e) => setNewTagText(e.target.value)} 
+                          style={{ flex: 1, padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}
+                        />
+                        <input 
+                          type="color" 
+                          value={newTagColor} 
+                          onChange={(e) => setNewTagColor(e.target.value)} 
+                          style={{ width: '32px', height: '32px', padding: 0, border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'transparent' }} 
+                        />
+                        <button 
+                          type="button" 
+                          onClick={addTag} 
+                          style={{ padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', backgroundColor: 'var(--primary)', color: '#0b0f19', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}
+                        >
+                          Add
+                        </button>
+                      </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input 
-                        type="text" 
-                        placeholder="Add item..." 
-                        value={newChecklistItem} 
-                        onChange={(e) => setNewChecklistItem(e.target.value)} 
-                        style={{ flex: 1, padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}
-                      />
-                      <button 
-                        type="button" 
-                        onClick={addChecklistItem} 
-                        style={{ padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', backgroundColor: 'var(--primary)', color: '#0b0f19', fontWeight: 'bold', border: 'none' }}
-                      >
-                        Add
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Comments */}
-                  <div style={{ border: '1px solid var(--border-light)', borderRadius: '12px', padding: '16px', backgroundColor: 'rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', height: '240px' }}>
-                    <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}><MessageSquare size={16} color="var(--primary)" /> Comments</h4>
-                    
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', marginBottom: '12px', paddingRight: '4px' }}>
-                      {editTask.comments && editTask.comments.length > 0 ? (
-                        editTask.comments.map((c, idx) => (
-                          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '2px', backgroundColor: 'var(--bg-main)', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                              <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{c.sender?.name || c.sender?.username || 'User'}</span>
-                              <span>{new Date(c.createdAt).toLocaleDateString()} {new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    {/* Checklist */}
+                    <div style={{ border: '1px solid var(--border-light)', borderRadius: '12px', padding: '16px', backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}><CheckSquare size={16} color="var(--primary)" /> Checklist</h4>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto', marginBottom: '12px' }}>
+                        {editTask.checklist && editTask.checklist.length > 0 ? (
+                          editTask.checklist.map((item, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1, fontSize: '0.85rem' }}>
+                                <input type="checkbox" checked={item.completed} onChange={() => toggleChecklistItem(idx)} />
+                                <span style={{ textDecoration: item.completed ? 'line-through' : 'none', color: item.completed ? 'var(--text-secondary)' : 'var(--text-primary)' }}>{item.text}</span>
+                              </label>
+                              <button type="button" onClick={() => deleteChecklistItem(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 0 }}><X size={14} /></button>
                             </div>
-                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-primary)', wordBreak: 'break-word' }}>{c.text}</p>
-                          </div>
-                        ))
-                      ) : (
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 'auto' }}>No comments yet.</span>
-                      )}
+                          ))
+                        ) : (
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No checklist items yet.</span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input 
+                          type="text" 
+                          placeholder="Add item..." 
+                          value={newChecklistItem} 
+                          onChange={(e) => setNewChecklistItem(e.target.value)} 
+                          style={{ flex: 1, padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}
+                        />
+                        <button 
+                          type="button" 
+                          onClick={addChecklistItem} 
+                          style={{ padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', backgroundColor: 'var(--primary)', color: '#0b0f19', fontWeight: 'bold', border: 'none' }}
+                        >
+                          Add
+                        </button>
+                      </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input 
-                        type="text" 
-                        placeholder="Write a comment..." 
-                        value={newCommentText} 
-                        onChange={(e) => setNewCommentText(e.target.value)} 
-                        style={{ flex: 1, padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}
-                      />
-                      <button 
-                        type="button" 
-                        onClick={addComment} 
-                        style={{ padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', backgroundColor: 'var(--primary)', color: '#0b0f19', fontWeight: 'bold', border: 'none' }}
-                      >
-                        Send
-                      </button>
+                    {/* Sub-Tasks */}
+                    <div style={{ border: '1px solid var(--border-light)', borderRadius: '12px', padding: '16px', backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}><CheckSquare size={16} color="var(--primary)" /> Sub-Tasks</h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto', marginBottom: '12px' }}>
+                        {(editTask.subTasks || []).length > 0 ? (
+                          editTask.subTasks.map((sub, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1, fontSize: '0.85rem' }}>
+                                <input type="checkbox" checked={sub.completed} onChange={() => toggleSubTask(idx)} />
+                                <span style={{ textDecoration: sub.completed ? 'line-through' : 'none', color: sub.completed ? 'var(--text-secondary)' : 'var(--text-primary)' }}>
+                                  {sub.title}
+                                </span>
+                                {sub.assignee && (
+                                  <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', marginLeft: '10px' }}>
+                                    👤 {sub.assignee.name || sub.assignee.username}
+                                  </span>
+                                )}
+                              </label>
+                              <button type="button" onClick={() => deleteSubTask(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 0 }}><X size={14} /></button>
+                            </div>
+                          ))
+                        ) : (
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No sub-tasks yet.</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <input 
+                          type="text" 
+                          placeholder="Sub-task title..." 
+                          value={newSubTaskTitle} 
+                          onChange={(e) => setNewSubTaskTitle(e.target.value)} 
+                          style={{ flex: 1, minWidth: '150px', padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }} 
+                        />
+                        <select 
+                          value={newSubTaskAssignee} 
+                          onChange={(e) => setNewSubTaskAssignee(e.target.value)} 
+                          style={{ padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }}
+                        >
+                          <option value="">Assignee...</option>
+                          {allUsers.map(u => (
+                            <option key={u._id} value={u._id}>{u.name || u.username}</option>
+                          ))}
+                        </select>
+                        <button 
+                          type="button" 
+                          onClick={addSubTask} 
+                          style={{ padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', backgroundColor: 'var(--primary)', color: '#0b0f19', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Comments */}
+                    <div style={{ border: '1px solid var(--border-light)', borderRadius: '12px', padding: '16px', backgroundColor: 'rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', height: '240px' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}><MessageSquare size={16} color="var(--primary)" /> Comments</h4>
+                      
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', marginBottom: '12px', paddingRight: '4px' }}>
+                        {editTask.comments && editTask.comments.length > 0 ? (
+                          editTask.comments.map((c, idx) => (
+                            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '2px', backgroundColor: 'var(--bg-main)', padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{c.sender?.name || c.sender?.username || 'User'}</span>
+                                <span>{new Date(c.createdAt).toLocaleDateString()} {new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-primary)', wordBreak: 'break-word' }}>{c.text}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 'auto' }}>No comments yet.</span>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input 
+                          type="text" 
+                          placeholder="Write a comment..." 
+                          value={newCommentText} 
+                          onChange={(e) => setNewCommentText(e.target.value)} 
+                          style={{ flex: 1, padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }}
+                        />
+                        <button 
+                          type="button" 
+                          onClick={addComment} 
+                          style={{ padding: '6px 12px', fontSize: '0.85rem', borderRadius: '6px', backgroundColor: 'var(--primary)', color: '#0b0f19', fontWeight: 'bold', border: 'none' }}
+                        >
+                          Send
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {taskDetailTab === 'time' && (
+                  <div style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        {/* Live Stopwatch */}
+                        <div style={{ border: '1px solid var(--border-light)', borderRadius: '12px', padding: '16px', backgroundColor: 'rgba(0,0,0,0.1)', textAlign: 'center' }}>
+                          <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95rem' }}>⏱️ Live Stopwatch</h4>
+                          <div style={{ fontSize: '2.5rem', fontFamily: 'monospace', fontWeight: 'bold', color: activeTimerTaskId === editTask._id ? 'var(--primary)' : 'var(--text-secondary)', margin: '15px 0' }}>
+                            {(() => {
+                              const displaySecs = activeTimerTaskId === editTask._id ? timerSeconds : 0;
+                              const hrs = Math.floor(displaySecs / 3600).toString().padStart(2, '0');
+                              const mins = Math.floor((displaySecs % 3600) / 60).toString().padStart(2, '0');
+                              const secs = (displaySecs % 60).toString().padStart(2, '0');
+                              return `${hrs}:${mins}:${secs}`;
+                            })()}
+                          </div>
+                          
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginBottom: '5px' }}>
+                            {activeTimerTaskId !== editTask._id ? (
+                              <button 
+                                type="button" 
+                                onClick={() => startStopwatch(editTask._id)}
+                                style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#10b981', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
+                              >
+                                Start Timer
+                              </button>
+                            ) : (
+                              <button 
+                                type="button" 
+                                onClick={() => {
+                                  const desc = prompt("Enter work description for this timer log:") || "";
+                                  stopStopwatchAndLog(desc);
+                                }}
+                                style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#ef4444', color: 'white', fontWeight: 'bold', cursor: 'pointer' }}
+                              >
+                                Stop & Log Time
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Manual Log */}
+                        <div style={{ border: '1px solid var(--border-light)', borderRadius: '12px', padding: '16px', backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                          <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem' }}>✍️ Manual Time Log</h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <div>
+                              <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Hours worked (e.g. 1.5)</label>
+                              <input type="number" step="0.1" placeholder="Hours" value={manualLogHours} onChange={e => setManualLogHours(e.target.value)} style={{ width: '100%', padding: '8px 12px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }} />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Description</label>
+                              <input type="text" placeholder="What did you do?" value={manualLogDesc} onChange={e => setManualLogDesc(e.target.value)} style={{ width: '100%', padding: '8px 12px', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)' }} />
+                            </div>
+                            <button type="button" onClick={addManualTimeLog} style={{ padding: '8px 16px', borderRadius: '6px', backgroundColor: 'var(--primary)', color: '#0b0f19', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>Log Hours</button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Log List */}
+                      <div style={{ flex: 1, border: '1px solid var(--border-light)', borderRadius: '12px', padding: '16px', backgroundColor: 'rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', height: '350px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid var(--border-light)', paddingBottom: '8px' }}>
+                          <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Logs Sheet</h4>
+                          <strong style={{ fontSize: '0.95rem', color: 'var(--primary)' }}>
+                            Total: {parseFloat((editTask.timeLogs || []).reduce((acc, curr) => acc + curr.hours, 0).toFixed(2))} hrs
+                          </strong>
+                        </div>
+                        
+                        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {(editTask.timeLogs || []).length > 0 ? (
+                            editTask.timeLogs.map((log, idx) => (
+                              <div key={idx} style={{ backgroundColor: 'var(--bg-main)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--primary)' }}>
+                                    {log.user?.name || log.user?.username || 'User'}
+                                  </div>
+                                  <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', marginTop: '2px' }}>
+                                    {log.description}
+                                  </div>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                    {new Date(log.createdAt).toLocaleDateString()}
+                                  </div>
+                                </div>
+                                <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{log.hours} hrs</span>
+                              </div>
+                            ))
+                          ) : (
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 'auto' }}>No hours logged yet.</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {taskDetailTab === 'history' && (
+                  <div style={{ flex: 1, minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{ border: '1px solid var(--border-light)', borderRadius: '12px', padding: '16px', backgroundColor: 'rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', height: '400px' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '0.95rem' }}>📜 Activity & Audit History</h4>
+                      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '4px' }}>
+                        {(editTask.activityLogs || []).length > 0 ? (
+                          [...editTask.activityLogs].reverse().map((log, idx) => (
+                            <div key={idx} style={{ display: 'flex', gap: '12px', position: 'relative' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'var(--primary)', boxShadow: '0 0 6px var(--primary)', marginTop: '4px' }} />
+                                {idx < editTask.activityLogs.length - 1 && <div style={{ flex: 1, width: '2px', backgroundColor: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />}
+                              </div>
+                              
+                              <div style={{ backgroundColor: 'var(--bg-main)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)', flex: 1 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                                  <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{log.action}</span>
+                                  <span>{new Date(log.createdAt).toLocaleDateString()} {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{log.details}</p>
+                                {log.user && (
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>
+                                    By: {log.user.name || log.user.username || 'System'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 'auto' }}>No activity history found.</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-light)', paddingTop: '15px', marginTop: '10px' }}>
