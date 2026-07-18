@@ -72,6 +72,10 @@ const Workspace = ({ currentUser }) => {
   const [manualLogDesc, setManualLogDesc] = useState('');
   const [workspaceTaskTab, setWorkspaceTaskTab] = useState('board');
   const [selectedFilterTags, setSelectedFilterTags] = useState([]);
+  const [showSlashDropdown, setShowSlashDropdown] = useState(false);
+  const [slashSearchText, setSlashSearchText] = useState('');
+  const [chatFilter, setChatFilter] = useState('all');
+  const [isAIProcessing, setIsAIProcessing] = useState(false);
 
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -852,6 +856,15 @@ const Workspace = ({ currentUser }) => {
     const val = e.target.value;
     setNewMessage(val);
     
+    // Slash commands detection
+    if (val.startsWith('/')) {
+      setShowSlashDropdown(true);
+      setSlashSearchText(val.substring(1));
+    } else {
+      setShowSlashDropdown(false);
+      setSlashSearchText('');
+    }
+
     // Mentions detection
     const cursor = e.target.selectionStart || 0;
     const textBeforeCursor = val.substring(0, cursor);
@@ -988,7 +1001,7 @@ const Workspace = ({ currentUser }) => {
     });
   };
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !activeRoom || !socket) return;
 
@@ -1001,6 +1014,145 @@ const Workspace = ({ currentUser }) => {
       username: currentUser.name || currentUser.username,
       isTyping: false
     });
+
+    if (newMessage.startsWith('/')) {
+      const parts = newMessage.trim().split(' ');
+      const command = parts[0].toLowerCase();
+      const args = parts.slice(1).join(' ');
+
+      if (command === '/task') {
+        if (!args) {
+          alert('Usage: /task [Task Title]');
+          setNewMessage('');
+          return;
+        }
+        socket.emit('create-task-from-chat', {
+          roomId: activeRoom._id,
+          senderId: currentUser._id,
+          content: 'Created via slash command',
+          title: args,
+          priority: 'medium',
+          assignees: [],
+          actorId: currentUser._id
+        });
+        setNewMessage('');
+        return;
+      }
+      
+      if (command === '/timer') {
+        const action = args.trim().toLowerCase();
+        if (action === 'start') {
+          if (editTask?._id) {
+            startStopwatch(editTask._id);
+          } else {
+            alert('Open a task card details modal first to use /timer start.');
+          }
+        } else if (action === 'stop') {
+          if (activeTimerTaskId) {
+            const desc = prompt("Enter description for logged time:") || "";
+            stopStopwatchAndLog(desc);
+          } else {
+            alert('No active stopwatch is currently running.');
+          }
+        } else {
+          alert('Usage: /timer [start/stop]');
+        }
+        setNewMessage('');
+        return;
+      }
+
+      if (command === '/invite') {
+        if (!args) {
+          alert('Usage: /invite [Username]');
+          setNewMessage('');
+          return;
+        }
+        const matchingUser = allUsers.find(u => 
+          (u.name || '').toLowerCase() === args.toLowerCase() || 
+          (u.username || '').toLowerCase() === args.toLowerCase()
+        );
+        if (matchingUser) {
+          const isAlreadyMember = activeRoom.members?.some(m => (m._id || m) === matchingUser._id);
+          if (isAlreadyMember) {
+            alert(`${args} is already a member of this channel.`);
+          } else {
+            const updatedMembers = [...(activeRoom.members || []).map(m => m._id || m), matchingUser._id];
+            socket.emit('update-room-settings', {
+              roomId: activeRoom._id,
+              name: activeRoom.name,
+              members: updatedMembers,
+              isArchived: activeRoom.isArchived || false
+            });
+            alert(`Invited ${matchingUser.name || matchingUser.username} to the channel.`);
+          }
+        } else {
+          alert(`User "${args}" not found.`);
+        }
+        setNewMessage('');
+        return;
+      }
+
+      if (command === '/pin') {
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg) {
+          togglePinMessage(lastMsg._id);
+        } else {
+          alert('No messages in this channel to pin.');
+        }
+        setNewMessage('');
+        return;
+      }
+
+      if (command === '/ai') {
+        if (!args) {
+          alert('Usage: /ai [Prompt]');
+          setNewMessage('');
+          return;
+        }
+        const tempMsgId = 'ai-loading-' + Date.now();
+        const loadingMessage = {
+          _id: tempMsgId,
+          roomId: activeRoom._id,
+          senderId: { _id: 'ai-bot', name: '✨ AI Copilot', username: 'ai-bot' },
+          content: 'Typing response...',
+          type: 'text',
+          createdAt: new Date().toISOString()
+        };
+        
+        const userPromptMsg = {
+          _id: 'user-prompt-' + Date.now(),
+          roomId: activeRoom._id,
+          senderId: currentUser,
+          content: newMessage,
+          type: 'text',
+          createdAt: new Date().toISOString()
+        };
+        
+        setMessages(prev => [...prev, userPromptMsg, loadingMessage]);
+        scrollToBottom();
+        setNewMessage('');
+
+        try {
+          const chatHistory = messages.slice(-5).map(m => ({
+            sender: m.senderId?.name || m.senderId?.username || 'User',
+            content: m.content
+          }));
+          const res = await axios.post('/v1/ai/chat', { prompt: args, history: chatHistory });
+          if (res.data && res.data.text) {
+            setMessages(prev => prev.map(m => 
+              m._id === tempMsgId ? { ...m, content: res.data.text } : m
+            ));
+            scrollToBottom();
+          }
+        } catch (err) {
+          console.error(err);
+          setMessages(prev => prev.map(m => 
+            m._id === tempMsgId ? { ...m, content: 'Sorry, I failed to connect to the AI model.' } : m
+          ));
+        }
+        return;
+      }
+    }
 
     if (editingMessageId) {
       socket.emit('edit-message', {
@@ -1280,6 +1432,34 @@ const Workspace = ({ currentUser }) => {
 
     setActiveTimerTaskId(null);
     setTimerSeconds(0);
+  };
+
+  const handleGenerateAISummary = async () => {
+    if (messages.length === 0) {
+      alert("No messages to summarize!");
+      return;
+    }
+    setIsAIProcessing(true);
+    try {
+      const res = await axios.post('/v1/ai/summarize', { messages });
+      if (res.data && res.data.text) {
+        const summaryMsg = {
+          _id: 'ai-summary-' + Date.now(),
+          roomId: activeRoom._id,
+          senderId: { _id: 'ai-bot', name: '✨ AI Summarizer', username: 'ai-bot' },
+          content: res.data.text,
+          type: 'text',
+          createdAt: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, summaryMsg]);
+        scrollToBottom();
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to connect to AI summarizer.');
+    } finally {
+      setIsAIProcessing(false);
+    }
   };
 
   const handleCreateTaskSubmit = (e) => {
@@ -1780,11 +1960,78 @@ const Workspace = ({ currentUser }) => {
       });
     };
 
-    const formatLine = (line) => {
-      const urlRegex = /(https?:\/\/[^\s]+)/g;
-      const parts = line.split(urlRegex);
+    const parseItalics = (text) => {
+      if (typeof text !== 'string') return text;
+      const italicRegex = /_([^_]+)_/g;
+      const parts = text.split(italicRegex);
+      return parts.map((part, index) => {
+        if (index % 2 === 1) {
+          return <em key={`i-${index}`} style={{ fontStyle: 'italic' }}>{highlightText(part)}</em>;
+        }
+        return highlightText(part);
+      });
+    };
+
+    const parseInlineMarkdown = (text) => {
+      if (!text) return text;
+      const inlineCodeRegex = /`([^`]+)`/g;
+      let parts = text.split(inlineCodeRegex);
       
       return parts.map((part, index) => {
+        if (index % 2 === 1) {
+          return <code key={index} style={{ backgroundColor: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '0.85rem', color: '#f87171' }}>{part}</code>;
+        }
+        
+        const doubleBoldRegex = /\*\*([^*]+)\*\*/g;
+        let boldParts = part.split(doubleBoldRegex);
+        
+        return boldParts.flatMap((bPart, bIndex) => {
+          if (bIndex % 2 === 1) {
+            return <strong key={`b-${bIndex}`} style={{ color: 'var(--text-primary, #ffffff)', fontWeight: 'bold' }}>{parseItalics(bPart)}</strong>;
+          }
+          
+          const singleBoldRegex = /\*([^*]+)\*/g;
+          let singleBoldParts = bPart.split(singleBoldRegex);
+          
+          return singleBoldParts.flatMap((sPart, sIndex) => {
+            if (sIndex % 2 === 1) {
+              return <strong key={`s-${sIndex}`} style={{ color: 'var(--text-primary, #ffffff)', fontWeight: 'bold' }}>{parseItalics(sPart)}</strong>;
+            }
+            return parseItalics(sPart);
+          });
+        });
+      });
+    };
+
+    const parseMarkdown = (text) => {
+      if (!text) return text;
+      const codeBlockRegex = /```([\s\S]*?)```/g;
+      const codeParts = text.split(codeBlockRegex);
+      
+      if (codeParts.length > 1) {
+        return codeParts.map((part, index) => {
+          if (index % 2 === 1) {
+            return (
+              <pre key={index} style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.85rem', overflowX: 'auto', border: '1px solid var(--border-light, rgba(255,255,255,0.08))', color: '#a6adbb', margin: '8px 0' }}>
+                <code>{part}</code>
+              </pre>
+            );
+          }
+          return parseInlineMarkdown(part);
+        });
+      }
+      
+      return parseInlineMarkdown(text);
+    };
+
+    const formatLine = (line) => {
+      const isList = line.trim().startsWith('- ') || line.trim().startsWith('* ');
+      const cleanLine = isList ? line.trim().substring(2) : line;
+      
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const parts = cleanLine.split(urlRegex);
+      
+      const renderedParts = parts.map((part, index) => {
         if (part.match(urlRegex)) {
           const isPdf = part.includes('/report/pdf');
           if (isPdf) {
@@ -1836,16 +2083,19 @@ const Workspace = ({ currentUser }) => {
           );
         }
         
-        // Parse bold *text*
-        const boldRegex = /\*([^*]+)\*/g;
-        const boldParts = part.split(boldRegex);
-        return boldParts.map((subPart, subIndex) => {
-          if (subIndex % 2 === 1) {
-            return <strong key={subIndex} style={{ color: 'var(--text-primary, #ffffff)' }}>{highlightText(subPart)}</strong>;
-          }
-          return highlightText(subPart);
-        });
+        return parseMarkdown(part);
       });
+
+      if (isList) {
+        return (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginLeft: '12px', marginTop: '4px' }}>
+            <span style={{ color: 'var(--primary)', marginTop: '2px' }}>•</span>
+            <div style={{ flex: 1 }}>{renderedParts}</div>
+          </div>
+        );
+      }
+
+      return renderedParts;
     };
 
     const lines = content.split('\n');
@@ -2056,6 +2306,32 @@ const Workspace = ({ currentUser }) => {
                       >
                         <Pin size={18} fill={showPinsDrawer ? '#facc15' : 'none'} />
                       </button>
+
+                      {/* AI Summary Button */}
+                      <button
+                        onClick={handleGenerateAISummary}
+                        disabled={isAIProcessing}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: isAIProcessing ? 'var(--primary)' : 'var(--text-secondary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '0.85rem',
+                          fontWeight: 'bold'
+                        }}
+                        title="Generate AI Summary of this Channel"
+                      >
+                        {isAIProcessing ? (
+                          <span style={{ fontSize: '0.85rem' }}>Processing...</span>
+                        ) : (
+                          <>
+                            <span style={{ fontSize: '1.1rem' }}>✨</span> AI Summary
+                          </>
+                        )}
+                      </button>
                       
                       {/* Room settings gear (only for group channels) */}
                       {activeRoom.type !== 'direct' && (
@@ -2077,6 +2353,38 @@ const Workspace = ({ currentUser }) => {
                     </div>
                   </div>
 
+                  {/* Timeline Categories Filters */}
+                  <div style={{ display: 'flex', gap: '8px', padding: '10px 20px', borderBottom: '1px solid var(--border-light, rgba(255,255,255,0.08))', backgroundColor: 'rgba(0,0,0,0.15)', flexWrap: 'wrap' }}>
+                    <button 
+                      type="button"
+                      onClick={() => setChatFilter('all')}
+                      style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', backgroundColor: chatFilter === 'all' ? 'var(--primary)' : 'transparent', color: chatFilter === 'all' ? '#0b0f19' : 'var(--text-secondary)' }}
+                    >
+                      All Messages
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setChatFilter('voice')}
+                      style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', backgroundColor: chatFilter === 'voice' ? 'var(--primary)' : 'transparent', color: chatFilter === 'voice' ? '#0b0f19' : 'var(--text-secondary)' }}
+                    >
+                      🎙️ Memos
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setChatFilter('task')}
+                      style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', backgroundColor: chatFilter === 'task' ? 'var(--primary)' : 'transparent', color: chatFilter === 'task' ? '#0b0f19' : 'var(--text-secondary)' }}
+                    >
+                      📋 Tasks
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setChatFilter('file')}
+                      style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', backgroundColor: chatFilter === 'file' ? 'var(--primary)' : 'transparent', color: chatFilter === 'file' ? '#0b0f19' : 'var(--text-secondary)' }}
+                    >
+                      📁 Attachments
+                    </button>
+                  </div>
+
                   {/* Messages */}
                   <div style={wsStyles.messageList} onScroll={handleScroll}>
                     {messages.length === 0 ? (
@@ -2084,8 +2392,21 @@ const Workspace = ({ currentUser }) => {
                     ) : (
                       (() => {
                         const filteredMessages = messages.filter(msg => {
-                          if (!searchQuery.trim()) return true;
-                          return msg.content && msg.content.toLowerCase().includes(searchQuery.toLowerCase());
+                          if (searchQuery.trim() && !(msg.content && msg.content.toLowerCase().includes(searchQuery.toLowerCase()))) {
+                            return false;
+                          }
+                          if (chatFilter === 'voice') {
+                            const isVoice = msg.attachment?.type?.startsWith('audio/') || msg.content?.includes('voice-note');
+                            if (!isVoice) return false;
+                          }
+                          if (chatFilter === 'task') {
+                            if (msg.type !== 'task-card') return false;
+                          }
+                          if (chatFilter === 'file') {
+                            const isFile = msg.attachment && !msg.attachment.type?.startsWith('audio');
+                            if (!isFile) return false;
+                          }
+                          return true;
                         });
 
                         if (filteredMessages.length === 0) {
@@ -2586,6 +2907,105 @@ const Workspace = ({ currentUser }) => {
                       </div>
                     )}
 
+                    {/* Slash Commands Dropdown */}
+                    {showSlashDropdown && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '80px',
+                        left: '20px',
+                        right: '20px',
+                        backgroundColor: '#161b26',
+                        border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
+                        borderRadius: '12px',
+                        boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)',
+                        zIndex: 100,
+                        overflow: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column'
+                      }}>
+                        <div style={{ padding: '10px 15px', borderBottom: '1px solid var(--border-light)', fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 'bold' }}>
+                          ⚡ Slash Commands
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', maxHeight: '180px', overflowY: 'auto' }}>
+                          {[
+                            { cmd: '/task', desc: 'Create a task card: /task [title]' },
+                            { cmd: '/timer', desc: 'Stopwatch controls: /timer [start/stop]' },
+                            { cmd: '/invite', desc: 'Invite member: /invite [Username]' },
+                            { cmd: '/pin', desc: 'Pin the last message' },
+                            { cmd: '/ai', desc: 'Ask AI Copilot: /ai [Prompt]' }
+                          ].filter(c => c.cmd.toLowerCase().includes(slashSearchText.toLowerCase())).map((c, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setNewMessage(c.cmd + ' ');
+                                setShowSlashDropdown(false);
+                                document.getElementById('chat-input-field')?.focus();
+                              }}
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'flex-start',
+                                padding: '10px 15px',
+                                border: 'none',
+                                background: 'transparent',
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                width: '100%',
+                                transition: 'background-color 0.2s',
+                                borderBottom: '1px solid rgba(255,255,255,0.02)'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'}
+                              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                              <strong style={{ fontSize: '0.85rem', color: 'var(--primary)' }}>{c.cmd}</strong>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{c.desc}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Formatting Helper Toolbar */}
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <button 
+                        type="button"
+                        onClick={() => setNewMessage(prev => prev + '**bold**')}
+                        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', color: 'var(--text-secondary)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 'bold' }}
+                        title="Bold Text"
+                      >
+                        B
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setNewMessage(prev => prev + '_italic_')}
+                        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', color: 'var(--text-secondary)', fontSize: '0.8rem', cursor: 'pointer', fontStyle: 'italic' }}
+                        title="Italic Text"
+                      >
+                        I
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setNewMessage(prev => prev + '`code`')}
+                        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', color: 'var(--text-secondary)', fontSize: '0.8rem', fontFamily: 'monospace', cursor: 'pointer' }}
+                        title="Inline Code"
+                      >
+                        &lt;/&gt;
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setNewMessage(prev => prev + '\n- ')}
+                        style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', color: 'var(--text-secondary)', fontSize: '0.8rem', cursor: 'pointer' }}
+                        title="List"
+                      >
+                        • List
+                      </button>
+                      <span style={{ flex: 1 }}></span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Type `/` for commands
+                      </span>
+                    </div>
+
                     <form onSubmit={handleSendMessage} style={wsStyles.inputForm}>
                       <button 
                         type="button" 
@@ -2768,6 +3188,25 @@ const Workspace = ({ currentUser }) => {
                     width: '220px'
                   }}
                 />
+                <button 
+                  onClick={() => {
+                    window.open('/v1/workspace/tasks/export', '_blank');
+                  }} 
+                  style={{ 
+                    padding: '10px 20px', 
+                    borderRadius: '8px', 
+                    border: '1px solid var(--border-light, rgba(255,255,255,0.08))', 
+                    backgroundColor: 'transparent', 
+                    color: 'var(--text-primary)', 
+                    cursor: 'pointer', 
+                    fontWeight: 'bold', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px' 
+                  }}
+                >
+                  📥 Export Report
+                </button>
                 <button onClick={() => setTaskModalMsg({ isStandalone: true, content: '' })} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: 'white', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Plus size={18} /> Create New Task
                 </button>

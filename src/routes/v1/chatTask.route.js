@@ -219,4 +219,76 @@ router.get('/tasks', async (req, res) => {
   }
 });
 
+const ExcelJS = require('exceljs');
+
+// Export Tasks to Excel
+router.get('/tasks/export', async (req, res) => {
+  try {
+    const tasks = await Task.find()
+      .populate('assignees', 'name email')
+      .populate('comments.sender', 'name username email')
+      .populate('timeLogs.user', 'name username email')
+      .populate('subTasks.assignee', 'name email');
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Tasks Overview');
+
+    worksheet.columns = [
+      { header: 'ID', key: 'id', width: 25 },
+      { header: 'Title', key: 'title', width: 30 },
+      { header: 'Description', key: 'description', width: 40 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Priority', key: 'priority', width: 15 },
+      { header: 'Due Date', key: 'dueDate', width: 20 },
+      { header: 'Assignees', key: 'assignees', width: 30 },
+      { header: 'Tags', key: 'tags', width: 25 },
+      { header: 'Sub-Tasks Status', key: 'subtasks', width: 30 },
+      { header: 'Total Logged Hours', key: 'hours', width: 20 },
+      { header: 'Created At', key: 'createdAt', width: 25 }
+    ];
+
+    tasks.forEach(task => {
+      const assigneeNames = (task.assignees || []).map(a => a.name || a.email).join(', ');
+      const tagText = (task.tags || []).map(t => t.text).join(', ');
+      
+      const totalSub = task.subTasks?.length || 0;
+      const completedSub = task.subTasks?.filter(s => s.completed).length || 0;
+      const subtaskStr = totalSub > 0 ? `${completedSub}/${totalSub} completed` : 'N/A';
+      
+      const totalHours = (task.timeLogs || []).reduce((acc, curr) => acc + curr.hours, 0);
+
+      worksheet.addRow({
+        id: task._id.toString(),
+        title: task.title,
+        description: task.description || '',
+        status: task.status,
+        priority: task.priority,
+        dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A',
+        assignees: assigneeNames || 'Unassigned',
+        tags: tagText || 'None',
+        subtasks: subtaskStr,
+        hours: totalHours.toFixed(2),
+        createdAt: new Date(task.createdAt).toLocaleString()
+      });
+    });
+
+    worksheet.getRow(1).font = { bold: true };
+    
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=' + 'tasks-export-' + Date.now() + '.xlsx'
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error('Failed to export tasks:', error);
+    res.status(500).json({ success: false, message: 'Server Error during Export' });
+  }
+});
+
 module.exports = router;

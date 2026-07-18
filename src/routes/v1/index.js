@@ -46,5 +46,6 @@ router.use('/fabric', require('./fabric.route'));
 router.use('/fabric-challan', require('./fabricChallan.route'));
 router.use('/raw-materials', require('./rawMaterial.route'));
 router.use('/infra-bills', require('./infrastructureBill.route'));
+router.use('/ai', require('./ai.route'));
 
 module.exports = router;
