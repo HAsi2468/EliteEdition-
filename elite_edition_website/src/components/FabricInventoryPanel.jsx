@@ -730,6 +730,13 @@ export default function FabricInventoryPanel() {
     }
   };
 
+  const allInwardLots = transactions
+    .filter(t => t.type === 'INWARD' && t.lotNo != null)
+    .map(t => Number(t.lotNo))
+    .filter(lot => !isNaN(lot));
+  const maxLotNo = allInwardLots.length > 0 ? Math.max(...allInwardLots) : 0;
+  const nextLotNo = maxLotNo + 1;
+
   // Filtered transaction lists
   const inwardTx = transactions.filter(t => {
     if (t.type !== 'INWARD') return false;
@@ -980,7 +987,23 @@ export default function FabricInventoryPanel() {
         {activeTab === 'inward' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <h2>Inward Transactions</h2>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <h2>Inward Transactions</h2>
+                {maxLotNo > 0 && (
+                  <span style={{ 
+                    fontSize: '0.85rem', 
+                    color: 'var(--success)', 
+                    background: 'rgba(16, 185, 129, 0.08)', 
+                    border: '1px solid rgba(16, 185, 129, 0.15)', 
+                    padding: '3px 10px', 
+                    borderRadius: '12px', 
+                    marginLeft: '12px', 
+                    fontWeight: 600 
+                  }}>
+                    Latest Lot: #{maxLotNo}
+                  </span>
+                )}
+              </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ position: 'relative' }}>
                   <Search size={14} style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -1931,7 +1954,7 @@ export default function FabricInventoryPanel() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Lot No</label>
-                  <input type="text" disabled value={editingTransaction ? `#${editingTransaction.lotNo}` : "Auto Generated"} style={{ ...inputStyle, background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }} />
+                  <input type="text" disabled value={editingTransaction ? `#${editingTransaction.lotNo}` : `Auto (Next: #${nextLotNo})`} style={{ ...inputStyle, background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }} />
                 </div>
               </div>
 
