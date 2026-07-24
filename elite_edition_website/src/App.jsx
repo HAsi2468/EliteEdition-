@@ -125,6 +125,10 @@ export default function App() {
   // Department state (digital_print vs elite_edition)
   const [activeDepartment, setActiveDepartment] = useState('digital_print');
 
+  // Theme state — persisted to localStorage
+  const [theme, setTheme] = useState(() => localStorage.getItem('elite_theme') || 'midnight');
+  const [isEliteOnlineOpen, setIsEliteOnlineOpen] = useState(true);
+
   const getFirstJobCardsTab = () => {
     if (!currentUser || currentUser.role === 'admin') return 'jobcards';
     const subTabs = ['jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings'];
