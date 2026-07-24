@@ -67,6 +67,26 @@ const CW      = PAGE_W - MARGIN * 2;  // content width ≈ 523
 const fmt = (n) => `${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 const fmtN = (n) => Number(n || 0).toLocaleString('en-IN');
 
+// Helper to format date and time in PDF report header
+const formatReportDateStr = (dateStart, dateEnd) => {
+  const formatSingle = (dtStr, defaultTime) => {
+    if (!dtStr) return 'N/A';
+    const hasTime = /T|\s|:/.test(dtStr);
+    const dateObj = hasTime ? new Date(dtStr) : new Date(dtStr + defaultTime);
+    if (isNaN(dateObj.getTime())) return dtStr;
+    
+    const yyyy = dateObj.getFullYear();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    const hh = String(dateObj.getHours()).padStart(2, '0');
+    const min = String(dateObj.getMinutes()).padStart(2, '0');
+    
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  };
+
+  return `${formatSingle(dateStart, "T00:00:00")}  to  ${formatSingle(dateEnd, "T23:59:59")}`;
+};
+
 // ─────────────────────────────────────────────────────────────
 // Draw punching guide on the left margin
 // ─────────────────────────────────────────────────────────────
@@ -246,7 +266,7 @@ const downloadSalesReportPdf = async (req, res) => {
     // Totals
     const totalOrders  = products.reduce((s, r) => s + r.qty, 0);
     const totalAmount  = products.reduce((s, r) => s + r.amt, 0);
-    const dateStr = `${dateStart}  to  ${dateEnd}`;
+    const dateStr = formatReportDateStr(dateStart, dateEnd);
 
     const doc = new PDFDocument({ margin: MARGIN, size: 'A4', bufferPages: true,
       info: { Title: `Elite Edition Sales Report ${dateStart}`, Author: 'Elite Edition ERP' }
@@ -411,7 +431,7 @@ const downloadBrandReportPdf = async (req, res) => {
     const hasTime = (str) => /T|\s|:/.test(str);
     const dateStartObj = hasTime(dateStart) ? new Date(dateStart) : new Date(dateStart + "T00:00:00");
     const dateEndObj   = hasTime(dateEnd) ? new Date(dateEnd) : new Date(dateEnd + "T23:59:59.999");
-    const dateStr = `${dateStart}  to  ${dateEnd}`;
+    const dateStr = formatReportDateStr(dateStart, dateEnd);
 
     logger.info('Generating Brand PDF report %s → %s', dateStart, dateEnd);
 
@@ -651,7 +671,7 @@ const downloadBrandReportHourWisePdf = async (req, res) => {
     const hasTime = (str) => /T|\s|:/.test(str);
     const dateStartObj = hasTime(dateStart) ? new Date(dateStart) : new Date(dateStart + "T00:00:00");
     const dateEndObj   = hasTime(dateEnd) ? new Date(dateEnd) : new Date(dateEnd + "T23:59:59.999");
-    const dateStr = `${dateStart}  to  ${dateEnd}`;
+    const dateStr = formatReportDateStr(dateStart, dateEnd);
 
     logger.info('Generating Brand Hourly PDF report %s → %s', dateStart, dateEnd);
 
@@ -1053,7 +1073,7 @@ const downloadReturnsBrandReportPdf = async (req, res) => {
       return res.status(400).json({ error: 'dateStart and dateEnd are required' });
     }
 
-    const dateStr = `${dateStart}  to  ${dateEnd}`;
+    const dateStr = formatReportDateStr(dateStart, dateEnd);
     logger.info('Generating Returns PDF report %s → %s (subType: %s)', dateStart, dateEnd, subType);
 
     let match;
