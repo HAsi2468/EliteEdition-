@@ -31,6 +31,8 @@ export default function ReportsCenter({ department }) {
   }); 
   const [dateStart, setDateStart] = useState(() => new Date().toISOString().split('T')[0]);
   const [dateEnd, setDateEnd] = useState(() => new Date().toISOString().split('T')[0]);
+  const [timeStart, setTimeStart] = useState('00:00');
+  const [timeEnd, setTimeEnd] = useState('23:59');
   const [searchCode, setSearchCode] = useState('');
   
   const [reportData, setReportData] = useState(null);
@@ -64,10 +66,10 @@ export default function ReportsCenter({ department }) {
     }
   }, [showShareModal]);
 
-  // Fetch report data on tab, department, or date changes
+  // Fetch report data on tab, department, or date/time changes
   useEffect(() => {
     fetchReportData();
-  }, [activeReportTab, activeDepartment, dateStart, dateEnd]);
+  }, [activeReportTab, activeDepartment, dateStart, dateEnd, timeStart, timeEnd]);
 
   // When department changes, set the first sub-tab as active
   useEffect(() => {
@@ -83,23 +85,26 @@ export default function ReportsCenter({ department }) {
     setError('');
     try {
       let data = null;
+      const combinedStart = `${dateStart}T${timeStart}:00`;
+      const combinedEnd = `${dateEnd}T${timeEnd}:59`;
+
       if (activeDepartment === 'elite-print') {
-        const res = await api.getElitePrintReports(dateStart, dateEnd);
+        const res = await api.getElitePrintReports(combinedStart, combinedEnd);
         data = res.data;
       } else if (activeReportTab === 'stock-value') {
         data = await api.getStockValueReportData();
       } else if (activeReportTab === 'stock-inward') {
-        data = await api.getStockInwardReportData(dateStart, dateEnd);
+        data = await api.getStockInwardReportData(combinedStart, combinedEnd);
       } else if (activeReportTab === 'stock-outward') {
-        data = await api.getStockOutwardReportData(dateStart, dateEnd);
+        data = await api.getStockOutwardReportData(combinedStart, combinedEnd);
       } else if (activeReportTab === 'sales') {
-        data = await api.getSalesReportData(dateStart, dateEnd, searchCode);
+        data = await api.getSalesReportData(combinedStart, combinedEnd, searchCode);
       } else if (activeReportTab === 'brand') {
-        data = await api.getBrandReportData(dateStart, dateEnd, searchCode);
+        data = await api.getBrandReportData(combinedStart, combinedEnd, searchCode);
       } else if (activeReportTab === 'brand-hourly') {
-        data = await api.getBrandReportHourWiseData(dateStart, dateEnd, searchCode);
+        data = await api.getBrandReportHourWiseData(combinedStart, combinedEnd, searchCode);
       } else if (activeReportTab === 'returns-analysis') {
-        const res = await api.getReturnsBrandReport({ dateStart, dateEnd });
+        const res = await api.getReturnsBrandReport({ dateStart: combinedStart, dateEnd: combinedEnd });
         data = res;
       }
       setReportData(data);
@@ -123,20 +128,22 @@ export default function ReportsCenter({ department }) {
         return;
       }
       
-      const dateText = dateStart === dateEnd ? dateStart : `${dateStart} to ${dateEnd}`;
+      const combinedStart = `${dateStart}T${timeStart}:00`;
+      const combinedEnd = `${dateEnd}T${timeEnd}:59`;
+      const dateText = `${combinedStart} to ${combinedEnd}`;
       const reportTitle = getReportTitle();
       const apiBase = getBaseUrl();
       const fullBase = apiBase.startsWith('http') ? apiBase : `${window.location.origin}${apiBase}`;
       
       let downloadLink = '';
       if (activeReportTab === 'brand-hourly') {
-        downloadLink = `${fullBase}/salesList/report/pdf?type=brand-hourly&dateStart=${dateStart}&dateEnd=${dateEnd}`;
+        downloadLink = `${fullBase}/salesList/report/pdf?type=brand-hourly&dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
       } else if (activeReportTab === 'brand') {
-        downloadLink = `${fullBase}/salesList/report/pdf?type=brand&dateStart=${dateStart}&dateEnd=${dateEnd}`;
+        downloadLink = `${fullBase}/salesList/report/pdf?type=brand&dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
       } else if (activeReportTab === 'returns-analysis') {
-        downloadLink = `${fullBase}/salesList/report/pdf?type=returns-analysis&dateStart=${dateStart}&dateEnd=${dateEnd}`;
+        downloadLink = `${fullBase}/salesList/report/pdf?type=returns-analysis&dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
       } else {
-        downloadLink = `${fullBase}/salesList/report/pdf?dateStart=${dateStart}&dateEnd=${dateEnd}`;
+        downloadLink = `${fullBase}/salesList/report/pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
       }
 
       let content = `📊 *SHARED REPORT: ${reportTitle.toUpperCase()}*\n📅 Period: ${dateText}\n\n`;
@@ -187,23 +194,26 @@ export default function ReportsCenter({ department }) {
     setDownloading(true);
     setError('');
     try {
-      const formattedDateStart = dateStart || new Date().toISOString().split('T')[0];
-      const formattedDateEnd = dateEnd || new Date().toISOString().split('T')[0];
+      const combinedStart = `${dateStart}T${timeStart}:00`;
+      const combinedEnd = `${dateEnd}T${timeEnd}:59`;
+      
+      const formattedDateStart = combinedStart.replace(/:/g, '-');
+      const formattedDateEnd = combinedEnd.replace(/:/g, '-');
       
       if (activeReportTab === 'stock-value') {
-        await api.downloadInventoryReport('stock-value', dateStart, dateEnd, `Stock_Value_Report_${formattedDateStart}.pdf`);
+        await api.downloadInventoryReport('stock-value', combinedStart, combinedEnd, `Stock_Value_Report_${formattedDateStart}.pdf`);
       } else if (activeReportTab === 'stock-inward') {
-        await api.downloadInventoryReport('stock-inward', dateStart, dateEnd, `Stock_Inward_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
+        await api.downloadInventoryReport('stock-inward', combinedStart, combinedEnd, `Stock_Inward_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
       } else if (activeReportTab === 'stock-outward') {
-        await api.downloadInventoryReport('stock-outward', dateStart, dateEnd, `Stock_Outward_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
+        await api.downloadInventoryReport('stock-outward', combinedStart, combinedEnd, `Stock_Outward_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
       } else if (activeReportTab === 'sales') {
-        await api.downloadSalesReport(dateStart, dateEnd, searchCode, `Sales_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
+        await api.downloadSalesReport(combinedStart, combinedEnd, searchCode, `Sales_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
       } else if (activeReportTab === 'brand') {
-        await api.downloadBrandReport(dateStart, dateEnd, searchCode, `Brand_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
+        await api.downloadBrandReport(combinedStart, combinedEnd, searchCode, `Brand_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
       } else if (activeReportTab === 'brand-hourly') {
-        await api.downloadBrandReportHourWise(dateStart, dateEnd, searchCode, `Brand_Hourly_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
+        await api.downloadBrandReportHourWise(combinedStart, combinedEnd, searchCode, `Brand_Hourly_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
       } else if (activeReportTab === 'returns-analysis') {
-        await api.downloadReturnsBrandReport(dateStart, dateEnd, returnsSubTab, `Returns_Brand_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
+        await api.downloadReturnsBrandReport(combinedStart, combinedEnd, returnsSubTab, `Returns_Brand_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
       }
     } catch (err) {
       setError(err.message || 'Failed to generate and download PDF report.');
@@ -364,21 +374,37 @@ export default function ReportsCenter({ department }) {
             <>
               <div style={styles.filterItem}>
                 <label style={styles.label}><Calendar size={13} /> Start Date</label>
-                <input 
-                  type="date" 
-                  value={dateStart} 
-                  onChange={(e) => setDateStart(e.target.value)} 
-                  style={styles.input} 
-                />
+                <div style={{ display: 'flex', gap: '5px' }}>
+                  <input 
+                    type="date" 
+                    value={dateStart} 
+                    onChange={(e) => setDateStart(e.target.value)} 
+                    style={styles.input} 
+                  />
+                  <input 
+                    type="time" 
+                    value={timeStart} 
+                    onChange={(e) => setTimeStart(e.target.value)} 
+                    style={{ ...styles.input, width: '90px' }} 
+                  />
+                </div>
               </div>
               <div style={styles.filterItem}>
                 <label style={styles.label}><Calendar size={13} /> End Date</label>
-                <input 
-                  type="date" 
-                  value={dateEnd} 
-                  onChange={(e) => setDateEnd(e.target.value)} 
-                  style={styles.input} 
-                />
+                <div style={{ display: 'flex', gap: '5px' }}>
+                  <input 
+                    type="date" 
+                    value={dateEnd} 
+                    onChange={(e) => setDateEnd(e.target.value)} 
+                    style={styles.input} 
+                  />
+                  <input 
+                    type="time" 
+                    value={timeEnd} 
+                    onChange={(e) => setTimeEnd(e.target.value)} 
+                    style={{ ...styles.input, width: '90px' }} 
+                  />
+                </div>
               </div>
             </>
           )}
