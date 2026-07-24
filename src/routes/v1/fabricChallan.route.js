@@ -20,6 +20,9 @@ router.put('/:id', c.updateChallan);
 // Delete a challan
 router.delete('/:id', c.deleteChallan);
 
+// Reset all challans
+router.post('/reset-all', c.resetAllChallans);
+
 // Download single challan PDF
 router.get('/:id/pdf', c.downloadChallanPdf);
 

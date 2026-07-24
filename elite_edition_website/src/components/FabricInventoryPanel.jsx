@@ -1999,35 +1999,31 @@ export default function FabricInventoryPanel() {
                     .split(',')
                     .map(s => s.trim())
                     .filter(s => s.length > 0);
-                  return challanForm.tpDetails.map((row, idx) => (
-                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '60px 120px 1fr 32px', gap: '0.5rem', alignItems: 'center' }}>
-                      <div style={{ ...inputStyle, textAlign: 'center', fontWeight: 700, color: 'var(--primary)', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {row.tpNo}
+                  return challanForm.tpDetails.map((row, idx) => {
+                    const assignedLot = row.lotNo || currentLots[0] || '';
+                    return (
+                      <div key={idx} style={{ display: 'grid', gridTemplateColumns: '60px 100px 1fr 32px', gap: '0.5rem', alignItems: 'center' }}>
+                        <div style={{ ...inputStyle, textAlign: 'center', fontWeight: 700, color: 'var(--primary)', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          TP {row.tpNo}
+                        </div>
+                        <div style={{ ...inputStyle, background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.3)', color: 'var(--primary)', fontWeight: 600, fontSize: '0.78rem', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {assignedLot ? `#${assignedLot}` : 'Auto Lot'}
+                        </div>
+                        <input
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          value={row.tpMeter}
+                          onChange={e => updateTpRow(idx, 'tpMeter', e.target.value)}
+                          style={inputStyle}
+                          placeholder="Enter TP meters…"
+                        />
+                        <button type="button" onClick={() => removeTpRow(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0.2rem', display: 'flex', alignItems: 'center' }}>
+                          <X size={15} />
+                        </button>
                       </div>
-                      <select
-                        value={row.lotNo || ''}
-                        onChange={e => updateTpRow(idx, 'lotNo', e.target.value)}
-                        style={inputStyle}
-                      >
-                        <option value="">-- Select --</option>
-                        {currentLots.map(lot => (
-                          <option key={lot} value={lot}>Lot #{lot}</option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        step="0.001"
-                        min="0"
-                        value={row.tpMeter}
-                        onChange={e => updateTpRow(idx, 'tpMeter', e.target.value)}
-                        style={inputStyle}
-                        placeholder="0.000"
-                      />
-                      <button type="button" onClick={() => removeTpRow(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0.2rem', display: 'flex', alignItems: 'center' }}>
-                        <X size={15} />
-                      </button>
-                    </div>
-                  ));
+                    );
+                  });
                 })()}
               </div>
 

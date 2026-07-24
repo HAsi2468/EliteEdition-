@@ -88,7 +88,12 @@ const createChallan = async (req, res) => {
     } = req.body;
 
     const details = Array.isArray(tpDetails) ? tpDetails : [];
-    const { totalMtr, totalTp } = computeTotals(details);
+    const primaryLot = lotNo ? String(lotNo).split(',')[0].trim() : '';
+    const sanitizedDetails = details.map(tp => ({
+      ...tp,
+      lotNo: (tp.lotNo || '').trim() || primaryLot
+    }));
+    const { totalMtr, totalTp } = computeTotals(sanitizedDetails);
 
     const challan = new FabricChallan({
       date: date ? new Date(date) : new Date(),
@@ -101,7 +106,7 @@ const createChallan = async (req, res) => {
       designNo: designNo || '',
       colour: colour || '',
       panna: panna || '',
-      tpDetails: details,
+      tpDetails: sanitizedDetails,
       totalMtr,
       totalTp,
       pcs: pcs !== '' && pcs != null ? parseInt(pcs) : 0,
@@ -348,6 +353,17 @@ const deleteChallan = async (req, res) => {
 
     await FabricChallan.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'Challan and linked fabric outward deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ── POST /fabric-challan/reset-all ─────────────────────────────────────────
+const resetAllChallans = async (req, res) => {
+  try {
+    await FabricChallan.deleteMany({});
+    await FabricTransaction.deleteMany({ challanNo: { $regex: /^EDP-/i } });
+    res.json({ success: true, message: 'All fabric challans and linked transactions reset successfully. Next Challan No will start at 1.' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -631,6 +647,7 @@ module.exports = {
   getChallans,
   updateChallan,
   deleteChallan,
+  resetAllChallans,
   getNextChallanNo,
   getLotInfo,
   downloadChallanPdf,
