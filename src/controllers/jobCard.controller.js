@@ -340,9 +340,42 @@ const downloadJobCardPdf = async (req, res) => {
     }
     doc.strokeColor('#c8d4e0').rect(RX, IMG_Y, RW, IMG_H).stroke();  // border on top
 
+    // Calculate fabric margin
+    let marginVal = '—';
+    const totalMtrNum = parseFloat(jobCard.totalMtr) || 0;
+    const pcsNum = parseFloat(jobCard.pcs) || 0;
+    const consumptionNum = parseFloat(jobCard.consumption) || 0;
+    const topNum = parseFloat(jobCard.top) || 0;
+    const sleeveNum = parseFloat(jobCard.sleeve) || 0;
+    const bottomNum = parseFloat(jobCard.bottom) || 0;
+    const dupattaNum = parseFloat(jobCard.dupatta) || 0;
+    const cutNum = parseFloat(jobCard.cut) || 0;
+
+    let theoreticalMtr = 0;
+    if (dupattaNum > 0 && cutNum > 0 && !topNum && !sleeveNum && !bottomNum) {
+      theoreticalMtr = dupattaNum * cutNum;
+    } else {
+      theoreticalMtr = topNum + sleeveNum + bottomNum;
+      if (dupattaNum > 0) {
+        if (cutNum > 0) {
+          theoreticalMtr += dupattaNum * cutNum;
+        } else {
+          theoreticalMtr += dupattaNum;
+        }
+      }
+      if (theoreticalMtr === 0 && pcsNum > 0 && consumptionNum > 0) {
+        theoreticalMtr = pcsNum * consumptionNum;
+      }
+    }
+
+    if (totalMtrNum > 0 && theoreticalMtr > 0) {
+      marginVal = (totalMtrNum - theoreticalMtr).toFixed(2) + ' mtr';
+    }
+
     // ── Fields right of image (below image box) ───────────────────────────
     let ry = IMG_Y + IMG_H + 8;
     [['Panna',jobCard.panna],['Pass',jobCard.pass],['Total Metres',jobCard.totalMtr],
+     ['Margin', marginVal],
      ['Expected Time',jobCard.expTime],['Machine',jobCard.machineName],['Bill No.',jobCard.billNo]]
     .forEach(([l,v]) => { F(l,v,RX,ry,RW); ry+=RH; });
 
