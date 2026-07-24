@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import CatalogManagerModal from './CatalogManagerModal';
+import { triggerPushNotification } from './NotificationToast';
 import {
   RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
   Layers, Database, Settings, Trash2, FileDown, Search, X,
@@ -409,8 +410,10 @@ export default function FabricInventoryPanel() {
     try {
       if (editingTransaction) {
         await api.updateFabricTransaction(editingTransaction._id, inwardForm);
+        triggerPushNotification('🧵 Fabric Transaction Updated', 'Inward fabric transaction updated.', 'info');
       } else {
         await api.createFabricInward(inwardForm);
+        triggerPushNotification('🧵 Fabric Inward Added', `${inwardForm.qty || ''}M of ${inwardForm.fabricQuality} inward recorded!`, 'success');
       }
       setIsInwardOpen(false);
       setEditingTransaction(null);
@@ -427,6 +430,7 @@ export default function FabricInventoryPanel() {
     setLoading(true);
     try {
       await api.createFabricOutward(outwardForm);
+      triggerPushNotification('📦 Fabric Outward Recorded', `${outwardForm.qty || ''}M fabric outward recorded for Job #${outwardForm.jobNo}.`, 'success');
       setIsOutwardOpen(false);
       setOutwardForm({ jobNo: '', partyName: '', fabricQuality: '', panna: '', lotNo: '', qty: '', date: new Date().toISOString().split('T')[0], notes: '' });
       fetchData();

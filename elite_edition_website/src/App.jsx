@@ -39,8 +39,11 @@ import {
   Settings,
   FileText,
   Menu,
-  X
+  X,
+  Bell
 } from 'lucide-react';
+
+import NotificationToastContainer, { triggerPushNotification, requestNotificationPermission } from './components/NotificationToast';
 
 // ─── Theme definitions ─────────────────────────────────────────────────────
 const THEMES = [
@@ -127,6 +130,9 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Notification Toasts state
+  const [toasts, setToasts] = useState([]);
+
   // Department state (digital_print vs elite_edition)
   const [activeDepartment, setActiveDepartment] = useState('digital_print');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -153,6 +159,8 @@ export default function App() {
 
   const handleSwitchDepartment = (dept) => {
     setActiveDepartment(dept);
+    const deptName = dept === 'digital_print' ? 'Elite Digital Print' : 'Elite Edition';
+    triggerPushNotification('Switched Department 🔄', `Now viewing ${deptName} modules.`, 'info');
     if (dept === 'digital_print') {
       const firstTab = getFirstJobCardsTab();
       setActiveTab(firstTab);
@@ -528,6 +536,15 @@ export default function App() {
               </div>
             )}
           </div>
+
+          <button
+            onClick={requestNotificationPermission}
+            className="btn-icon"
+            title="Enable / Status of Push Notifications"
+            style={{ color: typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'var(--success)' : 'var(--text-muted)' }}
+          >
+            <Bell size={15} />
+          </button>
 
           <button onClick={fetchData} className="btn-icon" title="Reload Data">
             <RefreshCw size={15} className={loading ? 'spin-loader' : ''} />
@@ -909,6 +926,9 @@ export default function App() {
           )}
         </section>
       </main>
+
+      {/* Global Push / Toast Notifications Container */}
+      <NotificationToastContainer toasts={toasts} setToasts={setToasts} />
 
       {/* Modal Dialog */}
       {isFormOpen && (
