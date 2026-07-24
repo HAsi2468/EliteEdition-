@@ -184,8 +184,9 @@ const downloadSalesReportPdf = async (req, res) => {
       return res.status(400).json({ error: 'dateStart and dateEnd are required' });
     }
 
-    const dateStartObj = new Date(dateStart + "T00:00:00");
-    const dateEndObj   = new Date(dateEnd + "T23:59:59.999");
+    const hasTime = (str) => /T|\s|:/.test(str);
+    const dateStartObj = hasTime(dateStart) ? new Date(dateStart) : new Date(dateStart + "T00:00:00");
+    const dateEndObj   = hasTime(dateEnd) ? new Date(dateEnd) : new Date(dateEnd + "T23:59:59.999");
 
     const { searchCode } = req.query;
     const whereClause = { orderDate: { $gte: dateStartObj, $lte: dateEndObj }, saleOrderStatus: { $ne: 'CANCELLED' } };
@@ -407,8 +408,9 @@ const downloadBrandReportPdf = async (req, res) => {
       return res.status(400).json({ error: 'dateStart and dateEnd are required' });
     }
 
-    const dateStartObj = new Date(dateStart + "T00:00:00");
-    const dateEndObj   = new Date(dateEnd + "T23:59:59.999");
+    const hasTime = (str) => /T|\s|:/.test(str);
+    const dateStartObj = hasTime(dateStart) ? new Date(dateStart) : new Date(dateStart + "T00:00:00");
+    const dateEndObj   = hasTime(dateEnd) ? new Date(dateEnd) : new Date(dateEnd + "T23:59:59.999");
     const dateStr = `${dateStart}  to  ${dateEnd}`;
 
     logger.info('Generating Brand PDF report %s → %s', dateStart, dateEnd);
@@ -646,8 +648,9 @@ const downloadBrandReportHourWisePdf = async (req, res) => {
       return res.status(400).json({ error: 'dateStart and dateEnd are required' });
     }
 
-    const dateStartObj = new Date(dateStart + "T00:00:00");
-    const dateEndObj   = new Date(dateEnd + "T23:59:59.999");
+    const hasTime = (str) => /T|\s|:/.test(str);
+    const dateStartObj = hasTime(dateStart) ? new Date(dateStart) : new Date(dateStart + "T00:00:00");
+    const dateEndObj   = hasTime(dateEnd) ? new Date(dateEnd) : new Date(dateEnd + "T23:59:59.999");
     const dateStr = `${dateStart}  to  ${dateEnd}`;
 
     logger.info('Generating Brand Hourly PDF report %s → %s', dateStart, dateEnd);
