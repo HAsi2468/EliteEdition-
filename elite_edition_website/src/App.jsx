@@ -122,15 +122,33 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Theme state — persisted to localStorage
-  const [theme, setTheme] = useState(() => localStorage.getItem('elite_theme') || 'midnight');
-  const [isEliteOnlineOpen, setIsEliteOnlineOpen] = useState(true);
+  // Department state (digital_print vs elite_edition)
+  const [activeDepartment, setActiveDepartment] = useState('digital_print');
 
   const getFirstJobCardsTab = () => {
     if (!currentUser || currentUser.role === 'admin') return 'jobcards';
     const subTabs = ['jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings'];
     const allowed = subTabs.filter(t => currentUser.permissions?.includes(t));
     return allowed[0] || 'jobcards';
+  };
+
+  // Sync activeDepartment when activeTab changes
+  useEffect(() => {
+    if (activeTab.startsWith('jobcards')) {
+      setActiveDepartment('digital_print');
+    } else if (['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'].includes(activeTab)) {
+      setActiveDepartment('elite_edition');
+    }
+  }, [activeTab]);
+
+  const handleSwitchDepartment = (dept) => {
+    setActiveDepartment(dept);
+    if (dept === 'digital_print') {
+      const firstTab = getFirstJobCardsTab();
+      setActiveTab(firstTab);
+    } else {
+      setActiveTab('dashboard');
+    }
   };
 
   // Auto-switch to default allowed tab based on user permissions
@@ -411,18 +429,44 @@ export default function App() {
   }
 
   return (
-    <div style={styles.appContainer}>
+    <div style={styles.appContainer} className="app-container">
       {/* Top Navbar */}
       <header className="glass-panel" style={styles.header}>
-        <div style={styles.headerLeft}>
-          <div style={styles.logoBadge}>EE</div>
+        <div style={styles.headerLeft} className="header-left-wrap">
+          <div style={styles.logoBadge}>
+            {activeDepartment === 'digital_print' ? 'EDP' : 'EE'}
+          </div>
           <div>
-            <h1 style={styles.brandTitle}>Elite Edition</h1>
-            <p style={styles.brandSubtitle}>Inventory Control Center</p>
+            <h1 style={styles.brandTitle}>
+              {activeDepartment === 'digital_print' ? 'Elite Digital Print' : 'Elite Edition'}
+            </h1>
+            <p style={styles.brandSubtitle}>
+              {activeDepartment === 'digital_print' ? 'Digital Printing & Job Cards' : 'Inventory Control Center'}
+            </p>
+          </div>
+
+          {/* Department Switcher Buttons */}
+          <div className="dept-switcher-header">
+            <button
+              onClick={() => handleSwitchDepartment('digital_print')}
+              className={`dept-switch-btn ${activeDepartment === 'digital_print' ? 'active' : ''}`}
+              title="Switch to Elite Digital Print Department"
+            >
+              <Printer size={15} />
+              <span>Elite Digital Print</span>
+            </button>
+            <button
+              onClick={() => handleSwitchDepartment('elite_edition')}
+              className={`dept-switch-btn ${activeDepartment === 'elite_edition' ? 'active' : ''}`}
+              title="Switch to Elite Edition E-Commerce Department"
+            >
+              <Store size={15} />
+              <span>Elite Edition</span>
+            </button>
           </div>
         </div>
 
-        <div style={styles.headerRight}>
+        <div style={styles.headerRight} className="header-right-wrap">
           {/* Theme Picker */}
           <ThemePicker currentTheme={theme} onSelect={setTheme} />
 
@@ -488,10 +532,10 @@ export default function App() {
       </header>
 
       {/* Main Layout Grid */}
-      <main style={styles.mainLayout}>
+      <main style={styles.mainLayout} className="main-layout-grid">
         
         {/* Left Navigation and Reports Sidebar */}
-        <aside style={styles.sidebar}>
+        <aside style={styles.sidebar} className="sidebar-wrap">
           <div className="glass-panel" style={styles.navPanel}>
             {/* Dashboard */}
             {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard')) && (
