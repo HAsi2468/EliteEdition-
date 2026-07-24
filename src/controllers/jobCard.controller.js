@@ -272,9 +272,20 @@ const downloadJobCardPdf = async (req, res) => {
     // Header bar
     doc.rect(23, 28, 544, 48).fill('#0f172a');
     doc.fillColor('#ffffff').fontSize(19).font('Helvetica-Bold')
-      .text('ELITE EDITION', 23, 38, { width:544, align:'center', lineBreak:false });
+      .text('ELITE DIGITAL PRINT', 23, 38, { width:544, align:'center', lineBreak:false });
     doc.fillColor('#94a3b8').fontSize(9).font('Helvetica')
       .text('Production Job Card', 23, 58, { width:544, align:'center', lineBreak:false });
+
+    // Corner logos (Elite Digital Prints)
+    const cornerLogoPath = path.join(__dirname, 'Logo.png');
+    if (fs.existsSync(cornerLogoPath)) {
+      const logoH = 32, logoW = 100;
+      // Left corner logo (white-inverted for dark background)
+      doc.image(cornerLogoPath, 30, 34, { height: logoH, fit:[logoW, logoH] });
+      // Right corner logo — mirror by placing at far right
+      doc.image(cornerLogoPath, 544 - logoW + 14, 34, { height: logoH, fit:[logoW, logoH] });
+    }
+
 
     // Job No banner
     doc.rect(23, 76, 544, 26).fill('#1e293b');
