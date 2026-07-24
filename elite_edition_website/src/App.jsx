@@ -37,7 +37,8 @@ import {
   BookOpen,
   Layers,
   Settings,
-  FileText
+  FileText,
+  Menu
 } from 'lucide-react';
 
 // ─── Theme definitions ─────────────────────────────────────────────────────
@@ -127,6 +128,7 @@ export default function App() {
 
   // Department state (digital_print vs elite_edition)
   const [activeDepartment, setActiveDepartment] = useState('digital_print');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Theme state — persisted to localStorage
   const [theme, setTheme] = useState(() => localStorage.getItem('elite_theme') || 'midnight');
@@ -440,6 +442,14 @@ export default function App() {
       {/* Top Navbar */}
       <header className="glass-panel" style={styles.header}>
         <div style={styles.headerLeft} className="header-left-wrap">
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="mobile-menu-toggle"
+            aria-label="Toggle Mobile Menu"
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+
           <div style={styles.logoBadge}>
             {activeDepartment === 'digital_print' ? 'EDP' : 'EE'}
           </div>
@@ -537,6 +547,162 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {/* Mobile Navigation Drawer Overlay */}
+      {mobileMenuOpen && (
+        <div className="mobile-drawer-overlay" onClick={() => setMobileMenuOpen(false)}>
+          <div className="mobile-drawer-content" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={styles.logoBadge}>{activeDepartment === 'digital_print' ? 'EDP' : 'EE'}</div>
+                <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                  {activeDepartment === 'digital_print' ? 'Elite Digital Print' : 'Elite Edition'}
+                </span>
+              </div>
+              <button onClick={() => setMobileMenuOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: '0.25rem' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Department Switcher Buttons inside Mobile Drawer */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <button
+                onClick={() => { handleSwitchDepartment('digital_print'); setMobileMenuOpen(false); }}
+                className={`dept-switch-btn ${activeDepartment === 'digital_print' ? 'active' : ''}`}
+                style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
+              >
+                <Printer size={16} />
+                <span>Elite Digital Print</span>
+              </button>
+              <button
+                onClick={() => { handleSwitchDepartment('elite_edition'); setMobileMenuOpen(false); }}
+                className={`dept-switch-btn ${activeDepartment === 'elite_edition' ? 'active' : ''}`}
+                style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
+              >
+                <Store size={16} />
+                <span>Elite Edition</span>
+              </button>
+            </div>
+
+            {/* Modules List inside Mobile Drawer */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.75rem' }}>
+              {activeDepartment === 'digital_print' ? (
+                <>
+                  <div style={styles.sidebarSectionHeader}>
+                    <Printer size={14} color="var(--primary)" />
+                    <span>Digital Print Modules</span>
+                  </div>
+
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards')) && (
+                    <button onClick={() => { setActiveTab('jobcards'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards' ? styles.navItemActive : {}) }}>
+                      <BarChart3 size={18} /><span>Prints Dashboard</span>
+                    </button>
+                  )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
+                    <button onClick={() => { setActiveTab('jobcards_list'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
+                      <FileText size={18} /><span>Job Cards</span>
+                    </button>
+                  )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) && (
+                    <button onClick={() => { setActiveTab('jobcards_catalogue'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_catalogue' ? styles.navItemActive : {}) }}>
+                      <BookOpen size={18} /><span>Design Catalog</span>
+                    </button>
+                  )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_tracking')) && (
+                    <button onClick={() => { setActiveTab('jobcards_tracking'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_tracking' ? styles.navItemActive : {}) }}>
+                      <RefreshCw size={18} /><span>Job Card Tracking</span>
+                    </button>
+                  )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master')) && (
+                    <button onClick={() => { setActiveTab('jobcards_master'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_master' ? styles.navItemActive : {}) }}>
+                      <Layers size={18} /><span>Design Master (100 Pic)</span>
+                    </button>
+                  )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) && (
+                    <button onClick={() => { setActiveTab('jobcards_fabric'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_fabric' ? styles.navItemActive : {}) }}>
+                      <Database size={18} /><span>Fabric Management</span>
+                    </button>
+                  )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_raw_materials')) && (
+                    <button onClick={() => { setActiveTab('jobcards_raw_materials'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_raw_materials' ? styles.navItemActive : {}) }}>
+                      <ShoppingBag size={18} /><span>Raw Materials</span>
+                    </button>
+                  )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) && (
+                    <button onClick={() => { setActiveTab('jobcards_settings'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_settings' ? styles.navItemActive : {}) }}>
+                      <Settings size={18} /><span>Prints Settings</span>
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div style={styles.sidebarSectionHeader}>
+                    <Store size={14} color="var(--primary)" />
+                    <span>E-Commerce Modules</span>
+                  </div>
+
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard')) && (
+                    <button onClick={() => { setActiveTab('dashboard'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'dashboard' ? styles.navItemActive : {}) }}>
+                      <LayoutDashboard size={18} /><span>Dashboard Overview</span>
+                    </button>
+                  )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('inventory')) && (
+                    <button onClick={() => { setActiveTab('inventory'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'inventory' ? styles.navItemActive : {}) }}>
+                      <Database size={18} /><span>Store Inventory</span>
+                    </button>
+                  )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('catalog')) && (
+                    <button onClick={() => { setActiveTab('catalog'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'catalog' ? styles.navItemActive : {}) }}>
+                      <BookOpen size={18} /><span>Product Catalog</span>
+                    </button>
+                  )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('returns')) && (
+                    <button onClick={() => { setActiveTab('returns'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'returns' ? styles.navItemActive : {}) }}>
+                      <PackageMinus size={18} /><span>Returns Department</span>
+                    </button>
+                  )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) && (
+                    <button onClick={() => { setActiveTab('sales'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'sales' ? styles.navItemActive : {}) }}>
+                      <ShoppingBag size={18} /><span>Sales Orders</span>
+                    </button>
+                  )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) && (
+                    <button onClick={() => { setActiveTab('reports'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'reports' ? styles.navItemActive : {}) }}>
+                      <BarChart3 size={18} /><span>Reports Center</span>
+                    </button>
+                  )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('unicommerce')) && (
+                    <button onClick={() => { setActiveTab('unicommerce'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'unicommerce' ? styles.navItemActive : {}) }}>
+                      <RefreshCw size={18} /><span>Uniware Integrations</span>
+                    </button>
+                  )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) && (
+                    <button onClick={() => { setActiveTab('myntra'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'myntra' ? styles.navItemActive : {}) }}>
+                      <ShoppingBag size={18} /><span>Myntra Integrations</span>
+                    </button>
+                  )}
+                </>
+              )}
+
+              <button onClick={() => { setActiveTab('workspace'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'workspace' ? styles.navItemActive : {}) }}>
+                <MessageSquare size={18} /><span>Workspace / Chat</span>
+              </button>
+
+              {currentUser && currentUser.role === 'admin' && (
+                <button onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'admin' ? styles.navItemActive : {}) }}>
+                  <ShieldAlert size={18} color="var(--primary)" /><span>Admin Panel</span>
+                </button>
+              )}
+            </div>
+
+            <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border-light)' }}>
+              <button onClick={handleLogout} className="btn-danger" style={{ width: '100%', justifyContent: 'center' }}>
+                <LogOut size={16} /><span>Sign Out</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Layout Grid */}
       <main style={styles.mainLayout} className="main-layout-grid">
