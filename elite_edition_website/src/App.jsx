@@ -38,7 +38,8 @@ import {
   Layers,
   Settings,
   FileText,
-  Menu
+  Menu,
+  X
 } from 'lucide-react';
 
 // ─── Theme definitions ─────────────────────────────────────────────────────
