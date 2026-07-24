@@ -320,10 +320,10 @@ export default function FabricInventoryPanel() {
       if (cfg && cfg.shipToOptions) setShipToOptions(cfg.shipToOptions);
 
       try {
-        const jRes = await api.getJobCards({ status: 'In Progress', limit: 200 });
+        const jRes = await api.getJobCards({ limit: 5000 });
         if (jRes && jRes.data) setInProgressJobCards(jRes.data);
       } catch (e) {
-        console.warn('Failed to fetch in-progress job cards', e);
+        console.warn('Failed to fetch job cards', e);
       }
 
       const stockRes = await api.getFabricStock();
@@ -343,6 +343,28 @@ export default function FabricInventoryPanel() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Flexible job card lookup helper
+  const findMatchingJobCard = (val) => {
+    if (!val) return null;
+    const cleanVal = String(val).trim().toUpperCase();
+    const numVal = cleanVal.replace(/\D/g, '');
+
+    return inProgressJobCards.find(j => {
+      if (!j.jobNo) return false;
+      const jStr = String(j.jobNo).trim().toUpperCase();
+      const jNum = jStr.replace(/\D/g, '');
+
+      return (
+        jStr === cleanVal ||
+        (numVal && jNum === numVal) ||
+        jStr === `JOB-${cleanVal}` ||
+        jStr === `EDP-${cleanVal}` ||
+        `JOB-${jStr}` === cleanVal ||
+        `EDP-${jStr}` === cleanVal
+      );
+    });
   };
 
   // fetch requirement from job cards
@@ -380,9 +402,9 @@ export default function FabricInventoryPanel() {
 
   const handleJobNoChange = async (e) => {
     const val = e.target.value;
-    const job = inProgressJobCards.find(j => j.jobNo === val);
+    const job = findMatchingJobCard(val);
     setOutwardForm(prev => {
-      const updated = { ...prev, jobNo: val, lotNo: '' };
+      const updated = { ...prev, jobNo: job ? job.jobNo : val, lotNo: '' };
       if (job) {
         updated.partyName = job.party || '';
         updated.fabricQuality = job.fabric || '';
@@ -590,11 +612,11 @@ export default function FabricInventoryPanel() {
   // When Job No changes — auto-fill design, colour, panna, fabric, party, billTo, shipTo
   const handleChallanJobChange = async (val) => {
     setChallanForm(prev => ({ ...prev, jobNo: val }));
-    const job = inProgressJobCards.find(j => j.jobNo === val);
+    const job = findMatchingJobCard(val);
     if (job) {
       setChallanForm(prev => ({
         ...prev,
-        jobNo: val,
+        jobNo: job.jobNo || val,
         designNo: job.designNo || prev.designNo,
         colour: job.colors || prev.colour,
         panna: job.panna || prev.panna,
@@ -821,7 +843,7 @@ export default function FabricInventoryPanel() {
     return sum + (lotStockItem ? lotStockItem.currentStock : 0);
   }, 0);
 
-  const activeJob = inProgressJobCards.find(j => j.jobNo === challanForm.jobNo);
+  const activeJob = findMatchingJobCard(challanForm.jobNo);
   const jobMtrNeeded = activeJob ? parseFloat(activeJob.totalMtr) || 0 : 0;
 
   return (
