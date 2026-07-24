@@ -1208,7 +1208,7 @@ export default function FabricInventoryPanel() {
                   />
                 </div>
 
-                <button className="btn-primary" onClick={() => { fetchData(); setIsOutwardOpen(true); }} style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}>
+                <button className="btn-primary" onClick={() => { fetchData(); setOutwardForm({ jobNo: '', challanNo: '', partyName: '', fabricQuality: '', panna: '', lotNo: '', qty: '', date: new Date().toISOString().split('T')[0], notes: '' }); setIsOutwardOpen(true); }} style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }}>
                   <PlusCircle size={16} /> New Outward
                 </button>
               </div>
