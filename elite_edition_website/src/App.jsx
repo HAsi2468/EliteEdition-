@@ -34,7 +34,10 @@ import {
   ChevronRight,
   Store,
   MessageSquare,
-  BookOpen
+  BookOpen,
+  Layers,
+  Settings,
+  FileText
 } from 'lucide-react';
 
 // ─── Theme definitions ─────────────────────────────────────────────────────
@@ -541,145 +544,114 @@ export default function App() {
         {/* Left Navigation and Reports Sidebar */}
         <aside style={styles.sidebar} className="sidebar-wrap">
           <div className="glass-panel" style={styles.navPanel}>
-            {/* Dashboard */}
-            {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard')) && (
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                style={{ ...styles.navItem, ...(activeTab === 'dashboard' ? styles.navItemActive : {}) }}
-              >
-                <LayoutDashboard size={18} /><span>Dashboard Overview</span>
-              </button>
+
+            {activeDepartment === 'digital_print' ? (
+              /* ── ELITE DIGITAL PRINT MODULES ── */
+              <>
+                <div style={styles.sidebarSectionHeader}>
+                  <Printer size={14} color="var(--primary)" />
+                  <span>Digital Print Modules</span>
+                </div>
+
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards')) && (
+                  <button onClick={() => setActiveTab('jobcards')} style={{ ...styles.navItem, ...(activeTab === 'jobcards' ? styles.navItemActive : {}) }}>
+                    <BarChart3 size={18} /><span>Prints Dashboard</span>
+                  </button>
+                )}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
+                  <button onClick={() => setActiveTab('jobcards_list')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
+                    <FileText size={18} /><span>Job Cards</span>
+                  </button>
+                )}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) && (
+                  <button onClick={() => setActiveTab('jobcards_catalogue')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_catalogue' ? styles.navItemActive : {}) }}>
+                    <BookOpen size={18} /><span>Design Catalog</span>
+                  </button>
+                )}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_tracking')) && (
+                  <button onClick={() => setActiveTab('jobcards_tracking')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_tracking' ? styles.navItemActive : {}) }}>
+                    <RefreshCw size={18} /><span>Job Card Tracking</span>
+                  </button>
+                )}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master')) && (
+                  <button onClick={() => setActiveTab('jobcards_master')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_master' ? styles.navItemActive : {}) }}>
+                    <Layers size={18} /><span>Design Master (100 Pic)</span>
+                  </button>
+                )}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) && (
+                  <button onClick={() => setActiveTab('jobcards_fabric')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_fabric' ? styles.navItemActive : {}) }}>
+                    <Database size={18} /><span>Fabric Management</span>
+                  </button>
+                )}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_raw_materials')) && (
+                  <button onClick={() => setActiveTab('jobcards_raw_materials')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_raw_materials' ? styles.navItemActive : {}) }}>
+                    <ShoppingBag size={18} /><span>Raw Materials</span>
+                  </button>
+                )}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) && (
+                  <button onClick={() => setActiveTab('jobcards_settings')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_settings' ? styles.navItemActive : {}) }}>
+                    <Settings size={18} /><span>Prints Settings</span>
+                  </button>
+                )}
+              </>
+            ) : (
+              /* ── ELITE EDITION (E-COMMERCE) MODULES ── */
+              <>
+                <div style={styles.sidebarSectionHeader}>
+                  <Store size={14} color="var(--primary)" />
+                  <span>E-Commerce Modules</span>
+                </div>
+
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard')) && (
+                  <button onClick={() => setActiveTab('dashboard')} style={{ ...styles.navItem, ...(activeTab === 'dashboard' ? styles.navItemActive : {}) }}>
+                    <LayoutDashboard size={18} /><span>Dashboard Overview</span>
+                  </button>
+                )}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('inventory')) && (
+                  <button onClick={() => setActiveTab('inventory')} style={{ ...styles.navItem, ...(activeTab === 'inventory' ? styles.navItemActive : {}) }}>
+                    <Database size={18} /><span>Store Inventory</span>
+                  </button>
+                )}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('catalog')) && (
+                  <button onClick={() => setActiveTab('catalog')} style={{ ...styles.navItem, ...(activeTab === 'catalog' ? styles.navItemActive : {}) }}>
+                    <BookOpen size={18} /><span>Product Catalog</span>
+                  </button>
+                )}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('returns')) && (
+                  <button onClick={() => setActiveTab('returns')} style={{ ...styles.navItem, ...(activeTab === 'returns' ? styles.navItemActive : {}) }}>
+                    <PackageMinus size={18} /><span>Returns Department</span>
+                  </button>
+                )}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) && (
+                  <button onClick={() => setActiveTab('sales')} style={{ ...styles.navItem, ...(activeTab === 'sales' ? styles.navItemActive : {}) }}>
+                    <ShoppingBag size={18} /><span>Sales Orders</span>
+                  </button>
+                )}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) && (
+                  <button onClick={() => setActiveTab('reports')} style={{ ...styles.navItem, ...(activeTab === 'reports' ? styles.navItemActive : {}) }}>
+                    <BarChart3 size={18} /><span>Reports Center</span>
+                  </button>
+                )}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('unicommerce')) && (
+                  <button onClick={() => setActiveTab('unicommerce')} style={{ ...styles.navItem, ...(activeTab === 'unicommerce' ? styles.navItemActive : {}) }}>
+                    <RefreshCw size={18} /><span>Uniware Integrations</span>
+                  </button>
+                )}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) && (
+                  <button onClick={() => setActiveTab('myntra')} style={{ ...styles.navItem, ...(activeTab === 'myntra' ? styles.navItemActive : {}) }}>
+                    <ShoppingBag size={18} /><span>Myntra Integrations</span>
+                  </button>
+                )}
+              </>
             )}
 
+            {/* Shared Workspace / Chat Tab */}
             <button
               onClick={() => setActiveTab('workspace')}
               style={{ ...styles.navItem, ...(activeTab === 'workspace' ? styles.navItemActive : {}) }}
             >
               <MessageSquare size={18} /><span>Workspace / Chat</span>
             </button>
-
-            {/* Elite Edition Online Submenu */}
-            {(!currentUser || currentUser.role === 'admin' || 
-              currentUser.permissions?.includes('inventory') || 
-              currentUser.permissions?.includes('returns') || 
-              currentUser.permissions?.includes('sales')) && (
-              <div style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>
-                <button
-                  onClick={() => {
-                    setActiveTab('elite_online');
-                    setIsEliteOnlineOpen(!isEliteOnlineOpen);
-                  }}
-                  style={{ ...styles.navItem, fontWeight: 'bold', paddingBottom: '0.5rem', color: 'var(--text-primary)', ...(activeTab === 'elite_online' || activeTab === 'inventory' || activeTab === 'returns' || activeTab === 'sales' ? styles.navItemActive : {}) }}
-                >
-                  <Store size={18} color="var(--primary)" />
-                  <span style={{ flex: 1, textAlign: 'left' }}>Elite Edition Online</span>
-                  {isEliteOnlineOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                </button>
-
-                {isEliteOnlineOpen && (
-                  <div style={{ paddingLeft: '1rem', borderLeft: '1px solid rgba(255,255,255,0.1)', marginLeft: '0.5rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <button onClick={() => setActiveTab('elite_online')} style={{ ...styles.navItem, padding: '0.5rem 0.75rem', fontSize: '0.8rem', ...(activeTab === 'elite_online' ? styles.navItemActive : {}) }}>
-                      <BarChart3 size={16} /><span>Dashboard</span>
-                    </button>
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('inventory')) && (
-                      <>
-                        <button onClick={() => setActiveTab('inventory')} style={{ ...styles.navItem, padding: '0.5rem 0.75rem', fontSize: '0.8rem', ...(activeTab === 'inventory' ? styles.navItemActive : {}) }}>
-                          <Database size={16} /><span>Store Inventory</span>
-                        </button>
-                        <button onClick={() => setActiveTab('catalog')} style={{ ...styles.navItem, padding: '0.5rem 0.75rem', fontSize: '0.8rem', ...(activeTab === 'catalog' ? styles.navItemActive : {}) }}>
-                          <BookOpen size={16} /><span>Product Catalog</span>
-                        </button>
-                      </>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('returns')) && (
-                      <button onClick={() => setActiveTab('returns')} style={{ ...styles.navItem, padding: '0.5rem 0.75rem', fontSize: '0.8rem', ...(activeTab === 'returns' ? styles.navItemActive : {}) }}>
-                        <PackageMinus size={16} /><span>Returns</span>
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) && (
-                      <button onClick={() => setActiveTab('sales')} style={{ ...styles.navItem, padding: '0.5rem 0.75rem', fontSize: '0.8rem', ...(activeTab === 'sales' ? styles.navItemActive : {}) }}>
-                        <ShoppingBag size={16} /><span>Sales Orders</span>
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Other Standalone Tabs */}
-            {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) && (
-              <button onClick={() => setActiveTab('reports')} style={{ ...styles.navItem, ...(activeTab === 'reports' ? styles.navItemActive : {}) }}>
-                <BarChart3 size={18} /><span>Reports Center</span>
-              </button>
-            )}
-            {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('unicommerce')) && (
-              <button onClick={() => setActiveTab('unicommerce')} style={{ ...styles.navItem, ...(activeTab === 'unicommerce' ? styles.navItemActive : {}) }}>
-                <RefreshCw size={18} /><span>Uniware Integrations</span>
-              </button>
-            )}
-            {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) && (
-              <button onClick={() => setActiveTab('myntra')} style={{ ...styles.navItem, ...(activeTab === 'myntra' ? styles.navItemActive : {}) }}>
-                <ShoppingBag size={18} /><span>Myntra Integrations</span>
-              </button>
-            )}
-            {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.some(p => p.startsWith('jobcards'))) && (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <button 
-                  onClick={() => {
-                    const firstAllowed = getFirstJobCardsTab();
-                    setActiveTab(firstAllowed);
-                  }}
-                  style={{ ...styles.navItem, ...(activeTab.startsWith('jobcards') ? styles.navItemActive : {}) }}
-                >
-                  <Printer size={18} /><span>Elite Digital Print</span>
-                  <ChevronDown size={14} style={{ marginLeft: 'auto', transform: activeTab.startsWith('jobcards') ? 'rotate(180deg)' : 'rotate(0deg)', transition: '0.2s' }} />
-                </button>
-                {activeTab.startsWith('jobcards') && (
-                  <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '1rem', marginTop: '0.25rem', gap: '0.25rem', borderLeft: '1px dashed var(--border-light)', paddingLeft: '0.5rem' }}>
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards')) && (
-                      <button onClick={() => setActiveTab('jobcards')} style={{ ...styles.navSubItem, ...(activeTab === 'jobcards' ? styles.navSubItemActive : {}) }}>
-                        Dashboard
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
-                      <button onClick={() => setActiveTab('jobcards_list')} style={{ ...styles.navSubItem, ...(activeTab === 'jobcards_list' ? styles.navSubItemActive : {}) }}>
-                        Job Card
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) && (
-                      <button onClick={() => setActiveTab('jobcards_catalogue')} style={{ ...styles.navSubItem, ...(activeTab === 'jobcards_catalogue' ? styles.navSubItemActive : {}) }}>
-                        Design Catalog
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_tracking')) && (
-                      <button onClick={() => setActiveTab('jobcards_tracking')} style={{ ...styles.navSubItem, ...(activeTab === 'jobcards_tracking' ? styles.navSubItemActive : {}) }}>
-                        Job Card Tracking
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master')) && (
-                      <button onClick={() => setActiveTab('jobcards_master')} style={{ ...styles.navSubItem, ...(activeTab === 'jobcards_master' ? styles.navSubItemActive : {}) }}>
-                        Design Master (100 Pic)
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) && (
-                      <button onClick={() => setActiveTab('jobcards_fabric')} style={{ ...styles.navSubItem, ...(activeTab === 'jobcards_fabric' ? styles.navSubItemActive : {}) }}>
-                        Fabric management
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_raw_materials')) && (
-                      <button onClick={() => setActiveTab('jobcards_raw_materials')} style={{ ...styles.navSubItem, ...(activeTab === 'jobcards_raw_materials' ? styles.navSubItemActive : {}) }}>
-                        Raw Materials
-                      </button>
-                    )}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) && (
-                      <button onClick={() => setActiveTab('jobcards_settings')} style={{ ...styles.navSubItem, ...(activeTab === 'jobcards_settings' ? styles.navSubItemActive : {}) }}>
-                        Settings
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
 
             {currentUser && currentUser.role === 'admin' && (
               <button
@@ -959,6 +931,19 @@ const styles = {
     background: 'rgba(255,255,255,0.05)',
     color: 'var(--text-primary)',
     fontWeight: '600',
+  },
+  sidebarSectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.45rem',
+    fontSize: '0.72rem',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: 'var(--text-muted)',
+    padding: '0.4rem 0.75rem',
+    borderBottom: '1px solid var(--border-light)',
+    marginBottom: '0.35rem',
   },
   themeDotsRow: {
     display: 'flex',
