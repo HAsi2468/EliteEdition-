@@ -36,6 +36,11 @@ const fabricChallanSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    deliveryBy: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     fabricName: {
       type: String,
       trim: true,

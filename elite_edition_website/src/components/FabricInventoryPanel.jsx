@@ -37,6 +37,13 @@ export default function FabricInventoryPanel() {
   const [availableLots, setAvailableLots] = useState([]);
   const [billToOptions, setBillToOptions] = useState([]);
   const [shipToOptions, setShipToOptions] = useState([]);
+  const [deliveryByOptions, setDeliveryByOptions] = useState([
+    'Self Delivery',
+    'Driver / Vehicle',
+    'Tempo / Auto',
+    'Courier / Transport',
+    'Party Collection'
+  ]);
 
   const emptyTpRows = () => [{ tpNo: 1, tpMeter: '' }];
   const [challanForm, setChallanForm] = useState({
@@ -44,6 +51,7 @@ export default function FabricInventoryPanel() {
     partyName: '',
     lotNo: '',
     vendorChallanNo: '',
+    deliveryBy: '',
     fabricName: '',
     shortagePct: '',
     jobNo: '',
@@ -495,8 +503,8 @@ export default function FabricInventoryPanel() {
     setAvailableLots([]);
     setChallanForm({
       date: new Date().toISOString().split('T')[0],
-      partyName: '', lotNo: '', vendorChallanNo: '', fabricName: '', shortagePct: '',
-      jobNo: '', designNo: '', colour: '', panna: '', pcs: '',
+      partyName: '', lotNo: '', vendorChallanNo: '', deliveryBy: '', fabricName: '', shortagePct: '',
+      jobNo: '', designNo: '', colour: '', panna: '', pcs: '', billTo: '', shipTo: '',
       tpDetails: emptyTpRows(), notes: '',
     });
   };
@@ -768,6 +776,7 @@ export default function FabricInventoryPanel() {
       partyName: c.partyName || '',
       lotNo: c.lotNo != null ? String(c.lotNo) : '',
       vendorChallanNo: c.vendorChallanNo || '',
+      deliveryBy: c.deliveryBy || '',
       fabricName: c.fabricName || '',
       shortagePct: c.shortagePct != null ? String(c.shortagePct) : '',
       jobNo: c.jobNo || '',
@@ -1831,8 +1840,8 @@ export default function FabricInventoryPanel() {
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lot Details</span>
               </div>
 
-              {/* Row 4: Lot No + Vendor Challan No + PCS */}
-              <div style={{ display: 'flex', gap: '1rem' }}>
+              {/* Row 4: Lot No + Vendor Challan No + Delivery By + PCS */}
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1.2 }}>
                   <label style={labelStyle}>Lot No {challanLotLoading && <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Loading…</span>}</label>
                   <input
@@ -1846,6 +1855,22 @@ export default function FabricInventoryPanel() {
                 <div style={{ flex: 1.2 }}>
                   <label style={labelStyle}>Vendor Challan No <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-filled)</span></label>
                   <input type="text" value={challanForm.vendorChallanNo} onChange={e => setChallanForm({ ...challanForm, vendorChallanNo: e.target.value })} style={inputStyle} placeholder="Auto-filled from lot…" />
+                </div>
+                <div style={{ flex: 1.2 }}>
+                  <label style={labelStyle}>Delivery By <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(driver/person)</span></label>
+                  <input
+                    type="text"
+                    list="delivery-by-options"
+                    value={challanForm.deliveryBy}
+                    onChange={e => setChallanForm({ ...challanForm, deliveryBy: e.target.value })}
+                    style={inputStyle}
+                    placeholder="Select or type..."
+                  />
+                  <datalist id="delivery-by-options">
+                    {deliveryByOptions.map((opt, i) => (
+                      <option key={i} value={opt} />
+                    ))}
+                  </datalist>
                 </div>
                 <div style={{ flex: 0.8 }}>
                   <label style={labelStyle}>PCS</label>

@@ -80,7 +80,7 @@ const createChallan = async (req, res) => {
   try {
     const {
       date, partyName,
-      lotNo, vendorChallanNo, fabricName, shortagePct,
+      lotNo, vendorChallanNo, deliveryBy, fabricName, shortagePct,
       jobNo, designNo, colour, panna,
       tpDetails, pcs,
       notes, createdBy,
@@ -100,6 +100,7 @@ const createChallan = async (req, res) => {
       partyName: partyName || '',
       lotNo: lotNo ? String(lotNo) : '',
       vendorChallanNo: vendorChallanNo || '',
+      deliveryBy: deliveryBy || '',
       fabricName: fabricName || '',
       shortagePct: shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null,
       jobNo: jobNo || '',
@@ -213,7 +214,7 @@ const updateChallan = async (req, res) => {
     const { id } = req.params;
     const {
       date, partyName,
-      lotNo, vendorChallanNo, fabricName, shortagePct,
+      lotNo, vendorChallanNo, deliveryBy, fabricName, shortagePct,
       jobNo, designNo, colour, panna,
       tpDetails, pcs, notes,
       billTo, shipTo,
@@ -228,6 +229,7 @@ const updateChallan = async (req, res) => {
     if (partyName !== undefined) challan.partyName = partyName;
     if (lotNo !== undefined) challan.lotNo = lotNo ? String(lotNo) : '';
     if (vendorChallanNo !== undefined) challan.vendorChallanNo = vendorChallanNo;
+    if (deliveryBy !== undefined) challan.deliveryBy = deliveryBy;
     if (fabricName !== undefined) challan.fabricName = fabricName;
     if (shortagePct !== undefined) challan.shortagePct = shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null;
     if (jobNo !== undefined) challan.jobNo = jobNo;
@@ -418,7 +420,7 @@ const downloadChallanPdf = async (req, res) => {
       .filter(tp => tp.tpMeter != null && parseFloat(tp.tpMeter) > 0);
 
     const activeCount = activeTps.length;
-    const tpColsCount = activeCount === 0 ? 1 : activeCount <= 5 ? 1 : activeCount <= 10 ? 2 : 3;
+    const tpColsCount = activeCount <= 10 ? 1 : activeCount <= 20 ? 2 : 3;
     const tpColWidth = contentWidth / tpColsCount;
     const tpRowHeight = 26;
     const tableHeaderHeight = 26;
@@ -431,7 +433,7 @@ const downloadChallanPdf = async (req, res) => {
 
     const getColor = (colorStr, isColorPage) => {
       if (isColorPage) return colorStr;
-      if (colorStr === '#dc2626') return '#dc2626'; // Keep Challan No in RED!
+      if (colorStr === '#dc2626') return '#dc2626'; // Keep Challan No & Total TP in RED!
       if (colorStr === '#475569') return '#555555'; // Expected Pcs text in Gray
       return '#000000'; // Everything else B&W
     };
@@ -541,7 +543,8 @@ const downloadChallanPdf = async (req, res) => {
 
       renderField('Colour', challan.colour, ML, gridStartY + 34, colWidth4, 34);
       renderField('Fabric', challan.fabricName, ML + colWidth4, gridStartY + 34, colWidth4, 34);
-      renderField('Vendor Challan', challan.vendorChallanNo, ML + colWidth4 * 2, gridStartY + 34, colWidth4 * 2, 34);
+      renderField('Vendor Challan', challan.vendorChallanNo, ML + colWidth4 * 2, gridStartY + 34, colWidth4, 34);
+      renderField('Delivery By', challan.deliveryBy, ML + colWidth4 * 3, gridStartY + 34, colWidth4, 34);
 
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(13).font('Helvetica-Bold')
         .text('TP Details', ML + 16, tpSectionY, { lineBreak: false });
@@ -565,8 +568,8 @@ const downloadChallanPdf = async (req, res) => {
       } else {
         for (let i = 0; i < activeCount; i++) {
           const tp = activeTps[i];
-          const colIndex = i % tpColsCount;
-          const rowIndex = Math.floor(i / tpColsCount);
+          const colIndex = Math.floor(i / rowsPerCol);
+          const rowIndex = i % rowsPerCol;
 
           const x = ML + colIndex * tpColWidth;
           const y = tpTableStartY + tableHeaderHeight + rowIndex * tpRowHeight;
@@ -589,7 +592,7 @@ const downloadChallanPdf = async (req, res) => {
       doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(ML, summaryStartY, summaryColWidth2, 48).stroke();
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(11.5).font('Helvetica-Bold')
         .text('TOTAL CHALLAN TP', ML, summaryStartY + 8, { width: summaryColWidth2, align: 'center' });
-      doc.fillColor(getColor('#10b981', isColorPage)).fontSize(17).font('Helvetica-Bold')
+      doc.fillColor(getColor('#dc2626', isColorPage)).fontSize(17).font('Helvetica-Bold')
         .text(String(challan.totalTp || 0), ML, summaryStartY + 23, { width: summaryColWidth2, align: 'center' });
 
       doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(ML + summaryColWidth2, summaryStartY, summaryColWidth2, 48).stroke();
