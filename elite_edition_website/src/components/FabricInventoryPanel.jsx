@@ -400,22 +400,6 @@ export default function FabricInventoryPanel() {
     if (isOutwardOpen) fetchAllLots();
   }, [isOutwardOpen]);
 
-  const handleJobNoChange = async (e) => {
-    const val = e.target.value;
-    const job = findMatchingJobCard(val);
-    setOutwardForm(prev => {
-      const updated = { ...prev, jobNo: job ? job.jobNo : val, lotNo: '' };
-      if (job) {
-        updated.partyName = job.party || '';
-        updated.fabricQuality = job.fabric || '';
-        updated.panna = job.panna || '';
-      }
-      return updated;
-    });
-    // Always refresh all lots when job changes
-    fetchAllLots();
-  };
-
   const handleLotNoChange = (e) => {
     const val = e.target.value;
     setOutwardForm(prev => {
@@ -609,27 +593,76 @@ export default function FabricInventoryPanel() {
     }
   };
 
-  // When Job No changes — auto-fill design, colour, panna, fabric, party, billTo, shipTo
+  const handleJobNoChange = async (e) => {
+    const val = e.target.value;
+    const rawTokens = String(val || '').split(',').map(s => s.trim()).filter(Boolean);
+    const matchedJobs = rawTokens.map(token => findMatchingJobCard(token)).filter(Boolean);
+
+    if (matchedJobs.length > 0) {
+      const primaryJob = matchedJobs[0];
+      const combinedJobNo = Array.from(new Set(matchedJobs.map(j => j.jobNo))).join(', ');
+
+      setOutwardForm(prev => ({
+        ...prev,
+        jobNo: val.includes(',') ? val : (combinedJobNo || val),
+        partyName: primaryJob.party || prev.partyName,
+        fabricQuality: primaryJob.fabric || prev.fabricQuality,
+        panna: primaryJob.panna || prev.panna,
+        lotNo: prev.lotNo
+      }));
+    } else {
+      setOutwardForm(prev => ({ ...prev, jobNo: val }));
+    }
+    fetchAllLots();
+  };
+
+  const toggleOutwardJobPill = (jobNoToToggle) => {
+    const currentTokens = String(outwardForm.jobNo || '').split(',').map(s => s.trim()).filter(Boolean);
+    let updatedTokens;
+
+    const existsIndex = currentTokens.findIndex(tok => {
+      const j1 = findMatchingJobCard(tok);
+      const j2 = findMatchingJobCard(jobNoToToggle);
+      return (j1 && j2 && j1._id === j2._id) || tok.toUpperCase() === jobNoToToggle.toUpperCase();
+    });
+
+    if (existsIndex >= 0) {
+      updatedTokens = currentTokens.filter((_, idx) => idx !== existsIndex);
+    } else {
+      updatedTokens = [...currentTokens, jobNoToToggle];
+    }
+
+    const newVal = updatedTokens.join(', ');
+    handleJobNoChange({ target: { value: newVal } });
+  };
+
+  // When Job No changes — handles single or multiple comma-separated Job Nos
   const handleChallanJobChange = async (val) => {
-    setChallanForm(prev => ({ ...prev, jobNo: val }));
-    const job = findMatchingJobCard(val);
-    if (job) {
+    const rawTokens = String(val || '').split(',').map(s => s.trim()).filter(Boolean);
+    const matchedJobs = rawTokens.map(token => findMatchingJobCard(token)).filter(Boolean);
+
+    if (matchedJobs.length > 0) {
+      const combinedJobNo = Array.from(new Set(matchedJobs.map(j => j.jobNo))).join(', ');
+      const combinedDesigns = Array.from(new Set(matchedJobs.map(j => j.designNo).filter(Boolean))).join(', ');
+      const combinedColors = Array.from(new Set(matchedJobs.map(j => j.colors).filter(Boolean))).join(', ');
+      const primaryJob = matchedJobs[0];
+
       setChallanForm(prev => ({
         ...prev,
-        jobNo: job.jobNo || val,
-        designNo: job.designNo || prev.designNo,
-        colour: job.colors || prev.colour,
-        panna: job.panna || prev.panna,
-        fabricName: job.fabric || prev.fabricName,
-        partyName: job.party || prev.partyName,
-        billTo: job.billTo || prev.billTo || '',
-        shipTo: job.shipTo || prev.shipTo || '',
+        jobNo: val.includes(',') ? val : (combinedJobNo || val),
+        designNo: combinedDesigns || prev.designNo,
+        colour: combinedColors || prev.colour,
+        panna: primaryJob.panna || prev.panna,
+        fabricName: primaryJob.fabric || prev.fabricName,
+        partyName: primaryJob.party || prev.partyName,
+        billTo: primaryJob.billTo || prev.billTo || '',
+        shipTo: primaryJob.shipTo || prev.shipTo || '',
       }));
 
       // Fetch lot numbers that have this fabric
-      if (job.fabric) {
+      if (primaryJob.fabric) {
         try {
-          const res = await api.getFabricLotStock({ fabricQuality: job.fabric });
+          const res = await api.getFabricLotStock({ fabricQuality: primaryJob.fabric });
           if (res.success && res.data) {
             setAvailableLots(res.data);
           }
@@ -638,8 +671,30 @@ export default function FabricInventoryPanel() {
         }
       }
     } else {
+      setChallanForm(prev => ({ ...prev, jobNo: val }));
       setAvailableLots([]);
     }
+  };
+
+  // Toggle job card pill selection for Challan form
+  const toggleChallanJobPill = (jobNoToToggle) => {
+    const currentTokens = String(challanForm.jobNo || '').split(',').map(s => s.trim()).filter(Boolean);
+    let updatedTokens;
+
+    const existsIndex = currentTokens.findIndex(tok => {
+      const j1 = findMatchingJobCard(tok);
+      const j2 = findMatchingJobCard(jobNoToToggle);
+      return (j1 && j2 && j1._id === j2._id) || tok.toUpperCase() === jobNoToToggle.toUpperCase();
+    });
+
+    if (existsIndex >= 0) {
+      updatedTokens = currentTokens.filter((_, idx) => idx !== existsIndex);
+    } else {
+      updatedTokens = [...currentTokens, jobNoToToggle];
+    }
+
+    const newVal = updatedTokens.join(', ');
+    handleChallanJobChange(newVal);
   };
 
   // TP detail update
@@ -1676,13 +1731,50 @@ export default function FabricInventoryPanel() {
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Job Details</span>
               </div>
 
-              {/* Row 2: Job No */}
+              {/* Row 2: Job No + Party Job Pills */}
               <div>
-                <label style={labelStyle}>Job No <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-fills design, colour, panna, fabric)</span></label>
-                <input type="text" list="challan-jobs" value={challanForm.jobNo} onChange={e => handleChallanJobChange(e.target.value)} style={inputStyle} placeholder="Select or type job no…" />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+                  <label style={labelStyle}>Job No(s) <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(select multiple or type comma-separated)</span></label>
+                  {challanForm.partyName && (
+                    <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 600 }}>
+                      Party: {challanForm.partyName}
+                    </span>
+                  )}
+                </div>
+
+                <input type="text" list="challan-jobs" value={challanForm.jobNo} onChange={e => handleChallanJobChange(e.target.value)} style={inputStyle} placeholder="e.g. JOB-2252, JOB-2253 (or select below)..." />
                 <datalist id="challan-jobs">
-                  {inProgressJobCards.map(j => <option key={j._id} value={j.jobNo}>{j.jobNo} — {j.party}</option>)}
+                  {inProgressJobCards.map(j => <option key={j._id} value={j.jobNo}>{j.jobNo} — {j.party} ({j.designNo || ''})</option>)}
                 </datalist>
+
+                {/* Interactive Job Pills */}
+                <div style={{ marginTop: '0.4rem', display: 'flex', flexWrap: 'wrap', gap: '0.35rem', maxHeight: '100px', overflowY: 'auto' }}>
+                  {inProgressJobCards
+                    .filter(j => !challanForm.partyName || (j.party && j.party.toLowerCase().trim() === challanForm.partyName.toLowerCase().trim()))
+                    .slice(0, 20)
+                    .map(j => {
+                      const isSelected = String(challanForm.jobNo || '').toUpperCase().includes(String(j.jobNo).toUpperCase());
+                      return (
+                        <button
+                          key={j._id}
+                          type="button"
+                          onClick={() => toggleChallanJobPill(j.jobNo)}
+                          style={{
+                            padding: '0.2rem 0.55rem',
+                            fontSize: '0.72rem',
+                            borderRadius: '12px',
+                            border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-light)',
+                            background: isSelected ? 'rgba(56,189,248,0.25)' : 'rgba(255,255,255,0.05)',
+                            color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {isSelected ? '✓ ' : '+ '} {j.jobNo} {j.designNo ? `(${j.designNo})` : ''}
+                        </button>
+                      );
+                    })}
+                </div>
               </div>
 
               {/* Row 3: Design + Colour + Panna */}
