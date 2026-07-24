@@ -557,8 +557,9 @@ const buildWhereClause = (query) => {
   const whereClause = { saleOrderStatus: { $ne: 'CANCELLED' } };
 
   if (dateStart) {
-    const startOfDay = new Date(dateStart + "T00:00:00");
-    const endOfDay = new Date((dateEnd || dateStart) + "T23:59:59.999");
+    const hasTime = (str) => /T|\s|:/.test(str);
+    const startOfDay = hasTime(dateStart) ? new Date(dateStart) : new Date(dateStart + "T00:00:00");
+    const endOfDay = hasTime(dateEnd || dateStart) ? new Date(dateEnd || dateStart) : new Date((dateEnd || dateStart) + "T23:59:59.999");
     whereClause.orderDate = {
       $gte: startOfDay,
       $lte: endOfDay,

@@ -8,9 +8,12 @@ const buildDateFilter = (dateStart, dateEnd) => {
   const filter = { saleOrderStatus: { $ne: 'CANCELLED' } };
   if (dateStart || dateEnd) {
     filter.orderDate = {};
-    if (dateStart) filter.orderDate.$gte = new Date(dateStart + "T00:00:00");
+    const hasTime = (str) => /T|\s|:/.test(str);
+    if (dateStart) {
+      filter.orderDate.$gte = hasTime(dateStart) ? new Date(dateStart) : new Date(dateStart + "T00:00:00");
+    }
     if (dateEnd) {
-      filter.orderDate.$lte = new Date(dateEnd + "T23:59:59.999");
+      filter.orderDate.$lte = hasTime(dateEnd) ? new Date(dateEnd) : new Date(dateEnd + "T23:59:59.999");
     }
   }
   return filter;
@@ -568,13 +571,25 @@ const getReturnsBrandReport = async (req, res) => {
   try {
     const { dateStart, dateEnd } = req.query;
     
+    const hasTime = (str) => /T|\s|:/.test(str);
+    const getStartStr = (str) => {
+      if (!str) return '';
+      const clean = str.replace('T', ' ');
+      return hasTime(str) ? clean : `${clean} 00:00:00`;
+    };
+    const getEndStr = (str) => {
+      if (!str) return '';
+      const clean = str.replace('T', ' ');
+      return hasTime(str) ? clean : `${clean} 23:59:59`;
+    };
+
     // 1. Pickup Report Match
     const matchPickup = {
       reversePickupCreatedDate: { $ne: null, $exists: true, $ne: "" }
     };
     if (dateStart || dateEnd) {
-      if (dateStart) matchPickup.reversePickupCreatedDate.$gte = `${dateStart} 00:00:00`;
-      if (dateEnd) matchPickup.reversePickupCreatedDate.$lte = `${dateEnd} 23:59:59`;
+      if (dateStart) matchPickup.reversePickupCreatedDate.$gte = getStartStr(dateStart);
+      if (dateEnd) matchPickup.reversePickupCreatedDate.$lte = getEndStr(dateEnd);
     }
 
     // 2. Physical Return Match
@@ -583,10 +598,10 @@ const getReturnsBrandReport = async (req, res) => {
       returnDate: { $ne: null, $exists: true, $ne: "" }
     };
     if (dateStart || dateEnd) {
-      if (dateStart) matchPhysical.returnDate = { $gte: `${dateStart} 00:00:00` };
+      if (dateStart) matchPhysical.returnDate = { $gte: getStartStr(dateStart) };
       if (dateEnd) {
         if (!matchPhysical.returnDate) matchPhysical.returnDate = {};
-        matchPhysical.returnDate.$lte = `${dateEnd} 23:59:59`;
+        matchPhysical.returnDate.$lte = getEndStr(dateEnd);
       }
     }
 
