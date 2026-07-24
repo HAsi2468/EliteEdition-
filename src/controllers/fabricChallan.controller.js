@@ -493,11 +493,21 @@ const downloadChallanPdf = async (req, res) => {
         doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5)
           .rect(x, y, width, height).stroke();
 
-        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica-Bold')
-          .text(label.toUpperCase(), x + 10, y + 5, { width: width - 20, align: 'left', lineBreak: false });
+        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(9.5).font('Helvetica-Bold')
+          .text(label.toUpperCase(), x + 6, y + 3, { width: width - 12, align: 'left', lineBreak: false });
 
-        doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
-          .text(String(value || '—'), x + 10, y + 17, { width: width - 20, align: 'left', lineBreak: false });
+        const valStr = String(value || '—').trim();
+        let fontSize = 12;
+        if (valStr.length > 28) {
+          fontSize = 7.5;
+        } else if (valStr.length > 18) {
+          fontSize = 8.5;
+        } else if (valStr.length > 11) {
+          fontSize = 9.5;
+        }
+
+        doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(fontSize).font('Helvetica-Bold')
+          .text(valStr, x + 6, y + 15, { width: width - 12, align: 'left', lineBreak: true, height: height - 16 });
       }
 
       const billStartY = startY + 28;
