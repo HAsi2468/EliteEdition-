@@ -267,25 +267,25 @@ const downloadJobCardPdf = async (req, res) => {
     const PW=595, PH=842, M=28, CW=PW-2*M;
 
     // Outer card border
-    doc.strokeColor('#c8d4e0').lineWidth(1).rect(28, 28, 539, 786).stroke();
+    doc.strokeColor('#c8d4e0').lineWidth(1).rect(23, 28, 544, 786).stroke();
 
     // Header bar
-    doc.rect(28, 28, 539, 48).fill('#0f172a');
+    doc.rect(23, 28, 544, 48).fill('#0f172a');
     doc.fillColor('#ffffff').fontSize(19).font('Helvetica-Bold')
-      .text('ELITE EDITION', 28, 38, { width:539, align:'center', lineBreak:false });
+      .text('ELITE EDITION', 23, 38, { width:544, align:'center', lineBreak:false });
     doc.fillColor('#94a3b8').fontSize(9).font('Helvetica')
-      .text('Production Job Card', 28, 58, { width:539, align:'center', lineBreak:false });
+      .text('Production Job Card', 23, 58, { width:544, align:'center', lineBreak:false });
 
     // Job No banner
-    doc.rect(28, 76, 539, 26).fill('#1e293b');
+    doc.rect(23, 76, 544, 26).fill('#1e293b');
     doc.fillColor('#ffffff').fontSize(11).font('Helvetica-Bold')
-      .text(`JOB CARD:  ${jobCard.jobNo||'—'}`, 36, 83, { width:200, lineBreak:false });
+      .text(`JOB CARD:  ${jobCard.jobNo||'—'}`, 31, 83, { width:200, lineBreak:false });
     const sCol = jobCard.status==='Done' ? '#22c55e' : jobCard.status==='In Progress' ? '#f59e0b' : '#ef4444';
     doc.fillColor(sCol).fontSize(9).font('Helvetica-Bold')
-      .text(jobCard.status||'Pending', 28, 85, { width:539-16, align:'right', lineBreak:false });
+      .text(jobCard.status||'Pending', 23, 85, { width:544-16, align:'right', lineBreak:false });
 
     // Layout
-    const BODY_Y=112, LX=36, LW=300, RX=352, RW=208;
+    const BODY_Y=112, LX=31, LW=300, RX=352, RW=208;
     const IMG_Y=BODY_Y, IMG_H=200, RH=35;
 
     // Field helper — absolute position, no cursor side-effects, centering and size +2
@@ -398,33 +398,33 @@ const downloadJobCardPdf = async (req, res) => {
 
     // ── Divider ───────────────────────────────────────────────────────────
     const divY = Math.max(ly, ry) + 12;
-    doc.moveTo(28, divY).lineTo(567, divY).strokeColor('#dde3ea').lineWidth(0.5).stroke();
+    doc.moveTo(23, divY).lineTo(567, divY).strokeColor('#dde3ea').lineWidth(0.5).stroke();
 
     // ── Status Tracking ───────────────────────────────────────────────────
     let ty = divY + 12;
     doc.fillColor('#1e293b').fontSize(9).font('Helvetica-Bold')
-      .text('STATUS TRACKING', 36, ty, { lineBreak:false });
+      .text('STATUS TRACKING', 31, ty, { lineBreak:false });
     ty += 16;
     const tcW = 126.75;
     [['Print Status',jobCard.printStatus],['Print Date',jobCard.printDate],
      ['Print Metres',jobCard.printMtr],['Fusing Status',jobCard.fusingStatus],
      ['Fusing Date',jobCard.fusingDate],['Delivery Status',jobCard.deliveryStatus],
      ['Delivery Date',jobCard.deliveryDate],['Created Date',jobCard.date]]
-    .forEach(([l,v],i) => F(l,v, 36+(i%4)*130, ty+Math.floor(i/4)*35, 120));
+    .forEach(([l,v],i) => F(l,v, 31+(i%4)*130, ty+Math.floor(i/4)*35, 120));
     ty += 80;
 
     // ── Notes ─────────────────────────────────────────────────────────────
     if (jobCard.emergencyNotes || jobCard.note1 || jobCard.note2) {
-      doc.moveTo(28,ty).lineTo(567,ty).strokeColor('#dde3ea').lineWidth(0.5).stroke();
+      doc.moveTo(23,ty).lineTo(567,ty).strokeColor('#dde3ea').lineWidth(0.5).stroke();
       ty+=12;
-      doc.fillColor('#1e293b').fontSize(9).font('Helvetica-Bold').text('NOTES', 36, ty, { lineBreak:false });
+      doc.fillColor('#1e293b').fontSize(9).font('Helvetica-Bold').text('NOTES', 31, ty, { lineBreak:false });
       ty+=16;
       if (jobCard.emergencyNotes) {
         doc.fillColor('#ef4444').fontSize(8.5).font('Helvetica-Bold')
-          .text('⚠ EMERGENCY: '+jobCard.emergencyNotes, 36, ty, { width:500 }); ty+=22;
+          .text('⚠ EMERGENCY: '+jobCard.emergencyNotes, 31, ty, { width:500 }); ty+=22;
       }
-      if (jobCard.note1) { F('Note 1',jobCard.note1,36,ty,500); ty+=38; }
-      if (jobCard.note2) { F('Note 2',jobCard.note2,36,ty,500); ty+=38; }
+      if (jobCard.note1) { F('Note 1',jobCard.note1,31,ty,500); ty+=38; }
+      if (jobCard.note2) { F('Note 2',jobCard.note2,31,ty,500); ty+=38; }
     }
 
     doc.end();
