@@ -9,23 +9,27 @@ const getElitePrintReports = async (req, res) => {
   try {
     const { dateStart, dateEnd } = req.query;
 
+    const cleanDateStart = dateStart ? dateStart.split('T')[0] : '';
+    const cleanDateEnd = dateEnd ? dateEnd.split('T')[0] : '';
+
     // Match stage for JobCard (which uses String format "YYYY-MM-DD" for `date`)
     const matchStage = {};
-    if (dateStart || dateEnd) {
+    if (cleanDateStart || cleanDateEnd) {
       matchStage.date = {};
-      if (dateStart) matchStage.date.$gte = dateStart;
-      if (dateEnd) matchStage.date.$lte = dateEnd;
+      if (cleanDateStart) matchStage.date.$gte = cleanDateStart;
+      if (cleanDateEnd) matchStage.date.$lte = cleanDateEnd;
     }
 
     // Match stage for Design (which uses Date object `created_date_time`)
     const designMatchStage = {};
     if (dateStart || dateEnd) {
       designMatchStage.created_date_time = {};
+      const hasTime = (str) => /T|\s|:/.test(str);
       if (dateStart) {
-        designMatchStage.created_date_time.$gte = new Date(dateStart + "T00:00:00.000Z");
+        designMatchStage.created_date_time.$gte = hasTime(dateStart) ? new Date(dateStart) : new Date(dateStart + "T00:00:00.000Z");
       }
       if (dateEnd) {
-        designMatchStage.created_date_time.$lte = new Date(dateEnd + "T23:59:59.999Z");
+        designMatchStage.created_date_time.$lte = hasTime(dateEnd) ? new Date(dateEnd) : new Date(dateEnd + "T23:59:59.999Z");
       }
     }
 
@@ -61,10 +65,10 @@ const getElitePrintReports = async (req, res) => {
 
     // 4. Fusing Operator Throughput
     const fusingMatchStage = { fusingStatus: "Fusing Done" };
-    if (dateStart || dateEnd) {
+    if (cleanDateStart || cleanDateEnd) {
       fusingMatchStage.fusingDate = {};
-      if (dateStart) fusingMatchStage.fusingDate.$gte = dateStart;
-      if (dateEnd) fusingMatchStage.fusingDate.$lte = dateEnd;
+      if (cleanDateStart) fusingMatchStage.fusingDate.$gte = cleanDateStart;
+      if (cleanDateEnd) fusingMatchStage.fusingDate.$lte = cleanDateEnd;
     }
     const fusingThroughput = await JobCard.aggregate([
       { $match: fusingMatchStage },
@@ -105,10 +109,10 @@ const getElitePrintReports = async (req, res) => {
 
     // 6. Production Deadline Adherence
     const deliveryMatchStage = { deliveryDate: { $exists: true, $ne: "" } };
-    if (dateStart || dateEnd) {
+    if (cleanDateStart || cleanDateEnd) {
       deliveryMatchStage.deliveryDate = {};
-      if (dateStart) deliveryMatchStage.deliveryDate.$gte = dateStart;
-      if (dateEnd) deliveryMatchStage.deliveryDate.$lte = dateEnd;
+      if (cleanDateStart) deliveryMatchStage.deliveryDate.$gte = cleanDateStart;
+      if (cleanDateEnd) deliveryMatchStage.deliveryDate.$lte = cleanDateEnd;
     }
     const deadlineAdherence = await JobCard.aggregate([
       { $match: deliveryMatchStage },

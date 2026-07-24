@@ -117,12 +117,36 @@ const getAllJobCards = async (req, res) => {
         { $sort: { urgencyScore: -1, created_date_time: -1 } },
         { $skip: skip }, { $limit: Number(limit) }
       ]);
+    } else if (!sortBy || sortBy === 'jobNo') {
+      const order = sortOrder === 'desc' ? -1 : 1;
+      cards = await db.JobCard.aggregate([
+        { $match: filter },
+        {
+          $addFields: {
+            jobNoNum: {
+              $convert: {
+                input: {
+                  $let: {
+                    vars: {
+                      matchObj: { $regexFind: { input: "$jobNo", regex: "\\d+" } }
+                    },
+                    in: "$$matchObj.match"
+                  }
+                },
+                to: "int",
+                onError: 0,
+                onNull: 0
+              }
+            }
+          }
+        },
+        { $sort: { jobNoNum: order } },
+        { $skip: skip },
+        { $limit: Number(limit) }
+      ]);
     } else {
-      let sort = { jobNo: 1 };
-      if (sortBy) {
-        const order = sortOrder === 'desc' ? -1 : 1;
-        sort = { [sortBy]: order };
-      }
+      const order = sortOrder === 'desc' ? -1 : 1;
+      const sort = { [sortBy]: order };
       cards = await db.JobCard.find(filter)
         .collation({ locale:'en', numericOrdering:true })
         .sort(sort).skip(skip).limit(Number(limit)).lean();
