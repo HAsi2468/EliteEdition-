@@ -141,9 +141,30 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails)
   const usedLotsSet = new Set();
   const lotGroups = {};
 
-  if (availableLots.length > 0) {
-    // We have active stock in inward lots -> allocate FIFO
-    const lotStockMap = availableLots.map(l => ({ lotNo: String(l.lotNo), remaining: l.currentStock }));
+  // Build prioritized lotStockMap:
+  // If user specified lots (e.g. ["330", "328", "317"]), place them FIRST in exact order!
+  const lotStockMap = [];
+  const addedLotSet = new Set();
+
+  if (fallbackLots.length > 0) {
+    for (const fLot of fallbackLots) {
+      const match = availableLots.find(l => String(l.lotNo) === fLot);
+      const rem = match ? match.currentStock : Infinity;
+      lotStockMap.push({ lotNo: fLot, remaining: rem });
+      addedLotSet.add(fLot);
+    }
+  }
+
+  // Then append any remaining FIFO lots from database
+  for (const aLot of availableLots) {
+    const lStr = String(aLot.lotNo);
+    if (!addedLotSet.has(lStr)) {
+      lotStockMap.push({ lotNo: lStr, remaining: aLot.currentStock });
+      addedLotSet.add(lStr);
+    }
+  }
+
+  if (lotStockMap.length > 0) {
     let lotIdx = 0;
 
     for (const tp of details) {
@@ -163,8 +184,8 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails)
           continue;
         }
 
-        const take = Math.min(needed, curLot.remaining);
-        curLot.remaining -= take;
+        const take = curLot.remaining === Infinity ? needed : Math.min(needed, curLot.remaining);
+        if (curLot.remaining !== Infinity) curLot.remaining -= take;
         needed -= take;
 
         const lotStr = curLot.lotNo;
