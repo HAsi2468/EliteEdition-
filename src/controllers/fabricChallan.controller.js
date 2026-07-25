@@ -78,6 +78,152 @@ function parseLotNo(lotStr) {
   return undefined;
 }
 
+// ── Helper: Automated Lot Allocation Program Logic ─────────────────────────
+// Automatically allocates lot numbers across TP details based on available inward stock
+// (or distributes fallback lots across TP rows if no inward stock is recorded yet).
+async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails) {
+  const details = Array.isArray(tpDetails) ? tpDetails : [];
+  if (!fabricName || details.length === 0) {
+    return {
+      sanitizedDetails: details,
+      finalLotNoStr: rawLotNoStr || '',
+      lotGroups: {}
+    };
+  }
+
+  // 1. Fetch available INWARD lot stocks for this fabric
+  let availableLots = [];
+  try {
+    const cleanFabric = fabricName.trim();
+    const re = new RegExp(`^${cleanFabric.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+    
+    const pipeline = [
+      {
+        $match: {
+          fabricQuality: re,
+          lotNo: { $ne: null }
+        }
+      },
+      {
+        $group: {
+          _id: '$lotNo',
+          totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+          totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } }
+        }
+      },
+      {
+        $project: {
+          lotNo: '$_id',
+          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
+          _id: 0
+        }
+      },
+      { $match: { currentStock: { $gt: 0 } } },
+      { $sort: { lotNo: 1 } } // FIFO: oldest lot first
+    ];
+
+    availableLots = await FabricTransaction.aggregate(pipeline);
+  } catch (e) {
+    console.warn('Failed to query inward lot stock:', e.message);
+  }
+
+  // Parse existing/header lot numbers string (e.g. "330,328,317" -> ["330", "328", "317"])
+  const fallbackLots = (rawLotNoStr || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  const sanitizedDetails = [];
+  const usedLotsSet = new Set();
+  const lotGroups = {};
+
+  if (availableLots.length > 0) {
+    // We have active stock in inward lots -> allocate FIFO
+    const lotStockMap = availableLots.map(l => ({ lotNo: String(l.lotNo), remaining: l.currentStock }));
+    let lotIdx = 0;
+
+    for (const tp of details) {
+      const m = parseFloat(tp.tpMeter) || 0;
+      if (m <= 0) {
+        sanitizedDetails.push({ ...tp, lotNo: '' });
+        continue;
+      }
+
+      let needed = m;
+      let assignedLots = [];
+
+      while (needed > 0 && lotIdx < lotStockMap.length) {
+        const curLot = lotStockMap[lotIdx];
+        if (curLot.remaining <= 0) {
+          lotIdx++;
+          continue;
+        }
+
+        const take = Math.min(needed, curLot.remaining);
+        curLot.remaining -= take;
+        needed -= take;
+
+        const lotStr = curLot.lotNo;
+        if (!assignedLots.includes(lotStr)) assignedLots.push(lotStr);
+        usedLotsSet.add(lotStr);
+
+        lotGroups[lotStr] = (lotGroups[lotStr] || 0) + take;
+
+        if (curLot.remaining <= 0) {
+          lotIdx++;
+        }
+      }
+
+      if (needed > 0) {
+        // Remaining meters beyond available stock -> assign to last used lot or fallback lot
+        const lastLot = assignedLots.length > 0 ? assignedLots[assignedLots.length - 1] : (fallbackLots[0] || '1');
+        if (!assignedLots.includes(lastLot)) assignedLots.push(lastLot);
+        usedLotsSet.add(lastLot);
+        lotGroups[lastLot] = (lotGroups[lastLot] || 0) + needed;
+      }
+
+      sanitizedDetails.push({
+        ...tp,
+        lotNo: assignedLots.join(', ')
+      });
+    }
+  } else {
+    // No inward stock records in DB yet -> distribute fallback lots across TP rows programmatically
+    const defaultLot = fallbackLots[0] || '1';
+    let fIdx = 0;
+    const itemsPerLot = fallbackLots.length > 1 ? Math.ceil(details.length / fallbackLots.length) : details.length;
+
+    details.forEach((tp, idx) => {
+      const m = parseFloat(tp.tpMeter) || 0;
+      if (m <= 0) {
+        sanitizedDetails.push({ ...tp, lotNo: '' });
+        return;
+      }
+
+      if (fallbackLots.length > 1 && idx > 0 && idx % itemsPerLot === 0) {
+        if (fIdx < fallbackLots.length - 1) fIdx++;
+      }
+
+      const assignedLot = fallbackLots[fIdx] || defaultLot;
+      usedLotsSet.add(assignedLot);
+      lotGroups[assignedLot] = (lotGroups[assignedLot] || 0) + m;
+
+      sanitizedDetails.push({
+        ...tp,
+        lotNo: assignedLot
+      });
+    });
+  }
+
+  const finalLotNoStr = Array.from(usedLotsSet).join(', ') || rawLotNoStr || '';
+
+  return {
+    sanitizedDetails,
+    finalLotNoStr,
+    lotGroups
+  };
+}
+
 // ── POST /fabric-challan ───────────────────────────────────────────────────
 const createChallan = async (req, res) => {
   try {
@@ -91,17 +237,21 @@ const createChallan = async (req, res) => {
     } = req.body;
 
     const details = Array.isArray(tpDetails) ? tpDetails : [];
-    const primaryLot = lotNo ? String(lotNo).split(',')[0].trim() : '';
-    const sanitizedDetails = details.map(tp => ({
-      ...tp,
-      lotNo: (tp.lotNo || '').trim() || primaryLot
-    }));
+
+    // Program-side automated lot allocation
+    const { sanitizedDetails, finalLotNoStr, lotGroups } = await allocateLotsForChallan(
+      fabricName || '',
+      panna || '',
+      lotNo ? String(lotNo) : '',
+      details
+    );
+
     const { totalMtr, totalTp } = computeTotals(sanitizedDetails);
 
     const challan = new FabricChallan({
       date: date ? new Date(date) : new Date(),
       partyName: partyName || '',
-      lotNo: lotNo ? String(lotNo) : '',
+      lotNo: finalLotNoStr,
       vendorChallanNo: vendorChallanNo || '',
       deliveryBy: deliveryBy || '',
       fabricName: fabricName || '',
@@ -123,25 +273,8 @@ const createChallan = async (req, res) => {
     await challan.save();
 
     // ── Auto-create OUTWARD fabric transactions (lot-wise) ──────────────
-    if (fabricName && totalMtr > 0) {
+    if (fabricName && totalMtr > 0 && Object.keys(lotGroups).length > 0) {
       try {
-        // Group tpDetails by lotNo
-        const lotGroups = {};
-        for (const tp of details) {
-          const m = parseFloat(tp.tpMeter) || 0;
-          if (m > 0) {
-            // If row has lotNo, use it, otherwise fall back to parent lotNo
-            let itemLot = (tp.lotNo || '').trim();
-            if (!itemLot) {
-              itemLot = (lotNo || '').trim();
-            }
-            if (!lotGroups[itemLot]) {
-              lotGroups[itemLot] = 0;
-            }
-            lotGroups[itemLot] += m;
-          }
-        }
-
         const createdTxIds = [];
         for (const [lot, groupMtr] of Object.entries(lotGroups)) {
           const rawMtr = computeRawMeters(groupMtr, challan.shortagePct);
@@ -230,7 +363,6 @@ const updateChallan = async (req, res) => {
 
     if (date !== undefined) challan.date = new Date(date);
     if (partyName !== undefined) challan.partyName = partyName;
-    if (lotNo !== undefined) challan.lotNo = lotNo ? String(lotNo) : '';
     if (vendorChallanNo !== undefined) challan.vendorChallanNo = vendorChallanNo;
     if (deliveryBy !== undefined) challan.deliveryBy = deliveryBy;
     if (fabricName !== undefined) challan.fabricName = fabricName;
@@ -244,13 +376,22 @@ const updateChallan = async (req, res) => {
     if (shipTo !== undefined) challan.shipTo = shipTo;
     if (notes !== undefined) challan.notes = notes;
 
-    if (tpDetails !== undefined) {
-      const details = Array.isArray(tpDetails) ? tpDetails : [];
-      const { totalMtr, totalTp } = computeTotals(details);
-      challan.tpDetails = details;
-      challan.totalMtr = totalMtr;
-      challan.totalTp = totalTp;
-    }
+    const details = tpDetails !== undefined ? (Array.isArray(tpDetails) ? tpDetails : []) : challan.tpDetails;
+    const rawLotStr = lotNo !== undefined ? String(lotNo) : challan.lotNo;
+
+    // Run program-side automated lot allocation
+    const { sanitizedDetails, finalLotNoStr, lotGroups } = await allocateLotsForChallan(
+      challan.fabricName,
+      challan.panna,
+      rawLotStr,
+      details
+    );
+
+    const { totalMtr, totalTp } = computeTotals(sanitizedDetails);
+    challan.tpDetails = sanitizedDetails;
+    challan.lotNo = finalLotNoStr;
+    challan.totalMtr = totalMtr;
+    challan.totalTp = totalTp;
 
     await challan.save();
 
@@ -269,23 +410,7 @@ const updateChallan = async (req, res) => {
         challan.fabricOutwardIds = [];
       }
 
-      if (challan.fabricName && challan.totalMtr > 0) {
-        // Group tpDetails by lotNo
-        const lotGroups = {};
-        for (const tp of challan.tpDetails) {
-          const m = parseFloat(tp.tpMeter) || 0;
-          if (m > 0) {
-            let itemLot = (tp.lotNo || '').trim();
-            if (!itemLot) {
-              itemLot = (challan.lotNo || '').trim();
-            }
-            if (!lotGroups[itemLot]) {
-              lotGroups[itemLot] = 0;
-            }
-            lotGroups[itemLot] += m;
-          }
-        }
-
+      if (challan.fabricName && challan.totalMtr > 0 && Object.keys(lotGroups).length > 0) {
         const createdTxIds = [];
         for (const [lot, groupMtr] of Object.entries(lotGroups)) {
           const rawMtr = computeRawMeters(groupMtr, challan.shortagePct);

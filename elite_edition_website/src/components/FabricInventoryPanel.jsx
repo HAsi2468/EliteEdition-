@@ -2005,7 +2005,10 @@ export default function FabricInventoryPanel() {
 
               {/* Divider: TP Details */}
               <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TP Details</span>
+                <div>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TP Details</span>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--primary)', marginLeft: '0.5rem', fontWeight: 600 }}>(Lot No Auto-managed by Program)</span>
+                </div>
                 <button type="button" className="btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.78rem' }} onClick={addTpRow} disabled={challanForm.tpDetails.length >= 30}>
                   <PlusCircle size={13} /> Add TP Row
                 </button>
@@ -2013,8 +2016,8 @@ export default function FabricInventoryPanel() {
 
               {/* TP Rows */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '60px 120px 1fr 32px', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, paddingLeft: '0.25rem' }}>
-                  <span>TP No.</span><span>Lot No</span><span>TP Meter (mtr)</span><span></span>
+                <div style={{ display: 'grid', gridTemplateColumns: '60px 110px 1fr 32px', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, paddingLeft: '0.25rem' }}>
+                  <span>TP No.</span><span>Lot No (Auto)</span><span>TP Meter (mtr)</span><span></span>
                 </div>
                 {(() => {
                   const currentLots = String(challanForm.lotNo || '')
@@ -2024,11 +2027,11 @@ export default function FabricInventoryPanel() {
                   return challanForm.tpDetails.map((row, idx) => {
                     const assignedLot = row.lotNo || currentLots[0] || '';
                     return (
-                      <div key={idx} style={{ display: 'grid', gridTemplateColumns: '60px 100px 1fr 32px', gap: '0.5rem', alignItems: 'center' }}>
+                      <div key={idx} style={{ display: 'grid', gridTemplateColumns: '60px 110px 1fr 32px', gap: '0.5rem', alignItems: 'center' }}>
                         <div style={{ ...inputStyle, textAlign: 'center', fontWeight: 700, color: 'var(--primary)', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           TP {row.tpNo}
                         </div>
-                        <div style={{ ...inputStyle, background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.3)', color: 'var(--primary)', fontWeight: 600, fontSize: '0.78rem', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ ...inputStyle, background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.3)', color: 'var(--primary)', fontWeight: 600, fontSize: '0.78rem', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Lot No is automatically assigned by the program based on fabric stock">
                           {assignedLot ? `#${assignedLot}` : 'Auto Lot'}
                         </div>
                         <input
