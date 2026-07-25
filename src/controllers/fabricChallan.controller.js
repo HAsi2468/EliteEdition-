@@ -491,21 +491,30 @@ const downloadChallanPdf = async (req, res) => {
       const startY = MR + 98;
 
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
-        .text('M/s:', ML + 12, startY + 6, { lineBreak: false });
+        .text('M/S:', ML + 12, startY + 6, { lineBreak: false });
       doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(14.5).font('Helvetica-Bold')
         .text(challan.partyName || '—', ML + 42, startY + 4, { lineBreak: false });
         
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
-        .text('Date:', PW - MR - 260, startY + 6, { width: 45, align: 'right', lineBreak: false });
+        .text('DATE:', PW - MR - 260, startY + 6, { width: 48, align: 'right', lineBreak: false });
       doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(13).font('Helvetica-Bold')
         .text(formattedDate, PW - MR - 210, startY + 6, { width: 80, align: 'left', lineBreak: false });
 
+      // CH. NO. label — right-aligned, with value also pinned to the right border
+      const challanLabel = 'CH. NO.:';
+      const challanValue = 'EDP-' + (challan.challanNo || '—');
+      const rightEdge = PW - MR - 8;          // 8px padding from right border
+      const chNoValueW = 70;                   // fixed width for value (fits up to EDP-9999)
+      const chNoLabelW = 58;                   // fixed width for label
+      const chNoValueX = rightEdge - chNoValueW;
+      const chNoLabelX = chNoValueX - chNoLabelW;
+
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
-        .text('Ch.no.:', PW - MR - 120, startY + 6, { width: 55, align: 'right', lineBreak: false });
-      
+        .text(challanLabel, chNoLabelX, startY + 6, { width: chNoLabelW, align: 'right', lineBreak: false });
+
       // CHALLAN NO IS RED ON BOTH PAGES
       doc.fillColor(getColor('#dc2626', isColorPage)).fontSize(14.5).font('Helvetica-Bold')
-        .text('EDP-' + (challan.challanNo || '—'), PW - MR - 60, startY + 4, { width: 60, align: 'left', lineBreak: false });
+        .text(challanValue, chNoValueX, startY + 4, { width: chNoValueW, align: 'right', lineBreak: false });
 
       doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.6)
         .moveTo(ML, startY + 28).lineTo(PW - MR, startY + 28).stroke();
