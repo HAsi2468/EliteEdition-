@@ -75,7 +75,7 @@ const updatePrintConfig = async (req, res) => {
       'paperTypes', 'billToOptions', 'shipToOptions', 'machines',
       'machine_profile', 'temperatures', 'speeds', 'startingJobNo', 'rawMaterials',
       'sublimationPanna', 'sublimationQualities', 'butterPanna', 'inkColors', 'inkCanSizes',
-      'deliveryOptions'
+      'deliveryOptions', 'lotPartyMap'
     ];
     if (!validFields.includes(field)) {
       return res.status(httpStatus.BAD_REQUEST).send('Invalid field');

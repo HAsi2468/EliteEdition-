@@ -38,6 +38,7 @@ export default function FabricInventoryPanel() {
   const [billToOptions, setBillToOptions] = useState([]);
   const [shipToOptions, setShipToOptions] = useState([]);
   const [deliveryByOptions, setDeliveryByOptions] = useState([]);
+  const [lotPartyMap, setLotPartyMap] = useState({});
 
   const emptyTpRows = () => [{ tpNo: 1, tpMeter: '' }];
   const [challanForm, setChallanForm] = useState({
@@ -323,6 +324,7 @@ export default function FabricInventoryPanel() {
       if (cfg && Array.isArray(cfg.deliveryOptions) && cfg.deliveryOptions.length > 0) {
         setDeliveryByOptions(cfg.deliveryOptions);
       }
+      if (cfg && cfg.lotPartyMap) setLotPartyMap(cfg.lotPartyMap);
 
       try {
         const jRes = await api.getJobCards({ limit: 5000 });
@@ -542,6 +544,15 @@ export default function FabricInventoryPanel() {
       .filter(Boolean);
     const defaultLot = lotsList[0] || '';
 
+    // Auto-fill partyName if mapped in lotPartyMap
+    let mappedParty = '';
+    for (const lotStr of lotsList) {
+      if (lotPartyMap[lotStr]) {
+        mappedParty = lotPartyMap[lotStr];
+        break;
+      }
+    }
+
     setChallanForm(prev => {
       const updatedTps = prev.tpDetails.map(tp => {
         if (!tp.lotNo || !lotsList.includes(tp.lotNo)) {
@@ -549,7 +560,12 @@ export default function FabricInventoryPanel() {
         }
         return tp;
       });
-      return { ...prev, lotNo: val, tpDetails: updatedTps };
+      return {
+        ...prev,
+        lotNo: val,
+        partyName: mappedParty || prev.partyName,
+        tpDetails: updatedTps
+      };
     });
     if (!val) return;
 

@@ -94,6 +94,11 @@ const printConfigSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    lotPartyMap: {
+      type: Map,
+      of: String,
+      default: {},
+    },
   },
   {
     timestamps: true,
