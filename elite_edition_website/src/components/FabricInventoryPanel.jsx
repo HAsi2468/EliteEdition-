@@ -37,13 +37,7 @@ export default function FabricInventoryPanel() {
   const [availableLots, setAvailableLots] = useState([]);
   const [billToOptions, setBillToOptions] = useState([]);
   const [shipToOptions, setShipToOptions] = useState([]);
-  const [deliveryByOptions, setDeliveryByOptions] = useState([
-    'Self Delivery',
-    'Driver / Vehicle',
-    'Tempo / Auto',
-    'Courier / Transport',
-    'Party Collection'
-  ]);
+  const [deliveryByOptions, setDeliveryByOptions] = useState([]);
 
   const emptyTpRows = () => [{ tpNo: 1, tpMeter: '' }];
   const [challanForm, setChallanForm] = useState({
@@ -326,6 +320,9 @@ export default function FabricInventoryPanel() {
       if (cfg && cfg.widths) setWidthsList(cfg.widths);
       if (cfg && cfg.billToOptions) setBillToOptions(cfg.billToOptions);
       if (cfg && cfg.shipToOptions) setShipToOptions(cfg.shipToOptions);
+      if (cfg && Array.isArray(cfg.deliveryOptions) && cfg.deliveryOptions.length > 0) {
+        setDeliveryByOptions(cfg.deliveryOptions);
+      }
 
       try {
         const jRes = await api.getJobCards({ limit: 5000 });

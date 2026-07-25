@@ -30,6 +30,7 @@ export default function PrintSettings() {
   const [newMachineProfiles, setNewMachineProfiles] = useState({});
   const [newBillTo, setNewBillTo] = useState('');
   const [newShipTo, setNewShipTo] = useState('');
+  const [newDeliveryOption, setNewDeliveryOption] = useState('');
   const [newTemperature, setNewTemperature] = useState('');
   const [newSpeed, setNewSpeed] = useState('');
   const [newPaperType, setNewPaperType] = useState('');
@@ -369,6 +370,7 @@ export default function PrintSettings() {
             {renderSection('Parties (Clients)', 'parties', newParty, setNewParty, config?.parties)}
             {renderSection('Bill To', 'billToOptions', newBillTo, setNewBillTo, config?.billToOptions)}
             {renderSection('Ship To', 'shipToOptions', newShipTo, setNewShipTo, config?.shipToOptions)}
+            {renderSection('🚚 Delivery By Options', 'deliveryOptions', newDeliveryOption, setNewDeliveryOption, config?.deliveryOptions)}
           </div>
         )}
       </div>

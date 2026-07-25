@@ -90,6 +90,10 @@ const printConfigSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    deliveryOptions: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,
