@@ -2,15 +2,25 @@ const FabricTransaction = require('../db/models/fabricTransaction.model');
 const PDFDocument = require('pdfkit');
 
 // Normalize functions to merge matching fabric and panna widths (e.g. 58" and 58)
-const normalizePanna = (val) => {
-  if (val === null || val === undefined) return 'Unknown';
-  let clean = String(val).trim().replace(/['"]/g, '');
-  return clean || 'Unknown';
-};
-
 const normalizeFabric = (val) => {
   if (!val) return '';
-  return String(val).trim().toUpperCase();
+  let clean = String(val).trim().toUpperCase();
+  if (clean === 'CAMRIK' || clean === 'CEMBRIC' || clean === 'CEMBRIK' || clean === 'CAMBRIK' || clean.includes('CAMRIK') || clean.includes('CEMBRIK')) {
+    return 'CAMBRIC';
+  }
+  return clean;
+};
+
+const normalizePanna = (val, fabricName = '') => {
+  let clean = val ? String(val).trim().replace(/['"]/g, '') : '';
+  if (!clean || clean.toUpperCase() === 'UNKNOWN') {
+    const fabUpper = String(fabricName || '').trim().toUpperCase();
+    if (fabUpper.includes('ARMANI')) {
+      return '44"';
+    }
+    return '58"';
+  }
+  return clean;
 };
 
 // Create a new INWARD transaction
@@ -22,12 +32,15 @@ const createInward = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Fabric Quality and a valid Quantity are required.' });
     }
 
+    const normFabric = normalizeFabric(fabricQuality);
+    const normP = normalizePanna(panna, normFabric);
+
     const transaction = new FabricTransaction({
       type: 'INWARD',
       challanNo,
       vendorName,
-      fabricQuality,
-      panna,
+      fabricQuality: normFabric,
+      panna: normP,
       qty,
       date: date ? new Date(date) : new Date(),
       notes,
@@ -51,13 +64,16 @@ const createOutward = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Fabric Quality and a valid Quantity (>0) are required.' });
     }
 
+    const normFabric = normalizeFabric(fabricQuality);
+    const normP = normalizePanna(panna, normFabric);
+
     const transaction = new FabricTransaction({
       type: 'OUTWARD',
       jobNo,
       challanNo,
       partyName,
-      fabricQuality,
-      panna,
+      fabricQuality: normFabric,
+      panna: normP,
       lotNo: lotNo ? Number(lotNo) : undefined,
       qty,
       date: date ? new Date(date) : new Date(),

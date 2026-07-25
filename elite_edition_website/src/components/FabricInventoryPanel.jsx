@@ -12,6 +12,27 @@ import {
 export default function FabricInventoryPanel() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const currentUser = api.getCurrentUser();
+
+  const normalizeFabricName = (val) => {
+    if (!val) return '';
+    let clean = String(val).trim().toUpperCase();
+    if (clean === 'CAMRIK' || clean === 'CEMBRIC' || clean === 'CEMBRIK' || clean === 'CAMBRIK' || clean.includes('CAMRIK') || clean.includes('CEMBRIK')) {
+      return 'CAMBRIC';
+    }
+    return clean;
+  };
+
+  const getDefaultPannaForFabric = (fabricName, currentPanna = '') => {
+    let clean = currentPanna ? String(currentPanna).trim().replace(/['"]/g, '') : '';
+    if (!clean || clean.toUpperCase() === 'UNKNOWN') {
+      const fabUpper = String(fabricName || '').trim().toUpperCase();
+      if (fabUpper.includes('ARMANI')) {
+        return '44"';
+      }
+      return '58"';
+    }
+    return clean;
+  };
   const isAdmin = currentUser?.role === 'admin';
   const [stock, setStock] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -1895,7 +1916,18 @@ export default function FabricInventoryPanel() {
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <div style={{ flex: 2 }}>
                   <label style={labelStyle}>Fabric Name <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-filled)</span></label>
-                  <input type="text" list="challan-fabrics" value={challanForm.fabricName} onChange={e => setChallanForm({ ...challanForm, fabricName: e.target.value })} style={inputStyle} placeholder="Auto-filled from lot…" />
+                  <input
+                    type="text"
+                    list="challan-fabrics"
+                    value={challanForm.fabricName}
+                    onChange={e => {
+                      const normFab = normalizeFabricName(e.target.value);
+                      const autoP = getDefaultPannaForFabric(normFab, challanForm.panna);
+                      setChallanForm({ ...challanForm, fabricName: normFab, panna: autoP });
+                    }}
+                    style={inputStyle}
+                    placeholder="Auto-filled from lot…"
+                  />
                   <datalist id="challan-fabrics">
                     {fabricsList.map((f, i) => <option key={i} value={f} />)}
                   </datalist>
@@ -2129,7 +2161,19 @@ export default function FabricInventoryPanel() {
 
               <div>
                 <label style={labelStyle}>Fabric Quality *</label>
-                <input type="text" required list="inward-fabrics" value={inwardForm.fabricQuality} onChange={e => setInwardForm({ ...inwardForm, fabricQuality: e.target.value })} style={inputStyle} placeholder="Select or type fabric..." />
+                <input
+                  type="text"
+                  required
+                  list="inward-fabrics"
+                  value={inwardForm.fabricQuality}
+                  onChange={e => {
+                    const normFab = normalizeFabricName(e.target.value);
+                    const autoP = getDefaultPannaForFabric(normFab, inwardForm.panna);
+                    setInwardForm({ ...inwardForm, fabricQuality: normFab, panna: autoP });
+                  }}
+                  style={inputStyle}
+                  placeholder="Select or type fabric..."
+                />
                 <datalist id="inward-fabrics">
                   {fabricsList.map(f => <option key={f} value={f} />)}
                 </datalist>

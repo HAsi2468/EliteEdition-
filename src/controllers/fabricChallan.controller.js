@@ -224,6 +224,28 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails)
   };
 }
 
+// ── Helper: normalize fabric and panna widths ─────────────────────────────
+const normalizeFabric = (val) => {
+  if (!val) return '';
+  let clean = String(val).trim().toUpperCase();
+  if (clean === 'CAMRIK' || clean === 'CEMBRIC' || clean === 'CEMBRIK' || clean === 'CAMBRIK' || clean.includes('CAMRIK') || clean.includes('CEMBRIK')) {
+    return 'CAMBRIC';
+  }
+  return clean;
+};
+
+const normalizePanna = (val, fabricName = '') => {
+  let clean = val ? String(val).trim().replace(/['"]/g, '') : '';
+  if (!clean || clean.toUpperCase() === 'UNKNOWN') {
+    const fabUpper = String(fabricName || '').trim().toUpperCase();
+    if (fabUpper.includes('ARMANI')) {
+      return '44"';
+    }
+    return '58"';
+  }
+  return clean;
+};
+
 // ── POST /fabric-challan ───────────────────────────────────────────────────
 const createChallan = async (req, res) => {
   try {
@@ -236,12 +258,14 @@ const createChallan = async (req, res) => {
       billTo, shipTo,
     } = req.body;
 
+    const normFabric = normalizeFabric(fabricName || '');
+    const normP = normalizePanna(panna || '', normFabric);
     const details = Array.isArray(tpDetails) ? tpDetails : [];
 
     // Program-side automated lot allocation
     const { sanitizedDetails, finalLotNoStr, lotGroups } = await allocateLotsForChallan(
-      fabricName || '',
-      panna || '',
+      normFabric,
+      normP,
       lotNo ? String(lotNo) : '',
       details
     );
@@ -254,12 +278,12 @@ const createChallan = async (req, res) => {
       lotNo: finalLotNoStr,
       vendorChallanNo: vendorChallanNo || '',
       deliveryBy: deliveryBy || '',
-      fabricName: fabricName || '',
+      fabricName: normFabric,
       shortagePct: shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null,
       jobNo: jobNo || '',
       designNo: designNo || '',
       colour: colour || '',
-      panna: panna || '',
+      panna: normP,
       tpDetails: sanitizedDetails,
       totalMtr,
       totalTp,
