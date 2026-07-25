@@ -612,11 +612,10 @@ export default function FabricInventoryPanel() {
         const vendorChallans = validResults
           .map(r => {
             const shortName = getVendorShortForm(r.data.vendorName);
-            const vNo = r.data.vendorChallanNo;
+            const vNo = r.data.vendorChallanNo || '';
             if (shortName && vNo) {
-              // Avoid duplicate prepending if already prefixed
-              if (vNo.toUpperCase().startsWith(shortName + '-')) return vNo;
-              return `${shortName}-${vNo}`;
+              const cleanNo = vNo.replace(/^[A-Za-z0-9]{2,3}-/i, '');
+              return `${shortName}-${cleanNo}`;
             }
             return vNo;
           })
