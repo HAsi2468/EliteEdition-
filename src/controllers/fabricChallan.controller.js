@@ -142,25 +142,19 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails)
   const lotGroups = {};
 
   // Build prioritized lotStockMap:
-  // If user specified lots (e.g. ["330", "328", "317"]), place them FIRST in exact order!
+  // If user specified lots (e.g. ["330", "328", "317"]), use ONLY those specified lots!
   const lotStockMap = [];
-  const addedLotSet = new Set();
 
   if (fallbackLots.length > 0) {
     for (const fLot of fallbackLots) {
       const match = availableLots.find(l => String(l.lotNo) === fLot);
       const rem = match ? match.currentStock : Infinity;
       lotStockMap.push({ lotNo: fLot, remaining: rem });
-      addedLotSet.add(fLot);
     }
-  }
-
-  // Then append any remaining FIFO lots from database
-  for (const aLot of availableLots) {
-    const lStr = String(aLot.lotNo);
-    if (!addedLotSet.has(lStr)) {
-      lotStockMap.push({ lotNo: lStr, remaining: aLot.currentStock });
-      addedLotSet.add(lStr);
+  } else {
+    // If no specific lots provided, fall back to available FIFO lots from database
+    for (const aLot of availableLots) {
+      lotStockMap.push({ lotNo: String(aLot.lotNo), remaining: aLot.currentStock });
     }
   }
 
