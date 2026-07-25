@@ -339,7 +339,13 @@ export default function FabricInventoryPanel() {
       }
 
       if (cfg && cfg.parties) setPartiesList(cfg.parties);
-      if (cfg && cfg.widths) setWidthsList(cfg.widths);
+      if (cfg && cfg.widths) {
+        const defaultWidths = ['58"', '44"', '58', '44'];
+        const combined = Array.from(new Set([...defaultWidths, ...cfg.widths]));
+        setWidthsList(combined);
+      } else {
+        setWidthsList(['58"', '44"', '58', '44']);
+      }
       if (cfg && cfg.billToOptions) setBillToOptions(cfg.billToOptions);
       if (cfg && cfg.shipToOptions) setShipToOptions(cfg.shipToOptions);
       if (cfg && Array.isArray(cfg.deliveryOptions) && cfg.deliveryOptions.length > 0) {
