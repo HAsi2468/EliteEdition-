@@ -97,13 +97,17 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails)
     const cleanFabric = fabricName.trim();
     const re = new RegExp(`^${cleanFabric.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
     
+    const matchFilter = {
+      fabricQuality: re,
+      lotNo: { $ne: null }
+    };
+    if (panna && String(panna).trim()) {
+      const cleanP = String(panna).trim().replace(/['"]/g, '');
+      matchFilter.panna = new RegExp(`^${cleanP}["']?$`, 'i');
+    }
+    
     const pipeline = [
-      {
-        $match: {
-          fabricQuality: re,
-          lotNo: { $ne: null }
-        }
-      },
+      { $match: matchFilter },
       {
         $group: {
           _id: '$lotNo',
