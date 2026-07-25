@@ -188,8 +188,9 @@ const getLotStock = async (req, res) => {
         candidates.push('SUMMER COOL');
         candidates.push('SUMMAR COOL');
       }
-      if (clean.includes('CREP') || clean.includes('CREPE')) {
+      if (clean.includes('CREP') || clean.includes('CREPE') || clean.includes('CRAPE')) {
         candidates.push('CREPE');
+        candidates.push('CRAPE');
         candidates.push('FRENCH CREP');
         candidates.push('FRENCH CREPE');
       }
@@ -201,9 +202,11 @@ const getLotStock = async (req, res) => {
         candidates.push('REYON');
         candidates.push('RAYON');
       }
-      if (clean.includes('CEMBRIC') || clean.includes('CEMBRIK')) {
+      if (clean.includes('CAMBRIC') || clean.includes('CEMBRIC') || clean.includes('CEMBRIK') || clean.includes('CAMRIK')) {
+        candidates.push('CAMBRIC');
         candidates.push('CEMBRIC');
         candidates.push('CEMBRIK');
+        candidates.push('CAMRIK');
       }
 
       matchStage.fabricQuality = {
@@ -218,6 +221,8 @@ const getLotStock = async (req, res) => {
           _id: '$lotNo',
           fabricQuality: { $first: '$fabricQuality' },
           panna: { $first: '$panna' },
+          vendorName: { $first: '$vendorName' },
+          vendorChallanNo: { $first: '$challanNo' },
           totalInward: {
             $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] }
           },
@@ -231,6 +236,10 @@ const getLotStock = async (req, res) => {
           lotNo: '$_id',
           fabricQuality: 1,
           panna: 1,
+          vendorName: 1,
+          vendorChallanNo: 1,
+          totalInward: 1,
+          totalOutward: 1,
           currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
           _id: 0
         }
@@ -241,7 +250,7 @@ const getLotStock = async (req, res) => {
           currentStock: { $gt: 0 }
         }
       },
-      { $sort: { lotNo: 1 } }
+      { $sort: { lotNo: -1 } } // Show newest inward lot numbers first!
     ];
 
     const lotStock = await FabricTransaction.aggregate(pipeline);

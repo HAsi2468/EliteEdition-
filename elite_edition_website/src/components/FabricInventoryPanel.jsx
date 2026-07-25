@@ -526,13 +526,15 @@ export default function FabricInventoryPanel() {
 
   // ── Challan helpers ────────────────────────────────────────────────────
   const resetChallanForm = () => {
-    setAvailableLots([]);
     setChallanForm({
       date: new Date().toISOString().split('T')[0],
       partyName: '', lotNo: '', vendorChallanNo: '', deliveryBy: '', fabricName: '', shortagePct: '',
       jobNo: '', designNo: '', colour: '', panna: '', pcs: '', billTo: '', shipTo: '',
       tpDetails: emptyTpRows(), notes: '',
     });
+    api.getFabricLotStock({}).then(res => {
+      if (res.success && res.data) setAvailableLots(res.data);
+    }).catch(() => setAvailableLots([]));
   };
 
   const fetchChallans = async () => {
@@ -1886,11 +1888,54 @@ export default function FabricInventoryPanel() {
                   <label style={labelStyle}>Lot No {challanLotLoading && <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Loading…</span>}</label>
                   <input
                     type="text"
+                    list="challan-lot-options"
                     value={challanForm.lotNo}
                     onChange={e => handleChallanLotChange(e.target.value)}
                     style={inputStyle}
-                    placeholder="e.g. 320, 321"
+                    placeholder="Select or type e.g. 337, 338..."
                   />
+                  <datalist id="challan-lot-options">
+                    {availableLots.map((l, i) => (
+                      <option key={i} value={String(l.lotNo)}>
+                        Lot #{l.lotNo} — {l.fabricQuality} ({l.panna || '58"'}) [{l.currentStock ? `${l.currentStock}m` : ''}]
+                      </option>
+                    ))}
+                  </datalist>
+                  {availableLots.length > 0 && (
+                    <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem', maxHeight: '75px', overflowY: 'auto' }}>
+                      {availableLots.slice(0, 15).map((lot, idx) => {
+                        const selectedList = String(challanForm.lotNo || '').split(/[,\s&]+/).map(s => s.trim()).filter(Boolean);
+                        const isSelected = selectedList.includes(String(lot.lotNo));
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              let newLotStr;
+                              if (isSelected) {
+                                newLotStr = selectedList.filter(x => x !== String(lot.lotNo)).join(', ');
+                              } else {
+                                newLotStr = [...selectedList, String(lot.lotNo)].join(', ');
+                              }
+                              handleChallanLotChange(newLotStr);
+                            }}
+                            style={{
+                              padding: '0.15rem 0.45rem',
+                              fontSize: '0.68rem',
+                              borderRadius: '10px',
+                              border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-light)',
+                              background: isSelected ? 'rgba(56,189,248,0.25)' : 'rgba(255,255,255,0.05)',
+                              color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {isSelected ? '✓ ' : '+ '} Lot #{lot.lotNo} ({lot.fabricQuality || ''} {lot.currentStock ? `${lot.currentStock}m` : ''})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
                 <div style={{ flex: 1.2 }}>
                   <label style={labelStyle}>Vendor Challan No <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-filled)</span></label>
