@@ -19,8 +19,11 @@ function computeTotals(tpDetails = []) {
 // ── GET /fabric-challan/next-no ────────────────────────────────────────────
 const getNextChallanNo = async (req, res) => {
   try {
+    const CHALLAN_START_NO = 621;
     const last = await FabricChallan.findOne({}, 'challanNo').sort({ challanNo: -1 });
-    const next = last && last.challanNo ? last.challanNo + 1 : 1;
+    const next = last && last.challanNo
+      ? Math.max(last.challanNo + 1, CHALLAN_START_NO)
+      : CHALLAN_START_NO;
     res.json({ success: true, nextNo: next });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

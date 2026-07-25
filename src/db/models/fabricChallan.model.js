@@ -127,10 +127,14 @@ const fabricChallanSchema = new mongoose.Schema(
 );
 
 // Auto-increment challanNo before saving a new doc
+// Starting from EDP-621 as the baseline
+const CHALLAN_START_NO = 621;
 fabricChallanSchema.pre('save', async function () {
   if (this.isNew && !this.challanNo) {
     const last = await this.constructor.findOne({}, 'challanNo').sort({ challanNo: -1 });
-    this.challanNo = last && last.challanNo ? last.challanNo + 1 : 1;
+    this.challanNo = last && last.challanNo
+      ? Math.max(last.challanNo + 1, CHALLAN_START_NO)
+      : CHALLAN_START_NO;
   }
 });
 
