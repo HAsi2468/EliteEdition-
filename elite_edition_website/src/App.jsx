@@ -136,6 +136,13 @@ export default function App() {
   // Department state (digital_print vs elite_edition)
   const [activeDepartment, setActiveDepartment] = useState('digital_print');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Theme state — persisted to localStorage
   const [theme, setTheme] = useState(() => localStorage.getItem('elite_theme') || 'midnight');
@@ -814,42 +821,42 @@ export default function App() {
                 </div>
 
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards')) && (
-                  <button onClick={() => setActiveTab('jobcards')} style={{ ...styles.navItem, ...(activeTab === 'jobcards' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('jobcards')} style={{ ...styles.navItem, ...(activeTab === 'jobcards' ? styles.navItemActive : {}) }}>
                     <BarChart3 size={18} /><span>Prints Dashboard</span>
                   </button>
                 )}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
-                  <button onClick={() => setActiveTab('jobcards_list')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('jobcards_list')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
                     <FileText size={18} /><span>Job Cards</span>
                   </button>
                 )}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) && (
-                  <button onClick={() => setActiveTab('jobcards_catalogue')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_catalogue' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('jobcards_catalogue')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_catalogue' ? styles.navItemActive : {}) }}>
                     <BookOpen size={18} /><span>Design Catalog</span>
                   </button>
                 )}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_tracking')) && (
-                  <button onClick={() => setActiveTab('jobcards_tracking')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_tracking' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('jobcards_tracking')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_tracking' ? styles.navItemActive : {}) }}>
                     <RefreshCw size={18} /><span>Job Card Tracking</span>
                   </button>
                 )}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master')) && (
-                  <button onClick={() => setActiveTab('jobcards_master')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_master' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('jobcards_master')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_master' ? styles.navItemActive : {}) }}>
                     <Layers size={18} /><span>Design Master (100 Pic)</span>
                   </button>
                 )}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) && (
-                  <button onClick={() => setActiveTab('jobcards_fabric')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_fabric' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('jobcards_fabric')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_fabric' ? styles.navItemActive : {}) }}>
                     <Database size={18} /><span>Fabric Management</span>
                   </button>
                 )}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_raw_materials')) && (
-                  <button onClick={() => setActiveTab('jobcards_raw_materials')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_raw_materials' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('jobcards_raw_materials')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_raw_materials' ? styles.navItemActive : {}) }}>
                     <ShoppingBag size={18} /><span>Raw Materials</span>
                   </button>
                 )}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) && (
-                  <button onClick={() => setActiveTab('jobcards_settings')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_settings' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('jobcards_settings')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_settings' ? styles.navItemActive : {}) }}>
                     <Settings size={18} /><span>Prints Settings</span>
                   </button>
                 )}
@@ -863,42 +870,42 @@ export default function App() {
                 </div>
 
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard')) && (
-                  <button onClick={() => setActiveTab('dashboard')} style={{ ...styles.navItem, ...(activeTab === 'dashboard' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('dashboard')} style={{ ...styles.navItem, ...(activeTab === 'dashboard' ? styles.navItemActive : {}) }}>
                     <LayoutDashboard size={18} /><span>Dashboard Overview</span>
                   </button>
                 )}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('inventory')) && (
-                  <button onClick={() => setActiveTab('inventory')} style={{ ...styles.navItem, ...(activeTab === 'inventory' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('inventory')} style={{ ...styles.navItem, ...(activeTab === 'inventory' ? styles.navItemActive : {}) }}>
                     <Database size={18} /><span>Store Inventory</span>
                   </button>
                 )}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('catalog')) && (
-                  <button onClick={() => setActiveTab('catalog')} style={{ ...styles.navItem, ...(activeTab === 'catalog' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('catalog')} style={{ ...styles.navItem, ...(activeTab === 'catalog' ? styles.navItemActive : {}) }}>
                     <BookOpen size={18} /><span>Product Catalog</span>
                   </button>
                 )}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('returns')) && (
-                  <button onClick={() => setActiveTab('returns')} style={{ ...styles.navItem, ...(activeTab === 'returns' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('returns')} style={{ ...styles.navItem, ...(activeTab === 'returns' ? styles.navItemActive : {}) }}>
                     <PackageMinus size={18} /><span>Returns Department</span>
                   </button>
                 )}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) && (
-                  <button onClick={() => setActiveTab('sales')} style={{ ...styles.navItem, ...(activeTab === 'sales' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('sales')} style={{ ...styles.navItem, ...(activeTab === 'sales' ? styles.navItemActive : {}) }}>
                     <ShoppingBag size={18} /><span>Sales Orders</span>
                   </button>
                 )}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) && (
-                  <button onClick={() => setActiveTab('reports')} style={{ ...styles.navItem, ...(activeTab === 'reports' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('reports')} style={{ ...styles.navItem, ...(activeTab === 'reports' ? styles.navItemActive : {}) }}>
                     <BarChart3 size={18} /><span>Reports Center</span>
                   </button>
                 )}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('unicommerce')) && (
-                  <button onClick={() => setActiveTab('unicommerce')} style={{ ...styles.navItem, ...(activeTab === 'unicommerce' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('unicommerce')} style={{ ...styles.navItem, ...(activeTab === 'unicommerce' ? styles.navItemActive : {}) }}>
                     <RefreshCw size={18} /><span>Uniware Integrations</span>
                   </button>
                 )}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) && (
-                  <button onClick={() => setActiveTab('myntra')} style={{ ...styles.navItem, ...(activeTab === 'myntra' ? styles.navItemActive : {}) }}>
+                  <button onClick={() => handleNavClick('myntra')} style={{ ...styles.navItem, ...(activeTab === 'myntra' ? styles.navItemActive : {}) }}>
                     <ShoppingBag size={18} /><span>Myntra Integrations</span>
                   </button>
                 )}
@@ -907,7 +914,7 @@ export default function App() {
 
             {/* Shared Workspace / Chat Tab */}
             <button
-              onClick={() => setActiveTab('workspace')}
+              onClick={() => handleNavClick('workspace')}
               style={{ ...styles.navItem, ...(activeTab === 'workspace' ? styles.navItemActive : {}) }}
             >
               <MessageSquare size={18} /><span>Workspace / Chat</span>
@@ -915,7 +922,7 @@ export default function App() {
 
             {currentUser && currentUser.role === 'admin' && (
               <button
-                onClick={() => setActiveTab('admin')}
+                onClick={() => handleNavClick('admin')}
                 style={{
                   ...styles.navItem,
                   ...(activeTab === 'admin' ? styles.navItemActive : {}),
@@ -1139,15 +1146,17 @@ const styles = {
     fontSize: '0.8rem',
   },
   mainLayout: {
-    display: 'grid',
-    gridTemplateColumns: '280px 1fr',
-    gap: '1.5rem',
+    display: isMobile ? 'flex' : 'grid',
+    flexDirection: isMobile ? 'column' : 'row',
+    gridTemplateColumns: isMobile ? '1fr' : '280px 1fr',
+    gap: isMobile ? '0.75rem' : '1.5rem',
     alignItems: 'flex-start',
   },
   sidebar: {
-    display: 'flex',
+    display: isMobile && !mobileMenuOpen ? 'none' : 'flex',
     flexDirection: 'column',
     gap: '1.5rem',
+    width: '100%',
   },
   navPanel: {
     padding: '0.5rem',
