@@ -1731,70 +1731,57 @@ export default function ReportsCenter({ department }) {
         )}
       {/* Share Report Modal */}
       {showShareModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.75)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999,
-          backdropFilter: 'blur(4px)'
-        }}>
-          <div style={{
-            background: 'var(--bg-panel, #111827)',
-            border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-            borderRadius: '12px',
-            width: '100%',
-            maxWidth: '480px',
-            padding: '24px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4)',
-            color: 'var(--text-primary, #f3f4f6)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>Share Report to Chat</h3>
+        <div className="share-modal-overlay">
+          <div className="share-modal-card">
+            {/* Mobile Top Drag Indicator */}
+            <div style={{ width: '36px', height: '4px', borderRadius: '2px', backgroundColor: 'rgba(255,255,255,0.2)', margin: '0 auto 14px auto' }} />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Send size={18} color="var(--primary)" /> Share Report to Chat
+              </h3>
               <button 
+                type="button"
                 onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); }} 
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted, #9ca3af)' }}
+                style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleShareReport}>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary, #d1d5db)' }}>Search Channel or Member</label>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Search Channel or Member</label>
                 <input 
                   type="text" 
                   value={shareSearch} 
                   onChange={e => setShareSearch(e.target.value)} 
-                  placeholder="Type name to search..." 
+                  placeholder="Type name to filter..." 
                   style={{
                     width: '100%',
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-                    backgroundColor: 'rgba(255,255,255,0.03)',
+                    padding: '12px 16px',
+                    borderRadius: '24px',
+                    border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
+                    backgroundColor: 'var(--bg-input, #0b0f19)',
                     color: 'var(--text-primary)',
                     outline: 'none',
-                    fontSize: '0.9rem'
+                    fontSize: '0.92rem'
                   }}
                 />
               </div>
 
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-secondary, #d1d5db)' }}>Select Chat Destination</label>
+              <div style={{ marginBottom: '22px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Chat Destination</label>
                 <div style={{
-                  maxHeight: '200px',
+                  maxHeight: '230px',
                   overflowY: 'auto',
-                  border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-                  borderRadius: '8px',
+                  border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
+                  borderRadius: '16px',
                   display: 'flex',
                   flexDirection: 'column',
-                  backgroundColor: 'rgba(255,255,255,0.01)'
+                  gap: '4px',
+                  padding: '6px',
+                  backgroundColor: 'rgba(0,0,0,0.2)'
                 }}>
                   {chatRooms
                     .filter(r => {
@@ -1817,22 +1804,35 @@ export default function ReportsCenter({ department }) {
                           onClick={() => setSelectedRoomId(r._id)}
                           style={{
                             padding: '10px 14px',
+                            borderRadius: '12px',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '10px',
+                            gap: '12px',
                             cursor: 'pointer',
-                            backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
-                            borderBottom: '1px solid rgba(255,255,255,0.04)',
-                            transition: 'background-color 0.2s',
+                            backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255,255,255,0.02)',
+                            border: isSelected ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid transparent',
+                            color: isSelected ? '#38bdf8' : 'var(--text-primary)',
+                            transition: 'all 0.2s ease',
                           }}
                         >
                           <div style={{
-                            width: '8px',
-                            height: '8px',
+                            width: '28px',
+                            height: '28px',
                             borderRadius: '50%',
-                            backgroundColor: isDirect ? 'var(--success, #10b981)' : 'var(--primary, #3b82f6)'
-                          }} />
-                          <span style={{ fontSize: '0.9rem', fontWeight: isSelected ? '600' : 'normal', color: isSelected ? 'var(--primary)' : 'var(--text-primary)' }}>{displayName}</span>
+                            background: isSelected
+                              ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)'
+                              : 'rgba(255,255,255,0.08)',
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}>
+                            {isDirect ? displayName.charAt(0).toUpperCase() : '#'}
+                          </div>
+                          <span style={{ fontSize: '0.92rem', fontWeight: isSelected ? '600' : 'normal', flex: 1 }}>{displayName}</span>
+                          {isSelected && <span style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: 'bold' }}>✓</span>}
                         </div>
                       );
                     })}
@@ -1844,18 +1844,19 @@ export default function ReportsCenter({ department }) {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <button 
                   type="button" 
                   onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); }} 
                   style={{
-                    padding: '10px 18px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-                    backgroundColor: 'transparent',
+                    padding: '12px 20px',
+                    borderRadius: '24px',
+                    border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
+                    backgroundColor: 'rgba(255,255,255,0.04)',
                     color: 'var(--text-primary)',
                     cursor: 'pointer',
-                    fontSize: '0.85rem'
+                    fontSize: '0.88rem',
+                    fontWeight: 600
                   }}
                 >
                   Cancel
@@ -1864,17 +1865,19 @@ export default function ReportsCenter({ department }) {
                   type="submit" 
                   disabled={sharingReport || !selectedRoomId}
                   style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
+                    padding: '12px 24px',
+                    borderRadius: '24px',
                     border: 'none',
-                    backgroundColor: selectedRoomId ? 'var(--primary, #3b82f6)' : 'var(--border-light, #374151)',
-                    color: '#000',
+                    background: selectedRoomId ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'rgba(255,255,255,0.08)',
+                    color: 'white',
                     cursor: selectedRoomId ? 'pointer' : 'not-allowed',
                     fontWeight: 'bold',
-                    fontSize: '0.85rem',
+                    fontSize: '0.88rem',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px'
+                    gap: '8px',
+                    boxShadow: selectedRoomId ? '0 4px 14px rgba(56,189,248,0.3)' : 'none',
+                    opacity: selectedRoomId ? 1 : 0.5
                   }}
                 >
                   {sharingReport ? 'Sharing...' : 'Confirm Share'}
