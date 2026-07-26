@@ -78,6 +78,17 @@ const Workspace = ({ currentUser }) => {
   const [chatFilter, setChatFilter] = useState('all');
   const [isAIProcessing, setIsAIProcessing] = useState(false);
 
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [mobileActiveView, setMobileActiveView] = useState('sidebar'); // 'sidebar' or 'chat'
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
   
@@ -441,56 +452,58 @@ const Workspace = ({ currentUser }) => {
     socket.emit('register-user', userId);
 
     const handleReceiveMessageNotify = (message) => {
-      const isMine = message.senderId?._id === currentUser._id;
+      const senderId = typeof message.senderId === 'object' ? (message.senderId?._id || message.senderId?.id) : message.senderId;
+      const myUserId = currentUser?._id || currentUser?.id;
+      const isMine = String(senderId) === String(myUserId);
+
       const currentActiveRoom = activeRoomRef.current;
       const currentRooms = roomsRef.current;
-      const isActive = currentActiveRoom && (message.roomId === currentActiveRoom._id || message.roomId?._id === currentActiveRoom._id);
+      const msgRoomId = typeof message.roomId === 'object' ? (message.roomId?._id || message.roomId?.id) : message.roomId;
+      const isActive = currentActiveRoom && String(msgRoomId) === String(currentActiveRoom._id);
       
       // Update room updatedAt in state list to trigger unread badge update dynamically
       setRooms(prevRooms => {
         return prevRooms.map(r => {
-          const match = r._id === message.roomId || r._id === message.roomId?._id;
-          if (match) {
+          if (String(r._id) === String(msgRoomId)) {
             return { ...r, updatedAt: message.createdAt || new Date().toISOString() };
           }
           return r;
         });
       });
 
-      // Increment unread counters if not active
+      // Increment unread counters if not active room
       if (!isMine && !isActive) {
-        const targetRoomId = message.roomId?._id || message.roomId;
         setUnreadCounts(prev => ({
           ...prev,
-          [targetRoomId]: (prev[targetRoomId] || 0) + 1
+          [msgRoomId]: (prev[msgRoomId] || 0) + 1
         }));
       }
 
-      if (!isMine && (!isActive || document.hidden)) {
-        const senderName = message.senderId?.name || message.senderId?.username || 'Someone';
-        let title = `New message in #${message.roomId?.name || 'chat'}`;
+      // Trigger Push & Toast Notifications for ALL incoming messages from others
+      if (!isMine) {
+        const senderName = typeof message.senderId === 'object' ? (message.senderId?.name || message.senderId?.username) : 'Team Member';
+        let title = `💬 Message from ${senderName}`;
         
-        // Find if room name is known
-        const targetRoom = currentRooms.find(r => r._id === message.roomId || r._id === message.roomId?._id);
+        const targetRoom = currentRooms.find(r => String(r._id) === String(msgRoomId));
         if (targetRoom) {
           if (targetRoom.type === 'direct') {
-            title = `New message from ${senderName}`;
+            title = `💬 DM from ${senderName}`;
           } else {
-            title = `New message in #${targetRoom.name}`;
+            title = `💬 #${targetRoom.name}`;
           }
-        } else if (message.roomId?.type === 'direct' || message.roomId?.name) {
-          title = message.roomId.type === 'direct' ? `New message from ${senderName}` : `New message in #${message.roomId.name}`;
         }
         
-        // Trigger global push notification + persistent history
-        triggerPushNotification(title, message.content || 'Attachment / Voice memo', 'info', 'workspace');
+        const snippet = message.attachment ? '📎 Sent an attachment' : (message.content || 'Sent a message');
+
+        // Trigger global push notification + persistent history + audio chime + tab flash
+        triggerPushNotification(title, `${senderName}: ${snippet}`, 'info', 'workspace');
         
         // Also show in-app Toast Notification
-        showToast(title, message.content, () => {
-          const matchedRoom = roomsRef.current.find(r => r._id === message.roomId || r._id === message.roomId?._id);
-          if (matchedRoom) {
-            setActiveRoom(matchedRoom);
+        showToast(title, `${senderName}: ${snippet}`, () => {
+          if (targetRoom) {
+            setActiveRoom(targetRoom);
             setWorkspaceTab('chat');
+            setMobileActiveView('chat');
           }
         });
       }
@@ -1542,9 +1555,29 @@ const Workspace = ({ currentUser }) => {
 
   // --- STYLES ---
   const wsStyles = {
-    container: { display: 'flex', height: 'calc(100vh - 100px)', gap: '20px' },
-    sidebar: { width: '280px', display: 'flex', flexDirection: 'column', gap: '15px', overflowY: 'auto' },
-    chatArea: { flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-card, #161b26)', borderRadius: '12px', border: '1px solid var(--border-light)', overflow: 'hidden' },
+    container: {
+      display: 'flex',
+      height: isMobile ? 'calc(100vh - 120px)' : 'calc(100vh - 100px)',
+      gap: isMobile ? '0' : '20px',
+      flexDirection: isMobile ? 'column' : 'row'
+    },
+    sidebar: {
+      width: isMobile ? '100%' : '280px',
+      display: isMobile && mobileActiveView === 'chat' ? 'none' : 'flex',
+      flexDirection: 'column',
+      gap: '15px',
+      overflowY: 'auto'
+    },
+    chatArea: {
+      flex: 1,
+      width: isMobile ? '100%' : 'auto',
+      display: isMobile && mobileActiveView === 'sidebar' ? 'none' : 'flex',
+      flexDirection: 'column',
+      backgroundColor: 'var(--bg-card, #161b26)',
+      borderRadius: '12px',
+      border: '1px solid var(--border-light)',
+      overflow: 'hidden'
+    },
     roomItem: (isActive) => ({ padding: '12px 16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', backgroundColor: isActive ? 'var(--primary)' : 'transparent', color: isActive ? 'white' : 'var(--text-primary)', transition: 'all 0.2s', fontWeight: isActive ? '500' : '400' }),
     header: { padding: '20px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
     messageList: { flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' },
@@ -2153,7 +2186,7 @@ const Workspace = ({ currentUser }) => {
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {groupRooms.map(room => (
-                    <div key={room._id} style={wsStyles.roomItem(activeRoom?._id === room._id)} onClick={() => setActiveRoom(room)}>
+                    <div key={room._id} style={wsStyles.roomItem(activeRoom?._id === room._id)} onClick={() => { setActiveRoom(room); setMobileActiveView('chat'); }}>
                       <Hash size={18} /><span>{room.name}</span>
                       {unreadCounts[room._id] > 0 && (
                         <div style={{
@@ -2186,7 +2219,7 @@ const Workspace = ({ currentUser }) => {
                     const isActive = existingRoom && activeRoom?._id === existingRoom._id;
                     const isOnline = onlineUsers.includes(user._id);
                     return (
-                      <div key={user._id} style={wsStyles.roomItem(isActive)} onClick={() => handleUserDMClick(user)}>
+                      <div key={user._id} style={wsStyles.roomItem(isActive)} onClick={() => { handleUserDMClick(user); setMobileActiveView('chat'); }}>
                         <div style={{
                           width: '8px',
                           height: '8px',
@@ -2248,6 +2281,28 @@ const Workspace = ({ currentUser }) => {
                   {/* Header */}
                   <div style={wsStyles.header}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {isMobile && (
+                        <button
+                          type="button"
+                          onClick={() => setMobileActiveView('sidebar')}
+                          style={{
+                            background: 'rgba(56, 189, 248, 0.15)',
+                            border: '1px solid var(--primary)',
+                            color: 'var(--primary)',
+                            borderRadius: '8px',
+                            padding: '4px 10px',
+                            fontSize: '0.8rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            marginRight: '6px'
+                          }}
+                        >
+                          ← Chats
+                        </button>
+                      )}
                       {activeRoom.type === 'direct' ? <Users size={24} color="var(--primary)" /> : <Hash size={24} color="var(--primary)" />}
                       <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{getActiveRoomName()}</h3>
                     </div>
