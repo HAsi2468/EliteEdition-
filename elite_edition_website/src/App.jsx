@@ -649,16 +649,43 @@ export default function App() {
           <div style={styles.divider}></div>
 
           {currentUser && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginRight: '0.75rem', alignSelf: 'center' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{currentUser.name}</span>
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>{currentUser.role || 'user'}</span>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              backgroundColor: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid var(--border-light)',
+              borderRadius: '24px',
+              padding: '4px 6px 4px 14px'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1 }}>{currentUser.name}</span>
+                <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>{currentUser.role || 'user'}</span>
+              </div>
+              <button
+                onClick={handleLogout}
+                title="Sign Out"
+                style={{
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  color: '#ef4444',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.15)'
+                }}
+                className="logout-icon-btn"
+              >
+                <LogOut size={15} />
+              </button>
             </div>
           )}
-
-          <button onClick={handleLogout} className="btn-danger" style={styles.logoutBtn}>
-            <LogOut size={15} />
-            <span>Sign Out</span>
-          </button>
         </div>
       </header>
 
@@ -810,7 +837,27 @@ export default function App() {
             </div>
 
             <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border-light)' }}>
-              <button onClick={handleLogout} className="btn-danger" style={{ width: '100%', justifyContent: 'center' }}>
+              <button
+                onClick={handleLogout}
+                style={{
+                  width: '100%',
+                  justify: 'center',
+                  padding: '12px',
+                  borderRadius: '14px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  color: '#ef4444',
+                  fontWeight: '600',
+                  fontSize: '0.9rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
+                }}
+                className="logout-icon-btn"
+              >
                 <LogOut size={16} /><span>Sign Out</span>
               </button>
             </div>
