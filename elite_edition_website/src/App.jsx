@@ -1015,7 +1015,7 @@ export default function App() {
             <UnicommerceHub />
           ) : activeTab === 'myntra' ? (
             <MyntraHub />
-          ) : activeTab === 'admin' ? (
+          ) : activeTab === 'workspace' ? null : activeTab === 'admin' ? (
             <AdminPanel />
           ) : (
             <div style={styles.noAccessContainer}>
