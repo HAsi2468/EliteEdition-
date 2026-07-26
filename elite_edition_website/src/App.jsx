@@ -224,13 +224,18 @@ export default function App() {
     setLoading(true);
     setError('');
     try {
-      // Run all 4 requests in parallel — ~4x faster than sequential awaits
-      const [inventoryResult, catalogResult, salesResult, partiesResult] = await Promise.allSettled([
+      // Run requests in parallel including user permissions sync
+      const [inventoryResult, catalogResult, salesResult, partiesResult, userResult] = await Promise.allSettled([
         api.getInventory(),
         api.getProductsCatalog(),
         api.getSales({ limit: 1000 }),
         api.getParties(),
+        api.refreshCurrentUser(),
       ]);
+
+      if (userResult.status === 'fulfilled' && userResult.value) {
+        setCurrentUser(userResult.value);
+      }
 
       if (inventoryResult.status === 'fulfilled') {
         setItems(inventoryResult.value || []);

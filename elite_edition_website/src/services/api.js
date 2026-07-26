@@ -84,6 +84,23 @@ export const api = {
     }
   },
 
+  async refreshCurrentUser() {
+    const user = this.getCurrentUser();
+    if (!user) return null;
+    const userId = user.id || user._id;
+    if (!userId) return user;
+    try {
+      const res = await request(`/users/${userId}`);
+      if (res && res.user) {
+        localStorage.setItem('elite_user', JSON.stringify(res.user));
+        return res.user;
+      }
+    } catch (e) {
+      console.warn('Failed to refresh current user profile:', e);
+    }
+    return user;
+  },
+
   isAuthenticated() {
     return !!localStorage.getItem('elite_auth_token');
   },
