@@ -144,6 +144,11 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const isHasiUser = currentUser && (
+    (currentUser.username && currentUser.username.toLowerCase() === 'hasi') ||
+    (currentUser.name && currentUser.name.toLowerCase().includes('hasi'))
+  );
+
   // Theme state — persisted to localStorage
   const [theme, setTheme] = useState(() => localStorage.getItem('elite_theme') || 'midnight');
   const [isEliteOnlineOpen, setIsEliteOnlineOpen] = useState(true);
@@ -562,49 +567,52 @@ export default function App() {
         </div>
 
         <div style={styles.headerRight} className="header-right-wrap">
-          {/* Theme Picker */}
-          <ThemePicker currentTheme={theme} onSelect={setTheme} />
+          {/* Theme Picker & Server Config (Visible only to Hasi user) */}
+          {isHasiUser && (
+            <>
+              <ThemePicker currentTheme={theme} onSelect={setTheme} />
 
-          {/* Active Server indicator */}
-          <div style={styles.serverConfigContainer}>
-            <button 
-              onClick={() => setShowServerSettings(!showServerSettings)} 
-              style={styles.serverBtn}
-              title="Configure API Endpoint"
-            >
-              <Server size={14} color="var(--primary)" />
-              <span style={styles.serverText}>Server Config</span>
-            </button>
-            
-            {showServerSettings && (
-              <div className="glass-panel" style={styles.serverDropdown}>
-                <div style={styles.dropdownTitle}>API Target Settings</div>
-                <input 
-                  type="text" 
-                  value={tempUrl} 
-                  onChange={(e) => setTempUrl(e.target.value)}
-                  style={styles.dropdownInput}
-                  placeholder="http://localhost:3001"
-                />
-                <div style={styles.dropdownActions}>
-                  <button 
-                    onClick={() => setShowServerSettings(false)} 
-                    className="btn-secondary" 
-                    style={styles.dropActionBtn}
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    onClick={applyServerEndpoint} 
-                    className="btn-primary" 
-                    style={styles.dropActionBtn}
-                  >
-                    Apply
-                  </button>
-                </div>
+              <div style={styles.serverConfigContainer}>
+                <button 
+                  onClick={() => setShowServerSettings(!showServerSettings)} 
+                  style={styles.serverBtn}
+                  title="Configure API Endpoint"
+                >
+                  <Server size={14} color="var(--primary)" />
+                  <span style={styles.serverText}>Server Config</span>
+                </button>
+                
+                {showServerSettings && (
+                  <div className="glass-panel" style={styles.serverDropdown}>
+                    <div style={styles.dropdownTitle}>API Target Settings</div>
+                    <input 
+                      type="text" 
+                      value={tempUrl} 
+                      onChange={(e) => setTempUrl(e.target.value)}
+                      style={styles.dropdownInput}
+                      placeholder="http://localhost:3001"
+                    />
+                    <div style={styles.dropdownActions}>
+                      <button 
+                        onClick={() => setShowServerSettings(false)} 
+                        className="btn-secondary" 
+                        style={styles.dropActionBtn}
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={applyServerEndpoint} 
+                        className="btn-primary" 
+                        style={styles.dropActionBtn}
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
 
           <button
             onClick={() => setShowNotificationDrawer(true)}
@@ -957,23 +965,25 @@ export default function App() {
               </button>
             )}
 
-            {/* Theme quick-select dots */}
-            <div style={styles.themeDotsRow}>
-              {THEMES.map(t => (
-                <button
-                  key={t.id}
-                  title={t.name}
-                  onClick={() => setTheme(t.id)}
-                  style={{
-                    ...styles.themeDot,
-                    background: t.accent,
-                    outline: theme === t.id ? `2px solid ${t.accent}` : '2px solid transparent',
-                    outlineOffset: '2px',
-                    transform: theme === t.id ? 'scale(1.25)' : 'scale(1)',
-                  }}
-                />
-              ))}
-            </div>
+            {/* Theme quick-select dots (Visible only to Hasi user) */}
+            {isHasiUser && (
+              <div style={styles.themeDotsRow}>
+                {THEMES.map(t => (
+                  <button
+                    key={t.id}
+                    title={t.name}
+                    onClick={() => setTheme(t.id)}
+                    style={{
+                      ...styles.themeDot,
+                      background: t.accent,
+                      outline: theme === t.id ? `2px solid ${t.accent}` : '2px solid transparent',
+                      outlineOffset: '2px',
+                      transform: theme === t.id ? 'scale(1.25)' : 'scale(1)',
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </aside>
 
