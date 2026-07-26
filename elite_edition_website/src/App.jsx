@@ -1015,8 +1015,6 @@ export default function App() {
             <UnicommerceHub />
           ) : activeTab === 'myntra' ? (
             <MyntraHub />
-          ) : activeTab === 'workspace' ? (
-            <Workspace currentUser={currentUser} />
           ) : activeTab === 'admin' ? (
             <AdminPanel />
           ) : (
@@ -1028,6 +1026,11 @@ export default function App() {
               </p>
             </div>
           )}
+
+          {/* Persistent Workspace / Chat (always mounted to listen for socket notifications & record history) */}
+          <div style={{ display: activeTab === 'workspace' ? 'block' : 'none', height: '100%' }}>
+            <Workspace currentUser={currentUser} />
+          </div>
         </section>
       </main>
 
