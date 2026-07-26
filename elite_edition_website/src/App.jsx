@@ -818,27 +818,11 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Layout Grid */}
-      <main
-        style={{
-          ...styles.mainLayout,
-          display: isMobile ? 'flex' : 'grid',
-          flexDirection: isMobile ? 'column' : 'row',
-          gridTemplateColumns: isMobile ? '1fr' : '280px 1fr',
-          gap: isMobile ? '0.75rem' : '1.5rem',
-        }}
-        className="main-layout-grid"
-      >
+      {/* Main Layout */}
+      <main style={styles.mainLayout} className="main-layout-container">
         
-        {/* Left Navigation and Reports Sidebar */}
-        <aside
-          style={{
-            ...styles.sidebar,
-            display: isMobile && !mobileMenuOpen ? 'none' : 'flex',
-            width: isMobile ? '100%' : 'auto',
-          }}
-          className="sidebar-wrap"
-        >
+        {/* Left Navigation Sidebar */}
+        <aside style={styles.sidebar} className="sidebar-wrap">
           <div className="glass-panel" style={styles.navPanel}>
 
             {activeDepartment === 'digital_print' ? (
@@ -1180,12 +1164,14 @@ const styles = {
     fontSize: '0.8rem',
   },
   mainLayout: {
-    display: 'grid',
-    gridTemplateColumns: '280px 1fr',
+    display: 'flex',
+    width: '100%',
     gap: '1.5rem',
     alignItems: 'flex-start',
   },
   sidebar: {
+    width: '260px',
+    flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
     gap: '1.5rem',

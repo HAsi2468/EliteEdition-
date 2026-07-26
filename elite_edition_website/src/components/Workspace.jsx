@@ -2256,12 +2256,12 @@ const Workspace = ({ currentUser }) => {
         </div>
       </div>
 
-      <div style={wsStyles.container}>
+      <div style={wsStyles.container} className="workspace-main-container">
         
         {workspaceTab === 'chat' && (
           <>
             {/* Left Sidebar: Channels & DMs */}
-            <div className="glass-panel" style={wsStyles.sidebar}>
+            <div className={`glass-panel workspace-sidebar-panel ${isMobile && mobileActiveView === 'chat' ? 'ws-hide-mobile' : ''}`} style={wsStyles.sidebar}>
               <div style={{ marginBottom: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px' }}>
                   <h3 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Channels</h3>
@@ -2335,6 +2335,7 @@ const Workspace = ({ currentUser }) => {
 
             {/* Right Area: Chat Stream */}
             <div 
+              className={`workspace-chat-panel ${isMobile && mobileActiveView === 'sidebar' ? 'ws-hide-mobile' : ''}`}
               style={{ ...wsStyles.chatArea, position: 'relative' }}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
