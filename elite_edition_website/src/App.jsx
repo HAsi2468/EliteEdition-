@@ -169,26 +169,50 @@ export default function App() {
     }
   };
 
-  // Auto-switch to default allowed tab based on user permissions
+  // Auto-request Push Notification permission on site open
   useEffect(() => {
-    if (isAuthenticated && currentUser) {
-      if (currentUser.role === 'admin') {
-        const validAdminTabs = [
-          'dashboard', 'inventory', 'catalog', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
-          'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings'
-        ];
-        if (!validAdminTabs.includes(activeTab)) {
-          setActiveTab('dashboard');
-        }
-      } else if (currentUser.permissions && currentUser.permissions.length > 0) {
-        if (!currentUser.permissions.includes(activeTab) && !(activeTab === 'catalog' && currentUser.permissions.includes('inventory'))) {
-          setActiveTab(currentUser.permissions[0]);
-        }
-      } else {
-        setActiveTab('no-access');
+    if (isAuthenticated) {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().then(perm => {
+          if (perm === 'granted') {
+            triggerPushNotification('Push Notifications Active 🔔', 'You will receive real-time popups for Chat, Tasks, and Operations.', 'success');
+          }
+        }).catch(() => {});
       }
     }
-  }, [currentUser, isAuthenticated]);
+  }, [isAuthenticated]);
+
+  // Tab permission validation — ONLY reset activeTab if the tab is truly forbidden
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser) return;
+
+    const ALL_SYSTEM_TABS = [
+      'dashboard', 'workspace', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
+      'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings'
+    ];
+
+    if (currentUser.role === 'admin') {
+      // Admins have access to all system tabs
+      if (!ALL_SYSTEM_TABS.includes(activeTab)) {
+        setActiveTab('dashboard');
+      }
+    } else if (currentUser.permissions && currentUser.permissions.length > 0) {
+      // For non-admin users, check if activeTab or any parent category is allowed
+      const isAllowed = currentUser.permissions.some(p => {
+        if (p === activeTab) return true;
+        if (activeTab === 'catalog' && p === 'inventory') return true;
+        if (activeTab.startsWith('jobcards_') && (p === 'jobcards' || p === activeTab)) return true;
+        if (activeTab === 'jobcards' && p.startsWith('jobcards')) return true;
+        return false;
+      });
+
+      if (!isAllowed && !['workspace', 'dashboard'].includes(activeTab)) {
+        setActiveTab(currentUser.permissions[0]);
+      }
+    } else {
+      setActiveTab('no-access');
+    }
+  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), isAuthenticated]);
 
   // Apply theme to <html> element
   useEffect(() => {
