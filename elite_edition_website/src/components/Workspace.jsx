@@ -1557,7 +1557,7 @@ const Workspace = ({ currentUser }) => {
   const wsStyles = {
     container: {
       display: 'flex',
-      height: isMobile ? 'calc(100vh - 120px)' : 'calc(100vh - 100px)',
+      height: isMobile ? 'calc(100vh - 110px)' : 'calc(100vh - 100px)',
       gap: isMobile ? '0' : '20px',
       flexDirection: isMobile ? 'column' : 'row'
     },
@@ -1565,35 +1565,65 @@ const Workspace = ({ currentUser }) => {
       width: isMobile ? '100%' : '280px',
       display: isMobile && mobileActiveView === 'chat' ? 'none' : 'flex',
       flexDirection: 'column',
-      gap: '15px',
-      overflowY: 'auto'
+      gap: '12px',
+      overflowY: 'auto',
+      padding: isMobile ? '10px' : '15px'
     },
     chatArea: {
       flex: 1,
       width: isMobile ? '100%' : 'auto',
+      height: '100%',
       display: isMobile && mobileActiveView === 'sidebar' ? 'none' : 'flex',
       flexDirection: 'column',
       backgroundColor: 'var(--bg-card, #161b26)',
-      borderRadius: '12px',
-      border: '1px solid var(--border-light)',
+      borderRadius: isMobile ? '0' : '12px',
+      border: isMobile ? 'none' : '1px solid var(--border-light)',
       overflow: 'hidden'
     },
-    roomItem: (isActive) => ({ padding: '12px 16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', backgroundColor: isActive ? 'var(--primary)' : 'transparent', color: isActive ? 'white' : 'var(--text-primary)', transition: 'all 0.2s', fontWeight: isActive ? '500' : '400' }),
-    header: { padding: '20px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-    messageList: { flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' },
+    roomItem: (isActive) => ({
+      padding: isMobile ? '14px 16px' : '12px 16px',
+      borderRadius: '12px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      cursor: 'pointer',
+      backgroundColor: isActive ? 'var(--primary)' : 'rgba(255,255,255,0.02)',
+      color: isActive ? 'white' : 'var(--text-primary)',
+      transition: 'all 0.2s',
+      fontWeight: isActive ? '600' : '400',
+      border: isActive ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.04)'
+    }),
+    header: {
+      padding: isMobile ? '12px 16px' : '20px',
+      borderBottom: '1px solid var(--border-light)',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: 'var(--bg-card, #161b26)',
+      zIndex: 10
+    },
+    messageList: {
+      flex: 1,
+      padding: isMobile ? '12px' : '20px',
+      overflowY: 'auto',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: isMobile ? '12px' : '20px'
+    },
     messageBubble: (isMine, isTask) => ({
       position: 'relative',
-      maxWidth: isTask ? '400px' : '70%',
+      maxWidth: isTask ? '400px' : isMobile ? '84%' : '70%',
       width: isTask ? '100%' : 'auto',
-      padding: isTask ? '0' : '12px 16px',
-      borderRadius: '12px',
+      padding: isTask ? '0' : isMobile ? '10px 14px' : '12px 16px',
+      borderRadius: '16px',
       backgroundColor: isTask ? 'var(--bg-card, #161b26)' : isMine ? 'var(--primary)' : 'var(--bg-main)',
       color: isTask ? 'var(--text-primary)' : isMine ? 'white' : 'var(--text-primary)',
-      borderBottomRightRadius: isMine ? '4px' : '12px',
-      borderBottomLeftRadius: !isMine ? '4px' : '12px',
+      borderBottomRightRadius: isMine ? '3px' : '16px',
+      borderBottomLeftRadius: !isMine ? '3px' : '16px',
       alignSelf: isMine ? 'flex-end' : 'flex-start',
-      boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-      border: isTask ? '1px solid var(--border-light)' : 'none'
+      boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+      border: isTask ? '1px solid var(--border-light)' : 'none',
+      fontSize: isMobile ? '0.88rem' : '0.95rem'
     }),
     taskCard: {
       header: { padding: '12px 16px', borderBottom: '1px solid var(--border-light)', backgroundColor: 'rgba(0,0,0,0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTopLeftRadius: '12px', borderTopRightRadius: '12px' },
@@ -1611,10 +1641,17 @@ const Workspace = ({ currentUser }) => {
       })
     },
     messageSender: (isMine) => ({ fontSize: '0.75rem', color: isMine ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)', marginBottom: '4px', display: 'flex', gap: '8px', justifyContent: isMine ? 'flex-end' : 'flex-start' }),
-    inputArea: { padding: '20px', borderTop: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)' },
-    inputForm: { display: 'flex', gap: '10px' },
-    inputField: { flex: 1, padding: '12px 20px', borderRadius: '24px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-input, #0b0f19)', color: 'var(--text-primary)', outline: 'none' },
-    sendBtn: { padding: '12px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    inputArea: {
+      padding: isMobile ? '10px 12px' : '20px',
+      borderTop: '1px solid var(--border-light)',
+      backgroundColor: 'var(--bg-main)',
+      position: isMobile ? 'sticky' : 'relative',
+      bottom: 0,
+      zIndex: 20
+    },
+    inputForm: { display: 'flex', gap: '10px', alignItems: 'center' },
+    inputField: { flex: 1, padding: isMobile ? '10px 16px' : '12px 20px', borderRadius: '24px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-input, #0b0f19)', color: 'var(--text-primary)', outline: 'none', fontSize: isMobile ? '0.9rem' : '0.95rem' },
+    sendBtn: { padding: isMobile ? '10px' : '12px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
     createTaskChip: {
       position: 'absolute', top: '-15px', right: '-10px', backgroundColor: 'var(--accent)', color: 'white', padding: '4px 10px', borderRadius: '16px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', zIndex: 10, border: 'none'
     },
@@ -2143,10 +2180,10 @@ const Workspace = ({ currentUser }) => {
   };
 
   return (
-    <div style={{ padding: '20px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ padding: isMobile ? '4px 0' : '20px', height: '100%', display: 'flex', flexDirection: 'column' }}>
       
       {/* Top Header & Tab Toggles */}
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: isMobile ? '10px' : '20px', justifyContent: 'space-between', padding: isMobile ? '0 8px' : '0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <MessageSquare size={24} color="var(--primary)" /> Team Workspace
