@@ -419,6 +419,133 @@ const downloadSalesReportPdf = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────────────────────
+// Normalize and Merge duplicate brand names & SKUs (case/space mismatch)
+// ─────────────────────────────────────────────────────────────
+const normalizeAndMergeBrands = (rawBrands) => {
+  if (!Array.isArray(rawBrands)) return [];
+  const brandMap = new Map();
+
+  for (const b of rawBrands) {
+    const rawBrandName = (b._id || b.brand || b.brandName || 'Unknown').toString().trim();
+    if (!rawBrandName) continue;
+    const cleanBrandKey = rawBrandName.toUpperCase();
+
+    if (!brandMap.has(cleanBrandKey)) {
+      brandMap.set(cleanBrandKey, {
+        _id: rawBrandName,
+        brand: rawBrandName,
+        brandName: rawBrandName,
+        brandQty: 0,
+        brandAmt: 0,
+        brandQuantity: 0,
+        brandSellableAmount: 0,
+        totalOrderQuantity: 0,
+        totalSellableAmount: 0,
+        productMap: new Map(),
+      });
+    }
+
+    const targetBrand = brandMap.get(cleanBrandKey);
+    const bQty = Number(b.brandQty || b.brandQuantity || b.totalOrderQuantity || 0);
+    const bAmt = Number(b.brandAmt || b.brandSellableAmount || b.totalSellableAmount || 0);
+
+    targetBrand.brandQty += bQty;
+    targetBrand.brandAmt += bAmt;
+    targetBrand.brandQuantity += bQty;
+    targetBrand.brandSellableAmount += bAmt;
+    targetBrand.totalOrderQuantity += bQty;
+    targetBrand.totalSellableAmount += bAmt;
+
+    const prods = b.products || [];
+    for (const p of prods) {
+      const rawSku = (p.sku || p.baseSku || '-').toString().trim();
+      if (!rawSku) continue;
+      const cleanSkuKey = rawSku.toUpperCase();
+
+      if (!targetBrand.productMap.has(cleanSkuKey)) {
+        targetBrand.productMap.set(cleanSkuKey, {
+          sku: rawSku,
+          qty: 0,
+          amt: 0,
+          total: 0,
+          sellableAmount: 0,
+          productQty: 0,
+          productAmt: 0,
+          skuQuantity: 0,
+          skuSellableAmount: 0,
+          variationMap: new Map(),
+        });
+      }
+
+      const targetProd = targetBrand.productMap.get(cleanSkuKey);
+      const pQty = Number(p.qty || p.total || p.skuQty || p.productQty || p.skuQuantity || 0);
+      const pAmt = Number(p.amt || p.sellableAmount || p.skuAmt || p.productAmt || p.skuSellableAmount || 0);
+
+      targetProd.qty += pQty;
+      targetProd.amt += pAmt;
+      targetProd.total += pQty;
+      targetProd.sellableAmount += pAmt;
+      targetProd.productQty += pQty;
+      targetProd.productAmt += pAmt;
+      targetProd.skuQuantity += pQty;
+      targetProd.skuSellableAmount += pAmt;
+
+      const vars = p.variations || [];
+      for (const v of vars) {
+        const rawSize = (v.size || 'N/A').toString().trim();
+        const cleanSizeKey = rawSize.toUpperCase() || 'N/A';
+
+        if (!targetProd.variationMap.has(cleanSizeKey)) {
+          targetProd.variationMap.set(cleanSizeKey, {
+            size: cleanSizeKey,
+            quantity: 0,
+            sellableAmount: 0,
+          });
+        }
+
+        const targetVar = targetProd.variationMap.get(cleanSizeKey);
+        targetVar.quantity += Number(v.quantity || 0);
+        targetVar.sellableAmount += Number(v.sellableAmount || 0);
+      }
+    }
+  }
+
+  const mergedBrands = [];
+  for (const b of brandMap.values()) {
+    const products = [];
+    for (const p of b.productMap.values()) {
+      const variations = Array.from(p.variationMap.values());
+      products.push({
+        sku: p.sku,
+        qty: p.qty,
+        amt: p.amt,
+        total: p.total,
+        sellableAmount: p.sellableAmount,
+        productQty: p.productQty,
+        productAmt: p.productAmt,
+        skuQuantity: p.skuQuantity,
+        skuSellableAmount: p.skuSellableAmount,
+        variations,
+      });
+    }
+    mergedBrands.push({
+      _id: b._id,
+      brand: b.brand,
+      brandName: b.brandName,
+      brandQty: b.brandQty,
+      brandAmt: b.brandAmt,
+      brandQuantity: b.brandQuantity,
+      brandSellableAmount: b.brandSellableAmount,
+      totalOrderQuantity: b.totalOrderQuantity,
+      totalSellableAmount: b.totalSellableAmount,
+      products,
+    });
+  }
+
+  return mergedBrands;
+};
+
+// ─────────────────────────────────────────────────────────────
 // BRAND REPORT PDF
 // ─────────────────────────────────────────────────────────────
 const downloadBrandReportPdf = async (req, res) => {
@@ -463,7 +590,8 @@ const downloadBrandReportPdf = async (req, res) => {
       }}
     ];
 
-    const brands = await db.SaleOrder.aggregate(pipeline);
+    const rawBrands = await db.SaleOrder.aggregate(pipeline);
+    const brands = normalizeAndMergeBrands(rawBrands);
 
     // Fetch images
     const allBaseSkus = brands.flatMap(b => b.products.map(p => p.sku)).filter(Boolean);
@@ -1121,7 +1249,8 @@ const downloadReturnsBrandReportPdf = async (req, res) => {
       }}
     ];
 
-    const brands = await db.SaleOrder.aggregate(pipeline);
+    const rawBrands = await db.SaleOrder.aggregate(pipeline);
+    const brands = normalizeAndMergeBrands(rawBrands);
 
     // Fetch images
     const allBaseSkus = brands.flatMap(b => b.products.map(p => p.sku)).filter(Boolean);
