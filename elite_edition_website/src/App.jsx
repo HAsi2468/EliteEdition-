@@ -806,10 +806,26 @@ export default function App() {
       )}
 
       {/* Main Layout Grid */}
-      <main style={styles.mainLayout} className="main-layout-grid">
+      <main
+        style={{
+          ...styles.mainLayout,
+          display: isMobile ? 'flex' : 'grid',
+          flexDirection: isMobile ? 'column' : 'row',
+          gridTemplateColumns: isMobile ? '1fr' : '280px 1fr',
+          gap: isMobile ? '0.75rem' : '1.5rem',
+        }}
+        className="main-layout-grid"
+      >
         
         {/* Left Navigation and Reports Sidebar */}
-        <aside style={styles.sidebar} className="sidebar-wrap">
+        <aside
+          style={{
+            ...styles.sidebar,
+            display: isMobile && !mobileMenuOpen ? 'none' : 'flex',
+            width: isMobile ? '100%' : 'auto',
+          }}
+          className="sidebar-wrap"
+        >
           <div className="glass-panel" style={styles.navPanel}>
 
             {activeDepartment === 'digital_print' ? (
@@ -1146,17 +1162,15 @@ const styles = {
     fontSize: '0.8rem',
   },
   mainLayout: {
-    display: isMobile ? 'flex' : 'grid',
-    flexDirection: isMobile ? 'column' : 'row',
-    gridTemplateColumns: isMobile ? '1fr' : '280px 1fr',
-    gap: isMobile ? '0.75rem' : '1.5rem',
+    display: 'grid',
+    gridTemplateColumns: '280px 1fr',
+    gap: '1.5rem',
     alignItems: 'flex-start',
   },
   sidebar: {
-    display: isMobile && !mobileMenuOpen ? 'none' : 'flex',
+    display: 'flex',
     flexDirection: 'column',
     gap: '1.5rem',
-    width: '100%',
   },
   navPanel: {
     padding: '0.5rem',
