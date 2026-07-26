@@ -962,4 +962,26 @@ body {
   to   { width: 0%; }
 }
 
+/* Responsive action button group in ReportsCenter */
+@media (max-width: 768px) {
+  .reports-action-group {
+    width: 100% !important;
+    margin-left: 0 !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.5rem !important;
+    margin-top: 0.75rem !important;
+  }
+  .reports-action-group .btn-primary,
+  .reports-action-group .btn-secondary {
+    width: 100% !important;
+    justify-content: center !important;
+    font-size: 0.78rem !important;
+    padding: 0.55rem 0.5rem !important;
+  }
+  .reports-action-group .share-to-chat-btn {
+    grid-column: span 2 !important;
+  }
+}
+
 

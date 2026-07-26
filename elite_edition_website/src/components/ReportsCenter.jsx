@@ -422,7 +422,7 @@ export default function ReportsCenter({ department }) {
             </div>
           )}
 
-          <div style={styles.actionsGroup}>
+          <div className="reports-action-group" style={styles.actionsGroup}>
             <button 
               onClick={fetchReportData} 
               disabled={loading || downloading} 
@@ -444,8 +444,14 @@ export default function ReportsCenter({ department }) {
             <button 
               onClick={() => setShowShareModal(true)} 
               disabled={loading || downloading || !reportData} 
-              className="btn-secondary" 
-              style={{ ...styles.actionBtn, background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.3)', marginLeft: '10px' }}
+              className="btn-secondary share-to-chat-btn" 
+              style={{
+                ...styles.actionBtn,
+                background: 'rgba(56, 189, 248, 0.1)',
+                color: '#38bdf8',
+                borderColor: 'rgba(56, 189, 248, 0.3)',
+                boxShadow: '0 2px 8px rgba(56, 189, 248, 0.12)',
+              }}
             >
               <Send size={14} />
               <span>Share to Chat</span>
