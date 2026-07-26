@@ -423,9 +423,21 @@ tr:hover td { background: rgba(255, 255, 255, 0.025); }
   border-radius: var(--radius-lg);
   width: 100%;
   max-width: 550px;
+  max-height: 92vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   box-shadow: var(--shadow-lg);
-  overflow: hidden;
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Touch momentum scrolling for mobile */
+form,
+.modal-content,
+.modal-overlay,
+.share-modal-card,
+.table-container,
+.table-responsive {
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ─────────────────────────────────────────────────
