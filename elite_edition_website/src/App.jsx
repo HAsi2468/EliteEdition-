@@ -164,6 +164,11 @@ export default function App() {
     }
   }, [activeTab]);
 
+  const handleNavClick = (tab) => {
+    setActiveTab(tab);
+    setMobileMenuOpen(false);
+  };
+
   const handleSwitchDepartment = (dept) => {
     setActiveDepartment(dept);
     const deptName = dept === 'digital_print' ? 'Elite Digital Print' : 'Elite Edition';
