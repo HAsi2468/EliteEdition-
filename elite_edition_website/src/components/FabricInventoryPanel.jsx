@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import CatalogManagerModal from './CatalogManagerModal';
-import { triggerPushNotification } from './NotificationToast';
+import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import {
   RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
   Layers, Database, Settings, Trash2, FileDown, Search, X,
@@ -418,7 +418,25 @@ export default function FabricInventoryPanel() {
     }
   };
 
-  useEffect(() => { fetchData(); fetchRequirement(); }, []);
+  useEffect(() => {
+    fetchData();
+    fetchRequirement();
+    const intervalId = setInterval(() => {
+      fetchData();
+      fetchRequirement();
+    }, 10000); // 10s auto-sync
+
+    const handleDataRefresh = () => {
+      fetchData();
+      fetchRequirement();
+    };
+    window.addEventListener('elite-data-refresh', handleDataRefresh);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('elite-data-refresh', handleDataRefresh);
+    };
+  }, []);
 
   // ─── Fetch ALL lots (no filter) — client side will filter by fabric ───
   const fetchAllLots = async () => {
@@ -462,6 +480,7 @@ export default function FabricInventoryPanel() {
       setIsInwardOpen(false);
       setEditingTransaction(null);
       setInwardForm({ challanNo: '', vendorName: '', fabricQuality: '', panna: '', qty: '', shortagePct: '', date: new Date().toISOString().split('T')[0], notes: '' });
+      triggerGlobalDataRefresh('fabric');
       fetchData();
     } catch (err) {
       alert(err.message);
@@ -477,6 +496,7 @@ export default function FabricInventoryPanel() {
       triggerPushNotification('📦 Fabric Outward Recorded', `${outwardForm.qty || ''}M fabric outward recorded for Job #${outwardForm.jobNo}.`, 'success');
       setIsOutwardOpen(false);
       setOutwardForm({ jobNo: '', partyName: '', fabricQuality: '', panna: '', lotNo: '', qty: '', date: new Date().toISOString().split('T')[0], notes: '' });
+      triggerGlobalDataRefresh('fabric');
       fetchData();
     } catch (err) {
       alert(err.message);
@@ -803,6 +823,7 @@ export default function FabricInventoryPanel() {
       setIsChallanOpen(false);
       setEditingChallan(null);
       resetChallanForm();
+      triggerGlobalDataRefresh('fabric');
       fetchData();
     } catch (err) {
       alert(err.message);
@@ -851,6 +872,7 @@ export default function FabricInventoryPanel() {
     try {
       await api.deleteFabricChallan(challanDeleteTarget.id);
       setChallanDeleteTarget(null);
+      triggerGlobalDataRefresh('fabric');
       fetchData();
     } catch (err) {
       alert('Failed to delete challan: ' + err.message);

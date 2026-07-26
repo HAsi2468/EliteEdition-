@@ -3,6 +3,7 @@ import { useSocket } from '../contexts/SocketContext';
 import { api } from '../services/api';
 import { MessageSquare, Send, Users, Hash, Plus, CheckSquare, X, ImagePlus, Loader2, Paperclip, Mic, Pin, Trash2, Edit2, Settings, Volume2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
+import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 
 const Workspace = ({ currentUser }) => {
   const socket = useSocket();
@@ -481,15 +482,10 @@ const Workspace = ({ currentUser }) => {
           title = message.roomId.type === 'direct' ? `New message from ${senderName}` : `New message in #${message.roomId.name}`;
         }
         
-        // 1. Show HTML5 browser notification
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(title, {
-            body: message.content,
-            icon: '/vite.svg'
-          });
-        }
+        // Trigger global push notification + persistent history
+        triggerPushNotification(title, message.content || 'Attachment / Voice memo', 'info', 'workspace');
         
-        // 2. Show in-app Toast Notification
+        // Also show in-app Toast Notification
         showToast(title, message.content, () => {
           const matchedRoom = roomsRef.current.find(r => r._id === message.roomId || r._id === message.roomId?._id);
           if (matchedRoom) {
@@ -501,19 +497,12 @@ const Workspace = ({ currentUser }) => {
     };
 
     const handleTaskUpdatedNotify = (task) => {
-      const isAssignedToMe = task.assignees?.some(a => a._id === currentUser._id);
+      const isAssignedToMe = task.assignees?.some(a => (a._id || a) === (currentUser._id || currentUser.id));
       
       if (isAssignedToMe) {
-        // 1. Browser Notification
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(`Task Assignment: ${task.title}`, {
-            body: `Status: ${task.status} · Priority: ${task.priority}`,
-            icon: '/vite.svg'
-          });
-        }
-        
-        // 2. In-App Toast
-        showToast(`Task Updated: ${task.title}`, `Status: ${task.status} · Priority: ${task.priority}`, () => {
+        const taskMsg = `Status: ${task.status} · Priority: ${task.priority}`;
+        triggerPushNotification(`Task Assignment: ${task.title}`, taskMsg, 'info', 'workspace');
+        showToast(`Task Updated: ${task.title}`, taskMsg, () => {
           setWorkspaceTab('tasks');
         });
       }

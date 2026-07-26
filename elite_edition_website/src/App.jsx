@@ -43,7 +43,7 @@ import {
   Bell
 } from 'lucide-react';
 
-import NotificationToastContainer, { triggerPushNotification, requestNotificationPermission } from './components/NotificationToast';
+import NotificationToastContainer, { triggerPushNotification, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
 
 // ─── Theme definitions ─────────────────────────────────────────────────────
 const THEMES = [
@@ -210,13 +210,35 @@ export default function App() {
   const [showServerSettings, setShowServerSettings] = useState(false);
   const [tempUrl, setTempUrl] = useState(getBaseUrl().replace('/v1', ''));
 
+  const [showNotificationDrawer, setShowNotificationDrawer] = useState(false);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(() => {
+    return getNotificationHistory().filter(h => !h.read).length;
+  });
+
+  useEffect(() => {
+    const handleNotifUpdate = () => {
+      setUnreadNotifCount(getNotificationHistory().filter(h => !h.read).length);
+    };
+    window.addEventListener('elite-notification-history-update', handleNotifUpdate);
+    return () => window.removeEventListener('elite-notification-history-update', handleNotifUpdate);
+  }, []);
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchData();
       const intervalId = setInterval(() => {
         fetchData();
-      }, 30000); // 30s auto-reload
-      return () => clearInterval(intervalId);
+      }, 10000); // 10s auto-sync
+
+      const handleDataRefresh = () => {
+        fetchData();
+      };
+      window.addEventListener('elite-data-refresh', handleDataRefresh);
+
+      return () => {
+        clearInterval(intervalId);
+        window.removeEventListener('elite-data-refresh', handleDataRefresh);
+      };
     }
   }, [isAuthenticated]);
 
@@ -313,6 +335,8 @@ export default function App() {
         setItems(prev => [newItem, ...prev]);
       }
       setIsFormOpen(false);
+      triggerGlobalDataRefresh();
+      fetchData();
     } catch (err) {
       alert(err.message || 'Failed to create item.');
     } finally {
@@ -335,13 +359,14 @@ export default function App() {
           imageUrl: formData.imageUrl
         };
         await api.updateProductCatalog(editingItem._id, payload);
-        await fetchData();
       } else if (activeTab === 'inventory') {
         const updatedItem = await api.updateInventory(editingItem._id, formData);
         setItems(prev => prev.map(item => item._id === editingItem._id ? { ...item, ...updatedItem } : item));
       }
       setIsFormOpen(false);
       setEditingItem(null);
+      triggerGlobalDataRefresh();
+      await fetchData();
     } catch (err) {
       alert(err.message || 'Failed to update item.');
     } finally {
@@ -356,6 +381,7 @@ export default function App() {
       try {
         await api.deleteProductCatalog(id);
         setCatalogItems(prev => prev.filter(item => item._id !== id));
+        triggerGlobalDataRefresh();
       } catch (err) {
         alert(err.message || 'Failed to delete product from catalog.');
       } finally {
@@ -367,6 +393,7 @@ export default function App() {
       try {
         await api.deleteInventory(id);
         setItems(prev => prev.filter(item => item._id !== id));
+        triggerGlobalDataRefresh();
       } catch (err) {
         alert(err.message || 'Failed to delete inventory item.');
       } finally {
@@ -381,6 +408,7 @@ export default function App() {
       const res = await api.bulkInward(parsedItems);
       alert(res.message || 'Bulk inward completed successfully!');
       setIsBulkInwardOpen(false);
+      triggerGlobalDataRefresh();
       await fetchData();
     } catch (err) {
       alert(err.message || 'Failed to process bulk inward.');
@@ -543,12 +571,31 @@ export default function App() {
           </div>
 
           <button
-            onClick={requestNotificationPermission}
+            onClick={() => setShowNotificationDrawer(true)}
             className="btn-icon"
-            title="Enable / Status of Push Notifications"
-            style={{ color: typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'var(--success)' : 'var(--text-muted)' }}
+            title="Notification History & Push Alerts"
+            style={{ position: 'relative' }}
           >
-            <Bell size={15} />
+            <Bell size={15} color={unreadNotifCount > 0 ? 'var(--primary)' : typeof Notification !== 'undefined' && Notification.permission === 'granted' ? 'var(--success)' : 'var(--text-muted)'} />
+            {unreadNotifCount > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '-3px',
+                right: '-3px',
+                background: 'var(--primary)',
+                color: '#fff',
+                fontSize: '0.6rem',
+                fontWeight: 800,
+                borderRadius: '10px',
+                padding: '1px 4px',
+                minWidth: '14px',
+                textAlign: 'center',
+                lineHeight: 1,
+                boxShadow: '0 0 8px rgba(56,189,248,0.6)'
+              }}>
+                {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
+              </span>
+            )}
           </button>
 
           <button onClick={fetchData} className="btn-icon" title="Reload Data">
@@ -934,6 +981,13 @@ export default function App() {
 
       {/* Global Push / Toast Notifications Container */}
       <NotificationToastContainer toasts={toasts} setToasts={setToasts} />
+
+      {/* Notification History Drawer */}
+      <NotificationHistoryDrawer
+        isOpen={showNotificationDrawer}
+        onClose={() => setShowNotificationDrawer(false)}
+        onSelectTab={(tab) => setActiveTab(tab)}
+      />
 
       {/* Modal Dialog */}
       {isFormOpen && (
