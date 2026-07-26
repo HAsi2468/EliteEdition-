@@ -1557,7 +1557,7 @@ const Workspace = ({ currentUser }) => {
   const wsStyles = {
     container: {
       display: 'flex',
-      height: isMobile ? 'calc(100vh - 110px)' : 'calc(100vh - 100px)',
+      height: isMobile ? 'calc(100dvh - 105px)' : 'calc(100vh - 100px)',
       gap: isMobile ? '0' : '20px',
       flexDirection: isMobile ? 'column' : 'row'
     },
@@ -1567,7 +1567,7 @@ const Workspace = ({ currentUser }) => {
       flexDirection: 'column',
       gap: '12px',
       overflowY: 'auto',
-      padding: isMobile ? '10px' : '15px'
+      padding: isMobile ? '10px 12px' : '16px'
     },
     chatArea: {
       flex: 1,
@@ -1576,54 +1576,76 @@ const Workspace = ({ currentUser }) => {
       display: isMobile && mobileActiveView === 'sidebar' ? 'none' : 'flex',
       flexDirection: 'column',
       backgroundColor: 'var(--bg-card, #161b26)',
-      borderRadius: isMobile ? '0' : '12px',
+      borderRadius: isMobile ? '0' : '16px',
       border: isMobile ? 'none' : '1px solid var(--border-light)',
+      boxShadow: isMobile ? 'none' : '0 10px 30px rgba(0,0,0,0.3)',
       overflow: 'hidden'
     },
     roomItem: (isActive) => ({
-      padding: isMobile ? '14px 16px' : '12px 16px',
-      borderRadius: '12px',
+      padding: isMobile ? '12px 14px' : '10px 14px',
+      borderRadius: '14px',
       display: 'flex',
       alignItems: 'center',
       gap: '12px',
       cursor: 'pointer',
-      backgroundColor: isActive ? 'var(--primary)' : 'rgba(255,255,255,0.02)',
-      color: isActive ? 'white' : 'var(--text-primary)',
-      transition: 'all 0.2s',
+      backgroundColor: isActive
+        ? 'rgba(56, 189, 248, 0.16)'
+        : 'rgba(255,255,255,0.02)',
+      color: isActive ? '#38bdf8' : 'var(--text-primary)',
+      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
       fontWeight: isActive ? '600' : '400',
-      border: isActive ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.04)'
+      border: isActive
+        ? '1px solid rgba(56, 189, 248, 0.4)'
+        : '1px solid rgba(255,255,255,0.05)',
+      boxShadow: isActive ? '0 4px 14px rgba(56, 189, 248, 0.15)' : 'none'
     }),
     header: {
-      padding: isMobile ? '12px 16px' : '20px',
+      padding: isMobile ? '12px 16px' : '18px 24px',
       borderBottom: '1px solid var(--border-light)',
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      backgroundColor: 'var(--bg-card, #161b26)',
+      backgroundColor: 'rgba(22, 27, 38, 0.95)',
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
       zIndex: 10
     },
     messageList: {
       flex: 1,
-      padding: isMobile ? '12px' : '20px',
+      padding: isMobile ? '14px 12px' : '24px',
       overflowY: 'auto',
       display: 'flex',
       flexDirection: 'column',
-      gap: isMobile ? '12px' : '20px'
+      gap: isMobile ? '14px' : '20px'
     },
     messageBubble: (isMine, isTask) => ({
       position: 'relative',
-      maxWidth: isTask ? '400px' : isMobile ? '84%' : '70%',
+      maxWidth: isTask ? '420px' : isMobile ? '86%' : '72%',
       width: isTask ? '100%' : 'auto',
-      padding: isTask ? '0' : isMobile ? '10px 14px' : '12px 16px',
-      borderRadius: '16px',
-      backgroundColor: isTask ? 'var(--bg-card, #161b26)' : isMine ? 'var(--primary)' : 'var(--bg-main)',
+      padding: isTask ? '0' : isMobile ? '11px 15px' : '13px 18px',
+      borderRadius: '18px',
+      backgroundColor: isTask
+        ? 'var(--bg-card, #161b26)'
+        : isMine
+          ? 'var(--primary, #3b82f6)'
+          : 'rgba(255, 255, 255, 0.05)',
+      backgroundImage: isMine && !isTask
+        ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)'
+        : 'none',
       color: isTask ? 'var(--text-primary)' : isMine ? 'white' : 'var(--text-primary)',
-      borderBottomRightRadius: isMine ? '3px' : '16px',
-      borderBottomLeftRadius: !isMine ? '3px' : '16px',
+      borderBottomRightRadius: isMine ? '4px' : '18px',
+      borderBottomLeftRadius: !isMine ? '4px' : '18px',
       alignSelf: isMine ? 'flex-end' : 'flex-start',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-      border: isTask ? '1px solid var(--border-light)' : 'none',
-      fontSize: isMobile ? '0.88rem' : '0.95rem'
+      boxShadow: isMine
+        ? '0 4px 14px rgba(37, 99, 235, 0.3)'
+        : '0 2px 8px rgba(0,0,0,0.15)',
+      border: isTask
+        ? '1px solid var(--border-light)'
+        : !isMine
+          ? '1px solid rgba(255, 255, 255, 0.08)'
+          : 'none',
+      fontSize: isMobile ? '0.9rem' : '0.96rem',
+      lineHeight: '1.45'
     }),
     taskCard: {
       header: { padding: '12px 16px', borderBottom: '1px solid var(--border-light)', backgroundColor: 'rgba(0,0,0,0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTopLeftRadius: '12px', borderTopRightRadius: '12px' },
@@ -1640,18 +1662,43 @@ const Workspace = ({ currentUser }) => {
         color: priority === 'high' ? '#ef4444' : priority === 'medium' ? '#f59e0b' : '#10b981'
       })
     },
-    messageSender: (isMine) => ({ fontSize: '0.75rem', color: isMine ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)', marginBottom: '4px', display: 'flex', gap: '8px', justifyContent: isMine ? 'flex-end' : 'flex-start' }),
+    messageSender: (isMine) => ({ fontSize: '0.75rem', color: isMine ? 'rgba(255,255,255,0.85)' : 'var(--text-secondary)', marginBottom: '4px', display: 'flex', gap: '8px', justifyContent: isMine ? 'flex-end' : 'flex-start', fontWeight: '500' }),
     inputArea: {
-      padding: isMobile ? '10px 12px' : '20px',
+      padding: isMobile ? '10px 12px' : '16px 24px',
       borderTop: '1px solid var(--border-light)',
-      backgroundColor: 'var(--bg-main)',
+      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
       position: isMobile ? 'sticky' : 'relative',
       bottom: 0,
       zIndex: 20
     },
     inputForm: { display: 'flex', gap: '10px', alignItems: 'center' },
-    inputField: { flex: 1, padding: isMobile ? '10px 16px' : '12px 20px', borderRadius: '24px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-input, #0b0f19)', color: 'var(--text-primary)', outline: 'none', fontSize: isMobile ? '0.9rem' : '0.95rem' },
-    sendBtn: { padding: isMobile ? '10px' : '12px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    inputField: {
+      flex: 1,
+      padding: isMobile ? '12px 18px' : '14px 22px',
+      borderRadius: '24px',
+      border: '1px solid rgba(255,255,255,0.1)',
+      backgroundColor: 'var(--bg-input, #0b0f19)',
+      color: 'var(--text-primary)',
+      outline: 'none',
+      fontSize: isMobile ? '0.92rem' : '0.96rem',
+      transition: 'border-color 0.2s, box-shadow 0.2s'
+    },
+    sendBtn: {
+      padding: isMobile ? '11px' : '13px',
+      borderRadius: '50%',
+      background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)',
+      color: 'white',
+      border: 'none',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      boxShadow: '0 4px 12px rgba(56, 189, 248, 0.3)',
+      transition: 'transform 0.15s ease'
+    },
     createTaskChip: {
       position: 'absolute', top: '-15px', right: '-10px', backgroundColor: 'var(--accent)', color: 'white', padding: '4px 10px', borderRadius: '16px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', zIndex: 10, border: 'none'
     },
