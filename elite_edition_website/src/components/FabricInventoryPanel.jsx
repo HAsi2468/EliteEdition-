@@ -16,6 +16,9 @@ export default function FabricInventoryPanel() {
   const normalizeFabricName = (val) => {
     if (!val) return '';
     let clean = String(val).trim().toUpperCase();
+    if (clean === 'CREPE' || clean === 'CRAPE' || clean === 'FRANCH CREPE' || clean === 'FRENCH CREP' || clean.includes('CREPE') || clean.includes('CRAPE')) {
+      return 'FRENCH CREPE';
+    }
     if (clean === 'CAMRIK' || clean === 'CEMBRIC' || clean === 'CEMBRIK' || clean === 'CAMBRIK' || clean.includes('CAMRIK') || clean.includes('CEMBRIK')) {
       return 'CAMBRIC';
     }
@@ -27,9 +30,9 @@ export default function FabricInventoryPanel() {
     if (!clean || clean.toUpperCase() === 'UNKNOWN') {
       const fabUpper = String(fabricName || '').trim().toUpperCase();
       if (fabUpper.includes('ARMANI')) {
-        return '44"';
+        return '44';
       }
-      return '58"';
+      return '58';
     }
     return clean;
   };
@@ -340,11 +343,12 @@ export default function FabricInventoryPanel() {
 
       if (cfg && cfg.parties) setPartiesList(cfg.parties);
       if (cfg && cfg.widths) {
-        const defaultWidths = ['58"', '44"', '58', '44'];
-        const combined = Array.from(new Set([...defaultWidths, ...cfg.widths]));
+        const defaultWidths = ['58', '44', '36'];
+        const cleanWidths = cfg.widths.map(w => String(w).replace(/['"]/g, '')).filter(Boolean);
+        const combined = Array.from(new Set([...defaultWidths, ...cleanWidths]));
         setWidthsList(combined);
       } else {
-        setWidthsList(['58"', '44"', '58', '44']);
+        setWidthsList(['58', '44', '36']);
       }
       if (cfg && cfg.billToOptions) setBillToOptions(cfg.billToOptions);
       if (cfg && cfg.shipToOptions) setShipToOptions(cfg.shipToOptions);
@@ -1084,7 +1088,7 @@ export default function FabricInventoryPanel() {
                                 <tr key={pi} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                                   <td style={{ padding: '0.5rem 0.5rem', fontWeight: 600 }}>
                                     <span style={{ background: 'rgba(255,255,255,0.08)', borderRadius: '4px', padding: '2px 8px', fontSize: '0.8rem' }}>
-                                      {p.panna && p.panna !== 'Unknown' ? `${p.panna}"` : '—'}
+                                      {p.panna && p.panna !== 'Unknown' ? String(p.panna).replace(/['"]/g, '') : '—'}
                                     </span>
                                   </td>
                                   <td style={{ textAlign: 'right', padding: '0.5rem', color: 'var(--success)' }}>+{p.totalInward}</td>
@@ -1592,7 +1596,7 @@ export default function FabricInventoryPanel() {
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{req.fabricQuality}</div>
                           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                            <span>Panna: <strong>{req.panna !== 'Unknown' ? `${req.panna}"` : '—'}</strong></span>
+                            <span>Panna: <strong>{req.panna !== 'Unknown' ? String(req.panna).replace(/['"]/g, '') : '—'}</strong></span>
                             <span>{req.jobs.length} job card{req.jobs.length !== 1 ? 's' : ''}</span>
                           </div>
                         </div>
@@ -1896,7 +1900,7 @@ export default function FabricInventoryPanel() {
                   <datalist id="challan-lot-options">
                     {availableLots.map((l, i) => (
                       <option key={i} value={String(l.lotNo)}>
-                        Lot #{l.lotNo} — {l.fabricQuality} ({l.panna || '58"'}) [{l.currentStock ? `${l.currentStock}m` : ''}]
+                        Lot #{l.lotNo} — {l.fabricQuality} ({l.panna ? String(l.panna).replace(/['"]/g, '') : '58'}) [{l.currentStock ? `${l.currentStock}m` : ''}]
                       </option>
                     ))}
                   </datalist>

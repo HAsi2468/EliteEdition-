@@ -247,6 +247,9 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails)
 const normalizeFabric = (val) => {
   if (!val) return '';
   let clean = String(val).trim().toUpperCase();
+  if (clean === 'CREPE' || clean === 'CRAPE' || clean === 'FRANCH CREPE' || clean === 'FRENCH CREP' || clean.includes('CREPE') || clean.includes('CRAPE')) {
+    return 'FRENCH CREPE';
+  }
   if (clean === 'CAMRIK' || clean === 'CEMBRIC' || clean === 'CEMBRIK' || clean === 'CAMBRIK' || clean.includes('CAMRIK') || clean.includes('CEMBRIK')) {
     return 'CAMBRIC';
   }
@@ -258,9 +261,9 @@ const normalizePanna = (val, fabricName = '') => {
   if (!clean || clean.toUpperCase() === 'UNKNOWN') {
     const fabUpper = String(fabricName || '').trim().toUpperCase();
     if (fabUpper.includes('ARMANI')) {
-      return '44"';
+      return '44';
     }
-    return '58"';
+    return '58';
   }
   return clean;
 };
