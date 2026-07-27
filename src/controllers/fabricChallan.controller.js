@@ -686,6 +686,16 @@ const downloadChallanPdf = async (req, res) => {
       }
     }
 
+    const hasNotes = !!(challan.notes && challan.notes.trim());
+    const hasPcs = !!(challan.pcs);
+
+    const getColor = (colorStr, isColorPage) => {
+      if (isColorPage) return colorStr;
+      if (colorStr === '#dc2626') return '#dc2626'; // Keep Challan No & Total TP in RED!
+      if (colorStr === '#475569') return '#555555'; // Expected Pcs text in Gray
+      return '#000000'; // Everything else B&W
+    };
+
     const renderPage = (isColorPage) => {
       // Draw border
       doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(1)
