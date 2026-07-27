@@ -907,15 +907,16 @@ const downloadChallanPdf = async (req, res) => {
 
       const sigLineY = PH - MR - 45;
 
-      // ── EMBED DESIGN IMAGE AT BOTTOM CENTER (FIXED & CONNECTED TO BOTTOM SIGNATURE LINE) ──
+      // ── EMBED DESIGN IMAGE CONNECTED TO OUTER BOTTOM BORDER ──
       if (firstDesignImg && firstDesignImg.path) {
-        const maxBoxH = sigLineY - notesEndY - 6;
+        const bottomBorderY = PH - MR; // 814 (Challan outer bottom border)
+        const maxBoxH = bottomBorderY - notesEndY - 4;
 
         if (maxBoxH >= 30) {
-          const imgBoxH = Math.min(85, Math.max(30, maxBoxH));
-          const imgBoxW = Math.min(145, Math.round(imgBoxH * 1.45));
+          const imgBoxH = Math.min(105, Math.max(30, maxBoxH));
+          const imgBoxW = Math.min(150, Math.round(imgBoxH * 1.45));
           const imgBoxX = ML + (contentWidth - imgBoxW) / 2;
-          const imgBoxY = sigLineY - imgBoxH; // Fixed & connected directly to bottom signature line!
+          const imgBoxY = bottomBorderY - imgBoxH; // Bottom edge rests directly ON the outer bottom border!
 
           // Draw image frame box
           doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5)
@@ -928,7 +929,7 @@ const downloadChallanPdf = async (req, res) => {
               valign: 'center'
             });
           } catch (e) {
-            console.warn('Failed to embed design image at bottom center:', e.message);
+            console.warn('Failed to embed design image at bottom border:', e.message);
           }
         }
       }
