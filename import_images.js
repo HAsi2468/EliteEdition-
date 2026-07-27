@@ -7,7 +7,10 @@ mongoose.connect('mongodb+srv://parth6070_db_user:76YmHfYkBeAdXscH@eliteedition.
   .then(async () => {
     console.log('Connected to MongoDB');
     const db = require('./src/db/models');
-    const dir = path.join(__dirname, '../Digital print');
+    const printDir = path.join(__dirname, '../Digital print');
+    const imagesDir = path.join(__dirname, '../elite_edition_images');
+    const dir = fs.existsSync(printDir) ? printDir : imagesDir;
+    console.log(`Scanning design images from: ${dir}`);
     const files = fs.readdirSync(dir);
     
     let processed = 0;
