@@ -612,9 +612,12 @@ const downloadChallanPdf = async (req, res) => {
       
       const possibleDirs = [
         path.join(__dirname, '../../elite_edition_images'),
+        path.join(__dirname, '../../../elite_edition_images'),
+        '/home/ubuntu/elite_edition_images',
         path.join(__dirname, '../elite_edition_images'),
         path.join(__dirname, '../../Digital print'),
-        path.join(__dirname, '../Digital print')
+        path.join(__dirname, '../../../Digital print'),
+        '/home/ubuntu/Digital print'
       ];
       for (const pDir of possibleDirs) {
         const fullPath = path.join(pDir, filename);
@@ -652,6 +655,15 @@ const downloadChallanPdf = async (req, res) => {
         .map(s => s.trim())
         .filter(Boolean);
 
+      const possibleDirs = [
+        path.join(__dirname, '../../elite_edition_images'),
+        path.join(__dirname, '../../../elite_edition_images'),
+        '/home/ubuntu/elite_edition_images',
+        path.join(__dirname, '../../Digital print'),
+        path.join(__dirname, '../../../Digital print'),
+        '/home/ubuntu/Digital print'
+      ];
+
       for (const dName of designTokens) {
         const cleanName = dName.replace(/^ED-/i, '');
         try {
@@ -674,11 +686,14 @@ const downloadChallanPdf = async (req, res) => {
         const directCandidates = [dName, `ED-${dName}`, cleanName, `ED-${cleanName}`];
         for (const cand of directCandidates) {
           for (const ext of ['.jpg', '.jpeg', '.png']) {
-            const testPath = path.join(__dirname, '../../elite_edition_images', `${cand}${ext}`);
-            if (fs.existsSync(testPath)) {
-              firstDesignImg = { path: testPath, label: `Design: ${cand}` };
-              break;
+            for (const pDir of possibleDirs) {
+              const testPath = path.join(pDir, `${cand}${ext}`);
+              if (fs.existsSync(testPath)) {
+                firstDesignImg = { path: testPath, label: `Design: ${cand}` };
+                break;
+              }
             }
+            if (firstDesignImg) break;
           }
           if (firstDesignImg) break;
         }
