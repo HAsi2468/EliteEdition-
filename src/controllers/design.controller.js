@@ -19,10 +19,14 @@ const getAll = async (req, res) => {
       ];
     }
     const skip = (Number(page) - 1) * Number(limit);
-    let sort = { designName: 1 };
+    let sort = { designName: -1 };
     if (sortBy) {
       const order = sortOrder === 'desc' ? -1 : 1;
-      sort = { [sortBy]: order };
+      if (sortBy === 'createdAt') {
+        sort = { createdAt: order, _id: order };
+      } else {
+        sort = { [sortBy]: order, _id: order };
+      }
     }
     const [docs, total] = await Promise.all([
       db.Design.find(filter).collation({ locale: "en_US", numericOrdering: true }).sort(sort).skip(skip).limit(Number(limit)).lean(),
