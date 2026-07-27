@@ -706,6 +706,9 @@ const updateTransaction = async (req, res) => {
 const downloadFabricInwardPdf = async (req, res) => {
   try {
     const PDFDocument = require('pdfkit');
+    const path = require('path');
+    const fs = require('fs');
+    const logoPath = path.join(__dirname, 'Logo.png');
     const { dateStart, dateEnd } = req.query;
 
     const filter = { type: 'INWARD' };
@@ -729,52 +732,72 @@ const downloadFabricInwardPdf = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="Fabric_Inward_Report_${cleanDateStart || 'all'}_to_${cleanDateEnd || 'all'}.pdf"`);
     doc.pipe(res);
 
-    doc.rect(30, 30, 535, 45).fill('#0f172a');
-    doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold')
-      .text('ELITE DIGITAL PRINTS — FABRIC INWARD REPORT', 30, 42, { width: 535, align: 'center' });
-    
-    let subtitle = 'Period: All Time';
-    if (cleanDateStart && cleanDateEnd) subtitle = `Period: ${cleanDateStart} to ${cleanDateEnd}`;
-    else if (cleanDateStart) subtitle = `Period: From ${cleanDateStart}`;
-    else if (cleanDateEnd) subtitle = `Period: Until ${cleanDateEnd}`;
-    
-    doc.fillColor('#94a3b8').fontSize(9).font('Helvetica')
-      .text(subtitle, 30, 60, { width: 535, align: 'center' });
+    // Premium Branded Header
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, 30, 25, { height: 42 });
+    }
 
-    let y = 90;
+    doc.fillColor('#0f172a').fontSize(16).font('Helvetica-Bold')
+      .text('ELITE DIGITAL PRINTS', 115, 27);
+    
+    doc.fillColor('#475569').fontSize(10).font('Helvetica-Bold')
+      .text('FABRIC INWARD REPORT', 115, 47);
+
+    let periodStr = 'Period: All Time';
+    if (cleanDateStart && cleanDateEnd) periodStr = `Period: ${cleanDateStart} to ${cleanDateEnd}`;
+    else if (cleanDateStart) periodStr = `Period: From ${cleanDateStart}`;
+    else if (cleanDateEnd) periodStr = `Period: Until ${cleanDateEnd}`;
+
+    doc.fillColor('#64748b').fontSize(8.5).font('Helvetica')
+      .text(periodStr, 30, 32, { width: 535, align: 'right' });
+    doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica')
+      .text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, 30, 47, { width: 535, align: 'right' });
+
+    doc.moveTo(30, 75).lineTo(565, 75).strokeColor('#e2e8f0').lineWidth(1).stroke();
+
+    let y = 88;
 
     const totalInwardMtr = transactions.reduce((s, t) => s + (t.qty || 0), 0);
     const totalLotsCount = transactions.length;
 
-    doc.rect(30, y, 260, 45).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL INWARD LOTS', 35, y + 8);
-    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(String(totalLotsCount), 35, y + 22);
+    doc.rect(30, y, 260, 42).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('TOTAL INWARD LOTS', 35, y + 7);
+    doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold').text(String(totalLotsCount), 35, y + 20);
 
-    doc.rect(305, y, 260, 45).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL INWARD METERAGE', 310, y + 8);
-    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(`${totalInwardMtr.toLocaleString('en-IN')} m`, 310, y + 22);
+    doc.rect(305, y, 260, 42).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('TOTAL INWARD METERAGE', 310, y + 7);
+    doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold').text(`${totalInwardMtr.toLocaleString('en-IN')} m`, 310, y + 20);
 
-    y += 60;
+    y += 54;
 
-    doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text('FABRIC INWARD TRANSACTIONS MASTER LIST', 30, y);
+    const renderTableHeader = (currY) => {
+      doc.rect(30, currY, 535, 20).fill('#1e293b');
+      doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+      doc.text('DATE', 35, currY + 6);
+      doc.text('LOT #', 105, currY + 6);
+      doc.text('VENDOR NAME', 155, currY + 6);
+      doc.text('VENDOR CH. NO.', 265, currY + 6);
+      doc.text('FABRIC & PANNA', 365, currY + 6);
+      doc.text('QTY (M)', 490, currY + 6);
+    };
+
+    doc.fillColor('#0f172a').fontSize(10.5).font('Helvetica-Bold').text('FABRIC INWARD TRANSACTIONS MASTER LIST', 30, y);
     y += 15;
 
-    doc.rect(30, y, 535, 20).fill('#1e293b');
-    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
-    doc.text('DATE', 35, y + 6);
-    doc.text('LOT #', 105, y + 6);
-    doc.text('VENDOR NAME', 155, y + 6);
-    doc.text('VENDOR CH. NO.', 265, y + 6);
-    doc.text('FABRIC & PANNA', 365, y + 6);
-    doc.text('QTY (M)', 490, y + 6);
+    renderTableHeader(y);
     y += 20;
 
     transactions.forEach((t, i) => {
-      if (y > 750) { doc.addPage(); y = 40; }
+      if (y > 750) {
+        doc.addPage();
+        y = 35;
+        renderTableHeader(y);
+        y += 20;
+      }
       const dt = t.date ? new Date(t.date).toLocaleDateString('en-IN', { day:'2-digit', month:'2-digit', year:'numeric' }) : '—';
       const fabStr = `${t.fabricQuality || '—'}${t.panna ? ' (' + t.panna + '")' : ''}`;
 
-      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#f1f5f9' : '#ffffff');
+      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#f8fafc' : '#ffffff');
       doc.fillColor('#1a472a').fontSize(8).font('Helvetica');
       doc.text(dt, 35, y + 5);
       doc.text(t.lotNo ? `#${t.lotNo}` : '—', 105, y + 5);
@@ -784,6 +807,11 @@ const downloadFabricInwardPdf = async (req, res) => {
       doc.text(`+${(t.qty || 0).toLocaleString('en-IN')} m`, 490, y + 5);
       y += 18;
     });
+
+    if (transactions.length === 0) {
+      doc.rect(30, y, 535, 25).fill('#f8fafc');
+      doc.fillColor('#94a3b8').fontSize(9).font('Helvetica').text('No fabric inward records found for selected period.', 30, y + 7, { width: 535, align: 'center' });
+    }
 
     const pages = doc.bufferedPageRange();
     for (let i = 0; i < pages.count; i++) {
@@ -802,6 +830,9 @@ const downloadFabricInwardPdf = async (req, res) => {
 const downloadFabricOutwardPdf = async (req, res) => {
   try {
     const PDFDocument = require('pdfkit');
+    const path = require('path');
+    const fs = require('fs');
+    const logoPath = path.join(__dirname, 'Logo.png');
     const { dateStart, dateEnd } = req.query;
 
     const filter = { type: 'OUTWARD' };
@@ -825,53 +856,73 @@ const downloadFabricOutwardPdf = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="Fabric_Outward_Report_${cleanDateStart || 'all'}_to_${cleanDateEnd || 'all'}.pdf"`);
     doc.pipe(res);
 
-    doc.rect(30, 30, 535, 45).fill('#0f172a');
-    doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold')
-      .text('ELITE DIGITAL PRINTS — FABRIC OUTWARD REPORT', 30, 42, { width: 535, align: 'center' });
-    
-    let subtitle = 'Period: All Time';
-    if (cleanDateStart && cleanDateEnd) subtitle = `Period: ${cleanDateStart} to ${cleanDateEnd}`;
-    else if (cleanDateStart) subtitle = `Period: From ${cleanDateStart}`;
-    else if (cleanDateEnd) subtitle = `Period: Until ${cleanDateEnd}`;
-    
-    doc.fillColor('#94a3b8').fontSize(9).font('Helvetica')
-      .text(subtitle, 30, 60, { width: 535, align: 'center' });
+    // Premium Branded Header
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, 30, 25, { height: 42 });
+    }
 
-    let y = 90;
+    doc.fillColor('#0f172a').fontSize(16).font('Helvetica-Bold')
+      .text('ELITE DIGITAL PRINTS', 115, 27);
+    
+    doc.fillColor('#475569').fontSize(10).font('Helvetica-Bold')
+      .text('FABRIC OUTWARD REPORT', 115, 47);
+
+    let periodStr = 'Period: All Time';
+    if (cleanDateStart && cleanDateEnd) periodStr = `Period: ${cleanDateStart} to ${cleanDateEnd}`;
+    else if (cleanDateStart) periodStr = `Period: From ${cleanDateStart}`;
+    else if (cleanDateEnd) periodStr = `Period: Until ${cleanDateEnd}`;
+
+    doc.fillColor('#64748b').fontSize(8.5).font('Helvetica')
+      .text(periodStr, 30, 32, { width: 535, align: 'right' });
+    doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica')
+      .text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, 30, 47, { width: 535, align: 'right' });
+
+    doc.moveTo(30, 75).lineTo(565, 75).strokeColor('#e2e8f0').lineWidth(1).stroke();
+
+    let y = 88;
 
     const totalOutwardMtr = transactions.reduce((s, t) => s + (t.qty || 0), 0);
     const totalOutwardCount = transactions.length;
 
-    doc.rect(30, y, 260, 45).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL OUTWARD DISPATCHES', 35, y + 8);
-    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(String(totalOutwardCount), 35, y + 22);
+    doc.rect(30, y, 260, 42).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('TOTAL OUTWARD DISPATCHES', 35, y + 7);
+    doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold').text(String(totalOutwardCount), 35, y + 20);
 
-    doc.rect(305, y, 260, 45).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL DISPATCHED METERAGE', 310, y + 8);
-    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(`${totalOutwardMtr.toLocaleString('en-IN')} m`, 310, y + 22);
+    doc.rect(305, y, 260, 42).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('TOTAL DISPATCHED METERAGE', 310, y + 7);
+    doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold').text(`${totalOutwardMtr.toLocaleString('en-IN')} m`, 310, y + 20);
 
-    y += 60;
+    y += 54;
 
-    doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text('FABRIC OUTWARD TRANSACTIONS MASTER LIST', 30, y);
+    const renderTableHeader = (currY) => {
+      doc.rect(30, currY, 535, 20).fill('#1e293b');
+      doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+      doc.text('DATE', 35, currY + 6);
+      doc.text('LOT #', 105, currY + 6);
+      doc.text('PARTY NAME', 155, currY + 6);
+      doc.text('CHALLAN / JOB NO.', 265, currY + 6);
+      doc.text('FABRIC & PANNA', 385, currY + 6);
+      doc.text('QTY (M)', 490, currY + 6);
+    };
+
+    doc.fillColor('#0f172a').fontSize(10.5).font('Helvetica-Bold').text('FABRIC OUTWARD TRANSACTIONS MASTER LIST', 30, y);
     y += 15;
 
-    doc.rect(30, y, 535, 20).fill('#1e293b');
-    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
-    doc.text('DATE', 35, y + 6);
-    doc.text('LOT #', 105, y + 6);
-    doc.text('PARTY NAME', 155, y + 6);
-    doc.text('CHALLAN / JOB NO.', 265, y + 6);
-    doc.text('FABRIC & PANNA', 385, y + 6);
-    doc.text('QTY (M)', 490, y + 6);
+    renderTableHeader(y);
     y += 20;
 
     transactions.forEach((t, i) => {
-      if (y > 750) { doc.addPage(); y = 40; }
+      if (y > 750) {
+        doc.addPage();
+        y = 35;
+        renderTableHeader(y);
+        y += 20;
+      }
       const dt = t.date ? new Date(t.date).toLocaleDateString('en-IN', { day:'2-digit', month:'2-digit', year:'numeric' }) : '—';
       const fabStr = `${t.fabricQuality || '—'}${t.panna ? ' (' + t.panna + '")' : ''}`;
       const refStr = `${t.challanNo || t.jobNo || '—'}`;
 
-      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#f1f5f9' : '#ffffff');
+      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#f8fafc' : '#ffffff');
       doc.fillColor('#7f1d1d').fontSize(8).font('Helvetica');
       doc.text(dt, 35, y + 5);
       doc.text(t.lotNo ? `#${t.lotNo}` : '—', 105, y + 5);
@@ -881,6 +932,11 @@ const downloadFabricOutwardPdf = async (req, res) => {
       doc.text(`-${(t.qty || 0).toLocaleString('en-IN')} m`, 490, y + 5);
       y += 18;
     });
+
+    if (transactions.length === 0) {
+      doc.rect(30, y, 535, 25).fill('#f8fafc');
+      doc.fillColor('#94a3b8').fontSize(9).font('Helvetica').text('No fabric outward records found for selected period.', 30, y + 7, { width: 535, align: 'center' });
+    }
 
     const pages = doc.bufferedPageRange();
     for (let i = 0; i < pages.count; i++) {
@@ -899,6 +955,9 @@ const downloadFabricOutwardPdf = async (req, res) => {
 const downloadFabricLotWisePdf = async (req, res) => {
   try {
     const PDFDocument = require('pdfkit');
+    const path = require('path');
+    const fs = require('fs');
+    const logoPath = path.join(__dirname, 'Logo.png');
     const { dateStart, dateEnd } = req.query;
 
     const matchFilter = {};
@@ -954,62 +1013,82 @@ const downloadFabricLotWisePdf = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="Lotwise_Fabric_Report_${cleanDateStart || 'all'}_to_${cleanDateEnd || 'all'}.pdf"`);
     doc.pipe(res);
 
-    doc.rect(30, 30, 535, 45).fill('#0f172a');
-    doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold')
-      .text('ELITE DIGITAL PRINTS — LOT-WISE FABRIC REPORT', 30, 42, { width: 535, align: 'center' });
-    
-    let subtitle = 'Period: All Time';
-    if (cleanDateStart && cleanDateEnd) subtitle = `Period: ${cleanDateStart} to ${cleanDateEnd}`;
-    else if (cleanDateStart) subtitle = `Period: From ${cleanDateStart}`;
-    else if (cleanDateEnd) subtitle = `Period: Until ${cleanDateEnd}`;
-    
-    doc.fillColor('#94a3b8').fontSize(9).font('Helvetica')
-      .text(subtitle, 30, 60, { width: 535, align: 'center' });
+    // Premium Branded Header
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, 30, 25, { height: 42 });
+    }
 
-    let y = 90;
+    doc.fillColor('#0f172a').fontSize(16).font('Helvetica-Bold')
+      .text('ELITE DIGITAL PRINTS', 115, 27);
+    
+    doc.fillColor('#475569').fontSize(10).font('Helvetica-Bold')
+      .text('LOT-WISE FABRIC STOCK BALANCE REPORT', 115, 47);
+
+    let periodStr = 'Period: All Time';
+    if (cleanDateStart && cleanDateEnd) periodStr = `Period: ${cleanDateStart} to ${cleanDateEnd}`;
+    else if (cleanDateStart) periodStr = `Period: From ${cleanDateStart}`;
+    else if (cleanDateEnd) periodStr = `Period: Until ${cleanDateEnd}`;
+
+    doc.fillColor('#64748b').fontSize(8.5).font('Helvetica')
+      .text(periodStr, 30, 32, { width: 535, align: 'right' });
+    doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica')
+      .text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, 30, 47, { width: 535, align: 'right' });
+
+    doc.moveTo(30, 75).lineTo(565, 75).strokeColor('#e2e8f0').lineWidth(1).stroke();
+
+    let y = 88;
 
     const totalInwardM = lots.reduce((s, l) => s + (l.totalInward || 0), 0);
     const totalOutwardM = lots.reduce((s, l) => s + (l.totalOutward || 0), 0);
     const totalRemainingM = lots.reduce((s, l) => s + Math.max(0, l.currentStock || 0), 0);
 
-    doc.rect(30, y, 125, 45).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL LOTS TRACKED', 35, y + 8);
-    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(String(lots.length), 35, y + 22);
+    doc.rect(30, y, 125, 42).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('TOTAL LOTS TRACKED', 35, y + 7);
+    doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold').text(String(lots.length), 35, y + 20);
 
-    doc.rect(165, y, 125, 45).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL INWARD (M)', 170, y + 8);
-    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(`${totalInwardM.toLocaleString('en-IN')} m`, 170, y + 22);
+    doc.rect(165, y, 125, 42).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('TOTAL INWARD (M)', 170, y + 7);
+    doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold').text(`${totalInwardM.toLocaleString('en-IN')} m`, 170, y + 20);
 
-    doc.rect(300, y, 135, 45).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL OUTWARD (M)', 305, y + 8);
-    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(`${totalOutwardM.toLocaleString('en-IN')} m`, 305, y + 22);
+    doc.rect(300, y, 135, 42).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('TOTAL OUTWARD (M)', 305, y + 7);
+    doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold').text(`${totalOutwardM.toLocaleString('en-IN')} m`, 305, y + 20);
 
-    doc.rect(445, y, 120, 45).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('NET BALANCE IN STOCK', 450, y + 8);
-    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(`${totalRemainingM.toLocaleString('en-IN')} m`, 450, y + 22);
+    doc.rect(445, y, 120, 42).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('NET BALANCE IN STOCK', 450, y + 7);
+    doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold').text(`${totalRemainingM.toLocaleString('en-IN')} m`, 450, y + 20);
 
-    y += 60;
+    y += 54;
 
-    doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text('LOT-WISE FABRIC STOCK BALANCE LIST', 30, y);
+    const renderTableHeader = (currY) => {
+      doc.rect(30, currY, 535, 20).fill('#1e293b');
+      doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+      doc.text('LOT #', 35, currY + 6);
+      doc.text('FABRIC & PANNA', 95, currY + 6);
+      doc.text('VENDOR NAME', 215, currY + 6);
+      doc.text('INWARD (M)', 315, currY + 6);
+      doc.text('OUTWARD (M)', 395, currY + 6);
+      doc.text('CURRENT STOCK', 475, currY + 6);
+    };
+
+    doc.fillColor('#0f172a').fontSize(10.5).font('Helvetica-Bold').text('LOT-WISE FABRIC STOCK BALANCE LIST', 30, y);
     y += 15;
 
-    doc.rect(30, y, 535, 20).fill('#1e293b');
-    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
-    doc.text('LOT #', 35, y + 6);
-    doc.text('FABRIC & PANNA', 95, y + 6);
-    doc.text('VENDOR NAME', 215, y + 6);
-    doc.text('INWARD (M)', 315, y + 6);
-    doc.text('OUTWARD (M)', 395, y + 6);
-    doc.text('CURRENT STOCK', 475, y + 6);
+    renderTableHeader(y);
     y += 20;
 
     lots.forEach((l, i) => {
-      if (y > 750) { doc.addPage(); y = 40; }
+      if (y > 750) {
+        doc.addPage();
+        y = 35;
+        renderTableHeader(y);
+        y += 20;
+      }
       const fabStr = `${l.fabricQuality || '—'}${l.panna ? ' (' + l.panna + '")' : ''}`;
       const stockVal = l.currentStock || 0;
       const stockCol = stockVal > 0 ? '#16a34a' : stockVal < 0 ? '#dc2626' : '#64748b';
 
-      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#f1f5f9' : '#ffffff');
+      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#f8fafc' : '#ffffff');
       doc.fillColor('#334155').fontSize(8).font('Helvetica');
       doc.text(`#${l.lotNo}`, 35, y + 5);
       doc.text(fabStr, 95, y + 5, { width: 115, lineBreak: false });
@@ -1019,6 +1098,11 @@ const downloadFabricLotWisePdf = async (req, res) => {
       doc.fillColor(stockCol).font('Helvetica-Bold').text(`${stockVal.toLocaleString('en-IN')} m`, 475, y + 5);
       y += 18;
     });
+
+    if (lots.length === 0) {
+      doc.rect(30, y, 535, 25).fill('#f8fafc');
+      doc.fillColor('#94a3b8').fontSize(9).font('Helvetica').text('No lot-wise fabric balance records found for selected period.', 30, y + 7, { width: 535, align: 'center' });
+    }
 
     const pages = doc.bufferedPageRange();
     for (let i = 0; i < pages.count; i++) {
