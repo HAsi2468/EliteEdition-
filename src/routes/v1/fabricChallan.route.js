@@ -23,6 +23,9 @@ router.delete('/:id', c.deleteChallan);
 // Reset all challans
 router.post('/reset-all', c.resetAllChallans);
 
+// Download challan summary report PDF
+router.get('/report/pdf', c.downloadChallanSummaryPdf);
+
 // Download single challan PDF
 router.get('/:id/pdf', c.downloadChallanPdf);
 

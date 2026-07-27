@@ -88,7 +88,10 @@ export default function ReportsCenter({ department }) {
       const combinedStart = `${dateStart}T${timeStart}:00`;
       const combinedEnd = `${dateEnd}T${timeEnd}:59`;
 
-      if (activeDepartment === 'elite-print') {
+      if (activeReportTab === 'challan-report') {
+        const res = await api.getFabricChallans({ dateStart: combinedStart, dateEnd: combinedEnd });
+        data = res.data || [];
+      } else if (activeDepartment === 'elite-print') {
         const res = await api.getElitePrintReports(combinedStart, combinedEnd);
         data = res.data;
       } else if (activeReportTab === 'stock-value') {
@@ -136,7 +139,9 @@ export default function ReportsCenter({ department }) {
       const fullBase = apiBase.startsWith('http') ? apiBase : `${window.location.origin}${apiBase}`;
       
       let downloadLink = '';
-      if (activeDepartment === 'elite-print') {
+      if (activeReportTab === 'challan-report') {
+        downloadLink = `${fullBase}/fabric-challan/report/pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
+      } else if (activeDepartment === 'elite-print') {
         downloadLink = `${fullBase}/department-reports/elite-print/pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
       } else if (activeReportTab === 'brand-hourly') {
         downloadLink = `${fullBase}/salesList/report/pdf?type=brand-hourly&dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
@@ -150,7 +155,13 @@ export default function ReportsCenter({ department }) {
 
       let content = `📊 *SHARED REPORT: ${reportTitle.toUpperCase()}*\n📅 Period: ${dateText}\n\n`;
       
-      if (activeDepartment === 'elite-print') {
+      if (activeReportTab === 'challan-report') {
+        const list = Array.isArray(reportData) ? reportData : [];
+        const totalM = list.reduce((s, c) => s + (c.totalMtr || 0), 0);
+        const totalT = list.reduce((s, c) => s + (c.totalTp || 0), 0);
+        content += `📋 *Total Challans:* ${list.length}\n`;
+        content += `🧵 *Total Dispatched:* ${totalM.toLocaleString('en-IN')} m (${totalT} rolls)\n`;
+      } else if (activeDepartment === 'elite-print') {
         const topF = reportData.fabricTrends ? reportData.fabricTrends[0] : null;
         content += `🖨️ *Avg Print to Delivery:* ${reportData.avgPrintToDelivery || 0} Days\n`;
         if (topF) content += `🧵 *Top Fabric Demand:* ${topF._id} (${topF.totalMtr} m)\n`;
@@ -207,7 +218,9 @@ export default function ReportsCenter({ department }) {
       const formattedDateStart = combinedStart.replace(/:/g, '-');
       const formattedDateEnd = combinedEnd.replace(/:/g, '-');
       
-      if (activeDepartment === 'elite-print') {
+      if (activeReportTab === 'challan-report') {
+        await api.downloadChallanReportPdf(combinedStart, combinedEnd, searchCode, `Fabric_Challan_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
+      } else if (activeDepartment === 'elite-print') {
         await api.downloadElitePrintReport(combinedStart, combinedEnd, `Elite_Print_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
       } else if (activeReportTab === 'stock-value') {
         await api.downloadInventoryReport('stock-value', combinedStart, combinedEnd, `Stock_Value_Report_${formattedDateStart}.pdf`);
@@ -238,6 +251,7 @@ export default function ReportsCenter({ department }) {
   const getReportTitle = () => {
     switch (activeReportTab) {
       case 'smart-dashboard': return 'Smart AI Analytics Dashboard';
+      case 'challan-report': return 'Fabric Challan Report';
       case 'stock-value': return 'Stock Value Report';
       case 'stock-inward': return 'Inward Report';
       case 'stock-outward': return 'Outward Report';
@@ -253,6 +267,7 @@ export default function ReportsCenter({ department }) {
     if (activeDepartment === 'elite-print') {
       switch (activeReportTab) {
         case 'smart-dashboard': return 'Displays real-time low stock warnings, production stage bottlenecks, top designs, and fabric demand forecasting.';
+        case 'challan-report': return 'Consolidated summary of all fabric challans issued, total meterages, roll counts, and party dispatches.';
         case 'creative-output': return 'Tracks the number of unique designs a designer completes over time to identify high-output creators.';
         case 'color-matching': return 'Measures how quickly designers spin up color variants for single prints.';
         case 'machine-speed': return 'Evaluates machine meterage output grouped by machine name, speed, and passes.';
@@ -262,6 +277,7 @@ export default function ReportsCenter({ department }) {
       }
     }
     switch (activeReportTab) {
+      case 'challan-report': return 'Consolidated summary of all fabric challans issued, total meterages, roll counts, and party dispatches.';
       case 'stock-value': return 'Displays the current active stock levels, purchase prices, sales prices, and total valuation calculations.';
       case 'stock-inward': return 'Summarizes all items stocked in, including purchase prices, supplier details, and in-flow quantities.';
       case 'stock-outward': return 'Summarizes all items scanned out of stock, including customer details, out-flow quantities, and profit calculations.';
@@ -345,6 +361,7 @@ export default function ReportsCenter({ department }) {
         {activeDepartment === 'elite-print' && (
           <>
             <button onClick={() => setActiveReportTab('smart-dashboard')} style={activeReportTab === 'smart-dashboard' ? styles.subTabActive : styles.subTab}>Smart Dashboard</button>
+            <button onClick={() => setActiveReportTab('challan-report')} style={activeReportTab === 'challan-report' ? styles.subTabActive : styles.subTab}>Fabric Challans</button>
             <button onClick={() => setActiveReportTab('creative-output')} style={activeReportTab === 'creative-output' ? styles.subTabActive : styles.subTab}>Creative Output</button>
             <button onClick={() => setActiveReportTab('color-matching')} style={activeReportTab === 'color-matching' ? styles.subTabActive : styles.subTab}>Color Matching</button>
             <button onClick={() => setActiveReportTab('machine-speed')} style={activeReportTab === 'machine-speed' ? styles.subTabActive : styles.subTab}>Machine Speed</button>
@@ -364,6 +381,7 @@ export default function ReportsCenter({ department }) {
         {activeDepartment === 'inventory' && (
           <>
             <button onClick={() => setActiveReportTab('stock-value')} style={activeReportTab === 'stock-value' ? styles.subTabActive : styles.subTab}>Stock Value</button>
+            <button onClick={() => setActiveReportTab('challan-report')} style={activeReportTab === 'challan-report' ? styles.subTabActive : styles.subTab}>Fabric Challans</button>
             <button onClick={() => setActiveReportTab('stock-inward')} style={activeReportTab === 'stock-inward' ? styles.subTabActive : styles.subTab}>Inward</button>
             <button onClick={() => setActiveReportTab('stock-outward')} style={activeReportTab === 'stock-outward' ? styles.subTabActive : styles.subTab}>Outward</button>
           </>
@@ -479,7 +497,37 @@ export default function ReportsCenter({ department }) {
       {/* Summary Cards */}
       {reportData && (
         <div style={styles.summaryGrid}>
-          {activeDepartment === 'elite-print' && (
+          {activeReportTab === 'challan-report' && Array.isArray(reportData) && (
+            <>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <Layers3 size={20} color="var(--primary)" />
+                <div>
+                  <div style={styles.summaryValue}>{reportData.length}</div>
+                  <div style={styles.summaryLabel}>Total Challans Issued</div>
+                </div>
+              </div>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <Activity size={20} color="var(--success)" />
+                <div>
+                  <div style={styles.summaryValue}>
+                    {reportData.reduce((s, c) => s + (c.totalTp || 0), 0)}
+                  </div>
+                  <div style={styles.summaryLabel}>Total Rolls / TPs</div>
+                </div>
+              </div>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <TrendingUp size={20} color="var(--primary)" />
+                <div>
+                  <div style={styles.summaryValue}>
+                    {reportData.reduce((s, c) => s + (c.totalMtr || 0), 0).toLocaleString('en-IN')} m
+                  </div>
+                  <div style={styles.summaryLabel}>Total Dispatched Meters</div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeDepartment === 'elite-print' && activeReportTab !== 'challan-report' && (
             <>
               {activeReportTab === 'smart-dashboard' && (
                 <>
@@ -728,6 +776,63 @@ export default function ReportsCenter({ department }) {
           </div>
         ) : (
           <div style={{ width: '100%' }}>
+            {activeReportTab === 'challan-report' && Array.isArray(reportData) && (
+              <div style={{ width: '100%', overflowX: 'auto', padding: '0.5rem 0' }}>
+                <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Challan No</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Date</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Party Name</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Fabric & Panna</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Job & Design</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Lot No.</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#94a3b8' }}>Rolls (TPs)</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#94a3b8' }}>Total Dispatched Mtr</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#94a3b8' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportData.map((c, idx) => (
+                      <tr key={c._id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <td style={{ padding: '12px 16px', fontWeight: '700', color: '#38bdf8' }}>EDP-{c.challanNo}</td>
+                        <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                          {c.date ? new Date(c.date).toLocaleDateString('en-IN') : '—'}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontWeight: '600', color: '#f8fafc' }}>{c.partyName || '—'}</td>
+                        <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                          {c.fabricName || '—'}{c.panna ? ` (${c.panna}")` : ''}
+                        </td>
+                        <td style={{ padding: '12px 16px', color: '#94a3b8' }}>
+                          {c.jobNo || '—'} {c.designNo ? `/ ED-${c.designNo.replace(/^ED-/i, '')}` : ''}
+                        </td>
+                        <td style={{ padding: '12px 16px', color: '#fbbf24' }}>{c.lotNo ? `#${c.lotNo}` : '—'}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '600', color: '#f8fafc' }}>{c.totalTp || 0}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#34d399' }}>
+                          {(c.totalMtr || 0).toLocaleString('en-IN')} m
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <button
+                            onClick={() => api.downloadFabricChallanPdf(c._id, c.challanNo)}
+                            className="btn-secondary"
+                            style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <Download size={12} /> PDF
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {reportData.length === 0 && (
+                      <tr>
+                        <td colSpan="9" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                          No fabric challans found for selected date range.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
             {activeReportTab === 'smart-dashboard' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%', padding: '0.5rem 0' }}>
                 {/* 1. Low Stock Warning Box */}

@@ -961,6 +961,29 @@ export const api = {
     link.parentNode.removeChild(link);
   },
 
+  async downloadChallanReportPdf(dateStart, dateEnd, search, fileName) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const query = new URLSearchParams();
+    if (dateStart) query.append('dateStart', dateStart);
+    if (dateEnd) query.append('dateEnd', dateEnd);
+    if (search) query.append('search', search);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const response = await fetch(`${baseUrl}/fabric-challan/report/pdf${qs}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate Fabric Challan report PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
   async getNextChallanNo() {
     return request('/fabric-challan/next-no');
   },
