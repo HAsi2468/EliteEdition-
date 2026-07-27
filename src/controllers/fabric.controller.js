@@ -1202,6 +1202,267 @@ const getFabricLotWiseReportData = async (req, res) => {
   }
 };
 
+const downloadFabricCombinedReportPdf = async (req, res) => {
+  try {
+    const { dateStart, dateEnd, reports } = req.query;
+    const PDFDocument = require('pdfkit');
+    const path = require('path');
+    const fs = require('fs');
+
+    const FabricChallan = require('../db/models/fabricChallan.model');
+
+    const selectedReports = reports
+      ? reports.split(',').map(s => s.trim().toLowerCase())
+      : ['challan', 'inward', 'outward', 'lotwise'];
+
+    const dateFilter = {};
+    if (dateStart || dateEnd) {
+      dateFilter.date = {};
+      if (dateStart) dateFilter.date.$gte = new Date(dateStart);
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.date.$lte = end;
+      }
+    }
+
+    let inwardData = [];
+    if (selectedReports.includes('inward')) {
+      inwardData = await FabricTransaction.find({ type: 'INWARD', ...dateFilter }).sort({ date: -1 }).lean();
+    }
+
+    let outwardData = [];
+    if (selectedReports.includes('outward')) {
+      outwardData = await FabricTransaction.find({ type: 'OUTWARD', ...dateFilter }).sort({ date: -1 }).lean();
+    }
+
+    let challanData = [];
+    if (selectedReports.includes('challan')) {
+      challanData = await FabricChallan.find(dateFilter).sort({ date: -1 }).lean();
+    }
+
+    let lotwiseData = [];
+    if (selectedReports.includes('lotwise')) {
+      const pipeline = [
+        { $match: dateFilter },
+        {
+          $group: {
+            _id: '$lotNo',
+            fabricQuality: { $first: '$fabricQuality' },
+            panna: { $first: '$panna' },
+            vendorName: { $first: '$vendorName' },
+            totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+            totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } }
+          }
+        },
+        {
+          $project: {
+            lotNo: '$_id',
+            fabricQuality: 1,
+            panna: 1,
+            vendorName: 1,
+            totalInward: 1,
+            totalOutward: 1,
+            currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
+            _id: 0
+          }
+        },
+        { $match: { lotNo: { $ne: null } } },
+        { $sort: { lotNo: -1 } }
+      ];
+      lotwiseData = await FabricTransaction.aggregate(pipeline);
+    }
+
+    const totalInwardMtr = inwardData.reduce((s, r) => s + (r.qty || 0), 0);
+    const totalOutwardMtr = outwardData.reduce((s, r) => s + (r.qty || 0), 0);
+    const totalChallanMtr = challanData.reduce((s, c) => s + (c.totalMtr || 0), 0);
+    const totalChallanTp = challanData.reduce((s, c) => s + (c.totalTp || 0), 0);
+    const totalLotNetStock = lotwiseData.reduce((s, l) => s + Math.max(0, l.currentStock || 0), 0);
+
+    const doc = new PDFDocument({ margin: 25, size: 'A4', autoFirstPage: true });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="Elite_Digital_Prints_Combined_Report.pdf"');
+    doc.pipe(res);
+
+    const PW = 595, PH = 842, ML = 30, MR = 30;
+    const contentWidth = PW - ML - MR;
+
+    const logoPath = path.join(__dirname, 'Logo.png');
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, ML, 20, { width: 120 });
+    }
+
+    doc.fillColor('#000000').fontSize(13).font('Helvetica-Bold')
+      .text('ELITE DIGITAL PRINTS — COMBINED MULTI-REPORT', ML + 130, 22, { width: contentWidth - 130, align: 'right' });
+
+    const startDateStr = dateStart ? new Date(dateStart).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'All Time';
+    const endDateStr = dateEnd ? new Date(dateEnd).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Present';
+
+    doc.fillColor('#475569').fontSize(8.5).font('Helvetica-Bold')
+      .text(`Report Period: ${startDateStr} to ${endDateStr}  |  Generated: ${new Date().toLocaleDateString('en-IN')}`, ML + 130, 38, { width: contentWidth - 130, align: 'right' });
+
+    doc.moveTo(ML, 52).lineTo(PW - MR, 52).strokeColor('#ddd6fe').lineWidth(1.2).stroke();
+
+    const activeSections = [
+      selectedReports.includes('challan') && { label: 'CHALLAN DISPATCHES', val: `${totalChallanMtr.toFixed(1)} mtr`, sub: `${challanData.length} Challans (${totalChallanTp} TP)` },
+      selectedReports.includes('inward') && { label: 'FABRIC INWARD', val: `${totalInwardMtr.toFixed(1)} mtr`, sub: `${inwardData.length} Receipts` },
+      selectedReports.includes('outward') && { label: 'FABRIC OUTWARD', val: `${totalOutwardMtr.toFixed(1)} mtr`, sub: `${outwardData.length} Dispatches` },
+      selectedReports.includes('lotwise') && { label: 'LOT STOCK BALANCE', val: `${totalLotNetStock.toFixed(1)} mtr`, sub: `${lotwiseData.length} Active Lots` }
+    ].filter(Boolean);
+
+    const cardCount = activeSections.length || 1;
+    const cardWidth = (contentWidth - (cardCount - 1) * 8) / cardCount;
+    let cardX = ML;
+
+    activeSections.forEach(card => {
+      doc.rect(cardX, 60, cardWidth, 48).fill('#f5f3ff').stroke('#ddd6fe');
+      doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
+        .text(card.label, cardX + 5, 65, { width: cardWidth - 10, align: 'center' });
+      doc.fillColor('#000000').fontSize(12).font('Helvetica-Bold')
+        .text(card.val, cardX + 5, 76, { width: cardWidth - 10, align: 'center' });
+      doc.fillColor('#475569').fontSize(7).font('Helvetica')
+        .text(card.sub, cardX + 5, 93, { width: cardWidth - 10, align: 'center' });
+      cardX += cardWidth + 8;
+    });
+
+    let currentY = 118;
+    const sectionCount = selectedReports.length;
+    const maxRowsPerSection = sectionCount > 2 ? 6 : 10;
+    const sectionHeight = sectionCount > 2 ? 155 : 310;
+
+    const drawSectionHeader = (title, countStr, x, y, width) => {
+      doc.rect(x, y, width, 18).fill('#ede9fe').stroke('#ddd6fe');
+      doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold')
+        .text(title.toUpperCase(), x + 6, y + 4, { lineBreak: false });
+      doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
+        .text(countStr, x + width - 100, y + 4, { width: 94, align: 'right', lineBreak: false });
+    };
+
+    const isGrid = sectionCount > 2;
+    const secWidth = isGrid ? (contentWidth - 10) / 2 : contentWidth;
+    let secIdx = 0;
+
+    const getSecPos = () => {
+      if (!isGrid) {
+        const pos = { x: ML, y: currentY, w: contentWidth, h: sectionHeight };
+        currentY += sectionHeight + 10;
+        return pos;
+      }
+      const col = secIdx % 2;
+      const row = Math.floor(secIdx / 2);
+      const x = ML + col * (secWidth + 10);
+      const y = 118 + row * (sectionHeight + 10);
+      secIdx++;
+      return { x, y, w: secWidth, h: sectionHeight };
+    };
+
+    if (selectedReports.includes('challan')) {
+      const { x, y, w, h } = getSecPos();
+      drawSectionHeader('1. Fabric Challans Summary', `${challanData.length} Records`, x, y, w);
+
+      let rowY = y + 20;
+      doc.rect(x, rowY, w, 16).fill('#f8fafc');
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+      doc.text('CH. NO', x + 4, rowY + 4, { width: 45 });
+      doc.text('PARTY NAME', x + 50, rowY + 4, { width: w - 150 });
+      doc.text('FABRIC', x + w - 98, rowY + 4, { width: 50 });
+      doc.text('METERS', x + w - 46, rowY + 4, { width: 42, align: 'right' });
+
+      rowY += 16;
+      challanData.slice(0, maxRowsPerSection).forEach(c => {
+        doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
+        doc.text(`EDP-${c.challanNo}`, x + 4, rowY + 3, { width: 45, lineBreak: false });
+        doc.text(c.partyName || '—', x + 50, rowY + 3, { width: w - 150, lineBreak: false });
+        doc.text(c.fabricName || '—', x + w - 98, rowY + 3, { width: 50, lineBreak: false });
+        doc.text(`${parseFloat(c.totalMtr || 0).toFixed(1)}`, x + w - 46, rowY + 3, { width: 42, align: 'right', lineBreak: false });
+        rowY += 15;
+      });
+    }
+
+    if (selectedReports.includes('inward')) {
+      const { x, y, w, h } = getSecPos();
+      drawSectionHeader('2. Fabric Inward Receipts', `${inwardData.length} Records`, x, y, w);
+
+      let rowY = y + 20;
+      doc.rect(x, rowY, w, 16).fill('#f8fafc');
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+      doc.text('DATE', x + 4, rowY + 4, { width: 45 });
+      doc.text('FABRIC QUALITY', x + 50, rowY + 4, { width: w - 150 });
+      doc.text('VENDOR', x + w - 98, rowY + 4, { width: 50 });
+      doc.text('METERS', x + w - 46, rowY + 4, { width: 42, align: 'right' });
+
+      rowY += 16;
+      inwardData.slice(0, maxRowsPerSection).forEach(r => {
+        const dStr = r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' }) : '—';
+        doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
+        doc.text(dStr, x + 4, rowY + 3, { width: 45, lineBreak: false });
+        doc.text(r.fabricQuality || '—', x + 50, rowY + 3, { width: w - 150, lineBreak: false });
+        doc.text(r.vendorName || '—', x + w - 98, rowY + 3, { width: 50, lineBreak: false });
+        doc.text(`${parseFloat(r.qty || 0).toFixed(1)}`, x + w - 46, rowY + 3, { width: 42, align: 'right', lineBreak: false });
+        rowY += 15;
+      });
+    }
+
+    if (selectedReports.includes('outward')) {
+      const { x, y, w, h } = getSecPos();
+      drawSectionHeader('3. Fabric Outward Dispatches', `${outwardData.length} Records`, x, y, w);
+
+      let rowY = y + 20;
+      doc.rect(x, rowY, w, 16).fill('#f8fafc');
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+      doc.text('DATE', x + 4, rowY + 4, { width: 45 });
+      doc.text('FABRIC QUALITY', x + 50, rowY + 4, { width: w - 150 });
+      doc.text('PARTY', x + w - 98, rowY + 4, { width: 50 });
+      doc.text('METERS', x + w - 46, rowY + 4, { width: 42, align: 'right' });
+
+      rowY += 16;
+      outwardData.slice(0, maxRowsPerSection).forEach(r => {
+        const dStr = r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' }) : '—';
+        doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
+        doc.text(dStr, x + 4, rowY + 3, { width: 45, lineBreak: false });
+        doc.text(r.fabricQuality || '—', x + 50, rowY + 3, { width: w - 150, lineBreak: false });
+        doc.text(r.partyName || '—', x + w - 98, rowY + 3, { width: 50, lineBreak: false });
+        doc.text(`${parseFloat(r.qty || 0).toFixed(1)}`, x + w - 46, rowY + 3, { width: 42, align: 'right', lineBreak: false });
+        rowY += 15;
+      });
+    }
+
+    if (selectedReports.includes('lotwise')) {
+      const { x, y, w, h } = getSecPos();
+      drawSectionHeader('4. Lot-Wise Stock Balance', `${lotwiseData.length} Lots`, x, y, w);
+
+      let rowY = y + 20;
+      doc.rect(x, rowY, w, 16).fill('#f8fafc');
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+      doc.text('LOT NO', x + 4, rowY + 4, { width: 40 });
+      doc.text('FABRIC QUALITY', x + 46, rowY + 4, { width: w - 155 });
+      doc.text('IN / OUT', x + w - 105, rowY + 4, { width: 55, align: 'center' });
+      doc.text('BALANCE', x + w - 46, rowY + 4, { width: 42, align: 'right' });
+
+      rowY += 16;
+      lotwiseData.slice(0, maxRowsPerSection).forEach(l => {
+        doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
+        doc.text(`#${l.lotNo}`, x + 4, rowY + 3, { width: 40, lineBreak: false });
+        doc.text(l.fabricQuality || '—', x + 46, rowY + 3, { width: w - 155, lineBreak: false });
+        doc.text(`${l.totalInward}/${l.totalOutward}`, x + w - 105, rowY + 3, { width: 55, align: 'center', lineBreak: false });
+        doc.fillColor(l.currentStock > 0 ? '#047857' : '#dc2626').font('Helvetica-Bold');
+        doc.text(`${parseFloat(l.currentStock || 0).toFixed(1)}`, x + w - 46, rowY + 3, { width: 42, align: 'right', lineBreak: false });
+        rowY += 15;
+      });
+    }
+
+    doc.fillColor('#6b21a8').fontSize(8).font('Helvetica')
+      .text('Page 1 of 1 — Elite Digital Prints Combined Multi-Report Attachment', ML, 795, { width: contentWidth, align: 'center', lineBreak: false });
+
+    doc.end();
+  } catch (err) {
+    console.error('Error generating combined fabric PDF:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
+};
+
 module.exports = {
   createInward,
   createOutward,
@@ -1218,6 +1479,7 @@ module.exports = {
   downloadFabricInwardPdf,
   downloadFabricOutwardPdf,
   downloadFabricLotWisePdf,
+  downloadFabricCombinedReportPdf,
   getFabricInwardReportData,
   getFabricOutwardReportData,
   getFabricLotWiseReportData,

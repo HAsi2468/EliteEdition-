@@ -304,6 +304,13 @@ export default function FabricInventoryPanel() {
   const [isPdfFilterOpen, setIsPdfFilterOpen] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
 
+  // Combined Multi-Report Modal state
+  const [isCombinedModalOpen, setIsCombinedModalOpen] = useState(false);
+  const [combinedDateStart, setCombinedDateStart] = useState(() => new Date().toISOString().split('T')[0]);
+  const [combinedDateEnd, setCombinedDateEnd] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedCombinedReports, setSelectedCombinedReports] = useState(['challan', 'inward', 'outward', 'lotwise']);
+  const [combinedLoading, setCombinedLoading] = useState(false);
+
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, type, label }
 
@@ -1015,6 +1022,9 @@ export default function FabricInventoryPanel() {
           />
           <button onClick={() => setIsPdfFilterOpen(true)} className="btn-secondary" title="Download Ledger PDF" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0 }}>
             <FileDown size={16} /> PDF Report
+          </button>
+          <button onClick={() => setIsCombinedModalOpen(true)} className="btn-primary" title="Multiple Reports (Combined 1-Page PDF)" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0, background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', color: '#ffffff', border: 'none', boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)' }}>
+            <FileText size={16} /> Multiple Reports
           </button>
           <button onClick={fetchData} className="btn-icon" title="Refresh Data" style={{ padding: '0.5rem', flexShrink: 0 }}>
             <RefreshCw size={18} className={loading ? 'spin-loader' : ''} />
@@ -2494,6 +2504,95 @@ export default function FabricInventoryPanel() {
             fetchData();
           }}
         />
+      )}
+
+      {/* COMBINED MULTI-REPORT MODAL */}
+      {isCombinedModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
+          <div className="glass-panel" style={{ background: 'var(--panel-bg, #1e1b4b)', width: '100%', maxWidth: '520px', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-light, #4c1d95)', color: 'var(--text-primary, #ffffff)', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <FileText size={22} color="#a78bfa" />
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>Multiple Reports (Combined 1-Page)</h3>
+              </div>
+              <button onClick={() => setIsCombinedModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.2rem' }}><X size={20} /></button>
+            </div>
+
+            <p style={{ fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '1.2rem', lineHeight: '1.4' }}>
+              Select report period and choose which reports to combine into a single, beautifully organized 1-page PDF.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', marginBottom: '0.3rem' }}>Date Start</label>
+                  <input type="date" value={combinedDateStart} onChange={e => setCombinedDateStart(e.target.value)} style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', marginBottom: '0.3rem' }}>Date End</label>
+                  <input type="date" value={combinedDateEnd} onChange={e => setCombinedDateEnd(e.target.value)} style={inputStyle} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', marginBottom: '0.5rem' }}>Select Reports to Include (Fits in 1 Page):</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {[
+                    { id: 'challan', label: 'Fabric Challans Summary', desc: 'Dispatched meterages, total TP rolls & party details' },
+                    { id: 'inward', label: 'Fabric Inward Receipts', desc: 'Supplier receipts, fabric qualities & inward meters' },
+                    { id: 'outward', label: 'Fabric Outward Dispatches', desc: 'Job dispatches, fabric issued & party names' },
+                    { id: 'lotwise', label: 'Lot-Wise Stock Balance', desc: 'Lot-level stock balance & net remaining meters' }
+                  ].map(rep => (
+                    <label key={rep.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedCombinedReports.includes(rep.id)}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setSelectedCombinedReports([...selectedCombinedReports, rep.id]);
+                          } else {
+                            if (selectedCombinedReports.length <= 1) {
+                              alert('Please select at least 1 report.');
+                              return;
+                            }
+                            setSelectedCombinedReports(selectedCombinedReports.filter(r => r !== rep.id));
+                          }
+                        }}
+                        style={{ marginTop: '0.15rem', accentColor: '#7c3aed' }}
+                      />
+                      <div>
+                        <strong style={{ color: '#f8fafc' }}>{rep.label}</strong>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{rep.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button onClick={() => setIsCombinedModalOpen(false)} className="btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>Cancel</button>
+              <button
+                onClick={async () => {
+                  setCombinedLoading(true);
+                  try {
+                    await api.downloadFabricCombinedReportPdf(combinedDateStart, combinedDateEnd, selectedCombinedReports, `Elite_Digital_Prints_Combined_Report_${combinedDateStart}_to_${combinedDateEnd}.pdf`);
+                    setIsCombinedModalOpen(false);
+                  } catch (err) {
+                    alert(err.message);
+                  } finally {
+                    setCombinedLoading(false);
+                  }
+                }}
+                disabled={combinedLoading}
+                className="btn-primary"
+                style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', border: 'none', gap: '0.4rem' }}
+              >
+                <Download size={16} /> {combinedLoading ? 'Generating 1-Page PDF...' : 'Download Combined PDF'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -33,6 +33,7 @@ router.get('/report/lotwise-data', fabricController.getFabricLotWiseReportData);
 router.get('/report/inward-pdf', fabricController.downloadFabricInwardPdf);
 router.get('/report/outward-pdf', fabricController.downloadFabricOutwardPdf);
 router.get('/report/lotwise-pdf', fabricController.downloadFabricLotWisePdf);
+router.get('/report/combined-pdf', fabricController.downloadFabricCombinedReportPdf);
 
 // Get stock grouped by fabricQuality + panna
 router.get('/stock-panna', fabricController.getStockByPanna);
