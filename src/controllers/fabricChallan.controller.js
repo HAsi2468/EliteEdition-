@@ -907,17 +907,15 @@ const downloadChallanPdf = async (req, res) => {
 
       const sigLineY = PH - MR - 45;
 
-      // ── EMBED DESIGN IMAGE AT BOTTOM CENTER ──
+      // ── EMBED DESIGN IMAGE AT BOTTOM CENTER (FIXED & CONNECTED TO BOTTOM SIGNATURE LINE) ──
       if (firstDesignImg && firstDesignImg.path) {
-        const availTop = notesEndY + 5;
-        const availBottom = sigLineY - 5;
-        const availHeight = availBottom - availTop;
+        const maxBoxH = sigLineY - notesEndY - 6;
 
-        if (availHeight >= 30) {
-          const imgBoxH = Math.min(100, Math.max(30, availHeight));
-          const imgBoxW = Math.min(150, Math.round(imgBoxH * 1.45));
+        if (maxBoxH >= 30) {
+          const imgBoxH = Math.min(85, Math.max(30, maxBoxH));
+          const imgBoxW = Math.min(145, Math.round(imgBoxH * 1.45));
           const imgBoxX = ML + (contentWidth - imgBoxW) / 2;
-          const imgBoxY = availTop + (availHeight - imgBoxH) / 2;
+          const imgBoxY = sigLineY - imgBoxH; // Fixed & connected directly to bottom signature line!
 
           // Draw image frame box
           doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5)
