@@ -596,11 +596,11 @@ const downloadChallanPdf = async (req, res) => {
     const activeCount = activeTps.length;
     const tpColsCount = activeCount <= 10 ? 1 : activeCount <= 20 ? 2 : 3;
     const tpColWidth = contentWidth / tpColsCount;
-    const tpRowHeight = 26;
-    const tableHeaderHeight = 26;
-    const tpSectionY = MR + 98 + 68 + 34 + 34 + 12; // startY + 68 + 34 (Colour/Fabric row) + 12
-    const tpTableStartY = tpSectionY + 16;
     const rowsPerCol = Math.ceil(activeCount / tpColsCount);
+    const tpRowHeight = rowsPerCol > 14 ? 18 : rowsPerCol > 11 ? 21 : 25;
+    const tableHeaderHeight = 24;
+    const tpSectionY = MR + 98 + 68 + 34 + 34 + 10;
+    const tpTableStartY = tpSectionY + 16;
 
     // Resolve Image Path helper
     const resolveImagePath = (urlOrPath) => {
@@ -909,28 +909,29 @@ const downloadChallanPdf = async (req, res) => {
 
       // ── EMBED DESIGN IMAGE AT BOTTOM CENTER ──
       if (firstDesignImg && firstDesignImg.path) {
-        const imgBoxW = 140;
-        const imgBoxH = 90;
-        const imgBoxX = ML + (contentWidth - imgBoxW) / 2;
-        
-        const availTop = notesEndY + 8;
-        const availBottom = sigLineY - 8;
-        let imgBoxY = availTop + (availBottom - availTop - imgBoxH) / 2;
+        const availTop = notesEndY + 5;
+        const availBottom = sigLineY - 5;
+        const availHeight = availBottom - availTop;
 
-        if (imgBoxY < availTop) imgBoxY = availTop;
+        if (availHeight >= 30) {
+          const imgBoxH = Math.min(100, Math.max(30, availHeight));
+          const imgBoxW = Math.min(150, Math.round(imgBoxH * 1.45));
+          const imgBoxX = ML + (contentWidth - imgBoxW) / 2;
+          const imgBoxY = availTop + (availHeight - imgBoxH) / 2;
 
-        // Draw image frame box
-        doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5)
-          .rect(imgBoxX, imgBoxY, imgBoxW, imgBoxH).stroke();
+          // Draw image frame box
+          doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5)
+            .rect(imgBoxX, imgBoxY, imgBoxW, imgBoxH).stroke();
 
-        try {
-          doc.image(firstDesignImg.path, imgBoxX + 3, imgBoxY + 3, {
-            fit: [imgBoxW - 6, imgBoxH - 6],
-            align: 'center',
-            valign: 'center'
-          });
-        } catch (e) {
-          console.warn('Failed to embed design image at bottom center:', e.message);
+          try {
+            doc.image(firstDesignImg.path, imgBoxX + 2, imgBoxY + 2, {
+              fit: [imgBoxW - 4, imgBoxH - 4],
+              align: 'center',
+              valign: 'center'
+            });
+          } catch (e) {
+            console.warn('Failed to embed design image at bottom center:', e.message);
+          }
         }
       }
       
