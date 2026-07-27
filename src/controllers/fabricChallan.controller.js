@@ -869,30 +869,27 @@ const downloadChallanSummaryPdf = async (req, res) => {
     const fs = require('fs');
     const logoPath = path.join(__dirname, 'Logo.png');
 
-    // Premium Branded Header
+    // Header section with Logo (image already includes brand name)
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, 30, 25, { height: 42 });
+      doc.image(logoPath, 30, 20, { width: 140 });
     }
 
-    doc.fillColor('#0f172a').fontSize(16).font('Helvetica-Bold')
-      .text('ELITE DIGITAL PRINTS', 115, 27);
-    
-    doc.fillColor('#475569').fontSize(10).font('Helvetica-Bold')
-      .text('FABRIC CHALLAN SUMMARY REPORT', 115, 47);
+    doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
+      .text('FABRIC CHALLAN SUMMARY REPORT', 190, 25, { width: 375, align: 'right' });
 
     let periodStr = 'Period: All Time';
     if (cleanDateStart && cleanDateEnd) periodStr = `Period: ${cleanDateStart} to ${cleanDateEnd}`;
     else if (cleanDateStart) periodStr = `Period: From ${cleanDateStart}`;
     else if (cleanDateEnd) periodStr = `Period: Until ${cleanDateEnd}`;
 
-    doc.fillColor('#64748b').fontSize(8.5).font('Helvetica')
-      .text(periodStr, 30, 32, { width: 535, align: 'right' });
-    doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica')
-      .text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, 30, 47, { width: 535, align: 'right' });
+    doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
+      .text(periodStr, 190, 43, { width: 375, align: 'right' });
+    doc.fillColor('#64748b').fontSize(8).font('Helvetica')
+      .text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, 190, 56, { width: 375, align: 'right' });
 
-    doc.moveTo(30, 75).lineTo(565, 75).strokeColor('#e2e8f0').lineWidth(1).stroke();
+    doc.moveTo(30, 72).lineTo(565, 72).strokeColor('#ddd6fe').lineWidth(1.5).stroke();
 
-    let y = 88;
+    let y = 84;
 
     // Totals
     const totalChallans = challans.length;
@@ -900,28 +897,28 @@ const downloadChallanSummaryPdf = async (req, res) => {
     const totalTp = challans.reduce((sum, c) => sum + (c.totalTp || 0), 0);
     const totalPcs = challans.reduce((sum, c) => sum + (c.pcs || 0), 0);
 
-    // KPI Cards
-    doc.rect(30, y, 125, 42).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('TOTAL CHALLANS', 35, y + 7);
-    doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold').text(String(totalChallans), 35, y + 20);
+    // KPI Cards with Light Purple background & Black numbers
+    doc.rect(30, y, 125, 42).fill('#f5f3ff').stroke('#ddd6fe');
+    doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold').text('TOTAL CHALLANS', 35, y + 7);
+    doc.fillColor('#000000').fontSize(13).font('Helvetica-Bold').text(String(totalChallans), 35, y + 20);
 
-    doc.rect(165, y, 125, 42).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('TOTAL ROLLS / TPS', 170, y + 7);
-    doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold').text(String(totalTp), 170, y + 20);
+    doc.rect(165, y, 125, 42).fill('#f5f3ff').stroke('#ddd6fe');
+    doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold').text('TOTAL ROLLS / TPS', 170, y + 7);
+    doc.fillColor('#000000').fontSize(13).font('Helvetica-Bold').text(String(totalTp), 170, y + 20);
 
-    doc.rect(300, y, 135, 42).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('TOTAL DISPATCHED (M)', 305, y + 7);
-    doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold').text(`${totalMtr.toLocaleString('en-IN')} m`, 305, y + 20);
+    doc.rect(300, y, 135, 42).fill('#f5f3ff').stroke('#ddd6fe');
+    doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold').text('TOTAL DISPATCHED (M)', 305, y + 7);
+    doc.fillColor('#000000').fontSize(13).font('Helvetica-Bold').text(`${totalMtr.toLocaleString('en-IN')} m`, 305, y + 20);
 
-    doc.rect(445, y, 120, 42).fill('#f8fafc').stroke('#cbd5e1');
-    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('EXPECTED PCS', 450, y + 7);
-    doc.fillColor('#0f172a').fontSize(13).font('Helvetica-Bold').text(String(totalPcs), 450, y + 20);
+    doc.rect(445, y, 120, 42).fill('#f5f3ff').stroke('#ddd6fe');
+    doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold').text('EXPECTED PCS', 450, y + 7);
+    doc.fillColor('#000000').fontSize(13).font('Helvetica-Bold').text(String(totalPcs), 450, y + 20);
 
-    y += 54;
+    y += 52;
 
     const renderTableHeader = (currY) => {
-      doc.rect(30, currY, 535, 20).fill('#1e293b');
-      doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+      doc.rect(30, currY, 535, 20).fill('#ede9fe');
+      doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold');
       doc.text('CHALLAN NO.', 35, currY + 6);
       doc.text('DATE', 105, currY + 6);
       doc.text('PARTY NAME', 170, currY + 6);
@@ -931,8 +928,8 @@ const downloadChallanSummaryPdf = async (req, res) => {
       doc.text('TOTAL MTR', 510, currY + 6);
     };
 
-    doc.fillColor('#0f172a').fontSize(10.5).font('Helvetica-Bold').text('FABRIC CHALLANS MASTER LIST', 30, y);
-    y += 15;
+    doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold').text('FABRIC CHALLANS MASTER LIST', 30, y);
+    y += 14;
 
     renderTableHeader(y);
     y += 20;
@@ -940,7 +937,7 @@ const downloadChallanSummaryPdf = async (req, res) => {
     challans.forEach((c, i) => {
       if (y > 750) {
         doc.addPage();
-        y = 35;
+        y = 30;
         renderTableHeader(y);
         y += 20;
       }
@@ -948,8 +945,8 @@ const downloadChallanSummaryPdf = async (req, res) => {
       const fabStr = `${c.fabricName || '—'}${c.panna ? ' (' + c.panna + '")' : ''}`;
       const jobDesStr = `${c.jobNo || '—'} / ${c.designNo || '—'}`;
 
-      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#f8fafc' : '#ffffff');
-      doc.fillColor('#334155').fontSize(8).font('Helvetica');
+      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#fcfaff' : '#ffffff');
+      doc.fillColor('#000000').fontSize(8).font('Helvetica');
       doc.text(`EDP-${c.challanNo}`, 35, y + 5);
       doc.text(dt, 105, y + 5);
       doc.text(c.partyName || '—', 170, y + 5, { width: 85, lineBreak: false });
@@ -961,14 +958,14 @@ const downloadChallanSummaryPdf = async (req, res) => {
     });
 
     if (challans.length === 0) {
-      doc.rect(30, y, 535, 25).fill('#f8fafc');
-      doc.fillColor('#94a3b8').fontSize(9).font('Helvetica').text('No fabric challan records found for selected period.', 30, y + 7, { width: 535, align: 'center' });
+      doc.rect(30, y, 535, 25).fill('#fcfaff');
+      doc.fillColor('#64748b').fontSize(9).font('Helvetica').text('No fabric challan records found for selected period.', 30, y + 7, { width: 535, align: 'center' });
     }
 
     const pages = doc.bufferedPageRange();
     for (let i = 0; i < pages.count; i++) {
       doc.switchToPage(i);
-      doc.fillColor('#94a3b8').fontSize(8).font('Helvetica')
+      doc.fillColor('#6b21a8').fontSize(8).font('Helvetica')
         .text(`Page ${i + 1} of ${pages.count} — Elite Digital Prints Fabric Challan Report`, 30, 815, { width: 535, align: 'center' });
     }
 
