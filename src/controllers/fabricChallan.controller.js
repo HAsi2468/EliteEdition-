@@ -602,15 +602,89 @@ const downloadChallanPdf = async (req, res) => {
     const tpTableStartY = tpSectionY + 16;
     const rowsPerCol = Math.ceil(activeCount / tpColsCount);
 
-    const hasNotes = !!(challan.notes && challan.notes.trim());
-    const hasPcs = !!(challan.pcs);
-
-    const getColor = (colorStr, isColorPage) => {
-      if (isColorPage) return colorStr;
-      if (colorStr === '#dc2626') return '#dc2626'; // Keep Challan No & Total TP in RED!
-      if (colorStr === '#475569') return '#555555'; // Expected Pcs text in Gray
-      return '#000000'; // Everything else B&W
+    // Resolve Image Path helper
+    const resolveImagePath = (urlOrPath) => {
+      if (!urlOrPath) return null;
+      let filename = urlOrPath.replace(/^.*\/designs\//, '').replace(/^\/designs\//, '');
+      try {
+        filename = decodeURIComponent(filename);
+      } catch (e) {}
+      
+      const possibleDirs = [
+        path.join(__dirname, '../../elite_edition_images'),
+        path.join(__dirname, '../elite_edition_images'),
+        path.join(__dirname, '../../Digital print'),
+        path.join(__dirname, '../Digital print')
+      ];
+      for (const pDir of possibleDirs) {
+        const fullPath = path.join(pDir, filename);
+        if (fs.existsSync(fullPath)) return fullPath;
+      }
+      return null;
     };
+
+    let firstDesignImg = null;
+
+    // 1. Try finding design image by JobCard
+    if (challan.jobNo) {
+      const jobTokens = String(challan.jobNo).split(',').map(s => s.trim()).filter(Boolean);
+      for (const jNo of jobTokens) {
+        try {
+          const job = await JobCard.findOne({ jobNo: jNo });
+          if (job) {
+            if (job.imageUrl1) {
+              const p = resolveImagePath(job.imageUrl1);
+              if (p) { firstDesignImg = { path: p, label: `Design: ${job.designNo || challan.designNo || ''}` }; break; }
+            }
+            if (job.imageUrl2) {
+              const p = resolveImagePath(job.imageUrl2);
+              if (p) { firstDesignImg = { path: p, label: `Design: ${job.designNo || challan.designNo || ''}` }; break; }
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 2. Try finding design image by Design No
+    if (!firstDesignImg && challan.designNo) {
+      const designTokens = String(challan.designNo)
+        .split(/[,\s&]+/)
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      for (const dName of designTokens) {
+        const cleanName = dName.replace(/^ED-/i, '');
+        try {
+          const Design = require('../db/models/design.model');
+          const dDoc = await Design.findOne({ 
+            designName: { $regex: new RegExp(`^(ED-)?${cleanName}$`, 'i') } 
+          });
+          if (dDoc) {
+            if (dDoc.imageUrl) {
+              const p = resolveImagePath(dDoc.imageUrl);
+              if (p) { firstDesignImg = { path: p, label: `Design: ${dDoc.designName}` }; break; }
+            }
+            if (dDoc.imageUrl2) {
+              const p = resolveImagePath(dDoc.imageUrl2);
+              if (p) { firstDesignImg = { path: p, label: `Design: ${dDoc.designName}` }; break; }
+            }
+          }
+        } catch (e) {}
+
+        const directCandidates = [dName, `ED-${dName}`, cleanName, `ED-${cleanName}`];
+        for (const cand of directCandidates) {
+          for (const ext of ['.jpg', '.jpeg', '.png']) {
+            const testPath = path.join(__dirname, '../../elite_edition_images', `${cand}${ext}`);
+            if (fs.existsSync(testPath)) {
+              firstDesignImg = { path: testPath, label: `Design: ${cand}` };
+              break;
+            }
+          }
+          if (firstDesignImg) break;
+        }
+        if (firstDesignImg) break;
+      }
+    }
 
     const renderPage = (isColorPage) => {
       // Draw border
@@ -671,19 +745,18 @@ const downloadChallanPdf = async (req, res) => {
       doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(13).font('Helvetica-Bold')
         .text(formattedDate, PW - MR - 210, startY + 6, { width: 80, align: 'left', lineBreak: false });
 
-      // CH. NO. label — right-aligned, with value also pinned to the right border
+      // CH. NO. label — right-aligned
       const challanLabel = 'CH. NO.:';
       const challanValue = 'EDP-' + (challan.challanNo || '—');
-      const rightEdge = PW - MR - 8;          // 8px padding from right border
-      const chNoValueW = 70;                   // fixed width for value (fits up to EDP-9999)
-      const chNoLabelW = 58;                   // fixed width for label
+      const rightEdge = PW - MR - 8;          
+      const chNoValueW = 70;                   
+      const chNoLabelW = 58;                   
       const chNoValueX = rightEdge - chNoValueW;
       const chNoLabelX = chNoValueX - chNoLabelW;
 
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
         .text(challanLabel, chNoLabelX, startY + 6, { width: chNoLabelW, align: 'right', lineBreak: false });
 
-      // CHALLAN NO IS RED ON BOTH PAGES
       doc.fillColor(getColor('#dc2626', isColorPage)).fontSize(14.5).font('Helvetica-Bold')
         .text(challanValue, chNoValueX, startY + 4, { width: chNoValueW, align: 'right', lineBreak: false });
 
@@ -784,8 +857,11 @@ const downloadChallanPdf = async (req, res) => {
       doc.fillColor(getColor('#10b981', isColorPage)).fontSize(17).font('Helvetica-Bold')
         .text(`${parseFloat(challan.totalMtr || 0).toFixed(2)} mtr`, ML + summaryColWidth2, summaryStartY + 23, { width: summaryColWidth2, align: 'center' });
 
+      let notesEndY = summaryStartY + 48;
+
       if (hasNotes || hasPcs) {
         const notesY = summaryStartY + 60;
+        notesEndY = notesY + 42;
         doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(ML, notesY, contentWidth, 42).stroke();
         doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(11.5).font('Helvetica-Bold')
           .text('NOTES / REMARKS', ML + 12, notesY + 6, { width: contentWidth - 24 });
@@ -805,6 +881,33 @@ const downloadChallanPdf = async (req, res) => {
       }
 
       const sigLineY = PH - MR - 45;
+
+      // ── EMBED DESIGN IMAGE AT BOTTOM CENTER ──
+      if (firstDesignImg && firstDesignImg.path) {
+        const imgBoxW = 140;
+        const imgBoxH = 90;
+        const imgBoxX = ML + (contentWidth - imgBoxW) / 2;
+        
+        const availTop = notesEndY + 8;
+        const availBottom = sigLineY - 8;
+        let imgBoxY = availTop + (availBottom - availTop - imgBoxH) / 2;
+
+        if (imgBoxY < availTop) imgBoxY = availTop;
+
+        // Draw image frame box
+        doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5)
+          .rect(imgBoxX, imgBoxY, imgBoxW, imgBoxH).stroke();
+
+        try {
+          doc.image(firstDesignImg.path, imgBoxX + 3, imgBoxY + 3, {
+            fit: [imgBoxW - 6, imgBoxH - 6],
+            align: 'center',
+            valign: 'center'
+          });
+        } catch (e) {
+          console.warn('Failed to embed design image at bottom center:', e.message);
+        }
+      }
       
       doc.moveTo(ML + 30, sigLineY).lineTo(ML + 160, sigLineY).strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).stroke();
       doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12).font('Helvetica-Bold')
@@ -818,150 +921,6 @@ const downloadChallanPdf = async (req, res) => {
     renderPage(true);  // Page 1: Color
     doc.addPage();
     renderPage(false); // Page 2: Black & White (Challan No in red)
-
-    // ── PAGE 3: DESIGN IMAGE PREVIEW ──
-    const resolveImagePath = (urlOrPath) => {
-      if (!urlOrPath) return null;
-      let filename = urlOrPath.replace(/^.*\/designs\//, '').replace(/^\/designs\//, '');
-      try {
-        filename = decodeURIComponent(filename);
-      } catch (e) {}
-      
-      const possibleDirs = [
-        path.join(__dirname, '../../elite_edition_images'),
-        path.join(__dirname, '../elite_edition_images'),
-        path.join(__dirname, '../../Digital print'),
-        path.join(__dirname, '../Digital print')
-      ];
-      for (const pDir of possibleDirs) {
-        const fullPath = path.join(pDir, filename);
-        if (fs.existsSync(fullPath)) return fullPath;
-      }
-      return null;
-    };
-
-    const imagePaths = [];
-
-    // 1. Try finding by JobCard
-    if (challan.jobNo) {
-      const jobTokens = String(challan.jobNo).split(',').map(s => s.trim()).filter(Boolean);
-      for (const jNo of jobTokens) {
-        try {
-          const job = await JobCard.findOne({ jobNo: jNo });
-          if (job) {
-            if (job.imageUrl1) {
-              const p = resolveImagePath(job.imageUrl1);
-              if (p && !imagePaths.some(img => img.path === p)) {
-                imagePaths.push({ path: p, label: `Job: ${job.jobNo} | Design: ${job.designNo || ''}` });
-              }
-            }
-            if (job.imageUrl2) {
-              const p = resolveImagePath(job.imageUrl2);
-              if (p && !imagePaths.some(img => img.path === p)) {
-                imagePaths.push({ path: p, label: `Job: ${job.jobNo} (Secondary Image)` });
-              }
-            }
-          }
-        } catch (e) {}
-      }
-    }
-
-    // 2. Try finding by Design No
-    const designTokens = String(challan.designNo || '')
-      .split(/[,\s&]+/)
-      .map(s => s.trim())
-      .filter(Boolean);
-
-    for (const dName of designTokens) {
-      const cleanName = dName.replace(/^ED-/i, '');
-      try {
-        const Design = require('../db/models/design.model');
-        const dDocs = await Design.find({ 
-          designName: { $regex: new RegExp(`^(ED-)?${cleanName}$`, 'i') } 
-        });
-        for (const dDoc of dDocs) {
-          if (dDoc.imageUrl) {
-            const p = resolveImagePath(dDoc.imageUrl);
-            if (p && !imagePaths.some(img => img.path === p)) {
-              imagePaths.push({ path: p, label: `Design: ${dDoc.designName}` });
-            }
-          }
-          if (dDoc.imageUrl2) {
-            const p = resolveImagePath(dDoc.imageUrl2);
-            if (p && !imagePaths.some(img => img.path === p)) {
-              imagePaths.push({ path: p, label: `Design: ${dDoc.designName} (Alt)` });
-            }
-          }
-        }
-      } catch (e) {}
-
-      const directCandidates = [dName, `ED-${dName}`, cleanName, `ED-${cleanName}`];
-      for (const cand of directCandidates) {
-        for (const ext of ['.jpg', '.jpeg', '.png']) {
-          const testPath = path.join(__dirname, '../../elite_edition_images', `${cand}${ext}`);
-          if (fs.existsSync(testPath) && !imagePaths.some(img => img.path === testPath)) {
-            imagePaths.push({ path: testPath, label: `Design: ${cand}` });
-          }
-        }
-      }
-    }
-
-    doc.addPage();
-
-    // Border for Page 3
-    doc.strokeColor('#5b21b6').lineWidth(1).rect(ML, MR, contentWidth, PH - 2 * MR).stroke();
-
-    // Header section with Logo
-    if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, ML + 10, MR + 8, { width: 130 });
-    }
-
-    doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
-      .text('DESIGN IMAGE ATTACHMENT', ML + 150, MR + 10, { width: contentWidth - 160, align: 'right' });
-
-    doc.fillColor('#475569').fontSize(9).font('Helvetica-Bold')
-      .text(`Challan No: EDP-${challan.challanNo || '—'}  |  Date: ${formattedDate}`, ML + 150, MR + 28, { width: contentWidth - 160, align: 'right' });
-    doc.fillColor('#64748b').fontSize(8.5).font('Helvetica')
-      .text(`Party: ${challan.partyName || '—'}  |  Job: ${challan.jobNo || '—'}  |  Design: ${challan.designNo || '—'}`, ML + 150, MR + 41, { width: contentWidth - 160, align: 'right' });
-
-    doc.moveTo(ML, MR + 58).lineTo(PW - MR, MR + 58).strokeColor('#ddd6fe').lineWidth(1.5).stroke();
-
-    let imgY = MR + 68;
-
-    if (imagePaths.length === 0) {
-      doc.rect(ML + 15, imgY, contentWidth - 30, 450).fill('#fcfaff').stroke('#ddd6fe');
-      doc.fillColor('#5b21b6').fontSize(12).font('Helvetica-Bold')
-        .text('NO DESIGN IMAGE ATTACHED', ML + 15, imgY + 200, { width: contentWidth - 30, align: 'center' });
-      doc.fillColor('#64748b').fontSize(9.5).font('Helvetica')
-        .text(`Design No: ${challan.designNo || 'N/A'} (Image not uploaded in catalog)`, ML + 15, imgY + 220, { width: contentWidth - 30, align: 'center' });
-    } else {
-      const displayList = imagePaths.slice(0, 2);
-      const boxHeight = displayList.length === 1 ? 680 : 335;
-
-      displayList.forEach((imgObj, idx) => {
-        doc.rect(ML + 15, imgY, contentWidth - 30, boxHeight).fill('#fcfaff').stroke('#ddd6fe');
-        
-        // Image Title Label Header
-        doc.rect(ML + 15, imgY, contentWidth - 30, 24).fill('#ede9fe');
-        doc.fillColor('#000000').fontSize(9.5).font('Helvetica-Bold')
-          .text(imgObj.label || `Design Image ${idx + 1}`, ML + 25, imgY + 7, { width: contentWidth - 50, align: 'left' });
-
-        try {
-          doc.image(imgObj.path, ML + 25, imgY + 30, {
-            fit: [contentWidth - 50, boxHeight - 40],
-            align: 'center',
-            valign: 'center'
-          });
-        } catch (imgErr) {
-          console.warn('Failed to embed image in PDF:', imgErr.message);
-        }
-
-        imgY += boxHeight + 15;
-      });
-    }
-
-    doc.fillColor('#6b21a8').fontSize(8).font('Helvetica')
-      .text(`Page 3 of 3 — EDP-${challan.challanNo} Design Preview Attachment`, ML, 795, { width: contentWidth, align: 'center', lineBreak: false });
 
     doc.end();
   } catch (err) {
