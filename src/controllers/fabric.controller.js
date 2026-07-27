@@ -1382,42 +1382,42 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
       const drawChallanHeaders = () => {
         doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
-        doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
-        doc.text('CH. NO', ML + 4, currentY + 5, { width: 42 });
-        doc.text('DATE', ML + 48, currentY + 5, { width: 44 });
-        doc.text('PARTY NAME', ML + 94, currentY + 5, { width: 105 });
-        doc.text('BILLING NAME', ML + 201, currentY + 5, { width: 105 });
-        doc.text('JOB NO', ML + 308, currentY + 5, { width: 50 });
-        doc.text('DESIGN NO', ML + 360, currentY + 5, { width: 75 });
-        doc.text('FABRIC', ML + 437, currentY + 5, { width: 55 });
-        doc.text('TP', ML + 494, currentY + 5, { width: 20, align: 'center' });
-        doc.text('METERS', ML + 516, currentY + 5, { width: 38, align: 'right' });
+        doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
+        doc.text('CH. NO', ML + 4, currentY + 5, { width: 44 });
+        doc.text('DATE', ML + 50, currentY + 5, { width: 42 });
+        doc.text('PARTY NAME', ML + 94, currentY + 5, { width: 96 });
+        doc.text('BILLING NAME', ML + 192, currentY + 5, { width: 96 });
+        doc.text('JOB NO', ML + 290, currentY + 5, { width: 50 });
+        doc.text('DESIGN NO', ML + 342, currentY + 5, { width: 70 });
+        doc.text('FABRIC', ML + 414, currentY + 5, { width: 50 });
+        doc.text('TP', ML + 466, currentY + 5, { width: 20, align: 'center' });
+        doc.text('METERS', ML + 488, currentY + 5, { width: 43, align: 'right' });
         currentY += 18;
       };
 
       drawChallanHeaders();
 
       challanData.forEach((c, idx) => {
-        if (checkAddPage(18)) {
+        if (checkAddPage(20)) {
           drawChallanHeaders();
         }
         const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
-        doc.rect(ML, currentY, contentWidth, 16).fill(bg);
-        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 16).stroke();
+        doc.rect(ML, currentY, contentWidth, 18).fill(bg);
+        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
 
         const dStr = c.date ? new Date(c.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' }) : '—';
-        doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
-        doc.text(`EDP-${c.challanNo || '—'}`, ML + 4, currentY + 4, { width: 42, lineBreak: false });
-        doc.text(dStr, ML + 48, currentY + 4, { width: 44, lineBreak: false });
-        doc.text(c.partyName || '—', ML + 94, currentY + 4, { width: 105, lineBreak: false });
-        doc.text(c.billTo || c.partyName || '—', ML + 201, currentY + 4, { width: 105, lineBreak: false });
-        doc.text(c.jobNo || '—', ML + 308, currentY + 4, { width: 50, lineBreak: false });
-        doc.text(c.designNo || '—', ML + 360, currentY + 4, { width: 75, lineBreak: false });
-        doc.text(c.fabricName || '—', ML + 437, currentY + 4, { width: 55, lineBreak: false });
-        doc.text(String(c.totalTp || 0), ML + 494, currentY + 4, { width: 20, align: 'center', lineBreak: false });
+        doc.fillColor('#000000').fontSize(7).font('Helvetica');
+        doc.text(`EDP-${c.challanNo || '—'}`, ML + 4, currentY + 4.5, { width: 44, lineBreak: false });
+        doc.text(dStr, ML + 50, currentY + 4.5, { width: 42, lineBreak: false });
+        doc.text(c.partyName || '—', ML + 94, currentY + 4.5, { width: 96, lineBreak: false });
+        doc.text(c.billTo || c.partyName || '—', ML + 192, currentY + 4.5, { width: 96, lineBreak: false });
+        doc.text(c.jobNo || '—', ML + 290, currentY + 4.5, { width: 50, lineBreak: false });
+        doc.text(c.designNo || '—', ML + 342, currentY + 4.5, { width: 70, lineBreak: false });
+        doc.text(c.fabricName || '—', ML + 414, currentY + 4.5, { width: 50, lineBreak: false });
+        doc.text(String(c.totalTp || 0), ML + 466, currentY + 4.5, { width: 20, align: 'center', lineBreak: false });
         doc.fillColor('#000000').font('Helvetica-Bold');
-        doc.text(`${parseFloat(c.totalMtr || 0).toFixed(2)}`, ML + 516, currentY + 4, { width: 38, align: 'right', lineBreak: false });
-        currentY += 16;
+        doc.text(`${parseFloat(c.totalMtr || 0).toFixed(2)}`, ML + 488, currentY + 4.5, { width: 43, align: 'right', lineBreak: false });
+        currentY += 18;
       });
 
       currentY += 12;
@@ -1437,38 +1437,38 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
       const drawInwardHeaders = () => {
         doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
-        doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+        doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
         doc.text('DATE', ML + 4, currentY + 5, { width: 52 });
         doc.text('VENDOR NAME', ML + 60, currentY + 5, { width: 140 });
         doc.text('VENDOR CHALLAN', ML + 204, currentY + 5, { width: 100 });
         doc.text('FABRIC QUALITY', ML + 308, currentY + 5, { width: 110 });
         doc.text('PANNA', ML + 422, currentY + 5, { width: 35 });
         doc.text('LOT NO', ML + 460, currentY + 5, { width: 35 });
-        doc.text('QTY (MTR)', ML + 498, currentY + 5, { width: 30, align: 'right' });
+        doc.text('QTY (MTR)', ML + 498, currentY + 5, { width: 33, align: 'right' });
         currentY += 18;
       };
 
       drawInwardHeaders();
 
       inwardData.forEach((r, idx) => {
-        if (checkAddPage(18)) {
+        if (checkAddPage(20)) {
           drawInwardHeaders();
         }
         const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
-        doc.rect(ML, currentY, contentWidth, 16).fill(bg);
-        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 16).stroke();
+        doc.rect(ML, currentY, contentWidth, 18).fill(bg);
+        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
 
         const dStr = r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
-        doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
-        doc.text(dStr, ML + 4, currentY + 4, { width: 52, lineBreak: false });
-        doc.text(r.vendorName || '—', ML + 60, currentY + 4, { width: 140, lineBreak: false });
-        doc.text(r.challanNo || '—', ML + 204, currentY + 4, { width: 100, lineBreak: false });
-        doc.text(r.fabricQuality || '—', ML + 308, currentY + 4, { width: 110, lineBreak: false });
-        doc.text(`${r.panna || '58'}"`, ML + 422, currentY + 4, { width: 35, lineBreak: false });
-        doc.text(r.lotNo ? `#${r.lotNo}` : '—', ML + 460, currentY + 4, { width: 35, lineBreak: false });
+        doc.fillColor('#000000').fontSize(7).font('Helvetica');
+        doc.text(dStr, ML + 4, currentY + 4.5, { width: 52, lineBreak: false });
+        doc.text(r.vendorName || '—', ML + 60, currentY + 4.5, { width: 140, lineBreak: false });
+        doc.text(r.challanNo || '—', ML + 204, currentY + 4.5, { width: 100, lineBreak: false });
+        doc.text(r.fabricQuality || '—', ML + 308, currentY + 4.5, { width: 110, lineBreak: false });
+        doc.text(`${r.panna || '58'}"`, ML + 422, currentY + 4.5, { width: 35, lineBreak: false });
+        doc.text(r.lotNo ? `#${r.lotNo}` : '—', ML + 460, currentY + 4.5, { width: 35, lineBreak: false });
         doc.fillColor('#047857').font('Helvetica-Bold');
-        doc.text(`${parseFloat(r.qty || 0).toFixed(2)}`, ML + 498, currentY + 4, { width: 30, align: 'right', lineBreak: false });
-        currentY += 16;
+        doc.text(`${parseFloat(r.qty || 0).toFixed(2)}`, ML + 498, currentY + 4.5, { width: 33, align: 'right', lineBreak: false });
+        currentY += 18;
       });
 
       currentY += 12;
@@ -1488,41 +1488,41 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
       const drawOutwardHeaders = () => {
         doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
-        doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
-        doc.text('DATE', ML + 4, currentY + 5, { width: 52 });
-        doc.text('PARTY NAME', ML + 60, currentY + 5, { width: 130 });
-        doc.text('JOB NO', ML + 194, currentY + 5, { width: 55 });
-        doc.text('CHALLAN NO', ML + 253, currentY + 5, { width: 60 });
-        doc.text('FABRIC QUALITY', ML + 317, currentY + 5, { width: 90 });
-        doc.text('LOT NO', ML + 411, currentY + 5, { width: 40 });
-        doc.text('SHORTAGE', ML + 453, currentY + 5, { width: 45, align: 'center' });
-        doc.text('QTY (MTR)', ML + 500, currentY + 5, { width: 42, align: 'right' });
+        doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
+        doc.text('DATE', ML + 4, currentY + 5, { width: 50 });
+        doc.text('PARTY NAME', ML + 56, currentY + 5, { width: 130 });
+        doc.text('JOB NO', ML + 188, currentY + 5, { width: 55 });
+        doc.text('CHALLAN NO', ML + 245, currentY + 5, { width: 60 });
+        doc.text('FABRIC QUALITY', ML + 307, currentY + 5, { width: 95 });
+        doc.text('LOT NO', ML + 404, currentY + 5, { width: 40 });
+        doc.text('SHORTAGE', ML + 446, currentY + 5, { width: 45, align: 'center' });
+        doc.text('QTY (MTR)', ML + 493, currentY + 5, { width: 38, align: 'right' });
         currentY += 18;
       };
 
       drawOutwardHeaders();
 
       outwardData.forEach((r, idx) => {
-        if (checkAddPage(18)) {
+        if (checkAddPage(20)) {
           drawOutwardHeaders();
         }
         const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
-        doc.rect(ML, currentY, contentWidth, 16).fill(bg);
-        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 16).stroke();
+        doc.rect(ML, currentY, contentWidth, 18).fill(bg);
+        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
 
         const dStr = r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
         const shortageStr = r.shortagePct != null ? `${r.shortagePct}%` : '—';
-        doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
-        doc.text(dStr, ML + 4, currentY + 4, { width: 52, lineBreak: false });
-        doc.text(r.partyName || '—', ML + 60, currentY + 4, { width: 130, lineBreak: false });
-        doc.text(r.jobNo || '—', ML + 194, currentY + 4, { width: 55, lineBreak: false });
-        doc.text(r.challanNo || '—', ML + 253, currentY + 4, { width: 60, lineBreak: false });
-        doc.text(r.fabricQuality || '—', ML + 317, currentY + 4, { width: 90, lineBreak: false });
-        doc.text(r.lotNo ? `#${r.lotNo}` : '—', ML + 411, currentY + 4, { width: 40, lineBreak: false });
-        doc.text(shortageStr, ML + 453, currentY + 4, { width: 45, align: 'center', lineBreak: false });
+        doc.fillColor('#000000').fontSize(7).font('Helvetica');
+        doc.text(dStr, ML + 4, currentY + 4.5, { width: 50, lineBreak: false });
+        doc.text(r.partyName || '—', ML + 56, currentY + 4.5, { width: 130, lineBreak: false });
+        doc.text(r.jobNo || '—', ML + 188, currentY + 4.5, { width: 55, lineBreak: false });
+        doc.text(r.challanNo || '—', ML + 245, currentY + 4.5, { width: 60, lineBreak: false });
+        doc.text(r.fabricQuality || '—', ML + 307, currentY + 4.5, { width: 95, lineBreak: false });
+        doc.text(r.lotNo ? `#${r.lotNo}` : '—', ML + 404, currentY + 4.5, { width: 40, lineBreak: false });
+        doc.text(shortageStr, ML + 446, currentY + 4.5, { width: 45, align: 'center', lineBreak: false });
         doc.fillColor('#b91c1c').font('Helvetica-Bold');
-        doc.text(`${parseFloat(r.qty || 0).toFixed(2)}`, ML + 500, currentY + 4, { width: 42, align: 'right', lineBreak: false });
-        currentY += 16;
+        doc.text(`${parseFloat(r.qty || 0).toFixed(2)}`, ML + 493, currentY + 4.5, { width: 38, align: 'right', lineBreak: false });
+        currentY += 18;
       });
 
       currentY += 12;
@@ -1542,37 +1542,37 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
       const drawLotHeaders = () => {
         doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
-        doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+        doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
         doc.text('LOT NO', ML + 4, currentY + 5, { width: 45 });
         doc.text('FABRIC QUALITY', ML + 52, currentY + 5, { width: 150 });
         doc.text('PANNA', ML + 206, currentY + 5, { width: 45 });
         doc.text('SUPPLIER VENDOR', ML + 254, currentY + 5, { width: 140 });
         doc.text('INWARD', ML + 398, currentY + 5, { width: 42, align: 'right' });
         doc.text('OUTWARD', ML + 444, currentY + 5, { width: 42, align: 'right' });
-        doc.text('BALANCE', ML + 490, currentY + 5, { width: 38, align: 'right' });
+        doc.text('BALANCE', ML + 490, currentY + 5, { width: 41, align: 'right' });
         currentY += 18;
       };
 
       drawLotHeaders();
 
       lotwiseData.forEach((l, idx) => {
-        if (checkAddPage(18)) {
+        if (checkAddPage(20)) {
           drawLotHeaders();
         }
         const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
-        doc.rect(ML, currentY, contentWidth, 16).fill(bg);
-        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 16).stroke();
+        doc.rect(ML, currentY, contentWidth, 18).fill(bg);
+        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
 
-        doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
-        doc.text(`#${l.lotNo}`, ML + 4, currentY + 4, { width: 45, lineBreak: false });
-        doc.text(l.fabricQuality || '—', ML + 52, currentY + 4, { width: 150, lineBreak: false });
-        doc.text(`${l.panna || '58'}"`, ML + 206, currentY + 4, { width: 45, lineBreak: false });
-        doc.text(l.vendorName || '—', ML + 254, currentY + 4, { width: 140, lineBreak: false });
-        doc.text(`${parseFloat(l.totalInward || 0).toFixed(2)}`, ML + 398, currentY + 4, { width: 42, align: 'right', lineBreak: false });
-        doc.text(`${parseFloat(l.totalOutward || 0).toFixed(2)}`, ML + 444, currentY + 4, { width: 42, align: 'right', lineBreak: false });
+        doc.fillColor('#000000').fontSize(7).font('Helvetica');
+        doc.text(`#${l.lotNo}`, ML + 4, currentY + 4.5, { width: 45, lineBreak: false });
+        doc.text(l.fabricQuality || '—', ML + 52, currentY + 4.5, { width: 150, lineBreak: false });
+        doc.text(`${l.panna || '58'}"`, ML + 206, currentY + 4.5, { width: 45, lineBreak: false });
+        doc.text(l.vendorName || '—', ML + 254, currentY + 4.5, { width: 140, lineBreak: false });
+        doc.text(`${parseFloat(l.totalInward || 0).toFixed(2)}`, ML + 398, currentY + 4.5, { width: 42, align: 'right', lineBreak: false });
+        doc.text(`${parseFloat(l.totalOutward || 0).toFixed(2)}`, ML + 444, currentY + 4.5, { width: 42, align: 'right', lineBreak: false });
         doc.fillColor(l.currentStock > 0 ? '#047857' : '#dc2626').font('Helvetica-Bold');
-        doc.text(`${parseFloat(l.currentStock || 0).toFixed(2)}`, ML + 490, currentY + 4, { width: 38, align: 'right', lineBreak: false });
-        currentY += 16;
+        doc.text(`${parseFloat(l.currentStock || 0).toFixed(2)}`, ML + 490, currentY + 4.5, { width: 41, align: 'right', lineBreak: false });
+        currentY += 18;
       });
 
       currentY += 12;
@@ -1594,7 +1594,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
       const drawStockHeaders = () => {
         doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
-        doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+        doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
         doc.text('FABRIC QUALITY', ML + 4, currentY + 5, { width: 180 });
         doc.text('TOTAL INWARD (MTR)', ML + 188, currentY + 5, { width: 85, align: 'right' });
         doc.text('TOTAL OUTWARD (MTR)', ML + 277, currentY + 5, { width: 85, align: 'right' });
@@ -1606,26 +1606,26 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       drawStockHeaders();
 
       stockSummaryData.forEach((st, idx) => {
-        if (checkAddPage(18)) {
+        if (checkAddPage(20)) {
           drawStockHeaders();
         }
         const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
-        doc.rect(ML, currentY, contentWidth, 16).fill(bg);
-        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 16).stroke();
+        doc.rect(ML, currentY, contentWidth, 18).fill(bg);
+        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
 
         const isLow = st.currentStock <= 50 && st.currentStock > 0;
         const isEmpty = st.currentStock <= 0;
         const statusLabel = isEmpty ? 'EMPTY' : isLow ? 'LOW STOCK' : 'SAFE';
         const statusColor = isEmpty ? '#dc2626' : isLow ? '#d97706' : '#047857';
 
-        doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
-        doc.text(st.fabricQuality || '—', ML + 4, currentY + 4, { width: 180, lineBreak: false });
-        doc.text(`${parseFloat(st.totalInward || 0).toFixed(2)}`, ML + 188, currentY + 4, { width: 85, align: 'right', lineBreak: false });
-        doc.text(`${parseFloat(st.totalOutward || 0).toFixed(2)}`, ML + 277, currentY + 4, { width: 85, align: 'right', lineBreak: false });
+        doc.fillColor('#000000').fontSize(7).font('Helvetica');
+        doc.text(st.fabricQuality || '—', ML + 4, currentY + 4.5, { width: 180, lineBreak: false });
+        doc.text(`${parseFloat(st.totalInward || 0).toFixed(2)}`, ML + 188, currentY + 4.5, { width: 85, align: 'right', lineBreak: false });
+        doc.text(`${parseFloat(st.totalOutward || 0).toFixed(2)}`, ML + 277, currentY + 4.5, { width: 85, align: 'right', lineBreak: false });
         doc.fillColor(statusColor).font('Helvetica-Bold');
-        doc.text(`${parseFloat(st.currentStock || 0).toFixed(2)}`, ML + 366, currentY + 4, { width: 85, align: 'right', lineBreak: false });
-        doc.text(statusLabel, ML + 455, currentY + 4, { width: 73, align: 'center', lineBreak: false });
-        currentY += 16;
+        doc.text(`${parseFloat(st.currentStock || 0).toFixed(2)}`, ML + 366, currentY + 4.5, { width: 85, align: 'right', lineBreak: false });
+        doc.text(statusLabel, ML + 455, currentY + 4.5, { width: 73, align: 'center', lineBreak: false });
+        currentY += 18;
       });
     }
 
