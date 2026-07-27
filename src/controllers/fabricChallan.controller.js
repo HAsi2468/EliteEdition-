@@ -966,7 +966,7 @@ const downloadChallanSummaryPdf = async (req, res) => {
     for (let i = 0; i < pages.count; i++) {
       doc.switchToPage(i);
       doc.fillColor('#6b21a8').fontSize(8).font('Helvetica')
-        .text(`Page ${i + 1} of ${pages.count} — Elite Digital Prints Fabric Challan Report`, 30, 815, { width: 535, align: 'center' });
+        .text(`Page ${i + 1} of ${pages.count} — Elite Digital Prints Fabric Challan Report`, 30, 795, { width: 535, align: 'center', lineBreak: false });
     }
 
     doc.end();
