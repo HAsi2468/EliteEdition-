@@ -819,6 +819,150 @@ const downloadChallanPdf = async (req, res) => {
     doc.addPage();
     renderPage(false); // Page 2: Black & White (Challan No in red)
 
+    // ── PAGE 3: DESIGN IMAGE PREVIEW ──
+    const resolveImagePath = (urlOrPath) => {
+      if (!urlOrPath) return null;
+      let filename = urlOrPath.replace(/^.*\/designs\//, '').replace(/^\/designs\//, '');
+      try {
+        filename = decodeURIComponent(filename);
+      } catch (e) {}
+      
+      const possibleDirs = [
+        path.join(__dirname, '../../elite_edition_images'),
+        path.join(__dirname, '../elite_edition_images'),
+        path.join(__dirname, '../../Digital print'),
+        path.join(__dirname, '../Digital print')
+      ];
+      for (const pDir of possibleDirs) {
+        const fullPath = path.join(pDir, filename);
+        if (fs.existsSync(fullPath)) return fullPath;
+      }
+      return null;
+    };
+
+    const imagePaths = [];
+
+    // 1. Try finding by JobCard
+    if (challan.jobNo) {
+      const jobTokens = String(challan.jobNo).split(',').map(s => s.trim()).filter(Boolean);
+      for (const jNo of jobTokens) {
+        try {
+          const job = await JobCard.findOne({ jobNo: jNo });
+          if (job) {
+            if (job.imageUrl1) {
+              const p = resolveImagePath(job.imageUrl1);
+              if (p && !imagePaths.some(img => img.path === p)) {
+                imagePaths.push({ path: p, label: `Job: ${job.jobNo} | Design: ${job.designNo || ''}` });
+              }
+            }
+            if (job.imageUrl2) {
+              const p = resolveImagePath(job.imageUrl2);
+              if (p && !imagePaths.some(img => img.path === p)) {
+                imagePaths.push({ path: p, label: `Job: ${job.jobNo} (Secondary Image)` });
+              }
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 2. Try finding by Design No
+    const designTokens = String(challan.designNo || '')
+      .split(/[,\s&]+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    for (const dName of designTokens) {
+      const cleanName = dName.replace(/^ED-/i, '');
+      try {
+        const Design = require('../db/models/design.model');
+        const dDocs = await Design.find({ 
+          designName: { $regex: new RegExp(`^(ED-)?${cleanName}$`, 'i') } 
+        });
+        for (const dDoc of dDocs) {
+          if (dDoc.imageUrl) {
+            const p = resolveImagePath(dDoc.imageUrl);
+            if (p && !imagePaths.some(img => img.path === p)) {
+              imagePaths.push({ path: p, label: `Design: ${dDoc.designName}` });
+            }
+          }
+          if (dDoc.imageUrl2) {
+            const p = resolveImagePath(dDoc.imageUrl2);
+            if (p && !imagePaths.some(img => img.path === p)) {
+              imagePaths.push({ path: p, label: `Design: ${dDoc.designName} (Alt)` });
+            }
+          }
+        }
+      } catch (e) {}
+
+      const directCandidates = [dName, `ED-${dName}`, cleanName, `ED-${cleanName}`];
+      for (const cand of directCandidates) {
+        for (const ext of ['.jpg', '.jpeg', '.png']) {
+          const testPath = path.join(__dirname, '../../elite_edition_images', `${cand}${ext}`);
+          if (fs.existsSync(testPath) && !imagePaths.some(img => img.path === testPath)) {
+            imagePaths.push({ path: testPath, label: `Design: ${cand}` });
+          }
+        }
+      }
+    }
+
+    doc.addPage();
+
+    // Border for Page 3
+    doc.strokeColor('#5b21b6').lineWidth(1).rect(ML, MR, contentWidth, PH - 2 * MR).stroke();
+
+    // Header section with Logo
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, ML + 10, MR + 8, { width: 130 });
+    }
+
+    doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
+      .text('DESIGN IMAGE ATTACHMENT', ML + 150, MR + 10, { width: contentWidth - 160, align: 'right' });
+
+    doc.fillColor('#475569').fontSize(9).font('Helvetica-Bold')
+      .text(`Challan No: EDP-${challan.challanNo || '—'}  |  Date: ${formattedDate}`, ML + 150, MR + 28, { width: contentWidth - 160, align: 'right' });
+    doc.fillColor('#64748b').fontSize(8.5).font('Helvetica')
+      .text(`Party: ${challan.partyName || '—'}  |  Job: ${challan.jobNo || '—'}  |  Design: ${challan.designNo || '—'}`, ML + 150, MR + 41, { width: contentWidth - 160, align: 'right' });
+
+    doc.moveTo(ML, MR + 58).lineTo(PW - MR, MR + 58).strokeColor('#ddd6fe').lineWidth(1.5).stroke();
+
+    let imgY = MR + 68;
+
+    if (imagePaths.length === 0) {
+      doc.rect(ML + 15, imgY, contentWidth - 30, 450).fill('#fcfaff').stroke('#ddd6fe');
+      doc.fillColor('#5b21b6').fontSize(12).font('Helvetica-Bold')
+        .text('NO DESIGN IMAGE ATTACHED', ML + 15, imgY + 200, { width: contentWidth - 30, align: 'center' });
+      doc.fillColor('#64748b').fontSize(9.5).font('Helvetica')
+        .text(`Design No: ${challan.designNo || 'N/A'} (Image not uploaded in catalog)`, ML + 15, imgY + 220, { width: contentWidth - 30, align: 'center' });
+    } else {
+      const displayList = imagePaths.slice(0, 2);
+      const boxHeight = displayList.length === 1 ? 680 : 335;
+
+      displayList.forEach((imgObj, idx) => {
+        doc.rect(ML + 15, imgY, contentWidth - 30, boxHeight).fill('#fcfaff').stroke('#ddd6fe');
+        
+        // Image Title Label Header
+        doc.rect(ML + 15, imgY, contentWidth - 30, 24).fill('#ede9fe');
+        doc.fillColor('#000000').fontSize(9.5).font('Helvetica-Bold')
+          .text(imgObj.label || `Design Image ${idx + 1}`, ML + 25, imgY + 7, { width: contentWidth - 50, align: 'left' });
+
+        try {
+          doc.image(imgObj.path, ML + 25, imgY + 30, {
+            fit: [contentWidth - 50, boxHeight - 40],
+            align: 'center',
+            valign: 'center'
+          });
+        } catch (imgErr) {
+          console.warn('Failed to embed image in PDF:', imgErr.message);
+        }
+
+        imgY += boxHeight + 15;
+      });
+    }
+
+    doc.fillColor('#6b21a8').fontSize(8).font('Helvetica')
+      .text(`Page 3 of 3 — EDP-${challan.challanNo} Design Preview Attachment`, ML, 795, { width: contentWidth, align: 'center', lineBreak: false });
+
     doc.end();
   } catch (err) {
     console.error('Error downloading challan PDF:', err);

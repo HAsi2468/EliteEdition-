@@ -424,11 +424,13 @@ export default function FabricInventoryPanel() {
     const intervalId = setInterval(() => {
       fetchData();
       fetchRequirement();
+      fetchChallans();
     }, 10000); // 10s auto-sync
 
     const handleDataRefresh = () => {
       fetchData();
       fetchRequirement();
+      fetchChallans();
     };
     window.addEventListener('elite-data-refresh', handleDataRefresh);
 
@@ -825,6 +827,7 @@ export default function FabricInventoryPanel() {
       resetChallanForm();
       triggerGlobalDataRefresh('fabric');
       fetchData();
+      fetchChallans();
     } catch (err) {
       alert(err.message);
     } finally {
@@ -874,6 +877,7 @@ export default function FabricInventoryPanel() {
       setChallanDeleteTarget(null);
       triggerGlobalDataRefresh('fabric');
       fetchData();
+      fetchChallans();
     } catch (err) {
       alert('Failed to delete challan: ' + err.message);
     }
