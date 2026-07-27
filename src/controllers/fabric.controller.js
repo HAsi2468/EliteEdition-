@@ -1279,30 +1279,36 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     const totalChallanTp = challanData.reduce((s, c) => s + (c.totalTp || 0), 0);
     const totalLotNetStock = lotwiseData.reduce((s, l) => s + Math.max(0, l.currentStock || 0), 0);
 
-    const doc = new PDFDocument({ margin: 25, size: 'A4', autoFirstPage: true });
+    const doc = new PDFDocument({ margin: 25, size: 'A4', autoFirstPage: true, bufferPages: true });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="Elite_Digital_Prints_Combined_Report.pdf"');
     doc.pipe(res);
 
     const PW = 595, PH = 842, ML = 30, MR = 30;
     const contentWidth = PW - ML - MR;
-
-    const logoPath = path.join(__dirname, 'Logo.png');
-    if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, ML, 20, { width: 120 });
-    }
-
-    doc.fillColor('#000000').fontSize(13).font('Helvetica-Bold')
-      .text('ELITE DIGITAL PRINTS — COMBINED MULTI-REPORT', ML + 130, 22, { width: contentWidth - 130, align: 'right' });
+    const maxY = 770;
 
     const startDateStr = dateStart ? new Date(dateStart).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'All Time';
     const endDateStr = dateEnd ? new Date(dateEnd).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Present';
+    const logoPath = path.join(__dirname, 'Logo.png');
 
-    doc.fillColor('#475569').fontSize(8.5).font('Helvetica-Bold')
-      .text(`Report Period: ${startDateStr} to ${endDateStr}  |  Generated: ${new Date().toLocaleDateString('en-IN')}`, ML + 130, 38, { width: contentWidth - 130, align: 'right' });
+    const drawPageHeader = (isFirstPage = false) => {
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, ML, 20, { width: 120 });
+      }
 
-    doc.moveTo(ML, 52).lineTo(PW - MR, 52).strokeColor('#ddd6fe').lineWidth(1.2).stroke();
+      doc.fillColor('#000000').fontSize(13).font('Helvetica-Bold')
+        .text('ELITE DIGITAL PRINTS — COMBINED MULTI-REPORT', ML + 130, 22, { width: contentWidth - 130, align: 'right' });
 
+      doc.fillColor('#475569').fontSize(8.5).font('Helvetica-Bold')
+        .text(`Report Period: ${startDateStr} to ${endDateStr}  |  Generated: ${new Date().toLocaleDateString('en-IN')}`, ML + 130, 38, { width: contentWidth - 130, align: 'right' });
+
+      doc.moveTo(ML, 52).lineTo(PW - MR, 52).strokeColor('#ddd6fe').lineWidth(1.2).stroke();
+    };
+
+    drawPageHeader(true);
+
+    // KPI Cards on Page 1
     const activeSections = [
       selectedReports.includes('challan') && { label: 'CHALLAN DISPATCHES', val: `${totalChallanMtr.toFixed(1)} mtr`, sub: `${challanData.length} Challans (${totalChallanTp} TP)` },
       selectedReports.includes('inward') && { label: 'FABRIC INWARD', val: `${totalInwardMtr.toFixed(1)} mtr`, sub: `${inwardData.length} Receipts` },
@@ -1315,144 +1321,238 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     let cardX = ML;
 
     activeSections.forEach(card => {
-      doc.rect(cardX, 60, cardWidth, 48).fill('#f5f3ff').stroke('#ddd6fe');
+      doc.rect(cardX, 60, cardWidth, 46).fill('#f5f3ff').stroke('#ddd6fe');
       doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
-        .text(card.label, cardX + 5, 65, { width: cardWidth - 10, align: 'center' });
-      doc.fillColor('#000000').fontSize(12).font('Helvetica-Bold')
-        .text(card.val, cardX + 5, 76, { width: cardWidth - 10, align: 'center' });
+        .text(card.label, cardX + 5, 64, { width: cardWidth - 10, align: 'center' });
+      doc.fillColor('#000000').fontSize(11.5).font('Helvetica-Bold')
+        .text(card.val, cardX + 5, 75, { width: cardWidth - 10, align: 'center' });
       doc.fillColor('#475569').fontSize(7).font('Helvetica')
-        .text(card.sub, cardX + 5, 93, { width: cardWidth - 10, align: 'center' });
+        .text(card.sub, cardX + 5, 91, { width: cardWidth - 10, align: 'center' });
       cardX += cardWidth + 8;
     });
 
     let currentY = 118;
-    const sectionCount = selectedReports.length;
-    const maxRowsPerSection = sectionCount > 2 ? 6 : 10;
-    const sectionHeight = sectionCount > 2 ? 155 : 310;
 
-    const drawSectionHeader = (title, countStr, x, y, width) => {
-      doc.rect(x, y, width, 18).fill('#ede9fe').stroke('#ddd6fe');
-      doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold')
-        .text(title.toUpperCase(), x + 6, y + 4, { lineBreak: false });
-      doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
-        .text(countStr, x + width - 100, y + 4, { width: 94, align: 'right', lineBreak: false });
-    };
-
-    const isGrid = sectionCount > 2;
-    const secWidth = isGrid ? (contentWidth - 10) / 2 : contentWidth;
-    let secIdx = 0;
-
-    const getSecPos = () => {
-      if (!isGrid) {
-        const pos = { x: ML, y: currentY, w: contentWidth, h: sectionHeight };
-        currentY += sectionHeight + 10;
-        return pos;
+    const checkAddPage = (heightNeeded) => {
+      if (currentY + heightNeeded > maxY) {
+        doc.addPage();
+        drawPageHeader(false);
+        currentY = 62;
+        return true;
       }
-      const col = secIdx % 2;
-      const row = Math.floor(secIdx / 2);
-      const x = ML + col * (secWidth + 10);
-      const y = 118 + row * (sectionHeight + 10);
-      secIdx++;
-      return { x, y, w: secWidth, h: sectionHeight };
+      return false;
     };
 
+    // ── 1. FABRIC CHALLANS SUMMARY (COMPLETE DATA) ──
     if (selectedReports.includes('challan')) {
-      const { x, y, w, h } = getSecPos();
-      drawSectionHeader('1. Fabric Challans Summary', `${challanData.length} Records`, x, y, w);
+      checkAddPage(60);
 
-      let rowY = y + 20;
-      doc.rect(x, rowY, w, 16).fill('#f8fafc');
-      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
-      doc.text('CH. NO', x + 4, rowY + 4, { width: 45 });
-      doc.text('PARTY NAME', x + 50, rowY + 4, { width: w - 150 });
-      doc.text('FABRIC', x + w - 98, rowY + 4, { width: 50 });
-      doc.text('METERS', x + w - 46, rowY + 4, { width: 42, align: 'right' });
+      doc.rect(ML, currentY, contentWidth, 20).fill('#ede9fe').stroke('#ddd6fe');
+      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
+        .text('1. FABRIC CHALLANS DISPATCH SUMMARY', ML + 8, currentY + 5, { lineBreak: false });
+      doc.fillColor('#5b21b6').fontSize(8.5).font('Helvetica-Bold')
+        .text(`Total: ${challanData.length} Records (${totalChallanMtr.toFixed(1)} mtr)`, ML + contentWidth - 220, currentY + 5, { width: 210, align: 'right', lineBreak: false });
 
-      rowY += 16;
-      challanData.slice(0, maxRowsPerSection).forEach(c => {
+      currentY += 24;
+
+      const drawChallanHeaders = () => {
+        doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
+        doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+        doc.text('CH. NO', ML + 4, currentY + 5, { width: 45 });
+        doc.text('DATE', ML + 52, currentY + 5, { width: 48 });
+        doc.text('PARTY NAME', ML + 104, currentY + 5, { width: 140 });
+        doc.text('JOB NO', ML + 248, currentY + 5, { width: 55 });
+        doc.text('DESIGN NO', ML + 306, currentY + 5, { width: 85 });
+        doc.text('FABRIC', ML + 394, currentY + 5, { width: 65 });
+        doc.text('TP', ML + 462, currentY + 5, { width: 25, align: 'center' });
+        doc.text('METERS', ML + 490, currentY + 5, { width: 38, align: 'right' });
+        currentY += 18;
+      };
+
+      drawChallanHeaders();
+
+      challanData.forEach((c, idx) => {
+        if (checkAddPage(18)) {
+          drawChallanHeaders();
+        }
+        const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
+        doc.rect(ML, currentY, contentWidth, 16).fill(bg);
+        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 16).stroke();
+
+        const dStr = c.date ? new Date(c.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' }) : '—';
         doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
-        doc.text(`EDP-${c.challanNo}`, x + 4, rowY + 3, { width: 45, lineBreak: false });
-        doc.text(c.partyName || '—', x + 50, rowY + 3, { width: w - 150, lineBreak: false });
-        doc.text(c.fabricName || '—', x + w - 98, rowY + 3, { width: 50, lineBreak: false });
-        doc.text(`${parseFloat(c.totalMtr || 0).toFixed(1)}`, x + w - 46, rowY + 3, { width: 42, align: 'right', lineBreak: false });
-        rowY += 15;
+        doc.text(`EDP-${c.challanNo || '—'}`, ML + 4, currentY + 4, { width: 45, lineBreak: false });
+        doc.text(dStr, ML + 52, currentY + 4, { width: 48, lineBreak: false });
+        doc.text(c.partyName || '—', ML + 104, currentY + 4, { width: 140, lineBreak: false });
+        doc.text(c.jobNo || '—', ML + 248, currentY + 4, { width: 55, lineBreak: false });
+        doc.text(c.designNo || '—', ML + 306, currentY + 4, { width: 85, lineBreak: false });
+        doc.text(c.fabricName || '—', ML + 394, currentY + 4, { width: 65, lineBreak: false });
+        doc.text(String(c.totalTp || 0), ML + 462, currentY + 4, { width: 25, align: 'center', lineBreak: false });
+        doc.fillColor('#000000').font('Helvetica-Bold');
+        doc.text(`${parseFloat(c.totalMtr || 0).toFixed(1)}`, ML + 490, currentY + 4, { width: 38, align: 'right', lineBreak: false });
+        currentY += 16;
       });
+
+      currentY += 12;
     }
 
+    // ── 2. FABRIC INWARD RECEIPTS (COMPLETE DATA) ──
     if (selectedReports.includes('inward')) {
-      const { x, y, w, h } = getSecPos();
-      drawSectionHeader('2. Fabric Inward Receipts', `${inwardData.length} Records`, x, y, w);
+      checkAddPage(60);
 
-      let rowY = y + 20;
-      doc.rect(x, rowY, w, 16).fill('#f8fafc');
-      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
-      doc.text('DATE', x + 4, rowY + 4, { width: 45 });
-      doc.text('FABRIC QUALITY', x + 50, rowY + 4, { width: w - 150 });
-      doc.text('VENDOR', x + w - 98, rowY + 4, { width: 50 });
-      doc.text('METERS', x + w - 46, rowY + 4, { width: 42, align: 'right' });
+      doc.rect(ML, currentY, contentWidth, 20).fill('#ede9fe').stroke('#ddd6fe');
+      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
+        .text('2. FABRIC INWARD RECEIPTS LEDGER', ML + 8, currentY + 5, { lineBreak: false });
+      doc.fillColor('#5b21b6').fontSize(8.5).font('Helvetica-Bold')
+        .text(`Total: ${inwardData.length} Receipts (${totalInwardMtr.toFixed(1)} mtr)`, ML + contentWidth - 220, currentY + 5, { width: 210, align: 'right', lineBreak: false });
 
-      rowY += 16;
-      inwardData.slice(0, maxRowsPerSection).forEach(r => {
-        const dStr = r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' }) : '—';
+      currentY += 24;
+
+      const drawInwardHeaders = () => {
+        doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
+        doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+        doc.text('DATE', ML + 4, currentY + 5, { width: 52 });
+        doc.text('VENDOR NAME', ML + 60, currentY + 5, { width: 140 });
+        doc.text('VENDOR CHALLAN', ML + 204, currentY + 5, { width: 100 });
+        doc.text('FABRIC QUALITY', ML + 308, currentY + 5, { width: 110 });
+        doc.text('PANNA', ML + 422, currentY + 5, { width: 35 });
+        doc.text('LOT NO', ML + 460, currentY + 5, { width: 35 });
+        doc.text('QTY (MTR)', ML + 498, currentY + 5, { width: 30, align: 'right' });
+        currentY += 18;
+      };
+
+      drawInwardHeaders();
+
+      inwardData.forEach((r, idx) => {
+        if (checkAddPage(18)) {
+          drawInwardHeaders();
+        }
+        const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
+        doc.rect(ML, currentY, contentWidth, 16).fill(bg);
+        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 16).stroke();
+
+        const dStr = r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
         doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
-        doc.text(dStr, x + 4, rowY + 3, { width: 45, lineBreak: false });
-        doc.text(r.fabricQuality || '—', x + 50, rowY + 3, { width: w - 150, lineBreak: false });
-        doc.text(r.vendorName || '—', x + w - 98, rowY + 3, { width: 50, lineBreak: false });
-        doc.text(`${parseFloat(r.qty || 0).toFixed(1)}`, x + w - 46, rowY + 3, { width: 42, align: 'right', lineBreak: false });
-        rowY += 15;
+        doc.text(dStr, ML + 4, currentY + 4, { width: 52, lineBreak: false });
+        doc.text(r.vendorName || '—', ML + 60, currentY + 4, { width: 140, lineBreak: false });
+        doc.text(r.challanNo || '—', ML + 204, currentY + 4, { width: 100, lineBreak: false });
+        doc.text(r.fabricQuality || '—', ML + 308, currentY + 4, { width: 110, lineBreak: false });
+        doc.text(`${r.panna || '58'}"`, ML + 422, currentY + 4, { width: 35, lineBreak: false });
+        doc.text(r.lotNo ? `#${r.lotNo}` : '—', ML + 460, currentY + 4, { width: 35, lineBreak: false });
+        doc.fillColor('#047857').font('Helvetica-Bold');
+        doc.text(`${parseFloat(r.qty || 0).toFixed(1)}`, ML + 498, currentY + 4, { width: 30, align: 'right', lineBreak: false });
+        currentY += 16;
       });
+
+      currentY += 12;
     }
 
+    // ── 3. FABRIC OUTWARD DISPATCHES (COMPLETE DATA) ──
     if (selectedReports.includes('outward')) {
-      const { x, y, w, h } = getSecPos();
-      drawSectionHeader('3. Fabric Outward Dispatches', `${outwardData.length} Records`, x, y, w);
+      checkAddPage(60);
 
-      let rowY = y + 20;
-      doc.rect(x, rowY, w, 16).fill('#f8fafc');
-      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
-      doc.text('DATE', x + 4, rowY + 4, { width: 45 });
-      doc.text('FABRIC QUALITY', x + 50, rowY + 4, { width: w - 150 });
-      doc.text('PARTY', x + w - 98, rowY + 4, { width: 50 });
-      doc.text('METERS', x + w - 46, rowY + 4, { width: 42, align: 'right' });
+      doc.rect(ML, currentY, contentWidth, 20).fill('#ede9fe').stroke('#ddd6fe');
+      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
+        .text('3. FABRIC OUTWARD DISPATCHES LEDGER', ML + 8, currentY + 5, { lineBreak: false });
+      doc.fillColor('#5b21b6').fontSize(8.5).font('Helvetica-Bold')
+        .text(`Total: ${outwardData.length} Dispatches (${totalOutwardMtr.toFixed(1)} mtr)`, ML + contentWidth - 220, currentY + 5, { width: 210, align: 'right', lineBreak: false });
 
-      rowY += 16;
-      outwardData.slice(0, maxRowsPerSection).forEach(r => {
-        const dStr = r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' }) : '—';
+      currentY += 24;
+
+      const drawOutwardHeaders = () => {
+        doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
+        doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+        doc.text('DATE', ML + 4, currentY + 5, { width: 52 });
+        doc.text('PARTY NAME', ML + 60, currentY + 5, { width: 140 });
+        doc.text('JOB NO', ML + 204, currentY + 5, { width: 60 });
+        doc.text('CHALLAN NO', ML + 268, currentY + 5, { width: 65 });
+        doc.text('FABRIC QUALITY', ML + 336, currentY + 5, { width: 95 });
+        doc.text('LOT NO', ML + 434, currentY + 5, { width: 45 });
+        doc.text('QTY (MTR)', ML + 482, currentY + 5, { width: 46, align: 'right' });
+        currentY += 18;
+      };
+
+      drawOutwardHeaders();
+
+      outwardData.forEach((r, idx) => {
+        if (checkAddPage(18)) {
+          drawOutwardHeaders();
+        }
+        const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
+        doc.rect(ML, currentY, contentWidth, 16).fill(bg);
+        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 16).stroke();
+
+        const dStr = r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
         doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
-        doc.text(dStr, x + 4, rowY + 3, { width: 45, lineBreak: false });
-        doc.text(r.fabricQuality || '—', x + 50, rowY + 3, { width: w - 150, lineBreak: false });
-        doc.text(r.partyName || '—', x + w - 98, rowY + 3, { width: 50, lineBreak: false });
-        doc.text(`${parseFloat(r.qty || 0).toFixed(1)}`, x + w - 46, rowY + 3, { width: 42, align: 'right', lineBreak: false });
-        rowY += 15;
+        doc.text(dStr, ML + 4, currentY + 4, { width: 52, lineBreak: false });
+        doc.text(r.partyName || '—', ML + 60, currentY + 4, { width: 140, lineBreak: false });
+        doc.text(r.jobNo || '—', ML + 204, currentY + 4, { width: 60, lineBreak: false });
+        doc.text(r.challanNo || '—', ML + 268, currentY + 4, { width: 65, lineBreak: false });
+        doc.text(r.fabricQuality || '—', ML + 336, currentY + 4, { width: 95, lineBreak: false });
+        doc.text(r.lotNo ? `#${r.lotNo}` : '—', ML + 434, currentY + 4, { width: 45, lineBreak: false });
+        doc.fillColor('#b91c1c').font('Helvetica-Bold');
+        doc.text(`${parseFloat(r.qty || 0).toFixed(1)}`, ML + 482, currentY + 4, { width: 46, align: 'right', lineBreak: false });
+        currentY += 16;
       });
+
+      currentY += 12;
     }
 
+    // ── 4. LOT-WISE FABRIC STOCK BALANCE (COMPLETE DATA) ──
     if (selectedReports.includes('lotwise')) {
-      const { x, y, w, h } = getSecPos();
-      drawSectionHeader('4. Lot-Wise Stock Balance', `${lotwiseData.length} Lots`, x, y, w);
+      checkAddPage(60);
 
-      let rowY = y + 20;
-      doc.rect(x, rowY, w, 16).fill('#f8fafc');
-      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
-      doc.text('LOT NO', x + 4, rowY + 4, { width: 40 });
-      doc.text('FABRIC QUALITY', x + 46, rowY + 4, { width: w - 155 });
-      doc.text('IN / OUT', x + w - 105, rowY + 4, { width: 55, align: 'center' });
-      doc.text('BALANCE', x + w - 46, rowY + 4, { width: 42, align: 'right' });
+      doc.rect(ML, currentY, contentWidth, 20).fill('#ede9fe').stroke('#ddd6fe');
+      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
+        .text('4. LOT-WISE FABRIC STOCK BALANCE LEDGER', ML + 8, currentY + 5, { lineBreak: false });
+      doc.fillColor('#5b21b6').fontSize(8.5).font('Helvetica-Bold')
+        .text(`Total: ${lotwiseData.length} Lots (${totalLotNetStock.toFixed(1)} mtr balance)`, ML + contentWidth - 240, currentY + 5, { width: 230, align: 'right', lineBreak: false });
 
-      rowY += 16;
-      lotwiseData.slice(0, maxRowsPerSection).forEach(l => {
+      currentY += 24;
+
+      const drawLotHeaders = () => {
+        doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
+        doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+        doc.text('LOT NO', ML + 4, currentY + 5, { width: 45 });
+        doc.text('FABRIC QUALITY', ML + 52, currentY + 5, { width: 150 });
+        doc.text('PANNA', ML + 206, currentY + 5, { width: 45 });
+        doc.text('SUPPLIER VENDOR', ML + 254, currentY + 5, { width: 140 });
+        doc.text('INWARD', ML + 398, currentY + 5, { width: 42, align: 'right' });
+        doc.text('OUTWARD', ML + 444, currentY + 5, { width: 42, align: 'right' });
+        doc.text('BALANCE', ML + 490, currentY + 5, { width: 38, align: 'right' });
+        currentY += 18;
+      };
+
+      drawLotHeaders();
+
+      lotwiseData.forEach((l, idx) => {
+        if (checkAddPage(18)) {
+          drawLotHeaders();
+        }
+        const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
+        doc.rect(ML, currentY, contentWidth, 16).fill(bg);
+        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 16).stroke();
+
         doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
-        doc.text(`#${l.lotNo}`, x + 4, rowY + 3, { width: 40, lineBreak: false });
-        doc.text(l.fabricQuality || '—', x + 46, rowY + 3, { width: w - 155, lineBreak: false });
-        doc.text(`${l.totalInward}/${l.totalOutward}`, x + w - 105, rowY + 3, { width: 55, align: 'center', lineBreak: false });
+        doc.text(`#${l.lotNo}`, ML + 4, currentY + 4, { width: 45, lineBreak: false });
+        doc.text(l.fabricQuality || '—', ML + 52, currentY + 4, { width: 150, lineBreak: false });
+        doc.text(`${l.panna || '58'}"`, ML + 206, currentY + 4, { width: 45, lineBreak: false });
+        doc.text(l.vendorName || '—', ML + 254, currentY + 4, { width: 140, lineBreak: false });
+        doc.text(`${parseFloat(l.totalInward || 0).toFixed(1)}`, ML + 398, currentY + 4, { width: 42, align: 'right', lineBreak: false });
+        doc.text(`${parseFloat(l.totalOutward || 0).toFixed(1)}`, ML + 444, currentY + 4, { width: 42, align: 'right', lineBreak: false });
         doc.fillColor(l.currentStock > 0 ? '#047857' : '#dc2626').font('Helvetica-Bold');
-        doc.text(`${parseFloat(l.currentStock || 0).toFixed(1)}`, x + w - 46, rowY + 3, { width: 42, align: 'right', lineBreak: false });
-        rowY += 15;
+        doc.text(`${parseFloat(l.currentStock || 0).toFixed(1)}`, ML + 490, currentY + 4, { width: 38, align: 'right', lineBreak: false });
+        currentY += 16;
       });
     }
 
-    doc.fillColor('#6b21a8').fontSize(8).font('Helvetica')
-      .text('Page 1 of 1 — Elite Digital Prints Combined Multi-Report Attachment', ML, 795, { width: contentWidth, align: 'center', lineBreak: false });
+    // Dynamic Footer Page Stamping on All Pages
+    const pageRange = doc.bufferedPageRange();
+    for (let i = pageRange.start; i < pageRange.start + pageRange.count; i++) {
+      doc.switchToPage(i);
+      doc.fillColor('#6b21a8').fontSize(8).font('Helvetica')
+        .text(`Page ${i + 1} of ${pageRange.count} — Elite Digital Prints Combined Multi-Report Archive`, ML, 795, { width: contentWidth, align: 'center', lineBreak: false });
+    }
 
     doc.end();
   } catch (err) {
