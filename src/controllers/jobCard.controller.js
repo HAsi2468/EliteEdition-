@@ -166,9 +166,34 @@ const getJobCard = async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Internal Server Error' }); }
 };
 
+function normalizeDateStr(dtStr) {
+  if (!dtStr || typeof dtStr !== 'string' || !dtStr.trim()) return '';
+  const s = dtStr.trim();
+  const slashMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (slashMatch) {
+    const day   = slashMatch[1].padStart(2, '0');
+    const month = slashMatch[2].padStart(2, '0');
+    const year  = slashMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+  const isoMatch = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (isoMatch) {
+    const year  = isoMatch[1];
+    const month = isoMatch[2].padStart(2, '0');
+    const day   = isoMatch[3].padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return s;
+}
+
 const createJobCard = async (req, res) => {
   try {
     const body = req.body;
+    if (body.date) body.date = normalizeDateStr(body.date);
+    if (body.printDate) body.printDate = normalizeDateStr(body.printDate);
+    if (body.fusingDate) body.fusingDate = normalizeDateStr(body.fusingDate);
+    if (body.deliveryDate) body.deliveryDate = normalizeDateStr(body.deliveryDate);
+
     if (body.panna && body.pass && body.totalMtr && body.machineName)
       body.expTime = calcExpTime(body.panna, body.pass, body.totalMtr, body.machineName);
     const card = await db.JobCard.create(body);
@@ -183,6 +208,11 @@ const createJobCard = async (req, res) => {
 const updateJobCard = async (req, res) => {
   try {
     const body = req.body;
+    if (body.date) body.date = normalizeDateStr(body.date);
+    if (body.printDate) body.printDate = normalizeDateStr(body.printDate);
+    if (body.fusingDate) body.fusingDate = normalizeDateStr(body.fusingDate);
+    if (body.deliveryDate) body.deliveryDate = normalizeDateStr(body.deliveryDate);
+
     if (body.panna && body.pass && body.totalMtr && body.machineName)
       body.expTime = calcExpTime(body.panna, body.pass, body.totalMtr, body.machineName);
     const existingCard = await db.JobCard.findById(req.params.id);
