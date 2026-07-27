@@ -499,6 +499,36 @@ export const api = {
     return request(url);
   },
 
+  async downloadElitePrintReport(dateStart, dateEnd, fileName) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const headers = {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+    const query = new URLSearchParams();
+    if (dateStart) query.append('dateStart', dateStart);
+    if (dateEnd) query.append('dateEnd', dateEnd);
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+
+    const response = await fetch(`${baseUrl}/department-reports/elite-print/pdf${queryString}`, {
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate Elite Print report PDF');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
   async getBrandReportData(dateStart, dateEnd, searchCode = '') {
     const query = new URLSearchParams({ dateStart, dateEnd });
     if (searchCode) query.append('searchCode', searchCode);

@@ -136,7 +136,9 @@ export default function ReportsCenter({ department }) {
       const fullBase = apiBase.startsWith('http') ? apiBase : `${window.location.origin}${apiBase}`;
       
       let downloadLink = '';
-      if (activeReportTab === 'brand-hourly') {
+      if (activeDepartment === 'elite-print') {
+        downloadLink = `${fullBase}/department-reports/elite-print/pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
+      } else if (activeReportTab === 'brand-hourly') {
         downloadLink = `${fullBase}/salesList/report/pdf?type=brand-hourly&dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
       } else if (activeReportTab === 'brand') {
         downloadLink = `${fullBase}/salesList/report/pdf?type=brand&dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
@@ -148,7 +150,12 @@ export default function ReportsCenter({ department }) {
 
       let content = `📊 *SHARED REPORT: ${reportTitle.toUpperCase()}*\n📅 Period: ${dateText}\n\n`;
       
-      if (activeReportTab === 'brand-hourly') {
+      if (activeDepartment === 'elite-print') {
+        const topF = reportData.fabricTrends ? reportData.fabricTrends[0] : null;
+        content += `🖨️ *Avg Print to Delivery:* ${reportData.avgPrintToDelivery || 0} Days\n`;
+        if (topF) content += `🧵 *Top Fabric Demand:* ${topF._id} (${topF.totalMtr} m)\n`;
+        content += `⚠️ *Low Stock Alerts:* ${reportData.lowStockAlerts ? reportData.lowStockAlerts.length : 0} items\n`;
+      } else if (activeReportTab === 'brand-hourly') {
         const peak = [...(reportData.hourlyTotals || [])].sort((a,b) => b.quantity - a.quantity)[0];
         content += `📦 *Total Qty:* ${(reportData.totalOrderQuantity || 0).toLocaleString('en-IN')} pcs\n`;
         content += `💰 *Total Revenue:* ${formatPrice(reportData.totalSellableAmount || 0)}\n`;
@@ -200,7 +207,9 @@ export default function ReportsCenter({ department }) {
       const formattedDateStart = combinedStart.replace(/:/g, '-');
       const formattedDateEnd = combinedEnd.replace(/:/g, '-');
       
-      if (activeReportTab === 'stock-value') {
+      if (activeDepartment === 'elite-print') {
+        await api.downloadElitePrintReport(combinedStart, combinedEnd, `Elite_Print_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
+      } else if (activeReportTab === 'stock-value') {
         await api.downloadInventoryReport('stock-value', combinedStart, combinedEnd, `Stock_Value_Report_${formattedDateStart}.pdf`);
       } else if (activeReportTab === 'stock-inward') {
         await api.downloadInventoryReport('stock-inward', combinedStart, combinedEnd, `Stock_Inward_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);

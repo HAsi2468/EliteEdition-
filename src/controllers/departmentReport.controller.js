@@ -401,6 +401,194 @@ const getElitePrintReports = async (req, res) => {
   }
 };
 
+const downloadElitePrintPdf = async (req, res) => {
+  try {
+    const PDFDocument = require('pdfkit');
+    const { dateStart, dateEnd } = req.query;
+
+    const cleanDateStart = dateStart ? dateStart.split('T')[0] : '';
+    const cleanDateEnd = dateEnd ? dateEnd.split('T')[0] : '';
+
+    const matchStage = {};
+    if (cleanDateStart || cleanDateEnd) {
+      matchStage.date = {};
+      if (cleanDateStart) matchStage.date.$gte = cleanDateStart;
+      if (cleanDateEnd) matchStage.date.$lte = cleanDateEnd;
+    }
+
+    const machineMeterage = await JobCard.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: { machineName: "$machineName", pass: "$pass" },
+          totalMtr: { $sum: { $convert: { input: "$printMtr", to: "double", onError: 0, onNull: 0 } } },
+          totalJobs: { $sum: 1 }
+        }
+      },
+      { $sort: { totalMtr: -1 } }
+    ]);
+
+    const topDesigns = await JobCard.aggregate([
+      { $match: { ...matchStage, designName: { $exists: true, $ne: "" } } },
+      {
+        $group: {
+          _id: "$designName",
+          totalMtr: { $sum: { $convert: { input: "$printMtr", to: "double", onError: 0, onNull: 0 } } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { totalMtr: -1 } },
+      { $limit: 10 }
+    ]);
+
+    const busiestParties = await JobCard.aggregate([
+      { $match: { ...matchStage, party: { $exists: true, $ne: "" } } },
+      {
+        $group: {
+          _id: "$party",
+          totalMtr: { $sum: { $convert: { input: "$printMtr", to: "double", onError: 0, onNull: 0 } } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { totalMtr: -1 } },
+      { $limit: 10 }
+    ]);
+
+    const fabricTrends = await JobCard.aggregate([
+      { $match: { ...matchStage, fabric: { $exists: true, $ne: "" } } },
+      {
+        $group: {
+          _id: "$fabric",
+          totalMtr: { $sum: { $convert: { input: "$printMtr", to: "double", onError: 0, onNull: 0 } } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { totalMtr: -1 } },
+      { $limit: 10 }
+    ]);
+
+    const doc = new PDFDocument({ margin: 30, size: 'A4', bufferPages: true });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Elite_Print_Report_${cleanDateStart || 'all'}_to_${cleanDateEnd || 'all'}.pdf"`);
+    doc.pipe(res);
+
+    doc.rect(30, 30, 535, 45).fill('#0f172a');
+    doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold')
+      .text('ELITE DIGITAL PRINTS — DEPARTMENT REPORT', 30, 42, { width: 535, align: 'center' });
+    
+    let subtitle = 'Period: All Time';
+    if (cleanDateStart && cleanDateEnd) subtitle = `Period: ${cleanDateStart} to ${cleanDateEnd}`;
+    else if (cleanDateStart) subtitle = `Period: From ${cleanDateStart}`;
+    else if (cleanDateEnd) subtitle = `Period: Until ${cleanDateEnd}`;
+    
+    doc.fillColor('#94a3b8').fontSize(9).font('Helvetica')
+      .text(subtitle, 30, 60, { width: 535, align: 'center' });
+
+    let y = 90;
+
+    const totalPrintedMtr = machineMeterage.reduce((sum, item) => sum + item.totalMtr, 0);
+    const totalJobsCount = machineMeterage.reduce((sum, item) => sum + item.totalJobs, 0);
+
+    doc.rect(30, y, 160, 45).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL JOBS PROCESSED', 35, y + 8);
+    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(String(totalJobsCount), 35, y + 22);
+
+    doc.rect(205, y, 160, 45).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL METRES PRINTED', 210, y + 8);
+    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(`${totalPrintedMtr.toLocaleString('en-IN')} m`, 210, y + 22);
+
+    doc.rect(380, y, 185, 45).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOP FABRIC DEMAND', 385, y + 8);
+    doc.fillColor('#0f172a').fontSize(12).font('Helvetica-Bold').text(fabricTrends[0] ? fabricTrends[0]._id : 'N/A', 385, y + 24, { width: 175, lineBreak: false });
+
+    y += 60;
+
+    doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text('1. MACHINE METERAGE & PRODUCTION OUTPUT', 30, y);
+    y += 15;
+
+    doc.rect(30, y, 535, 20).fill('#1e293b');
+    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+    doc.text('MACHINE NAME', 35, y + 6);
+    doc.text('PASS / CONFIG', 200, y + 6);
+    doc.text('JOB CARDS COUNT', 340, y + 6);
+    doc.text('TOTAL METERAGE (m)', 450, y + 6);
+    y += 20;
+
+    machineMeterage.forEach((row, i) => {
+      if (y > 750) { doc.addPage(); y = 40; }
+      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#f1f5f9' : '#ffffff');
+      doc.fillColor('#334155').fontSize(8).font('Helvetica');
+      doc.text(row._id.machineName || '—', 35, y + 5);
+      doc.text(row._id.pass || '—', 200, y + 5);
+      doc.text(String(row.totalJobs), 340, y + 5);
+      doc.text(row.totalMtr.toLocaleString('en-IN') + ' m', 450, y + 5);
+      y += 18;
+    });
+
+    y += 15;
+    if (y > 700) { doc.addPage(); y = 40; }
+
+    doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text('2. TOP DESIGNS BY PRINT VOLUME', 30, y);
+    y += 15;
+
+    doc.rect(30, y, 535, 20).fill('#1e293b');
+    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+    doc.text('RANK / DESIGN NAME', 35, y + 6);
+    doc.text('TOTAL JOBS', 300, y + 6);
+    doc.text('TOTAL METRES (m)', 430, y + 6);
+    y += 20;
+
+    topDesigns.forEach((row, i) => {
+      if (y > 750) { doc.addPage(); y = 40; }
+      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#f1f5f9' : '#ffffff');
+      doc.fillColor('#334155').fontSize(8).font('Helvetica');
+      doc.text(`#${i+1}  ${row._id}`, 35, y + 5);
+      doc.text(String(row.count), 300, y + 5);
+      doc.text(row.totalMtr.toLocaleString('en-IN') + ' m', 430, y + 5);
+      y += 18;
+    });
+
+    y += 15;
+    if (y > 700) { doc.addPage(); y = 40; }
+
+    doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text('3. PARTY WISE PRODUCTION & FABRIC TRENDS', 30, y);
+    y += 15;
+
+    doc.rect(30, y, 535, 20).fill('#1e293b');
+    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+    doc.text('PARTY NAME', 35, y + 6);
+    doc.text('JOBS COUNT', 220, y + 6);
+    doc.text('METRES (m)', 320, y + 6);
+    doc.text('TOP FABRIC DEMAND', 420, y + 6);
+    y += 20;
+
+    busiestParties.forEach((party, i) => {
+      if (y > 750) { doc.addPage(); y = 40; }
+      const matchingFabric = fabricTrends[i] ? fabricTrends[i]._id : '—';
+      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#f1f5f9' : '#ffffff');
+      doc.fillColor('#334155').fontSize(8).font('Helvetica');
+      doc.text(party._id, 35, y + 5);
+      doc.text(String(party.count), 220, y + 5);
+      doc.text(party.totalMtr.toLocaleString('en-IN') + ' m', 320, y + 5);
+      doc.text(matchingFabric, 420, y + 5);
+      y += 18;
+    });
+
+    const pages = doc.bufferedPageRange();
+    for (let i = 0; i < pages.count; i++) {
+      doc.switchToPage(i);
+      doc.fillColor('#94a3b8').fontSize(8).font('Helvetica')
+        .text(`Page ${i + 1} of ${pages.count} — Elite Digital Prints Department Report`, 30, 815, { width: 535, align: 'center' });
+    }
+
+    doc.end();
+  } catch (err) {
+    console.error('Error generating Elite Print PDF report:', err);
+    if (!res.headersSent) res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
 module.exports = {
   getElitePrintReports,
+  downloadElitePrintPdf,
 };
