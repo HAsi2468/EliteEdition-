@@ -1213,7 +1213,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
     const selectedReports = reports
       ? reports.split(',').map(s => s.trim().toLowerCase())
-      : ['challan', 'inward', 'outward', 'lotwise'];
+      : ['challan', 'inward', 'outward', 'lotwise', 'stock'];
 
     const dateFilter = {};
     if (dateStart || dateEnd) {
@@ -1273,6 +1273,31 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       lotwiseData = await FabricTransaction.aggregate(pipeline);
     }
 
+    let stockSummaryData = [];
+    if (selectedReports.includes('stock')) {
+      const stockPipeline = [
+        {
+          $group: {
+            _id: '$fabricQuality',
+            totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+            totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } }
+          }
+        },
+        {
+          $project: {
+            fabricQuality: '$_id',
+            totalInward: 1,
+            totalOutward: 1,
+            currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
+            _id: 0
+          }
+        },
+        { $match: { fabricQuality: { $ne: null } } },
+        { $sort: { fabricQuality: 1 } }
+      ];
+      stockSummaryData = await FabricTransaction.aggregate(stockPipeline);
+    }
+
     const totalInwardMtr = inwardData.reduce((s, r) => s + (r.qty || 0), 0);
     const totalOutwardMtr = outwardData.reduce((s, r) => s + (r.qty || 0), 0);
     const totalChallanMtr = challanData.reduce((s, c) => s + (c.totalMtr || 0), 0);
@@ -1281,7 +1306,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
     const doc = new PDFDocument({ margin: 25, size: 'A4', autoFirstPage: true, bufferPages: true });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="Elite_Digital_Prints_Combined_Report.pdf"');
+    res.setHeader('Content-Disposition', 'attachment; filename="Elite_Digital_Prints_1_Page_Report.pdf"');
     doc.pipe(res);
 
     const PW = 595, PH = 842, ML = 30, MR = 30;
@@ -1298,7 +1323,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       }
 
       doc.fillColor('#000000').fontSize(13).font('Helvetica-Bold')
-        .text('ELITE DIGITAL PRINTS — COMBINED MULTI-REPORT', ML + 130, 22, { width: contentWidth - 130, align: 'right' });
+        .text('ELITE DIGITAL PRINTS — 1 PAGE REPORT', ML + 130, 22, { width: contentWidth - 130, align: 'right' });
 
       doc.fillColor('#475569').fontSize(8.5).font('Helvetica-Bold')
         .text(`Report Period: ${startDateStr} to ${endDateStr}  |  Generated: ${new Date().toLocaleDateString('en-IN')}`, ML + 130, 38, { width: contentWidth - 130, align: 'right' });
@@ -1310,10 +1335,10 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
     // KPI Cards on Page 1
     const activeSections = [
-      selectedReports.includes('challan') && { label: 'CHALLAN DISPATCHES', val: `${totalChallanMtr.toFixed(1)} mtr`, sub: `${challanData.length} Challans (${totalChallanTp} TP)` },
-      selectedReports.includes('inward') && { label: 'FABRIC INWARD', val: `${totalInwardMtr.toFixed(1)} mtr`, sub: `${inwardData.length} Receipts` },
-      selectedReports.includes('outward') && { label: 'FABRIC OUTWARD', val: `${totalOutwardMtr.toFixed(1)} mtr`, sub: `${outwardData.length} Dispatches` },
-      selectedReports.includes('lotwise') && { label: 'LOT STOCK BALANCE', val: `${totalLotNetStock.toFixed(1)} mtr`, sub: `${lotwiseData.length} Active Lots` }
+      selectedReports.includes('challan') && { label: 'CHALLAN DISPATCHES', val: `${totalChallanMtr.toFixed(2)} mtr`, sub: `${challanData.length} Challans (${totalChallanTp} TP)` },
+      selectedReports.includes('inward') && { label: 'FABRIC INWARD', val: `${totalInwardMtr.toFixed(2)} mtr`, sub: `${inwardData.length} Receipts` },
+      selectedReports.includes('outward') && { label: 'FABRIC CONSUMPTION', val: `${totalOutwardMtr.toFixed(2)} mtr`, sub: `${outwardData.length} Dispatches` },
+      selectedReports.includes('lotwise') && { label: 'LOT STOCK BALANCE', val: `${totalLotNetStock.toFixed(2)} mtr`, sub: `${lotwiseData.length} Active Lots` }
     ].filter(Boolean);
 
     const cardCount = activeSections.length || 1;
@@ -1343,29 +1368,30 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       return false;
     };
 
-    // ── 1. FABRIC CHALLANS SUMMARY (COMPLETE DATA) ──
+    // ── 1. FABRIC CHALLANS DISPATCH OUTWARDS (COMPLETE DATA) ──
     if (selectedReports.includes('challan')) {
       checkAddPage(60);
 
       doc.rect(ML, currentY, contentWidth, 20).fill('#ede9fe').stroke('#ddd6fe');
       doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
-        .text('1. FABRIC CHALLANS DISPATCH SUMMARY', ML + 8, currentY + 5, { lineBreak: false });
+        .text('1. FABRIC CHALLANS DISPATCH OUTWARDS', ML + 8, currentY + 5, { lineBreak: false });
       doc.fillColor('#5b21b6').fontSize(8.5).font('Helvetica-Bold')
-        .text(`Total: ${challanData.length} Records (${totalChallanMtr.toFixed(1)} mtr)`, ML + contentWidth - 220, currentY + 5, { width: 210, align: 'right', lineBreak: false });
+        .text(`Total: ${challanData.length} Records (${totalChallanMtr.toFixed(2)} mtr)`, ML + contentWidth - 220, currentY + 5, { width: 210, align: 'right', lineBreak: false });
 
       currentY += 24;
 
       const drawChallanHeaders = () => {
         doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
         doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
-        doc.text('CH. NO', ML + 4, currentY + 5, { width: 45 });
-        doc.text('DATE', ML + 52, currentY + 5, { width: 48 });
-        doc.text('PARTY NAME', ML + 104, currentY + 5, { width: 140 });
-        doc.text('JOB NO', ML + 248, currentY + 5, { width: 55 });
-        doc.text('DESIGN NO', ML + 306, currentY + 5, { width: 85 });
-        doc.text('FABRIC', ML + 394, currentY + 5, { width: 65 });
-        doc.text('TP', ML + 462, currentY + 5, { width: 25, align: 'center' });
-        doc.text('METERS', ML + 490, currentY + 5, { width: 38, align: 'right' });
+        doc.text('CH. NO', ML + 4, currentY + 5, { width: 42 });
+        doc.text('DATE', ML + 48, currentY + 5, { width: 44 });
+        doc.text('PARTY NAME', ML + 94, currentY + 5, { width: 105 });
+        doc.text('BILLING NAME', ML + 201, currentY + 5, { width: 105 });
+        doc.text('JOB NO', ML + 308, currentY + 5, { width: 50 });
+        doc.text('DESIGN NO', ML + 360, currentY + 5, { width: 75 });
+        doc.text('FABRIC', ML + 437, currentY + 5, { width: 55 });
+        doc.text('TP', ML + 494, currentY + 5, { width: 20, align: 'center' });
+        doc.text('METERS', ML + 516, currentY + 5, { width: 38, align: 'right' });
         currentY += 18;
       };
 
@@ -1381,30 +1407,31 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
         const dStr = c.date ? new Date(c.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit' }) : '—';
         doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
-        doc.text(`EDP-${c.challanNo || '—'}`, ML + 4, currentY + 4, { width: 45, lineBreak: false });
-        doc.text(dStr, ML + 52, currentY + 4, { width: 48, lineBreak: false });
-        doc.text(c.partyName || '—', ML + 104, currentY + 4, { width: 140, lineBreak: false });
-        doc.text(c.jobNo || '—', ML + 248, currentY + 4, { width: 55, lineBreak: false });
-        doc.text(c.designNo || '—', ML + 306, currentY + 4, { width: 85, lineBreak: false });
-        doc.text(c.fabricName || '—', ML + 394, currentY + 4, { width: 65, lineBreak: false });
-        doc.text(String(c.totalTp || 0), ML + 462, currentY + 4, { width: 25, align: 'center', lineBreak: false });
+        doc.text(`EDP-${c.challanNo || '—'}`, ML + 4, currentY + 4, { width: 42, lineBreak: false });
+        doc.text(dStr, ML + 48, currentY + 4, { width: 44, lineBreak: false });
+        doc.text(c.partyName || '—', ML + 94, currentY + 4, { width: 105, lineBreak: false });
+        doc.text(c.billTo || c.partyName || '—', ML + 201, currentY + 4, { width: 105, lineBreak: false });
+        doc.text(c.jobNo || '—', ML + 308, currentY + 4, { width: 50, lineBreak: false });
+        doc.text(c.designNo || '—', ML + 360, currentY + 4, { width: 75, lineBreak: false });
+        doc.text(c.fabricName || '—', ML + 437, currentY + 4, { width: 55, lineBreak: false });
+        doc.text(String(c.totalTp || 0), ML + 494, currentY + 4, { width: 20, align: 'center', lineBreak: false });
         doc.fillColor('#000000').font('Helvetica-Bold');
-        doc.text(`${parseFloat(c.totalMtr || 0).toFixed(1)}`, ML + 490, currentY + 4, { width: 38, align: 'right', lineBreak: false });
+        doc.text(`${parseFloat(c.totalMtr || 0).toFixed(2)}`, ML + 516, currentY + 4, { width: 38, align: 'right', lineBreak: false });
         currentY += 16;
       });
 
       currentY += 12;
     }
 
-    // ── 2. FABRIC INWARD RECEIPTS (COMPLETE DATA) ──
+    // ── 2. FABRIC INWARDS SUMMARY (COMPLETE DATA) ──
     if (selectedReports.includes('inward')) {
       checkAddPage(60);
 
       doc.rect(ML, currentY, contentWidth, 20).fill('#ede9fe').stroke('#ddd6fe');
       doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
-        .text('2. FABRIC INWARD RECEIPTS LEDGER', ML + 8, currentY + 5, { lineBreak: false });
+        .text('2. FABRIC INWARDS SUMMARY', ML + 8, currentY + 5, { lineBreak: false });
       doc.fillColor('#5b21b6').fontSize(8.5).font('Helvetica-Bold')
-        .text(`Total: ${inwardData.length} Receipts (${totalInwardMtr.toFixed(1)} mtr)`, ML + contentWidth - 220, currentY + 5, { width: 210, align: 'right', lineBreak: false });
+        .text(`Total: ${inwardData.length} Receipts (${totalInwardMtr.toFixed(2)} mtr)`, ML + contentWidth - 220, currentY + 5, { width: 210, align: 'right', lineBreak: false });
 
       currentY += 24;
 
@@ -1440,22 +1467,22 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         doc.text(`${r.panna || '58'}"`, ML + 422, currentY + 4, { width: 35, lineBreak: false });
         doc.text(r.lotNo ? `#${r.lotNo}` : '—', ML + 460, currentY + 4, { width: 35, lineBreak: false });
         doc.fillColor('#047857').font('Helvetica-Bold');
-        doc.text(`${parseFloat(r.qty || 0).toFixed(1)}`, ML + 498, currentY + 4, { width: 30, align: 'right', lineBreak: false });
+        doc.text(`${parseFloat(r.qty || 0).toFixed(2)}`, ML + 498, currentY + 4, { width: 30, align: 'right', lineBreak: false });
         currentY += 16;
       });
 
       currentY += 12;
     }
 
-    // ── 3. FABRIC OUTWARD DISPATCHES (COMPLETE DATA) ──
+    // ── 3. FABRIC CONSUMPTION SUMMARY (COMPLETE DATA WITH SHORTAGE) ──
     if (selectedReports.includes('outward')) {
       checkAddPage(60);
 
       doc.rect(ML, currentY, contentWidth, 20).fill('#ede9fe').stroke('#ddd6fe');
       doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
-        .text('3. FABRIC OUTWARD DISPATCHES LEDGER', ML + 8, currentY + 5, { lineBreak: false });
+        .text('3. FABRIC CONSUMPTION SUMMARY', ML + 8, currentY + 5, { lineBreak: false });
       doc.fillColor('#5b21b6').fontSize(8.5).font('Helvetica-Bold')
-        .text(`Total: ${outwardData.length} Dispatches (${totalOutwardMtr.toFixed(1)} mtr)`, ML + contentWidth - 220, currentY + 5, { width: 210, align: 'right', lineBreak: false });
+        .text(`Total: ${outwardData.length} Dispatches (${totalOutwardMtr.toFixed(2)} mtr)`, ML + contentWidth - 220, currentY + 5, { width: 210, align: 'right', lineBreak: false });
 
       currentY += 24;
 
@@ -1463,12 +1490,13 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
         doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
         doc.text('DATE', ML + 4, currentY + 5, { width: 52 });
-        doc.text('PARTY NAME', ML + 60, currentY + 5, { width: 140 });
-        doc.text('JOB NO', ML + 204, currentY + 5, { width: 60 });
-        doc.text('CHALLAN NO', ML + 268, currentY + 5, { width: 65 });
-        doc.text('FABRIC QUALITY', ML + 336, currentY + 5, { width: 95 });
-        doc.text('LOT NO', ML + 434, currentY + 5, { width: 45 });
-        doc.text('QTY (MTR)', ML + 482, currentY + 5, { width: 46, align: 'right' });
+        doc.text('PARTY NAME', ML + 60, currentY + 5, { width: 130 });
+        doc.text('JOB NO', ML + 194, currentY + 5, { width: 55 });
+        doc.text('CHALLAN NO', ML + 253, currentY + 5, { width: 60 });
+        doc.text('FABRIC QUALITY', ML + 317, currentY + 5, { width: 90 });
+        doc.text('LOT NO', ML + 411, currentY + 5, { width: 40 });
+        doc.text('SHORTAGE', ML + 453, currentY + 5, { width: 45, align: 'center' });
+        doc.text('QTY (MTR)', ML + 500, currentY + 5, { width: 42, align: 'right' });
         currentY += 18;
       };
 
@@ -1483,30 +1511,32 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 16).stroke();
 
         const dStr = r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
+        const shortageStr = r.shortagePct != null ? `${r.shortagePct}%` : '—';
         doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
         doc.text(dStr, ML + 4, currentY + 4, { width: 52, lineBreak: false });
-        doc.text(r.partyName || '—', ML + 60, currentY + 4, { width: 140, lineBreak: false });
-        doc.text(r.jobNo || '—', ML + 204, currentY + 4, { width: 60, lineBreak: false });
-        doc.text(r.challanNo || '—', ML + 268, currentY + 4, { width: 65, lineBreak: false });
-        doc.text(r.fabricQuality || '—', ML + 336, currentY + 4, { width: 95, lineBreak: false });
-        doc.text(r.lotNo ? `#${r.lotNo}` : '—', ML + 434, currentY + 4, { width: 45, lineBreak: false });
+        doc.text(r.partyName || '—', ML + 60, currentY + 4, { width: 130, lineBreak: false });
+        doc.text(r.jobNo || '—', ML + 194, currentY + 4, { width: 55, lineBreak: false });
+        doc.text(r.challanNo || '—', ML + 253, currentY + 4, { width: 60, lineBreak: false });
+        doc.text(r.fabricQuality || '—', ML + 317, currentY + 4, { width: 90, lineBreak: false });
+        doc.text(r.lotNo ? `#${r.lotNo}` : '—', ML + 411, currentY + 4, { width: 40, lineBreak: false });
+        doc.text(shortageStr, ML + 453, currentY + 4, { width: 45, align: 'center', lineBreak: false });
         doc.fillColor('#b91c1c').font('Helvetica-Bold');
-        doc.text(`${parseFloat(r.qty || 0).toFixed(1)}`, ML + 482, currentY + 4, { width: 46, align: 'right', lineBreak: false });
+        doc.text(`${parseFloat(r.qty || 0).toFixed(2)}`, ML + 500, currentY + 4, { width: 42, align: 'right', lineBreak: false });
         currentY += 16;
       });
 
       currentY += 12;
     }
 
-    // ── 4. LOT-WISE FABRIC STOCK BALANCE (COMPLETE DATA) ──
+    // ── 4. LOT-WISE FABRIC STOCK BALANCE SUMMARY ──
     if (selectedReports.includes('lotwise')) {
       checkAddPage(60);
 
       doc.rect(ML, currentY, contentWidth, 20).fill('#ede9fe').stroke('#ddd6fe');
       doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
-        .text('4. LOT-WISE FABRIC STOCK BALANCE LEDGER', ML + 8, currentY + 5, { lineBreak: false });
+        .text('4. LOT-WISE FABRIC STOCK BALANCE SUMMARY', ML + 8, currentY + 5, { lineBreak: false });
       doc.fillColor('#5b21b6').fontSize(8.5).font('Helvetica-Bold')
-        .text(`Total: ${lotwiseData.length} Lots (${totalLotNetStock.toFixed(1)} mtr balance)`, ML + contentWidth - 240, currentY + 5, { width: 230, align: 'right', lineBreak: false });
+        .text(`Total: ${lotwiseData.length} Lots (${totalLotNetStock.toFixed(2)} mtr balance)`, ML + contentWidth - 240, currentY + 5, { width: 230, align: 'right', lineBreak: false });
 
       currentY += 24;
 
@@ -1538,10 +1568,63 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         doc.text(l.fabricQuality || '—', ML + 52, currentY + 4, { width: 150, lineBreak: false });
         doc.text(`${l.panna || '58'}"`, ML + 206, currentY + 4, { width: 45, lineBreak: false });
         doc.text(l.vendorName || '—', ML + 254, currentY + 4, { width: 140, lineBreak: false });
-        doc.text(`${parseFloat(l.totalInward || 0).toFixed(1)}`, ML + 398, currentY + 4, { width: 42, align: 'right', lineBreak: false });
-        doc.text(`${parseFloat(l.totalOutward || 0).toFixed(1)}`, ML + 444, currentY + 4, { width: 42, align: 'right', lineBreak: false });
+        doc.text(`${parseFloat(l.totalInward || 0).toFixed(2)}`, ML + 398, currentY + 4, { width: 42, align: 'right', lineBreak: false });
+        doc.text(`${parseFloat(l.totalOutward || 0).toFixed(2)}`, ML + 444, currentY + 4, { width: 42, align: 'right', lineBreak: false });
         doc.fillColor(l.currentStock > 0 ? '#047857' : '#dc2626').font('Helvetica-Bold');
-        doc.text(`${parseFloat(l.currentStock || 0).toFixed(1)}`, ML + 490, currentY + 4, { width: 38, align: 'right', lineBreak: false });
+        doc.text(`${parseFloat(l.currentStock || 0).toFixed(2)}`, ML + 490, currentY + 4, { width: 38, align: 'right', lineBreak: false });
+        currentY += 16;
+      });
+
+      currentY += 12;
+    }
+
+    // ── 5. FABRIC CURRENT STOCK SUMMARY (NEW TABLE) ──
+    if (selectedReports.includes('stock') && stockSummaryData.length > 0) {
+      checkAddPage(60);
+
+      const totalStockMtr = stockSummaryData.reduce((s, st) => s + Math.max(0, st.currentStock || 0), 0);
+
+      doc.rect(ML, currentY, contentWidth, 20).fill('#ede9fe').stroke('#ddd6fe');
+      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
+        .text('5. FABRIC CURRENT STOCK SUMMARY', ML + 8, currentY + 5, { lineBreak: false });
+      doc.fillColor('#5b21b6').fontSize(8.5).font('Helvetica-Bold')
+        .text(`Total: ${stockSummaryData.length} Qualities (${totalStockMtr.toFixed(2)} mtr available)`, ML + contentWidth - 250, currentY + 5, { width: 240, align: 'right', lineBreak: false });
+
+      currentY += 24;
+
+      const drawStockHeaders = () => {
+        doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
+        doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+        doc.text('FABRIC QUALITY', ML + 4, currentY + 5, { width: 180 });
+        doc.text('TOTAL INWARD (MTR)', ML + 188, currentY + 5, { width: 85, align: 'right' });
+        doc.text('TOTAL OUTWARD (MTR)', ML + 277, currentY + 5, { width: 85, align: 'right' });
+        doc.text('CURRENT STOCK (MTR)', ML + 366, currentY + 5, { width: 85, align: 'right' });
+        doc.text('STOCK STATUS', ML + 455, currentY + 5, { width: 73, align: 'center' });
+        currentY += 18;
+      };
+
+      drawStockHeaders();
+
+      stockSummaryData.forEach((st, idx) => {
+        if (checkAddPage(18)) {
+          drawStockHeaders();
+        }
+        const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
+        doc.rect(ML, currentY, contentWidth, 16).fill(bg);
+        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 16).stroke();
+
+        const isLow = st.currentStock <= 50 && st.currentStock > 0;
+        const isEmpty = st.currentStock <= 0;
+        const statusLabel = isEmpty ? 'EMPTY' : isLow ? 'LOW STOCK' : 'SAFE';
+        const statusColor = isEmpty ? '#dc2626' : isLow ? '#d97706' : '#047857';
+
+        doc.fillColor('#000000').fontSize(7.5).font('Helvetica');
+        doc.text(st.fabricQuality || '—', ML + 4, currentY + 4, { width: 180, lineBreak: false });
+        doc.text(`${parseFloat(st.totalInward || 0).toFixed(2)}`, ML + 188, currentY + 4, { width: 85, align: 'right', lineBreak: false });
+        doc.text(`${parseFloat(st.totalOutward || 0).toFixed(2)}`, ML + 277, currentY + 4, { width: 85, align: 'right', lineBreak: false });
+        doc.fillColor(statusColor).font('Helvetica-Bold');
+        doc.text(`${parseFloat(st.currentStock || 0).toFixed(2)}`, ML + 366, currentY + 4, { width: 85, align: 'right', lineBreak: false });
+        doc.text(statusLabel, ML + 455, currentY + 4, { width: 73, align: 'center', lineBreak: false });
         currentY += 16;
       });
     }
@@ -1551,7 +1634,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     for (let i = pageRange.start; i < pageRange.start + pageRange.count; i++) {
       doc.switchToPage(i);
       doc.fillColor('#6b21a8').fontSize(8).font('Helvetica')
-        .text(`Page ${i + 1} of ${pageRange.count} — Elite Digital Prints Combined Multi-Report Archive`, ML, 795, { width: contentWidth, align: 'center', lineBreak: false });
+        .text(`Page ${i + 1} of ${pageRange.count} — Elite Digital Prints 1 Page Report`, ML, 795, { width: contentWidth, align: 'center', lineBreak: false });
     }
 
     doc.end();

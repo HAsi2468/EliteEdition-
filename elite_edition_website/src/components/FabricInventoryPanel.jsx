@@ -308,7 +308,7 @@ export default function FabricInventoryPanel() {
   const [isCombinedModalOpen, setIsCombinedModalOpen] = useState(false);
   const [combinedDateStart, setCombinedDateStart] = useState(() => new Date().toISOString().split('T')[0]);
   const [combinedDateEnd, setCombinedDateEnd] = useState(() => new Date().toISOString().split('T')[0]);
-  const [selectedCombinedReports, setSelectedCombinedReports] = useState(['challan', 'inward', 'outward', 'lotwise']);
+  const [selectedCombinedReports, setSelectedCombinedReports] = useState(['challan', 'inward', 'outward', 'lotwise', 'stock']);
   const [combinedLoading, setCombinedLoading] = useState(false);
 
   // Delete confirmation
@@ -2538,10 +2538,11 @@ export default function FabricInventoryPanel() {
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', marginBottom: '0.5rem' }}>Select Reports to Include (Fits in 1 Page):</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
                   {[
-                    { id: 'challan', label: 'Fabric Challans Summary', desc: 'Dispatched meterages, total TP rolls & party details' },
-                    { id: 'inward', label: 'Fabric Inward Receipts', desc: 'Supplier receipts, fabric qualities & inward meters' },
-                    { id: 'outward', label: 'Fabric Outward Dispatches', desc: 'Job dispatches, fabric issued & party names' },
-                    { id: 'lotwise', label: 'Lot-Wise Stock Balance', desc: 'Lot-level stock balance & net remaining meters' }
+                    { id: 'challan', label: 'Fabric Challans Dispatch Outwards', desc: 'Dispatched meters, party name, billing name & TP rolls' },
+                    { id: 'inward', label: 'Fabric Inwards Summary', desc: 'Supplier receipts, vendor details & inward meters' },
+                    { id: 'outward', label: 'Fabric Consumption Summary', desc: 'Fabric consumed, job dispatches & shortage %' },
+                    { id: 'lotwise', label: 'Lot-Wise Fabric Stock Balance Summary', desc: 'Lot-level stock balance & net remaining meters' },
+                    { id: 'stock', label: 'Fabric Current Stock Summary', desc: 'Available fabric quality stock levels & status' }
                   ].map(rep => (
                     <label key={rep.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}>
                       <input
