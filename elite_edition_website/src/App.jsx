@@ -119,6 +119,76 @@ function ThemePicker({ currentTheme, onSelect }) {
   );
 }
 
+// ─── SidePanelColorPicker component ──────────────────────────────────────────
+const ACCENT_COLORS = [
+  { id: 'cyan', label: 'Electric Cyan', hex: '#38bdf8' },
+  { id: 'purple', label: 'Royal Purple', hex: '#8b5cf6' },
+  { id: 'emerald', label: 'Emerald Cyber', hex: '#10b981' },
+  { id: 'amber', label: 'Sunset Amber', hex: '#f59e0b' },
+  { id: 'pink', label: 'Rose Neon', hex: '#ec4899' },
+  { id: 'blue', label: 'Enterprise Blue', hex: '#2563eb' }
+];
+
+function SidePanelColorPicker() {
+  const [activeColor, setActiveColor] = useState(() => localStorage.getItem('elite_side_panel_accent') || '#38bdf8');
+
+  const applyColor = (hex) => {
+    setActiveColor(hex);
+    const root = document.documentElement;
+    root.style.setProperty('--primary', hex);
+    root.style.setProperty('--primary-dark', hex);
+    root.style.setProperty('--primary-glow', hex + '33');
+    root.style.setProperty('--nav-active-border', hex);
+    root.style.setProperty('--nav-active-bg', hex + '1a');
+    root.style.setProperty('--border-focus', hex + '80');
+    localStorage.setItem('elite_side_panel_accent', hex);
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem('elite_side_panel_accent');
+    if (saved) applyColor(saved);
+  }, []);
+
+  return (
+    <div style={{
+      marginTop: 'auto',
+      paddingTop: '0.85rem',
+      borderTop: '1px solid var(--border-light)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '0.4rem'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+          <Palette size={12} color="var(--primary)" /> Side Panel Theme
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'space-between' }}>
+        {ACCENT_COLORS.map(c => (
+          <button
+            key={c.id}
+            onClick={() => applyColor(c.hex)}
+            title={c.label}
+            style={{
+              width: '22px',
+              height: '22px',
+              borderRadius: '50%',
+              background: c.hex,
+              border: activeColor === c.hex ? '2px solid #ffffff' : '1px solid transparent',
+              boxShadow: activeColor === c.hex ? `0 0 8px ${c.hex}` : 'none',
+              cursor: 'pointer',
+              transition: 'transform 0.15s ease',
+              padding: 0
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.2)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(api.isAuthenticated());
   const [currentUser, setCurrentUser] = useState(() => api.getCurrentUser());
@@ -995,6 +1065,9 @@ export default function App() {
                 <span>Admin Panel</span>
               </button>
             )}
+
+            {/* Side Panel Color Customizer for All Users */}
+            <SidePanelColorPicker />
 
             {/* Theme quick-select dots (Visible only to Hasi user) */}
             {isHasiUser && (

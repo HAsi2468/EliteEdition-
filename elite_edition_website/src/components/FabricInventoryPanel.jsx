@@ -1046,9 +1046,9 @@ export default function FabricInventoryPanel() {
             {stock.length > 0 && (
               <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
                 <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Fabrics</span><br /><strong>{stock.length}</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Received</span><br /><strong style={{ color: 'var(--success)' }}>{stock.reduce((a, i) => a + i.totalInward, 0)} mtr</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Used</span><br /><strong style={{ color: 'var(--danger)' }}>{stock.reduce((a, i) => a + i.totalOutward, 0)} mtr</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Net Available</span><br /><strong style={{ color: 'var(--primary)' }}>{stock.reduce((a, i) => a + i.currentStock, 0)} mtr</strong></div>
+                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Received</span><br /><strong style={{ color: 'var(--success)' }}>{Number(stock.reduce((a, i) => a + (i.totalInward || 0), 0)).toFixed(2)} mtr</strong></div>
+                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Used</span><br /><strong style={{ color: 'var(--danger)' }}>{Number(stock.reduce((a, i) => a + (i.totalOutward || 0), 0)).toFixed(2)} mtr</strong></div>
+                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Net Available</span><br /><strong style={{ color: 'var(--primary)' }}>{Number(stock.reduce((a, i) => a + (i.currentStock || 0), 0)).toFixed(2)} mtr</strong></div>
                 <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Low Stock</span><br /><strong style={{ color: '#f59e0b' }}>{stock.filter(i => i.currentStock > 0 && i.currentStock <= 50).length}</strong></div>
               </div>
             )}
@@ -1087,14 +1087,14 @@ export default function FabricInventoryPanel() {
                           )}
                         </div>
                         <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.25rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                          <span>In: <strong style={{ color: 'var(--success)' }}>{item.totalInward} mtr</strong></span>
-                          <span>Out: <strong style={{ color: 'var(--danger)' }}>{item.totalOutward} mtr</strong></span>
+                          <span>In: <strong style={{ color: 'var(--success)' }}>{Number(item.totalInward || 0).toFixed(2)} mtr</strong></span>
+                          <span>Out: <strong style={{ color: 'var(--danger)' }}>{Number(item.totalOutward || 0).toFixed(2)} mtr</strong></span>
                           <span>{pannaRows.length} panna variant{pannaRows.length !== 1 ? 's' : ''}</span>
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: '1.6rem', fontWeight: 800, color: isEmpty ? 'var(--danger)' : isLow ? '#f59e0b' : 'var(--primary)' }}>
-                          {item.currentStock}
+                          {Number(item.currentStock || 0).toFixed(2)}
                         </div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-4px' }}>mtr available</div>
                       </div>
@@ -1127,10 +1127,10 @@ export default function FabricInventoryPanel() {
                                       {p.panna && p.panna !== 'Unknown' ? String(p.panna).replace(/['"]/g, '') : '—'}
                                     </span>
                                   </td>
-                                  <td style={{ textAlign: 'right', padding: '0.5rem', color: 'var(--success)' }}>+{p.totalInward}</td>
-                                  <td style={{ textAlign: 'right', padding: '0.5rem', color: 'var(--danger)' }}>-{p.totalOutward}</td>
+                                  <td style={{ textAlign: 'right', padding: '0.5rem', color: 'var(--success)' }}>+{Number(p.totalInward || 0).toFixed(2)}</td>
+                                  <td style={{ textAlign: 'right', padding: '0.5rem', color: 'var(--danger)' }}>-{Number(p.totalOutward || 0).toFixed(2)}</td>
                                   <td style={{ textAlign: 'right', padding: '0.5rem', fontWeight: 700, color: rowIsEmpty ? 'var(--danger)' : rowIsLow ? '#f59e0b' : 'var(--text-primary)' }}>
-                                    {p.currentStock}
+                                    {Number(p.currentStock || 0).toFixed(2)}
                                   </td>
                                   <td style={{ textAlign: 'center', padding: '0.5rem' }}>
                                     <span style={{ background: 'rgba(255,255,255,0.07)', borderRadius: '20px', padding: '2px 8px', fontSize: '0.75rem' }}>{p.lotCount}</span>
@@ -1307,7 +1307,7 @@ export default function FabricInventoryPanel() {
                       <td>{t.vendorName}</td>
                       <td>{t.fabricQuality}</td>
                       <td>{t.panna || '-'}</td>
-                      <td style={{ color: 'var(--success)', fontWeight: 600 }}>+{t.qty}</td>
+                      <td style={{ color: 'var(--success)', fontWeight: 600 }}>+{Number(t.qty || 0).toFixed(2)}</td>
                       <td>{t.shortagePct != null ? `${t.shortagePct}%` : '-'}</td>
                       <td>{t.notes}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>
@@ -1494,7 +1494,7 @@ export default function FabricInventoryPanel() {
                       <td>{t.fabricQuality}</td>
                       <td>{t.lotNo ? `#${t.lotNo}` : '-'}</td>
                       <td>{t.panna || '-'}</td>
-                      <td style={{ color: 'var(--danger)', fontWeight: 600 }}>-{t.qty}</td>
+                      <td style={{ color: 'var(--danger)', fontWeight: 600 }}>-{Number(t.qty || 0).toFixed(2)}</td>
                       <td>
                         {(() => {
                           const notes = t.notes || '';
@@ -1590,10 +1590,10 @@ export default function FabricInventoryPanel() {
                   <strong>{requirement.filter(r => r.status === 'No Stock').length}</strong> No Stock
                 </div>
                 <div style={{ padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', borderRadius: '6px', fontSize: '0.85rem' }}>
-                  Total Needed: <strong>{requirement.reduce((a, r) => a + r.totalMtrRequired, 0).toFixed(1)} mtr</strong>
+                  Total Needed: <strong>{Number(requirement.reduce((a, r) => a + (r.totalMtrRequired || 0), 0)).toFixed(2)} mtr</strong>
                 </div>
                 <div style={{ padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', borderRadius: '6px', fontSize: '0.85rem' }}>
-                  Total Shortfall: <strong style={{ color: 'var(--danger)' }}>{requirement.reduce((a, r) => a + r.shortfall, 0).toFixed(1)} mtr</strong>
+                  Total Shortfall: <strong style={{ color: 'var(--danger)' }}>{Number(requirement.reduce((a, r) => a + (r.shortfall || 0), 0)).toFixed(2)} mtr</strong>
                 </div>
               </div>
             )}
@@ -1639,18 +1639,18 @@ export default function FabricInventoryPanel() {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', textAlign: 'center' }}>
                           <div>
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>REQUIRED</div>
-                            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{req.totalMtrRequired.toFixed(1)} <span style={{ fontSize: '0.7rem' }}>mtr</span></div>
+                            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{Number(req.totalMtrRequired || 0).toFixed(2)} <span style={{ fontSize: '0.7rem' }}>mtr</span></div>
                           </div>
                           <div>
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>IN STOCK</div>
                             <div style={{ fontWeight: 700, fontSize: '1rem', color: req.currentStock > 0 ? 'var(--success)' : 'var(--danger)' }}>
-                              {req.currentStock.toFixed(1)} <span style={{ fontSize: '0.7rem' }}>mtr</span>
+                              {Number(req.currentStock || 0).toFixed(2)} <span style={{ fontSize: '0.7rem' }}>mtr</span>
                             </div>
                           </div>
                           <div>
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>SHORTFALL</div>
                             <div style={{ fontWeight: 700, fontSize: '1rem', color: req.shortfall > 0 ? 'var(--danger)' : 'var(--success)' }}>
-                              {req.shortfall > 0 ? `-${req.shortfall.toFixed(1)}` : '✓'} <span style={{ fontSize: '0.7rem' }}>{req.shortfall > 0 ? 'mtr' : ''}</span>
+                              {req.shortfall > 0 ? `-${Number(req.shortfall || 0).toFixed(2)}` : '✓'} <span style={{ fontSize: '0.7rem' }}>{req.shortfall > 0 ? 'mtr' : ''}</span>
                             </div>
                           </div>
                         </div>
@@ -1687,7 +1687,7 @@ export default function FabricInventoryPanel() {
                                   <td style={{ padding: '0.45rem 0.5rem', fontWeight: 600, color: 'var(--primary)' }}>{job.jobNo}</td>
                                   <td style={{ padding: '0.45rem 0.5rem' }}>{job.party || '—'}</td>
                                   <td style={{ padding: '0.45rem 0.5rem', color: 'var(--text-muted)' }}>{job.date || '—'}</td>
-                                  <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right', fontWeight: 600 }}>{job.totalMtr > 0 ? `${job.totalMtr} mtr` : '—'}</td>
+                                  <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right', fontWeight: 600 }}>{job.totalMtr > 0 ? `${Number(job.totalMtr).toFixed(2)} mtr` : '—'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -2046,7 +2046,7 @@ export default function FabricInventoryPanel() {
                   {/* Job Requirement Info */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      Job Requirement: <strong>{jobMtrNeeded > 0 ? `${jobMtrNeeded} mtr` : 'Not specified'}</strong>
+                      Job Requirement: <strong>{jobMtrNeeded > 0 ? `${Number(jobMtrNeeded).toFixed(2)} mtr` : 'Not specified'}</strong>
                     </span>
                     {jobMtrNeeded > 0 && (
                       <span style={{
@@ -2379,7 +2379,7 @@ export default function FabricInventoryPanel() {
                       : lotList;
                     return filtered.map(lot => (
                       <option key={lot.lotNo} value={lot.lotNo}>
-                        Lot #{lot.lotNo} — {lot.fabricQuality} | Stock: {lot.currentStock} mtr{lot.panna ? ` | Panna: ${lot.panna}` : ''}
+                        Lot #{lot.lotNo} — {lot.fabricQuality} | Stock: {Number(lot.currentStock || 0).toFixed(2)} mtr{lot.panna ? ` | Panna: ${lot.panna}` : ''}
                       </option>
                     ));
                   })()}
@@ -2398,7 +2398,7 @@ export default function FabricInventoryPanel() {
                 )}
                 {outwardForm.lotNo && lotList.find(l => String(l.lotNo) === String(outwardForm.lotNo)) && (
                   <span style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '0.25rem', display: 'block' }}>
-                    ✓ Available stock: {lotList.find(l => String(l.lotNo) === String(outwardForm.lotNo)).currentStock} mtr
+                    ✓ Available stock: {Number(lotList.find(l => String(l.lotNo) === String(outwardForm.lotNo)).currentStock || 0).toFixed(2)} mtr
                   </span>
                 )}
               </div>
