@@ -894,6 +894,96 @@ export const api = {
     });
   },
 
+  async getFabricInwardReportData(dateStart, dateEnd) {
+    const q = new URLSearchParams();
+    if (dateStart) q.append('dateStart', dateStart);
+    if (dateEnd) q.append('dateEnd', dateEnd);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return request(`/fabric/report/inward-data${qs}`);
+  },
+
+  async getFabricOutwardReportData(dateStart, dateEnd) {
+    const q = new URLSearchParams();
+    if (dateStart) q.append('dateStart', dateStart);
+    if (dateEnd) q.append('dateEnd', dateEnd);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return request(`/fabric/report/outward-data${qs}`);
+  },
+
+  async getFabricLotWiseReportData(dateStart, dateEnd) {
+    const q = new URLSearchParams();
+    if (dateStart) q.append('dateStart', dateStart);
+    if (dateEnd) q.append('dateEnd', dateEnd);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return request(`/fabric/report/lotwise-data${qs}`);
+  },
+
+  async downloadFabricInwardReportPdf(dateStart, dateEnd, fileName) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const query = new URLSearchParams();
+    if (dateStart) query.append('dateStart', dateStart);
+    if (dateEnd) query.append('dateEnd', dateEnd);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const response = await fetch(`${baseUrl}/fabric/report/inward-pdf${qs}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate Fabric Inward PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
+  async downloadFabricOutwardReportPdf(dateStart, dateEnd, fileName) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const query = new URLSearchParams();
+    if (dateStart) query.append('dateStart', dateStart);
+    if (dateEnd) query.append('dateEnd', dateEnd);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const response = await fetch(`${baseUrl}/fabric/report/outward-pdf${qs}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate Fabric Outward PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
+  async downloadFabricLotWiseReportPdf(dateStart, dateEnd, fileName) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const query = new URLSearchParams();
+    if (dateStart) query.append('dateStart', dateStart);
+    if (dateEnd) query.append('dateEnd', dateEnd);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const response = await fetch(`${baseUrl}/fabric/report/lotwise-pdf${qs}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate Lot-Wise Fabric PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
   async getInfraBills() {
     return request('/infra-bills', { method: 'GET' });
   },

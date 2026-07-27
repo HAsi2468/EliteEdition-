@@ -88,7 +88,16 @@ export default function ReportsCenter({ department }) {
       const combinedStart = `${dateStart}T${timeStart}:00`;
       const combinedEnd = `${dateEnd}T${timeEnd}:59`;
 
-      if (activeReportTab === 'challan-report') {
+      if (activeReportTab === 'fabric-inward') {
+        const res = await api.getFabricInwardReportData(combinedStart, combinedEnd);
+        data = res.data || [];
+      } else if (activeReportTab === 'fabric-outward') {
+        const res = await api.getFabricOutwardReportData(combinedStart, combinedEnd);
+        data = res.data || [];
+      } else if (activeReportTab === 'fabric-lotwise') {
+        const res = await api.getFabricLotWiseReportData(combinedStart, combinedEnd);
+        data = res.data || [];
+      } else if (activeReportTab === 'challan-report') {
         const res = await api.getFabricChallans({ dateStart: combinedStart, dateEnd: combinedEnd });
         data = res.data || [];
       } else if (activeDepartment === 'elite-print') {
@@ -139,7 +148,13 @@ export default function ReportsCenter({ department }) {
       const fullBase = apiBase.startsWith('http') ? apiBase : `${window.location.origin}${apiBase}`;
       
       let downloadLink = '';
-      if (activeReportTab === 'challan-report') {
+      if (activeReportTab === 'fabric-inward') {
+        downloadLink = `${fullBase}/fabric/report/inward-pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
+      } else if (activeReportTab === 'fabric-outward') {
+        downloadLink = `${fullBase}/fabric/report/outward-pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
+      } else if (activeReportTab === 'fabric-lotwise') {
+        downloadLink = `${fullBase}/fabric/report/lotwise-pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
+      } else if (activeReportTab === 'challan-report') {
         downloadLink = `${fullBase}/fabric-challan/report/pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
       } else if (activeDepartment === 'elite-print') {
         downloadLink = `${fullBase}/department-reports/elite-print/pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
@@ -155,7 +170,26 @@ export default function ReportsCenter({ department }) {
 
       let content = `📊 *SHARED REPORT: ${reportTitle.toUpperCase()}*\n📅 Period: ${dateText}\n\n`;
       
-      if (activeReportTab === 'challan-report') {
+      if (activeReportTab === 'fabric-inward') {
+        const list = Array.isArray(reportData) ? reportData : [];
+        const totalM = list.reduce((s, r) => s + (r.qty || 0), 0);
+        content += `📥 *Total Inward Lots:* ${list.length}\n`;
+        content += `🧵 *Total Inward Meters:* ${totalM.toLocaleString('en-IN')} m\n`;
+      } else if (activeReportTab === 'fabric-outward') {
+        const list = Array.isArray(reportData) ? reportData : [];
+        const totalM = list.reduce((s, r) => s + (r.qty || 0), 0);
+        content += `📤 *Total Outward Dispatches:* ${list.length}\n`;
+        content += `🧵 *Total Dispatched Meters:* ${totalM.toLocaleString('en-IN')} m\n`;
+      } else if (activeReportTab === 'fabric-lotwise') {
+        const list = Array.isArray(reportData) ? reportData : [];
+        const totalIn = list.reduce((s, r) => s + (r.totalInward || 0), 0);
+        const totalOut = list.reduce((s, r) => s + (r.totalOutward || 0), 0);
+        const netStock = list.reduce((s, r) => s + Math.max(0, r.currentStock || 0), 0);
+        content += `📦 *Total Lots Tracked:* ${list.length}\n`;
+        content += `📥 *Total Inward:* ${totalIn.toLocaleString('en-IN')} m\n`;
+        content += `📤 *Total Outward:* ${totalOut.toLocaleString('en-IN')} m\n`;
+        content += `🧵 *Net In-Stock Balance:* ${netStock.toLocaleString('en-IN')} m\n`;
+      } else if (activeReportTab === 'challan-report') {
         const list = Array.isArray(reportData) ? reportData : [];
         const totalM = list.reduce((s, c) => s + (c.totalMtr || 0), 0);
         const totalT = list.reduce((s, c) => s + (c.totalTp || 0), 0);
@@ -218,7 +252,13 @@ export default function ReportsCenter({ department }) {
       const formattedDateStart = combinedStart.replace(/:/g, '-');
       const formattedDateEnd = combinedEnd.replace(/:/g, '-');
       
-      if (activeReportTab === 'challan-report') {
+      if (activeReportTab === 'fabric-inward') {
+        await api.downloadFabricInwardReportPdf(combinedStart, combinedEnd, `Fabric_Inward_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
+      } else if (activeReportTab === 'fabric-outward') {
+        await api.downloadFabricOutwardReportPdf(combinedStart, combinedEnd, `Fabric_Outward_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
+      } else if (activeReportTab === 'fabric-lotwise') {
+        await api.downloadFabricLotWiseReportPdf(combinedStart, combinedEnd, `LotWise_Fabric_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
+      } else if (activeReportTab === 'challan-report') {
         await api.downloadChallanReportPdf(combinedStart, combinedEnd, searchCode, `Fabric_Challan_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
       } else if (activeDepartment === 'elite-print') {
         await api.downloadElitePrintReport(combinedStart, combinedEnd, `Elite_Print_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
@@ -252,6 +292,9 @@ export default function ReportsCenter({ department }) {
     switch (activeReportTab) {
       case 'smart-dashboard': return 'Smart AI Analytics Dashboard';
       case 'challan-report': return 'Fabric Challan Report';
+      case 'fabric-inward': return 'Fabric Inward Report';
+      case 'fabric-outward': return 'Fabric Outward Report';
+      case 'fabric-lotwise': return 'Lot-Wise Fabric Stock Balance Report';
       case 'stock-value': return 'Stock Value Report';
       case 'stock-inward': return 'Inward Report';
       case 'stock-outward': return 'Outward Report';
@@ -268,6 +311,9 @@ export default function ReportsCenter({ department }) {
       switch (activeReportTab) {
         case 'smart-dashboard': return 'Displays real-time low stock warnings, production stage bottlenecks, top designs, and fabric demand forecasting.';
         case 'challan-report': return 'Consolidated summary of all fabric challans issued, total meterages, roll counts, and party dispatches.';
+        case 'fabric-inward': return 'Ledger of all fabric inward receipts from suppliers with Lot Numbers, Vendor names, and quantities.';
+        case 'fabric-outward': return 'Dispatch ledger of fabric issued for job cards and printing orders, with Lot allocations and party dispatches.';
+        case 'fabric-lotwise': return 'Consolidated lot-level inventory balance comparing total inward vs total outward meters with net remaining stock per Lot.';
         case 'creative-output': return 'Tracks the number of unique designs a designer completes over time to identify high-output creators.';
         case 'color-matching': return 'Measures how quickly designers spin up color variants for single prints.';
         case 'machine-speed': return 'Evaluates machine meterage output grouped by machine name, speed, and passes.';
@@ -278,6 +324,9 @@ export default function ReportsCenter({ department }) {
     }
     switch (activeReportTab) {
       case 'challan-report': return 'Consolidated summary of all fabric challans issued, total meterages, roll counts, and party dispatches.';
+      case 'fabric-inward': return 'Ledger of all fabric inward receipts from suppliers with Lot Numbers, Vendor names, and quantities.';
+      case 'fabric-outward': return 'Dispatch ledger of fabric issued for job cards and printing orders, with Lot allocations and party dispatches.';
+      case 'fabric-lotwise': return 'Consolidated lot-level inventory balance comparing total inward vs total outward meters with net remaining stock per Lot.';
       case 'stock-value': return 'Displays the current active stock levels, purchase prices, sales prices, and total valuation calculations.';
       case 'stock-inward': return 'Summarizes all items stocked in, including purchase prices, supplier details, and in-flow quantities.';
       case 'stock-outward': return 'Summarizes all items scanned out of stock, including customer details, out-flow quantities, and profit calculations.';
@@ -357,10 +406,13 @@ export default function ReportsCenter({ department }) {
       )}
 
       {/* Sub Tabs Header */}
-      <div style={{ ...styles.tabsContainer, marginTop: '0.5rem', background: 'transparent', padding: 0 }}>
+      <div style={{ ...styles.tabsContainer, marginTop: '0.5rem', background: 'transparent', padding: 0, flexWrap: 'wrap' }}>
         {activeDepartment === 'elite-print' && (
           <>
             <button onClick={() => setActiveReportTab('smart-dashboard')} style={activeReportTab === 'smart-dashboard' ? styles.subTabActive : styles.subTab}>Smart Dashboard</button>
+            <button onClick={() => setActiveReportTab('fabric-inward')} style={activeReportTab === 'fabric-inward' ? styles.subTabActive : styles.subTab}>Fabric Inward</button>
+            <button onClick={() => setActiveReportTab('fabric-outward')} style={activeReportTab === 'fabric-outward' ? styles.subTabActive : styles.subTab}>Fabric Outward</button>
+            <button onClick={() => setActiveReportTab('fabric-lotwise')} style={activeReportTab === 'fabric-lotwise' ? styles.subTabActive : styles.subTab}>Lot-Wise Fabric</button>
             <button onClick={() => setActiveReportTab('challan-report')} style={activeReportTab === 'challan-report' ? styles.subTabActive : styles.subTab}>Fabric Challans</button>
             <button onClick={() => setActiveReportTab('creative-output')} style={activeReportTab === 'creative-output' ? styles.subTabActive : styles.subTab}>Creative Output</button>
             <button onClick={() => setActiveReportTab('color-matching')} style={activeReportTab === 'color-matching' ? styles.subTabActive : styles.subTab}>Color Matching</button>
@@ -381,9 +433,12 @@ export default function ReportsCenter({ department }) {
         {activeDepartment === 'inventory' && (
           <>
             <button onClick={() => setActiveReportTab('stock-value')} style={activeReportTab === 'stock-value' ? styles.subTabActive : styles.subTab}>Stock Value</button>
+            <button onClick={() => setActiveReportTab('fabric-inward')} style={activeReportTab === 'fabric-inward' ? styles.subTabActive : styles.subTab}>Fabric Inward</button>
+            <button onClick={() => setActiveReportTab('fabric-outward')} style={activeReportTab === 'fabric-outward' ? styles.subTabActive : styles.subTab}>Fabric Outward</button>
+            <button onClick={() => setActiveReportTab('fabric-lotwise')} style={activeReportTab === 'fabric-lotwise' ? styles.subTabActive : styles.subTab}>Lot-Wise Fabric</button>
             <button onClick={() => setActiveReportTab('challan-report')} style={activeReportTab === 'challan-report' ? styles.subTabActive : styles.subTab}>Fabric Challans</button>
-            <button onClick={() => setActiveReportTab('stock-inward')} style={activeReportTab === 'stock-inward' ? styles.subTabActive : styles.subTab}>Inward</button>
-            <button onClick={() => setActiveReportTab('stock-outward')} style={activeReportTab === 'stock-outward' ? styles.subTabActive : styles.subTab}>Outward</button>
+            <button onClick={() => setActiveReportTab('stock-inward')} style={activeReportTab === 'stock-inward' ? styles.subTabActive : styles.subTab}>Item Inward</button>
+            <button onClick={() => setActiveReportTab('stock-outward')} style={activeReportTab === 'stock-outward' ? styles.subTabActive : styles.subTab}>Item Outward</button>
           </>
         )}
         {activeDepartment === 'returns' && (
@@ -497,6 +552,87 @@ export default function ReportsCenter({ department }) {
       {/* Summary Cards */}
       {reportData && (
         <div style={styles.summaryGrid}>
+          {activeReportTab === 'fabric-inward' && Array.isArray(reportData) && (
+            <>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <Layers3 size={20} color="var(--primary)" />
+                <div>
+                  <div style={styles.summaryValue}>{reportData.length}</div>
+                  <div style={styles.summaryLabel}>Total Inward Transactions</div>
+                </div>
+              </div>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <TrendingUp size={20} color="var(--success)" />
+                <div>
+                  <div style={styles.summaryValue}>
+                    {reportData.reduce((s, r) => s + (r.qty || 0), 0).toLocaleString('en-IN')} m
+                  </div>
+                  <div style={styles.summaryLabel}>Total Inward Fabric (m)</div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeReportTab === 'fabric-outward' && Array.isArray(reportData) && (
+            <>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <Layers3 size={20} color="var(--primary)" />
+                <div>
+                  <div style={styles.summaryValue}>{reportData.length}</div>
+                  <div style={styles.summaryLabel}>Total Outward Dispatches</div>
+                </div>
+              </div>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <TrendingUp size={20} color="#f87171" />
+                <div>
+                  <div style={styles.summaryValue}>
+                    {reportData.reduce((s, r) => s + (r.qty || 0), 0).toLocaleString('en-IN')} m
+                  </div>
+                  <div style={styles.summaryLabel}>Total Dispatched Fabric (m)</div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeReportTab === 'fabric-lotwise' && Array.isArray(reportData) && (
+            <>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <Layers3 size={20} color="var(--primary)" />
+                <div>
+                  <div style={styles.summaryValue}>{reportData.length}</div>
+                  <div style={styles.summaryLabel}>Total Fabric Lots Tracked</div>
+                </div>
+              </div>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <ArrowUpRight size={20} color="var(--success)" />
+                <div>
+                  <div style={styles.summaryValue}>
+                    {reportData.reduce((s, r) => s + (r.totalInward || 0), 0).toLocaleString('en-IN')} m
+                  </div>
+                  <div style={styles.summaryLabel}>Total Inward (m)</div>
+                </div>
+              </div>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <Activity size={20} color="#f87171" />
+                <div>
+                  <div style={styles.summaryValue}>
+                    {reportData.reduce((s, r) => s + (r.totalOutward || 0), 0).toLocaleString('en-IN')} m
+                  </div>
+                  <div style={styles.summaryLabel}>Total Outward (m)</div>
+                </div>
+              </div>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <TrendingUp size={20} color="#38bdf8" />
+                <div>
+                  <div style={styles.summaryValue}>
+                    {reportData.reduce((s, r) => s + Math.max(0, r.currentStock || 0), 0).toLocaleString('en-IN')} m
+                  </div>
+                  <div style={styles.summaryLabel}>Net Stock Balance</div>
+                </div>
+              </div>
+            </>
+          )}
+
           {activeReportTab === 'challan-report' && Array.isArray(reportData) && (
             <>
               <div className="glass-panel" style={styles.summaryCard}>
@@ -776,6 +912,156 @@ export default function ReportsCenter({ department }) {
           </div>
         ) : (
           <div style={{ width: '100%' }}>
+            {activeReportTab === 'fabric-inward' && Array.isArray(reportData) && (
+              <div style={{ width: '100%', overflowX: 'auto', padding: '0.5rem 0' }}>
+                <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Date</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Lot #</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Vendor Name</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Vendor Challan No</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Fabric Quality & Panna</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#94a3b8' }}>Inward Quantity (m)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportData.map((t, idx) => (
+                      <tr key={t._id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                          {t.date ? new Date(t.date).toLocaleDateString('en-IN') : '—'}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontWeight: '700', color: '#fbbf24' }}>
+                          {t.lotNo ? `#${t.lotNo}` : '—'}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontWeight: '600', color: '#f8fafc' }}>{t.vendorName || '—'}</td>
+                        <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>{t.challanNo || '—'}</td>
+                        <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                          {t.fabricQuality || '—'}{t.panna ? ` (${t.panna}")` : ''}
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#34d399' }}>
+                          +{(t.qty || 0).toLocaleString('en-IN')} m
+                        </td>
+                      </tr>
+                    ))}
+                    {reportData.length === 0 && (
+                      <tr>
+                        <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                          No fabric inward records found for selected date range.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {activeReportTab === 'fabric-outward' && Array.isArray(reportData) && (
+              <div style={{ width: '100%', overflowX: 'auto', padding: '0.5rem 0' }}>
+                <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Date</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Lot #</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Party Name</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Challan / Job No</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Fabric Quality & Panna</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#94a3b8' }}>Dispatched Qty (m)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportData.map((t, idx) => (
+                      <tr key={t._id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                          {t.date ? new Date(t.date).toLocaleDateString('en-IN') : '—'}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontWeight: '700', color: '#fbbf24' }}>
+                          {t.lotNo ? `#${t.lotNo}` : '—'}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontWeight: '600', color: '#f8fafc' }}>{t.partyName || '—'}</td>
+                        <td style={{ padding: '12px 16px', color: '#38bdf8' }}>{t.challanNo || t.jobNo || '—'}</td>
+                        <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                          {t.fabricQuality || '—'}{t.panna ? ` (${t.panna}")` : ''}
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#f87171' }}>
+                          -{(t.qty || 0).toLocaleString('en-IN')} m
+                        </td>
+                      </tr>
+                    ))}
+                    {reportData.length === 0 && (
+                      <tr>
+                        <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                          No fabric outward records found for selected date range.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {activeReportTab === 'fabric-lotwise' && Array.isArray(reportData) && (
+              <div style={{ width: '100%', overflowX: 'auto', padding: '0.5rem 0' }}>
+                <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Lot #</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Fabric Quality & Panna</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Vendor Name</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#94a3b8' }}>Total Inward (m)</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#94a3b8' }}>Total Outward (m)</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#94a3b8' }}>Current Lot Balance</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#94a3b8' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportData.map((l, idx) => {
+                      const stockVal = l.currentStock || 0;
+                      return (
+                        <tr key={l.lotNo || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <td style={{ padding: '12px 16px', fontWeight: '700', color: '#fbbf24' }}>
+                            {l.lotNo ? `#${l.lotNo}` : '—'}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontWeight: '600', color: '#f8fafc' }}>
+                            {l.fabricQuality || '—'}{l.panna ? ` (${l.panna}")` : ''}
+                          </td>
+                          <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>{l.vendorName || '—'}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', color: '#34d399' }}>
+                            +{(l.totalInward || 0).toLocaleString('en-IN')} m
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', color: '#f87171' }}>
+                            -{(l.totalOutward || 0).toLocaleString('en-IN')} m
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: stockVal > 0 ? '#34d399' : stockVal < 0 ? '#f87171' : '#94a3b8' }}>
+                            {stockVal.toLocaleString('en-IN')} m
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '0.7rem',
+                              fontWeight: '600',
+                              background: stockVal > 0 ? 'rgba(52, 211, 153, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+                              color: stockVal > 0 ? '#34d399' : '#94a3b8'
+                            }}>
+                              {stockVal > 0 ? 'Active Stock' : 'Consumed'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {reportData.length === 0 && (
+                      <tr>
+                        <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                          No lot-wise fabric balance records found for selected date range.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
             {activeReportTab === 'challan-report' && Array.isArray(reportData) && (
               <div style={{ width: '100%', overflowX: 'auto', padding: '0.5rem 0' }}>
                 <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>

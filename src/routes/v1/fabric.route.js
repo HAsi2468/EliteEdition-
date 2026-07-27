@@ -26,6 +26,14 @@ router.get('/lot-ledger', fabricController.getLotLedger);
 // Download fabric ledger PDF
 router.get('/report/pdf', fabricController.downloadLedgerPdf);
 
+// Fabric Inward/Outward/Lotwise Reports
+router.get('/report/inward-data', fabricController.getFabricInwardReportData);
+router.get('/report/outward-data', fabricController.getFabricOutwardReportData);
+router.get('/report/lotwise-data', fabricController.getFabricLotWiseReportData);
+router.get('/report/inward-pdf', fabricController.downloadFabricInwardPdf);
+router.get('/report/outward-pdf', fabricController.downloadFabricOutwardPdf);
+router.get('/report/lotwise-pdf', fabricController.downloadFabricLotWisePdf);
+
 // Get stock grouped by fabricQuality + panna
 router.get('/stock-panna', fabricController.getStockByPanna);
 

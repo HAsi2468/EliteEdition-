@@ -703,6 +703,428 @@ const updateTransaction = async (req, res) => {
   }
 };
 
+const downloadFabricInwardPdf = async (req, res) => {
+  try {
+    const PDFDocument = require('pdfkit');
+    const { dateStart, dateEnd } = req.query;
+
+    const filter = { type: 'INWARD' };
+    if (dateStart || dateEnd) {
+      filter.date = {};
+      if (dateStart) filter.date.$gte = new Date(dateStart);
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        filter.date.$lte = end;
+      }
+    }
+
+    const transactions = await FabricTransaction.find(filter).sort({ date: -1, lotNo: -1 }).lean();
+
+    const cleanDateStart = dateStart ? dateStart.split('T')[0] : '';
+    const cleanDateEnd = dateEnd ? dateEnd.split('T')[0] : '';
+
+    const doc = new PDFDocument({ margin: 30, size: 'A4', bufferPages: true });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Fabric_Inward_Report_${cleanDateStart || 'all'}_to_${cleanDateEnd || 'all'}.pdf"`);
+    doc.pipe(res);
+
+    doc.rect(30, 30, 535, 45).fill('#0f172a');
+    doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold')
+      .text('ELITE DIGITAL PRINTS — FABRIC INWARD REPORT', 30, 42, { width: 535, align: 'center' });
+    
+    let subtitle = 'Period: All Time';
+    if (cleanDateStart && cleanDateEnd) subtitle = `Period: ${cleanDateStart} to ${cleanDateEnd}`;
+    else if (cleanDateStart) subtitle = `Period: From ${cleanDateStart}`;
+    else if (cleanDateEnd) subtitle = `Period: Until ${cleanDateEnd}`;
+    
+    doc.fillColor('#94a3b8').fontSize(9).font('Helvetica')
+      .text(subtitle, 30, 60, { width: 535, align: 'center' });
+
+    let y = 90;
+
+    const totalInwardMtr = transactions.reduce((s, t) => s + (t.qty || 0), 0);
+    const totalLotsCount = transactions.length;
+
+    doc.rect(30, y, 260, 45).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL INWARD LOTS', 35, y + 8);
+    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(String(totalLotsCount), 35, y + 22);
+
+    doc.rect(305, y, 260, 45).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL INWARD METERAGE', 310, y + 8);
+    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(`${totalInwardMtr.toLocaleString('en-IN')} m`, 310, y + 22);
+
+    y += 60;
+
+    doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text('FABRIC INWARD TRANSACTIONS MASTER LIST', 30, y);
+    y += 15;
+
+    doc.rect(30, y, 535, 20).fill('#1e293b');
+    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+    doc.text('DATE', 35, y + 6);
+    doc.text('LOT #', 105, y + 6);
+    doc.text('VENDOR NAME', 155, y + 6);
+    doc.text('VENDOR CH. NO.', 265, y + 6);
+    doc.text('FABRIC & PANNA', 365, y + 6);
+    doc.text('QTY (M)', 490, y + 6);
+    y += 20;
+
+    transactions.forEach((t, i) => {
+      if (y > 750) { doc.addPage(); y = 40; }
+      const dt = t.date ? new Date(t.date).toLocaleDateString('en-IN', { day:'2-digit', month:'2-digit', year:'numeric' }) : '—';
+      const fabStr = `${t.fabricQuality || '—'}${t.panna ? ' (' + t.panna + '")' : ''}`;
+
+      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#f1f5f9' : '#ffffff');
+      doc.fillColor('#1a472a').fontSize(8).font('Helvetica');
+      doc.text(dt, 35, y + 5);
+      doc.text(t.lotNo ? `#${t.lotNo}` : '—', 105, y + 5);
+      doc.text(t.vendorName || '—', 155, y + 5, { width: 105, lineBreak: false });
+      doc.text(t.challanNo || '—', 265, y + 5, { width: 95, lineBreak: false });
+      doc.text(fabStr, 365, y + 5, { width: 120, lineBreak: false });
+      doc.text(`+${(t.qty || 0).toLocaleString('en-IN')} m`, 490, y + 5);
+      y += 18;
+    });
+
+    const pages = doc.bufferedPageRange();
+    for (let i = 0; i < pages.count; i++) {
+      doc.switchToPage(i);
+      doc.fillColor('#94a3b8').fontSize(8).font('Helvetica')
+        .text(`Page ${i + 1} of ${pages.count} — Elite Digital Prints Fabric Inward Report`, 30, 815, { width: 535, align: 'center' });
+    }
+
+    doc.end();
+  } catch (err) {
+    console.error('Error generating Fabric Inward PDF report:', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+const downloadFabricOutwardPdf = async (req, res) => {
+  try {
+    const PDFDocument = require('pdfkit');
+    const { dateStart, dateEnd } = req.query;
+
+    const filter = { type: 'OUTWARD' };
+    if (dateStart || dateEnd) {
+      filter.date = {};
+      if (dateStart) filter.date.$gte = new Date(dateStart);
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        filter.date.$lte = end;
+      }
+    }
+
+    const transactions = await FabricTransaction.find(filter).sort({ date: -1 }).lean();
+
+    const cleanDateStart = dateStart ? dateStart.split('T')[0] : '';
+    const cleanDateEnd = dateEnd ? dateEnd.split('T')[0] : '';
+
+    const doc = new PDFDocument({ margin: 30, size: 'A4', bufferPages: true });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Fabric_Outward_Report_${cleanDateStart || 'all'}_to_${cleanDateEnd || 'all'}.pdf"`);
+    doc.pipe(res);
+
+    doc.rect(30, 30, 535, 45).fill('#0f172a');
+    doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold')
+      .text('ELITE DIGITAL PRINTS — FABRIC OUTWARD REPORT', 30, 42, { width: 535, align: 'center' });
+    
+    let subtitle = 'Period: All Time';
+    if (cleanDateStart && cleanDateEnd) subtitle = `Period: ${cleanDateStart} to ${cleanDateEnd}`;
+    else if (cleanDateStart) subtitle = `Period: From ${cleanDateStart}`;
+    else if (cleanDateEnd) subtitle = `Period: Until ${cleanDateEnd}`;
+    
+    doc.fillColor('#94a3b8').fontSize(9).font('Helvetica')
+      .text(subtitle, 30, 60, { width: 535, align: 'center' });
+
+    let y = 90;
+
+    const totalOutwardMtr = transactions.reduce((s, t) => s + (t.qty || 0), 0);
+    const totalOutwardCount = transactions.length;
+
+    doc.rect(30, y, 260, 45).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL OUTWARD DISPATCHES', 35, y + 8);
+    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(String(totalOutwardCount), 35, y + 22);
+
+    doc.rect(305, y, 260, 45).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL DISPATCHED METERAGE', 310, y + 8);
+    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(`${totalOutwardMtr.toLocaleString('en-IN')} m`, 310, y + 22);
+
+    y += 60;
+
+    doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text('FABRIC OUTWARD TRANSACTIONS MASTER LIST', 30, y);
+    y += 15;
+
+    doc.rect(30, y, 535, 20).fill('#1e293b');
+    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+    doc.text('DATE', 35, y + 6);
+    doc.text('LOT #', 105, y + 6);
+    doc.text('PARTY NAME', 155, y + 6);
+    doc.text('CHALLAN / JOB NO.', 265, y + 6);
+    doc.text('FABRIC & PANNA', 385, y + 6);
+    doc.text('QTY (M)', 490, y + 6);
+    y += 20;
+
+    transactions.forEach((t, i) => {
+      if (y > 750) { doc.addPage(); y = 40; }
+      const dt = t.date ? new Date(t.date).toLocaleDateString('en-IN', { day:'2-digit', month:'2-digit', year:'numeric' }) : '—';
+      const fabStr = `${t.fabricQuality || '—'}${t.panna ? ' (' + t.panna + '")' : ''}`;
+      const refStr = `${t.challanNo || t.jobNo || '—'}`;
+
+      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#f1f5f9' : '#ffffff');
+      doc.fillColor('#7f1d1d').fontSize(8).font('Helvetica');
+      doc.text(dt, 35, y + 5);
+      doc.text(t.lotNo ? `#${t.lotNo}` : '—', 105, y + 5);
+      doc.text(t.partyName || '—', 155, y + 5, { width: 105, lineBreak: false });
+      doc.text(refStr, 265, y + 5, { width: 115, lineBreak: false });
+      doc.text(fabStr, 385, y + 5, { width: 100, lineBreak: false });
+      doc.text(`-${(t.qty || 0).toLocaleString('en-IN')} m`, 490, y + 5);
+      y += 18;
+    });
+
+    const pages = doc.bufferedPageRange();
+    for (let i = 0; i < pages.count; i++) {
+      doc.switchToPage(i);
+      doc.fillColor('#94a3b8').fontSize(8).font('Helvetica')
+        .text(`Page ${i + 1} of ${pages.count} — Elite Digital Prints Fabric Outward Report`, 30, 815, { width: 535, align: 'center' });
+    }
+
+    doc.end();
+  } catch (err) {
+    console.error('Error generating Fabric Outward PDF report:', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+const downloadFabricLotWisePdf = async (req, res) => {
+  try {
+    const PDFDocument = require('pdfkit');
+    const { dateStart, dateEnd } = req.query;
+
+    const matchFilter = {};
+    if (dateStart || dateEnd) {
+      matchFilter.date = {};
+      if (dateStart) matchFilter.date.$gte = new Date(dateStart);
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        matchFilter.date.$lte = end;
+      }
+    }
+
+    const pipeline = [
+      { $match: matchFilter },
+      {
+        $group: {
+          _id: '$lotNo',
+          fabricQuality: { $first: '$fabricQuality' },
+          panna: { $first: '$panna' },
+          vendorName: { $first: '$vendorName' },
+          vendorChallanNo: { $first: '$challanNo' },
+          totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+          totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } },
+          firstDate: { $min: '$date' }
+        }
+      },
+      {
+        $project: {
+          lotNo: '$_id',
+          fabricQuality: 1,
+          panna: 1,
+          vendorName: 1,
+          vendorChallanNo: 1,
+          totalInward: 1,
+          totalOutward: 1,
+          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
+          firstDate: 1,
+          _id: 0
+        }
+      },
+      { $match: { lotNo: { $ne: null } } },
+      { $sort: { lotNo: -1 } }
+    ];
+
+    const lots = await FabricTransaction.aggregate(pipeline);
+
+    const cleanDateStart = dateStart ? dateStart.split('T')[0] : '';
+    const cleanDateEnd = dateEnd ? dateEnd.split('T')[0] : '';
+
+    const doc = new PDFDocument({ margin: 30, size: 'A4', bufferPages: true });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Lotwise_Fabric_Report_${cleanDateStart || 'all'}_to_${cleanDateEnd || 'all'}.pdf"`);
+    doc.pipe(res);
+
+    doc.rect(30, 30, 535, 45).fill('#0f172a');
+    doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold')
+      .text('ELITE DIGITAL PRINTS — LOT-WISE FABRIC REPORT', 30, 42, { width: 535, align: 'center' });
+    
+    let subtitle = 'Period: All Time';
+    if (cleanDateStart && cleanDateEnd) subtitle = `Period: ${cleanDateStart} to ${cleanDateEnd}`;
+    else if (cleanDateStart) subtitle = `Period: From ${cleanDateStart}`;
+    else if (cleanDateEnd) subtitle = `Period: Until ${cleanDateEnd}`;
+    
+    doc.fillColor('#94a3b8').fontSize(9).font('Helvetica')
+      .text(subtitle, 30, 60, { width: 535, align: 'center' });
+
+    let y = 90;
+
+    const totalInwardM = lots.reduce((s, l) => s + (l.totalInward || 0), 0);
+    const totalOutwardM = lots.reduce((s, l) => s + (l.totalOutward || 0), 0);
+    const totalRemainingM = lots.reduce((s, l) => s + Math.max(0, l.currentStock || 0), 0);
+
+    doc.rect(30, y, 125, 45).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL LOTS TRACKED', 35, y + 8);
+    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(String(lots.length), 35, y + 22);
+
+    doc.rect(165, y, 125, 45).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL INWARD (M)', 170, y + 8);
+    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(`${totalInwardM.toLocaleString('en-IN')} m`, 170, y + 22);
+
+    doc.rect(300, y, 135, 45).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('TOTAL OUTWARD (M)', 305, y + 8);
+    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(`${totalOutwardM.toLocaleString('en-IN')} m`, 305, y + 22);
+
+    doc.rect(445, y, 120, 45).fill('#f8fafc').stroke('#cbd5e1');
+    doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('NET BALANCE IN STOCK', 450, y + 8);
+    doc.fillColor('#0f172a').fontSize(14).font('Helvetica-Bold').text(`${totalRemainingM.toLocaleString('en-IN')} m`, 450, y + 22);
+
+    y += 60;
+
+    doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text('LOT-WISE FABRIC STOCK BALANCE LIST', 30, y);
+    y += 15;
+
+    doc.rect(30, y, 535, 20).fill('#1e293b');
+    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+    doc.text('LOT #', 35, y + 6);
+    doc.text('FABRIC & PANNA', 95, y + 6);
+    doc.text('VENDOR NAME', 215, y + 6);
+    doc.text('INWARD (M)', 315, y + 6);
+    doc.text('OUTWARD (M)', 395, y + 6);
+    doc.text('CURRENT STOCK', 475, y + 6);
+    y += 20;
+
+    lots.forEach((l, i) => {
+      if (y > 750) { doc.addPage(); y = 40; }
+      const fabStr = `${l.fabricQuality || '—'}${l.panna ? ' (' + l.panna + '")' : ''}`;
+      const stockVal = l.currentStock || 0;
+      const stockCol = stockVal > 0 ? '#16a34a' : stockVal < 0 ? '#dc2626' : '#64748b';
+
+      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#f1f5f9' : '#ffffff');
+      doc.fillColor('#334155').fontSize(8).font('Helvetica');
+      doc.text(`#${l.lotNo}`, 35, y + 5);
+      doc.text(fabStr, 95, y + 5, { width: 115, lineBreak: false });
+      doc.text(l.vendorName || '—', 215, y + 5, { width: 95, lineBreak: false });
+      doc.text(`+${(l.totalInward || 0).toLocaleString('en-IN')} m`, 315, y + 5);
+      doc.text(`-${(l.totalOutward || 0).toLocaleString('en-IN')} m`, 395, y + 5);
+      doc.fillColor(stockCol).font('Helvetica-Bold').text(`${stockVal.toLocaleString('en-IN')} m`, 475, y + 5);
+      y += 18;
+    });
+
+    const pages = doc.bufferedPageRange();
+    for (let i = 0; i < pages.count; i++) {
+      doc.switchToPage(i);
+      doc.fillColor('#94a3b8').fontSize(8).font('Helvetica')
+        .text(`Page ${i + 1} of ${pages.count} — Elite Digital Prints Lot-Wise Fabric Report`, 30, 815, { width: 535, align: 'center' });
+    }
+
+    doc.end();
+  } catch (err) {
+    console.error('Error generating Lot-Wise Fabric PDF report:', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+const getFabricInwardReportData = async (req, res) => {
+  try {
+    const { dateStart, dateEnd } = req.query;
+    const filter = { type: 'INWARD' };
+    if (dateStart || dateEnd) {
+      filter.date = {};
+      if (dateStart) filter.date.$gte = new Date(dateStart);
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        filter.date.$lte = end;
+      }
+    }
+    const transactions = await FabricTransaction.find(filter).sort({ date: -1, lotNo: -1 }).lean();
+    res.status(200).json({ success: true, data: transactions });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const getFabricOutwardReportData = async (req, res) => {
+  try {
+    const { dateStart, dateEnd } = req.query;
+    const filter = { type: 'OUTWARD' };
+    if (dateStart || dateEnd) {
+      filter.date = {};
+      if (dateStart) filter.date.$gte = new Date(dateStart);
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        filter.date.$lte = end;
+      }
+    }
+    const transactions = await FabricTransaction.find(filter).sort({ date: -1 }).lean();
+    res.status(200).json({ success: true, data: transactions });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const getFabricLotWiseReportData = async (req, res) => {
+  try {
+    const { dateStart, dateEnd } = req.query;
+    const matchFilter = {};
+    if (dateStart || dateEnd) {
+      matchFilter.date = {};
+      if (dateStart) matchFilter.date.$gte = new Date(dateStart);
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        matchFilter.date.$lte = end;
+      }
+    }
+    const pipeline = [
+      { $match: matchFilter },
+      {
+        $group: {
+          _id: '$lotNo',
+          fabricQuality: { $first: '$fabricQuality' },
+          panna: { $first: '$panna' },
+          vendorName: { $first: '$vendorName' },
+          vendorChallanNo: { $first: '$challanNo' },
+          totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+          totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } },
+          firstDate: { $min: '$date' }
+        }
+      },
+      {
+        $project: {
+          lotNo: '$_id',
+          fabricQuality: 1,
+          panna: 1,
+          vendorName: 1,
+          vendorChallanNo: 1,
+          totalInward: 1,
+          totalOutward: 1,
+          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
+          firstDate: 1,
+          _id: 0
+        }
+      },
+      { $match: { lotNo: { $ne: null } } },
+      { $sort: { lotNo: -1 } }
+    ];
+    const lots = await FabricTransaction.aggregate(pipeline);
+    res.status(200).json({ success: true, data: lots });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 module.exports = {
   createInward,
   createOutward,
@@ -715,5 +1137,11 @@ module.exports = {
   downloadLedgerPdf,
   getStockByPanna,
   getFabricRequirement,
-  importStock
+  importStock,
+  downloadFabricInwardPdf,
+  downloadFabricOutwardPdf,
+  downloadFabricLotWisePdf,
+  getFabricInwardReportData,
+  getFabricOutwardReportData,
+  getFabricLotWiseReportData,
 };
