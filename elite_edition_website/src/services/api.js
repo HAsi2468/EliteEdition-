@@ -785,6 +785,28 @@ export const api = {
     return request('/fabric/stock-panna');
   },
 
+  async downloadFabricLotWisePdf(dateStart = '', dateEnd = '', fileName = 'Fabric_LotWise_Stock_Report.pdf') {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const query = new URLSearchParams();
+    if (dateStart) query.append('dateStart', dateStart);
+    if (dateEnd) query.append('dateEnd', dateEnd);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const response = await fetch(`${baseUrl}/fabric/report/lotwise-pdf${qs}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate lot-wise fabric PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
   async getFabricRequirement() {
     return request('/fabric/requirement');
   },

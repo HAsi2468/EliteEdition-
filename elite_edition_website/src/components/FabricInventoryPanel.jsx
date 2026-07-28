@@ -295,6 +295,12 @@ export default function FabricInventoryPanel() {
   const [outwardSortBy, setOutwardSortBy] = useState('date');
   const [outwardSortOrder, setOutwardSortOrder] = useState('desc');
 
+  // Lot-Wise Management state
+  const [lotSearch, setLotSearch] = useState('');
+  const [lotStatusFilter, setLotStatusFilter] = useState('All');
+  const [expandedLotNo, setExpandedLotNo] = useState(null);
+  const [lotPdfLoading, setLotPdfLoading] = useState(false);
+
   // PDF download filter state
   const [pdfFilter, setPdfFilter] = useState({
     dateStart: '',
@@ -962,11 +968,68 @@ export default function FabricInventoryPanel() {
 
   const tabs = [
     { id: 'dashboard', label: 'Stock Overview', icon: Database },
+    { id: 'lotwise', label: 'Lot-Wise Management', icon: Layers },
     { id: 'inward', label: 'Inward Register', icon: ArrowDownToLine },
     ...(isAdmin ? [{ id: 'outward', label: 'Outward Register', icon: ArrowUpFromLine }] : []),
     { id: 'challan', label: 'Challan', icon: FileText },
     { id: 'requirement', label: 'Fabric Requirement', icon: AlertTriangle },
   ];
+
+  // Group all transactions by Lot No for Lot-Wise Management View
+  const lotMap = new Map();
+  transactions.forEach(t => {
+    if (t.lotNo == null || t.lotNo === '') return;
+    const lotNoKey = String(t.lotNo).trim();
+    if (!lotMap.has(lotNoKey)) {
+      lotMap.set(lotNoKey, {
+        lotNo: lotNoKey,
+        fabricQuality: t.fabricQuality || '',
+        panna: t.panna || '58',
+        vendorName: t.vendorName || '',
+        vendorChallanNo: t.type === 'INWARD' ? (t.challanNo || '') : '',
+        totalInward: 0,
+        totalOutward: 0,
+        inwardTxs: [],
+        outwardTxs: [],
+        firstDate: t.date
+      });
+    }
+    const item = lotMap.get(lotNoKey);
+    if (t.fabricQuality && !item.fabricQuality) item.fabricQuality = t.fabricQuality;
+    if (t.panna && !item.panna) item.panna = t.panna;
+    if (t.vendorName && !item.vendorName) item.vendorName = t.vendorName;
+
+    const qty = Number(t.qty || 0);
+    if (t.type === 'INWARD') {
+      item.totalInward += qty;
+      if (t.challanNo && !item.vendorChallanNo) item.vendorChallanNo = t.challanNo;
+      item.inwardTxs.push(t);
+    } else if (t.type === 'OUTWARD') {
+      item.totalOutward += qty;
+      item.outwardTxs.push(t);
+    }
+  });
+
+  const lotRecords = Array.from(lotMap.values()).map(l => ({
+    ...l,
+    currentStock: l.totalInward - l.totalOutward
+  })).sort((a, b) => {
+    const numA = parseInt(a.lotNo, 10);
+    const numB = parseInt(b.lotNo, 10);
+    if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+    return b.lotNo.localeCompare(a.lotNo);
+  });
+
+  const filteredLots = lotRecords.filter(l => {
+    if (lotStatusFilter === 'InStock' && l.currentStock <= 0) return false;
+    if (lotStatusFilter === 'Exhausted' && l.currentStock > 0) return false;
+    if (!lotSearch) return true;
+    const s = lotSearch.toLowerCase();
+    return String(l.lotNo).toLowerCase().includes(s) ||
+           (l.fabricQuality || '').toLowerCase().includes(s) ||
+           (l.vendorName || '').toLowerCase().includes(s) ||
+           l.outwardTxs.some(ot => (ot.partyName || '').toLowerCase().includes(s) || (ot.jobNo || '').toLowerCase().includes(s));
+  });
 
   // Parse lot numbers from the comma-separated lotNo field
   const parseSelectedLots = (lotNoStr) => {
@@ -1150,6 +1213,301 @@ export default function FabricInventoryPanel() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Lot-Wise Management Tab */}
+        {activeTab === 'lotwise' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
+                  <Layers size={22} color="var(--primary)" />
+                  Lot-Wise Fabric Management
+                </h2>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  Track inward receipts, outward dispatches, and net available stock for every fabric lot.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  onClick={async () => {
+                    try {
+                      setLotPdfLoading(true);
+                      await api.downloadFabricLotWisePdf('', '', `Fabric_LotWise_Management_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+                    } catch (err) {
+                      alert('Failed to download Lot Report PDF: ' + err.message);
+                    } finally {
+                      setLotPdfLoading(false);
+                    }
+                  }}
+                  disabled={lotPdfLoading}
+                  className="btn-primary"
+                  style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', border: 'none' }}
+                >
+                  <FileDown size={16} className={lotPdfLoading ? 'spin-loader' : ''} />
+                  {lotPdfLoading ? 'Generating PDF...' : 'Download Lot Report (PDF)'}
+                </button>
+              </div>
+            </div>
+
+            {/* Lot Summary Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 600 }}>Total Lots Tracked</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: 'var(--text-primary)' }}>{lotRecords.length}</div>
+              </div>
+              <div style={{ padding: '1rem', background: 'rgba(16, 185, 129, 0.06)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                <span style={{ color: 'var(--success)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 600 }}>In-Stock Lots</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: 'var(--success)' }}>
+                  {lotRecords.filter(l => l.currentStock > 0).length}
+                </div>
+              </div>
+              <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.06)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                <span style={{ color: '#f87171', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 600 }}>Exhausted Lots</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: '#ef4444' }}>
+                  {lotRecords.filter(l => l.currentStock <= 0).length}
+                </div>
+              </div>
+              <div style={{ padding: '1rem', background: 'rgba(56, 189, 248, 0.06)', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
+                <span style={{ color: '#38bdf8', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 600 }}>Total Net Lot Stock</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: '#38bdf8' }}>
+                  {Number(lotRecords.reduce((acc, l) => acc + Math.max(0, l.currentStock), 0)).toFixed(2)} <span style={{ fontSize: '0.8rem' }}>mtr</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', flex: 1, minWidth: '280px', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                  <Search size={15} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search Lot #, Fabric Quality, Vendor, or Party Name..."
+                    value={lotSearch}
+                    onChange={e => setLotSearch(e.target.value)}
+                    style={{ width: '100%', paddingLeft: '2.2rem', paddingRight: '0.75rem', paddingTop: '0.5rem', paddingBottom: '0.5rem', fontSize: '0.85rem' }}
+                  />
+                  {lotSearch && (
+                    <X size={14} onClick={() => setLotSearch('')} style={{ position: 'absolute', right: '0.65rem', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--text-muted)' }} />
+                  )}
+                </div>
+
+                <select
+                  value={lotStatusFilter}
+                  onChange={e => setLotStatusFilter(e.target.value)}
+                  style={{ padding: '0.5rem 0.8rem', fontSize: '0.85rem', minWidth: '150px' }}
+                >
+                  <option value="All">All Lot Statuses ({lotRecords.length})</option>
+                  <option value="InStock">In-Stock Only ({lotRecords.filter(l => l.currentStock > 0).length})</option>
+                  <option value="Exhausted">Exhausted Only ({lotRecords.filter(l => l.currentStock <= 0).length})</option>
+                </select>
+              </div>
+
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Showing <strong>{filteredLots.length}</strong> of <strong>{lotRecords.length}</strong> lots
+              </div>
+            </div>
+
+            {/* Lot Cards List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {filteredLots.map(lot => {
+                const isExpanded = expandedLotNo === lot.lotNo;
+                const isLow = lot.currentStock <= 50 && lot.currentStock > 0;
+                const isEmpty = lot.currentStock <= 0;
+                const statusLabel = isEmpty ? 'EXHAUSTED' : isLow ? 'LOW STOCK' : 'IN STOCK';
+                const statusBg = isEmpty ? 'rgba(239,68,68,0.12)' : isLow ? 'rgba(245,158,11,0.12)' : 'rgba(16,185,129,0.12)';
+                const statusBorder = isEmpty ? 'rgba(239,68,68,0.3)' : isLow ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)';
+                const statusColor = isEmpty ? '#ef4444' : isLow ? '#f59e0b' : 'var(--success)';
+
+                return (
+                  <div
+                    key={lot.lotNo}
+                    style={{
+                      background: 'rgba(255,255,255,0.02)',
+                      border: isExpanded ? '1px solid var(--primary)' : '1px solid var(--border-light)',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {/* Header Summary Row */}
+                    <div
+                      onClick={() => setExpandedLotNo(isExpanded ? null : lot.lotNo)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justify: 'space-between',
+                        padding: '0.9rem 1.25rem',
+                        cursor: 'pointer',
+                        background: isExpanded ? 'rgba(124, 58, 237, 0.05)' : 'transparent',
+                        flexWrap: 'wrap',
+                        gap: '1rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: '220px' }}>
+                        <span style={{
+                          background: 'linear-gradient(135deg, var(--primary) 0%, #4c1d95 100%)',
+                          color: '#ffffff',
+                          fontWeight: 800,
+                          fontSize: '0.9rem',
+                          padding: '4px 12px',
+                          borderRadius: '6px',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+                        }}>
+                          Lot #{lot.lotNo}
+                        </span>
+
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                            {lot.fabricQuality || 'Unspecified Fabric'}
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', gap: '0.75rem', marginTop: '2px' }}>
+                            <span>Panna: <strong>{lot.panna}"</strong></span>
+                            {lot.vendorName && <span>Vendor: <strong>{lot.vendorName}</strong></span>}
+                            {lot.vendorChallanNo && <span>Vendor Ch: <strong>{lot.vendorChallanNo}</strong></span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Stock Totals & Status */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                        <div style={{ textAlign: 'right', fontSize: '0.82rem' }}>
+                          <div style={{ color: 'var(--success)', fontWeight: 600 }}>Inward: +{Number(lot.totalInward || 0).toFixed(2)} mtr</div>
+                          <div style={{ color: 'var(--danger)', fontWeight: 600 }}>Outward: -{Number(lot.totalOutward || 0).toFixed(2)} mtr</div>
+                        </div>
+
+                        <div style={{ textAlign: 'right', minWidth: '110px' }}>
+                          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: statusColor }}>
+                            {Number(lot.currentStock || 0).toFixed(2)} <span style={{ fontSize: '0.75rem' }}>mtr</span>
+                          </div>
+                          <span style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            color: statusColor,
+                            background: statusBg,
+                            border: `1px solid ${statusBorder}`,
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            display: 'inline-block',
+                            marginTop: '2px'
+                          }}>
+                            {statusLabel}
+                          </span>
+                        </div>
+
+                        <button
+                          className="btn-icon"
+                          style={{ padding: '0.35rem', color: 'var(--text-muted)' }}
+                          title={isExpanded ? 'Collapse History' : 'View Inward & Outward Breakdown'}
+                        >
+                          {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Detailed History Breakdown Drawer */}
+                    {isExpanded && (
+                      <div style={{ borderTop: '1px solid var(--border-light)', padding: '1.25rem', background: 'rgba(0,0,0,0.15)' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+                          
+                          {/* Inward Transactions Box */}
+                          <div style={{ background: 'rgba(16, 185, 129, 0.03)', border: '1px solid rgba(16, 185, 129, 0.15)', borderRadius: '8px', padding: '1rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                              <h4 style={{ margin: 0, fontSize: '0.88rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <ArrowDownToLine size={16} /> Inward Receipts ({lot.inwardTxs.length})
+                              </h4>
+                              <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--success)' }}>
+                                Total: +{Number(lot.totalInward || 0).toFixed(2)} mtr
+                              </span>
+                            </div>
+
+                            {lot.inwardTxs.length === 0 ? (
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No inward transactions logged.</div>
+                            ) : (
+                              <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', fontSize: '0.78rem', borderCollapse: 'collapse' }}>
+                                  <thead>
+                                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-muted)', textAlign: 'left' }}>
+                                      <th style={{ padding: '0.35rem' }}>Date</th>
+                                      <th style={{ padding: '0.35rem' }}>Vendor</th>
+                                      <th style={{ padding: '0.35rem' }}>Challan</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'right' }}>Qty (mtr)</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {lot.inwardTxs.map((inTx, iIdx) => (
+                                      <tr key={inTx._id || iIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                        <td style={{ padding: '0.35rem' }}>{new Date(inTx.date).toLocaleDateString()}</td>
+                                        <td style={{ padding: '0.35rem' }}>{inTx.vendorName || '—'}</td>
+                                        <td style={{ padding: '0.35rem' }}>{inTx.challanNo || '—'}</td>
+                                        <td style={{ padding: '0.35rem', textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>
+                                          +{Number(inTx.qty || 0).toFixed(2)}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Outward Dispatches Box */}
+                          <div style={{ background: 'rgba(239, 68, 68, 0.03)', border: '1px solid rgba(239, 68, 68, 0.15)', borderRadius: '8px', padding: '1rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                              <h4 style={{ margin: 0, fontSize: '0.88rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <ArrowUpFromLine size={16} /> Outward Dispatches ({lot.outwardTxs.length})
+                              </h4>
+                              <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#ef4444' }}>
+                                Total: -{Number(lot.totalOutward || 0).toFixed(2)} mtr
+                              </span>
+                            </div>
+
+                            {lot.outwardTxs.length === 0 ? (
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No outward dispatches against this lot.</div>
+                            ) : (
+                              <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', fontSize: '0.78rem', borderCollapse: 'collapse' }}>
+                                  <thead>
+                                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-muted)', textAlign: 'left' }}>
+                                      <th style={{ padding: '0.35rem' }}>Date</th>
+                                      <th style={{ padding: '0.35rem' }}>Party Name</th>
+                                      <th style={{ padding: '0.35rem' }}>Job / Ch.</th>
+                                      <th style={{ padding: '0.35rem', textAlign: 'right' }}>Qty (mtr)</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {lot.outwardTxs.map((outTx, oIdx) => (
+                                      <tr key={outTx._id || oIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                        <td style={{ padding: '0.35rem' }}>{new Date(outTx.date).toLocaleDateString()}</td>
+                                        <td style={{ padding: '0.35rem' }}>{outTx.partyName || '—'}</td>
+                                        <td style={{ padding: '0.35rem' }}>{outTx.jobNo || outTx.challanNo || '—'}</td>
+                                        <td style={{ padding: '0.35rem', textAlign: 'right', fontWeight: 700, color: 'var(--danger)' }}>
+                                          -{Number(outTx.qty || 0).toFixed(2)}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {filteredLots.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                  No lot records found matching your filters.
+                </div>
+              )}
             </div>
           </div>
         )}
