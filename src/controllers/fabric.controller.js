@@ -1097,13 +1097,13 @@ const downloadFabricLotWisePdf = async (req, res) => {
 
     const renderTableHeader = (currY) => {
       doc.rect(30, currY, 535, 20).fill('#ede9fe');
-      doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold');
+      doc.fillColor('#000000').fontSize(7.8).font('Helvetica-Bold');
       doc.text('LOT #', 35, currY + 6);
-      doc.text('FABRIC & PANNA', 95, currY + 6);
-      doc.text('VENDOR NAME', 215, currY + 6);
-      doc.text('INWARD (M)', 315, currY + 6);
-      doc.text('OUTWARD (M)', 395, currY + 6);
-      doc.text('CURRENT STOCK', 475, currY + 6);
+      doc.text('FABRIC & PANNA', 85, currY + 6);
+      doc.text('VENDOR NAME', 195, currY + 6);
+      doc.text('INWARD (M)', 295, currY + 6);
+      doc.text('OUTWARD WITH SHORTAGE (M)', 375, currY + 6);
+      doc.text('CURRENT STOCK', 495, currY + 6);
     };
 
     doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold').text('LOT-WISE FABRIC STOCK BALANCE LIST', 30, y);
@@ -1125,11 +1125,11 @@ const downloadFabricLotWisePdf = async (req, res) => {
       doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#fcfaff' : '#ffffff');
       doc.fillColor('#000000').fontSize(8).font('Helvetica');
       doc.text(`#${l.lotNo}`, 35, y + 5);
-      doc.text(fabStr, 95, y + 5, { width: 115, lineBreak: false });
-      doc.text(l.vendorName || '—', 215, y + 5, { width: 95, lineBreak: false });
-      doc.text(`+${(l.totalInward || 0).toLocaleString('en-IN')} m`, 315, y + 5);
-      doc.text(`-${(l.totalOutward || 0).toLocaleString('en-IN')} m`, 395, y + 5);
-      doc.fillColor(stockVal > 0 ? '#15803d' : stockVal < 0 ? '#b91c1c' : '#64748b').font('Helvetica-Bold').text(`${stockVal.toLocaleString('en-IN')} m`, 475, y + 5);
+      doc.text(fabStr, 85, y + 5, { width: 105, lineBreak: false });
+      doc.text(l.vendorName || '—', 195, y + 5, { width: 95, lineBreak: false });
+      doc.text(`+${(l.totalInward || 0).toLocaleString('en-IN')} m`, 295, y + 5);
+      doc.text(`-${(l.totalOutward || 0).toLocaleString('en-IN')} m`, 375, y + 5);
+      doc.fillColor(stockVal > 0 ? '#15803d' : stockVal < 0 ? '#b91c1c' : '#64748b').font('Helvetica-Bold').text(`${stockVal.toLocaleString('en-IN')} m`, 495, y + 5);
       y += 18;
     });
 
