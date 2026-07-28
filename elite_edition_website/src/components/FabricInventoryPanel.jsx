@@ -1016,8 +1016,8 @@ export default function FabricInventoryPanel() {
   })).sort((a, b) => {
     const numA = parseInt(a.lotNo, 10);
     const numB = parseInt(b.lotNo, 10);
-    if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
-    return b.lotNo.localeCompare(a.lotNo);
+    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+    return a.lotNo.localeCompare(b.lotNo);
   });
 
   const filteredLots = lotRecords.filter(l => {

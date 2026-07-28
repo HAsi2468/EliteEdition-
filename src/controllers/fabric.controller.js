@@ -120,6 +120,38 @@ const createOutward = async (req, res) => {
       }
     }
 
+    // Auto-clear lot balance if remaining stock <= 5 mtr
+    if (lotNo) {
+      const lotAgg = await FabricTransaction.aggregate([
+        { $match: { lotNo: Number(lotNo) } },
+        {
+          $group: {
+            _id: '$lotNo',
+            fabricQuality: { $first: '$fabricQuality' },
+            panna: { $first: '$panna' },
+            totalIn: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+            totalOut: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } }
+          }
+        }
+      ]);
+      if (lotAgg.length > 0) {
+        const rem = lotAgg[0].totalIn - lotAgg[0].totalOut;
+        if (rem > 0 && rem <= 5.0) {
+          const scrapTx = new FabricTransaction({
+            type: 'OUTWARD',
+            fabricQuality: lotAgg[0].fabricQuality,
+            panna: lotAgg[0].panna,
+            lotNo: Number(lotNo),
+            qty: Number(rem.toFixed(2)),
+            date: new Date(),
+            notes: 'Remnant Stock Auto-Clear (<= 5 mtr remaining converted to 0)'
+          });
+          await scrapTx.save();
+          console.log(`Auto-cleared remnant stock for Lot #${lotNo} (${rem.toFixed(2)} mtr converted to 0)`);
+        }
+      }
+    }
+
     res.status(201).json({ success: true, data: transaction });
   } catch (error) {
     console.error('Error creating outward fabric transaction:', error);
@@ -253,7 +285,7 @@ const getLotStock = async (req, res) => {
           currentStock: { $gt: 0 }
         }
       },
-      { $sort: { lotNo: -1 } } // Show newest inward lot numbers first!
+      { $sort: { lotNo: 1 } } // Sort ascending: clear earliest lot numbers first (FIFO)!
     ];
 
     const lotStock = await FabricTransaction.aggregate(pipeline);
@@ -564,7 +596,13 @@ const importStock = async (req, res) => {
 
       const csvOpening = (row.openingStock !== undefined && row.openingStock !== null && row.openingStock !== '') ? parseFloat(row.openingStock) : null;
       const csvInward = (row.inwardQty !== undefined && row.inwardQty !== null && row.inwardQty !== '') ? parseFloat(row.inwardQty) : null;
-      const csvOutward = (row.outwardQty !== undefined && row.outwardQty !== null && row.outwardQty !== '') ? parseFloat(row.outwardQty) : null;
+      let csvOutward = (row.outwardQty !== undefined && row.outwardQty !== null && row.outwardQty !== '') ? parseFloat(row.outwardQty) : null;
+      
+      // Rule: Add +2% in outwards for FRENCH CREPE inserted from sheet
+      if (csvOutward !== null && !isNaN(csvOutward) && (fabricQuality.includes('CREPE') || fabricQuality.includes('CRAPE'))) {
+        csvOutward = Number((csvOutward * 1.02).toFixed(2));
+      }
+
       const csvCurrent = (row.currentStock !== undefined && row.currentStock !== null && row.currentStock !== '') ? parseFloat(row.currentStock) : null;
 
       // Extract metadata fields
