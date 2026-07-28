@@ -438,7 +438,7 @@ export default function FabricInventoryPanel() {
       fetchData();
       fetchRequirement();
       fetchChallans();
-    }, 10000); // 10s auto-sync
+    }, 5000); // 5s real-time auto-sync
 
     const handleDataRefresh = () => {
       fetchData();
@@ -1010,10 +1010,15 @@ export default function FabricInventoryPanel() {
     }
   });
 
-  const lotRecords = Array.from(lotMap.values()).map(l => ({
-    ...l,
-    currentStock: l.totalInward - l.totalOutward
-  })).sort((a, b) => {
+  const lotRecords = Array.from(lotMap.values()).map(l => {
+    const rawStock = l.totalInward - l.totalOutward;
+    // Real-Time Safeguard: If remaining lot balance <= 5.0 meters, display as 0 (Exhausted)!
+    const netStock = rawStock <= 5.0 ? 0 : rawStock;
+    return {
+      ...l,
+      currentStock: netStock
+    };
+  }).sort((a, b) => {
     const numA = parseInt(a.lotNo, 10);
     const numB = parseInt(b.lotNo, 10);
     if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
