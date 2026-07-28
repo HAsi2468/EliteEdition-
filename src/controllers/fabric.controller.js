@@ -1004,14 +1004,10 @@ const downloadFabricLotWisePdf = async (req, res) => {
     const { dateStart, dateEnd } = req.query;
 
     const matchFilter = {};
-    if (dateStart || dateEnd) {
-      matchFilter.date = {};
-      if (dateStart) matchFilter.date.$gte = new Date(dateStart);
-      if (dateEnd) {
-        const end = new Date(dateEnd);
-        end.setHours(23, 59, 59, 999);
-        matchFilter.date.$lte = end;
-      }
+    if (dateEnd) {
+      const end = new Date(dateEnd);
+      end.setHours(23, 59, 59, 999);
+      matchFilter.date = { $lte: end };
     }
 
     const pipeline = [
@@ -1202,14 +1198,10 @@ const getFabricLotWiseReportData = async (req, res) => {
   try {
     const { dateStart, dateEnd } = req.query;
     const matchFilter = {};
-    if (dateStart || dateEnd) {
-      matchFilter.date = {};
-      if (dateStart) matchFilter.date.$gte = new Date(dateStart);
-      if (dateEnd) {
-        const end = new Date(dateEnd);
-        end.setHours(23, 59, 59, 999);
-        matchFilter.date.$lte = end;
-      }
+    if (dateEnd) {
+      const end = new Date(dateEnd);
+      end.setHours(23, 59, 59, 999);
+      matchFilter.date = { $lte: end };
     }
     const pipeline = [
       { $match: matchFilter },
@@ -1290,8 +1282,14 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
     let lotwiseData = [];
     if (selectedReports.includes('lotwise')) {
+      const lotDateFilter = {};
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        lotDateFilter.date = { $lte: end };
+      }
       const pipeline = [
-        { $match: dateFilter },
+        { $match: lotDateFilter },
         {
           $group: {
             _id: '$lotNo',
