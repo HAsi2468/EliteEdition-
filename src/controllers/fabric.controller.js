@@ -72,11 +72,9 @@ const createOutward = async (req, res) => {
 
     let finalQty = parseFloat(qty);
     let finalNotes = notes || '';
-    if (normFabric.includes('CREPE') || normFabric.includes('CRAPE')) {
-      finalQty = Number((finalQty * 1.02).toFixed(2));
-      if (!finalNotes.includes('+2% French Crepe Applied')) {
-        finalNotes = finalNotes ? `${finalNotes} (+2% French Crepe Applied)` : '(+2% French Crepe Applied)';
-      }
+    finalQty = Number((finalQty * 1.02).toFixed(2));
+    if (!finalNotes.includes('+2% Shortage Applied')) {
+      finalNotes = finalNotes ? `${finalNotes} (+2% Shortage Applied)` : '(+2% Shortage Applied)';
     }
 
     const transaction = new FabricTransaction({
@@ -607,8 +605,8 @@ const importStock = async (req, res) => {
       const csvInward = (row.inwardQty !== undefined && row.inwardQty !== null && row.inwardQty !== '') ? parseFloat(row.inwardQty) : null;
       let csvOutward = (row.outwardQty !== undefined && row.outwardQty !== null && row.outwardQty !== '') ? parseFloat(row.outwardQty) : null;
       
-      // Rule: Add +2% in outwards for FRENCH CREPE inserted from sheet
-      if (csvOutward !== null && !isNaN(csvOutward) && (fabricQuality.includes('CREPE') || fabricQuality.includes('CRAPE'))) {
+      // Rule: Add +2% in outwards inserted from sheet
+      if (csvOutward !== null && !isNaN(csvOutward) && csvOutward > 0) {
         csvOutward = Number((csvOutward * 1.02).toFixed(2));
       }
 
