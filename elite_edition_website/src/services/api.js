@@ -1126,4 +1126,37 @@ export const api = {
   async getFabricLotInfo(lotNo) {
     return request(`/fabric-challan/lot-info/${lotNo}`);
   },
+
+  // ── Stock Adjustment (SA) ──────────────────────────────────────────────
+  async getStockAdjustments() {
+    return request('/fabric/stock-adjustment');
+  },
+
+  async createStockAdjustment(data) {
+    return request('/fabric/stock-adjustment', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteStockAdjustment(id) {
+    return request(`/fabric/stock-adjustment/${id}`, { method: 'DELETE' });
+  },
+
+  async downloadStockAdjustmentPdf(id, saNo) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const response = await fetch(`${baseUrl}/fabric/stock-adjustment/${id}/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate Stock Adjustment PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Stock_Adjustment_${saNo || 'Voucher'}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+  },
 };

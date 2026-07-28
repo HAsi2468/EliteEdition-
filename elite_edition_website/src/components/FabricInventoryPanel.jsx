@@ -84,6 +84,26 @@ export default function FabricInventoryPanel() {
     notes: '',
   });
 
+  // Stock Adjustment (SA) state
+  const [stockAdjustments, setStockAdjustments] = useState([]);
+  const [saSearch, setSaSearch] = useState('');
+  const [saDateStart, setSaDateStart] = useState('');
+  const [saDateEnd, setSaDateEnd] = useState('');
+  const [isSaFormOpen, setIsSaFormOpen] = useState(false);
+  const [saDeleteTarget, setSaDeleteTarget] = useState(null);
+  const [saAvailableLots, setSaAvailableLots] = useState([]);
+  const [saForm, setSaForm] = useState({
+    date: new Date().toISOString().split('T')[0],
+    partyName: '',
+    adjustmentType: 'RETURN_REJECTED',
+    fabricQuality: '',
+    panna: '',
+    lotNo: '',
+    reason: 'Fabric Return / Rejection',
+    notes: '',
+    tpDetails: [{ tpNo: 1, tpMeter: '', lotNo: '' }]
+  });
+
   const fileInputRef = useRef(null);
 
   const handleExportCsv = () => {
@@ -431,19 +451,32 @@ export default function FabricInventoryPanel() {
     }
   };
 
+  const fetchStockAdjustments = async () => {
+    try {
+      const res = await api.getStockAdjustments();
+      if (res && res.success) setStockAdjustments(res.data || []);
+    } catch (e) {
+      console.warn('Failed to fetch stock adjustments', e);
+    }
+  };
+
   useEffect(() => {
     fetchData();
     fetchRequirement();
+    fetchChallans();
+    fetchStockAdjustments();
     const intervalId = setInterval(() => {
       fetchData();
       fetchRequirement();
       fetchChallans();
+      fetchStockAdjustments();
     }, 5000); // 5s real-time auto-sync
 
     const handleDataRefresh = () => {
       fetchData();
       fetchRequirement();
       fetchChallans();
+      fetchStockAdjustments();
     };
     window.addEventListener('elite-data-refresh', handleDataRefresh);
 
@@ -904,6 +937,104 @@ export default function FabricInventoryPanel() {
     }
   };
 
+  // Stock Adjustment (SA) Helpers
+  const handleSaFabricChange = (e) => {
+    const fName = e.target.value;
+    setSaForm(prev => ({ ...prev, fabricQuality: fName, lotNo: '' }));
+    if (fName) {
+      api.getFabricLotStock({ fabricQuality: fName }).then(res => {
+        if (res && res.success) setSaAvailableLots(res.data || []);
+      }).catch(() => {});
+    } else {
+      setSaAvailableLots([]);
+    }
+  };
+
+  const addSaTpRow = () => {
+    setSaForm(prev => ({
+      ...prev,
+      tpDetails: [...prev.tpDetails, { tpNo: prev.tpDetails.length + 1, tpMeter: '', lotNo: prev.lotNo || '' }]
+    }));
+  };
+
+  const removeSaTpRow = (idx) => {
+    setSaForm(prev => ({
+      ...prev,
+      tpDetails: prev.tpDetails.filter((_, i) => i !== idx).map((r, i) => ({ ...r, tpNo: i + 1 }))
+    }));
+  };
+
+  const updateSaTpRow = (idx, field, val) => {
+    setSaForm(prev => {
+      const updated = [...prev.tpDetails];
+      updated[idx] = { ...updated[idx], [field]: val };
+      return { ...prev, tpDetails: updated };
+    });
+  };
+
+  const handleCreateSaSubmit = async (e) => {
+    e.preventDefault();
+    if (!saForm.fabricQuality) {
+      alert('Please select a Fabric Quality.');
+      return;
+    }
+    const calculatedTotalMtr = saForm.tpDetails.reduce((sum, r) => sum + (parseFloat(r.tpMeter) || 0), 0);
+    if (calculatedTotalMtr <= 0) {
+      alert('Please enter return meters for at least one TP / Roll.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const payload = {
+        ...saForm,
+        totalMtr: calculatedTotalMtr,
+        totalTp: saForm.tpDetails.length
+      };
+      const res = await api.createStockAdjustment(payload);
+      triggerPushNotification('📦 Stock Return / Adjustment Saved', `Stock Adjustment ${res.data.saNo} recorded successfully.`, 'success');
+      setIsSaFormOpen(false);
+      setSaForm({
+        date: new Date().toISOString().split('T')[0],
+        partyName: '',
+        adjustmentType: 'RETURN_REJECTED',
+        fabricQuality: '',
+        panna: '',
+        lotNo: '',
+        reason: 'Fabric Return / Rejection',
+        notes: '',
+        tpDetails: [{ tpNo: 1, tpMeter: '', lotNo: '' }]
+      });
+      triggerGlobalDataRefresh('fabric');
+      fetchData();
+      fetchStockAdjustments();
+    } catch (err) {
+      alert('Failed to save Stock Adjustment: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSa = async () => {
+    if (!saDeleteTarget) return;
+    try {
+      await api.deleteStockAdjustment(saDeleteTarget._id);
+      setSaDeleteTarget(null);
+      triggerGlobalDataRefresh('fabric');
+      fetchData();
+      fetchStockAdjustments();
+    } catch (err) {
+      alert('Failed to delete Stock Adjustment: ' + err.message);
+    }
+  };
+
+  const handleDownloadSaPdf = async (id, saNo) => {
+    try {
+      await api.downloadStockAdjustmentPdf(id, saNo);
+    } catch (err) {
+      alert('Failed to download SA PDF: ' + err.message);
+    }
+  };
+
   const allInwardLots = transactions
     .filter(t => t.type === 'INWARD' && t.lotNo != null)
     .map(t => Number(t.lotNo))
@@ -972,6 +1103,7 @@ export default function FabricInventoryPanel() {
     { id: 'inward', label: 'Inward Register', icon: ArrowDownToLine },
     ...(isAdmin ? [{ id: 'outward', label: 'Outward Register', icon: ArrowUpFromLine }] : []),
     { id: 'challan', label: 'Challan', icon: FileText },
+    { id: 'stockAdjustment', label: 'Stock Adjustment (SA)', icon: RefreshCw },
     { id: 'requirement', label: 'Fabric Requirement', icon: AlertTriangle },
   ];
 
@@ -2079,6 +2211,355 @@ export default function FabricInventoryPanel() {
           </div>
         )}
       </div>
+
+      {/* ── Stock Adjustment (SA) Tab ── */}
+      {activeTab === 'stockAdjustment' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <RefreshCw size={20} className="text-purple-400" /> Stock Adjustment & Fabric Return (SA)
+              </h2>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Return rejected fabric to vendors & adjust stock with auto-assigned SA-01 voucher numbers.
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              {!isSaFormOpen && (
+                <>
+                  <div style={{ position: 'relative' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <input
+                      type="text"
+                      placeholder="Search voucher, party, fabric, lot..."
+                      value={saSearch}
+                      onChange={e => setSaSearch(e.target.value)}
+                      style={{ ...inputStyle, width: '220px', paddingLeft: '1.8rem' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
+                    <input type="date" value={saDateStart} onChange={e => setSaDateStart(e.target.value)} style={{ ...inputStyle, width: '130px', padding: '0.3rem' }} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>To:</span>
+                    <input type="date" value={saDateEnd} onChange={e => setSaDateEnd(e.target.value)} style={{ ...inputStyle, width: '130px', padding: '0.3rem' }} />
+                  </div>
+                </>
+              )}
+
+              <button
+                className="btn-primary"
+                onClick={() => setIsSaFormOpen(!isSaFormOpen)}
+                style={{ background: isSaFormOpen ? 'var(--secondary)' : 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)' }}
+              >
+                {isSaFormOpen ? <X size={16} /> : <PlusCircle size={16} />}
+                {isSaFormOpen ? 'Back to SA Register' : 'New Fabric Return (SA)'}
+              </button>
+            </div>
+          </div>
+
+          {/* Form Mode */}
+          {isSaFormOpen ? (
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '1.5rem', marginTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
+                <h3 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <PlusCircle size={18} /> Issue Stock Return Voucher (Auto Voucher #: SA-01...)
+                </h3>
+                <span style={{ fontSize: '0.78rem', background: 'rgba(124, 58, 237, 0.15)', color: '#8b5cf6', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, border: '1px solid rgba(124, 58, 237, 0.3)' }}>
+                  No Job Card Needed
+                </span>
+              </div>
+
+              <form onSubmit={handleCreateSaSubmit}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.2rem' }}>
+                  <div>
+                    <label style={labelStyle}>Date *</label>
+                    <input
+                      type="date"
+                      value={saForm.date}
+                      onChange={e => setSaForm(prev => ({ ...prev, date: e.target.value }))}
+                      style={inputStyle}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Party / Vendor Name *</label>
+                    <input
+                      type="text"
+                      list="saPartyOptions"
+                      placeholder="Type or select Party / Vendor..."
+                      value={saForm.partyName}
+                      onChange={e => setSaForm(prev => ({ ...prev, partyName: e.target.value }))}
+                      style={inputStyle}
+                      required
+                    />
+                    <datalist id="saPartyOptions">
+                      {Array.from(new Set([...partiesList, ...vendorsList.map(v => v.vendorName || v)])).map((p, idx) => (
+                        <option key={idx} value={p} />
+                      ))}
+                    </datalist>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Adjustment Type</label>
+                    <select
+                      value={saForm.adjustmentType}
+                      onChange={e => setSaForm(prev => ({ ...prev, adjustmentType: e.target.value }))}
+                      style={inputStyle}
+                    >
+                      <option value="RETURN_REJECTED">Fabric Return / Rejected Outward (Deducts Stock)</option>
+                      <option value="STOCK_DEDUCTION">Stock Deduction / Loss (Deducts Stock)</option>
+                      <option value="STOCK_ADDITION">Stock Addition / Adjustment (Adds Stock)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Fabric Quality *</label>
+                    <select
+                      value={saForm.fabricQuality}
+                      onChange={handleSaFabricChange}
+                      style={inputStyle}
+                      required
+                    >
+                      <option value="">Select Fabric Quality…</option>
+                      {fabricsList.map((f, idx) => (
+                        <option key={idx} value={f}>{f}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Panna (Width)</label>
+                    <select
+                      value={saForm.panna}
+                      onChange={e => setSaForm(prev => ({ ...prev, panna: e.target.value }))}
+                      style={inputStyle}
+                    >
+                      <option value="">Select Panna…</option>
+                      {widthsList.map((w, idx) => (
+                        <option key={idx} value={w}>{w}"</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Lot No *</label>
+                    <select
+                      value={saForm.lotNo}
+                      onChange={e => setSaForm(prev => ({ ...prev, lotNo: e.target.value }))}
+                      style={inputStyle}
+                    >
+                      <option value="">Select Lot No…</option>
+                      {saAvailableLots.map((l, idx) => (
+                        <option key={idx} value={l.lotNo}>
+                          Lot #{l.lotNo} ({l.currentStock} mtr avail)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Reason / Remark</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Defective Fabric Return, Quality Rejection..."
+                      value={saForm.reason}
+                      onChange={e => setSaForm(prev => ({ ...prev, reason: e.target.value }))}
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Additional Notes</label>
+                    <input
+                      type="text"
+                      placeholder="Additional notes or remarks..."
+                      value={saForm.notes}
+                      onChange={e => setSaForm(prev => ({ ...prev, notes: e.target.value }))}
+                      style={inputStyle}
+                    />
+                  </div>
+                </div>
+
+                {/* TP / Rolls Entry Grid */}
+                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-light)', marginBottom: '1.2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                      TP / Roll Details ({saForm.tpDetails.length} Rolls)
+                    </span>
+                    <button type="button" onClick={addSaTpRow} className="btn-secondary" style={{ padding: '0.2rem 0.6rem', fontSize: '0.78rem' }}>
+                      <Plus size={14} /> Add Roll Row
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {saForm.tpDetails.map((tp, idx) => (
+                      <div key={idx} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr 40px', gap: '0.75rem', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>TP-{tp.tpNo}</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Return Meters (mtr)..."
+                          value={tp.tpMeter}
+                          onChange={e => updateSaTpRow(idx, 'tpMeter', e.target.value)}
+                          style={inputStyle}
+                          required
+                        />
+                        <input
+                          type="text"
+                          placeholder="Lot No (optional)..."
+                          value={tp.lotNo || saForm.lotNo}
+                          onChange={e => updateSaTpRow(idx, 'lotNo', e.target.value)}
+                          style={inputStyle}
+                        />
+                        {saForm.tpDetails.length > 1 && (
+                          <button type="button" onClick={() => removeSaTpRow(idx)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '0.3rem' }}>
+                            <X size={16} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                      Total Rolls: <strong>{saForm.tpDetails.length}</strong>
+                    </span>
+                    <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>
+                      Total Return Meters: {saForm.tpDetails.reduce((sum, r) => sum + (parseFloat(r.tpMeter) || 0), 0).toFixed(2)} mtr
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                  <button type="button" onClick={() => setIsSaFormOpen(false)} className="btn-secondary">
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-primary" disabled={loading} style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)' }}>
+                    {loading ? 'Saving...' : 'Save & Issue SA Voucher'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            /* Register Table Mode */
+            <div className="table-responsive" style={{ marginTop: '1rem' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Voucher #</th>
+                    <th>Date</th>
+                    <th>Party / Vendor</th>
+                    <th>Fabric Quality</th>
+                    <th>Lot No(s)</th>
+                    <th>Type</th>
+                    <th style={{ textAlign: 'center' }}>TP / Rolls</th>
+                    <th style={{ textAlign: 'right' }}>Total Return (mtr)</th>
+                    <th>Reason</th>
+                    <th style={{ textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const filteredSa = stockAdjustments.filter(sa => {
+                      if (saDateStart && new Date(sa.date) < new Date(saDateStart)) return false;
+                      if (saDateEnd && new Date(sa.date) > new Date(saDateEnd + 'T23:59:59')) return false;
+                      if (!saSearch) return true;
+                      const s = saSearch.toLowerCase();
+                      return (sa.saNo || '').toLowerCase().includes(s) ||
+                             (sa.partyName || '').toLowerCase().includes(s) ||
+                             (sa.fabricQuality || '').toLowerCase().includes(s) ||
+                             (sa.lotNo || '').toLowerCase().includes(s) ||
+                             (sa.reason || '').toLowerCase().includes(s);
+                    });
+
+                    if (filteredSa.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="10" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                            No stock adjustment / fabric return records found. Click <strong>"New Fabric Return (SA)"</strong> to create one.
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filteredSa.map((sa, idx) => (
+                      <tr key={idx}>
+                        <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{sa.saNo}</td>
+                        <td style={{ color: 'var(--text-muted)' }}>
+                          {sa.date ? new Date(sa.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                        </td>
+                        <td style={{ fontWeight: 600 }}>{sa.partyName || '—'}</td>
+                        <td>{sa.fabricQuality}{sa.panna ? ` (${sa.panna}")` : ''}</td>
+                        <td>{sa.lotNo ? `#${sa.lotNo}` : '—'}</td>
+                        <td>
+                          <span style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            background: sa.adjustmentType === 'STOCK_ADDITION' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                            color: sa.adjustmentType === 'STOCK_ADDITION' ? '#10b981' : '#f87171',
+                            border: `1px solid ${sa.adjustmentType === 'STOCK_ADDITION' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                          }}>
+                            {sa.adjustmentType === 'RETURN_REJECTED' ? 'Return / Rejected' : sa.adjustmentType}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{sa.totalTp || (sa.tpDetails ? sa.tpDetails.length : 1)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 800, color: sa.adjustmentType === 'STOCK_ADDITION' ? 'var(--success)' : 'var(--danger)' }}>
+                          {sa.adjustmentType === 'STOCK_ADDITION' ? '+' : '-'}{Number(sa.totalMtr || 0).toFixed(2)} mtr
+                        </td>
+                        <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{sa.reason || '—'}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                            <button
+                              onClick={() => handleDownloadSaPdf(sa._id, sa.saNo)}
+                              className="btn-icon"
+                              title="Download Printable SA Voucher PDF"
+                              style={{ color: '#8b5cf6' }}
+                            >
+                              <FileDown size={16} />
+                            </button>
+                            <button
+                              onClick={() => setSaDeleteTarget(sa)}
+                              className="btn-icon"
+                              title="Delete SA Voucher & Restore Stock"
+                              style={{ color: 'var(--danger)' }}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Delete SA Confirmation Modal */}
+          {saDeleteTarget && (
+            <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
+              <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '1.5rem', maxWidth: '420px', width: '90%' }}>
+                <h3 style={{ margin: 0, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <AlertCircle size={20} /> Delete Stock Adjustment {saDeleteTarget.saNo}?
+                </h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0.75rem 0 1.25rem' }}>
+                  Deleting this Stock Adjustment voucher will revert all corresponding lot outward/inward dispatches and restore lot stock balances.
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                  <button className="btn-secondary" onClick={() => setSaDeleteTarget(null)}>Cancel</button>
+                  <button className="btn-primary" style={{ background: 'var(--danger)' }} onClick={handleDeleteSa}>Confirm Delete</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Challan Tab ── */}
       {activeTab === 'challan' && (
