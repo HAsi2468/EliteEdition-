@@ -70,6 +70,15 @@ const createOutward = async (req, res) => {
     const normFabric = normalizeFabric(fabricQuality);
     const normP = normalizePanna(panna, normFabric);
 
+    let finalQty = parseFloat(qty);
+    let finalNotes = notes || '';
+    if (normFabric.includes('CREPE') || normFabric.includes('CRAPE')) {
+      finalQty = Number((finalQty * 1.02).toFixed(2));
+      if (!finalNotes.includes('+2% French Crepe Applied')) {
+        finalNotes = finalNotes ? `${finalNotes} (+2% French Crepe Applied)` : '(+2% French Crepe Applied)';
+      }
+    }
+
     const transaction = new FabricTransaction({
       type: 'OUTWARD',
       jobNo,
@@ -78,9 +87,9 @@ const createOutward = async (req, res) => {
       fabricQuality: normFabric,
       panna: normP,
       lotNo: lotNo ? Number(lotNo) : undefined,
-      qty,
+      qty: finalQty,
       date: date ? new Date(date) : new Date(),
-      notes
+      notes: finalNotes
     });
 
     await transaction.save();

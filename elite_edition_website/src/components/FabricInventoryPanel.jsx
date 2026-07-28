@@ -2773,6 +2773,11 @@ export default function FabricInventoryPanel() {
               <div>
                 <label style={labelStyle}>Quantity (mtr) *</label>
                 <input type="number" step="0.01" required min="0.1" value={outwardForm.qty} onChange={e => setOutwardForm({ ...outwardForm, qty: e.target.value })} style={inputStyle} />
+                {(outwardForm.fabricQuality || '').toUpperCase().includes('CREPE') && (
+                  <span style={{ fontSize: '0.75rem', color: '#8b5cf6', marginTop: '0.3rem', display: 'block', fontWeight: 600 }}>
+                    💡 +2% Auto-Added for French Crepe {outwardForm.qty && !isNaN(outwardForm.qty) ? `(${outwardForm.qty} mtr → ${(parseFloat(outwardForm.qty) * 1.02).toFixed(2)} mtr outward)` : '(e.g. 100 mtr → 102.00 mtr)'}
+                  </span>
+                )}
               </div>
 
               <div>
