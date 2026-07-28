@@ -1487,6 +1487,12 @@ export default function FabricInventoryPanel() {
                                         <td style={{ padding: '0.35rem' }}>{outTx.jobNo || outTx.challanNo || '—'}</td>
                                         <td style={{ padding: '0.35rem', textAlign: 'right', fontWeight: 700, color: 'var(--danger)' }}>
                                           -{Number(outTx.qty || 0).toFixed(2)}
+                                          {(outTx.notes || '').includes('+2% French Crepe Applied') && (
+                                            <span style={{ fontSize: '0.65rem', background: 'rgba(124, 58, 237, 0.15)', color: '#8b5cf6', padding: '1px 4px', borderRadius: '4px', marginLeft: '4px', border: '1px solid rgba(124, 58, 237, 0.3)' }}>+2%</span>
+                                          )}
+                                          {(outTx.notes || '').includes('Remnant Stock Auto-Clear') && (
+                                            <span style={{ fontSize: '0.65rem', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '1px 4px', borderRadius: '4px', marginLeft: '4px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>Cleared (≤5m)</span>
+                                          )}
                                         </td>
                                       </tr>
                                     ))}
@@ -1852,7 +1858,15 @@ export default function FabricInventoryPanel() {
                       <td>{t.fabricQuality}</td>
                       <td>{t.lotNo ? `#${t.lotNo}` : '-'}</td>
                       <td>{t.panna || '-'}</td>
-                      <td style={{ color: 'var(--danger)', fontWeight: 600 }}>-{Number(t.qty || 0).toFixed(2)}</td>
+                      <td style={{ color: 'var(--danger)', fontWeight: 600 }}>
+                        -{Number(t.qty || 0).toFixed(2)}
+                        {(t.notes || '').includes('+2% French Crepe Applied') && (
+                          <span style={{ fontSize: '0.68rem', background: 'rgba(124, 58, 237, 0.15)', color: '#8b5cf6', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(124, 58, 237, 0.3)', display: 'inline-block' }}>+2%</span>
+                        )}
+                        {(t.notes || '').includes('Remnant Stock Auto-Clear') && (
+                          <span style={{ fontSize: '0.68rem', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px', border: '1px solid rgba(239, 68, 68, 0.3)', display: 'inline-block' }}>Cleared (≤5m)</span>
+                        )}
+                      </td>
                       <td>
                         {(() => {
                           const notes = t.notes || '';
