@@ -1012,8 +1012,8 @@ export default function FabricInventoryPanel() {
 
   const lotRecords = Array.from(lotMap.values()).map(l => {
     const rawStock = l.totalInward - l.totalOutward;
-    // Real-Time Safeguard: If remaining lot balance <= 5.0 meters, display as 0 (Exhausted)!
-    const netStock = rawStock <= 5.0 ? 0 : rawStock;
+    // Real-Time Safeguard: Only positive stock between 0 and 5m (0 < rawStock <= 5) converts to 0! Negative stock (< 0) is preserved as true deficit.
+    const netStock = (rawStock > 0 && rawStock <= 5.0) ? 0 : rawStock;
     return {
       ...l,
       currentStock: netStock

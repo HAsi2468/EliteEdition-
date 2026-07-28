@@ -1036,7 +1036,7 @@ const downloadFabricLotWisePdf = async (req, res) => {
           _id: 0
         }
       },
-      { $match: { lotNo: { $ne: null }, currentStock: { $gt: 0 } } },
+      { $match: { lotNo: { $ne: null }, currentStock: { $ne: 0 } } },
       { $sort: { lotNo: 1 } }
     ];
 
@@ -1229,7 +1229,7 @@ const getFabricLotWiseReportData = async (req, res) => {
           _id: 0
         }
       },
-      { $match: { lotNo: { $ne: null }, currentStock: { $gt: 0 } } },
+      { $match: { lotNo: { $ne: null }, currentStock: { $ne: 0 } } },
       { $sort: { lotNo: 1 } }
     ];
     const lots = await FabricTransaction.aggregate(pipeline);
@@ -1310,7 +1310,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
             _id: 0
           }
         },
-        { $match: { lotNo: { $ne: null }, currentStock: { $gt: 0 } } },
+        { $match: { lotNo: { $ne: null }, currentStock: { $ne: 0 } } },
         { $sort: { lotNo: 1 } }
       ];
       lotwiseData = await FabricTransaction.aggregate(pipeline);
