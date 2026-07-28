@@ -41,6 +41,13 @@ router.get('/stock-panna', fabricController.getStockByPanna);
 // Get fabric requirement from in-progress job cards
 router.get('/requirement', fabricController.getFabricRequirement);
 
+// Stock Adjustment / Return routes
+router.post('/stock-adjustment', fabricController.createStockAdjustment);
+router.get('/stock-adjustment', fabricController.getStockAdjustments);
+router.get('/stock-adjustment/:id', fabricController.getStockAdjustmentById);
+router.delete('/stock-adjustment/:id', fabricController.deleteStockAdjustment);
+router.get('/stock-adjustment/:id/pdf', fabricController.downloadStockAdjustmentPdf);
+
 // Update a transaction by ID
 router.put('/:id', fabricController.updateTransaction);
 

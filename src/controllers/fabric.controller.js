@@ -1,4 +1,5 @@
 const FabricTransaction = require('../db/models/fabricTransaction.model');
+const FabricStockAdjustment = require('../db/models/fabricStockAdjustment.model');
 const PDFDocument = require('pdfkit');
 
 // Normalize functions to merge matching fabric and panna widths (e.g. 58" and 58)
@@ -1691,6 +1692,283 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
   }
 };
 
+const createStockAdjustment = async (req, res) => {
+  try {
+    const {
+      date,
+      partyName,
+      adjustmentType = 'RETURN_REJECTED',
+      fabricQuality,
+      panna,
+      lotNo,
+      tpDetails = [],
+      totalMtr = 0,
+      totalTp = 0,
+      reason = 'Fabric Return / Rejection',
+      notes = '',
+      createdBy = ''
+    } = req.body;
+
+    if (!fabricQuality || (!totalMtr && tpDetails.length === 0)) {
+      return res.status(400).json({ success: false, error: 'Fabric Quality and return meters/TP details are required.' });
+    }
+
+    const normFabric = normalizeFabric(fabricQuality);
+    const normP = normalizePanna(panna, normFabric);
+
+    const saDoc = new FabricStockAdjustment({
+      date: date ? new Date(date) : new Date(),
+      partyName: partyName || '',
+      adjustmentType,
+      fabricQuality: normFabric,
+      panna: normP,
+      lotNo: lotNo || '',
+      tpDetails: tpDetails || [],
+      totalMtr: Number(totalMtr) || 0,
+      totalTp: Number(totalTp) || tpDetails.length,
+      reason: reason || 'Fabric Return / Rejection',
+      notes: notes || '',
+      createdBy: createdBy || ''
+    });
+
+    await saDoc.save();
+
+    const isReturnOrDeduction = adjustmentType === 'RETURN_REJECTED' || adjustmentType === 'STOCK_DEDUCTION';
+    const txType = isReturnOrDeduction ? 'OUTWARD' : 'INWARD';
+
+    const createdTxIds = [];
+    const lotMeterMap = {};
+
+    if (tpDetails.length > 0) {
+      tpDetails.forEach(tp => {
+        const lKey = (tp.lotNo || lotNo || '').trim();
+        const mtr = parseFloat(tp.tpMeter) || 0;
+        if (lKey && mtr > 0) {
+          lotMeterMap[lKey] = (lotMeterMap[lKey] || 0) + mtr;
+        }
+      });
+    }
+
+    if (Object.keys(lotMeterMap).length === 0) {
+      const lKey = (lotNo || '').trim();
+      lotMeterMap[lKey || 'UNASSIGNED'] = Number(totalMtr);
+    }
+
+    for (const [lNo, mtr] of Object.entries(lotMeterMap)) {
+      let finalQty = Number(mtr.toFixed(2));
+      let finalNotes = `Stock Adjustment ${saDoc.saNo} (${reason})`;
+      if (notes) finalNotes += ` - ${notes}`;
+
+      if (txType === 'OUTWARD' && (normFabric.includes('CREPE') || normFabric.includes('CRAPE') || normFabric.includes('FRENCH'))) {
+        finalQty = Number((finalQty * 1.02).toFixed(2));
+        finalNotes += ' (+2% French Crepe Applied)';
+      }
+
+      const tx = new FabricTransaction({
+        type: txType,
+        jobNo: saDoc.saNo,
+        partyName: partyName || 'VEND_RETURN',
+        fabricQuality: normFabric,
+        panna: normP,
+        lotNo: lNo !== 'UNASSIGNED' && !isNaN(parseInt(lNo, 10)) ? parseInt(lNo, 10) : undefined,
+        qty: finalQty,
+        date: saDoc.date,
+        notes: finalNotes
+      });
+
+      await tx.save();
+      createdTxIds.push(tx._id);
+
+      if (tx.lotNo) {
+        const lotAgg = await FabricTransaction.aggregate([
+          { $match: { lotNo: tx.lotNo } },
+          {
+            $group: {
+              _id: '$lotNo',
+              fabricQuality: { $first: '$fabricQuality' },
+              panna: { $first: '$panna' },
+              totalIn: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+              totalOut: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } }
+            }
+          }
+        ]);
+        if (lotAgg.length > 0) {
+          const rem = lotAgg[0].totalIn - lotAgg[0].totalOut;
+          if (rem > 0 && rem <= 5.0) {
+            const scrapTx = new FabricTransaction({
+              type: 'OUTWARD',
+              fabricQuality: lotAgg[0].fabricQuality,
+              panna: lotAgg[0].panna,
+              lotNo: tx.lotNo,
+              qty: Number(rem.toFixed(2)),
+              date: new Date(),
+              notes: 'Remnant Stock Auto-Clear (0 < stock <= 5m converted to 0)'
+            });
+            await scrapTx.save();
+          }
+        }
+      }
+    }
+
+    saDoc.fabricTransactionIds = createdTxIds;
+    await saDoc.save();
+
+    res.status(201).json({ success: true, data: saDoc });
+  } catch (err) {
+    console.error('Error creating fabric stock adjustment:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const getStockAdjustments = async (req, res) => {
+  try {
+    const adjustments = await FabricStockAdjustment.find().sort({ saSeq: -1 }).lean();
+    res.status(200).json({ success: true, data: adjustments });
+  } catch (err) {
+    console.error('Error fetching stock adjustments:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const getStockAdjustmentById = async (req, res) => {
+  try {
+    const saDoc = await FabricStockAdjustment.findById(req.params.id).lean();
+    if (!saDoc) return res.status(404).json({ success: false, error: 'Stock adjustment record not found.' });
+    res.status(200).json({ success: true, data: saDoc });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const deleteStockAdjustment = async (req, res) => {
+  try {
+    const saDoc = await FabricStockAdjustment.findById(req.params.id);
+    if (!saDoc) return res.status(404).json({ success: false, error: 'Stock adjustment record not found.' });
+
+    if (saDoc.fabricTransactionIds && saDoc.fabricTransactionIds.length > 0) {
+      await FabricTransaction.deleteMany({ _id: { $in: saDoc.fabricTransactionIds } });
+    }
+
+    await FabricStockAdjustment.findByIdAndDelete(req.params.id);
+    res.status(200).json({ success: true, message: `Stock Adjustment ${saDoc.saNo} deleted and stock restored successfully.` });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const downloadStockAdjustmentPdf = async (req, res) => {
+  try {
+    const saDoc = await FabricStockAdjustment.findById(req.params.id).lean();
+    if (!saDoc) return res.status(404).json({ error: 'Stock adjustment record not found' });
+
+    const path = require('path');
+    const fs = require('fs');
+    const logoPath = path.join(__dirname, 'Logo.png');
+
+    const doc = new PDFDocument({ size: 'A4', margin: 30, bufferPages: true });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="Stock_Adjustment_${saDoc.saNo}.pdf"`);
+    doc.pipe(res);
+
+    const ML = 30;
+    const contentWidth = 535;
+
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, ML, 20, { width: 140 });
+    }
+
+    doc.fillColor('#000000').fontSize(16).font('Helvetica-Bold')
+      .text('FABRIC STOCK RETURN / ADJUSTMENT VOUCHER', ML, 22, { width: contentWidth, align: 'right' });
+    
+    doc.fillColor('#6b21a8').fontSize(12).font('Helvetica-Bold')
+      .text(`VOUCHER #: ${saDoc.saNo}`, ML, 42, { width: contentWidth, align: 'right' });
+
+    const dStr = saDoc.date ? new Date(saDoc.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+    doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
+      .text(`Date: ${dStr}`, ML, 58, { width: contentWidth, align: 'right' });
+
+    doc.moveTo(ML, 74).lineTo(ML + contentWidth, 74).strokeColor('#c084fc').lineWidth(1.5).stroke();
+
+    let y = 86;
+
+    doc.rect(ML, y, contentWidth, 54).fill('#faf5ff').stroke('#e9d5ff');
+    doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold');
+    
+    doc.text('PARTY / VENDOR:', ML + 10, y + 8);
+    doc.font('Helvetica').text(saDoc.partyName || '—', ML + 110, y + 8);
+
+    doc.font('Helvetica-Bold').text('ADJUSTMENT TYPE:', ML + 300, y + 8);
+    doc.font('Helvetica').text(saDoc.adjustmentType === 'RETURN_REJECTED' ? 'Fabric Return / Rejected Outward' : saDoc.adjustmentType, ML + 410, y + 8);
+
+    doc.font('Helvetica-Bold').text('FABRIC & PANNA:', ML + 10, y + 24);
+    doc.font('Helvetica').text(`${saDoc.fabricQuality || '—'}${saDoc.panna ? ' (' + saDoc.panna + '")' : ''}`, ML + 110, y + 24);
+
+    doc.font('Helvetica-Bold').text('LOT NUMBER(S):', ML + 300, y + 24);
+    doc.font('Helvetica').text(saDoc.lotNo ? `#${saDoc.lotNo}` : '—', ML + 410, y + 24);
+
+    doc.font('Helvetica-Bold').text('REASON / REMARK:', ML + 10, y + 40);
+    doc.font('Helvetica').text(saDoc.reason || 'Fabric Return / Rejection', ML + 110, y + 40);
+
+    y += 66;
+
+    doc.rect(ML, y, contentWidth, 20).fill('#ede9fe');
+    doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold');
+    doc.text('SR #', ML + 10, y + 6);
+    doc.text('TP / ROLL NO', ML + 70, y + 6);
+    doc.text('LOT NO', ML + 220, y + 6);
+    doc.text('METERS (MTR)', ML + 380, y + 6, { width: 135, align: 'right' });
+
+    y += 20;
+
+    const details = saDoc.tpDetails && saDoc.tpDetails.length > 0 ? saDoc.tpDetails : [{ tpNo: 1, tpMeter: saDoc.totalMtr, lotNo: saDoc.lotNo }];
+
+    details.forEach((tp, i) => {
+      if (y > 740) {
+        doc.addPage();
+        y = 30;
+      }
+      doc.rect(ML, y, contentWidth, 18).fill(i % 2 === 0 ? '#ffffff' : '#fcfaff');
+      doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, y, contentWidth, 18).stroke();
+
+      doc.fillColor('#000000').fontSize(8.5).font('Helvetica');
+      doc.text(String(i + 1), ML + 10, y + 5);
+      doc.text(`TP-${tp.tpNo}`, ML + 70, y + 5);
+      doc.text(tp.lotNo ? `#${tp.lotNo}` : (saDoc.lotNo ? `#${saDoc.lotNo}` : '—'), ML + 220, y + 5);
+      doc.font('Helvetica-Bold').text(`${parseFloat(tp.tpMeter || 0).toFixed(2)} mtr`, ML + 380, y + 5, { width: 135, align: 'right' });
+      y += 18;
+    });
+
+    doc.rect(ML, y, contentWidth, 24).fill('#f3e8ff').stroke('#c084fc');
+    doc.fillColor('#000000').fontSize(9.5).font('Helvetica-Bold');
+    doc.text(`TOTAL ROLLS / TP: ${saDoc.totalTp || details.length}`, ML + 10, y + 7);
+    doc.fillColor('#7e22ce').fontSize(11).font('Helvetica-Bold')
+      .text(`TOTAL METERS RETURNED: ${parseFloat(saDoc.totalMtr || 0).toFixed(2)} MTR`, ML + 200, y + 6, { width: 325, align: 'right' });
+
+    y += 45;
+
+    doc.fillColor('#475569').fontSize(8.5).font('Helvetica-Bold');
+    doc.text('Prepared By', ML + 20, y);
+    doc.text('Store Receiver / Supplier Sign', ML + 180, y);
+    doc.text('Authorized Signatory', ML + 380, y, { width: 135, align: 'right' });
+
+    doc.moveTo(ML + 10, y + 25).lineTo(ML + 100, y + 25).strokeColor('#cbd5e1').lineWidth(1).stroke();
+    doc.moveTo(ML + 175, y + 25).lineTo(ML + 310, y + 25).strokeColor('#cbd5e1').lineWidth(1).stroke();
+    doc.moveTo(ML + 380, y + 25).lineTo(ML + contentWidth, y + 25).strokeColor('#cbd5e1').lineWidth(1).stroke();
+
+    const pages = doc.bufferedPageRange();
+    for (let i = 0; i < pages.count; i++) {
+      doc.switchToPage(i);
+      doc.fillColor('#6b21a8').fontSize(8).font('Helvetica')
+        .text(`Page ${i + 1} of ${pages.count} — Elite Digital Prints Fabric Stock Adjustment (${saDoc.saNo})`, ML, 795, { width: contentWidth, align: 'center', lineBreak: false });
+    }
+
+    doc.end();
+  } catch (err) {
+    console.error('Error generating Stock Adjustment PDF voucher:', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
 module.exports = {
   createInward,
   createOutward,
@@ -1711,4 +1989,9 @@ module.exports = {
   getFabricInwardReportData,
   getFabricOutwardReportData,
   getFabricLotWiseReportData,
+  createStockAdjustment,
+  getStockAdjustments,
+  getStockAdjustmentById,
+  deleteStockAdjustment,
+  downloadStockAdjustmentPdf,
 };
