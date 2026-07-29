@@ -8,14 +8,14 @@ const axios = require('axios');
 // ─── Google Drive URL converter ───────────────────────────────────────────────
 function convertDriveUrl(link) {
   if (!link || !link.trim()) return '';
+  if (link.includes('lh3.googleusercontent.com/d/')) return link;
+  const fileMatch = link.match(/\/d\/([-\w]{20,})/) || link.match(/[?&]id=([-\w]{20,})/);
+  if (fileMatch) {
+    return `https://lh3.googleusercontent.com/d/${fileMatch[1]}=s1000`;
+  }
   if (link.includes('drive.google.com') || link.includes('googleusercontent') || link.includes('lh3.google')) {
-    if (link.includes('uc?export') || link.includes('lh3.google') || link.includes('googleusercontent')) return link;
-    const fileMatch = link.match(/\/d\/([-\w]{20,})/);
-    if (fileMatch) return `https://drive.google.com/uc?export=view&id=${fileMatch[1]}`;
-    const openMatch = link.match(/[?&]id=([-\w]{20,})/);
-    if (openMatch) return `https://drive.google.com/uc?export=view&id=${openMatch[1]}`;
     const idMatch = link.match(/([-\w]{25,})/);
-    return idMatch ? `https://drive.google.com/uc?export=view&id=${idMatch[1]}` : link;
+    return idMatch ? `https://lh3.googleusercontent.com/d/${idMatch[1]}=s1000` : link;
   }
   return link;
 }
@@ -275,16 +275,45 @@ const downloadJobCardPdf = async (req, res) => {
     const jobCard = await db.JobCard.findById(req.params.id).lean();
     if (!jobCard) return res.status(404).json({ error: 'Job Card not found' });
 
-    // Fall back to Design catalog image if job card has no imageUrl1
+    // Fall back to Design catalog image if job card has no imageUrl1 / imageUrl2
     let imageUrl1 = jobCard.imageUrl1 || '';
     let imageUrl2 = jobCard.imageUrl2 || '';
-    if (!imageUrl1) {
-      const key = jobCard.designName || jobCard.designNo;
-      if (key) {
-        const design = await db.Design.findOne({ designName: key }).lean();
-        if (design) { imageUrl1 = design.imageUrl || ''; imageUrl2 = design.imageUrl2 || ''; }
+
+    function extractNames(str) {
+      if (!str || typeof str !== 'string') return [];
+      return str.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
+    }
+
+    const keyStr = jobCard.designName || jobCard.designNo || '';
+    const names = extractNames(keyStr);
+
+    if (!imageUrl1 && names[0]) {
+      const design1 = await db.Design.findOne({
+        $or: [
+          { designName: { $regex: `^${names[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
+          { designNo: { $regex: `^${names[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
+        ]
+      }).lean();
+      if (design1) {
+        imageUrl1 = design1.imageUrl || design1.imageUrl2 || '';
+        if (!imageUrl2 && design1.imageUrl2 && names.length === 1) {
+          imageUrl2 = design1.imageUrl2;
+        }
       }
     }
+
+    if (!imageUrl2 && names[1]) {
+      const design2 = await db.Design.findOne({
+        $or: [
+          { designName: { $regex: `^${names[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
+          { designNo: { $regex: `^${names[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
+        ]
+      }).lean();
+      if (design2) {
+        imageUrl2 = design2.imageUrl || design2.imageUrl2 || '';
+      }
+    }
+
     const [imgBuf1, imgBuf2] = await Promise.all([getImageBuffer(imageUrl1), getImageBuffer(imageUrl2)]);
 
     // PDF document

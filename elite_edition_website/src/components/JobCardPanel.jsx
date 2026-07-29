@@ -398,7 +398,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
           <td class="label">DATE :</td><td class="val">${card.date || ''}</td>
         </tr>
         <tr>
-          <td class="label">D. NO. :</td><td class="val">${card.designNo || ''}</td>
+          <td class="label">D. NO. :</td><td class="val">${card.designNo || card.designName || ''}</td>
           <td class="label">PANNA :</td><td class="val">${card.panna || ''}</td>
           <td class="label">PASS :</td><td class="val">${card.pass || ''}</td>
         </tr>
@@ -534,10 +534,41 @@ function JobCardPrintView({ card, onClose, onShare }) {
           <td class="tp-label"></td><td class="tp-val"></td>
         </tr>
       </table>
-    </div></body></html>`);
+    </div>
+    <script>
+      window.onload = function() {
+        var imgs = document.getElementsByTagName('img');
+        var loaded = 0;
+        var total = imgs.length;
+        function triggerPrint() {
+          setTimeout(function() {
+            window.focus();
+            window.print();
+          }, 300);
+        }
+        if (total === 0) {
+          triggerPrint();
+          return;
+        }
+        for (var i = 0; i < total; i++) {
+          if (imgs[i].complete) {
+            loaded++;
+            if (loaded >= total) triggerPrint();
+          } else {
+            imgs[i].onload = function() {
+              loaded++;
+              if (loaded >= total) triggerPrint();
+            };
+            imgs[i].onerror = function() {
+              loaded++;
+              if (loaded >= total) triggerPrint();
+            };
+          }
+        }
+      };
+    </script>
+    </body></html>`);
     win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); }, 600);
   };
 
   return (
