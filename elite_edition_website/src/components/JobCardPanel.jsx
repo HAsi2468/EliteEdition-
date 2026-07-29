@@ -13,6 +13,7 @@ import ReportsCenter from './ReportsCenter';
 import FabricInventoryPanel from './FabricInventoryPanel';
 import RawMaterialsPanel from './RawMaterialsPanel';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
+import { triggerPushNotification } from './NotificationToast';
 
 // ─── EXP.TIME calculation (mirrors Apps Script exactly) ─────────────────────
 const SPEED_GRANDO = {
@@ -50,14 +51,20 @@ function convertDriveUrl(link) {
   if (!link || !link.trim()) return '';
   if (link.startsWith('data:')) return link;
   
-  // If it's a local relative path
+  // If it's a local relative path — always resolve to absolute using window.location.origin
+  // This is critical for the print popup window which opens as a blank page
   if (link.startsWith('/')) {
-    const baseUrl = getBaseUrl();
-    if (baseUrl && baseUrl.startsWith('http')) {
-      try {
-        const url = new URL(baseUrl);
-        return `${url.origin}${link}`;
-      } catch (e) {}
+    try {
+      return `${window.location.origin}${link}`;
+    } catch (e) {
+      // Fallback to getBaseUrl origin
+      const baseUrl = getBaseUrl();
+      if (baseUrl && baseUrl.startsWith('http')) {
+        try {
+          const url = new URL(baseUrl);
+          return `${url.origin}${link}`;
+        } catch (e2) {}
+      }
     }
     return link;
   }
@@ -81,6 +88,15 @@ function convertDriveUrl(link) {
   
   // Fallback
   return link;
+}
+
+// ─── Extract multiple design names helper ────────────────────────────────────
+function extractDesignNames(str) {
+  if (!str || typeof str !== 'string') return [];
+  return str
+    .split(/[,&/+]|\band\b/i)
+    .map(s => s.trim())
+    .filter(Boolean);
 }
 
 // ─── Blank form ──────────────────────────────────────────────────────────────
@@ -123,18 +139,46 @@ function JobCardPrintView({ card, onClose, onShare }) {
 
   useEffect(() => {
     const resolveImages = async () => {
-      if (card.imageUrl1) return;
-      const key = card.designName || card.designNo;
-      if (!key) return;
+      let img1 = card.imageUrl1 || '';
+      let img2 = card.imageUrl2 || '';
+
+      if (img1 && img2) {
+        setResolvedImages({ imageUrl1: img1, imageUrl2: img2 });
+        return;
+      }
+
+      const keyStr = card.designName || card.designNo || '';
+      const names = extractDesignNames(keyStr);
+
+      if (names.length === 0 && !img1 && !img2) return;
+
       try {
-        const res = await api.getDesigns({ search: key, limit: 5 });
-        if (res && res.data && res.data.length > 0) {
-          const matched = res.data.find(d => d.designName === key || d.designNo === key) || res.data[0];
-          setResolvedImages({
-            imageUrl1: matched.imageUrl || '',
-            imageUrl2: matched.imageUrl2 || '',
-          });
+        if (!img1 && names[0]) {
+          const res1 = await api.getDesigns({ search: names[0], limit: 5 });
+          if (res1 && res1.data && res1.data.length > 0) {
+            const matched1 = res1.data.find(d =>
+              d.designName?.toLowerCase() === names[0].toLowerCase() ||
+              String(d.designNo || '').toLowerCase() === names[0].toLowerCase()
+            ) || res1.data[0];
+            img1 = matched1.imageUrl || matched1.imageUrl2 || '';
+            if (!img2 && matched1.imageUrl2 && names.length === 1) {
+              img2 = matched1.imageUrl2;
+            }
+          }
         }
+
+        if (!img2 && names[1]) {
+          const res2 = await api.getDesigns({ search: names[1], limit: 5 });
+          if (res2 && res2.data && res2.data.length > 0) {
+            const matched2 = res2.data.find(d =>
+              d.designName?.toLowerCase() === names[1].toLowerCase() ||
+              String(d.designNo || '').toLowerCase() === names[1].toLowerCase()
+            ) || res2.data[0];
+            img2 = matched2.imageUrl || matched2.imageUrl2 || '';
+          }
+        }
+
+        setResolvedImages({ imageUrl1: img1, imageUrl2: img2 });
       } catch (err) {
         console.error('Failed to resolve design images for print:', err);
       }
@@ -335,32 +379,14 @@ function JobCardPrintView({ card, onClose, onShare }) {
       <!-- HEADER -->
       <div class="header">
         <div class="logo-box">
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <svg width="18" height="26" viewBox="0 0 22 30" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;">
-              <rect width="22" height="30" rx="10" fill="black"/>
-              <path d="M11 6C7.5 6 5 8.5 5 12C5 15.5 7.5 18 11 18C13 18 15 16.5 15 15C15 13.5 13.5 13 12 13C10.5 13 9.5 14 9.5 15C9.5 16 10.5 16.5 11 16.5C11.5 16.5 12 16 12 15.5H13.5C13.5 17 12 18 10 18C7.5 18 6.5 15.5 6.5 13C6.5 10.5 8 7.5 11 7.5C14 7.5 15.5 10.5 15.5 13C15.5 14.5 14.5 15.5 13.5 16L14.5 17.5C16 16.5 17 15 17 13C17 8.5 14.5 6 11 6Z" fill="white"/>
-            </svg>
-            <div style="text-align: left; line-height: 1.1;">
-              <div style="font-size: 15.5pt; font-weight: 900; letter-spacing: -0.5px; color: #000;">ELITE</div>
-              <div style="font-size: 6.5pt; font-weight: 800; letter-spacing: 2px; color: #000; margin-top: -1px;">EDITION</div>
-            </div>
-          </div>
+          <img src="${window.location.origin}/DigitalLogo.png" alt="Elite Digital Prints" style="height: 36px; object-fit: contain; filter: invert(0);">
         </div>
         <div class="center-box">
           <div class="center-title">ELITE DIGITAL</div>
           <div class="machine-box">${card.machineName || '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}</div>
         </div>
         <div class="logo-box-right">
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <svg width="18" height="26" viewBox="0 0 22 30" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;">
-              <rect width="22" height="30" rx="10" fill="black"/>
-              <path d="M11 6C7.5 6 5 8.5 5 12C5 15.5 7.5 18 11 18C13 18 15 16.5 15 15C15 13.5 13.5 13 12 13C10.5 13 9.5 14 9.5 15C9.5 16 10.5 16.5 11 16.5C11.5 16.5 12 16 12 15.5H13.5C13.5 17 12 18 10 18C7.5 18 6.5 15.5 6.5 13C6.5 10.5 8 7.5 11 7.5C14 7.5 15.5 10.5 15.5 13C15.5 14.5 14.5 15.5 13.5 16L14.5 17.5C16 16.5 17 15 17 13C17 8.5 14.5 6 11 6Z" fill="white"/>
-            </svg>
-            <div style="text-align: left; line-height: 1.1;">
-              <div style="font-size: 15.5pt; font-weight: 900; letter-spacing: -0.5px; color: #000;">ELITE</div>
-              <div style="font-size: 6.5pt; font-weight: 800; letter-spacing: 2px; color: #000; margin-top: -1px;">EDITION</div>
-            </div>
-          </div>
+          <img src="${window.location.origin}/DigitalLogo.png" alt="Elite Digital Prints" style="height: 36px; object-fit: contain; transform: scaleX(-1);">
         </div>
       </div>
 
@@ -858,7 +884,7 @@ function JobCardForm({ card, onSave, onClose }) {
 
     const fetchAllDesigns = async () => {
       try {
-        const res = await api.getDesigns({ limit: 100 });
+        const res = await api.getDesigns({ limit: 5000 });
         if (res && res.data) {
           setDesignsList(res.data);
         }
@@ -886,10 +912,54 @@ function JobCardForm({ card, onSave, onClose }) {
   // Sync selectedDesign if editing an existing card
   useEffect(() => {
     if (card && card.designName && designsList.length > 0) {
-      const matched = designsList.find(d => d.designName === card.designName);
+      const matched = designsList.find(d => d.designName === card.designName || d.designNo === card.designNo);
       if (matched) setSelectedDesign(matched);
     }
   }, [card, designsList]);
+
+  // Auto-resolve images when 2 design names are entered in form
+  useEffect(() => {
+    if (!designsList || designsList.length === 0) return;
+    const rawKey = form.designName || form.designNo || '';
+    const names = extractDesignNames(rawKey);
+
+    if (names.length >= 2) {
+      const d1 = designsList.find(d =>
+        (d.designName && d.designName.toLowerCase() === names[0].toLowerCase()) ||
+        (d.designNo && String(d.designNo).toLowerCase() === names[0].toLowerCase())
+      );
+      const d2 = designsList.find(d =>
+        (d.designName && d.designName.toLowerCase() === names[1].toLowerCase()) ||
+        (d.designNo && String(d.designNo).toLowerCase() === names[1].toLowerCase())
+      );
+
+      let img1 = form.imageUrl1;
+      let img2 = form.imageUrl2;
+
+      if (d1 && (d1.imageUrl || d1.imageUrl2)) img1 = d1.imageUrl || d1.imageUrl2;
+      if (d2 && (d2.imageUrl || d2.imageUrl2)) img2 = d2.imageUrl || d2.imageUrl2;
+
+      if ((img1 && img1 !== form.imageUrl1) || (img2 && img2 !== form.imageUrl2)) {
+        setForm(f => ({
+          ...f,
+          imageUrl1: img1 || f.imageUrl1,
+          imageUrl2: img2 || f.imageUrl2,
+        }));
+      }
+    } else if (names.length === 1) {
+      const d1 = designsList.find(d =>
+        (d.designName && d.designName.toLowerCase() === names[0].toLowerCase()) ||
+        (d.designNo && String(d.designNo).toLowerCase() === names[0].toLowerCase())
+      );
+      if (d1 && d1.imageUrl && d1.imageUrl2 && !form.imageUrl1 && !form.imageUrl2) {
+        setForm(f => ({
+          ...f,
+          imageUrl1: d1.imageUrl,
+          imageUrl2: d1.imageUrl2
+        }));
+      }
+    }
+  }, [form.designName, form.designNo, designsList]);
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -904,12 +974,35 @@ function JobCardForm({ card, onSave, onClose }) {
 
   const handleDesignNameChange = (e) => {
     const { value } = e.target;
-    setForm(f => ({ ...f, designName: value }));
+    setForm(f => ({ ...f, designName: value, designNo: value }));
     setShowSuggestions(true);
   };
 
   const selectDesign = (d) => {
     setSelectedDesign(d);
+
+    const existingNames = extractDesignNames(form.designName || form.designNo);
+    const dName = d.designName || d.designNo;
+
+    let newDesignName = dName;
+    let img1 = d.imageUrl || d.imageUrl2 || form.imageUrl1 || '';
+    let img2 = d.imageUrl2 || form.imageUrl2 || '';
+
+    if (existingNames.length > 0 && existingNames[0].toLowerCase() !== dName.toLowerCase()) {
+      // Multiple designs selected! Combine as "Design1, Design2"
+      newDesignName = `${existingNames[0]}, ${dName}`;
+
+      const d1 = designsList.find(item =>
+        (item.designName && item.designName.toLowerCase() === existingNames[0].toLowerCase()) ||
+        (item.designNo && String(item.designNo).toLowerCase() === existingNames[0].toLowerCase())
+      );
+
+      img1 = (d1 && (d1.imageUrl || d1.imageUrl2)) || form.imageUrl1 || '';
+      img2 = d.imageUrl || d.imageUrl2 || '';
+    } else if (d.imageUrl && d.imageUrl2) {
+      img1 = d.imageUrl;
+      img2 = d.imageUrl2;
+    }
 
     // Auto-calculate standard values if pcs is already entered
     const pcsVal = parseFloat(form.pcs) || 0;
@@ -924,7 +1017,8 @@ function JobCardForm({ card, onSave, onClose }) {
 
     setForm(f => ({
       ...f,
-      designName: d.designName,
+      designName: newDesignName,
+      designNo: newDesignName,
       designer: d.designerName || f.designer,
       colourMatching: d.colourMatching || f.colourMatching,
       fabric: d.fabricName || f.fabric,
@@ -936,9 +1030,8 @@ function JobCardForm({ card, onSave, onClose }) {
       pass: d.pass || f.pass,
       profile: (d.machineProfiles && form.machineName && d.machineProfiles[form.machineName]) || f.profile,
       paperType: d.paperType || f.paperType,
-      imageUrl1: d.imageUrl || f.imageUrl1,
-      imageUrl2: d.imageUrl2 || f.imageUrl2,
-      designNo: d.designName,
+      imageUrl1: img1,
+      imageUrl2: img2,
 
       // Auto-calculated values based on pcs
       consumption: consumptionVal || f.consumption,
@@ -953,12 +1046,23 @@ function JobCardForm({ card, onSave, onClose }) {
     setShowSuggestions(false);
   };
 
-  const filteredDesigns = useMemo(() =>
-    form.designName
-      ? designsList.filter(d => d.designName.toLowerCase().includes(form.designName.toLowerCase()))
-      : designsList,
-    [form.designName, designsList]
-  );
+  const filteredDesigns = useMemo(() => {
+    const val = (form.designName || form.designNo || '').trim();
+    if (!val) return designsList;
+
+    const names = val.split(/[,&/+]|\band\b/i).map(s => s.trim());
+    const lastTerm = (names[names.length - 1] || val).toLowerCase();
+
+    if (!lastTerm) return designsList;
+
+    return designsList.filter(d =>
+      (d.designName && d.designName.toLowerCase().includes(lastTerm)) ||
+      (d.designNo && String(d.designNo).toLowerCase().includes(lastTerm)) ||
+      (d.category && d.category.toLowerCase().includes(lastTerm)) ||
+      (d.fabricName && d.fabricName.toLowerCase().includes(lastTerm)) ||
+      (d.designerName && d.designerName.toLowerCase().includes(lastTerm))
+    );
+  }, [form.designName, form.designNo, designsList]);
 
   // Auto-recalculate EXP.TIME whenever relevant fields change
   useEffect(() => {
@@ -1024,8 +1128,10 @@ function JobCardForm({ card, onSave, onClose }) {
     try {
       if (card?._id) {
         await api.updateJobCard(card._id, form);
+        triggerPushNotification('📝 Job Card Updated', `Job Card #${form.jobNo} saved successfully.`, 'info');
       } else {
         await api.createJobCard(form);
+        triggerPushNotification('✨ Job Card Created', `Job Card #${form.jobNo} created successfully!`, 'success');
       }
       onSave();
     } catch (err) {
@@ -1129,7 +1235,7 @@ function JobCardForm({ card, onSave, onClose }) {
             </div>
             <div ref={suggestionsRef} style={{ display:'flex', flexDirection:'column', gap:'0.3rem', flex: '0 0 calc(50% - 0.4rem)', minWidth:120, position:'relative' }}>
               <label style={{ fontSize:'0.68rem', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>
-                Design Name (ED1, ED2...)
+                Design No. / Design Name *
               </label>
               <input
                 type="text"
@@ -1137,7 +1243,7 @@ function JobCardForm({ card, onSave, onClose }) {
                 value={form.designName}
                 onChange={handleDesignNameChange}
                 onFocus={() => setShowSuggestions(true)}
-                placeholder="Type ED1, ED2 or select..."
+                placeholder="Type or select Design No. (e.g. ED1, ED2)..."
                 style={{
                   padding:'0.5rem 0.7rem',
                   fontSize:'0.85rem',
@@ -1159,7 +1265,7 @@ function JobCardForm({ card, onSave, onClose }) {
                   border:'1px solid var(--border-light)',
                   borderRadius:'var(--radius-sm)',
                   boxShadow:'var(--shadow-lg)',
-                  maxHeight:'160px',
+                  maxHeight:'200px',
                   overflowY:'auto',
                   zIndex:999,
                   marginTop:'4px'
@@ -1181,9 +1287,14 @@ function JobCardForm({ card, onSave, onClose }) {
                       onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
-                      <span style={{ fontWeight:700, color:'var(--primary)' }}>{d.designName}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span style={{ fontWeight:700, color:'var(--primary)' }}>{d.designName || d.designNo}</span>
+                        {d.designNo && d.designNo !== d.designName && (
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>({d.designNo})</span>
+                        )}
+                      </div>
                       <span style={{ fontSize:'0.7rem', color:'var(--text-muted)' }}>
-                        {d.fabricName ? `${d.fabricName} ` : ''}({d.designerName || 'No Designer'})
+                        {d.fabricName ? `${d.fabricName} • ` : ''}{d.category || ''} ({d.designerName || 'No Designer'})
                       </span>
                     </div>
                   ))}
@@ -1467,14 +1578,22 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
 
   useEffect(() => {
     fetchCards();
-    const interval = setInterval(fetchCards, 30000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchCards, 10000);
+    const handleDataRefresh = () => fetchCards();
+    window.addEventListener('elite-data-refresh', handleDataRefresh);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('elite-data-refresh', handleDataRefresh);
+    };
   }, [fetchCards, activeSubTab]);
 
   const handleDelete = async (id, jobNo) => {
     if (!window.confirm(`Delete Job Card "${jobNo}"?`)) return;
     try {
       await api.deleteJobCard(id);
+      triggerPushNotification('🗑️ Job Card Deleted', `Job Card #${jobNo} removed.`, 'warning');
+      triggerGlobalDataRefresh('jobcards');
       fetchCards();
     } catch (err) {
       alert(err.message || 'Failed to delete.');
@@ -1483,7 +1602,11 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
 
   const openNew  = () => { setFormCard(null); setShowForm(true); };
   const openEdit = (c) => { setFormCard(c); setShowForm(true); };
-  const onSaved  = () => { setShowForm(false); fetchCards(); };
+  const onSaved  = () => {
+    setShowForm(false);
+    triggerGlobalDataRefresh('jobcards');
+    fetchCards();
+  };
 
   const MACHINE_COLOR = { GRANDO:'#3b82f6', PRINTDOT:'#ef4444' };
 
@@ -1862,77 +1985,63 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
           card={previewCard} 
           onClose={()=>setPreviewCard(null)}
           onShare={(c) => {
-            setPreviewCard(null);
             handleOpenShareModal(c);
           }}
         />
       )}
 
       {showShareModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(3, 7, 18, 0.75)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999,
-          backdropFilter: 'blur(5px)'
-        }}>
-          <div style={{
-            background: '#161b26',
-            border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '480px',
-            padding: '24px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4)',
-            color: 'var(--text-primary)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>Share Job Card to Chat</h3>
+        <div className="share-modal-overlay">
+          <div className="share-modal-card">
+            {/* Mobile Top Drag Indicator */}
+            <div style={{ width: '36px', height: '4px', borderRadius: '2px', backgroundColor: 'rgba(255,255,255,0.2)', margin: '0 auto 14px auto' }} />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Send size={18} color="var(--primary)" /> Share Job Card to Chat
+              </h3>
               <button 
+                type="button"
                 onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); }} 
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted, #9ca3af)' }}
+                style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
             <form onSubmit={handleShareJobCard}>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Search Channel or Member</label>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Search Channel or Member</label>
                 <input 
                   type="text" 
                   value={shareSearch} 
                   onChange={e => setShareSearch(e.target.value)} 
-                  placeholder="Type name to search..." 
+                  placeholder="Type name to filter..." 
                   style={{
                     width: '100%',
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-                    backgroundColor: 'rgba(255,255,255,0.03)',
+                    padding: '12px 16px',
+                    borderRadius: '24px',
+                    border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
+                    backgroundColor: 'var(--bg-input, #0b0f19)',
                     color: 'var(--text-primary)',
                     outline: 'none',
-                    fontSize: '0.9rem'
+                    fontSize: '0.92rem'
                   }}
                 />
               </div>
 
-              <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Select Chat Destination</label>
+              <div style={{ marginBottom: '22px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Chat Destination</label>
                 <div style={{
-                  maxHeight: '200px',
+                  maxHeight: '230px',
                   overflowY: 'auto',
-                  border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-                  borderRadius: '8px',
+                  border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
+                  borderRadius: '16px',
                   display: 'flex',
                   flexDirection: 'column',
-                  backgroundColor: 'rgba(255,255,255,0.01)'
+                  gap: '4px',
+                  padding: '6px',
+                  backgroundColor: 'rgba(0,0,0,0.2)'
                 }}>
                   {chatRooms
                     .filter(r => {
@@ -1955,22 +2064,35 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
                           onClick={() => setSelectedRoomId(r._id)}
                           style={{
                             padding: '10px 14px',
+                            borderRadius: '12px',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '10px',
+                            gap: '12px',
                             cursor: 'pointer',
-                            backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-                            borderBottom: '1px solid rgba(255,255,255,0.04)',
-                            transition: 'background-color 0.2s',
+                            backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255,255,255,0.02)',
+                            border: isSelected ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid transparent',
+                            color: isSelected ? '#38bdf8' : 'var(--text-primary)',
+                            transition: 'all 0.2s ease',
                           }}
                         >
                           <div style={{
-                            width: '8px',
-                            height: '8px',
+                            width: '28px',
+                            height: '28px',
                             borderRadius: '50%',
-                            backgroundColor: isDirect ? 'var(--success)' : 'var(--primary)'
-                          }} />
-                          <span style={{ fontSize: '0.9rem', fontWeight: isSelected ? '600' : 'normal', color: isSelected ? 'var(--primary)' : 'var(--text-primary)' }}>{displayName}</span>
+                            background: isSelected
+                              ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)'
+                              : 'rgba(255,255,255,0.08)',
+                            color: 'white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold'
+                          }}>
+                            {isDirect ? displayName.charAt(0).toUpperCase() : '#'}
+                          </div>
+                          <span style={{ fontSize: '0.92rem', fontWeight: isSelected ? '600' : 'normal', flex: 1 }}>{displayName}</span>
+                          {isSelected && <span style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: 'bold' }}>✓</span>}
                         </div>
                       );
                     })}
@@ -1982,18 +2104,19 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <button 
                   type="button" 
                   onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); }} 
                   style={{
-                    padding: '10px 18px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-                    backgroundColor: 'transparent',
+                    padding: '12px 20px',
+                    borderRadius: '24px',
+                    border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
+                    backgroundColor: 'rgba(255,255,255,0.04)',
                     color: 'var(--text-primary)',
                     cursor: 'pointer',
-                    fontSize: '0.85rem'
+                    fontSize: '0.88rem',
+                    fontWeight: 600
                   }}
                 >
                   Cancel
@@ -2002,17 +2125,19 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
                   type="submit" 
                   disabled={sharingJobCard || !selectedRoomId}
                   style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
+                    padding: '12px 24px',
+                    borderRadius: '24px',
                     border: 'none',
-                    backgroundColor: selectedRoomId ? 'var(--primary)' : 'var(--border-light)',
-                    color: '#0b0f19',
+                    background: selectedRoomId ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'rgba(255,255,255,0.08)',
+                    color: 'white',
                     cursor: selectedRoomId ? 'pointer' : 'not-allowed',
                     fontWeight: 'bold',
-                    fontSize: '0.85rem',
+                    fontSize: '0.88rem',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px'
+                    gap: '8px',
+                    boxShadow: selectedRoomId ? '0 4px 14px rgba(56,189,248,0.3)' : 'none',
+                    opacity: selectedRoomId ? 1 : 0.5
                   }}
                 >
                   {sharingJobCard ? 'Sharing...' : 'Confirm Share'}
