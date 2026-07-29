@@ -339,9 +339,9 @@ const downloadJobCardPdf = async (req, res) => {
     const cornerLogoPath = path.join(__dirname, 'Logo.png');
     if (fs.existsSync(cornerLogoPath)) {
       const logoH = 32, logoW = 100;
-      // Left corner logo (white-inverted for dark background)
+      // Left corner logo
       doc.image(cornerLogoPath, 30, 34, { height: logoH, fit:[logoW, logoH] });
-      // Right corner logo — mirror by placing at far right
+      // Right corner logo — straight (no mirror)
       doc.image(cornerLogoPath, 544 - logoW + 14, 34, { height: logoH, fit:[logoW, logoH] });
     }
 

@@ -386,7 +386,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
           <div class="machine-box">${card.machineName || '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}</div>
         </div>
         <div class="logo-box-right">
-          <img src="${window.location.origin}/DigitalLogo.png" alt="Elite Digital Prints" style="height: 36px; object-fit: contain; transform: scaleX(-1);">
+          <img src="${window.location.origin}/DigitalLogo.png" alt="Elite Digital Prints" style="height: 36px; object-fit: contain;">
         </div>
       </div>
 
