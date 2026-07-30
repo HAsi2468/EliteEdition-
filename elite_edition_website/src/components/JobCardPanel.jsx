@@ -141,17 +141,15 @@ function JobCardPrintView({ card, onClose, onShare }) {
     const resolveImages = async () => {
       const keyStr = card.designName || card.designNo || '';
       const names = extractDesignNames(keyStr);
-
-      // Always fetch fresh from design catalog so image matches the screen view
-      // Only show 2 images when 2 separate design names are entered
       const showTwoImages = names.length >= 2;
 
-      let img1 = '';
-      let img2 = '';
+      // Use the stored imageUrl1 from the job card — it was set explicitly during creation
+      let img1 = card.imageUrl1 || '';
+      let img2 = '';  // always start empty — only populate for 2nd design
 
       try {
-        // Fetch image 1 from catalog
-        if (names[0]) {
+        // Only fetch from catalog if no stored image on the card
+        if (!img1 && names[0]) {
           const res1 = await api.getDesigns({ search: names[0], limit: 5 });
           if (res1 && res1.data && res1.data.length > 0) {
             const matched1 = res1.data.find(d =>
@@ -161,8 +159,6 @@ function JobCardPrintView({ card, onClose, onShare }) {
             img1 = matched1.imageUrl || matched1.imageUrl2 || '';
           }
         }
-        // Fall back to stored imageUrl1 if catalog didn't find anything
-        if (!img1) img1 = card.imageUrl1 || '';
 
         // Only fetch image 2 when 2 design names are entered
         if (showTwoImages && names[1]) {
@@ -176,12 +172,11 @@ function JobCardPrintView({ card, onClose, onShare }) {
           }
           if (!img2) img2 = card.imageUrl2 || '';
         }
-        // img2 stays '' when only 1 design — only 1 image will show
+        // img2 stays '' for single design — only 1 image shows
 
         setResolvedImages({ imageUrl1: img1, imageUrl2: img2 });
       } catch (err) {
         console.error('Failed to resolve design images for print:', err);
-        // On error fall back to stored values but still enforce single image rule
         setResolvedImages({
           imageUrl1: card.imageUrl1 || '',
           imageUrl2: showTwoImages ? (card.imageUrl2 || '') : '',

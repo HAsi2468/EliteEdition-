@@ -275,10 +275,10 @@ const downloadJobCardPdf = async (req, res) => {
     const jobCard = await db.JobCard.findById(req.params.id).lean();
     if (!jobCard) return res.status(404).json({ error: 'Job Card not found' });
 
-    // Always fetch image fresh from design catalog for accuracy.
-    // Fall back to job card's stored imageUrl1 only if catalog lookup fails.
-    let imageUrl1 = '';
-    let imageUrl2 = '';
+    // Use the stored imageUrl1 from the job card — this is what was explicitly set during creation.
+    // Only resolve imageUrl2 from catalog when 2 design names are entered.
+    let imageUrl1 = jobCard.imageUrl1 || '';
+    let imageUrl2 = '';  // always start empty — only populate for 2nd design
 
     function extractNames(str) {
       if (!str || typeof str !== 'string') return [];
@@ -288,19 +288,16 @@ const downloadJobCardPdf = async (req, res) => {
     const keyStr = jobCard.designName || jobCard.designNo || '';
     const names = extractNames(keyStr);
 
-    if (names[0]) {
+    // If no stored imageUrl1, try catalog as fallback
+    if (!imageUrl1 && names[0]) {
       const design1 = await db.Design.findOne({
         $or: [
           { designName: { $regex: `^${names[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
           { designNo: { $regex: `^${names[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
         ]
       }).lean();
-      if (design1) {
-        imageUrl1 = design1.imageUrl || design1.imageUrl2 || '';
-      }
+      if (design1) imageUrl1 = design1.imageUrl || design1.imageUrl2 || '';
     }
-    // Fall back to stored value if catalog lookup found nothing
-    if (!imageUrl1) imageUrl1 = jobCard.imageUrl1 || '';
 
     // Only load second image if 2 separate design names entered
     if (names.length >= 2 && names[1]) {
@@ -310,12 +307,10 @@ const downloadJobCardPdf = async (req, res) => {
           { designNo: { $regex: `^${names[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
         ]
       }).lean();
-      if (design2) {
-        imageUrl2 = design2.imageUrl || design2.imageUrl2 || '';
-      }
+      if (design2) imageUrl2 = design2.imageUrl || design2.imageUrl2 || '';
       if (!imageUrl2) imageUrl2 = jobCard.imageUrl2 || '';
     }
-    // imageUrl2 stays empty when only 1 design name — ensures only 1 image in PDF
+    // imageUrl2 stays '' for single design — only 1 image in PDF
 
     const [imgBuf1, imgBuf2] = await Promise.all([getImageBuffer(imageUrl1), getImageBuffer(imageUrl2)]);
 
