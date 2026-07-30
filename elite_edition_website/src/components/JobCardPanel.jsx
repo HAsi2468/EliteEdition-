@@ -161,9 +161,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
               String(d.designNo || '').toLowerCase() === names[0].toLowerCase()
             ) || res1.data[0];
             img1 = matched1.imageUrl || matched1.imageUrl2 || '';
-            if (!img2 && matched1.imageUrl2 && names.length === 1) {
-              img2 = matched1.imageUrl2;
-            }
+            // Do NOT auto-fill img2 when only 1 design name is entered
           }
         }
 

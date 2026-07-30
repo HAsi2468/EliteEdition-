@@ -296,12 +296,12 @@ const downloadJobCardPdf = async (req, res) => {
       }).lean();
       if (design1) {
         imageUrl1 = design1.imageUrl || design1.imageUrl2 || '';
-        if (!imageUrl2 && design1.imageUrl2 && names.length === 1) {
-          imageUrl2 = design1.imageUrl2;
-        }
+        // Only pull imageUrl2 from same design if the job card itself had imageUrl2 stored
+        // Do NOT auto-fill imageUrl2 when only 1 design name is entered
       }
     }
 
+    // Only resolve second image if there are actually 2 design names entered
     if (!imageUrl2 && names[1]) {
       const design2 = await db.Design.findOne({
         $or: [
