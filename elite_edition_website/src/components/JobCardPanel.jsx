@@ -139,26 +139,19 @@ function JobCardPrintView({ card, onClose, onShare }) {
 
   useEffect(() => {
     const resolveImages = async () => {
-      let img1 = card.imageUrl1 || '';
-      let img2 = card.imageUrl2 || '';
-
-      if (img1 && img2) {
-        setResolvedImages({ imageUrl1: img1, imageUrl2: img2 });
-        return;
-      }
-
       const keyStr = card.designName || card.designNo || '';
       const names = extractDesignNames(keyStr);
 
-      if (names.length === 0 && !img1 && !img2) return;
-
+      // Always fetch fresh from design catalog so image matches the screen view
       // Only show 2 images when 2 separate design names are entered
-      if (names.length <= 1) {
-        img2 = '';
-      }
+      const showTwoImages = names.length >= 2;
+
+      let img1 = '';
+      let img2 = '';
 
       try {
-        if (!img1 && names[0]) {
+        // Fetch image 1 from catalog
+        if (names[0]) {
           const res1 = await api.getDesigns({ search: names[0], limit: 5 });
           if (res1 && res1.data && res1.data.length > 0) {
             const matched1 = res1.data.find(d =>
@@ -166,11 +159,13 @@ function JobCardPrintView({ card, onClose, onShare }) {
               String(d.designNo || '').toLowerCase() === names[0].toLowerCase()
             ) || res1.data[0];
             img1 = matched1.imageUrl || matched1.imageUrl2 || '';
-            // Do NOT auto-fill img2 when only 1 design name is entered
           }
         }
+        // Fall back to stored imageUrl1 if catalog didn't find anything
+        if (!img1) img1 = card.imageUrl1 || '';
 
-        if (!img2 && names[1]) {
+        // Only fetch image 2 when 2 design names are entered
+        if (showTwoImages && names[1]) {
           const res2 = await api.getDesigns({ search: names[1], limit: 5 });
           if (res2 && res2.data && res2.data.length > 0) {
             const matched2 = res2.data.find(d =>
@@ -179,11 +174,18 @@ function JobCardPrintView({ card, onClose, onShare }) {
             ) || res2.data[0];
             img2 = matched2.imageUrl || matched2.imageUrl2 || '';
           }
+          if (!img2) img2 = card.imageUrl2 || '';
         }
+        // img2 stays '' when only 1 design — only 1 image will show
 
         setResolvedImages({ imageUrl1: img1, imageUrl2: img2 });
       } catch (err) {
         console.error('Failed to resolve design images for print:', err);
+        // On error fall back to stored values but still enforce single image rule
+        setResolvedImages({
+          imageUrl1: card.imageUrl1 || '',
+          imageUrl2: showTwoImages ? (card.imageUrl2 || '') : '',
+        });
       }
     };
     resolveImages();
