@@ -275,7 +275,7 @@ const downloadJobCardPdf = async (req, res) => {
     const jobCard = await db.JobCard.findById(req.params.id).lean();
     if (!jobCard) return res.status(404).json({ error: 'Job Card not found' });
 
-    // Fall back to Design catalog image if job card has no imageUrl1 / imageUrl2
+    // Fall back to Design catalog image if job card has no imageUrl1
     let imageUrl1 = jobCard.imageUrl1 || '';
     let imageUrl2 = jobCard.imageUrl2 || '';
 
@@ -287,6 +287,12 @@ const downloadJobCardPdf = async (req, res) => {
     const keyStr = jobCard.designName || jobCard.designNo || '';
     const names = extractNames(keyStr);
 
+    // IMPORTANT: If only 1 design name entered, ignore any stored imageUrl2
+    // Only show 2 images when 2 separate design names are entered
+    if (names.length <= 1) {
+      imageUrl2 = '';
+    }
+
     if (!imageUrl1 && names[0]) {
       const design1 = await db.Design.findOne({
         $or: [
@@ -296,8 +302,6 @@ const downloadJobCardPdf = async (req, res) => {
       }).lean();
       if (design1) {
         imageUrl1 = design1.imageUrl || design1.imageUrl2 || '';
-        // Only pull imageUrl2 from same design if the job card itself had imageUrl2 stored
-        // Do NOT auto-fill imageUrl2 when only 1 design name is entered
       }
     }
 

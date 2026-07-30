@@ -152,6 +152,11 @@ function JobCardPrintView({ card, onClose, onShare }) {
 
       if (names.length === 0 && !img1 && !img2) return;
 
+      // Only show 2 images when 2 separate design names are entered
+      if (names.length <= 1) {
+        img2 = '';
+      }
+
       try {
         if (!img1 && names[0]) {
           const res1 = await api.getDesigns({ search: names[0], limit: 5 });
