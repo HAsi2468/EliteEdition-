@@ -43,6 +43,7 @@ router.get('/requirement', fabricController.getFabricRequirement);
 
 // Stock Adjustment / Return routes
 router.post('/stock-adjustment', fabricController.createStockAdjustment);
+router.put('/stock-adjustment/:id', fabricController.updateStockAdjustment);
 router.get('/stock-adjustment', fabricController.getStockAdjustments);
 router.get('/stock-adjustment/:id', fabricController.getStockAdjustmentById);
 router.delete('/stock-adjustment/:id', fabricController.deleteStockAdjustment);

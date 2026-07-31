@@ -1733,11 +1733,6 @@ const createStockAdjustment = async (req, res) => {
       let finalNotes = `Stock Adjustment ${saDoc.saNo} (${reason})`;
       if (notes) finalNotes += ` - ${notes}`;
 
-      if (txType === 'OUTWARD' && (normFabric.includes('CREPE') || normFabric.includes('CRAPE') || normFabric.includes('FRENCH'))) {
-        finalQty = Number((finalQty * 1.02).toFixed(2));
-        finalNotes += ' (+2% French Crepe Applied)';
-      }
-
       const tx = new FabricTransaction({
         type: txType,
         jobNo: saDoc.saNo,
@@ -1746,6 +1741,7 @@ const createStockAdjustment = async (req, res) => {
         panna: normP,
         lotNo: lNo !== 'UNASSIGNED' && !isNaN(parseInt(lNo, 10)) ? parseInt(lNo, 10) : undefined,
         qty: finalQty,
+        shortagePct: 0,
         date: saDoc.date,
         notes: finalNotes
       });
@@ -1775,6 +1771,7 @@ const createStockAdjustment = async (req, res) => {
               panna: lotAgg[0].panna,
               lotNo: tx.lotNo,
               qty: Number(rem.toFixed(2)),
+              shortagePct: 0,
               date: new Date(),
               notes: 'Remnant Stock Auto-Clear (0 < stock <= 5m converted to 0)'
             });
@@ -1790,6 +1787,110 @@ const createStockAdjustment = async (req, res) => {
     res.status(201).json({ success: true, data: saDoc });
   } catch (err) {
     console.error('Error creating fabric stock adjustment:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const updateStockAdjustment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const saDoc = await FabricStockAdjustment.findById(id);
+    if (!saDoc) {
+      return res.status(404).json({ success: false, error: 'Stock adjustment record not found.' });
+    }
+
+    const {
+      date,
+      partyName,
+      adjustmentType = 'RETURN_REJECTED',
+      fabricQuality,
+      panna,
+      lotNo,
+      vendorChallanNo = '',
+      tpDetails = [],
+      totalMtr = 0,
+      totalTp = 0,
+      reason = 'Fabric Return / Rejection',
+      notes = '',
+      createdBy = ''
+    } = req.body;
+
+    if (!fabricQuality || (!totalMtr && tpDetails.length === 0)) {
+      return res.status(400).json({ success: false, error: 'Fabric Quality and return meters/TP details are required.' });
+    }
+
+    const normFabric = normalizeFabric(fabricQuality);
+    const normP = normalizePanna(panna, normFabric);
+
+    // Delete existing transactions tied to this SA
+    if (saDoc.fabricTransactionIds && saDoc.fabricTransactionIds.length > 0) {
+      await FabricTransaction.deleteMany({ _id: { $in: saDoc.fabricTransactionIds } });
+    }
+
+    // Update SA document fields
+    saDoc.date = date ? new Date(date) : saDoc.date;
+    saDoc.partyName = partyName || '';
+    saDoc.adjustmentType = adjustmentType;
+    saDoc.fabricQuality = normFabric;
+    saDoc.panna = normP;
+    saDoc.lotNo = lotNo || '';
+    saDoc.vendorChallanNo = vendorChallanNo || '';
+    saDoc.tpDetails = tpDetails || [];
+    saDoc.totalMtr = Number(totalMtr) || 0;
+    saDoc.totalTp = Number(totalTp) || (tpDetails ? tpDetails.length : 0);
+    saDoc.reason = reason || 'Fabric Return / Rejection';
+    saDoc.notes = notes || '';
+    if (createdBy) saDoc.createdBy = createdBy;
+
+    const isReturnOrDeduction = adjustmentType === 'RETURN_REJECTED' || adjustmentType === 'STOCK_DEDUCTION';
+    const txType = isReturnOrDeduction ? 'OUTWARD' : 'INWARD';
+
+    const createdTxIds = [];
+    const lotMeterMap = {};
+
+    if (tpDetails.length > 0) {
+      tpDetails.forEach(tp => {
+        const lKey = (tp.lotNo || lotNo || '').trim();
+        const mtr = parseFloat(tp.tpMeter) || 0;
+        if (lKey && mtr > 0) {
+          lotMeterMap[lKey] = (lotMeterMap[lKey] || 0) + mtr;
+        }
+      });
+    }
+
+    if (Object.keys(lotMeterMap).length === 0) {
+      const lKey = (lotNo || '').trim();
+      lotMeterMap[lKey || 'UNASSIGNED'] = Number(totalMtr);
+    }
+
+    for (const [lNo, mtr] of Object.entries(lotMeterMap)) {
+      let finalQty = Number(mtr.toFixed(2));
+      let finalNotes = `Stock Adjustment ${saDoc.saNo} (${reason})`;
+      if (notes) finalNotes += ` - ${notes}`;
+
+      const tx = new FabricTransaction({
+        type: txType,
+        jobNo: saDoc.saNo,
+        partyName: partyName || 'VEND_RETURN',
+        fabricQuality: normFabric,
+        panna: normP,
+        lotNo: lNo !== 'UNASSIGNED' && !isNaN(parseInt(lNo, 10)) ? parseInt(lNo, 10) : undefined,
+        qty: finalQty,
+        shortagePct: 0,
+        date: saDoc.date,
+        notes: finalNotes
+      });
+
+      await tx.save();
+      createdTxIds.push(tx._id);
+    }
+
+    saDoc.fabricTransactionIds = createdTxIds;
+    await saDoc.save();
+
+    res.status(200).json({ success: true, data: saDoc });
+  } catch (err) {
+    console.error('Error updating fabric stock adjustment:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 };
@@ -2318,6 +2419,7 @@ module.exports = {
   getFabricOutwardReportData,
   getFabricLotWiseReportData,
   createStockAdjustment,
+  updateStockAdjustment,
   getStockAdjustments,
   getStockAdjustmentById,
   deleteStockAdjustment,

@@ -92,9 +92,11 @@ export default function FabricInventoryPanel() {
   const [isSaFormOpen, setIsSaFormOpen] = useState(false);
   const [saDeleteTarget, setSaDeleteTarget] = useState(null);
   const [saAvailableLots, setSaAvailableLots] = useState([]);
+  const [editingSa, setEditingSa] = useState(null);
   const [saForm, setSaForm] = useState({
     date: new Date().toISOString().split('T')[0],
     partyName: '',
+    vendorChallanNo: '',
     adjustmentType: 'RETURN_REJECTED',
     fabricQuality: '',
     panna: '',
@@ -1075,6 +1077,23 @@ export default function FabricInventoryPanel() {
     });
   };
 
+  const handleEditSa = (sa) => {
+    setEditingSa(sa);
+    setSaForm({
+      date: sa.date ? new Date(sa.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      partyName: sa.partyName || '',
+      vendorChallanNo: sa.vendorChallanNo || '',
+      adjustmentType: sa.adjustmentType || 'RETURN_REJECTED',
+      fabricQuality: sa.fabricQuality || '',
+      panna: sa.panna || '',
+      lotNo: sa.lotNo || '',
+      reason: sa.reason || 'Fabric Return / Rejection',
+      notes: sa.notes || '',
+      tpDetails: sa.tpDetails && sa.tpDetails.length > 0 ? sa.tpDetails : [{ tpNo: 1, tpMeter: sa.totalMtr || '', lotNo: sa.lotNo || '' }]
+    });
+    setIsSaFormOpen(true);
+  };
+
   const handleCreateSaSubmit = async (e) => {
     e.preventDefault();
     if (!saForm.fabricQuality) {
@@ -1093,12 +1112,22 @@ export default function FabricInventoryPanel() {
         totalMtr: calculatedTotalMtr,
         totalTp: saForm.tpDetails.length
       };
-      const res = await api.createStockAdjustment(payload);
-      triggerPushNotification('📦 Stock Return / Adjustment Saved', `Stock Adjustment ${res.data.saNo} recorded successfully.`, 'success');
+
+      let res;
+      if (editingSa) {
+        res = await api.updateStockAdjustment(editingSa._id, payload);
+        triggerPushNotification('✏️ Stock Return Updated', `Stock Adjustment ${editingSa.saNo} updated successfully.`, 'success');
+      } else {
+        res = await api.createStockAdjustment(payload);
+        triggerPushNotification('📦 Stock Return / Adjustment Saved', `Stock Adjustment ${res.data.saNo} recorded successfully.`, 'success');
+      }
+
       setIsSaFormOpen(false);
+      setEditingSa(null);
       setSaForm({
         date: new Date().toISOString().split('T')[0],
         partyName: '',
+        vendorChallanNo: '',
         adjustmentType: 'RETURN_REJECTED',
         fabricQuality: '',
         panna: '',
@@ -2546,7 +2575,27 @@ export default function FabricInventoryPanel() {
 
               <button
                 className="btn-primary"
-                onClick={() => setIsSaFormOpen(!isSaFormOpen)}
+                onClick={() => {
+                  if (isSaFormOpen) {
+                    setIsSaFormOpen(false);
+                    setEditingSa(null);
+                  } else {
+                    setEditingSa(null);
+                    setSaForm({
+                      date: new Date().toISOString().split('T')[0],
+                      partyName: '',
+                      vendorChallanNo: '',
+                      adjustmentType: 'RETURN_REJECTED',
+                      fabricQuality: '',
+                      panna: '',
+                      lotNo: '',
+                      reason: 'Fabric Return / Rejection',
+                      notes: '',
+                      tpDetails: [{ tpNo: 1, tpMeter: '', lotNo: '' }]
+                    });
+                    setIsSaFormOpen(true);
+                  }
+                }}
                 style={{ background: isSaFormOpen ? 'var(--secondary)' : 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)' }}
               >
                 {isSaFormOpen ? <X size={16} /> : <PlusCircle size={16} />}
@@ -2560,7 +2609,8 @@ export default function FabricInventoryPanel() {
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '1.5rem', marginTop: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
                 <h3 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <PlusCircle size={18} /> Issue Stock Return Voucher (Auto Voucher #: SA-01...)
+                  {editingSa ? <Edit size={18} /> : <PlusCircle size={18} />}
+                  {editingSa ? `Edit Stock Return Voucher (${editingSa.saNo})` : 'Issue Stock Return Voucher (Auto Voucher #: SA-01...)'}
                 </h3>
                 <span style={{ fontSize: '0.78rem', background: 'rgba(124, 58, 237, 0.15)', color: '#8b5cf6', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, border: '1px solid rgba(124, 58, 237, 0.3)' }}>
                   No Job Card Needed
@@ -2596,6 +2646,17 @@ export default function FabricInventoryPanel() {
                         <option key={idx} value={p} />
                       ))}
                     </datalist>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Vendor Challan No (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. VC-10492 / Bill No..."
+                      value={saForm.vendorChallanNo}
+                      onChange={e => setSaForm(prev => ({ ...prev, vendorChallanNo: e.target.value }))}
+                      style={inputStyle}
+                    />
                   </div>
 
                   <div>
@@ -2730,11 +2791,11 @@ export default function FabricInventoryPanel() {
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                  <button type="button" onClick={() => setIsSaFormOpen(false)} className="btn-secondary">
+                  <button type="button" onClick={() => { setIsSaFormOpen(false); setEditingSa(null); }} className="btn-secondary">
                     Cancel
                   </button>
                   <button type="submit" className="btn-primary" disabled={loading} style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)' }}>
-                    {loading ? 'Saving...' : 'Save & Issue SA Voucher'}
+                    {loading ? 'Saving...' : editingSa ? 'Update SA Voucher' : 'Save & Issue SA Voucher'}
                   </button>
                 </div>
               </form>
@@ -2748,6 +2809,7 @@ export default function FabricInventoryPanel() {
                     <th>Voucher #</th>
                     <th>Date</th>
                     <th>Party / Vendor</th>
+                    <th>Vendor Challan</th>
                     <th>Fabric Quality</th>
                     <th>Lot No(s)</th>
                     <th>Type</th>
@@ -2766,6 +2828,7 @@ export default function FabricInventoryPanel() {
                       const s = saSearch.toLowerCase();
                       return (sa.saNo || '').toLowerCase().includes(s) ||
                              (sa.partyName || '').toLowerCase().includes(s) ||
+                             (sa.vendorChallanNo || '').toLowerCase().includes(s) ||
                              (sa.fabricQuality || '').toLowerCase().includes(s) ||
                              (sa.lotNo || '').toLowerCase().includes(s) ||
                              (sa.reason || '').toLowerCase().includes(s);
@@ -2774,7 +2837,7 @@ export default function FabricInventoryPanel() {
                     if (filteredSa.length === 0) {
                       return (
                         <tr>
-                          <td colSpan="10" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                          <td colSpan="11" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                             No stock adjustment / fabric return records found. Click <strong>"New Fabric Return (SA)"</strong> to create one.
                           </td>
                         </tr>
@@ -2788,6 +2851,7 @@ export default function FabricInventoryPanel() {
                           {sa.date ? new Date(sa.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
                         </td>
                         <td style={{ fontWeight: 600 }}>{sa.partyName || '—'}</td>
+                        <td style={{ color: 'var(--text-muted)' }}>{sa.vendorChallanNo || '—'}</td>
                         <td>{sa.fabricQuality}{sa.panna ? ` (${sa.panna}")` : ''}</td>
                         <td>{sa.lotNo ? `#${sa.lotNo}` : '—'}</td>
                         <td>
@@ -2817,6 +2881,14 @@ export default function FabricInventoryPanel() {
                               style={{ color: '#8b5cf6' }}
                             >
                               <FileDown size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleEditSa(sa)}
+                              className="btn-icon"
+                              title="Edit Stock Adjustment Voucher"
+                              style={{ color: 'var(--primary)' }}
+                            >
+                              <Edit size={16} />
                             </button>
                             <button
                               onClick={() => setSaDeleteTarget(sa)}

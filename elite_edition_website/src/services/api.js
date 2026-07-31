@@ -1139,6 +1139,13 @@ export const api = {
     });
   },
 
+  async updateStockAdjustment(id, data) {
+    return request(`/fabric/stock-adjustment/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
   async deleteStockAdjustment(id) {
     return request(`/fabric/stock-adjustment/${id}`, { method: 'DELETE' });
   },
