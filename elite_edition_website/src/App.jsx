@@ -223,21 +223,49 @@ export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('elite_theme') || 'midnight');
   const [isEliteOnlineOpen, setIsEliteOnlineOpen] = useState(true);
 
+  // Department permission helpers
+  const EE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
+  const EDP_PERMISSIONS = ['jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings'];
+
+  const hasEliteEditionAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => EE_PERMISSIONS.includes(p)));
+  const hasDigitalPrintAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => EDP_PERMISSIONS.includes(p) || p.startsWith('jobcards')));
+  const hasWorkspaceAccess = !currentUser || currentUser.role === 'admin' || !currentUser.permissions || currentUser.permissions.length === 0 || currentUser.permissions.includes('workspace');
+
   const getFirstJobCardsTab = () => {
-    if (!currentUser || currentUser.role === 'admin') return 'jobcards';
-    const subTabs = ['jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings'];
+    if (!currentUser || currentUser.role === 'admin') return 'jobcards_fabric';
+    const subTabs = ['jobcards_fabric', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards', 'jobcards_raw_materials'];
     const allowed = subTabs.filter(t => currentUser.permissions?.includes(t));
-    return allowed[0] || 'jobcards';
+    return allowed[0] || 'jobcards_fabric';
+  };
+
+  const getFirstEETab = () => {
+    if (!currentUser || currentUser.role === 'admin') return 'dashboard';
+    const allowed = EE_PERMISSIONS.filter(t => currentUser.permissions?.includes(t));
+    return allowed[0] || 'dashboard';
   };
 
   // Sync activeDepartment when activeTab changes
   useEffect(() => {
     if (activeTab.startsWith('jobcards')) {
       setActiveDepartment('digital_print');
-    } else if (['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'].includes(activeTab)) {
+    } else if (EE_PERMISSIONS.includes(activeTab)) {
       setActiveDepartment('elite_edition');
     }
   }, [activeTab]);
+
+  // Auto-switch department if user lacks permission for current activeDepartment
+  useEffect(() => {
+    if (!currentUser || currentUser.role === 'admin') return;
+    if (currentUser.permissions && currentUser.permissions.length > 0) {
+      if (!hasDigitalPrintAccess && hasEliteEditionAccess && activeDepartment === 'digital_print') {
+        setActiveDepartment('elite_edition');
+        if (activeTab !== 'workspace') setActiveTab(getFirstEETab());
+      } else if (!hasEliteEditionAccess && hasDigitalPrintAccess && activeDepartment === 'elite_edition') {
+        setActiveDepartment('digital_print');
+        if (activeTab !== 'workspace') setActiveTab(getFirstJobCardsTab());
+      }
+    }
+  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), hasDigitalPrintAccess, hasEliteEditionAccess]);
 
   const handleNavClick = (tab) => {
     setActiveTab(tab);
@@ -252,7 +280,8 @@ export default function App() {
       const firstTab = getFirstJobCardsTab();
       setActiveTab(firstTab);
     } else {
-      setActiveTab('dashboard');
+      const firstTab = getFirstEETab();
+      setActiveTab(firstTab);
     }
   };
 
@@ -604,43 +633,51 @@ export default function App() {
           </button>
 
           <div style={styles.logoBadge}>
-            {activeDepartment === 'digital_print' ? 'EDP' : 'EE'}
+            {activeTab === 'workspace' ? 'WS' : activeDepartment === 'digital_print' ? 'EDP' : 'EE'}
           </div>
           <div>
             <h1 style={styles.brandTitle}>
-              {activeDepartment === 'digital_print' ? 'Elite Digital Print' : 'Elite Edition'}
+              {activeTab === 'workspace' ? 'Workspace & Operations' : activeDepartment === 'digital_print' ? 'Elite Digital Print' : 'Elite Edition'}
             </h1>
             <p style={styles.brandSubtitle}>
-              {activeDepartment === 'digital_print' ? 'Digital Printing & Job Cards' : 'Inventory Control Center'}
+              {activeTab === 'workspace' ? 'Team Collaboration & Real-Time Chat' : activeDepartment === 'digital_print' ? 'Digital Printing & Job Cards' : 'Inventory Control Center'}
             </p>
           </div>
 
           {/* Department Switcher Buttons */}
           <div className="dept-switcher-header">
-            <button
-              onClick={() => handleSwitchDepartment('digital_print')}
-              className={`dept-switch-btn ${activeDepartment === 'digital_print' && activeTab !== 'workspace' ? 'active' : ''}`}
-              title="Switch to Elite Digital Print Department"
-            >
-              <Printer size={15} />
-              <span>Elite Digital Print</span>
-            </button>
-            <button
-              onClick={() => { setActiveTab('workspace'); setMobileMenuOpen(false); }}
-              className={`dept-switch-btn ${activeTab === 'workspace' ? 'active' : ''}`}
-              title="Open Workspace / Chat"
-            >
-              <MessageSquare size={15} />
-              <span>Workspace / Chat</span>
-            </button>
-            <button
-              onClick={() => handleSwitchDepartment('elite_edition')}
-              className={`dept-switch-btn ${activeDepartment === 'elite_edition' && activeTab !== 'workspace' ? 'active' : ''}`}
-              title="Switch to Elite Edition E-Commerce Department"
-            >
-              <Store size={15} />
-              <span>Elite Edition</span>
-            </button>
+            {hasEliteEditionAccess && (
+              <button
+                onClick={() => handleSwitchDepartment('elite_edition')}
+                className={`dept-switch-btn ${activeDepartment === 'elite_edition' && activeTab !== 'workspace' ? 'active' : ''}`}
+                title="Switch to Elite Edition E-Commerce Department"
+              >
+                <Store size={15} />
+                <span>Elite Edition</span>
+              </button>
+            )}
+
+            {hasDigitalPrintAccess && (
+              <button
+                onClick={() => handleSwitchDepartment('digital_print')}
+                className={`dept-switch-btn ${activeDepartment === 'digital_print' && activeTab !== 'workspace' ? 'active' : ''}`}
+                title="Switch to Elite Digital Print Department"
+              >
+                <Printer size={15} />
+                <span>Elite Digital Print</span>
+              </button>
+            )}
+
+            {hasWorkspaceAccess && (
+              <button
+                onClick={() => { setActiveTab('workspace'); setMobileMenuOpen(false); }}
+                className={`dept-switch-btn ${activeTab === 'workspace' ? 'active' : ''}`}
+                title="Open Workspace / Chat"
+              >
+                <MessageSquare size={15} />
+                <span>Workspace / Chat</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -785,35 +822,51 @@ export default function App() {
 
             {/* Department Switcher Buttons inside Mobile Drawer */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-              <button
-                onClick={() => { handleSwitchDepartment('digital_print'); setMobileMenuOpen(false); }}
-                className={`dept-switch-btn ${activeDepartment === 'digital_print' && activeTab !== 'workspace' ? 'active' : ''}`}
-                style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
-              >
-                <Printer size={16} />
-                <span>Elite Digital Print</span>
-              </button>
-              <button
-                onClick={() => { setActiveTab('workspace'); setMobileMenuOpen(false); }}
-                className={`dept-switch-btn ${activeTab === 'workspace' ? 'active' : ''}`}
-                style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
-              >
-                <MessageSquare size={16} />
-                <span>Workspace / Chat</span>
-              </button>
-              <button
-                onClick={() => { handleSwitchDepartment('elite_edition'); setMobileMenuOpen(false); }}
-                className={`dept-switch-btn ${activeDepartment === 'elite_edition' && activeTab !== 'workspace' ? 'active' : ''}`}
-                style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
-              >
-                <Store size={16} />
-                <span>Elite Edition</span>
-              </button>
+              {hasEliteEditionAccess && (
+                <button
+                  onClick={() => { handleSwitchDepartment('elite_edition'); setMobileMenuOpen(false); }}
+                  className={`dept-switch-btn ${activeDepartment === 'elite_edition' && activeTab !== 'workspace' ? 'active' : ''}`}
+                  style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
+                >
+                  <Store size={16} />
+                  <span>Elite Edition</span>
+                </button>
+              )}
+              {hasDigitalPrintAccess && (
+                <button
+                  onClick={() => { handleSwitchDepartment('digital_print'); setMobileMenuOpen(false); }}
+                  className={`dept-switch-btn ${activeDepartment === 'digital_print' && activeTab !== 'workspace' ? 'active' : ''}`}
+                  style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
+                >
+                  <Printer size={16} />
+                  <span>Elite Digital Print</span>
+                </button>
+              )}
+              {hasWorkspaceAccess && (
+                <button
+                  onClick={() => { setActiveTab('workspace'); setMobileMenuOpen(false); }}
+                  className={`dept-switch-btn ${activeTab === 'workspace' ? 'active' : ''}`}
+                  style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
+                >
+                  <MessageSquare size={16} />
+                  <span>Workspace / Chat</span>
+                </button>
+              )}
             </div>
 
             {/* Modules List inside Mobile Drawer */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.75rem' }}>
-              {activeDepartment === 'digital_print' ? (
+              {activeTab === 'workspace' ? (
+                <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                  <div style={styles.sidebarSectionHeader}>
+                    <MessageSquare size={14} color="var(--primary)" />
+                    <span>Workspace & Chat Active</span>
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0.4rem 0 0' }}>
+                    Access chats, channels & team updates in main view.
+                  </p>
+                </div>
+              ) : activeDepartment === 'digital_print' ? (
                 <>
                   <div style={styles.sidebarSectionHeader}>
                     <Printer size={14} color="var(--primary)" />
@@ -917,10 +970,6 @@ export default function App() {
                 </>
               )}
 
-              <button onClick={() => { setActiveTab('workspace'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'workspace' ? styles.navItemActive : {}) }}>
-                <MessageSquare size={18} /><span>Workspace / Chat</span>
-              </button>
-
               {currentUser && currentUser.role === 'admin' && (
                 <button onClick={() => { setActiveTab('admin'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'admin' ? styles.navItemActive : {}) }}>
                   <ShieldAlert size={18} color="var(--primary)" /><span>Admin Panel</span>
@@ -964,7 +1013,17 @@ export default function App() {
         <aside style={styles.sidebar} className="sidebar-wrap">
           <div className="glass-panel" style={styles.navPanel}>
 
-            {activeDepartment === 'digital_print' ? (
+            {activeTab === 'workspace' ? (
+              <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                <div style={styles.sidebarSectionHeader}>
+                  <MessageSquare size={14} color="var(--primary)" />
+                  <span>Workspace & Operations</span>
+                </div>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0.5rem 0 0', lineHeight: 1.4 }}>
+                  Collaborate in real time, view task boards, and chat with team members.
+                </p>
+              </div>
+            ) : activeDepartment === 'digital_print' ? (
               /* ── ELITE DIGITAL PRINT MODULES ── */
               <>
                 <div style={styles.sidebarSectionHeader}>
@@ -1069,14 +1128,6 @@ export default function App() {
                 )}
               </>
             )}
-
-            {/* Shared Workspace / Chat Tab */}
-            <button
-              onClick={() => handleNavClick('workspace')}
-              style={{ ...styles.navItem, ...(activeTab === 'workspace' ? styles.navItemActive : {}) }}
-            >
-              <MessageSquare size={18} /><span>Workspace / Chat</span>
-            </button>
 
             {currentUser && currentUser.role === 'admin' && (
               <button
