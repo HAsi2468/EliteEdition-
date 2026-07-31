@@ -983,6 +983,7 @@ export default function ReportsCenter({ department }) {
                       <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Date</th>
                       <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Lot #</th>
                       <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Party Name</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Bill To</th>
                       <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Challan No</th>
                       <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Fabric Quality & Panna</th>
                       <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#94a3b8' }}>Shortage</th>
@@ -991,7 +992,15 @@ export default function ReportsCenter({ department }) {
                   </thead>
                   <tbody>
                     {reportData.map((t, idx) => {
-                      const shortageStr = (t.shortagePct !== undefined && t.shortagePct !== null && t.shortagePct !== '') ? `${t.shortagePct}%` : (t.fabricQuality && (t.fabricQuality.includes('CREPE') || t.fabricQuality.includes('CRAPE') || t.fabricQuality.includes('FRENCH'))) ? '2%' : '—';
+                      let shortageVal = (t.shortagePct !== undefined && t.shortagePct !== null && t.shortagePct !== '') ? t.shortagePct : null;
+                      if (shortageVal === null && t.notes) {
+                        const m = String(t.notes).match(/(\d+(?:\.\d+)?)%\s*shortage/i);
+                        if (m) shortageVal = m[1];
+                      }
+                      if (shortageVal === null && t.fabricQuality && (t.fabricQuality.includes('CREPE') || t.fabricQuality.includes('CRAPE') || t.fabricQuality.includes('FRENCH'))) {
+                        shortageVal = 2;
+                      }
+                      const shortageStr = shortageVal != null ? `${shortageVal}%` : '—';
                       return (
                         <tr key={t._id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                           <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
@@ -1001,6 +1010,7 @@ export default function ReportsCenter({ department }) {
                             {t.lotNo ? `#${t.lotNo}` : '—'}
                           </td>
                           <td style={{ padding: '12px 16px', fontWeight: '600', color: '#f8fafc' }}>{t.partyName || '—'}</td>
+                          <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>{t.billTo || t.partyName || '—'}</td>
                           <td style={{ padding: '12px 16px', color: '#38bdf8' }}>{t.challanNo || '—'}</td>
                           <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
                             {t.fabricQuality || '—'}{t.panna ? ` (${t.panna}")` : ''}
@@ -1016,7 +1026,7 @@ export default function ReportsCenter({ department }) {
                     })}
                     {reportData.length === 0 && (
                       <tr>
-                        <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                        <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                           No fabric outward records found for selected date range.
                         </td>
                       </tr>

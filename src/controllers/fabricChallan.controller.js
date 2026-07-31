@@ -330,9 +330,11 @@ const createChallan = async (req, res) => {
             panna: panna || '',
             lotNo: parseLotNo(lot),
             qty: rawMtr,
+            shortagePct: challan.shortagePct != null ? challan.shortagePct : ((fabricName && (fabricName.includes('CREPE') || fabricName.includes('CRAPE') || fabricName.includes('FRENCH'))) ? 2 : null),
             date: challan.date,
             jobNo: jobNo || '',
             partyName: partyName || '',
+            billTo: billTo || partyName || '',
             challanNo: 'EDP-' + challan.challanNo,
             notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Fresh=${groupMtr}m + ${challan.shortagePct || 0}% shortage = ${rawMtr}m raw`,
           });
@@ -466,9 +468,11 @@ const updateChallan = async (req, res) => {
             panna: challan.panna || '',
             lotNo: parseLotNo(lot),
             qty: rawMtr,
+            shortagePct: challan.shortagePct != null ? challan.shortagePct : ((challan.fabricName && (challan.fabricName.includes('CREPE') || challan.fabricName.includes('CRAPE') || challan.fabricName.includes('FRENCH'))) ? 2 : null),
             date: challan.date,
             jobNo: challan.jobNo || '',
             partyName: challan.partyName || '',
+            billTo: challan.billTo || challan.partyName || '',
             challanNo: 'EDP-' + challan.challanNo,
             notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Fresh=${groupMtr}m + ${challan.shortagePct || 0}% shortage = ${rawMtr}m raw`,
           });

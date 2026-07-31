@@ -942,12 +942,13 @@ const downloadFabricOutwardPdf = async (req, res) => {
       doc.rect(30, currY, 535, 20).fill('#ede9fe');
       doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold');
       doc.text('DATE', 35, currY + 6);
-      doc.text('LOT #', 95, currY + 6);
-      doc.text('PARTY NAME', 145, currY + 6);
-      doc.text('CHALLAN NO.', 255, currY + 6);
-      doc.text('FABRIC & PANNA', 345, currY + 6);
-      doc.text('SHORTAGE', 435, currY + 6);
-      doc.text('QTY (M)', 490, currY + 6);
+      doc.text('LOT #', 85, currY + 6);
+      doc.text('PARTY NAME', 130, currY + 6);
+      doc.text('BILL TO', 225, currY + 6);
+      doc.text('CHALLAN NO.', 320, currY + 6);
+      doc.text('FABRIC & PANNA', 395, currY + 6);
+      doc.text('SHORTAGE', 465, currY + 6);
+      doc.text('QTY (M)', 510, currY + 6);
     };
 
     doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold').text('FABRIC OUTWARD TRANSACTIONS MASTER LIST', 30, y);
@@ -966,17 +967,26 @@ const downloadFabricOutwardPdf = async (req, res) => {
       const dt = t.date ? new Date(t.date).toLocaleDateString('en-IN', { day:'2-digit', month:'2-digit', year:'numeric' }) : '—';
       const fabStr = `${t.fabricQuality || '—'}${t.panna ? ' (' + t.panna + '")' : ''}`;
       const chStr = `${t.challanNo || '—'}`;
-      const shortageStr = (t.shortagePct !== undefined && t.shortagePct !== null && t.shortagePct !== '') ? `${t.shortagePct}%` : (t.fabricQuality && (t.fabricQuality.includes('CREPE') || t.fabricQuality.includes('CRAPE') || t.fabricQuality.includes('FRENCH'))) ? '2%' : '—';
+      let shortageVal = (t.shortagePct !== undefined && t.shortagePct !== null && t.shortagePct !== '') ? t.shortagePct : null;
+      if (shortageVal === null && t.notes) {
+        const m = String(t.notes).match(/(\d+(?:\.\d+)?)%\s*shortage/i);
+        if (m) shortageVal = m[1];
+      }
+      if (shortageVal === null && t.fabricQuality && (t.fabricQuality.includes('CREPE') || t.fabricQuality.includes('CRAPE') || t.fabricQuality.includes('FRENCH'))) {
+        shortageVal = 2;
+      }
+      const shortageStr = shortageVal != null ? `${shortageVal}%` : '—';
 
       doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#fcfaff' : '#ffffff');
       doc.fillColor('#000000').fontSize(8).font('Helvetica');
       doc.text(dt, 35, y + 5);
-      doc.text(t.lotNo ? `#${t.lotNo}` : '—', 95, y + 5);
-      doc.text(t.partyName || '—', 145, y + 5, { width: 105, lineBreak: false });
-      doc.text(chStr, 255, y + 5, { width: 85, lineBreak: false });
-      doc.text(fabStr, 345, y + 5, { width: 85, lineBreak: false });
-      doc.text(shortageStr, 435, y + 5, { width: 50, lineBreak: false });
-      doc.fillColor('#b91c1c').font('Helvetica-Bold').text(`-${(t.qty || 0).toLocaleString('en-IN')} m`, 490, y + 5);
+      doc.text(t.lotNo ? `#${t.lotNo}` : '—', 85, y + 5);
+      doc.text(t.partyName || '—', 130, y + 5, { width: 90, lineBreak: false });
+      doc.text(t.billTo || t.partyName || '—', 225, y + 5, { width: 90, lineBreak: false });
+      doc.text(chStr, 320, y + 5, { width: 70, lineBreak: false });
+      doc.text(fabStr, 395, y + 5, { width: 65, lineBreak: false });
+      doc.text(shortageStr, 465, y + 5, { width: 40, lineBreak: false });
+      doc.fillColor('#b91c1c').font('Helvetica-Bold').text(`-${(t.qty || 0).toLocaleString('en-IN')} m`, 510, y + 5);
       y += 18;
     });
 
@@ -1522,14 +1532,15 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       const drawOutwardHeaders = () => {
         doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
         doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
-        doc.text('DATE', ML + 4, currentY + 5, { width: 50 });
-        doc.text('PARTY NAME', ML + 56, currentY + 5, { width: 130 });
-        doc.text('JOB NO', ML + 188, currentY + 5, { width: 55 });
-        doc.text('CHALLAN NO', ML + 245, currentY + 5, { width: 60 });
-        doc.text('FABRIC QUALITY', ML + 307, currentY + 5, { width: 95 });
-        doc.text('LOT NO', ML + 404, currentY + 5, { width: 40 });
-        doc.text('SHORTAGE', ML + 446, currentY + 5, { width: 45, align: 'center' });
-        doc.text('QTY (MTR)', ML + 493, currentY + 5, { width: 38, align: 'right' });
+        doc.text('DATE', ML + 4, currentY + 5, { width: 40 });
+        doc.text('PARTY NAME', ML + 46, currentY + 5, { width: 90 });
+        doc.text('BILL TO', ML + 138, currentY + 5, { width: 90 });
+        doc.text('JOB NO', ML + 230, currentY + 5, { width: 45 });
+        doc.text('CHALLAN NO', ML + 277, currentY + 5, { width: 55 });
+        doc.text('FABRIC QUALITY', ML + 334, currentY + 5, { width: 85 });
+        doc.text('LOT NO', ML + 421, currentY + 5, { width: 35 });
+        doc.text('SHORTAGE', ML + 458, currentY + 5, { width: 35, align: 'center' });
+        doc.text('QTY (MTR)', ML + 495, currentY + 5, { width: 36, align: 'right' });
         currentY += 18;
       };
 
@@ -1544,17 +1555,27 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
 
         const dStr = r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
-        const shortageStr = r.shortagePct != null ? `${r.shortagePct}%` : '—';
+        let shortageVal = (r.shortagePct !== undefined && r.shortagePct !== null && r.shortagePct !== '') ? r.shortagePct : null;
+        if (shortageVal === null && r.notes) {
+          const m = String(r.notes).match(/(\d+(?:\.\d+)?)%\s*shortage/i);
+          if (m) shortageVal = m[1];
+        }
+        if (shortageVal === null && r.fabricQuality && (r.fabricQuality.includes('CREPE') || r.fabricQuality.includes('CRAPE') || r.fabricQuality.includes('FRENCH'))) {
+          shortageVal = 2;
+        }
+        const shortageStr = shortageVal != null ? `${shortageVal}%` : '—';
+
         doc.fillColor('#000000').fontSize(7).font('Helvetica');
-        doc.text(dStr, ML + 4, currentY + 4.5, { width: 50, lineBreak: false });
-        doc.text(r.partyName || '—', ML + 56, currentY + 4.5, { width: 130, lineBreak: false });
-        doc.text(r.jobNo || '—', ML + 188, currentY + 4.5, { width: 55, lineBreak: false });
-        doc.text(r.challanNo || '—', ML + 245, currentY + 4.5, { width: 60, lineBreak: false });
-        doc.text(r.fabricQuality || '—', ML + 307, currentY + 4.5, { width: 95, lineBreak: false });
-        doc.text(r.lotNo ? `#${r.lotNo}` : '—', ML + 404, currentY + 4.5, { width: 40, lineBreak: false });
-        doc.text(shortageStr, ML + 446, currentY + 4.5, { width: 45, align: 'center', lineBreak: false });
+        doc.text(dStr, ML + 4, currentY + 4.5, { width: 40, lineBreak: false });
+        doc.text(r.partyName || '—', ML + 46, currentY + 4.5, { width: 90, lineBreak: false });
+        doc.text(r.billTo || r.partyName || '—', ML + 138, currentY + 4.5, { width: 90, lineBreak: false });
+        doc.text(r.jobNo || '—', ML + 230, currentY + 4.5, { width: 45, lineBreak: false });
+        doc.text(r.challanNo || '—', ML + 277, currentY + 4.5, { width: 55, lineBreak: false });
+        doc.text(r.fabricQuality || '—', ML + 334, currentY + 4.5, { width: 85, lineBreak: false });
+        doc.text(r.lotNo ? `#${r.lotNo}` : '—', ML + 421, currentY + 4.5, { width: 35, lineBreak: false });
+        doc.text(shortageStr, ML + 458, currentY + 4.5, { width: 35, align: 'center', lineBreak: false });
         doc.fillColor('#b91c1c').font('Helvetica-Bold');
-        doc.text(`${parseFloat(r.qty || 0).toFixed(2)}`, ML + 493, currentY + 4.5, { width: 38, align: 'right', lineBreak: false });
+        doc.text(`${parseFloat(r.qty || 0).toFixed(2)}`, ML + 495, currentY + 4.5, { width: 36, align: 'right', lineBreak: false });
         currentY += 18;
       });
 

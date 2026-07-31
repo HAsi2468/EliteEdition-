@@ -43,6 +43,10 @@ const fabricTransactionSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    billTo: {
+      type: String,
+      trim: true,
+    },
     panna: {
       type: String,
       trim: true,
