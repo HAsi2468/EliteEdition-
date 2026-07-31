@@ -261,13 +261,14 @@ const getLotStock = async (req, res) => {
 
     const pipeline = [
       { $match: matchStage },
+      { $sort: { date: 1, type: -1 } },
       {
         $group: {
           _id: '$lotNo',
           fabricQuality: { $first: '$fabricQuality' },
           panna: { $first: '$panna' },
-          vendorName: { $first: '$vendorName' },
-          vendorChallanNo: { $first: '$challanNo' },
+          vendorName: { $max: '$vendorName' },
+          vendorChallanNo: { $max: '$challanNo' },
           totalInward: {
             $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] }
           },
@@ -1689,6 +1690,17 @@ const createStockAdjustment = async (req, res) => {
     const normFabric = normalizeFabric(fabricQuality);
     const normP = normalizePanna(panna, normFabric);
 
+    let finalVendorChallan = (vendorChallanNo || '').trim();
+    if (!finalVendorChallan && lotNo) {
+      const numLot = parseInt(lotNo, 10);
+      if (!isNaN(numLot)) {
+        const inTx = await FabricTransaction.findOne({ lotNo: numLot, type: 'INWARD', challanNo: { $ne: null, $ne: '' } }).lean();
+        if (inTx && inTx.challanNo) {
+          finalVendorChallan = inTx.challanNo;
+        }
+      }
+    }
+
     const saDoc = new FabricStockAdjustment({
       date: date ? new Date(date) : new Date(),
       partyName: partyName || '',
@@ -1696,7 +1708,7 @@ const createStockAdjustment = async (req, res) => {
       fabricQuality: normFabric,
       panna: normP,
       lotNo: lotNo || '',
-      vendorChallanNo: vendorChallanNo || '',
+      vendorChallanNo: finalVendorChallan,
       tpDetails: tpDetails || [],
       totalMtr: Number(totalMtr) || 0,
       totalTp: Number(totalTp) || tpDetails.length,
@@ -1822,6 +1834,17 @@ const updateStockAdjustment = async (req, res) => {
     const normFabric = normalizeFabric(fabricQuality);
     const normP = normalizePanna(panna, normFabric);
 
+    let finalVendorChallan = (vendorChallanNo || '').trim();
+    if (!finalVendorChallan && lotNo) {
+      const numLot = parseInt(lotNo, 10);
+      if (!isNaN(numLot)) {
+        const inTx = await FabricTransaction.findOne({ lotNo: numLot, type: 'INWARD', challanNo: { $ne: null, $ne: '' } }).lean();
+        if (inTx && inTx.challanNo) {
+          finalVendorChallan = inTx.challanNo;
+        }
+      }
+    }
+
     // Delete existing transactions tied to this SA
     if (saDoc.fabricTransactionIds && saDoc.fabricTransactionIds.length > 0) {
       await FabricTransaction.deleteMany({ _id: { $in: saDoc.fabricTransactionIds } });
@@ -1834,7 +1857,7 @@ const updateStockAdjustment = async (req, res) => {
     saDoc.fabricQuality = normFabric;
     saDoc.panna = normP;
     saDoc.lotNo = lotNo || '';
-    saDoc.vendorChallanNo = vendorChallanNo || '';
+    saDoc.vendorChallanNo = finalVendorChallan;
     saDoc.tpDetails = tpDetails || [];
     saDoc.totalMtr = Number(totalMtr) || 0;
     saDoc.totalTp = Number(totalTp) || (tpDetails ? tpDetails.length : 0);

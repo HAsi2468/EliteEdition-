@@ -1091,7 +1091,24 @@ export default function FabricInventoryPanel() {
       notes: sa.notes || '',
       tpDetails: sa.tpDetails && sa.tpDetails.length > 0 ? sa.tpDetails : [{ tpNo: 1, tpMeter: sa.totalMtr || '', lotNo: sa.lotNo || '' }]
     });
+    if (sa.fabricQuality) {
+      api.getFabricLotStock({ fabricQuality: sa.fabricQuality }).then(res => {
+        if (res && res.success) setSaAvailableLots(res.data || []);
+      }).catch(() => {});
+    }
     setIsSaFormOpen(true);
+  };
+
+  const handleSaLotChange = (e) => {
+    const selectedLotNo = e.target.value;
+    const foundLot = saAvailableLots.find(l => String(l.lotNo) === String(selectedLotNo));
+    
+    setSaForm(prev => ({
+      ...prev,
+      lotNo: selectedLotNo,
+      vendorChallanNo: foundLot?.vendorChallanNo || prev.vendorChallanNo,
+      partyName: prev.partyName || foundLot?.vendorName || ''
+    }));
   };
 
   const handleCreateSaSubmit = async (e) => {
@@ -2705,7 +2722,7 @@ export default function FabricInventoryPanel() {
                     <label style={labelStyle}>Lot No *</label>
                     <select
                       value={saForm.lotNo}
-                      onChange={e => setSaForm(prev => ({ ...prev, lotNo: e.target.value }))}
+                      onChange={handleSaLotChange}
                       style={inputStyle}
                     >
                       <option value="">Select Lot No…</option>
