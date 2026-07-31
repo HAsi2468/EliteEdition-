@@ -2081,6 +2081,10 @@ const downloadStockAdjustmentPdf = async (req, res) => {
         doc.image(logoPath, ML + (contentWidth - 130) / 2, MR + 29, { width: 130 });
       }
 
+      // FABRIC RETURN title written in top right side corner of header box
+      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(14).font('Helvetica-Bold')
+        .text('FABRIC RETURN', ML, MR + 25, { width: contentWidth - 12, align: 'right', lineBreak: false });
+
       // Address Pin
       const drawMapPin = (d, x, y) => {
         d.save();
@@ -2115,16 +2119,16 @@ const downloadStockAdjustmentPdf = async (req, res) => {
         .text(saDoc.partyName || '—', ML + 42, startY + 4, { lineBreak: false });
         
       doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
-        .text('DATE:', PW - MR - 270, startY + 6, { width: 48, align: 'right', lineBreak: false });
+        .text('DATE:', PW - MR - 260, startY + 6, { width: 48, align: 'right', lineBreak: false });
       doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(13).font('Helvetica-Bold')
-        .text(formattedDate, PW - MR - 220, startY + 6, { width: 80, align: 'left', lineBreak: false });
+        .text(formattedDate, PW - MR - 210, startY + 6, { width: 80, align: 'left', lineBreak: false });
 
-      // Right header: FABRIC RETURN & Voucher #
-      const labelStr = 'FABRIC RETURN:';
+      // Right header: CH. NO. & Voucher #
+      const labelStr = 'CH. NO.:';
       const valStr = saDoc.saNo || '—';
       const rightEdge = PW - MR - 8;
       const valW = 60;
-      const labelW = 120;
+      const labelW = 70;
       const valX = rightEdge - valW;
       const labelX = valX - labelW;
 
