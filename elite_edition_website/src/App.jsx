@@ -232,10 +232,10 @@ export default function App() {
   const hasWorkspaceAccess = !currentUser || currentUser.role === 'admin' || !currentUser.permissions || currentUser.permissions.length === 0 || currentUser.permissions.includes('workspace');
 
   const getFirstJobCardsTab = () => {
-    if (!currentUser || currentUser.role === 'admin') return 'jobcards_fabric';
-    const subTabs = ['jobcards_fabric', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards', 'jobcards_raw_materials'];
+    if (!currentUser || currentUser.role === 'admin') return 'jobcards';
+    const subTabs = ['jobcards', 'jobcards_fabric', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials'];
     const allowed = subTabs.filter(t => currentUser.permissions?.includes(t));
-    return allowed[0] || 'jobcards_fabric';
+    return allowed[0] || 'jobcards';
   };
 
   const getFirstEETab = () => {
@@ -873,47 +873,49 @@ export default function App() {
                     <span>Digital Print Modules</span>
                   </div>
 
-                  {/* 1. Fabric Management */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) && (
-                    <button onClick={() => { setActiveTab('jobcards_fabric'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_fabric' ? styles.navItemActive : {}) }}>
-                      <Database size={18} /><span>Fabric Management</span>
-                    </button>
-                  )}
-                  {/* 2. Job Card */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
-                    <button onClick={() => { setActiveTab('jobcards_list'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
-                      <FileText size={18} /><span>Job Card</span>
-                    </button>
-                  )}
-                  {/* 3. Job Card Tracking */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_tracking')) && (
-                    <button onClick={() => { setActiveTab('jobcards_tracking'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_tracking' ? styles.navItemActive : {}) }}>
-                      <RefreshCw size={18} /><span>Job Card Tracking</span>
-                    </button>
-                  )}
-                  {/* 4. Design Catalog */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) && (
-                    <button onClick={() => { setActiveTab('jobcards_catalogue'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_catalogue' ? styles.navItemActive : {}) }}>
-                      <BookOpen size={18} /><span>Design Catalog</span>
-                    </button>
-                  )}
-                  {/* 5. Design Master */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master')) && (
-                    <button onClick={() => { setActiveTab('jobcards_master'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_master' ? styles.navItemActive : {}) }}>
-                      <Layers size={18} /><span>Design Master</span>
-                    </button>
-                  )}
-                  {/* 6. Print Settings */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) && (
-                    <button onClick={() => { setActiveTab('jobcards_settings'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_settings' ? styles.navItemActive : {}) }}>
-                      <Settings size={18} /><span>Print Settings</span>
-                    </button>
-                  )}
+                  {/* 1. Prints Dashboard & Reports */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards')) && (
                     <button onClick={() => { setActiveTab('jobcards'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards' ? styles.navItemActive : {}) }}>
                       <BarChart3 size={18} /><span>Prints Dashboard</span>
                     </button>
                   )}
+                  {/* 2. Fabric Management */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) && (
+                    <button onClick={() => { setActiveTab('jobcards_fabric'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_fabric' ? styles.navItemActive : {}) }}>
+                      <Database size={18} /><span>Fabric Management</span>
+                    </button>
+                  )}
+                  {/* 3. Job Card */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
+                    <button onClick={() => { setActiveTab('jobcards_list'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
+                      <FileText size={18} /><span>Job Card</span>
+                    </button>
+                  )}
+                  {/* 4. Job Card Tracking */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_tracking')) && (
+                    <button onClick={() => { setActiveTab('jobcards_tracking'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_tracking' ? styles.navItemActive : {}) }}>
+                      <RefreshCw size={18} /><span>Job Card Tracking</span>
+                    </button>
+                  )}
+                  {/* 5. Design Catalog */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) && (
+                    <button onClick={() => { setActiveTab('jobcards_catalogue'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_catalogue' ? styles.navItemActive : {}) }}>
+                      <BookOpen size={18} /><span>Design Catalog</span>
+                    </button>
+                  )}
+                  {/* 6. Design Master */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master')) && (
+                    <button onClick={() => { setActiveTab('jobcards_master'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_master' ? styles.navItemActive : {}) }}>
+                      <Layers size={18} /><span>Design Master</span>
+                    </button>
+                  )}
+                  {/* 7. Print Settings */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) && (
+                    <button onClick={() => { setActiveTab('jobcards_settings'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_settings' ? styles.navItemActive : {}) }}>
+                      <Settings size={18} /><span>Print Settings</span>
+                    </button>
+                  )}
+                  {/* 8. Raw Materials */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_raw_materials')) && (
                     <button onClick={() => { setActiveTab('jobcards_raw_materials'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_raw_materials' ? styles.navItemActive : {}) }}>
                       <ShoppingBag size={18} /><span>Raw Materials</span>
@@ -1031,47 +1033,49 @@ export default function App() {
                   <span>Digital Print Modules</span>
                 </div>
 
-                {/* 1. Fabric Management */}
+                {/* 1. Prints Dashboard & Reports */}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards')) && (
+                  <button onClick={() => handleNavClick('jobcards')} style={{ ...styles.navItem, ...(activeTab === 'jobcards' ? styles.navItemActive : {}) }}>
+                    <BarChart3 size={18} /><span>Prints Dashboard & Reports</span>
+                  </button>
+                )}
+                {/* 2. Fabric Management */}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) && (
                   <button onClick={() => handleNavClick('jobcards_fabric')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_fabric' ? styles.navItemActive : {}) }}>
                     <Database size={18} /><span>Fabric Management</span>
                   </button>
                 )}
-                {/* 2. Job Card */}
+                {/* 3. Job Card */}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
                   <button onClick={() => handleNavClick('jobcards_list')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
                     <FileText size={18} /><span>Job Card</span>
                   </button>
                 )}
-                {/* 3. Job Card Tracking */}
+                {/* 4. Job Card Tracking */}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_tracking')) && (
                   <button onClick={() => handleNavClick('jobcards_tracking')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_tracking' ? styles.navItemActive : {}) }}>
                     <RefreshCw size={18} /><span>Job Card Tracking</span>
                   </button>
                 )}
-                {/* 4. Design Catalog */}
+                {/* 5. Design Catalog */}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) && (
                   <button onClick={() => handleNavClick('jobcards_catalogue')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_catalogue' ? styles.navItemActive : {}) }}>
                     <BookOpen size={18} /><span>Design Catalog</span>
                   </button>
                 )}
-                {/* 5. Design Master */}
+                {/* 6. Design Master */}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master')) && (
                   <button onClick={() => handleNavClick('jobcards_master')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_master' ? styles.navItemActive : {}) }}>
                     <Layers size={18} /><span>Design Master</span>
                   </button>
                 )}
-                {/* 6. Print Settings */}
+                {/* 7. Print Settings */}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) && (
                   <button onClick={() => handleNavClick('jobcards_settings')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_settings' ? styles.navItemActive : {}) }}>
                     <Settings size={18} /><span>Print Settings</span>
                   </button>
                 )}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards')) && (
-                  <button onClick={() => handleNavClick('jobcards')} style={{ ...styles.navItem, ...(activeTab === 'jobcards' ? styles.navItemActive : {}) }}>
-                    <BarChart3 size={18} /><span>Prints Dashboard</span>
-                  </button>
-                )}
+                {/* 8. Raw Materials */}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_raw_materials')) && (
                   <button onClick={() => handleNavClick('jobcards_raw_materials')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_raw_materials' ? styles.navItemActive : {}) }}>
                     <ShoppingBag size={18} /><span>Raw Materials</span>
