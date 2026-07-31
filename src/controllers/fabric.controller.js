@@ -2006,36 +2006,59 @@ const createLotTransfer = async (req, res) => {
 const getLotTransfers = async (req, res) => {
   try {
     const { dateStart, dateEnd, search } = req.query;
-    const filter = {
-      $or: [
-        { notes: { $regex: /Lot Transfer/i } },
-        { notes: { $regex: /Lot Rebalance/i } },
-        { notes: { $regex: /\[Ref:\s*LT-/i } }
-      ]
-    };
+
+    // Base: any transaction that is a lot transfer/rebalance
+    // — primary: match by [Ref: LT-] tag in notes
+    // — fallback: catch first-batch auto-rebalance entries that lacked a Ref tag
+    const conditions = [
+      {
+        $or: [
+          { notes: { $regex: /\[Ref:\s*LT-/i } },
+          { notes: { $regex: /Auto Lot Rebalance/i } },
+          { notes: { $regex: /Lot Transfer to Lot/i } },
+          { notes: { $regex: /Lot Transfer from Lot/i } }
+        ]
+      }
+    ];
 
     if (dateStart || dateEnd) {
-      filter.date = {};
-      if (dateStart) filter.date.$gte = new Date(dateStart);
+      const dateRange = {};
+      if (dateStart) dateRange.$gte = new Date(dateStart);
       if (dateEnd) {
         const end = new Date(dateEnd);
         end.setHours(23, 59, 59, 999);
-        filter.date.$lte = end;
+        dateRange.$lte = end;
       }
+      conditions.push({ date: dateRange });
     }
 
     if (search) {
       const re = new RegExp(search, 'i');
-      filter.fabricQuality = re;
+      conditions.push({
+        $or: [
+          { fabricQuality: re },
+          { notes: re }
+        ]
+      });
     }
 
-    const txs = await FabricTransaction.find(filter).sort({ date: -1, createdAt: -1 });
+    const filter = conditions.length === 1 ? conditions[0] : { $and: conditions };
 
-    // Group pairs by Ref ID
+    const txs = await FabricTransaction.find(filter).sort({ date: -1, createdAt: -1 }).lean();
+
+    // Group pairs by unique Ref ID — each paired OUTWARD + INWARD shares the same [Ref: LT-xxx]
     const transferMap = new Map();
     txs.forEach(t => {
       const matchRef = (t.notes || '').match(/\[Ref:\s*(LT-[A-Za-z0-9_-]+)\]/i);
-      const refKey = matchRef ? matchRef[1] : `LT-LEGACY-${t.fabricQuality}_${new Date(t.date).toISOString().split('T')[0]}_${t.qty}_${t.lotNo}`;
+
+      // Build ref key: use [Ref: LT-xxx] if present, else build from notes/lot/qty
+      let refKey;
+      if (matchRef) {
+        refKey = matchRef[1];
+      } else {
+        // Fallback for old entries without a Ref tag — group by same note text (trimmed)
+        refKey = `LT-LEGACY-${(t.notes || '').replace(/\s+/g, '-').substring(0, 60)}`;
+      }
 
       if (!transferMap.has(refKey)) {
         transferMap.set(refKey, {
@@ -2062,7 +2085,10 @@ const getLotTransfers = async (req, res) => {
       }
     });
 
-    res.json({ success: true, data: Array.from(transferMap.values()) });
+    // Sort by date descending
+    const result = Array.from(transferMap.values()).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
