@@ -1171,4 +1171,10 @@ export const api = {
       body: JSON.stringify(data),
     });
   },
+
+  async autoLotTransfer() {
+    return request('/fabric/auto-lot-transfer', {
+      method: 'POST',
+    });
+  },
 };

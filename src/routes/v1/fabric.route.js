@@ -50,6 +50,7 @@ router.get('/stock-adjustment/:id/pdf', fabricController.downloadStockAdjustment
 
 // Lot Transfer routes
 router.post('/lot-transfer', fabricController.createLotTransfer);
+router.post('/auto-lot-transfer', fabricController.autoLotTransfer);
 router.get('/lot-transfer', fabricController.getLotTransfers);
 
 // Update a transaction by ID

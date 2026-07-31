@@ -2051,6 +2051,131 @@ const getLotTransfers = async (req, res) => {
   }
 };
 
+// ── POST /fabric/auto-lot-transfer ───────────────────────────────────────
+const autoLotTransfer = async (req, res) => {
+  try {
+    const lots = await computeLotWiseData();
+
+    // 1. Separate negative deficit lots and positive stock lots
+    const negativeLots = lots.filter(l => l.currentStock < 0);
+    const positiveLots = lots.filter(l => l.currentStock > 0);
+
+    if (negativeLots.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'No negative deficit lots found. Inventory stock balances are all clean!',
+        data: { transferredCount: 0, totalMetersTransferred: 0, transfers: [] }
+      });
+    }
+
+    const executedTransfers = [];
+    let totalMetersTransferred = 0;
+    const now = new Date();
+    const batchRefId = 'LT-AUTO-' + Date.now();
+
+    // Work on mutable copies of lot stocks
+    const posLots = positiveLots.map(l => ({ ...l }));
+
+    for (const negLot of negativeLots) {
+      let deficitNeeded = Math.abs(negLot.currentStock);
+
+      // Try matching by: 3) Fabric + Panna + Party, 2) Fabric + Panna, 1) Fabric
+      const matchCandidates = (strictness) => {
+        return posLots.filter(p => {
+          if (p.currentStock <= 0) return false;
+          if (String(p.lotNo) === String(negLot.lotNo)) return false;
+
+          const fabMatch = (p.fabricQuality || '').toLowerCase().trim() === (negLot.fabricQuality || '').toLowerCase().trim();
+          if (!fabMatch) return false;
+
+          const pannaMatch = String(p.panna || '').replace(/['"]/g, '').trim() === String(negLot.panna || '').replace(/['"]/g, '').trim();
+          const vendorMatch = (p.vendorName || '').toLowerCase().trim() === (negLot.vendorName || '').toLowerCase().trim() && Boolean(p.vendorName);
+
+          if (strictness === 3) return fabMatch && pannaMatch && vendorMatch;
+          if (strictness === 2) return fabMatch && pannaMatch;
+          if (strictness === 1) return fabMatch;
+          return false;
+        }).sort((a, b) => b.currentStock - a.currentStock); // prefer larger positive lots
+      };
+
+      // Try strict level 3 (Fabric + Panna + Party), then 2 (Fabric + Panna), then 1 (Fabric)
+      for (const level of [3, 2, 1]) {
+        if (deficitNeeded <= 0.001) break;
+
+        const candidates = matchCandidates(level);
+
+        for (const candidate of candidates) {
+          if (deficitNeeded <= 0.001) break;
+          if (candidate.currentStock <= 0) continue;
+
+          const transferQty = Number(Math.min(candidate.currentStock, deficitNeeded).toFixed(2));
+          if (transferQty <= 0) continue;
+
+          // Deduct from candidate, add to deficit
+          candidate.currentStock -= transferQty;
+          deficitNeeded -= transferQty;
+          totalMetersTransferred += transferQty;
+
+          const matchLabel = level === 3 ? 'Fabric + Panna + Party' : level === 2 ? 'Fabric + Panna' : 'Fabric Quality';
+          const noteMsg = `Auto Lot Rebalance (${matchLabel}): Lot #${candidate.lotNo} -> Lot #${negLot.lotNo} [Ref: ${batchRefId}]`;
+
+          // Create OUTWARD from candidate
+          const outwardTx = new FabricTransaction({
+            type: 'OUTWARD',
+            date: now,
+            fabricQuality: candidate.fabricQuality,
+            panna: candidate.panna || '',
+            lotNo: candidate.lotNo,
+            qty: transferQty,
+            notes: noteMsg
+          });
+
+          // Create INWARD to negative lot
+          const inwardTx = new FabricTransaction({
+            type: 'INWARD',
+            date: now,
+            fabricQuality: negLot.fabricQuality || candidate.fabricQuality,
+            panna: negLot.panna || candidate.panna || '',
+            lotNo: negLot.lotNo,
+            qty: transferQty,
+            notes: noteMsg
+          });
+
+          await outwardTx.save();
+          await inwardTx.save();
+
+          executedTransfers.push({
+            refId: batchRefId,
+            fabricQuality: candidate.fabricQuality,
+            panna: candidate.panna,
+            vendorName: candidate.vendorName || negLot.vendorName,
+            sourceLotNo: candidate.lotNo,
+            destLotNo: negLot.lotNo,
+            qty: transferQty,
+            matchCriteria: matchLabel
+          });
+        }
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: executedTransfers.length > 0
+        ? `Successfully auto-rebalanced ${executedTransfers.length} transfer pairs (${totalMetersTransferred.toFixed(2)} mtr total) and recorded in history.`
+        : 'Could not auto-rebalance negative lots because no matching positive stock lots were found for the same fabric/panna/party.',
+      data: {
+        batchRefId,
+        transferredCount: executedTransfers.length,
+        totalMetersTransferred: Number(totalMetersTransferred.toFixed(2)),
+        transfers: executedTransfers
+      }
+    });
+  } catch (error) {
+    console.error('Error executing auto lot transfer:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   createInward,
   createOutward,
@@ -2078,4 +2203,5 @@ module.exports = {
   downloadStockAdjustmentPdf,
   createLotTransfer,
   getLotTransfers,
+  autoLotTransfer,
 };

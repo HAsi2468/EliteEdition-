@@ -622,6 +622,39 @@ export default function FabricInventoryPanel() {
     }
   };
 
+  const [autoTransferLoading, setAutoTransferLoading] = useState(false);
+
+  const handleAutoLotTransfer = async () => {
+    const negLots = lotRecords.filter(l => l.currentStock < 0);
+    const negCount = negLots.length;
+    if (negCount === 0) {
+      alert('No negative deficit lots found. Inventory stock balances are clean!');
+      return;
+    }
+
+    const totalDeficit = negLots.reduce((sum, l) => sum + Math.abs(l.currentStock), 0);
+
+    if (!window.confirm(`⚡ AUTO REBALANCE CONFIRMATION:\n\nFound ${negCount} negative stock lots with a total deficit of ${totalDeficit.toFixed(2)} mtr.\n\nDo you want to automatically transfer stock from matching positive lots (filtering by Fabric Quality, Panna, and Vendor/Party) to eliminate these negative deficits?\n\nAll executed transfers will be recorded in History.`)) {
+      return;
+    }
+
+    setAutoTransferLoading(true);
+    try {
+      const res = await api.autoLotTransfer();
+      if (res.success) {
+        triggerPushNotification('⚡ Auto Lot Rebalance Complete', res.message || 'Deficit lots rebalanced successfully!', 'success');
+        triggerGlobalDataRefresh('fabric');
+        fetchData();
+      } else {
+        alert(res.error || 'Failed to auto-rebalance lot stock.');
+      }
+    } catch (err) {
+      alert('Error running auto lot transfer: ' + err.message);
+    } finally {
+      setAutoTransferLoading(false);
+    }
+  };
+
   const startEditInward = (t) => {
     setEditingTransaction(t);
     setInwardForm({
@@ -1441,6 +1474,17 @@ export default function FabricInventoryPanel() {
 
               <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button
+                  onClick={handleAutoLotTransfer}
+                  disabled={autoTransferLoading}
+                  className="btn-primary"
+                  style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', border: 'none' }}
+                  title="Auto-rebalance negative lots using matching Fabric Quality, Panna, and Vendor"
+                >
+                  <RefreshCw size={16} className={autoTransferLoading ? 'spin-loader' : ''} />
+                  {autoTransferLoading ? 'Rebalancing...' : '⚡ Auto-Rebalance All Deficits'}
+                </button>
+
+                <button
                   onClick={async () => {
                     try {
                       setLotPdfLoading(true);
@@ -1770,6 +1814,17 @@ export default function FabricInventoryPanel() {
               </div>
 
               <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  onClick={handleAutoLotTransfer}
+                  disabled={autoTransferLoading}
+                  className="btn-primary"
+                  style={{ gap: '0.4rem', padding: '0.55rem 1.1rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', border: 'none' }}
+                  title="Auto-rebalance negative lots using matching Fabric Quality, Panna, and Vendor"
+                >
+                  <RefreshCw size={16} className={autoTransferLoading ? 'spin-loader' : ''} />
+                  {autoTransferLoading ? 'Rebalancing...' : '⚡ Auto-Rebalance All Deficits'}
+                </button>
+
                 <button
                   onClick={() => {
                     setTransferForm({
