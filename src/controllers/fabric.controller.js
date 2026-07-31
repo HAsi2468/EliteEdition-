@@ -1963,177 +1963,212 @@ const downloadStockAdjustmentPdf = async (req, res) => {
     const fs = require('fs');
     const logoPath = path.join(__dirname, 'Logo.png');
 
-    const doc = new PDFDocument({ size: 'A4', margin: 30, bufferPages: true });
+    const doc = new PDFDocument({ margin: 28, size: 'A4', autoFirstPage: true });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="Stock_Adjustment_${saDoc.saNo}.pdf"`);
+    res.setHeader('Content-Disposition', `inline; filename="Fabric_Return_${saDoc.saNo}.pdf"`);
     doc.pipe(res);
 
-    const ML = 30;
-    const MR = 30;
-    const PW = 595;
+    const PW = 595, PH = 842, ML = 45, MR = 28;
     const contentWidth = PW - ML - MR;
-    const ADDRESS_LINE = 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, NR. KALAPUL, Punagam, Surat';
 
-    // ── HEADER ──────────────────────────────────────────────────────────────────
-    if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, ML, 18, { width: 140 });
-    }
+    const formattedDate = saDoc.date ? new Date(saDoc.date).toLocaleDateString('en-IN', {
+      day: '2-digit', month: '2-digit', year: 'numeric'
+    }) : '—';
 
-    doc.fillColor('#000000').fontSize(15).font('Helvetica-Bold')
-      .text('FABRIC STOCK RETURN / ADJUSTMENT VOUCHER', ML, 20, { width: contentWidth, align: 'right' });
+    const getColor = (colorStr, isColorPage) => {
+      if (isColorPage) return colorStr;
+      if (colorStr === '#dc2626') return '#dc2626'; // Keep Red for Voucher No
+      return '#000000'; // Everything else B&W on second page
+    };
 
-    doc.fillColor('#6b21a8').fontSize(11).font('Helvetica-Bold')
-      .text(`VOUCHER #: ${saDoc.saNo}`, ML, 40, { width: contentWidth, align: 'right' });
+    const renderPage = (isColorPage) => {
+      // Draw outer border
+      doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(1)
+         .rect(ML, MR, contentWidth, PH - 2 * MR).stroke();
 
-    const dStr = saDoc.date ? new Date(saDoc.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
-    doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
-      .text(`Date: ${dStr}`, ML, 56, { width: contentWidth, align: 'right' });
+      // Top line texts: GST, Shree Ganeshay Namah, Mobile
+      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica')
+        .text('GST : 24AANFE0044M1ZG', ML + 12, MR + 4, { lineBreak: false });
+      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica-Bold')
+        .text('|| Shree Ganeshay Namah ||', ML, MR + 4, { width: contentWidth, align: 'center', lineBreak: false });
+      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica')
+        .text('Mo. +91 99098 66667', ML, MR + 4, { width: contentWidth - 12, align: 'right', lineBreak: false });
 
-    // Address line below logo
-    doc.fillColor('#374151').fontSize(7.5).font('Helvetica')
-      .text(ADDRESS_LINE, ML, 72, { width: 290 });
+      doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5)
+        .moveTo(ML, MR + 14).lineTo(PW - MR, MR + 14).stroke();
 
-    doc.moveTo(ML, 86).lineTo(ML + contentWidth, 86).strokeColor('#c084fc').lineWidth(1.5).stroke();
-
-    let y = 98;
-
-    // ── PARTY / VENDOR INFO BOX ─────────────────────────────────────────────────
-    const infoBoxH = 70;
-    doc.rect(ML, y, contentWidth, infoBoxH).fill('#faf5ff').stroke('#e9d5ff');
-    doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold');
-
-    // Row 1
-    doc.text('PARTY / VENDOR:', ML + 10, y + 8);
-    doc.font('Helvetica').text(saDoc.partyName || '—', ML + 120, y + 8, { width: 155, lineBreak: false });
-
-    doc.font('Helvetica-Bold').text('ADJUSTMENT TYPE:', ML + 300, y + 8);
-    doc.font('Helvetica').text(
-      saDoc.adjustmentType === 'RETURN_REJECTED' ? 'Return / Rejected Outward'
-        : saDoc.adjustmentType === 'STOCK_DEDUCTION' ? 'Stock Deduction'
-        : saDoc.adjustmentType === 'STOCK_ADDITION' ? 'Stock Addition'
-        : saDoc.adjustmentType,
-      ML + 410, y + 8, { width: 115, lineBreak: false }
-    );
-
-    // Row 2
-    doc.font('Helvetica-Bold').text('FABRIC & PANNA:', ML + 10, y + 24);
-    doc.font('Helvetica').text(`${saDoc.fabricQuality || '—'}${saDoc.panna ? ' (' + saDoc.panna + '")'  : ''}`, ML + 120, y + 24, { width: 155, lineBreak: false });
-
-    doc.font('Helvetica-Bold').text('LOT NUMBER(S):', ML + 300, y + 24);
-    doc.font('Helvetica').text(saDoc.lotNo ? `#${saDoc.lotNo}` : '—', ML + 410, y + 24, { width: 115, lineBreak: false });
-
-    // Row 3 — Vendor Challan No + Reason
-    doc.font('Helvetica-Bold').text('VENDOR CHALLAN NO:', ML + 10, y + 40);
-    doc.font('Helvetica').text(saDoc.vendorChallanNo || '—', ML + 120, y + 40, { width: 155, lineBreak: false });
-
-    doc.font('Helvetica-Bold').text('REASON / REMARK:', ML + 300, y + 40);
-    doc.font('Helvetica').text(saDoc.reason || 'Fabric Return / Rejection', ML + 410, y + 40, { width: 115, lineBreak: false });
-
-    // Row 4 — Notes
-    if (saDoc.notes) {
-      doc.font('Helvetica-Bold').text('NOTES:', ML + 10, y + 56);
-      doc.font('Helvetica').text(saDoc.notes, ML + 120, y + 56, { width: 400, lineBreak: false });
-    }
-
-    y += infoBoxH + 12;
-
-    // ── ITEMS TABLE ─────────────────────────────────────────────────────────────
-    doc.rect(ML, y, contentWidth, 20).fill('#ede9fe');
-    doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold');
-    doc.text('SR #', ML + 8, y + 6, { width: 40 });
-    doc.text('TP / ROLL NO', ML + 55, y + 6, { width: 100 });
-    doc.text('LOT NO', ML + 200, y + 6, { width: 80 });
-    doc.text('METERS (MTR)', ML + 400, y + 6, { width: contentWidth - 410, align: 'right' });
-    y += 20;
-
-    const details = saDoc.tpDetails && saDoc.tpDetails.length > 0
-      ? saDoc.tpDetails
-      : [{ tpNo: 1, tpMeter: saDoc.totalMtr, lotNo: saDoc.lotNo }];
-
-    details.forEach((tp, i) => {
-      if (y > 680) {
-        doc.addPage();
-        y = 40;
+      // Logo
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, ML + (contentWidth - 130) / 2, MR + 29, { width: 130 });
       }
-      doc.rect(ML, y, contentWidth, 18).fill(i % 2 === 0 ? '#ffffff' : '#faf5ff');
-      doc.strokeColor('#f1f5f9').lineWidth(0.4).rect(ML, y, contentWidth, 18).stroke();
 
-      doc.fillColor('#000000').fontSize(8.5).font('Helvetica');
-      doc.text(String(i + 1), ML + 8, y + 5, { width: 40 });
-      doc.text(`TP-${tp.tpNo}`, ML + 55, y + 5, { width: 100 });
-      doc.text(tp.lotNo ? `#${tp.lotNo}` : (saDoc.lotNo ? `#${saDoc.lotNo}` : '—'), ML + 200, y + 5, { width: 80 });
-      doc.font('Helvetica-Bold').text(`${parseFloat(tp.tpMeter || 0).toFixed(2)} mtr`, ML + 400, y + 5, { width: contentWidth - 410, align: 'right' });
-      y += 18;
-    });
+      // Address Pin
+      const drawMapPin = (d, x, y) => {
+        d.save();
+        d.fillColor(getColor('#0000ff', isColorPage));
+        d.translate(x, y);
+        d.moveTo(0, 0)
+         .bezierCurveTo(-4, -4, -4, -9, 0, -9)
+         .bezierCurveTo(4, -9, 4, -4, 0, 0)
+         .fill();
+        d.fillColor('#ffffff')
+         .circle(0, -5, 1.5)
+         .fill();
+        d.restore();
+      };
 
-    // Total Row
-    doc.rect(ML, y, contentWidth, 26).fill('#f3e8ff').stroke('#c084fc');
-    doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold');
-    doc.text(`TOTAL ROLLS / TP: ${saDoc.totalTp || details.length}`, ML + 10, y + 8);
-    doc.fillColor('#7e22ce').fontSize(11).font('Helvetica-Bold')
-      .text(`TOTAL METERS RETURNED: ${parseFloat(saDoc.totalMtr || 0).toFixed(2)} MTR`, ML + 200, y + 7, { width: contentWidth - 210, align: 'right' });
+      const addressText = 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, NR. KALAPUL, Punagam, Surat';
+      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10).font('Helvetica-Bold');
+      const textWidth = doc.widthOfString(addressText);
+      const startX = ML + (contentWidth - textWidth) / 2;
+      
+      drawMapPin(doc, startX - 8, MR + 79 + 7);
+      doc.text(addressText, startX, MR + 79, { lineBreak: false });
 
-    y += 38;
+      doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.8)
+        .moveTo(ML, MR + 94).lineTo(PW - MR, MR + 94).stroke();
 
-    // ── TERMS & CONDITIONS ──────────────────────────────────────────────────────
-    if (y < 680) {
-      doc.fillColor('#64748b').fontSize(7).font('Helvetica')
-        .text('Terms & Conditions: Fabric return accepted subject to quality inspection. This voucher is valid only with company seal and signature.', ML, y, { width: contentWidth });
-      y += 16;
-    }
+      const startY = MR + 98;
 
-    // ── SIGNATURE SECTION ───────────────────────────────────────────────────────
-    // Push to bottom of page if there is room
-    const sigY = Math.max(y + 20, 720);
-    if (sigY + 60 > 820) {
-      doc.addPage();
-    }
-    const finalSigY = sigY + 60 > 820 ? 40 : sigY;
+      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
+        .text('M/S:', ML + 12, startY + 6, { lineBreak: false });
+      doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(14.5).font('Helvetica-Bold')
+        .text(saDoc.partyName || '—', ML + 42, startY + 4, { lineBreak: false });
+        
+      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
+        .text('DATE:', PW - MR - 270, startY + 6, { width: 48, align: 'right', lineBreak: false });
+      doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(13).font('Helvetica-Bold')
+        .text(formattedDate, PW - MR - 220, startY + 6, { width: 80, align: 'left', lineBreak: false });
 
-    // Divider above signatures
-    doc.moveTo(ML, finalSigY - 8).lineTo(ML + contentWidth, finalSigY - 8).strokeColor('#e2e8f0').lineWidth(0.8).stroke();
+      // Right header: FABRIC RETURN & Voucher #
+      const labelStr = 'FABRIC RETURN:';
+      const valStr = saDoc.saNo || '—';
+      const rightEdge = PW - MR - 8;
+      const valW = 60;
+      const labelW = 120;
+      const valX = rightEdge - valW;
+      const labelX = valX - labelW;
 
-    // Three signature columns
-    const sigColW = Math.floor(contentWidth / 3);
-    const col1X = ML;
-    const col2X = ML + sigColW;
-    const col3X = ML + sigColW * 2;
+      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
+        .text(labelStr, labelX, startY + 6, { width: labelW, align: 'right', lineBreak: false });
 
-    // Labels
-    doc.fillColor('#374151').fontSize(8).font('Helvetica-Bold');
-    doc.text('Prepared By', col1X, finalSigY, { width: sigColW, align: 'center' });
-    doc.text('Receiver / Supplier Sign', col2X, finalSigY, { width: sigColW, align: 'center' });
-    doc.text('Authorized Signatory', col3X, finalSigY, { width: sigColW, align: 'center' });
+      doc.fillColor(getColor('#dc2626', isColorPage)).fontSize(14.5).font('Helvetica-Bold')
+        .text(valStr, valX, startY + 4, { width: valW, align: 'right', lineBreak: false });
 
-    // Signature lines
-    const lineY = finalSigY + 32;
-    doc.moveTo(col1X + 10, lineY).lineTo(col1X + sigColW - 10, lineY).strokeColor('#94a3b8').lineWidth(1).stroke();
-    doc.moveTo(col2X + 10, lineY).lineTo(col2X + sigColW - 10, lineY).strokeColor('#94a3b8').lineWidth(1).stroke();
-    doc.moveTo(col3X + 10, lineY).lineTo(col3X + sigColW - 10, lineY).strokeColor('#94a3b8').lineWidth(1).stroke();
+      doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.6)
+        .moveTo(ML, startY + 28).lineTo(PW - MR, startY + 28).stroke();
 
-    // Stamp box for Authorized
-    doc.rect(col3X + 10, finalSigY + 2, sigColW - 20, 24).stroke('#d1d5db');
-    doc.fillColor('#d1d5db').fontSize(7).font('Helvetica')
-      .text('STAMP', col3X + 10, finalSigY + 10, { width: sigColW - 20, align: 'center' });
+      function renderField(label, value, x, y, width, height) {
+        doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5)
+          .rect(x, y, width, height).stroke();
 
-    // Date fields
-    doc.fillColor('#374151').fontSize(7.5).font('Helvetica')
-      .text('Date: ________________', col1X + 10, lineY + 8)
-      .text('Date: ________________', col2X + 10, lineY + 8);
+        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(9.5).font('Helvetica-Bold')
+          .text(label.toUpperCase(), x + 6, y + 3, { width: width - 12, align: 'left', lineBreak: false });
 
-    // Company info footer
-    doc.fillColor('#6b21a8').fontSize(7.5).font('Helvetica-Bold')
-      .text('ELITE DIGITAL PRINTS', ML, lineY + 30, { width: contentWidth, align: 'center' });
-    doc.fillColor('#64748b').fontSize(6.5).font('Helvetica')
-      .text(ADDRESS_LINE, ML, lineY + 42, { width: contentWidth, align: 'center' });
+        const valText = String(value || '—').trim();
+        let fontSize = 12;
+        if (valText.length > 28) fontSize = 7.5;
+        else if (valText.length > 18) fontSize = 8.5;
+        else if (valText.length > 11) fontSize = 9.5;
 
-    // ── PAGE FOOTER ─────────────────────────────────────────────────────────────
-    const pages = doc.bufferedPageRange();
-    for (let i = 0; i < pages.count; i++) {
-      doc.switchToPage(i);
-      doc.fillColor('#6b21a8').fontSize(7.5).font('Helvetica')
-        .text(`Page ${i + 1} of ${pages.count} — Elite Digital Prints | Stock Adjustment Voucher ${saDoc.saNo}`, ML, 820, { width: contentWidth, align: 'center', lineBreak: false });
-    }
+        doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(fontSize).font('Helvetica-Bold')
+          .text(valText, x + 6, y + 15, { width: width - 12, align: 'left', lineBreak: true, height: height - 16 });
+      }
+
+      const gridStartY = startY + 28;
+      const colWidth4 = contentWidth / 4;
+
+      renderField('Vendor Challan', saDoc.vendorChallanNo, ML, gridStartY, colWidth4, 34);
+      renderField('Fabric', saDoc.fabricQuality, ML + colWidth4, gridStartY, colWidth4, 34);
+      renderField('Lot No.', saDoc.lotNo ? `#${saDoc.lotNo}` : '—', ML + colWidth4 * 2, gridStartY, colWidth4, 34);
+      renderField('Panno', saDoc.panna ? `${saDoc.panna}"` : '—', ML + colWidth4 * 3, gridStartY, colWidth4, 34);
+
+      renderField('Adjustment Type', saDoc.adjustmentType === 'RETURN_REJECTED' ? 'Return / Rejected' : saDoc.adjustmentType, ML, gridStartY + 34, colWidth4, 34);
+      renderField('Reason', saDoc.reason, ML + colWidth4, gridStartY + 34, colWidth4 * 2, 34);
+      renderField('Notes', saDoc.notes, ML + colWidth4 * 3, gridStartY + 34, colWidth4, 34);
+
+      const tpSectionY = gridStartY + 68 + 10;
+      const tpTableStartY = tpSectionY + 16;
+
+      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(13).font('Helvetica-Bold')
+        .text('TP Details', ML + 16, tpSectionY, { lineBreak: false });
+
+      const activeTps = (saDoc.tpDetails && saDoc.tpDetails.length > 0 ? saDoc.tpDetails : [{ tpNo: 1, tpMeter: saDoc.totalMtr }])
+        .filter(tp => tp.tpMeter != null && parseFloat(tp.tpMeter) > 0);
+
+      const activeCount = activeTps.length;
+      const tpColsCount = activeCount <= 10 ? 1 : activeCount <= 20 ? 2 : 3;
+      const tpColWidth = contentWidth / tpColsCount;
+      const rowsPerCol = Math.ceil(activeCount / tpColsCount);
+      const tpRowHeight = rowsPerCol > 14 ? 18 : rowsPerCol > 11 ? 21 : 25;
+      const tableHeaderHeight = 24;
+
+      for (let c = 0; c < tpColsCount; c++) {
+        const x = ML + c * tpColWidth;
+        doc.rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).fill(isColorPage ? '#f8fafc' : '#ffffff');
+        doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).stroke();
+        
+        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12).font('Helvetica-Bold')
+          .text('TP NO.', x, tpTableStartY + 7, { width: tpColWidth * 0.35, align: 'center' });
+        doc.text('METRES', x + tpColWidth * 0.35, tpTableStartY + 7, { width: tpColWidth * 0.65, align: 'center' });
+      }
+
+      if (activeCount === 0) {
+        const x = ML;
+        const y = tpTableStartY + tableHeaderHeight;
+        doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(x, y, contentWidth, tpRowHeight).stroke();
+        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Oblique')
+          .text('No TP details entered.', x, y + 7, { width: contentWidth, align: 'center' });
+      } else {
+        for (let i = 0; i < activeCount; i++) {
+          const tp = activeTps[i];
+          const colIndex = Math.floor(i / rowsPerCol);
+          const rowIndex = i % rowsPerCol;
+
+          const x = ML + colIndex * tpColWidth;
+          const y = tpTableStartY + tableHeaderHeight + rowIndex * tpRowHeight;
+
+          doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(x, y, tpColWidth, tpRowHeight).stroke();
+
+          const val = `${parseFloat(tp.tpMeter).toFixed(2)} mtr`;
+
+          doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
+            .text(String(tp.tpNo), x, y + 7, { width: tpColWidth * 0.35, align: 'center' });
+          
+          doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(13).font('Helvetica')
+            .text(val, x + tpColWidth * 0.35, y + 7, { width: tpColWidth * 0.65, align: 'center' });
+        }
+      }
+
+      const summaryStartY = tpTableStartY + tableHeaderHeight + (activeCount > 0 ? rowsPerCol * tpRowHeight : tpRowHeight) + 15;
+      const summaryColWidth2 = contentWidth / 2;
+
+      doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(ML, summaryStartY, summaryColWidth2, 48).stroke();
+      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(11.5).font('Helvetica-Bold')
+        .text('TOTAL RETURN TP', ML, summaryStartY + 8, { width: summaryColWidth2, align: 'center' });
+      doc.fillColor(getColor('#dc2626', isColorPage)).fontSize(17).font('Helvetica-Bold')
+        .text(String(saDoc.totalTp || activeCount || 1), ML, summaryStartY + 23, { width: summaryColWidth2, align: 'center' });
+
+      doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(ML + summaryColWidth2, summaryStartY, summaryColWidth2, 48).stroke();
+      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(11.5).font('Helvetica-Bold')
+        .text('TOTAL RETURN METRES', ML + summaryColWidth2, summaryStartY + 8, { width: summaryColWidth2, align: 'center' });
+      doc.fillColor(getColor('#10b981', isColorPage)).fontSize(17).font('Helvetica-Bold')
+        .text(`${parseFloat(saDoc.totalMtr || 0).toFixed(2)} mtr`, ML + summaryColWidth2, summaryStartY + 23, { width: summaryColWidth2, align: 'center' });
+
+      const sigLineY = PH - MR - 45;
+
+      doc.moveTo(ML + 30, sigLineY).lineTo(ML + 160, sigLineY).strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).stroke();
+      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12).font('Helvetica-Bold')
+        .text('RECEIVER SIGNATURE', ML + 30, sigLineY + 5, { width: 130, align: 'center' });
+
+      doc.moveTo(PW - MR - 160, sigLineY).lineTo(PW - MR - 30, sigLineY).strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).stroke();
+      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12).font('Helvetica-Bold')
+        .text('AUTHORIZED SIGNATURE', PW - MR - 160, sigLineY + 5, { width: 130, align: 'center' });
+    };
+
+    renderPage(true);  // Page 1: Color (Original)
+    doc.addPage();
+    renderPage(false); // Page 2: Black & White (Duplicate)
 
     doc.end();
   } catch (err) {
