@@ -1462,27 +1462,33 @@ export default function FabricInventoryPanel() {
             </div>
 
             {/* Lot Summary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
               <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 600 }}>Total Lots Tracked</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>Total Lots Tracked</span>
                 <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: 'var(--text-primary)' }}>{lotRecords.length}</div>
               </div>
               <div style={{ padding: '1rem', background: 'rgba(16, 185, 129, 0.06)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                <span style={{ color: 'var(--success)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 600 }}>In-Stock Lots</span>
+                <span style={{ color: 'var(--success)', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>In-Stock Lots</span>
                 <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: 'var(--success)' }}>
                   {lotRecords.filter(l => l.currentStock > 0).length}
                 </div>
               </div>
               <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.06)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                <span style={{ color: '#f87171', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 600 }}>Exhausted Lots</span>
+                <span style={{ color: '#f87171', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>Exhausted / Deficit Lots</span>
                 <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: '#ef4444' }}>
                   {lotRecords.filter(l => l.currentStock <= 0).length}
                 </div>
               </div>
               <div style={{ padding: '1rem', background: 'rgba(56, 189, 248, 0.06)', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
-                <span style={{ color: '#38bdf8', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 600 }}>Total Net Lot Stock</span>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: '#38bdf8' }}>
-                  {Number(lotRecords.reduce((acc, l) => acc + Math.max(0, l.currentStock), 0)).toFixed(2)} <span style={{ fontSize: '0.8rem' }}>mtr</span>
+                <span style={{ color: '#38bdf8', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>Positive Lot Stock (Gross)</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '0.2rem', color: '#38bdf8' }}>
+                  {Number(lotRecords.reduce((acc, l) => acc + Math.max(0, l.currentStock), 0)).toFixed(2)} <span style={{ fontSize: '0.75rem' }}>mtr</span>
+                </div>
+              </div>
+              <div style={{ padding: '1rem', background: 'rgba(167, 139, 250, 0.06)', borderRadius: '8px', border: '1px solid rgba(167, 139, 250, 0.2)' }}>
+                <span style={{ color: '#c4b5fd', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>Net Available Stock</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '0.2rem', color: '#c4b5fd' }}>
+                  {Number(lotRecords.reduce((acc, l) => acc + (l.currentStock || 0), 0)).toFixed(2)} <span style={{ fontSize: '0.75rem' }}>mtr</span>
                 </div>
               </div>
             </div>
