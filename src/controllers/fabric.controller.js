@@ -942,10 +942,11 @@ const downloadFabricOutwardPdf = async (req, res) => {
       doc.rect(30, currY, 535, 20).fill('#ede9fe');
       doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold');
       doc.text('DATE', 35, currY + 6);
-      doc.text('LOT #', 105, currY + 6);
-      doc.text('PARTY NAME', 155, currY + 6);
-      doc.text('CHALLAN / JOB NO.', 265, currY + 6);
-      doc.text('FABRIC & PANNA', 385, currY + 6);
+      doc.text('LOT #', 95, currY + 6);
+      doc.text('PARTY NAME', 145, currY + 6);
+      doc.text('CHALLAN NO.', 255, currY + 6);
+      doc.text('FABRIC & PANNA', 345, currY + 6);
+      doc.text('SHORTAGE', 435, currY + 6);
       doc.text('QTY (M)', 490, currY + 6);
     };
 
@@ -964,15 +965,17 @@ const downloadFabricOutwardPdf = async (req, res) => {
       }
       const dt = t.date ? new Date(t.date).toLocaleDateString('en-IN', { day:'2-digit', month:'2-digit', year:'numeric' }) : '—';
       const fabStr = `${t.fabricQuality || '—'}${t.panna ? ' (' + t.panna + '")' : ''}`;
-      const refStr = `${t.challanNo || t.jobNo || '—'}`;
+      const chStr = `${t.challanNo || '—'}`;
+      const shortageStr = (t.shortagePct !== undefined && t.shortagePct !== null && t.shortagePct !== '') ? `${t.shortagePct}%` : (t.fabricQuality && (t.fabricQuality.includes('CREPE') || t.fabricQuality.includes('CRAPE') || t.fabricQuality.includes('FRENCH'))) ? '2%' : '—';
 
       doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#fcfaff' : '#ffffff');
       doc.fillColor('#000000').fontSize(8).font('Helvetica');
       doc.text(dt, 35, y + 5);
-      doc.text(t.lotNo ? `#${t.lotNo}` : '—', 105, y + 5);
-      doc.text(t.partyName || '—', 155, y + 5, { width: 105, lineBreak: false });
-      doc.text(refStr, 265, y + 5, { width: 115, lineBreak: false });
-      doc.text(fabStr, 385, y + 5, { width: 100, lineBreak: false });
+      doc.text(t.lotNo ? `#${t.lotNo}` : '—', 95, y + 5);
+      doc.text(t.partyName || '—', 145, y + 5, { width: 105, lineBreak: false });
+      doc.text(chStr, 255, y + 5, { width: 85, lineBreak: false });
+      doc.text(fabStr, 345, y + 5, { width: 85, lineBreak: false });
+      doc.text(shortageStr, 435, y + 5, { width: 50, lineBreak: false });
       doc.fillColor('#b91c1c').font('Helvetica-Bold').text(`-${(t.qty || 0).toLocaleString('en-IN')} m`, 490, y + 5);
       y += 18;
     });
@@ -996,6 +999,99 @@ const downloadFabricOutwardPdf = async (req, res) => {
   }
 };
 
+// Helper: Compute lot-wise inventory balance with shortage and date range filtering
+async function computeLotWiseData(dateStart, dateEnd) {
+  const dateFilter = {};
+  if (dateStart || dateEnd) {
+    dateFilter.date = {};
+    if (dateStart) dateFilter.date.$gte = new Date(dateStart);
+    if (dateEnd) {
+      const end = new Date(dateEnd);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.date.$lte = end;
+    }
+  }
+
+  // Find distinct lot numbers active in date range (if dateStart/dateEnd provided)
+  let activeLotNos = null;
+  if (dateStart || dateEnd) {
+    activeLotNos = await FabricTransaction.distinct('lotNo', {
+      lotNo: { $ne: null },
+      ...dateFilter
+    });
+  }
+
+  // Fetch all transactions for active lots (or all lots) up to dateEnd
+  const txFilter = { lotNo: { $ne: null } };
+  if (activeLotNos !== null) {
+    txFilter.lotNo = { $in: activeLotNos };
+  } else if (dateEnd) {
+    const end = new Date(dateEnd);
+    end.setHours(23, 59, 59, 999);
+    txFilter.date = { $lte: end };
+  }
+
+  const allTxs = await FabricTransaction.find(txFilter).sort({ lotNo: 1, date: 1 }).lean();
+
+  const lotMap = {};
+  for (const t of allTxs) {
+    const lot = t.lotNo;
+    if (!lot) continue;
+
+    if (!lotMap[lot]) {
+      lotMap[lot] = {
+        lotNo: lot,
+        fabricQuality: t.fabricQuality || '',
+        panna: t.panna || '',
+        vendorName: t.vendorName || '',
+        vendorChallanNo: t.challanNo || '',
+        totalInward: 0,
+        totalOutward: 0,
+        firstDate: t.date
+      };
+    }
+
+    if (t.vendorName && !lotMap[lot].vendorName) lotMap[lot].vendorName = t.vendorName;
+    if (t.challanNo && !lotMap[lot].vendorChallanNo) lotMap[lot].vendorChallanNo = t.challanNo;
+
+    if (t.type === 'INWARD') {
+      lotMap[lot].totalInward += (t.qty || 0);
+    } else if (t.type === 'OUTWARD') {
+      const pct = (t.shortagePct !== undefined && t.shortagePct !== null && t.shortagePct !== '')
+        ? parseFloat(t.shortagePct)
+        : ((t.fabricQuality && (t.fabricQuality.includes('CREPE') || t.fabricQuality.includes('CRAPE') || t.fabricQuality.includes('FRENCH'))) ? 2 : 0);
+      const outwardWithShortage = (t.qty || 0) * (1 + pct / 100);
+      lotMap[lot].totalOutward += outwardWithShortage;
+    }
+  }
+
+  const result = Object.values(lotMap).map(l => {
+    const rawInward = Number(l.totalInward.toFixed(2));
+    const rawOutward = Number(l.totalOutward.toFixed(2));
+    let rawStock = Number((rawInward - rawOutward).toFixed(2));
+
+    // Rule: 0 <= stock <= 5 makes stock 0 (negative stock stays negative)
+    if (rawStock >= 0 && rawStock <= 5) {
+      rawStock = 0;
+    }
+
+    return {
+      lotNo: l.lotNo,
+      fabricQuality: l.fabricQuality,
+      panna: l.panna,
+      vendorName: l.vendorName,
+      vendorChallanNo: l.vendorChallanNo,
+      totalInward: rawInward,
+      totalOutward: rawOutward,
+      currentStock: rawStock,
+      firstDate: l.firstDate
+    };
+  }).filter(l => l.currentStock !== 0 || (l.totalInward > 0 || l.totalOutward > 0))
+    .sort((a, b) => a.lotNo - b.lotNo);
+
+  return result;
+}
+
 const downloadFabricLotWisePdf = async (req, res) => {
   try {
     const PDFDocument = require('pdfkit');
@@ -1004,46 +1100,7 @@ const downloadFabricLotWisePdf = async (req, res) => {
     const logoPath = path.join(__dirname, 'Logo.png');
     const { dateStart, dateEnd } = req.query;
 
-    const matchFilter = {};
-    if (dateEnd) {
-      const end = new Date(dateEnd);
-      end.setHours(23, 59, 59, 999);
-      matchFilter.date = { $lte: end };
-    }
-
-    const pipeline = [
-      { $match: matchFilter },
-      {
-        $group: {
-          _id: '$lotNo',
-          fabricQuality: { $first: '$fabricQuality' },
-          panna: { $first: '$panna' },
-          vendorName: { $first: '$vendorName' },
-          vendorChallanNo: { $first: '$challanNo' },
-          totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
-          totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } },
-          firstDate: { $min: '$date' }
-        }
-      },
-      {
-        $project: {
-          lotNo: '$_id',
-          fabricQuality: 1,
-          panna: 1,
-          vendorName: 1,
-          vendorChallanNo: 1,
-          totalInward: 1,
-          totalOutward: 1,
-          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
-          firstDate: 1,
-          _id: 0
-        }
-      },
-      { $match: { lotNo: { $ne: null }, currentStock: { $ne: 0 } } },
-      { $sort: { lotNo: 1 } }
-    ];
-
-    const lots = await FabricTransaction.aggregate(pipeline);
+    const lots = await computeLotWiseData(dateStart, dateEnd);
 
     const cleanDateStart = dateStart ? dateStart.split('T')[0] : '';
     const cleanDateEnd = dateEnd ? dateEnd.split('T')[0] : '';
@@ -1053,7 +1110,7 @@ const downloadFabricLotWisePdf = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="Lotwise_Fabric_Report_${cleanDateStart || 'all'}_to_${cleanDateEnd || 'all'}.pdf"`);
     doc.pipe(res);
 
-    // Header section with Logo (image already includes brand name)
+    // Header section with Logo
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, 30, 20, { width: 140 });
     }
@@ -1198,44 +1255,7 @@ const getFabricOutwardReportData = async (req, res) => {
 const getFabricLotWiseReportData = async (req, res) => {
   try {
     const { dateStart, dateEnd } = req.query;
-    const matchFilter = {};
-    if (dateEnd) {
-      const end = new Date(dateEnd);
-      end.setHours(23, 59, 59, 999);
-      matchFilter.date = { $lte: end };
-    }
-    const pipeline = [
-      { $match: matchFilter },
-      {
-        $group: {
-          _id: '$lotNo',
-          fabricQuality: { $first: '$fabricQuality' },
-          panna: { $first: '$panna' },
-          vendorName: { $first: '$vendorName' },
-          vendorChallanNo: { $first: '$challanNo' },
-          totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
-          totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } },
-          firstDate: { $min: '$date' }
-        }
-      },
-      {
-        $project: {
-          lotNo: '$_id',
-          fabricQuality: 1,
-          panna: 1,
-          vendorName: 1,
-          vendorChallanNo: 1,
-          totalInward: 1,
-          totalOutward: 1,
-          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
-          firstDate: 1,
-          _id: 0
-        }
-      },
-      { $match: { lotNo: { $ne: null }, currentStock: { $ne: 0 } } },
-      { $sort: { lotNo: 1 } }
-    ];
-    const lots = await FabricTransaction.aggregate(pipeline);
+    const lots = await computeLotWiseData(dateStart, dateEnd);
     res.status(200).json({ success: true, data: lots });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -1283,40 +1303,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
     let lotwiseData = [];
     if (selectedReports.includes('lotwise')) {
-      const lotDateFilter = {};
-      if (dateEnd) {
-        const end = new Date(dateEnd);
-        end.setHours(23, 59, 59, 999);
-        lotDateFilter.date = { $lte: end };
-      }
-      const pipeline = [
-        { $match: lotDateFilter },
-        {
-          $group: {
-            _id: '$lotNo',
-            fabricQuality: { $first: '$fabricQuality' },
-            panna: { $first: '$panna' },
-            vendorName: { $first: '$vendorName' },
-            totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
-            totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } }
-          }
-        },
-        {
-          $project: {
-            lotNo: '$_id',
-            fabricQuality: 1,
-            panna: 1,
-            vendorName: 1,
-            totalInward: 1,
-            totalOutward: 1,
-            currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
-            _id: 0
-          }
-        },
-        { $match: { lotNo: { $ne: null }, currentStock: { $ne: 0 } } },
-        { $sort: { lotNo: 1 } }
-      ];
-      lotwiseData = await FabricTransaction.aggregate(pipeline);
+      lotwiseData = await computeLotWiseData(dateStart, dateEnd);
     }
 
     let stockSummaryData = [];

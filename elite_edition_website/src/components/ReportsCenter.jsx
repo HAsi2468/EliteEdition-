@@ -983,33 +983,40 @@ export default function ReportsCenter({ department }) {
                       <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Date</th>
                       <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Lot #</th>
                       <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Party Name</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Challan / Job No</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Challan No</th>
                       <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Fabric Quality & Panna</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#94a3b8' }}>Shortage</th>
                       <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#94a3b8' }}>Dispatched Qty (m)</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {reportData.map((t, idx) => (
-                      <tr key={t._id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
-                          {t.date ? new Date(t.date).toLocaleDateString('en-IN') : '—'}
-                        </td>
-                        <td style={{ padding: '12px 16px', fontWeight: '700', color: '#fbbf24' }}>
-                          {t.lotNo ? `#${t.lotNo}` : '—'}
-                        </td>
-                        <td style={{ padding: '12px 16px', fontWeight: '600', color: '#f8fafc' }}>{t.partyName || '—'}</td>
-                        <td style={{ padding: '12px 16px', color: '#38bdf8' }}>{t.challanNo || t.jobNo || '—'}</td>
-                        <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
-                          {t.fabricQuality || '—'}{t.panna ? ` (${t.panna}")` : ''}
-                        </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#f87171' }}>
-                          -{(t.qty || 0).toLocaleString('en-IN')} m
-                        </td>
-                      </tr>
-                    ))}
+                    {reportData.map((t, idx) => {
+                      const shortageStr = (t.shortagePct !== undefined && t.shortagePct !== null && t.shortagePct !== '') ? `${t.shortagePct}%` : (t.fabricQuality && (t.fabricQuality.includes('CREPE') || t.fabricQuality.includes('CRAPE') || t.fabricQuality.includes('FRENCH'))) ? '2%' : '—';
+                      return (
+                        <tr key={t._id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                            {t.date ? new Date(t.date).toLocaleDateString('en-IN') : '—'}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontWeight: '700', color: '#fbbf24' }}>
+                            {t.lotNo ? `#${t.lotNo}` : '—'}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontWeight: '600', color: '#f8fafc' }}>{t.partyName || '—'}</td>
+                          <td style={{ padding: '12px 16px', color: '#38bdf8' }}>{t.challanNo || '—'}</td>
+                          <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                            {t.fabricQuality || '—'}{t.panna ? ` (${t.panna}")` : ''}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center', color: '#a78bfa', fontWeight: '600' }}>
+                            {shortageStr}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#f87171' }}>
+                            -{(t.qty || 0).toLocaleString('en-IN')} m
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {reportData.length === 0 && (
                       <tr>
-                        <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                        <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                           No fabric outward records found for selected date range.
                         </td>
                       </tr>
