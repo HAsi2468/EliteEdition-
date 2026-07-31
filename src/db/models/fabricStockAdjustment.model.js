@@ -49,6 +49,11 @@ const fabricStockAdjustmentSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    vendorChallanNo: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     tpDetails: {
       type: [tpDetailSchema],
       default: [],
