@@ -1992,7 +1992,13 @@ const createLotTransfer = async (req, res) => {
 const getLotTransfers = async (req, res) => {
   try {
     const { dateStart, dateEnd, search } = req.query;
-    const filter = { notes: { $regex: /Lot Transfer/i } };
+    const filter = {
+      $or: [
+        { notes: { $regex: /Lot Transfer/i } },
+        { notes: { $regex: /Lot Rebalance/i } },
+        { notes: { $regex: /\[Ref:\s*LT-/i } }
+      ]
+    };
 
     if (dateStart || dateEnd) {
       filter.date = {};
@@ -2006,10 +2012,7 @@ const getLotTransfers = async (req, res) => {
 
     if (search) {
       const re = new RegExp(search, 'i');
-      filter.$or = [
-        { fabricQuality: re },
-        { notes: re }
-      ];
+      filter.fabricQuality = re;
     }
 
     const txs = await FabricTransaction.find(filter).sort({ date: -1, createdAt: -1 });
@@ -2017,8 +2020,8 @@ const getLotTransfers = async (req, res) => {
     // Group pairs by Ref ID
     const transferMap = new Map();
     txs.forEach(t => {
-      const matchRef = (t.notes || '').match(/\[Ref:\s*(LT-\d+)\]/i);
-      const refKey = matchRef ? matchRef[1] : `${t.fabricQuality}_${new Date(t.date).toISOString().split('T')[0]}_${t.qty}`;
+      const matchRef = (t.notes || '').match(/\[Ref:\s*(LT-[A-Za-z0-9_-]+)\]/i);
+      const refKey = matchRef ? matchRef[1] : `LT-LEGACY-${t.fabricQuality}_${new Date(t.date).toISOString().split('T')[0]}_${t.qty}_${t.lotNo}`;
 
       if (!transferMap.has(refKey)) {
         transferMap.set(refKey, {
@@ -2071,7 +2074,7 @@ const autoLotTransfer = async (req, res) => {
     const executedTransfers = [];
     let totalMetersTransferred = 0;
     const now = new Date();
-    const batchRefId = 'LT-AUTO-' + Date.now();
+    const batchTimestamp = Date.now();
 
     // Work on mutable copies of lot stocks
     const posLots = positiveLots.map(l => ({ ...l }));
@@ -2116,8 +2119,9 @@ const autoLotTransfer = async (req, res) => {
           deficitNeeded -= transferQty;
           totalMetersTransferred += transferQty;
 
+          const pairRefId = `LT-AUTO-${batchTimestamp}-${executedTransfers.length + 1}`;
           const matchLabel = level === 3 ? 'Fabric + Panna + Party' : level === 2 ? 'Fabric + Panna' : 'Fabric Quality';
-          const noteMsg = `Auto Lot Rebalance (${matchLabel}): Lot #${candidate.lotNo} -> Lot #${negLot.lotNo} [Ref: ${batchRefId}]`;
+          const noteMsg = `Auto Lot Transfer Rebalance (${matchLabel}): Lot #${candidate.lotNo} -> Lot #${negLot.lotNo} [Ref: ${pairRefId}]`;
 
           // Create OUTWARD from candidate
           const outwardTx = new FabricTransaction({
@@ -2145,7 +2149,7 @@ const autoLotTransfer = async (req, res) => {
           await inwardTx.save();
 
           executedTransfers.push({
-            refId: batchRefId,
+            refId: pairRefId,
             fabricQuality: candidate.fabricQuality,
             panna: candidate.panna,
             vendorName: candidate.vendorName || negLot.vendorName,
@@ -2164,7 +2168,7 @@ const autoLotTransfer = async (req, res) => {
         ? `Successfully auto-rebalanced ${executedTransfers.length} transfer pairs (${totalMetersTransferred.toFixed(2)} mtr total) and recorded in history.`
         : 'Could not auto-rebalance negative lots because no matching positive stock lots were found for the same fabric/panna/party.',
       data: {
-        batchRefId,
+        batchRefId: `LT-AUTO-${batchTimestamp}`,
         transferredCount: executedTransfers.length,
         totalMetersTransferred: Number(totalMetersTransferred.toFixed(2)),
         transfers: executedTransfers
