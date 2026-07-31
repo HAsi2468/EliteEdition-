@@ -1977,24 +1977,25 @@ const downloadStockAdjustmentPdf = async (req, res) => {
 
     const getColor = (colorStr, isColorPage) => {
       if (isColorPage) return colorStr;
-      if (colorStr === '#dc2626') return '#dc2626'; // Keep Red for Voucher No
+      if (colorStr === '#dc2626') return '#dc2626'; // Keep Red for Voucher No & Total TP
+      if (colorStr === '#10b981') return '#10b981'; // Keep Green for Total Meters
       return '#000000'; // Everything else B&W on second page
     };
 
     const renderPage = (isColorPage) => {
       // Draw outer border
-      doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(1)
+      doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(1)
          .rect(ML, MR, contentWidth, PH - 2 * MR).stroke();
 
       // Top line texts: GST, Shree Ganeshay Namah, Mobile
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica')
+      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(10.5).font('Helvetica')
         .text('GST : 24AANFE0044M1ZG', ML + 12, MR + 4, { lineBreak: false });
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica-Bold')
+      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(10.5).font('Helvetica-Bold')
         .text('|| Shree Ganeshay Namah ||', ML, MR + 4, { width: contentWidth, align: 'center', lineBreak: false });
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10.5).font('Helvetica')
+      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(10.5).font('Helvetica')
         .text('Mo. +91 99098 66667', ML, MR + 4, { width: contentWidth - 12, align: 'right', lineBreak: false });
 
-      doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5)
+      doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5)
         .moveTo(ML, MR + 14).lineTo(PW - MR, MR + 14).stroke();
 
       // Logo
@@ -2005,7 +2006,7 @@ const downloadStockAdjustmentPdf = async (req, res) => {
       // Address Pin
       const drawMapPin = (d, x, y) => {
         d.save();
-        d.fillColor(getColor('#0000ff', isColorPage));
+        d.fillColor(getColor('#6b21a8', isColorPage));
         d.translate(x, y);
         d.moveTo(0, 0)
          .bezierCurveTo(-4, -4, -4, -9, 0, -9)
@@ -2018,24 +2019,24 @@ const downloadStockAdjustmentPdf = async (req, res) => {
       };
 
       const addressText = 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, NR. KALAPUL, Punagam, Surat';
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(10).font('Helvetica-Bold');
+      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(10).font('Helvetica-Bold');
       const textWidth = doc.widthOfString(addressText);
       const startX = ML + (contentWidth - textWidth) / 2;
       
       drawMapPin(doc, startX - 8, MR + 79 + 7);
       doc.text(addressText, startX, MR + 79, { lineBreak: false });
 
-      doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.8)
+      doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.8)
         .moveTo(ML, MR + 94).lineTo(PW - MR, MR + 94).stroke();
 
       const startY = MR + 98;
 
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
+      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
         .text('M/S:', ML + 12, startY + 6, { lineBreak: false });
       doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(14.5).font('Helvetica-Bold')
         .text(saDoc.partyName || '—', ML + 42, startY + 4, { lineBreak: false });
         
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
+      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
         .text('DATE:', PW - MR - 270, startY + 6, { width: 48, align: 'right', lineBreak: false });
       doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(13).font('Helvetica-Bold')
         .text(formattedDate, PW - MR - 220, startY + 6, { width: 80, align: 'left', lineBreak: false });
@@ -2049,20 +2050,20 @@ const downloadStockAdjustmentPdf = async (req, res) => {
       const valX = rightEdge - valW;
       const labelX = valX - labelW;
 
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
+      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
         .text(labelStr, labelX, startY + 6, { width: labelW, align: 'right', lineBreak: false });
 
       doc.fillColor(getColor('#dc2626', isColorPage)).fontSize(14.5).font('Helvetica-Bold')
         .text(valStr, valX, startY + 4, { width: valW, align: 'right', lineBreak: false });
 
-      doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.6)
+      doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.6)
         .moveTo(ML, startY + 28).lineTo(PW - MR, startY + 28).stroke();
 
       function renderField(label, value, x, y, width, height) {
-        doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5)
+        doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5)
           .rect(x, y, width, height).stroke();
 
-        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(9.5).font('Helvetica-Bold')
+        doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(9.5).font('Helvetica-Bold')
           .text(label.toUpperCase(), x + 6, y + 3, { width: width - 12, align: 'left', lineBreak: false });
 
         const valText = String(value || '—').trim();
@@ -2090,7 +2091,7 @@ const downloadStockAdjustmentPdf = async (req, res) => {
       const tpSectionY = gridStartY + 68 + 10;
       const tpTableStartY = tpSectionY + 16;
 
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(13).font('Helvetica-Bold')
+      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(13).font('Helvetica-Bold')
         .text('TP Details', ML + 16, tpSectionY, { lineBreak: false });
 
       const activeTps = (saDoc.tpDetails && saDoc.tpDetails.length > 0 ? saDoc.tpDetails : [{ tpNo: 1, tpMeter: saDoc.totalMtr }])
@@ -2105,10 +2106,10 @@ const downloadStockAdjustmentPdf = async (req, res) => {
 
       for (let c = 0; c < tpColsCount; c++) {
         const x = ML + c * tpColWidth;
-        doc.rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).fill(isColorPage ? '#f8fafc' : '#ffffff');
-        doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).stroke();
+        doc.rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).fill(isColorPage ? '#faf5ff' : '#ffffff');
+        doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5).rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).stroke();
         
-        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12).font('Helvetica-Bold')
+        doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12).font('Helvetica-Bold')
           .text('TP NO.', x, tpTableStartY + 7, { width: tpColWidth * 0.35, align: 'center' });
         doc.text('METRES', x + tpColWidth * 0.35, tpTableStartY + 7, { width: tpColWidth * 0.65, align: 'center' });
       }
@@ -2116,8 +2117,8 @@ const downloadStockAdjustmentPdf = async (req, res) => {
       if (activeCount === 0) {
         const x = ML;
         const y = tpTableStartY + tableHeaderHeight;
-        doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(x, y, contentWidth, tpRowHeight).stroke();
-        doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Oblique')
+        doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5).rect(x, y, contentWidth, tpRowHeight).stroke();
+        doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12.5).font('Helvetica-Oblique')
           .text('No TP details entered.', x, y + 7, { width: contentWidth, align: 'center' });
       } else {
         for (let i = 0; i < activeCount; i++) {
@@ -2128,11 +2129,11 @@ const downloadStockAdjustmentPdf = async (req, res) => {
           const x = ML + colIndex * tpColWidth;
           const y = tpTableStartY + tableHeaderHeight + rowIndex * tpRowHeight;
 
-          doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(x, y, tpColWidth, tpRowHeight).stroke();
+          doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5).rect(x, y, tpColWidth, tpRowHeight).stroke();
 
           const val = `${parseFloat(tp.tpMeter).toFixed(2)} mtr`;
 
-          doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
+          doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
             .text(String(tp.tpNo), x, y + 7, { width: tpColWidth * 0.35, align: 'center' });
           
           doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(13).font('Helvetica')
@@ -2143,30 +2144,30 @@ const downloadStockAdjustmentPdf = async (req, res) => {
       const summaryStartY = tpTableStartY + tableHeaderHeight + (activeCount > 0 ? rowsPerCol * tpRowHeight : tpRowHeight) + 15;
       const summaryColWidth2 = contentWidth / 2;
 
-      doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(ML, summaryStartY, summaryColWidth2, 48).stroke();
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(11.5).font('Helvetica-Bold')
+      doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5).rect(ML, summaryStartY, summaryColWidth2, 48).stroke();
+      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(11.5).font('Helvetica-Bold')
         .text('TOTAL RETURN TP', ML, summaryStartY + 8, { width: summaryColWidth2, align: 'center' });
       doc.fillColor(getColor('#dc2626', isColorPage)).fontSize(17).font('Helvetica-Bold')
         .text(String(saDoc.totalTp || activeCount || 1), ML, summaryStartY + 23, { width: summaryColWidth2, align: 'center' });
 
-      doc.strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).rect(ML + summaryColWidth2, summaryStartY, summaryColWidth2, 48).stroke();
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(11.5).font('Helvetica-Bold')
+      doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5).rect(ML + summaryColWidth2, summaryStartY, summaryColWidth2, 48).stroke();
+      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(11.5).font('Helvetica-Bold')
         .text('TOTAL RETURN METRES', ML + summaryColWidth2, summaryStartY + 8, { width: summaryColWidth2, align: 'center' });
       doc.fillColor(getColor('#10b981', isColorPage)).fontSize(17).font('Helvetica-Bold')
         .text(`${parseFloat(saDoc.totalMtr || 0).toFixed(2)} mtr`, ML + summaryColWidth2, summaryStartY + 23, { width: summaryColWidth2, align: 'center' });
 
       const sigLineY = PH - MR - 45;
 
-      doc.moveTo(ML + 30, sigLineY).lineTo(ML + 160, sigLineY).strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).stroke();
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12).font('Helvetica-Bold')
+      doc.moveTo(ML + 30, sigLineY).lineTo(ML + 160, sigLineY).strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5).stroke();
+      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12).font('Helvetica-Bold')
         .text('RECEIVER SIGNATURE', ML + 30, sigLineY + 5, { width: 130, align: 'center' });
 
-      doc.moveTo(PW - MR - 160, sigLineY).lineTo(PW - MR - 30, sigLineY).strokeColor(getColor('#0000ff', isColorPage)).lineWidth(0.5).stroke();
-      doc.fillColor(getColor('#0000ff', isColorPage)).fontSize(12).font('Helvetica-Bold')
+      doc.moveTo(PW - MR - 160, sigLineY).lineTo(PW - MR - 30, sigLineY).strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5).stroke();
+      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12).font('Helvetica-Bold')
         .text('AUTHORIZED SIGNATURE', PW - MR - 160, sigLineY + 5, { width: 130, align: 'center' });
     };
 
-    renderPage(true);  // Page 1: Color (Original)
+    renderPage(true);  // Page 1: Color (Original - Purple Theme)
     doc.addPage();
     renderPage(false); // Page 2: Black & White (Duplicate)
 
