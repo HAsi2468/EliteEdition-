@@ -782,11 +782,11 @@ const downloadFabricInwardPdf = async (req, res) => {
 
     // Header section with Logo (image already includes brand name)
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, 30, 20, { width: 140 });
+      doc.image(logoPath, 30, 14, { width: 110 });
     }
 
     doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
-      .text('FABRIC INWARD REPORT', 190, 25, { width: 375, align: 'right' });
+      .text('FABRIC INWARD REPORT', 190, 20, { width: 375, align: 'right' });
 
     let periodStr = 'Period: All Time';
     if (cleanDateStart && cleanDateEnd) periodStr = `Period: ${cleanDateStart} to ${cleanDateEnd}`;
@@ -794,13 +794,13 @@ const downloadFabricInwardPdf = async (req, res) => {
     else if (cleanDateEnd) periodStr = `Period: Until ${cleanDateEnd}`;
 
     doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
-      .text(periodStr, 190, 43, { width: 375, align: 'right' });
+      .text(periodStr, 190, 38, { width: 375, align: 'right' });
     doc.fillColor('#64748b').fontSize(8).font('Helvetica')
-      .text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, 190, 56, { width: 375, align: 'right' });
+      .text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, 190, 50, { width: 375, align: 'right' });
 
-    doc.moveTo(30, 72).lineTo(565, 72).strokeColor('#ddd6fe').lineWidth(1.5).stroke();
+    doc.moveTo(30, 62).lineTo(565, 62).strokeColor('#ddd6fe').lineWidth(1.2).stroke();
 
-    let y = 84;
+    let y = 74;
 
     const totalInwardMtr = transactions.reduce((s, t) => s + (t.qty || 0), 0);
     const totalLotsCount = transactions.length;
@@ -904,11 +904,11 @@ const downloadFabricOutwardPdf = async (req, res) => {
 
     // Header section with Logo (image already includes brand name)
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, 30, 20, { width: 140 });
+      doc.image(logoPath, 30, 14, { width: 110 });
     }
 
     doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
-      .text('FABRIC OUTWARD REPORT', 190, 25, { width: 375, align: 'right' });
+      .text('FABRIC OUTWARD REPORT', 190, 20, { width: 375, align: 'right' });
 
     let periodStr = 'Period: All Time';
     if (cleanDateStart && cleanDateEnd) periodStr = `Period: ${cleanDateStart} to ${cleanDateEnd}`;
@@ -916,13 +916,13 @@ const downloadFabricOutwardPdf = async (req, res) => {
     else if (cleanDateEnd) periodStr = `Period: Until ${cleanDateEnd}`;
 
     doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
-      .text(periodStr, 190, 43, { width: 375, align: 'right' });
+      .text(periodStr, 190, 38, { width: 375, align: 'right' });
     doc.fillColor('#64748b').fontSize(8).font('Helvetica')
-      .text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, 190, 56, { width: 375, align: 'right' });
+      .text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, 190, 50, { width: 375, align: 'right' });
 
-    doc.moveTo(30, 72).lineTo(565, 72).strokeColor('#ddd6fe').lineWidth(1.5).stroke();
+    doc.moveTo(30, 62).lineTo(565, 62).strokeColor('#ddd6fe').lineWidth(1.2).stroke();
 
-    let y = 84;
+    let y = 74;
 
     const totalOutwardMtr = transactions.reduce((s, t) => s + (t.qty || 0), 0);
     const totalOutwardCount = transactions.length;
@@ -1362,26 +1362,26 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
     const drawPageHeader = (isFirstPage = false) => {
       if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, ML, 20, { width: 120 });
+        doc.image(logoPath, ML, 14, { width: 110 });
       }
 
       doc.fillColor('#000000').fontSize(13).font('Helvetica-Bold')
-        .text('ELITE DIGITAL PRINTS — 1 PAGE REPORT', ML + 130, 22, { width: contentWidth - 130, align: 'right' });
+        .text('ELITE DIGITAL PRINTS — 1 PAGE REPORT', ML + 130, 20, { width: contentWidth - 130, align: 'right' });
 
       doc.fillColor('#475569').fontSize(8.5).font('Helvetica-Bold')
         .text(`Report Period: ${startDateStr} to ${endDateStr}  |  Generated: ${new Date().toLocaleDateString('en-IN')}`, ML + 130, 38, { width: contentWidth - 130, align: 'right' });
 
-      doc.moveTo(ML, 52).lineTo(PW - MR, 52).strokeColor('#ddd6fe').lineWidth(1.2).stroke();
+      // Line drawn cleanly at y = 62, below the logo image!
+      doc.moveTo(ML, 62).lineTo(PW - MR, 62).strokeColor('#ddd6fe').lineWidth(1.2).stroke();
     };
 
     drawPageHeader(true);
 
-    // KPI Cards on Page 1
+    // KPI Cards on Page 1 (Excluding LOT STOCK BALANCE as requested)
     const activeSections = [
       selectedReports.includes('challan') && { label: 'CHALLAN DISPATCHES', val: `${totalChallanMtr.toFixed(2)} mtr`, sub: `${challanData.length} Challans (${totalChallanTp} TP)` },
       selectedReports.includes('inward') && { label: 'FABRIC INWARD', val: `${totalInwardMtr.toFixed(2)} mtr`, sub: `${inwardData.length} Receipts` },
       selectedReports.includes('outward') && { label: 'FABRIC CONSUMPTION', val: `${totalOutwardMtr.toFixed(2)} mtr`, sub: `${outwardData.length} Dispatches` },
-      selectedReports.includes('lotwise') && { label: 'LOT STOCK BALANCE', val: `${totalLotNetStock.toFixed(2)} mtr`, sub: `${lotwiseData.length} Active Lots` }
     ].filter(Boolean);
 
     const cardCount = activeSections.length || 1;
@@ -1389,23 +1389,23 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     let cardX = ML;
 
     activeSections.forEach(card => {
-      doc.rect(cardX, 60, cardWidth, 46).fill('#f5f3ff').stroke('#ddd6fe');
+      doc.rect(cardX, 68, cardWidth, 46).fill('#f5f3ff').stroke('#ddd6fe');
       doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
-        .text(card.label, cardX + 5, 64, { width: cardWidth - 10, align: 'center' });
+        .text(card.label, cardX + 5, 72, { width: cardWidth - 10, align: 'center' });
       doc.fillColor('#000000').fontSize(11.5).font('Helvetica-Bold')
-        .text(card.val, cardX + 5, 75, { width: cardWidth - 10, align: 'center' });
+        .text(card.val, cardX + 5, 83, { width: cardWidth - 10, align: 'center' });
       doc.fillColor('#475569').fontSize(7).font('Helvetica')
-        .text(card.sub, cardX + 5, 91, { width: cardWidth - 10, align: 'center' });
+        .text(card.sub, cardX + 5, 99, { width: cardWidth - 10, align: 'center' });
       cardX += cardWidth + 8;
     });
 
-    let currentY = 118;
+    let currentY = 126;
 
     const checkAddPage = (heightNeeded) => {
       if (currentY + heightNeeded > maxY) {
         doc.addPage();
         drawPageHeader(false);
-        currentY = 62;
+        currentY = 70;
         return true;
       }
       return false;
@@ -1517,7 +1517,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       currentY += 12;
     }
 
-    // ── 3. FABRIC CONSUMPTION SUMMARY (COMPLETE DATA WITH SHORTAGE) ──
+    // ── 3. FABRIC CONSUMPTION SUMMARY (COMPLETE DATA WITH SHORTAGE & BILL TO) ──
     if (selectedReports.includes('outward')) {
       checkAddPage(60);
 
@@ -1576,56 +1576,6 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         doc.text(shortageStr, ML + 458, currentY + 4.5, { width: 35, align: 'center', lineBreak: false });
         doc.fillColor('#b91c1c').font('Helvetica-Bold');
         doc.text(`${parseFloat(r.qty || 0).toFixed(2)}`, ML + 495, currentY + 4.5, { width: 36, align: 'right', lineBreak: false });
-        currentY += 18;
-      });
-
-      currentY += 12;
-    }
-
-    // ── 4. LOT-WISE FABRIC STOCK BALANCE SUMMARY ──
-    if (selectedReports.includes('lotwise')) {
-      checkAddPage(60);
-
-      doc.rect(ML, currentY, contentWidth, 20).fill('#ede9fe').stroke('#ddd6fe');
-      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
-        .text('4. LOT-WISE FABRIC STOCK BALANCE SUMMARY', ML + 8, currentY + 5, { lineBreak: false });
-      doc.fillColor('#5b21b6').fontSize(8.5).font('Helvetica-Bold')
-        .text(`Total: ${lotwiseData.length} Lots (${totalLotNetStock.toFixed(2)} mtr balance)`, ML + contentWidth - 240, currentY + 5, { width: 230, align: 'right', lineBreak: false });
-
-      currentY += 24;
-
-      const drawLotHeaders = () => {
-        doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
-        doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
-        doc.text('LOT NO', ML + 4, currentY + 5, { width: 45 });
-        doc.text('FABRIC QUALITY', ML + 52, currentY + 5, { width: 150 });
-        doc.text('PANNA', ML + 206, currentY + 5, { width: 45 });
-        doc.text('SUPPLIER VENDOR', ML + 254, currentY + 5, { width: 140 });
-        doc.text('INWARD', ML + 398, currentY + 5, { width: 42, align: 'right' });
-        doc.text('OUTWARD', ML + 444, currentY + 5, { width: 42, align: 'right' });
-        doc.text('BALANCE', ML + 490, currentY + 5, { width: 41, align: 'right' });
-        currentY += 18;
-      };
-
-      drawLotHeaders();
-
-      lotwiseData.forEach((l, idx) => {
-        if (checkAddPage(20)) {
-          drawLotHeaders();
-        }
-        const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
-        doc.rect(ML, currentY, contentWidth, 18).fill(bg);
-        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
-
-        doc.fillColor('#000000').fontSize(7).font('Helvetica');
-        doc.text(`#${l.lotNo}`, ML + 4, currentY + 4.5, { width: 45, lineBreak: false });
-        doc.text(l.fabricQuality || '—', ML + 52, currentY + 4.5, { width: 150, lineBreak: false });
-        doc.text(`${l.panna || '58'}"`, ML + 206, currentY + 4.5, { width: 45, lineBreak: false });
-        doc.text(l.vendorName || '—', ML + 254, currentY + 4.5, { width: 140, lineBreak: false });
-        doc.text(`${parseFloat(l.totalInward || 0).toFixed(2)}`, ML + 398, currentY + 4.5, { width: 42, align: 'right', lineBreak: false });
-        doc.text(`${parseFloat(l.totalOutward || 0).toFixed(2)}`, ML + 444, currentY + 4.5, { width: 42, align: 'right', lineBreak: false });
-        doc.fillColor(l.currentStock > 0 ? '#047857' : '#dc2626').font('Helvetica-Bold');
-        doc.text(`${parseFloat(l.currentStock || 0).toFixed(2)}`, ML + 490, currentY + 4.5, { width: 41, align: 'right', lineBreak: false });
         currentY += 18;
       });
 
