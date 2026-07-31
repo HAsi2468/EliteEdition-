@@ -759,7 +759,10 @@ const downloadFabricInwardPdf = async (req, res) => {
     const logoPath = path.join(__dirname, 'Logo.png');
     const { dateStart, dateEnd } = req.query;
 
-    const filter = { type: 'INWARD' };
+    const filter = {
+      type: 'INWARD',
+      notes: { $not: /Lot Transfer|Lot Rebalance|\[Ref:\s*LT-/i }
+    };
     if (dateStart || dateEnd) {
       filter.date = {};
       if (dateStart) filter.date.$gte = new Date(dateStart);
@@ -881,7 +884,10 @@ const downloadFabricOutwardPdf = async (req, res) => {
     const logoPath = path.join(__dirname, 'Logo.png');
     const { dateStart, dateEnd } = req.query;
 
-    const filter = { type: 'OUTWARD' };
+    const filter = {
+      type: 'OUTWARD',
+      notes: { $not: /Lot Transfer|Lot Rebalance|\[Ref:\s*LT-/i }
+    };
     if (dateStart || dateEnd) {
       filter.date = {};
       if (dateStart) filter.date.$gte = new Date(dateStart);
@@ -1225,7 +1231,10 @@ const downloadFabricLotWisePdf = async (req, res) => {
 const getFabricInwardReportData = async (req, res) => {
   try {
     const { dateStart, dateEnd } = req.query;
-    const filter = { type: 'INWARD' };
+    const filter = {
+      type: 'INWARD',
+      notes: { $not: /Lot Transfer|Lot Rebalance|\[Ref:\s*LT-/i }
+    };
     if (dateStart || dateEnd) {
       filter.date = {};
       if (dateStart) filter.date.$gte = new Date(dateStart);
@@ -1245,7 +1254,10 @@ const getFabricInwardReportData = async (req, res) => {
 const getFabricOutwardReportData = async (req, res) => {
   try {
     const { dateStart, dateEnd } = req.query;
-    const filter = { type: 'OUTWARD' };
+    const filter = {
+      type: 'OUTWARD',
+      notes: { $not: /Lot Transfer|Lot Rebalance|\[Ref:\s*LT-/i }
+    };
     if (dateStart || dateEnd) {
       filter.date = {};
       if (dateStart) filter.date.$gte = new Date(dateStart);
@@ -1296,14 +1308,16 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       }
     }
 
+    const lotTransferExclude = { notes: { $not: /Lot Transfer|Lot Rebalance|\[Ref:\s*LT-/i } };
+
     let inwardData = [];
     if (selectedReports.includes('inward')) {
-      inwardData = await FabricTransaction.find({ type: 'INWARD', ...dateFilter }).sort({ date: -1 }).lean();
+      inwardData = await FabricTransaction.find({ type: 'INWARD', ...dateFilter, ...lotTransferExclude }).sort({ date: -1 }).lean();
     }
 
     let outwardData = [];
     if (selectedReports.includes('outward')) {
-      outwardData = await FabricTransaction.find({ type: 'OUTWARD', ...dateFilter }).sort({ date: -1 }).lean();
+      outwardData = await FabricTransaction.find({ type: 'OUTWARD', ...dateFilter, ...lotTransferExclude }).sort({ date: -1 }).lean();
     }
 
     let challanData = [];
