@@ -1927,6 +1927,130 @@ const downloadStockAdjustmentPdf = async (req, res) => {
   }
 };
 
+// ── POST /fabric/lot-transfer ──────────────────────────────────────────────
+const createLotTransfer = async (req, res) => {
+  try {
+    const { date, fabricQuality, panna, sourceLotNo, destLotNo, qty, notes } = req.body;
+
+    const sourceLot = parseInt(sourceLotNo, 10);
+    const destLot = parseInt(destLotNo, 10);
+    const transferQty = parseFloat(qty);
+
+    if (isNaN(sourceLot) || isNaN(destLot)) {
+      return res.status(400).json({ success: false, error: 'Valid source and destination lot numbers are required.' });
+    }
+    if (sourceLot === destLot) {
+      return res.status(400).json({ success: false, error: 'Source and destination lots must be different.' });
+    }
+    if (isNaN(transferQty) || transferQty <= 0) {
+      return res.status(400).json({ success: false, error: 'Transfer quantity must be greater than 0.' });
+    }
+    if (!fabricQuality) {
+      return res.status(400).json({ success: false, error: 'Fabric quality is required.' });
+    }
+
+    const transferDate = date ? new Date(date) : new Date();
+    const transferRefId = 'LT-' + Date.now();
+
+    // 1. OUTWARD from Source Lot
+    const outwardTx = new FabricTransaction({
+      type: 'OUTWARD',
+      date: transferDate,
+      fabricQuality,
+      panna: panna || '',
+      lotNo: sourceLot,
+      qty: transferQty,
+      notes: `Lot Transfer to Lot #${destLot}${notes ? ' | ' + notes : ''} [Ref: ${transferRefId}]`
+    });
+
+    // 2. INWARD to Destination Lot
+    const inwardTx = new FabricTransaction({
+      type: 'INWARD',
+      date: transferDate,
+      fabricQuality,
+      panna: panna || '',
+      lotNo: destLot,
+      qty: transferQty,
+      notes: `Lot Transfer from Lot #${sourceLot}${notes ? ' | ' + notes : ''} [Ref: ${transferRefId}]`
+    });
+
+    await outwardTx.save();
+    await inwardTx.save();
+
+    res.status(201).json({
+      success: true,
+      message: `Successfully transferred ${transferQty}m from Lot #${sourceLot} to Lot #${destLot}`,
+      data: { outwardTx, inwardTx, transferRefId }
+    });
+  } catch (error) {
+    console.error('Error creating lot transfer:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ── GET /fabric/lot-transfer ───────────────────────────────────────────────
+const getLotTransfers = async (req, res) => {
+  try {
+    const { dateStart, dateEnd, search } = req.query;
+    const filter = { notes: { $regex: /Lot Transfer/i } };
+
+    if (dateStart || dateEnd) {
+      filter.date = {};
+      if (dateStart) filter.date.$gte = new Date(dateStart);
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        filter.date.$lte = end;
+      }
+    }
+
+    if (search) {
+      const re = new RegExp(search, 'i');
+      filter.$or = [
+        { fabricQuality: re },
+        { notes: re }
+      ];
+    }
+
+    const txs = await FabricTransaction.find(filter).sort({ date: -1, createdAt: -1 });
+
+    // Group pairs by Ref ID
+    const transferMap = new Map();
+    txs.forEach(t => {
+      const matchRef = (t.notes || '').match(/\[Ref:\s*(LT-\d+)\]/i);
+      const refKey = matchRef ? matchRef[1] : `${t.fabricQuality}_${new Date(t.date).toISOString().split('T')[0]}_${t.qty}`;
+
+      if (!transferMap.has(refKey)) {
+        transferMap.set(refKey, {
+          transferRefId: refKey,
+          date: t.date,
+          fabricQuality: t.fabricQuality,
+          panna: t.panna,
+          qty: t.qty,
+          sourceLotNo: null,
+          destLotNo: null,
+          sourceTxId: null,
+          destTxId: null,
+          notes: t.notes
+        });
+      }
+
+      const item = transferMap.get(refKey);
+      if (t.type === 'OUTWARD') {
+        item.sourceLotNo = t.lotNo;
+        item.sourceTxId = t._id;
+      } else if (t.type === 'INWARD') {
+        item.destLotNo = t.lotNo;
+        item.destTxId = t._id;
+      }
+    });
+
+    res.json({ success: true, data: Array.from(transferMap.values()) });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   createInward,
   createOutward,
@@ -1952,4 +2076,6 @@ module.exports = {
   getStockAdjustmentById,
   deleteStockAdjustment,
   downloadStockAdjustmentPdf,
+  createLotTransfer,
+  getLotTransfers,
 };

@@ -6,7 +6,7 @@ import {
   RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
   Layers, Database, Settings, Trash2, FileDown, Search, X,
   AlertTriangle, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Edit, FileText,
-  Check, Plus
+  Check, Plus, ArrowRightLeft, Download
 } from 'lucide-react';
 
 export default function FabricInventoryPanel() {
@@ -103,6 +103,37 @@ export default function FabricInventoryPanel() {
     notes: '',
     tpDetails: [{ tpNo: 1, tpMeter: '', lotNo: '' }]
   });
+
+  // Lot Transfer state
+  const [lotTransfers, setLotTransfers] = useState([]);
+  const [transferSearch, setTransferSearch] = useState('');
+  const [transferDateStart, setTransferDateStart] = useState('');
+  const [transferDateEnd, setTransferDateEnd] = useState('');
+  const [isTransferFormOpen, setIsTransferFormOpen] = useState(false);
+  const [transferForm, setTransferForm] = useState({
+    date: new Date().toISOString().split('T')[0],
+    fabricQuality: '',
+    panna: '58',
+    sourceLotNo: '',
+    destLotNo: '',
+    qty: '',
+    notes: '',
+  });
+
+  const openQuickTransfer = (targetLot) => {
+    const rawDeficit = Math.abs(targetLot.currentStock || 0);
+    setTransferForm({
+      date: new Date().toISOString().split('T')[0],
+      fabricQuality: targetLot.fabricQuality || '',
+      panna: targetLot.panna || '58',
+      sourceLotNo: '',
+      destLotNo: String(targetLot.lotNo),
+      qty: rawDeficit > 0 ? String(rawDeficit.toFixed(2)) : '',
+      notes: `Deficit Clearance for Lot #${targetLot.lotNo}`
+    });
+    setIsTransferFormOpen(true);
+    setActiveTab('lotTransfer');
+  };
 
   const fileInputRef = useRef(null);
 
@@ -409,6 +440,12 @@ export default function FabricInventoryPanel() {
         if (pRes && pRes.success) setPannaStock(pRes.data || []);
       } catch (e) { console.warn('Failed to fetch panna stock', e); }
 
+      // Lot Transfers
+      try {
+        const ltRes = await api.getLotTransfers();
+        if (ltRes && ltRes.success) setLotTransfers(ltRes.data || []);
+      } catch (e) { console.warn('Failed to fetch lot transfers', e); }
+
     } catch (err) {
       setError(err.message || 'Failed to load fabric inventory data.');
     } finally {
@@ -548,6 +585,39 @@ export default function FabricInventoryPanel() {
       fetchData();
     } catch (err) {
       alert(err.message);
+      setLoading(false);
+    }
+  };
+
+  const handleTransferSubmit = async (e) => {
+    e.preventDefault();
+    if (!transferForm.fabricQuality || !transferForm.sourceLotNo || !transferForm.destLotNo || !transferForm.qty) {
+      alert('Please fill in all required fields (Fabric Quality, Source Lot, Destination Lot, Quantity).');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await api.createLotTransfer(transferForm);
+      if (res.success) {
+        triggerPushNotification('🔄 Lot Transfer Complete', res.message || `Transferred ${transferForm.qty}m to Lot #${transferForm.destLotNo}`, 'success');
+        setIsTransferFormOpen(false);
+        setTransferForm({
+          date: new Date().toISOString().split('T')[0],
+          fabricQuality: '',
+          panna: '58',
+          sourceLotNo: '',
+          destLotNo: '',
+          qty: '',
+          notes: '',
+        });
+        triggerGlobalDataRefresh('fabric');
+        fetchData();
+      } else {
+        alert(res.error || 'Failed to create lot transfer');
+      }
+    } catch (err) {
+      alert('Error creating lot transfer: ' + err.message);
+    } finally {
       setLoading(false);
     }
   };
@@ -1100,6 +1170,7 @@ export default function FabricInventoryPanel() {
   const tabs = [
     { id: 'dashboard', label: 'Stock Overview', icon: Database },
     { id: 'lotwise', label: 'Lot-Wise Management', icon: Layers },
+    { id: 'lotTransfer', label: 'Lot Transfer', icon: ArrowRightLeft },
     { id: 'inward', label: 'Inward Register', icon: ArrowDownToLine },
     ...(isAdmin ? [{ id: 'outward', label: 'Outward Register', icon: ArrowUpFromLine }] : []),
     { id: 'challan', label: 'Challan', icon: FileText },
@@ -1536,6 +1607,29 @@ export default function FabricInventoryPanel() {
                           </span>
                         </div>
 
+                        {lot.currentStock < 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openQuickTransfer(lot);
+                            }}
+                            className="btn-primary"
+                            style={{
+                              background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+                              color: '#ffffff',
+                              fontSize: '0.78rem',
+                              padding: '0.35rem 0.75rem',
+                              gap: '0.35rem',
+                              border: 'none',
+                              boxShadow: '0 2px 6px rgba(220,38,38,0.3)',
+                              flexShrink: 0
+                            }}
+                            title="Transfer stock from another lot to clear this negative deficit"
+                          >
+                            <ArrowRightLeft size={14} /> Clear Deficit ({Math.abs(lot.currentStock).toFixed(2)}m)
+                          </button>
+                        )}
+
                         <button
                           className="btn-icon"
                           style={{ padding: '0.35rem', color: 'var(--text-muted)' }}
@@ -1651,6 +1745,146 @@ export default function FabricInventoryPanel() {
                   No lot records found matching your filters.
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Lot Transfer Tab */}
+        {activeTab === 'lotTransfer' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
+                  <ArrowRightLeft size={22} color="var(--primary)" />
+                  Fabric Lot Transfer & Deficit Rebalancing
+                </h2>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  Transfer stock meters between lots to eliminate negative balances and keep lot stock clean.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => {
+                    setTransferForm({
+                      date: new Date().toISOString().split('T')[0],
+                      fabricQuality: fabricsList[0] || '',
+                      panna: '58',
+                      sourceLotNo: '',
+                      destLotNo: '',
+                      qty: '',
+                      notes: '',
+                    });
+                    setIsTransferFormOpen(true);
+                  }}
+                  className="btn-primary"
+                  style={{ gap: '0.4rem', padding: '0.55rem 1.1rem', fontSize: '0.85rem' }}
+                >
+                  <PlusCircle size={16} /> New Lot Transfer
+                </button>
+              </div>
+            </div>
+
+            {/* Transfer Summary Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 600 }}>Total Transfers Done</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: 'var(--text-primary)' }}>{lotTransfers.length}</div>
+              </div>
+              <div style={{ padding: '1rem', background: 'rgba(124, 58, 237, 0.06)', borderRadius: '8px', border: '1px solid rgba(124, 58, 237, 0.2)' }}>
+                <span style={{ color: '#a78bfa', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 600 }}>Total Meters Transferred</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: '#c4b5fd' }}>
+                  {lotTransfers.reduce((sum, t) => sum + (t.qty || 0), 0).toFixed(2)} mtr
+                </div>
+              </div>
+              <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.06)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                <span style={{ color: '#f87171', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 600 }}>Negative Lots Remaining</span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: '#ef4444' }}>
+                  {lotRecords.filter(l => l.currentStock < 0).length} Lots
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  placeholder="Search by fabric, lot #, or notes..."
+                  value={transferSearch}
+                  onChange={e => setTransferSearch(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem 0.75rem 0.5rem 2.2rem', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                />
+              </div>
+              <input
+                type="date"
+                value={transferDateStart}
+                onChange={e => setTransferDateStart(e.target.value)}
+                style={{ padding: '0.5rem', fontSize: '0.85rem' }}
+                title="From Date"
+              />
+              <input
+                type="date"
+                value={transferDateEnd}
+                onChange={e => setTransferDateEnd(e.target.value)}
+                style={{ padding: '0.5rem', fontSize: '0.85rem' }}
+                title="To Date"
+              />
+            </div>
+
+            {/* Transfers Table */}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)' }}>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Date</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Fabric Quality</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>From Lot (Source)</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>To Lot (Destination)</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted)' }}>Transferred Qty</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Notes / Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lotTransfers.filter(t => {
+                    if (transferDateStart && new Date(t.date) < new Date(transferDateStart)) return false;
+                    if (transferDateEnd && new Date(t.date) > new Date(transferDateEnd + 'T23:59:59')) return false;
+                    if (!transferSearch) return true;
+                    const s = transferSearch.toLowerCase();
+                    return (t.fabricQuality || '').toLowerCase().includes(s) ||
+                           String(t.sourceLotNo || '').includes(s) ||
+                           String(t.destLotNo || '').includes(s) ||
+                           (t.notes || '').toLowerCase().includes(s);
+                  }).map((t, idx) => (
+                    <tr key={t.transferRefId || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td style={{ padding: '0.75rem 1rem' }}>{t.date ? new Date(t.date).toLocaleDateString('en-IN') : '—'}</td>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{t.fabricQuality}</td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                        <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                          Lot #{t.sourceLotNo || '—'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                        <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                          Lot #{t.destLotNo || '—'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, color: '#a78bfa' }}>
+                        {Number(t.qty || 0).toFixed(2)} mtr
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{t.notes || '—'}</td>
+                    </tr>
+                  ))}
+                  {lotTransfers.length === 0 && (
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                        No lot transfers performed yet. Click "New Lot Transfer" to move stock between lots.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -3455,6 +3689,168 @@ export default function FabricInventoryPanel() {
                 <Download size={16} /> {combinedLoading ? 'Generating 1-Page PDF...' : 'Download Combined PDF'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lot Transfer Modal */}
+      {isTransferFormOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: '1rem'
+        }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '550px', padding: '1.5rem', background: '#0f172a', border: '1px solid #334155', borderRadius: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f8fafc' }}>
+                <ArrowRightLeft size={20} color="#a78bfa" /> Perform Fabric Lot Transfer
+              </h3>
+              <X size={20} onClick={() => setIsTransferFormOpen(false)} style={{ cursor: 'pointer', color: '#94a3b8' }} />
+            </div>
+
+            <form onSubmit={handleTransferSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={transferForm.date}
+                    onChange={e => setTransferForm({ ...transferForm, date: e.target.value })}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: '#1e293b', border: '1px solid #475569', color: '#f8fafc' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Fabric Quality</label>
+                  <select
+                    required
+                    value={transferForm.fabricQuality}
+                    onChange={e => {
+                      const fab = e.target.value;
+                      setTransferForm({
+                        ...transferForm,
+                        fabricQuality: fab,
+                        sourceLotNo: '',
+                        destLotNo: '',
+                        qty: ''
+                      });
+                    }}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: '#1e293b', border: '1px solid #475569', color: '#f8fafc' }}
+                  >
+                    <option value="">Select Fabric Quality</option>
+                    {fabricsList.map(f => (
+                      <option key={f} value={f}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Source Lot and Destination Lot */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#f87171', marginBottom: '0.3rem', fontWeight: 600 }}>
+                    Source Lot # (From / Decreases Stock)
+                  </label>
+                  <select
+                    required
+                    value={transferForm.sourceLotNo}
+                    onChange={e => setTransferForm({ ...transferForm, sourceLotNo: e.target.value })}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: '#1e293b', border: '1px solid #475569', color: '#f8fafc' }}
+                  >
+                    <option value="">Select Source Lot</option>
+                    {lotRecords
+                      .filter(l => !transferForm.fabricQuality || l.fabricQuality.toUpperCase() === transferForm.fabricQuality.toUpperCase())
+                      .filter(l => l.currentStock > 0)
+                      .map(l => (
+                        <option key={l.lotNo} value={l.lotNo}>
+                          Lot #{l.lotNo} ({l.currentStock.toFixed(2)}m available)
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#34d399', marginBottom: '0.3rem', fontWeight: 600 }}>
+                    Destination Lot # (To / Increases Stock)
+                  </label>
+                  <select
+                    required
+                    value={transferForm.destLotNo}
+                    onChange={e => {
+                      const dLotNo = e.target.value;
+                      const matched = lotRecords.find(l => String(l.lotNo) === String(dLotNo));
+                      let autoQty = transferForm.qty;
+                      if (matched && matched.currentStock < 0) {
+                        autoQty = String(Math.abs(matched.currentStock).toFixed(2));
+                      }
+                      setTransferForm({ ...transferForm, destLotNo: dLotNo, qty: autoQty });
+                    }}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: '#1e293b', border: '1px solid #475569', color: '#f8fafc' }}
+                  >
+                    <option value="">Select Destination Lot</option>
+                    {lotRecords
+                      .filter(l => !transferForm.fabricQuality || l.fabricQuality.toUpperCase() === transferForm.fabricQuality.toUpperCase())
+                      .filter(l => String(l.lotNo) !== String(transferForm.sourceLotNo))
+                      .map(l => (
+                        <option key={l.lotNo} value={l.lotNo}>
+                          Lot #{l.lotNo} ({l.currentStock < 0 ? `DEFICIT: ${l.currentStock.toFixed(2)}m` : `${l.currentStock.toFixed(2)}m stock`})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                  <label style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Transfer Quantity (Meters)</label>
+                  {transferForm.destLotNo && (() => {
+                    const matched = lotRecords.find(l => String(l.lotNo) === String(transferForm.destLotNo));
+                    if (matched && matched.currentStock < 0) {
+                      const defVal = Math.abs(matched.currentStock);
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setTransferForm({ ...transferForm, qty: String(defVal.toFixed(2)) })}
+                          style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                        >
+                          Auto-fill Deficit ({defVal.toFixed(2)}m)
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  placeholder="e.g. 15.5"
+                  value={transferForm.qty}
+                  onChange={e => setTransferForm({ ...transferForm, qty: e.target.value })}
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: '#1e293b', border: '1px solid #475569', color: '#f8fafc', fontWeight: 700 }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Notes / Reason (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Rebalance negative lot stock balance"
+                  value={transferForm.notes}
+                  onChange={e => setTransferForm({ ...transferForm, notes: e.target.value })}
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: '#1e293b', border: '1px solid #475569', color: '#f8fafc' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setIsTransferFormOpen(false)} className="btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>Cancel</button>
+                <button type="submit" disabled={loading} className="btn-primary" style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', border: 'none' }}>
+                  {loading ? 'Processing Transfer...' : 'Execute Transfer'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

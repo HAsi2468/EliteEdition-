@@ -1159,4 +1159,16 @@ export const api = {
     link.click();
     link.parentNode.removeChild(link);
   },
+
+  // ── Lot Transfer ───────────────────────────────────────────────────────
+  async getLotTransfers() {
+    return request('/fabric/lot-transfer');
+  },
+
+  async createLotTransfer(data) {
+    return request('/fabric/lot-transfer', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
 };

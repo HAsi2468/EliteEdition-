@@ -48,6 +48,10 @@ router.get('/stock-adjustment/:id', fabricController.getStockAdjustmentById);
 router.delete('/stock-adjustment/:id', fabricController.deleteStockAdjustment);
 router.get('/stock-adjustment/:id/pdf', fabricController.downloadStockAdjustmentPdf);
 
+// Lot Transfer routes
+router.post('/lot-transfer', fabricController.createLotTransfer);
+router.get('/lot-transfer', fabricController.getLotTransfers);
+
 // Update a transaction by ID
 router.put('/:id', fabricController.updateTransaction);
 
