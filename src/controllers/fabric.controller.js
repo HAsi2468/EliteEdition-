@@ -1690,20 +1690,66 @@ const createStockAdjustment = async (req, res) => {
     const normFabric = normalizeFabric(fabricQuality);
     const normP = normalizePanna(panna, normFabric);
 
+    const getVendorShortCode = (name) => {
+      if (!name) return '';
+      const u = name.toUpperCase().trim();
+      if (u.includes('AVSAR')) return 'AV';
+      if (u.includes('ELITE')) return 'EL';
+      if (u.includes('FABTEX')) return 'FT';
+      if (u.includes('MAHAGAURI')) return 'MG';
+      if (u.includes('OEQUAL') || u.includes('OE')) return 'OE';
+      if (u.includes('OZONE')) return 'OZ';
+      if (u.includes('YAMUNAJI')) return 'YM';
+      if (u.includes('SUDAR')) return 'SUD';
+      if (u.includes('SUMM')) return 'SUM';
+      if (u.includes('RAYON') || u.includes('REYON')) return 'RY';
+      
+      const words = u.split(/\s+/).filter(Boolean);
+      if (words.length >= 2) {
+        return words.map(w => w[0]).join('').substring(0, 3);
+      }
+      return u.substring(0, 3);
+    };
+
+    const formatVendorChallanWithPrefix = (vNo, vendorName) => {
+      if (!vNo) return '';
+      const cleanNo = String(vNo).trim();
+      if (!cleanNo) return '';
+      if (/^[A-Za-z0-9]{2,4}-/.test(cleanNo)) {
+        return cleanNo;
+      }
+      const shortForm = getVendorShortCode(vendorName);
+      if (shortForm) {
+        return `${shortForm}-${cleanNo}`;
+      }
+      return cleanNo;
+    };
+
     let finalVendorChallan = (vendorChallanNo || '').trim();
-    if (!finalVendorChallan && lotNo) {
+    let vendorForLookup = partyName || '';
+
+    if (lotNo) {
       const numLot = parseInt(lotNo, 10);
       if (!isNaN(numLot)) {
-        const inTx = await FabricTransaction.findOne({ lotNo: numLot, type: 'INWARD', challanNo: { $ne: null, $ne: '' } }).lean();
-        if (inTx && inTx.challanNo) {
-          finalVendorChallan = inTx.challanNo;
+        const inTx = await FabricTransaction.findOne({ lotNo: numLot, type: 'INWARD' }).sort({ date: 1 }).lean();
+        if (inTx) {
+          if (!finalVendorChallan && inTx.challanNo) {
+            finalVendorChallan = inTx.challanNo;
+          }
+          if (!vendorForLookup && inTx.vendorName) {
+            vendorForLookup = inTx.vendorName;
+          }
         }
       }
     }
 
+    if (finalVendorChallan && vendorForLookup) {
+      finalVendorChallan = formatVendorChallanWithPrefix(finalVendorChallan, vendorForLookup);
+    }
+
     const saDoc = new FabricStockAdjustment({
       date: date ? new Date(date) : new Date(),
-      partyName: partyName || '',
+      partyName: partyName || vendorForLookup || '',
       adjustmentType,
       fabricQuality: normFabric,
       panna: normP,
@@ -1835,13 +1881,45 @@ const updateStockAdjustment = async (req, res) => {
     const normP = normalizePanna(panna, normFabric);
 
     let finalVendorChallan = (vendorChallanNo || '').trim();
-    if (!finalVendorChallan && lotNo) {
+    let vendorForLookup = partyName || saDoc.partyName || '';
+
+    if (lotNo) {
       const numLot = parseInt(lotNo, 10);
       if (!isNaN(numLot)) {
-        const inTx = await FabricTransaction.findOne({ lotNo: numLot, type: 'INWARD', challanNo: { $ne: null, $ne: '' } }).lean();
-        if (inTx && inTx.challanNo) {
-          finalVendorChallan = inTx.challanNo;
+        const inTx = await FabricTransaction.findOne({ lotNo: numLot, type: 'INWARD' }).sort({ date: 1 }).lean();
+        if (inTx) {
+          if (!finalVendorChallan && inTx.challanNo) {
+            finalVendorChallan = inTx.challanNo;
+          }
+          if (!vendorForLookup && inTx.vendorName) {
+            vendorForLookup = inTx.vendorName;
+          }
         }
+      }
+    }
+
+    if (finalVendorChallan && vendorForLookup) {
+      const getVendorShortCode = (name) => {
+        if (!name) return '';
+        const u = name.toUpperCase().trim();
+        if (u.includes('AVSAR')) return 'AV';
+        if (u.includes('ELITE')) return 'EL';
+        if (u.includes('FABTEX')) return 'FT';
+        if (u.includes('MAHAGAURI')) return 'MG';
+        if (u.includes('OEQUAL') || u.includes('OE')) return 'OE';
+        if (u.includes('OZONE')) return 'OZ';
+        if (u.includes('YAMUNAJI')) return 'YM';
+        if (u.includes('SUDAR')) return 'SUD';
+        if (u.includes('SUMM')) return 'SUM';
+        if (u.includes('RAYON') || u.includes('REYON')) return 'RY';
+        const words = u.split(/\s+/).filter(Boolean);
+        if (words.length >= 2) return words.map(w => w[0]).join('').substring(0, 3);
+        return u.substring(0, 3);
+      };
+
+      if (!/^[A-Za-z0-9]{2,4}-/.test(finalVendorChallan)) {
+        const sc = getVendorShortCode(vendorForLookup);
+        if (sc) finalVendorChallan = `${sc}-${finalVendorChallan}`;
       }
     }
 
@@ -1852,7 +1930,7 @@ const updateStockAdjustment = async (req, res) => {
 
     // Update SA document fields
     saDoc.date = date ? new Date(date) : saDoc.date;
-    saDoc.partyName = partyName || '';
+    saDoc.partyName = partyName || vendorForLookup || '';
     saDoc.adjustmentType = adjustmentType;
     saDoc.fabricQuality = normFabric;
     saDoc.panna = normP;

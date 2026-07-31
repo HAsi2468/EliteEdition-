@@ -1103,10 +1103,20 @@ export default function FabricInventoryPanel() {
     const selectedLotNo = e.target.value;
     const foundLot = saAvailableLots.find(l => String(l.lotNo) === String(selectedLotNo));
     
+    let rawChallan = foundLot?.vendorChallanNo || '';
+    const vName = foundLot?.vendorName || saForm.partyName || '';
+    
+    if (rawChallan && vName) {
+      const shortName = getVendorShortForm(vName);
+      if (shortName && !/^[A-Za-z0-9]{2,4}-/.test(rawChallan)) {
+        rawChallan = `${shortName}-${rawChallan}`;
+      }
+    }
+    
     setSaForm(prev => ({
       ...prev,
       lotNo: selectedLotNo,
-      vendorChallanNo: foundLot?.vendorChallanNo || prev.vendorChallanNo,
+      vendorChallanNo: rawChallan || prev.vendorChallanNo,
       partyName: prev.partyName || foundLot?.vendorName || ''
     }));
   };
