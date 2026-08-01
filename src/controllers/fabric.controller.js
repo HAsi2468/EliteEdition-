@@ -2069,19 +2069,21 @@ const downloadStockAdjustmentPdf = async (req, res) => {
         doc.image(logoPath, ML, y, { width: 140 });
       }
 
-      // Title & Voucher # on right
-      doc.fillColor(getColor('#000000', isColorPage)).fontSize(14).font('Helvetica-Bold')
-        .text('FABRIC STOCK RETURN / ADJUSTMENT VOUCHER', ML, y + 2, { width: contentWidth, align: 'right' });
+      const displayNo = (saDoc.saNo || '').replace(/^SA-/i, 'RE-');
+
+      // Title & Return # on right
+      doc.fillColor(getColor('#000000', isColorPage)).fontSize(16).font('Helvetica-Bold')
+        .text('RETURN', ML, y + 2, { width: contentWidth, align: 'right', lineBreak: false });
 
       doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12).font('Helvetica-Bold')
-        .text(`VOUCHER #: ${saDoc.saNo}`, ML, y + 22, { width: contentWidth, align: 'right' });
+        .text(`RETURN #: ${displayNo}`, ML, y + 22, { width: contentWidth, align: 'right', lineBreak: false });
 
       doc.fillColor(getColor('#475569', isColorPage)).fontSize(8.5).font('Helvetica')
-        .text(`Date: ${dStr}`, ML, y + 38, { width: contentWidth, align: 'right' });
+        .text(`Date: ${dStr}`, ML, y + 38, { width: contentWidth, align: 'right', lineBreak: false });
 
-      // Address line below logo
+      // Address line below logo (STRICT SINGLE LINE)
       doc.fillColor(getColor('#374151', isColorPage)).fontSize(7.5).font('Helvetica')
-        .text(ADDRESS_LINE, ML, y + 54, { width: 310 });
+        .text(ADDRESS_LINE, ML, y + 54, { width: 380, lineBreak: false });
 
       doc.moveTo(ML, y + 68).lineTo(ML + contentWidth, y + 68).strokeColor(getColor('#c084fc', isColorPage)).lineWidth(1.5).stroke();
 

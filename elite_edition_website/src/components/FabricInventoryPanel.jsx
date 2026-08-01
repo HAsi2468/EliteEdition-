@@ -2637,7 +2637,7 @@ export default function FabricInventoryPanel() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
                 <h3 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   {editingSa ? <Edit size={18} /> : <PlusCircle size={18} />}
-                  {editingSa ? `Edit Stock Return Voucher (${editingSa.saNo})` : 'Issue Stock Return Voucher (Auto Voucher #: SA-01...)'}
+                  {editingSa ? `Edit Stock Return Voucher (${(editingSa.saNo || '').replace(/^SA-/i, 'RE-')})` : 'Issue Stock Return Voucher (Auto Return #: RE-01...)'}
                 </h3>
                 <span style={{ fontSize: '0.78rem', background: 'rgba(124, 58, 237, 0.15)', color: '#8b5cf6', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, border: '1px solid rgba(124, 58, 237, 0.3)' }}>
                   No Job Card Needed
@@ -2873,7 +2873,7 @@ export default function FabricInventoryPanel() {
 
                     return filteredSa.map((sa, idx) => (
                       <tr key={idx}>
-                        <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{sa.saNo}</td>
+                        <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{(sa.saNo || '').replace(/^SA-/i, 'RE-')}</td>
                         <td style={{ color: 'var(--text-muted)' }}>
                           {sa.date ? new Date(sa.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
                         </td>

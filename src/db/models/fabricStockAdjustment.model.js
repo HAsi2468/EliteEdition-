@@ -101,7 +101,7 @@ fabricStockAdjustmentSchema.pre('validate', async function () {
     const last = await this.constructor.findOne({}, 'saSeq').sort({ saSeq: -1 });
     const nextSeq = last && last.saSeq ? last.saSeq + 1 : SA_START_SEQ;
     this.saSeq = nextSeq;
-    this.saNo = `SA-${String(nextSeq).padStart(2, '0')}`;
+    this.saNo = `RE-${String(nextSeq).padStart(2, '0')}`;
   }
 });
 
