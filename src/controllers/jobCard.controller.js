@@ -186,6 +186,24 @@ function normalizeDateStr(dtStr) {
   return s;
 }
 
+const syncDesignImage = async (body, existingCard = null) => {
+  const dName = body.designName || body.designNo || (existingCard ? (existingCard.designName || existingCard.designNo) : '');
+  if (dName) {
+    const cleanName = String(dName).trim().replace(/^ED-/i, '');
+    try {
+      const designDoc = await db.Design.findOne({
+        $or: [
+          { designName: { $regex: `^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
+          { designNo: { $regex: `^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
+        ]
+      }).lean();
+      if (designDoc && (designDoc.imageUrl || designDoc.imageUrl2)) {
+        body.imageUrl1 = designDoc.imageUrl || designDoc.imageUrl2;
+      }
+    } catch (e) {}
+  }
+};
+
 const createJobCard = async (req, res) => {
   try {
     const body = req.body;
@@ -193,6 +211,8 @@ const createJobCard = async (req, res) => {
     if (body.printDate) body.printDate = normalizeDateStr(body.printDate);
     if (body.fusingDate) body.fusingDate = normalizeDateStr(body.fusingDate);
     if (body.deliveryDate) body.deliveryDate = normalizeDateStr(body.deliveryDate);
+
+    await syncDesignImage(body);
 
     if (body.panna && body.pass && body.totalMtr && body.machineName)
       body.expTime = calcExpTime(body.panna, body.pass, body.totalMtr, body.machineName);
@@ -213,10 +233,14 @@ const updateJobCard = async (req, res) => {
     if (body.fusingDate) body.fusingDate = normalizeDateStr(body.fusingDate);
     if (body.deliveryDate) body.deliveryDate = normalizeDateStr(body.deliveryDate);
 
-    if (body.panna && body.pass && body.totalMtr && body.machineName)
-      body.expTime = calcExpTime(body.panna, body.pass, body.totalMtr, body.machineName);
     const existingCard = await db.JobCard.findById(req.params.id);
     if (!existingCard) return res.status(404).json({ error: 'Job card not found' });
+
+    await syncDesignImage(body, existingCard);
+
+    if (body.panna && body.pass && body.totalMtr && body.machineName)
+      body.expTime = calcExpTime(body.panna, body.pass, body.totalMtr, body.machineName);
+
     const printStatus    = body.printStatus    !== undefined ? body.printStatus    : existingCard.printStatus;
     const fusingStatus   = body.fusingStatus   !== undefined ? body.fusingStatus   : existingCard.fusingStatus;
     const deliveryStatus = body.deliveryStatus !== undefined ? body.deliveryStatus : existingCard.deliveryStatus;
@@ -275,10 +299,8 @@ const downloadJobCardPdf = async (req, res) => {
     const jobCard = await db.JobCard.findById(req.params.id).lean();
     if (!jobCard) return res.status(404).json({ error: 'Job Card not found' });
 
-    // Use the stored imageUrl1 from the job card — this is what was explicitly set during creation.
-    // Only resolve imageUrl2 from catalog when 2 design names are entered.
-    let imageUrl1 = jobCard.imageUrl1 || '';
-    let imageUrl2 = '';  // always start empty — only populate for 2nd design
+    let imageUrl1 = '';
+    let imageUrl2 = '';
 
     function extractNames(str) {
       if (!str || typeof str !== 'string') return [];
@@ -288,23 +310,32 @@ const downloadJobCardPdf = async (req, res) => {
     const keyStr = jobCard.designName || jobCard.designNo || '';
     const names = extractNames(keyStr);
 
-    // If no stored imageUrl1, try catalog as fallback
-    if (!imageUrl1 && names[0]) {
+    // Prioritize catalog image lookup for design 1 so exact design image is rendered
+    if (names[0]) {
+      const cleanName = names[0].replace(/^ED-/i, '');
       const design1 = await db.Design.findOne({
         $or: [
-          { designName: { $regex: `^${names[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
-          { designNo: { $regex: `^${names[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
+          { designName: { $regex: `^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
+          { designNo: { $regex: `^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
         ]
       }).lean();
-      if (design1) imageUrl1 = design1.imageUrl || design1.imageUrl2 || '';
+      if (design1 && (design1.imageUrl || design1.imageUrl2)) {
+        imageUrl1 = design1.imageUrl || design1.imageUrl2;
+      }
+    }
+
+    // Fallback to stored imageUrl1 on job card
+    if (!imageUrl1) {
+      imageUrl1 = jobCard.imageUrl1 || '';
     }
 
     // Only load second image if 2 separate design names entered
     if (names.length >= 2 && names[1]) {
+      const cleanName2 = names[1].replace(/^ED-/i, '');
       const design2 = await db.Design.findOne({
         $or: [
-          { designName: { $regex: `^${names[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
-          { designNo: { $regex: `^${names[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
+          { designName: { $regex: `^(ED-)?${cleanName2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
+          { designNo: { $regex: `^(ED-)?${cleanName2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
         ]
       }).lean();
       if (design2) imageUrl2 = design2.imageUrl || design2.imageUrl2 || '';
