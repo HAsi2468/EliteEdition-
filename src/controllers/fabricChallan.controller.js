@@ -606,14 +606,12 @@ const downloadChallanPdf = async (req, res) => {
     const tpSectionY = MR + 98 + 68 + 34 + 34 + 10;
     const tpTableStartY = tpSectionY + 16;
 
-    // Resolve Image Path helper
+    // Case-insensitive image path resolver
     const resolveImagePath = (urlOrPath) => {
       if (!urlOrPath) return null;
-      let filename = urlOrPath.replace(/^.*\/designs\//, '').replace(/^\/designs\//, '');
-      try {
-        filename = decodeURIComponent(filename);
-      } catch (e) {}
-      
+      let filename = urlOrPath.replace(/^.*\/designs\//, '').replace(/^\/designs\//, '').trim();
+      try { filename = decodeURIComponent(filename); } catch (e) {}
+
       const possibleDirs = [
         path.join(__dirname, '../../elite_edition_images'),
         path.join(__dirname, '../../../elite_edition_images'),
@@ -623,9 +621,46 @@ const downloadChallanPdf = async (req, res) => {
         path.join(__dirname, '../../../Digital print'),
         '/home/ubuntu/Digital print'
       ];
+
       for (const pDir of possibleDirs) {
-        const fullPath = path.join(pDir, filename);
-        if (fs.existsSync(fullPath)) return fullPath;
+        if (fs.existsSync(pDir)) {
+          const direct = path.join(pDir, filename);
+          if (fs.existsSync(direct)) return direct;
+
+          try {
+            const files = fs.readdirSync(pDir);
+            const lowerFilename = filename.toLowerCase();
+            const matched = files.find(f => f.toLowerCase() === lowerFilename);
+            if (matched) return path.join(pDir, matched);
+          } catch (e) {}
+        }
+      }
+      return null;
+    };
+
+    const findImageByDesignToken = (dName) => {
+      if (!dName) return null;
+      const clean = dName.trim().replace(/^ED-/i, '');
+      const pattern = new RegExp(`^(ED-)?${clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\([^)]+\\)|\\s.*)?\\.(jpg|jpeg|png|webp)$`, 'i');
+
+      const possibleDirs = [
+        path.join(__dirname, '../../elite_edition_images'),
+        path.join(__dirname, '../../../elite_edition_images'),
+        '/home/ubuntu/elite_edition_images',
+        path.join(__dirname, '../elite_edition_images'),
+        path.join(__dirname, '../../Digital print'),
+        path.join(__dirname, '../../../Digital print'),
+        '/home/ubuntu/Digital print'
+      ];
+
+      for (const pDir of possibleDirs) {
+        if (fs.existsSync(pDir)) {
+          try {
+            const files = fs.readdirSync(pDir);
+            const matchedFile = files.find(f => pattern.test(f));
+            if (matchedFile) return path.join(pDir, matchedFile);
+          } catch (e) {}
+        }
       }
       return null;
     };
@@ -653,17 +688,10 @@ const downloadChallanPdf = async (req, res) => {
         .map(s => s.trim())
         .filter(Boolean);
 
-      const possibleDirs = [
-        path.join(__dirname, '../../elite_edition_images'),
-        path.join(__dirname, '../../../elite_edition_images'),
-        '/home/ubuntu/elite_edition_images',
-        path.join(__dirname, '../../Digital print'),
-        path.join(__dirname, '../../../Digital print'),
-        '/home/ubuntu/Digital print'
-      ];
-
       for (const dName of designTokens) {
         const cleanName = dName.replace(/^ED-/i, '');
+        
+        // A. Try Design DB document
         try {
           const Design = require('../db/models/design.model');
           const dDoc = await Design.findOne({
@@ -684,21 +712,12 @@ const downloadChallanPdf = async (req, res) => {
           }
         } catch (e) {}
 
-        const directCandidates = [dName, `ED-${dName}`, cleanName, `ED-${cleanName}`];
-        for (const cand of directCandidates) {
-          for (const ext of ['.jpg', '.jpeg', '.png']) {
-            for (const pDir of possibleDirs) {
-              const testPath = path.join(pDir, `${cand}${ext}`);
-              if (fs.existsSync(testPath)) {
-                firstDesignImg = { path: testPath, label: `Design: ${cand}` };
-                break;
-              }
-            }
-            if (firstDesignImg) break;
-          }
-          if (firstDesignImg) break;
+        // B. Try case-insensitive directory file match
+        const foundFile = findImageByDesignToken(dName);
+        if (foundFile) {
+          firstDesignImg = { path: foundFile, label: `Design: ${dName}` };
+          break;
         }
-        if (firstDesignImg) break;
       }
     }
 
