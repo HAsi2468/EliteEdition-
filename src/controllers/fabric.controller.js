@@ -2041,167 +2041,122 @@ const downloadStockAdjustmentPdf = async (req, res) => {
     const fs = require('fs');
     const logoPath = path.join(__dirname, 'Logo.png');
 
-    const doc = new PDFDocument({ margin: 28, size: 'A4', autoFirstPage: true });
+    const doc = new PDFDocument({ size: 'A4', margin: 30, bufferPages: true });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="Fabric_Return_${saDoc.saNo}.pdf"`);
     doc.pipe(res);
 
-    const PW = 595, PH = 842, ML = 45, MR = 28;
+    const ML = 30;
+    const MR = 30;
+    const PW = 595;
+    const PH = 842;
     const contentWidth = PW - ML - MR;
+    const ADDRESS_LINE = 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, NR. KALAPUL, Punagam, Surat';
 
-    const formattedDate = saDoc.date ? new Date(saDoc.date).toLocaleDateString('en-IN', {
-      day: '2-digit', month: '2-digit', year: 'numeric'
-    }) : '—';
+    const dStr = saDoc.date ? new Date(saDoc.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
 
     const getColor = (colorStr, isColorPage) => {
       if (isColorPage) return colorStr;
-      if (colorStr === '#dc2626') return '#dc2626'; // Keep Red for Voucher No & Total TP
-      if (colorStr === '#10b981') return '#10b981'; // Keep Green for Total Meters
-      return '#000000'; // Everything else B&W on second page
+      if (colorStr === '#7e22ce' || colorStr === '#6b21a8') return '#000000';
+      return '#000000'; // Black & White on second page
     };
 
     const renderPage = (isColorPage) => {
-      // Draw outer border
-      doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(1)
-         .rect(ML, MR, contentWidth, PH - 2 * MR).stroke();
+      let y = 18;
 
-      // Top line texts: GST, Shree Ganeshay Namah, Mobile
-      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(10.5).font('Helvetica')
-        .text('GST : 24AANFE0044M1ZG', ML + 12, MR + 4, { lineBreak: false });
-      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(10.5).font('Helvetica-Bold')
-        .text('|| Shree Ganeshay Namah ||', ML, MR + 4, { width: contentWidth, align: 'center', lineBreak: false });
-      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(10.5).font('Helvetica')
-        .text('Mo. +91 99098 66667', ML, MR + 4, { width: contentWidth - 12, align: 'right', lineBreak: false });
-
-      doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5)
-        .moveTo(ML, MR + 14).lineTo(PW - MR, MR + 14).stroke();
-
-      // Logo
+      // ── HEADER SECTION ────────────────────────────────────────────────────────
       if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, ML + (contentWidth - 130) / 2, MR + 29, { width: 130 });
+        doc.image(logoPath, ML, y, { width: 140 });
       }
 
-      // FABRIC RETURN title written in top right side corner of header box
-      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(14).font('Helvetica-Bold')
-        .text('FABRIC RETURN', ML, MR + 25, { width: contentWidth - 12, align: 'right', lineBreak: false });
+      // Title & Voucher # on right
+      doc.fillColor(getColor('#000000', isColorPage)).fontSize(14).font('Helvetica-Bold')
+        .text('FABRIC STOCK RETURN / ADJUSTMENT VOUCHER', ML, y + 2, { width: contentWidth, align: 'right' });
 
-      // Address Pin
-      const drawMapPin = (d, x, y) => {
-        d.save();
-        d.fillColor(getColor('#6b21a8', isColorPage));
-        d.translate(x, y);
-        d.moveTo(0, 0)
-         .bezierCurveTo(-4, -4, -4, -9, 0, -9)
-         .bezierCurveTo(4, -9, 4, -4, 0, 0)
-         .fill();
-        d.fillColor('#ffffff')
-         .circle(0, -5, 1.5)
-         .fill();
-        d.restore();
-      };
+      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12).font('Helvetica-Bold')
+        .text(`VOUCHER #: ${saDoc.saNo}`, ML, y + 22, { width: contentWidth, align: 'right' });
 
-      const addressText = 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, NR. KALAPUL, Punagam, Surat';
-      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(10).font('Helvetica-Bold');
-      const textWidth = doc.widthOfString(addressText);
-      const startX = ML + (contentWidth - textWidth) / 2;
-      
-      drawMapPin(doc, startX - 8, MR + 79 + 7);
-      doc.text(addressText, startX, MR + 79, { lineBreak: false });
+      doc.fillColor(getColor('#475569', isColorPage)).fontSize(8.5).font('Helvetica')
+        .text(`Date: ${dStr}`, ML, y + 38, { width: contentWidth, align: 'right' });
 
-      doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.8)
-        .moveTo(ML, MR + 94).lineTo(PW - MR, MR + 94).stroke();
+      // Address line below logo
+      doc.fillColor(getColor('#374151', isColorPage)).fontSize(7.5).font('Helvetica')
+        .text(ADDRESS_LINE, ML, y + 54, { width: 310 });
 
-      const startY = MR + 98;
+      doc.moveTo(ML, y + 68).lineTo(ML + contentWidth, y + 68).strokeColor(getColor('#c084fc', isColorPage)).lineWidth(1.5).stroke();
 
-      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
-        .text('M/S:', ML + 12, startY + 6, { lineBreak: false });
-      doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(14.5).font('Helvetica-Bold')
-        .text(saDoc.partyName || '—', ML + 42, startY + 4, { lineBreak: false });
-        
-      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
-        .text('DATE:', PW - MR - 260, startY + 6, { width: 48, align: 'right', lineBreak: false });
-      doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(13).font('Helvetica-Bold')
-        .text(formattedDate, PW - MR - 210, startY + 6, { width: 80, align: 'left', lineBreak: false });
+      y = y + 78;
 
-      // Right header: CH. NO. & Voucher #
-      const labelStr = 'CH. NO.:';
-      const valStr = saDoc.saNo || '—';
-      const rightEdge = PW - MR - 8;
-      const valW = 60;
-      const labelW = 70;
-      const valX = rightEdge - valW;
-      const labelX = valX - labelW;
+      // ── PARTY / VENDOR INFO BOX ─────────────────────────────────────────────────
+      const infoBoxH = saDoc.notes ? 72 : 58;
+      doc.rect(ML, y, contentWidth, infoBoxH).fill(isColorPage ? '#faf5ff' : '#ffffff').stroke(getColor('#e9d5ff', isColorPage));
+      doc.fillColor(getColor('#000000', isColorPage)).fontSize(8.5).font('Helvetica-Bold');
 
-      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
-        .text(labelStr, labelX, startY + 6, { width: labelW, align: 'right', lineBreak: false });
+      // Row 1
+      doc.text('PARTY / VENDOR:', ML + 10, y + 8);
+      doc.font('Helvetica').text(saDoc.partyName || '—', ML + 120, y + 8, { width: 165, lineBreak: false });
 
-      doc.fillColor(getColor('#dc2626', isColorPage)).fontSize(14.5).font('Helvetica-Bold')
-        .text(valStr, valX, startY + 4, { width: valW, align: 'right', lineBreak: false });
+      doc.font('Helvetica-Bold').text('ADJUSTMENT TYPE:', ML + 295, y + 8);
+      doc.font('Helvetica').text(
+        saDoc.adjustmentType === 'RETURN_REJECTED' ? 'Return / Rejected Outward'
+          : saDoc.adjustmentType === 'STOCK_DEDUCTION' ? 'Stock Deduction'
+          : saDoc.adjustmentType === 'STOCK_ADDITION' ? 'Stock Addition'
+          : saDoc.adjustmentType,
+        ML + 400, y + 8, { width: 125, lineBreak: false }
+      );
 
-      doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.6)
-        .moveTo(ML, startY + 28).lineTo(PW - MR, startY + 28).stroke();
+      // Row 2
+      doc.font('Helvetica-Bold').text('FABRIC & PANNA:', ML + 10, y + 23);
+      doc.font('Helvetica').text(`${saDoc.fabricQuality || '—'}${saDoc.panna ? ' (' + saDoc.panna + '")' : ''}`, ML + 120, y + 23, { width: 165, lineBreak: false });
 
-      function renderField(label, value, x, y, width, height) {
-        doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5)
-          .rect(x, y, width, height).stroke();
+      doc.font('Helvetica-Bold').text('LOT NUMBER(S):', ML + 295, y + 23);
+      doc.font('Helvetica').text(saDoc.lotNo ? `#${saDoc.lotNo}` : '—', ML + 400, y + 23, { width: 125, lineBreak: false });
 
-        doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(9.5).font('Helvetica-Bold')
-          .text(label.toUpperCase(), x + 6, y + 3, { width: width - 12, align: 'left', lineBreak: false });
+      // Row 3
+      doc.font('Helvetica-Bold').text('VENDOR CHALLAN NO:', ML + 10, y + 38);
+      doc.font('Helvetica').text(saDoc.vendorChallanNo || '—', ML + 120, y + 38, { width: 165, lineBreak: false });
 
-        const valText = String(value || '—').trim();
-        let fontSize = 12;
-        if (valText.length > 28) fontSize = 7.5;
-        else if (valText.length > 18) fontSize = 8.5;
-        else if (valText.length > 11) fontSize = 9.5;
+      doc.font('Helvetica-Bold').text('REASON / REMARK:', ML + 295, y + 38);
+      doc.font('Helvetica').text(saDoc.reason || 'Fabric Return / Rejection', ML + 400, y + 38, { width: 125, lineBreak: false });
 
-        doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(fontSize).font('Helvetica-Bold')
-          .text(valText, x + 6, y + 15, { width: width - 12, align: 'left', lineBreak: true, height: height - 16 });
+      // Row 4 (Notes)
+      if (saDoc.notes) {
+        doc.font('Helvetica-Bold').text('NOTES:', ML + 10, y + 53);
+        doc.font('Helvetica').text(saDoc.notes, ML + 120, y + 53, { width: 400, lineBreak: false });
       }
 
-      const gridStartY = startY + 28;
-      const colWidth4 = contentWidth / 4;
+      y += infoBoxH + 12;
 
-      renderField('Vendor Challan', saDoc.vendorChallanNo, ML, gridStartY, colWidth4, 34);
-      renderField('Fabric', saDoc.fabricQuality, ML + colWidth4, gridStartY, colWidth4, 34);
-      renderField('Lot No.', saDoc.lotNo ? `#${saDoc.lotNo}` : '—', ML + colWidth4 * 2, gridStartY, colWidth4, 34);
-      renderField('Panno', saDoc.panna ? `${saDoc.panna}"` : '—', ML + colWidth4 * 3, gridStartY, colWidth4, 34);
-
-      renderField('Adjustment Type', saDoc.adjustmentType === 'RETURN_REJECTED' ? 'Return / Rejected' : saDoc.adjustmentType, ML, gridStartY + 34, colWidth4, 34);
-      renderField('Reason', saDoc.reason, ML + colWidth4, gridStartY + 34, colWidth4 * 2, 34);
-      renderField('Notes', saDoc.notes, ML + colWidth4 * 3, gridStartY + 34, colWidth4, 34);
-
-      const tpSectionY = gridStartY + 68 + 10;
-      const tpTableStartY = tpSectionY + 16;
-
-      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(13).font('Helvetica-Bold')
-        .text('TP Details', ML + 16, tpSectionY, { lineBreak: false });
-
+      // ── 3-COLUMN TP DETAILS TABLE ──────────────────────────────────────────────
       const activeTps = (saDoc.tpDetails && saDoc.tpDetails.length > 0 ? saDoc.tpDetails : [{ tpNo: 1, tpMeter: saDoc.totalMtr }])
         .filter(tp => tp.tpMeter != null && parseFloat(tp.tpMeter) > 0);
 
       const activeCount = activeTps.length;
-      const tpColsCount = activeCount <= 10 ? 1 : activeCount <= 20 ? 2 : 3;
+      const tpColsCount = 3; // FORCED 3 COLUMNS as requested by user
       const tpColWidth = contentWidth / tpColsCount;
-      const rowsPerCol = Math.ceil(activeCount / tpColsCount);
-      const tpRowHeight = rowsPerCol > 14 ? 18 : rowsPerCol > 11 ? 21 : 25;
-      const tableHeaderHeight = 24;
+      const rowsPerCol = Math.max(1, Math.ceil(activeCount / tpColsCount));
+      const tpRowHeight = 19;
+      const tableHeaderHeight = 20;
 
+      // Table Header Row across 3 columns
       for (let c = 0; c < tpColsCount; c++) {
         const x = ML + c * tpColWidth;
-        doc.rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).fill(isColorPage ? '#faf5ff' : '#ffffff');
-        doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5).rect(x, tpTableStartY, tpColWidth, tableHeaderHeight).stroke();
-        
-        doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12).font('Helvetica-Bold')
-          .text('TP NO.', x, tpTableStartY + 7, { width: tpColWidth * 0.35, align: 'center' });
-        doc.text('METRES', x + tpColWidth * 0.35, tpTableStartY + 7, { width: tpColWidth * 0.65, align: 'center' });
+        doc.rect(x, y, tpColWidth, tableHeaderHeight).fill(isColorPage ? '#ede9fe' : '#f1f5f9');
+        doc.strokeColor(getColor('#c084fc', isColorPage)).lineWidth(0.5).rect(x, y, tpColWidth, tableHeaderHeight).stroke();
+
+        doc.fillColor(getColor('#000000', isColorPage)).fontSize(8.5).font('Helvetica-Bold');
+        doc.text('TP / ROLL NO', x + 8, y + 6, { width: tpColWidth * 0.45 });
+        doc.text('METERS (MTR)', x + tpColWidth * 0.45, y + 6, { width: tpColWidth * 0.52, align: 'right' });
       }
 
+      y += tableHeaderHeight;
+      const tableBodyStartY = y;
+
       if (activeCount === 0) {
-        const x = ML;
-        const y = tpTableStartY + tableHeaderHeight;
-        doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5).rect(x, y, contentWidth, tpRowHeight).stroke();
-        doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12.5).font('Helvetica-Oblique')
-          .text('No TP details entered.', x, y + 7, { width: contentWidth, align: 'center' });
+        doc.rect(ML, y, contentWidth, tpRowHeight).fill('#ffffff').stroke('#f1f5f9');
+        doc.fillColor('#000000').fontSize(8.5).font('Helvetica')
+          .text('No TP details entered.', ML + 10, y + 5);
+        y += tpRowHeight;
       } else {
         for (let i = 0; i < activeCount; i++) {
           const tp = activeTps[i];
@@ -2209,49 +2164,58 @@ const downloadStockAdjustmentPdf = async (req, res) => {
           const rowIndex = i % rowsPerCol;
 
           const x = ML + colIndex * tpColWidth;
-          const y = tpTableStartY + tableHeaderHeight + rowIndex * tpRowHeight;
+          const rowY = tableBodyStartY + rowIndex * tpRowHeight;
 
-          doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5).rect(x, y, tpColWidth, tpRowHeight).stroke();
+          doc.rect(x, rowY, tpColWidth, tpRowHeight).fill(rowIndex % 2 === 0 ? '#ffffff' : (isColorPage ? '#faf5ff' : '#f8fafc'));
+          doc.strokeColor('#e2e8f0').lineWidth(0.4).rect(x, rowY, tpColWidth, tpRowHeight).stroke();
 
-          const val = `${parseFloat(tp.tpMeter).toFixed(2)} mtr`;
-
-          doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12.5).font('Helvetica-Bold')
-            .text(String(tp.tpNo), x, y + 7, { width: tpColWidth * 0.35, align: 'center' });
-          
-          doc.fillColor(getColor('#0f172a', isColorPage)).fontSize(13).font('Helvetica')
-            .text(val, x + tpColWidth * 0.35, y + 7, { width: tpColWidth * 0.65, align: 'center' });
+          doc.fillColor(getColor('#000000', isColorPage)).fontSize(8.5).font('Helvetica');
+          doc.text(`TP-${tp.tpNo}`, x + 8, rowY + 5, { width: tpColWidth * 0.45 });
+          doc.font('Helvetica-Bold').text(`${parseFloat(tp.tpMeter || 0).toFixed(2)} mtr`, x + tpColWidth * 0.45, rowY + 5, { width: tpColWidth * 0.52, align: 'right' });
         }
+
+        // Fill remaining empty cells in partial columns to keep grid clean
+        const totalGridCells = rowsPerCol * tpColsCount;
+        for (let i = activeCount; i < totalGridCells; i++) {
+          const colIndex = Math.floor(i / rowsPerCol);
+          const rowIndex = i % rowsPerCol;
+          const x = ML + colIndex * tpColWidth;
+          const rowY = tableBodyStartY + rowIndex * tpRowHeight;
+
+          doc.rect(x, rowY, tpColWidth, tpRowHeight).fill(rowIndex % 2 === 0 ? '#ffffff' : (isColorPage ? '#faf5ff' : '#f8fafc'));
+          doc.strokeColor('#e2e8f0').lineWidth(0.4).rect(x, rowY, tpColWidth, tpRowHeight).stroke();
+        }
+
+        y = tableBodyStartY + rowsPerCol * tpRowHeight;
       }
 
-      const summaryStartY = tpTableStartY + tableHeaderHeight + (activeCount > 0 ? rowsPerCol * tpRowHeight : tpRowHeight) + 15;
-      const summaryColWidth2 = contentWidth / 2;
+      // ── TOTALS SUMMARY ROW ─────────────────────────────────────────────────────
+      doc.rect(ML, y, contentWidth, 26).fill(isColorPage ? '#f3e8ff' : '#f1f5f9').stroke(getColor('#c084fc', isColorPage));
+      doc.fillColor(getColor('#000000', isColorPage)).fontSize(9).font('Helvetica-Bold');
+      doc.text(`TOTAL ROLLS / TP: ${saDoc.totalTp || activeCount}`, ML + 10, y + 8);
+      doc.fillColor(getColor('#7e22ce', isColorPage)).fontSize(11).font('Helvetica-Bold')
+        .text(`TOTAL METERS RETURNED: ${parseFloat(saDoc.totalMtr || 0).toFixed(2)} MTR`, ML + 200, y + 7, { width: contentWidth - 210, align: 'right' });
 
-      doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5).rect(ML, summaryStartY, summaryColWidth2, 48).stroke();
-      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(11.5).font('Helvetica-Bold')
-        .text('TOTAL RETURN TP', ML, summaryStartY + 8, { width: summaryColWidth2, align: 'center' });
-      doc.fillColor(getColor('#dc2626', isColorPage)).fontSize(17).font('Helvetica-Bold')
-        .text(String(saDoc.totalTp || activeCount || 1), ML, summaryStartY + 23, { width: summaryColWidth2, align: 'center' });
+      y += 34;
 
-      doc.strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5).rect(ML + summaryColWidth2, summaryStartY, summaryColWidth2, 48).stroke();
-      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(11.5).font('Helvetica-Bold')
-        .text('TOTAL RETURN METRES', ML + summaryColWidth2, summaryStartY + 8, { width: summaryColWidth2, align: 'center' });
-      doc.fillColor(getColor('#10b981', isColorPage)).fontSize(17).font('Helvetica-Bold')
-        .text(`${parseFloat(saDoc.totalMtr || 0).toFixed(2)} mtr`, ML + summaryColWidth2, summaryStartY + 23, { width: summaryColWidth2, align: 'center' });
+      // ── TERMS & CONDITIONS ──────────────────────────────────────────────────────
+      doc.fillColor(getColor('#64748b', isColorPage)).fontSize(7).font('Helvetica')
+        .text('Terms & Conditions: Fabric return accepted subject to quality inspection. This voucher is valid only with company seal and signature.', ML, y, { width: contentWidth });
 
-      const sigLineY = PH - MR - 45;
+      // ── SIGNATURES AT BOTTOM ────────────────────────────────────────────────────
+      const sigY = PH - MR - 45;
 
-      doc.moveTo(ML + 30, sigLineY).lineTo(ML + 160, sigLineY).strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5).stroke();
-      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12).font('Helvetica-Bold')
-        .text('RECEIVER SIGNATURE', ML + 30, sigLineY + 5, { width: 130, align: 'center' });
+      doc.fillColor(getColor('#374151', isColorPage)).fontSize(8).font('Helvetica-Bold');
+      doc.text('Receiver / Supplier Sign', ML + 20, sigY, { width: 160, align: 'center' });
+      doc.text('Authorized Signatory', ML + contentWidth - 180, sigY, { width: 160, align: 'center' });
 
-      doc.moveTo(PW - MR - 160, sigLineY).lineTo(PW - MR - 30, sigLineY).strokeColor(getColor('#6b21a8', isColorPage)).lineWidth(0.5).stroke();
-      doc.fillColor(getColor('#6b21a8', isColorPage)).fontSize(12).font('Helvetica-Bold')
-        .text('AUTHORIZED SIGNATURE', PW - MR - 160, sigLineY + 5, { width: 130, align: 'center' });
+      doc.moveTo(ML + 20, sigY + 22).lineTo(ML + 180, sigY + 22).strokeColor(getColor('#94a3b8', isColorPage)).lineWidth(1).stroke();
+      doc.moveTo(ML + contentWidth - 180, sigY + 22).lineTo(ML + contentWidth - 20, sigY + 22).strokeColor(getColor('#94a3b8', isColorPage)).lineWidth(1).stroke();
     };
 
-    renderPage(true);  // Page 1: Color (Original - Purple Theme)
+    renderPage(true);  // Page 1: Color
     doc.addPage();
-    renderPage(false); // Page 2: Black & White (Duplicate)
+    renderPage(false); // Page 2: Black & White Duplicate
 
     doc.end();
   } catch (err) {
