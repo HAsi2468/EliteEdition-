@@ -99,6 +99,42 @@ const printConfigSchema = new mongoose.Schema(
       of: String,
       default: {},
     },
+    companyName: {
+      type: String,
+      default: 'ELITE DIGITAL PRINTS',
+    },
+    companyGstin: {
+      type: String,
+      default: '24AAAFE1234F1Z5',
+    },
+    companyAddress: {
+      type: String,
+      default: 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, Surat - 395006',
+    },
+    companyPhone: {
+      type: String,
+      default: '+91 98790 00000',
+    },
+    companyEmail: {
+      type: String,
+      default: 'info@elitedigitalprints.com',
+    },
+    companyBankName: {
+      type: String,
+      default: '',
+    },
+    companyAccountNo: {
+      type: String,
+      default: '',
+    },
+    companyIfscCode: {
+      type: String,
+      default: '',
+    },
+    companyTerms: {
+      type: String,
+      default: 'Payment due within 15 days from invoice date. Subject to Surat jurisdiction.',
+    },
   },
   {
     timestamps: true,

@@ -39,6 +39,17 @@ export default function PrintSettings() {
   const [isVendorManagerOpen, setIsVendorManagerOpen] = useState(false);
   const [newInkCanSizes, setNewInkCanSizes] = useState('');
   const [startingJobNo, setStartingJobNo] = useState('1');
+  const [companyProfile, setCompanyProfile] = useState({
+    companyName: 'ELITE DIGITAL PRINTS',
+    companyGstin: '24AAAFE1234F1Z5',
+    companyAddress: 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, Surat - 395006',
+    companyPhone: '+91 98790 00000',
+    companyEmail: 'info@elitedigitalprints.com',
+    companyBankName: '',
+    companyAccountNo: '',
+    companyIfscCode: '',
+    companyTerms: 'Payment due within 15 days from invoice date. Subject to Surat jurisdiction.'
+  });
 
   useEffect(() => {
     fetchConfig();
@@ -51,13 +62,41 @@ export default function PrintSettings() {
       setLoading(true);
       const data = await api.getPrintConfig();
       setConfig(data);
-      if (data && data.startingJobNo !== undefined) {
-        setStartingJobNo(String(data.startingJobNo));
+      if (data) {
+        if (data.startingJobNo !== undefined) setStartingJobNo(String(data.startingJobNo));
+        setCompanyProfile({
+          companyName: data.companyName || 'ELITE DIGITAL PRINTS',
+          companyGstin: data.companyGstin || '24AAAFE1234F1Z5',
+          companyAddress: data.companyAddress || 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, Surat - 395006',
+          companyPhone: data.companyPhone || '+91 98790 00000',
+          companyEmail: data.companyEmail || 'info@elitedigitalprints.com',
+          companyBankName: data.companyBankName || '',
+          companyAccountNo: data.companyAccountNo || '',
+          companyIfscCode: data.companyIfscCode || '',
+          companyTerms: data.companyTerms || 'Payment due within 15 days from invoice date. Subject to Surat jurisdiction.'
+        });
       }
     } catch (err) {
       console.error('Failed to fetch print config:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveCompanyProfile = async () => {
+    try {
+      setActionLoading(true);
+      const updated = await api.updatePrintConfig({
+        action: 'set_company',
+        companyData: companyProfile
+      });
+      setConfig(updated);
+      alert('Company Profile & GST details updated successfully!');
+    } catch (err) {
+      console.error('Failed to update company profile:', err);
+      alert('Failed to update company profile.');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -224,9 +263,131 @@ export default function PrintSettings() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <Settings size={24} color="#a855f7" />
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)' }}>Dynamic Print Settings</h2>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Manage the dropdown options available when creating new Job Cards.</p>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)' }}>System & Business Settings</h2>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Manage GST profile details, bank accounts, invoice terms, and job card options.</p>
           </div>
+        </div>
+      </div>
+
+      {/* Business Profile & GST Settings Card */}
+      <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem', background: 'rgba(59,130,246,0.02)', border: '1px solid var(--border-light)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              🏢 Business Profile & GST Settings
+            </h3>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Configure your Company Name, GSTIN Number, Billing Address, Phone, and Bank details for Tax Invoices.</p>
+          </div>
+          <button
+            className="btn-primary"
+            onClick={handleSaveCompanyProfile}
+            disabled={actionLoading}
+            style={{ background: 'linear-gradient(135deg,#3b82f6,#2563eb)' }}
+          >
+            {actionLoading ? 'Saving...' : 'Save Profile'}
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Company / Business Name *</label>
+            <input
+              type="text"
+              style={styles.input}
+              value={companyProfile.companyName}
+              onChange={e => setCompanyProfile(p => ({ ...p, companyName: e.target.value }))}
+              placeholder="e.g. ELITE DIGITAL PRINTS"
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>GSTIN Number *</label>
+            <input
+              type="text"
+              style={styles.input}
+              value={companyProfile.companyGstin}
+              onChange={e => setCompanyProfile(p => ({ ...p, companyGstin: e.target.value }))}
+              placeholder="e.g. 24AAAFE1234F1Z5"
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Phone Number</label>
+            <input
+              type="text"
+              style={styles.input}
+              value={companyProfile.companyPhone}
+              onChange={e => setCompanyProfile(p => ({ ...p, companyPhone: e.target.value }))}
+              placeholder="e.g. +91 98790 00000"
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Email Address</label>
+            <input
+              type="text"
+              style={styles.input}
+              value={companyProfile.companyEmail}
+              onChange={e => setCompanyProfile(p => ({ ...p, companyEmail: e.target.value }))}
+              placeholder="e.g. info@elitedigitalprints.com"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Company Registered Address</label>
+          <input
+            type="text"
+            style={styles.input}
+            value={companyProfile.companyAddress}
+            onChange={e => setCompanyProfile(p => ({ ...p, companyAddress: e.target.value }))}
+            placeholder="Plot / Street / City / Pincode"
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', borderTop: '1px dashed var(--border-light)', paddingTop: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Bank Name</label>
+            <input
+              type="text"
+              style={styles.input}
+              value={companyProfile.companyBankName}
+              onChange={e => setCompanyProfile(p => ({ ...p, companyBankName: e.target.value }))}
+              placeholder="e.g. HDFC Bank"
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Bank Account Number</label>
+            <input
+              type="text"
+              style={styles.input}
+              value={companyProfile.companyAccountNo}
+              onChange={e => setCompanyProfile(p => ({ ...p, companyAccountNo: e.target.value }))}
+              placeholder="e.g. 50200012345678"
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>IFSC Code</label>
+            <input
+              type="text"
+              style={styles.input}
+              value={companyProfile.companyIfscCode}
+              onChange={e => setCompanyProfile(p => ({ ...p, companyIfscCode: e.target.value }))}
+              placeholder="e.g. HDFC0001234"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Default Invoice Terms & Conditions</label>
+          <textarea
+            style={{ ...styles.input, width: '100%', minHeight: '60px', fontFamily: 'inherit' }}
+            value={companyProfile.companyTerms}
+            onChange={e => setCompanyProfile(p => ({ ...p, companyTerms: e.target.value }))}
+            placeholder="Terms printed at bottom of invoices..."
+          />
         </div>
       </div>
 

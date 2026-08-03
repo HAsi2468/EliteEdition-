@@ -64,9 +64,28 @@ const getPrintConfig = async (req, res) => {
 
 const updatePrintConfig = async (req, res) => {
   try {
-    const { action, field, value, machineName } = req.body;
+    const { action, field, value, machineName, companyData } = req.body;
     
-    if (!action || !field || !value) {
+    let config = await getConfig();
+
+    if (action === 'set_company') {
+      if (companyData) {
+        if (companyData.companyName !== undefined) config.companyName = companyData.companyName;
+        if (companyData.companyGstin !== undefined) config.companyGstin = companyData.companyGstin;
+        if (companyData.companyAddress !== undefined) config.companyAddress = companyData.companyAddress;
+        if (companyData.companyPhone !== undefined) config.companyPhone = companyData.companyPhone;
+        if (companyData.companyEmail !== undefined) config.companyEmail = companyData.companyEmail;
+        if (companyData.companyBankName !== undefined) config.companyBankName = companyData.companyBankName;
+        if (companyData.companyAccountNo !== undefined) config.companyAccountNo = companyData.companyAccountNo;
+        if (companyData.companyIfscCode !== undefined) config.companyIfscCode = companyData.companyIfscCode;
+        if (companyData.companyTerms !== undefined) config.companyTerms = companyData.companyTerms;
+
+        await config.save();
+        return res.status(httpStatus.OK).send(config);
+      }
+    }
+
+    if (!action || !field || value === undefined) {
       return res.status(httpStatus.BAD_REQUEST).send('Missing action, field, or value');
     }
 
@@ -75,13 +94,12 @@ const updatePrintConfig = async (req, res) => {
       'paperTypes', 'billToOptions', 'shipToOptions', 'machines',
       'machine_profile', 'temperatures', 'speeds', 'startingJobNo', 'rawMaterials',
       'sublimationPanna', 'sublimationQualities', 'butterPanna', 'inkColors', 'inkCanSizes',
-      'deliveryOptions', 'lotPartyMap'
+      'deliveryOptions', 'lotPartyMap', 'companyName', 'companyGstin', 'companyAddress',
+      'companyPhone', 'companyEmail', 'companyBankName', 'companyAccountNo', 'companyIfscCode', 'companyTerms'
     ];
     if (!validFields.includes(field)) {
       return res.status(httpStatus.BAD_REQUEST).send('Invalid field');
     }
-
-    let config = await getConfig();
 
     if (field === 'machines') {
       if (action === 'add') {
@@ -102,6 +120,8 @@ const updatePrintConfig = async (req, res) => {
       }
     } else if (field === 'startingJobNo') {
       config.startingJobNo = Number(value) || 1;
+    } else if (field.startsWith('company')) {
+      config[field] = value;
     } else {
       if (!config[field]) config[field] = [];
       

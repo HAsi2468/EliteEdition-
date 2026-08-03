@@ -275,6 +275,14 @@ const downloadInvoicePdf = async (req, res) => {
       return res.status(404).send('Invoice not found');
     }
 
+    const PrintConfig = require('../db/models/printConfig.model');
+    const config = await PrintConfig.findOne({ isConfig: true }).lean() || {};
+    const companyName = config.companyName || 'ELITE DIGITAL PRINTS';
+    const companyGstin = config.companyGstin || '24AAAFE1234F1Z5';
+    const companyAddress = config.companyAddress || 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, Surat - 395006';
+    const companyPhone = config.companyPhone || '+91 98790 00000';
+    const companyTerms = invoice.terms || config.companyTerms || 'Payment due within 15 days from invoice date.';
+
     const doc = new PDFDocument({ margin: 25, size: 'A4', autoFirstPage: true, bufferPages: true });
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -291,10 +299,10 @@ const downloadInvoicePdf = async (req, res) => {
     }
 
     doc.fillColor('#0f172a').fontSize(16).font('Helvetica-Bold')
-      .text('ELITE DIGITAL PRINTS', ML + 140, 20, { width: contentWidth - 140, align: 'right' });
+      .text(companyName.toUpperCase(), ML + 140, 20, { width: contentWidth - 140, align: 'right' });
     doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
-      .text('G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, Surat - 395006', ML + 140, 40, { width: contentWidth - 140, align: 'right' })
-      .text('GSTIN: 24AAAFE1234F1Z5  |  Phone: +91 98790 00000', ML + 140, 52, { width: contentWidth - 140, align: 'right' });
+      .text(companyAddress, ML + 140, 40, { width: contentWidth - 140, align: 'right' })
+      .text(`GSTIN: ${companyGstin}  |  Phone: ${companyPhone}`, ML + 140, 52, { width: contentWidth - 140, align: 'right' });
 
     doc.moveTo(ML, 68).lineTo(PW - MR, 68).strokeColor('#7c3aed').lineWidth(1.5).stroke();
 
@@ -404,15 +412,19 @@ const downloadInvoicePdf = async (req, res) => {
     doc.fillColor('#475569').fontSize(8).font('Helvetica')
       .text(numToWords(invoice.grandTotal), ML, tableY + 18, { width: contentWidth - 230 });
 
-    // Payment History Box
+    // Payment Details / Bank Details Box
     tableY += 105;
     doc.fillColor('#0f172a').fontSize(9).font('Helvetica-Bold')
-      .text('PAYMENT DETAILS:', ML, tableY);
+      .text('PAYMENT & BANK DETAILS:', ML, tableY);
     tableY += 12;
 
+    let payDetailsStr = `Paid Amount: ₹ ${Number(invoice.paidAmount || 0).toFixed(2)}   |   Balance Due: ₹ ${Number(invoice.balanceDue || 0).toFixed(2)}`;
+    if (config.companyBankName || config.companyAccountNo) {
+      payDetailsStr += `\nBank: ${config.companyBankName || 'N/A'}  |  A/C No: ${config.companyAccountNo || 'N/A'}  |  IFSC: ${config.companyIfscCode || 'N/A'}`;
+    }
+
     doc.fillColor('#475569').fontSize(8).font('Helvetica')
-      .text(`Paid Amount: ₹ ${Number(invoice.paidAmount || 0).toFixed(2)}`, ML, tableY)
-      .text(`Balance Due: ₹ ${Number(invoice.balanceDue || 0).toFixed(2)}`, ML + 160, tableY);
+      .text(payDetailsStr, ML, tableY, { width: contentWidth });
 
     // Terms & Authorized Signatory Footer
     tableY += 35;
@@ -421,10 +433,12 @@ const downloadInvoicePdf = async (req, res) => {
 
     doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
       .text('Terms & Conditions:', ML, tableY)
-      .text(invoice.terms || 'Payment due within 15 days.', ML, tableY + 10, { width: 300 });
+      .text(companyTerms, ML, tableY + 10, { width: 300 });
 
     doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold')
-      .text('For ELITE DIGITAL PRINTS', ML + 350, tableY, { width: contentWidth - 350, align: 'right' });
+      .text(`For ${companyName.toUpperCase()}`, ML + 350, tableY, { width: contentWidth - 350, align: 'right' });
+    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
+      .text('Authorized Signatory', ML + 350, tableY + 35, { width: contentWidth - 350, align: 'right' });
     doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
       .text('Authorized Signatory', ML + 350, tableY + 35, { width: contentWidth - 350, align: 'right' });
 
