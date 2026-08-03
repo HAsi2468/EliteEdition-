@@ -1204,6 +1204,17 @@ const downloadReturnsBrandReportPdf = async (req, res) => {
     const dateStr = formatReportDateStr(dateStart, dateEnd);
     logger.info('Generating Returns PDF report %s → %s (subType: %s)', dateStart, dateEnd, subType);
 
+    const getCleanStartStr = (str) => {
+      if (!str) return '';
+      const clean = str.split('T')[0].split(' ')[0];
+      return `${clean} 00:00:00`;
+    };
+    const getCleanEndStr = (str) => {
+      if (!str) return '';
+      const clean = str.split('T')[0].split(' ')[0];
+      return `${clean} 23:59:59`;
+    };
+
     let match;
     let reportTitle = 'Returns Brand Report (Pickup Date)';
     if (subType === 'physical') {
@@ -1212,20 +1223,14 @@ const downloadReturnsBrandReportPdf = async (req, res) => {
         reversePickupCreatedDate: { $ne: null, $exists: true, $ne: "" },
         returnDate: { $ne: null, $exists: true, $ne: "" }
       };
-      if (dateStart) match.returnDate = { $gte: `${dateStart} 00:00:00` };
-      if (dateEnd) {
-        if (!match.returnDate) match.returnDate = {};
-        match.returnDate.$lte = `${dateEnd} 23:59:59`;
-      }
+      if (dateStart) match.returnDate.$gte = getCleanStartStr(dateStart);
+      if (dateEnd) match.returnDate.$lte = getCleanEndStr(dateEnd);
     } else {
       match = {
         reversePickupCreatedDate: { $ne: null, $exists: true, $ne: "" }
       };
-      if (dateStart) match.reversePickupCreatedDate = { $gte: `${dateStart} 00:00:00` };
-      if (dateEnd) {
-        if (!match.reversePickupCreatedDate) match.reversePickupCreatedDate = {};
-        match.reversePickupCreatedDate.$lte = `${dateEnd} 23:59:59`;
-      }
+      if (dateStart) match.reversePickupCreatedDate.$gte = getCleanStartStr(dateStart);
+      if (dateEnd) match.reversePickupCreatedDate.$lte = getCleanEndStr(dateEnd);
     }
 
     const pipeline = [
