@@ -1318,45 +1318,32 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     }
 
     const lotTransferExclude = { notes: { $not: /Lot Transfer|Lot Rebalance|\[Ref:\s*LT-/i } };
-    const eliteVendorFilter = {
-      $or: [
-        { vendorName: { $regex: /ELITE|Elite\s*Digital/i } },
-        { partyName: { $regex: /ELITE|Elite\s*Digital/i } }
-      ]
-    };
 
     let inwardData = [];
     if (selectedReports.includes('inward')) {
-      inwardData = await FabricTransaction.find({ type: 'INWARD', ...eliteVendorFilter, ...dateFilter, ...lotTransferExclude }).sort({ date: -1 }).lean();
+      inwardData = await FabricTransaction.find({ type: 'INWARD', ...dateFilter, ...lotTransferExclude }).sort({ date: -1 }).lean();
     }
 
     let outwardData = [];
     if (selectedReports.includes('outward')) {
-      outwardData = await FabricTransaction.find({ type: 'OUTWARD', ...eliteVendorFilter, ...dateFilter, ...lotTransferExclude }).sort({ date: -1 }).lean();
+      outwardData = await FabricTransaction.find({ type: 'OUTWARD', ...dateFilter, ...lotTransferExclude }).sort({ date: -1 }).lean();
     }
 
     let challanData = [];
     if (selectedReports.includes('challan')) {
       challanData = await FabricChallan.find({
-        $or: [
-          { partyName: { $regex: /ELITE|Elite\s*Digital/i } },
-          { billTo: { $regex: /ELITE|Elite\s*Digital/i } },
-          { shipTo: { $regex: /ELITE|Elite\s*Digital/i } },
-          { partyName: { $in: [null, '', undefined] } }
-        ],
         ...dateFilter
       }).sort({ date: -1 }).lean();
     }
 
     let lotwiseData = [];
     if (selectedReports.includes('lotwise')) {
-      lotwiseData = await computeLotWiseData(dateStart, dateEnd, 'ELITE|Elite\\s*Digital');
+      lotwiseData = await computeLotWiseData(dateStart, dateEnd, null);
     }
 
     let stockSummaryData = [];
     if (selectedReports.includes('stock')) {
       const stockPipeline = [
-        { $match: eliteVendorFilter },
         {
           $group: {
             _id: '$fabricQuality',
