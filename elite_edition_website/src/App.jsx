@@ -891,12 +891,6 @@ export default function App() {
                       <FileText size={18} /><span>Billing & Invoicing</span>
                     </button>
                   )}
-                  {/* Print Operations Engine & Chat */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_engine')) && (
-                    <button onClick={() => { setActiveTab('jobcards_engine'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_engine' ? styles.navItemActive : {}) }}>
-                      <Printer size={18} /><span>Print Ops Engine & Chat</span>
-                    </button>
-                  )}
                   {/* 3. Job Card */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
                     <button onClick={() => { setActiveTab('jobcards_list'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
@@ -1061,12 +1055,6 @@ export default function App() {
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) && (
                   <button onClick={() => handleNavClick('jobcards_billing')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_billing' ? styles.navItemActive : {}) }}>
                     <FileText size={18} /><span>Billing & Invoicing</span>
-                  </button>
-                )}
-                {/* Print Operations Engine & Chat */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_engine')) && (
-                  <button onClick={() => handleNavClick('jobcards_engine')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_engine' ? styles.navItemActive : {}) }}>
-                    <Printer size={18} /><span>Print Ops Engine & Chat</span>
                   </button>
                 )}
                 {/* 3. Job Card */}
