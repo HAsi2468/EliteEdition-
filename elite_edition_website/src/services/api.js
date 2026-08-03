@@ -473,6 +473,33 @@ export const api = {
     window.URL.revokeObjectURL(url);
   },
 
+  async downloadSalesReturnsRatioReport(dateStart, dateEnd, fileName) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const headers = {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+    const query = new URLSearchParams({ type: 'sales-returns-ratio', dateStart, dateEnd });
+
+    const response = await fetch(`${baseUrl}/salesList/report/pdf?${query.toString()}`, {
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to generate sales & returns ratio report PDF');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
   // Raw Report Data
   async getStockValueReportData() {
     return request('/inventory/report/stock-value-data');
@@ -497,6 +524,13 @@ export const api = {
     if (dateStart) url += `dateStart=${dateStart}&`;
     if (dateEnd) url += `dateEnd=${dateEnd}&`;
     return request(url);
+  },
+
+  async getSalesReturnsRatioReport(dateStart, dateEnd) {
+    const query = new URLSearchParams();
+    if (dateStart) query.append('dateStart', dateStart);
+    if (dateEnd) query.append('dateEnd', dateEnd);
+    return request(`/analytics/sales-returns-ratio?${query.toString()}`);
   },
 
   async downloadElitePrintReport(dateStart, dateEnd, fileName) {

@@ -21,6 +21,9 @@ router.get('/report/pdf', (req, res) => {
   if (req.query.type === 'returns-analysis') {
     return salesReportController.downloadReturnsBrandReportPdf(req, res);
   }
+  if (req.query.type === 'sales-returns-ratio') {
+    return salesReportController.downloadSalesReturnsRatioPdf(req, res);
+  }
   return salesReportController.downloadSalesReportPdf(req, res);
 });
 

@@ -123,6 +123,8 @@ export default function ReportsCenter({ department }) {
       } else if (activeReportTab === 'returns-analysis') {
         const res = await api.getReturnsBrandReport({ dateStart: combinedStart, dateEnd: combinedEnd });
         data = res;
+      } else if (activeReportTab === 'sales-returns-ratio') {
+        data = await api.getSalesReturnsRatioReport(combinedStart, combinedEnd);
       }
       setReportData(data);
     } catch (err) {
@@ -169,6 +171,8 @@ export default function ReportsCenter({ department }) {
         downloadLink = `${fullBase}/salesList/report/pdf?type=brand&dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
       } else if (activeReportTab === 'returns-analysis') {
         downloadLink = `${fullBase}/salesList/report/pdf?type=returns-analysis&dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
+      } else if (activeReportTab === 'sales-returns-ratio') {
+        downloadLink = `${fullBase}/salesList/report/pdf?type=sales-returns-ratio&dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
       } else {
         downloadLink = `${fullBase}/salesList/report/pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
       }
@@ -228,6 +232,11 @@ export default function ReportsCenter({ department }) {
         if (Array.isArray(reportData) && reportData[0]) {
           content += `🏆 *Top Return Brand:* ${reportData[0].brand} (${reportData[0].returnsCount} returns)\n`;
         }
+      } else if (activeReportTab === 'sales-returns-ratio') {
+        content += `📦 *Total Gross Qty:* ${(reportData.summary?.totalGrossQty || 0).toLocaleString('en-IN')} pcs\n`;
+        content += `💰 *Total Gross Revenue:* ${formatPrice(reportData.summary?.totalGrossRevenue || 0)}\n`;
+        content += `🔄 *Total Returned Qty:* ${(reportData.summary?.totalReturnedQty || 0).toLocaleString('en-IN')} pcs (${reportData.summary?.overallReturnQtyPct || 0}%)\n`;
+        content += `💵 *Total Net Revenue:* ${formatPrice(reportData.summary?.totalNetRevenue || 0)}\n`;
       } else {
         content += `📦 *Orders/Items Count:* ${(reportData.count || reportData.total || 0).toLocaleString('en-IN')}\n`;
       }
@@ -281,6 +290,8 @@ export default function ReportsCenter({ department }) {
         await api.downloadBrandReportHourWise(combinedStart, combinedEnd, searchCode, `Brand_Hourly_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
       } else if (activeReportTab === 'returns-analysis') {
         await api.downloadReturnsBrandReport(combinedStart, combinedEnd, returnsSubTab, `Returns_Brand_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
+      } else if (activeReportTab === 'sales-returns-ratio') {
+        await api.downloadSalesReturnsRatioReport(combinedStart, combinedEnd, `Sales_Returns_Ratio_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
       }
     } catch (err) {
       setError(err.message || 'Failed to generate and download PDF report.');
@@ -307,6 +318,7 @@ export default function ReportsCenter({ department }) {
       case 'brand': return 'Brand Performance Report';
       case 'brand-hourly': return 'Hourly Brand Analysis Report';
       case 'returns-analysis': return 'Returns Brand Report';
+      case 'sales-returns-ratio': return 'Ratio of Sale and Return Report';
       default: return 'Reports';
     }
   };
@@ -338,6 +350,7 @@ export default function ReportsCenter({ department }) {
       case 'sales': return 'Shows sales performance details aggregated by product SKU code, including total orders and revenue.';
       case 'brand': return 'Renders sales performance details grouped by brand, showcasing size distributions, base SKU totals, and brand-level revenue metrics.';
       case 'returns-analysis': return 'Analyzes returned orders grouped by brand, based on reverse pickup created dates in Unicommerce.';
+      case 'sales-returns-ratio': return 'Brand-wise comparison of Gross Sales vs Returns, calculating Return Rate percentage and Risk Levels.';
       default: return '';
     }
   };
@@ -433,6 +446,7 @@ export default function ReportsCenter({ department }) {
             <button onClick={() => setActiveReportTab('brand')} style={activeReportTab === 'brand' ? styles.subTabActive : styles.subTab}>Brand Analytics</button>
             <button onClick={() => setActiveReportTab('brand-hourly')} style={activeReportTab === 'brand-hourly' ? styles.subTabActive : styles.subTab}>Hourly Brand Analysis</button>
             <button onClick={() => setActiveReportTab('returns-analysis')} style={activeReportTab === 'returns-analysis' ? styles.subTabActive : styles.subTab}>Returns Brand Analysis</button>
+            <button onClick={() => setActiveReportTab('sales-returns-ratio')} style={activeReportTab === 'sales-returns-ratio' ? styles.subTabActive : styles.subTab}>Sales to Return Ratio</button>
           </>
         )}
         {activeDepartment === 'inventory' && (
@@ -842,6 +856,39 @@ export default function ReportsCenter({ department }) {
                     {formatPrice(Array.isArray(reportData) ? reportData.reduce((s, r) => s + (r.sellableAmount || 0), 0) : 0)}
                   </div>
                   <div style={styles.summaryLabel}>Sales Revenue</div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeReportTab === 'sales-returns-ratio' && reportData?.summary && (
+            <>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <Layers3 size={20} color="var(--primary)" />
+                <div>
+                  <div style={styles.summaryValue}>{reportData.summary.totalGrossQty?.toLocaleString('en-IN')}</div>
+                  <div style={styles.summaryLabel}>Gross Sales Qty</div>
+                </div>
+              </div>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <IndianRupee size={20} color="var(--success)" />
+                <div>
+                  <div style={styles.summaryValue}>{formatPrice(reportData.summary.totalGrossRevenue)}</div>
+                  <div style={styles.summaryLabel}>Gross Revenue</div>
+                </div>
+              </div>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <Activity size={20} color="#f87171" />
+                <div>
+                  <div style={styles.summaryValue}>{reportData.summary.totalReturnedQty?.toLocaleString('en-IN')} ({reportData.summary.overallReturnQtyPct}%)</div>
+                  <div style={styles.summaryLabel}>Returned Qty (% Rate)</div>
+                </div>
+              </div>
+              <div className="glass-panel" style={styles.summaryCard}>
+                <TrendingUp size={20} color="#38bdf8" />
+                <div>
+                  <div style={styles.summaryValue}>{formatPrice(reportData.summary.totalNetRevenue)}</div>
+                  <div style={styles.summaryLabel}>Net Revenue</div>
                 </div>
               </div>
             </>
@@ -2167,6 +2214,68 @@ export default function ReportsCenter({ department }) {
                 </div>
               );
             })()}
+
+            {activeReportTab === 'sales-returns-ratio' && reportData && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
+                <div style={styles.brandContainer}>
+                  <div style={styles.brandSection}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 'var(--radius-sm)', marginBottom: '1rem' }}>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#93c5fd' }}>Brand-Wise Sales & Return Ratio Performance</span>
+                      <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        <span>Total Brands Tracked: <strong style={{ color: 'var(--text-primary)' }}>{reportData.brands?.length || 0}</strong></span>
+                      </div>
+                    </div>
+
+                    <div className="mobile-table-wrap">
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', minWidth: '700px' }}>
+                        <thead>
+                          <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Brand Name</th>
+                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Gross Qty</th>
+                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Gross Revenue</th>
+                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'center', color: '#f87171', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Returned Qty</th>
+                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right', color: '#f87171', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Returned Revenue</th>
+                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'center', color: 'var(--success)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Net Qty</th>
+                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right', color: 'var(--success)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Net Revenue</th>
+                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Return Qty %</th>
+                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Risk Level</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(reportData.brands || []).map((b, idx) => (
+                            <tr key={b.brand || idx} style={{ borderBottom: '1px solid var(--border-light)', background: idx % 2 === 1 ? 'rgba(255,255,255,0.015)' : 'transparent' }}>
+                              <td style={{ padding: '0.65rem 0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{b.brand || 'Unknown'}</td>
+                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', fontWeight: 600 }}>{b.grossQty?.toLocaleString('en-IN')}</td>
+                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'right', fontWeight: 600 }}>{formatPrice(b.grossRevenue)}</td>
+                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', fontWeight: 600, color: '#f87171' }}>{b.returnedQty?.toLocaleString('en-IN')}</td>
+                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'right', fontWeight: 600, color: '#f87171' }}>{formatPrice(b.returnedRevenue)}</td>
+                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', fontWeight: 700, color: 'var(--success)' }}>{b.netQty?.toLocaleString('en-IN')}</td>
+                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>{formatPrice(b.netRevenue)}</td>
+                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', fontWeight: 700, color: b.returnQtyPct >= 20 ? '#ef4444' : b.returnQtyPct >= 10 ? '#f59e0b' : 'var(--text-primary)' }}>
+                                {b.returnQtyPct}%
+                              </td>
+                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center' }}>
+                                <span style={{
+                                  padding: '0.2rem 0.5rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  background: b.riskLevel === 'HIGH' ? 'rgba(239,68,68,0.2)' : b.riskLevel === 'MODERATE' ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)',
+                                  color: b.riskLevel === 'HIGH' ? '#f87171' : b.riskLevel === 'MODERATE' ? '#fbbf24' : '#34d399',
+                                  border: `1px solid ${b.riskLevel === 'HIGH' ? 'rgba(239,68,68,0.4)' : b.riskLevel === 'MODERATE' ? 'rgba(245,158,11,0.4)' : 'rgba(16,185,129,0.4)'}`
+                                }}>
+                                  {b.riskLevel}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
               </div>
             )}
           </div>

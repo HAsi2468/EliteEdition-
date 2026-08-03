@@ -695,6 +695,156 @@ const getReturnsBrandReport = async (req, res) => {
   }
 };
 
+const getSalesReturnsRatioReport = async (req, res) => {
+  try {
+    const { dateStart, dateEnd } = req.query;
+
+    const hasTime = (str) => /T|\s|:/.test(str);
+    const getStartStr = (str) => {
+      if (!str) return '';
+      const clean = str.replace('T', ' ');
+      return hasTime(str) ? clean : `${clean} 00:00:00`;
+    };
+    const getEndStr = (str) => {
+      if (!str) return '';
+      const clean = str.replace('T', ' ');
+      return hasTime(str) ? clean : `${clean} 23:59:59`;
+    };
+
+    // 1. Match Gross Sales
+    const matchSales = {};
+    if (dateStart || dateEnd) {
+      matchSales.orderDate = {};
+      if (dateStart) matchSales.orderDate.$gte = new Date(dateStart);
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        matchSales.orderDate.$lte = end;
+      }
+    }
+
+    // 2. Match Returns
+    const matchReturns = {
+      reversePickupCreatedDate: { $ne: null, $exists: true, $ne: "" }
+    };
+    if (dateStart || dateEnd) {
+      if (dateStart) matchReturns.reversePickupCreatedDate.$gte = getStartStr(dateStart);
+      if (dateEnd) matchReturns.reversePickupCreatedDate.$lte = getEndStr(dateEnd);
+    }
+
+    // Aggregate Gross Sales by Brand
+    const grossSalesPipeline = [
+      { $match: matchSales },
+      {
+        $group: {
+          _id: { $cond: { if: { $or: [{ $eq: ['$itemTypeBrand', ''] }, { $eq: [{ $ifNull: ['$itemTypeBrand', null] }, null] }] }, then: 'Unknown', else: '$itemTypeBrand' } },
+          totalQty: { $sum: { $ifNull: ['$saleCount', 1] } },
+          totalRevenue: { $sum: { $multiply: [{ $ifNull: ['$saleCount', 1] }, { $convert: { input: '$totalPrice', to: 'double', onError: 0, onNull: 0 } }] } }
+        }
+      }
+    ];
+
+    // Aggregate Returns by Brand
+    const returnsPipeline = [
+      { $match: matchReturns },
+      {
+        $group: {
+          _id: { $cond: { if: { $or: [{ $eq: ['$itemTypeBrand', ''] }, { $eq: [{ $ifNull: ['$itemTypeBrand', null] }, null] }] }, then: 'Unknown', else: '$itemTypeBrand' } },
+          returnedQty: { $sum: { $ifNull: ['$saleCount', 1] } },
+          returnedRevenue: { $sum: { $multiply: [{ $ifNull: ['$saleCount', 1] }, { $convert: { input: '$totalPrice', to: 'double', onError: 0, onNull: 0 } }] } }
+        }
+      }
+    ];
+
+    const [salesAgg, returnsAgg] = await Promise.all([
+      db.SaleOrder.aggregate(grossSalesPipeline),
+      db.SaleOrder.aggregate(returnsPipeline)
+    ]);
+
+    const brandMap = {};
+
+    salesAgg.forEach(s => {
+      const brand = s._id || 'Unknown';
+      brandMap[brand] = {
+        brand,
+        grossQty: s.totalQty || 0,
+        grossRevenue: s.totalRevenue || 0,
+        returnedQty: 0,
+        returnedRevenue: 0
+      };
+    });
+
+    returnsAgg.forEach(r => {
+      const brand = r._id || 'Unknown';
+      if (!brandMap[brand]) {
+        brandMap[brand] = {
+          brand,
+          grossQty: 0,
+          grossRevenue: 0,
+          returnedQty: r.returnedQty || 0,
+          returnedRevenue: r.returnedRevenue || 0
+        };
+      } else {
+        brandMap[brand].returnedQty = r.returnedQty || 0;
+        brandMap[brand].returnedRevenue = r.returnedRevenue || 0;
+      }
+    });
+
+    const brandRatios = Object.values(brandMap).map(b => {
+      const netQty = Math.max(0, b.grossQty - b.returnedQty);
+      const netRevenue = Math.max(0, b.grossRevenue - b.returnedRevenue);
+
+      const returnQtyPct = b.grossQty > 0 ? parseFloat(((b.returnedQty / b.grossQty) * 100).toFixed(2)) : 0;
+      const returnRevenuePct = b.grossRevenue > 0 ? parseFloat(((b.returnedRevenue / b.grossRevenue) * 100).toFixed(2)) : 0;
+
+      let riskLevel = 'LOW';
+      if (returnQtyPct >= 25) riskLevel = 'HIGH';
+      else if (returnQtyPct >= 15) riskLevel = 'MODERATE';
+
+      return {
+        ...b,
+        netQty,
+        netRevenue: parseFloat(netRevenue.toFixed(2)),
+        returnQtyPct,
+        returnRevenuePct,
+        riskLevel
+      };
+    });
+
+    // Sort by gross sales descending
+    brandRatios.sort((a, b) => b.grossRevenue - a.grossRevenue);
+
+    // Calculate Overall Summary Metrics
+    const totalGrossQty = brandRatios.reduce((sum, b) => sum + b.grossQty, 0);
+    const totalGrossRevenue = brandRatios.reduce((sum, b) => sum + b.grossRevenue, 0);
+    const totalReturnedQty = brandRatios.reduce((sum, b) => sum + b.returnedQty, 0);
+    const totalReturnedRevenue = brandRatios.reduce((sum, b) => sum + b.returnedRevenue, 0);
+    const totalNetQty = Math.max(0, totalGrossQty - totalReturnedQty);
+    const totalNetRevenue = Math.max(0, totalGrossRevenue - totalReturnedRevenue);
+
+    const overallReturnQtyPct = totalGrossQty > 0 ? parseFloat(((totalReturnedQty / totalGrossQty) * 100).toFixed(2)) : 0;
+    const overallReturnRevenuePct = totalGrossRevenue > 0 ? parseFloat(((totalReturnedRevenue / totalGrossRevenue) * 100).toFixed(2)) : 0;
+
+    res.json({
+      success: true,
+      summary: {
+        totalGrossQty,
+        totalGrossRevenue: parseFloat(totalGrossRevenue.toFixed(2)),
+        totalReturnedQty,
+        totalReturnedRevenue: parseFloat(totalReturnedRevenue.toFixed(2)),
+        totalNetQty,
+        totalNetRevenue: parseFloat(totalNetRevenue.toFixed(2)),
+        overallReturnQtyPct,
+        overallReturnRevenuePct
+      },
+      brands: brandRatios
+    });
+  } catch (error) {
+    logger.error('Sales & Returns Ratio report error: %o', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getVariantAnalytics,
   getDemographicsAnalytics,
@@ -702,4 +852,5 @@ module.exports = {
   getDeadStockReport,
   getLostRevenueEstimate,
   getReturnsBrandReport,
+  getSalesReturnsRatioReport,
 };

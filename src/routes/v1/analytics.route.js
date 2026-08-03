@@ -9,5 +9,6 @@ router.route('/heatmap').get(analyticsController.getTimeHeatmapData);
 router.route('/dead-stock').get(analyticsController.getDeadStockReport);
 router.route('/lost-revenue').get(analyticsController.getLostRevenueEstimate);
 router.route('/returns-brand').get(analyticsController.getReturnsBrandReport);
+router.route('/sales-returns-ratio').get(analyticsController.getSalesReturnsRatioReport);
 
 module.exports = router;

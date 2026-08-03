@@ -1448,9 +1448,239 @@ const downloadReturnsBrandReportPdf = async (req, res) => {
   }
 };
 
+const downloadSalesReturnsRatioPdf = async (req, res) => {
+  try {
+    const { dateStart, dateEnd } = req.query;
+    if (!dateStart || !dateEnd) {
+      return res.status(400).json({ error: 'dateStart and dateEnd are required' });
+    }
+
+    const hasTime = (str) => /T|\s|:/.test(str);
+    const getStartStr = (str) => {
+      if (!str) return '';
+      const clean = str.replace('T', ' ');
+      return hasTime(str) ? clean : `${clean} 00:00:00`;
+    };
+    const getEndStr = (str) => {
+      if (!str) return '';
+      const clean = str.replace('T', ' ');
+      return hasTime(str) ? clean : `${clean} 23:59:59`;
+    };
+
+    const dateStartObj = hasTime(dateStart) ? new Date(dateStart) : new Date(dateStart + "T00:00:00");
+    const dateEndObj   = hasTime(dateEnd) ? new Date(dateEnd) : new Date(dateEnd + "T23:59:59.999");
+    const dateStr = formatReportDateStr(dateStart, dateEnd);
+
+    logger.info('Generating Sales & Returns Ratio PDF report %s → %s', dateStart, dateEnd);
+
+    // 1. Gross Sales pipeline
+    const grossSalesPipeline = [
+      { $match: { orderDate: { $gte: dateStartObj, $lte: dateEndObj }, saleOrderStatus: { $ne: 'CANCELLED' } } },
+      {
+        $group: {
+          _id: { $cond: { if: { $or: [{ $eq: ['$itemTypeBrand', ''] }, { $eq: [{ $ifNull: ['$itemTypeBrand', null] }, null] }] }, then: 'Unknown', else: '$itemTypeBrand' } },
+          totalQty: { $sum: { $ifNull: ['$saleCount', 1] } },
+          totalRevenue: { $sum: { $multiply: [{ $ifNull: ['$saleCount', 1] }, { $convert: { input: '$totalPrice', to: 'double', onError: 0, onNull: 0 } }] } }
+        }
+      }
+    ];
+
+    // 2. Returns pipeline
+    const returnsPipeline = [
+      {
+        $match: {
+          reversePickupCreatedDate: { $ne: null, $exists: true, $ne: "" },
+          reversePickupCreatedDate: { $gte: getStartStr(dateStart), $lte: getEndStr(dateEnd) }
+        }
+      },
+      {
+        $group: {
+          _id: { $cond: { if: { $or: [{ $eq: ['$itemTypeBrand', ''] }, { $eq: [{ $ifNull: ['$itemTypeBrand', null] }, null] }] }, then: 'Unknown', else: '$itemTypeBrand' } },
+          returnedQty: { $sum: { $ifNull: ['$saleCount', 1] } },
+          returnedRevenue: { $sum: { $multiply: [{ $ifNull: ['$saleCount', 1] }, { $convert: { input: '$totalPrice', to: 'double', onError: 0, onNull: 0 } }] } }
+        }
+      }
+    ];
+
+    const [salesAgg, returnsAgg] = await Promise.all([
+      db.SaleOrder.aggregate(grossSalesPipeline),
+      db.SaleOrder.aggregate(returnsPipeline)
+    ]);
+
+    const brandMap = {};
+    salesAgg.forEach(s => {
+      const brand = s._id || 'Unknown';
+      brandMap[brand] = {
+        brand,
+        grossQty: s.totalQty || 0,
+        grossRevenue: s.totalRevenue || 0,
+        returnedQty: 0,
+        returnedRevenue: 0
+      };
+    });
+
+    returnsAgg.forEach(r => {
+      const brand = r._id || 'Unknown';
+      if (!brandMap[brand]) {
+        brandMap[brand] = {
+          brand,
+          grossQty: 0,
+          grossRevenue: 0,
+          returnedQty: r.returnedQty || 0,
+          returnedRevenue: r.returnedRevenue || 0
+        };
+      } else {
+        brandMap[brand].returnedQty = r.returnedQty || 0;
+        brandMap[brand].returnedRevenue = r.returnedRevenue || 0;
+      }
+    });
+
+    const brandRatios = Object.values(brandMap).map(b => {
+      const netQty = Math.max(0, b.grossQty - b.returnedQty);
+      const netRevenue = Math.max(0, b.grossRevenue - b.returnedRevenue);
+      const returnQtyPct = b.grossQty > 0 ? parseFloat(((b.returnedQty / b.grossQty) * 100).toFixed(2)) : 0;
+      const returnRevenuePct = b.grossRevenue > 0 ? parseFloat(((b.returnedRevenue / b.grossRevenue) * 100).toFixed(2)) : 0;
+
+      let riskLevel = 'LOW';
+      if (returnQtyPct >= 25) riskLevel = 'HIGH';
+      else if (returnQtyPct >= 15) riskLevel = 'MODERATE';
+
+      return {
+        ...b,
+        netQty,
+        netRevenue,
+        returnQtyPct,
+        returnRevenuePct,
+        riskLevel
+      };
+    });
+
+    brandRatios.sort((a, b) => b.grossRevenue - a.grossRevenue);
+
+    const totalGrossQty = brandRatios.reduce((sum, b) => sum + b.grossQty, 0);
+    const totalGrossRevenue = brandRatios.reduce((sum, b) => sum + b.grossRevenue, 0);
+    const totalReturnedQty = brandRatios.reduce((sum, b) => sum + b.returnedQty, 0);
+    const totalReturnedRevenue = brandRatios.reduce((sum, b) => sum + b.returnedRevenue, 0);
+    const totalNetRevenue = Math.max(0, totalGrossRevenue - totalReturnedRevenue);
+    const overallReturnQtyPct = totalGrossQty > 0 ? ((totalReturnedQty / totalGrossQty) * 100).toFixed(1) : '0.0';
+
+    const doc = new PDFDocument({ margin: MARGIN, size: 'A4', bufferPages: true,
+      info: { Title: `Elite Edition Ratio of Sale and Return Report ${dateStart}`, Author: 'Elite Edition ERP' }
+    });
+
+    doc.on('pageAdded', () => drawPunchGuide(doc));
+    drawPunchGuide(doc);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Sales_Returns_Ratio_Report_${dateStart}.pdf"`);
+    doc.pipe(res);
+
+    let pageNum = 1;
+    drawHeader(doc, 'Sales to Return Ratio Report', dateStr, pageNum);
+
+    let y = 65;
+    y = drawSummaryCards(doc, y, [
+      { label: 'Gross Sales Qty', value: fmtN(totalGrossQty) },
+      { label: 'Gross Revenue',   value: fmt(totalGrossRevenue) },
+      { label: 'Returned Qty',    value: `${fmtN(totalReturnedQty)} (${overallReturnQtyPct}%)`, color: C.red },
+      { label: 'Net Revenue',     value: fmt(totalNetRevenue), color: C.accentBlue },
+    ]);
+
+    const RATIO_COLS = [
+      { label: 'Brand Name',       w: 110 },
+      { label: 'Gross (Qty/Amt)', w: 95 },
+      { label: 'Return (Qty/Amt)',w: 95 },
+      { label: 'Net (Qty/Amt)',   w: 95 },
+      { label: 'Return %',        w: 68 },
+      { label: 'Risk',            w: 60 },
+    ];
+
+    y = drawTableHeader(doc, y, RATIO_COLS);
+
+    let alt = false;
+    for (const b of brandRatios) {
+      const rowH = 26;
+      if (y + rowH > PAGE_H - MARGIN - 28) {
+        doc.addPage();
+        pageNum++;
+        drawHeader(doc, 'Sales to Return Ratio Report (continued)', dateStr, pageNum);
+        y = 65;
+        y = drawTableHeader(doc, y, RATIO_COLS);
+        alt = false;
+      }
+
+      doc.rect(MARGIN, y, CW, rowH).fill(alt ? C.rowAlt : C.rowNormal);
+      doc.moveTo(MARGIN, y + rowH).lineTo(MARGIN + CW, y + rowH).strokeColor(C.border).lineWidth(0.4).stroke();
+      drawDividers(doc, MARGIN, y, rowH, RATIO_COLS);
+
+      const mid = y + rowH / 2;
+      let x = MARGIN;
+
+      // Brand Name
+      doc.fillColor(C.tableText).font('Helvetica-Bold').fontSize(8.5)
+         .text(b.brand || 'Unknown', x + 4, mid - 5, { width: RATIO_COLS[0].w - 8, align: 'left', lineBreak: false, ellipsis: true });
+      x += RATIO_COLS[0].w;
+
+      // Gross Qty / Amt
+      doc.fillColor(C.text).font('Helvetica').fontSize(7.5)
+         .text(`${fmtN(b.grossQty)} pcs  ·  ${fmt(b.grossRevenue)}`, x + 2, mid - 4, { width: RATIO_COLS[1].w - 4, align: 'center' });
+      x += RATIO_COLS[1].w;
+
+      // Return Qty / Amt
+      doc.fillColor(C.red).font('Helvetica').fontSize(7.5)
+         .text(`${fmtN(b.returnedQty)} pcs  ·  ${fmt(b.returnedRevenue)}`, x + 2, mid - 4, { width: RATIO_COLS[2].w - 4, align: 'center' });
+      x += RATIO_COLS[2].w;
+
+      // Net Qty / Amt
+      doc.fillColor(C.green).font('Helvetica-Bold').fontSize(7.5)
+         .text(`${fmtN(b.netQty)} pcs  ·  ${fmt(b.netRevenue)}`, x + 2, mid - 4, { width: RATIO_COLS[3].w - 4, align: 'center' });
+      x += RATIO_COLS[3].w;
+
+      // Return %
+      const returnColor = b.returnQtyPct >= 20 ? C.red : b.returnQtyPct >= 10 ? '#D97706' : C.text;
+      doc.fillColor(returnColor).font('Helvetica-Bold').fontSize(8)
+         .text(`${b.returnQtyPct}%`, x + 2, mid - 5, { width: RATIO_COLS[4].w - 4, align: 'center' });
+      x += RATIO_COLS[4].w;
+
+      // Risk
+      const riskBg = b.riskLevel === 'HIGH' ? C.redBg : b.riskLevel === 'MODERATE' ? '#FEF3C7' : C.greenBg;
+      const riskTextColor = b.riskLevel === 'HIGH' ? C.red : b.riskLevel === 'MODERATE' ? '#D97706' : C.green;
+      
+      const badgeW = 50;
+      const badgeH = 14;
+      const bx = x + (RATIO_COLS[5].w - badgeW) / 2;
+      const by = mid - badgeH / 2;
+
+      doc.rect(bx, by, badgeW, badgeH).fill(riskBg);
+      doc.fillColor(riskTextColor).font('Helvetica-Bold').fontSize(7)
+         .text(b.riskLevel, bx, by + 3, { width: badgeW, align: 'center' });
+
+      y += rowH;
+      alt = !alt;
+    }
+
+    // Footer
+    const pages = doc.bufferedPageRange();
+    for (let p = 0; p < pages.count; p++) {
+      doc.switchToPage(pages.start + p);
+      doc.page.margins.bottom = 0;
+      doc.rect(0, PAGE_H - 26, PAGE_W, 26).fill(C.headerBg);
+      doc.fillColor(C.headerText).font('Helvetica-Bold').fontSize(7.5)
+         .text(`Elite Edition ERP  •  Generated: ${new Date().toLocaleString('en-IN')}  •  Page ${p + 1} of ${pages.count}`,
+           MARGIN, PAGE_H - 17, { width: CW, align: 'center' });
+    }
+
+    doc.end();
+    logger.info('Sales & Returns Ratio PDF complete.');
+  } catch (err) {
+    logger.error('Sales & Returns Ratio PDF error: %o', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Internal Server Error', details: err.message });
+  }
+};
+
 module.exports = {
   downloadSalesReportPdf,
   downloadBrandReportPdf,
   downloadBrandReportHourWisePdf,
   downloadReturnsBrandReportPdf,
+  downloadSalesReturnsRatioPdf,
 };
