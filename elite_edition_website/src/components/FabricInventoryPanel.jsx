@@ -3770,13 +3770,13 @@ export default function FabricInventoryPanel() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <FileText size={22} color="#a78bfa" />
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>Multiple Reports (Combined 1-Page)</h3>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>Multiple Reports (Elite Digital Prints)</h3>
               </div>
               <button onClick={() => setIsCombinedModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.2rem' }}><X size={20} /></button>
             </div>
 
             <p style={{ fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '1.2rem', lineHeight: '1.4' }}>
-              Select report period and choose which reports to combine into a single, beautifully organized 1-page PDF.
+              Select report period and choose which reports to combine into a single PDF report exclusively for <strong>Elite Digital Prints</strong>.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>

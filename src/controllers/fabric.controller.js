@@ -1017,7 +1017,7 @@ const downloadFabricOutwardPdf = async (req, res) => {
 };
 
 // Helper: Compute lot-wise inventory balance with shortage and date range filtering
-async function computeLotWiseData(dateStart, dateEnd) {
+async function computeLotWiseData(dateStart, dateEnd, vendorRegex = null) {
   const dateFilter = {};
   if (dateStart || dateEnd) {
     dateFilter.date = {};
@@ -1029,17 +1029,25 @@ async function computeLotWiseData(dateStart, dateEnd) {
     }
   }
 
+  const vendorQuery = vendorRegex ? {
+    $or: [
+      { vendorName: { $regex: new RegExp(vendorRegex, 'i') } },
+      { partyName: { $regex: new RegExp(vendorRegex, 'i') } }
+    ]
+  } : {};
+
   // Find distinct lot numbers active in date range (if dateStart/dateEnd provided)
   let activeLotNos = null;
   if (dateStart || dateEnd) {
     activeLotNos = await FabricTransaction.distinct('lotNo', {
       lotNo: { $ne: null },
-      ...dateFilter
+      ...dateFilter,
+      ...vendorQuery
     });
   }
 
   // Fetch all transactions for active lots (or all lots) up to dateEnd
-  const txFilter = { lotNo: { $ne: null } };
+  const txFilter = { lotNo: { $ne: null }, ...vendorQuery };
   if (activeLotNos !== null) {
     txFilter.lotNo = { $in: activeLotNos };
   } else if (dateEnd) {
@@ -1310,30 +1318,45 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     }
 
     const lotTransferExclude = { notes: { $not: /Lot Transfer|Lot Rebalance|\[Ref:\s*LT-/i } };
+    const eliteVendorFilter = {
+      $or: [
+        { vendorName: { $regex: /ELITE|Elite\s*Digital/i } },
+        { partyName: { $regex: /ELITE|Elite\s*Digital/i } }
+      ]
+    };
 
     let inwardData = [];
     if (selectedReports.includes('inward')) {
-      inwardData = await FabricTransaction.find({ type: 'INWARD', ...dateFilter, ...lotTransferExclude }).sort({ date: -1 }).lean();
+      inwardData = await FabricTransaction.find({ type: 'INWARD', ...eliteVendorFilter, ...dateFilter, ...lotTransferExclude }).sort({ date: -1 }).lean();
     }
 
     let outwardData = [];
     if (selectedReports.includes('outward')) {
-      outwardData = await FabricTransaction.find({ type: 'OUTWARD', ...dateFilter, ...lotTransferExclude }).sort({ date: -1 }).lean();
+      outwardData = await FabricTransaction.find({ type: 'OUTWARD', ...eliteVendorFilter, ...dateFilter, ...lotTransferExclude }).sort({ date: -1 }).lean();
     }
 
     let challanData = [];
     if (selectedReports.includes('challan')) {
-      challanData = await FabricChallan.find(dateFilter).sort({ date: -1 }).lean();
+      challanData = await FabricChallan.find({
+        $or: [
+          { partyName: { $regex: /ELITE|Elite\s*Digital/i } },
+          { billTo: { $regex: /ELITE|Elite\s*Digital/i } },
+          { shipTo: { $regex: /ELITE|Elite\s*Digital/i } },
+          { partyName: { $in: [null, '', undefined] } }
+        ],
+        ...dateFilter
+      }).sort({ date: -1 }).lean();
     }
 
     let lotwiseData = [];
     if (selectedReports.includes('lotwise')) {
-      lotwiseData = await computeLotWiseData(dateStart, dateEnd);
+      lotwiseData = await computeLotWiseData(dateStart, dateEnd, 'ELITE|Elite\\s*Digital');
     }
 
     let stockSummaryData = [];
     if (selectedReports.includes('stock')) {
       const stockPipeline = [
+        { $match: eliteVendorFilter },
         {
           $group: {
             _id: '$fabricQuality',
