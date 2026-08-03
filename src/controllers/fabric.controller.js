@@ -1372,6 +1372,21 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     const totalChallanTp = challanData.reduce((s, c) => s + (c.totalTp || 0), 0);
     const totalLotNetStock = lotwiseData.reduce((s, l) => s + Math.max(0, l.currentStock || 0), 0);
 
+    // ── MTD (Month-Till-Date: 1st of current month to today end) Calculations ──
+    const now = new Date();
+    const mtdStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const mtdEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const mtdDateFilter = { date: { $gte: mtdStart, $lte: mtdEnd } };
+
+    const mtdInwardData = await FabricTransaction.find({ type: 'INWARD', ...mtdDateFilter, ...lotTransferExclude }).lean();
+    const mtdOutwardData = await FabricTransaction.find({ type: 'OUTWARD', ...mtdDateFilter, ...lotTransferExclude }).lean();
+    const mtdChallanData = await FabricChallan.find({ ...mtdDateFilter }).lean();
+
+    const mtdTotalInwardMtr = mtdInwardData.reduce((s, r) => s + (r.qty || 0), 0);
+    const mtdTotalOutwardMtr = mtdOutwardData.reduce((s, r) => s + (r.qty || 0), 0);
+    const mtdTotalChallanMtr = mtdChallanData.reduce((s, c) => s + (c.totalMtr || 0), 0);
+    const mtdTotalChallanTp = mtdChallanData.reduce((s, c) => s + (c.totalTp || 0), 0);
+
     const doc = new PDFDocument({ margin: 25, size: 'A4', autoFirstPage: true, bufferPages: true });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="Elite_Digital_Prints_1_Page_Report.pdf"');
@@ -1402,29 +1417,51 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
     drawPageHeader(true);
 
-    // KPI Cards on Page 1 (Excluding LOT STOCK BALANCE as requested)
-    const activeSections = [
+    // Row 1: Selected Period KPI Cards
+    const periodSections = [
       selectedReports.includes('challan') && { label: 'CHALLAN DISPATCHES', val: `${totalChallanMtr.toFixed(2)} mtr`, sub: `${challanData.length} Challans (${totalChallanTp} TP)` },
       selectedReports.includes('inward') && { label: 'FABRIC INWARD', val: `${totalInwardMtr.toFixed(2)} mtr`, sub: `${inwardData.length} Receipts` },
       selectedReports.includes('outward') && { label: 'FABRIC CONSUMPTION', val: `${totalOutwardMtr.toFixed(2)} mtr`, sub: `${outwardData.length} Dispatches` },
     ].filter(Boolean);
 
-    const cardCount = activeSections.length || 1;
-    const cardWidth = (contentWidth - (cardCount - 1) * 8) / cardCount;
-    let cardX = ML;
+    const cardCount1 = periodSections.length || 1;
+    const cardWidth1 = (contentWidth - (cardCount1 - 1) * 8) / cardCount1;
+    let cardX1 = ML;
 
-    activeSections.forEach(card => {
-      doc.rect(cardX, 68, cardWidth, 46).fill('#f5f3ff').stroke('#ddd6fe');
+    periodSections.forEach(card => {
+      doc.rect(cardX1, 68, cardWidth1, 42).fill('#f5f3ff').stroke('#ddd6fe');
       doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
-        .text(card.label, cardX + 5, 72, { width: cardWidth - 10, align: 'center' });
-      doc.fillColor('#000000').fontSize(11.5).font('Helvetica-Bold')
-        .text(card.val, cardX + 5, 83, { width: cardWidth - 10, align: 'center' });
-      doc.fillColor('#475569').fontSize(7).font('Helvetica')
-        .text(card.sub, cardX + 5, 99, { width: cardWidth - 10, align: 'center' });
-      cardX += cardWidth + 8;
+        .text(card.label, cardX1 + 5, 72, { width: cardWidth1 - 10, align: 'center' });
+      doc.fillColor('#000000').fontSize(11).font('Helvetica-Bold')
+        .text(card.val, cardX1 + 5, 82, { width: cardWidth1 - 10, align: 'center' });
+      doc.fillColor('#475569').fontSize(6.8).font('Helvetica')
+        .text(card.sub, cardX1 + 5, 96, { width: cardWidth1 - 10, align: 'center' });
+      cardX1 += cardWidth1 + 8;
     });
 
-    let currentY = 126;
+    // Row 2: Month Till Date (MTD) KPI Cards
+    const mtdSections = [
+      selectedReports.includes('challan') && { label: 'MTD CHALLAN DISPATCHES', val: `${mtdTotalChallanMtr.toFixed(2)} mtr`, sub: `${mtdChallanData.length} Challans (${mtdTotalChallanTp} TP)` },
+      selectedReports.includes('inward') && { label: 'MTD FABRIC INWARD', val: `${mtdTotalInwardMtr.toFixed(2)} mtr`, sub: `${mtdInwardData.length} Receipts` },
+      selectedReports.includes('outward') && { label: 'MTD FABRIC CONSUMPTION', val: `${mtdTotalOutwardMtr.toFixed(2)} mtr`, sub: `${mtdOutwardData.length} Dispatches` },
+    ].filter(Boolean);
+
+    const cardCount2 = mtdSections.length || 1;
+    const cardWidth2 = (contentWidth - (cardCount2 - 1) * 8) / cardCount2;
+    let cardX2 = ML;
+
+    mtdSections.forEach(card => {
+      doc.rect(cardX2, 114, cardWidth2, 42).fill('#eff6ff').stroke('#bfdbfe');
+      doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
+        .text(card.label, cardX2 + 5, 118, { width: cardWidth2 - 10, align: 'center' });
+      doc.fillColor('#000000').fontSize(11).font('Helvetica-Bold')
+        .text(card.val, cardX2 + 5, 128, { width: cardWidth2 - 10, align: 'center' });
+      doc.fillColor('#475569').fontSize(6.8).font('Helvetica')
+        .text(card.sub, cardX2 + 5, 142, { width: cardWidth2 - 10, align: 'center' });
+      cardX2 += cardWidth2 + 8;
+    });
+
+    let currentY = 164;
 
     const checkAddPage = (heightNeeded) => {
       if (currentY + heightNeeded > maxY) {

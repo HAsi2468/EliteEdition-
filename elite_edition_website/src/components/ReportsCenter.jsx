@@ -36,6 +36,7 @@ export default function ReportsCenter({ department }) {
   const [searchCode, setSearchCode] = useState('');
   
   const [reportData, setReportData] = useState(null);
+  const [mtdStats, setMtdStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
@@ -127,6 +128,38 @@ export default function ReportsCenter({ department }) {
         data = await api.getSalesReturnsRatioReport(combinedStart, combinedEnd);
       }
       setReportData(data);
+
+      // Fetch Month-Till-Date (MTD) Overall Performance Stats
+      try {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const mtdStart = `${yyyy}-${mm}-01T00:00:00`;
+        const mtdEnd = `${yyyy}-${mm}-${dd}T23:59:59`;
+
+        const [inMtdRes, outMtdRes, chMtdRes] = await Promise.all([
+          api.getFabricInwardReportData(mtdStart, mtdEnd),
+          api.getFabricOutwardReportData(mtdStart, mtdEnd),
+          api.getFabricChallans({ dateStart: mtdStart, dateEnd: mtdEnd })
+        ]);
+
+        const inMtdList = inMtdRes.data || [];
+        const outMtdList = outMtdRes.data || [];
+        const chMtdList = chMtdRes.data || [];
+
+        setMtdStats({
+          inwardMtr: inMtdList.reduce((s, r) => s + (r.qty || 0), 0),
+          inwardCount: inMtdList.length,
+          outwardMtr: outMtdList.reduce((s, r) => s + (r.qty || 0), 0),
+          outwardCount: outMtdList.length,
+          challanMtr: chMtdList.reduce((s, c) => s + (c.totalMtr || 0), 0),
+          challanCount: chMtdList.length,
+          challanTp: chMtdList.reduce((s, c) => s + (c.totalTp || 0), 0)
+        });
+      } catch (mErr) {
+        console.error('Failed to fetch MTD stats:', mErr);
+      }
     } catch (err) {
       setError(err.message || 'Failed to fetch report data.');
     } finally {
@@ -579,6 +612,34 @@ export default function ReportsCenter({ department }) {
         <div style={styles.errorContainer}>
           <AlertCircle size={16} />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* 📅 Month-Till-Date (MTD) Overall Performance Banner */}
+      {mtdStats && ['fabric-inward', 'fabric-outward', 'fabric-lotwise', 'challan-report'].includes(activeReportTab) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem' }}>
+          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            📅 Month Till Date (MTD) Performance Overview
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+            <div className="glass-panel" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid #7c3aed', background: 'rgba(124,58,237,0.03)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>MTD CHALLAN DISPATCHES</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>{mtdStats.challanMtr.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} mtr</div>
+              <div style={{ fontSize: '0.72rem', color: '#a78bfa', marginTop: 2 }}>{mtdStats.challanCount} Challans ({mtdStats.challanTp} TP)</div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid #10b981', background: 'rgba(16,185,129,0.03)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>MTD FABRIC INWARD</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>{mtdStats.inwardMtr.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} mtr</div>
+              <div style={{ fontSize: '0.72rem', color: '#34d399', marginTop: 2 }}>{mtdStats.inwardCount} Receipts</div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid #ef4444', background: 'rgba(239,68,68,0.03)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>MTD FABRIC CONSUMPTION</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>{mtdStats.outwardMtr.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} mtr</div>
+              <div style={{ fontSize: '0.72rem', color: '#f87171', marginTop: 2 }}>{mtdStats.outwardCount} Dispatches</div>
+            </div>
+          </div>
         </div>
       )}
 
