@@ -48,6 +48,34 @@ const jobCardSchema = new mongoose.Schema(
     deliveryDate:     { type: String, default: '' },
     billNo:           { type: String, default: '', trim: true },
     status:           { type: String, default: 'Pending', enum: ['Pending', 'In Progress', 'Done'] },
+
+    // ── Module 1 Enhancements: Print Specifications & Dynamic Costing ──
+    operatorName:     { type: String, default: '', trim: true },
+    productionStage:  {
+      type: String,
+      enum: ['Order Received', 'File Ready/Proofing', 'Printing', 'Heat Press/Finishing', 'Quality Check', 'Ready for Dispatch'],
+      default: 'Order Received'
+    },
+    printSpecifications: {
+      width: { type: Number, default: 0 },
+      height: { type: Number, default: 0 },
+      dimensionsUnit: { type: String, enum: ['inch', 'ft'], default: 'inch' },
+      totalSqFt: { type: Number, default: 0 },
+      totalSqMtr: { type: Number, default: 0 },
+      materialType: { type: String, default: 'Sublimation' },
+      resolutionPass: { type: String, default: '4 Pass' },
+      wastageFactorPct: { type: Number, default: 5 },
+      unitPricePerSqFt: { type: Number, default: 0 },
+      totalCalculatedCost: { type: Number, default: 0 }
+    },
+    proofing: {
+      artworkUrl: { type: String, default: '' },
+      artworkFileName: { type: String, default: '' },
+      approvalStatus: { type: String, enum: ['Pending', 'Approved', 'Revision Requested'], default: 'Pending' },
+      clientFeedback: { type: String, default: '' },
+      approvedAt: { type: Date }
+    },
+    orderChatRoomId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatRoom' }
   },
   {
     timestamps: {

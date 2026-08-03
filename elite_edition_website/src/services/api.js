@@ -564,6 +564,15 @@ export const api = {
     const q = new URLSearchParams({ panna, pass, totalMtr, machineName });
     return request(`/jobCards/calc-exp-time?${q.toString()}`);
   },
+  async calculatePrintCost(data) {
+    return request('/jobCards/calc-cost', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async updateJobStage(id, data) {
+    return request(`/jobCards/${id}/stage`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
+  async updateJobProofing(id, data) {
+    return request(`/jobCards/${id}/proofing`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
 
   // ─── Design Catalogue ──────────────────────────────────────────────────────
   async uploadImage(file) {

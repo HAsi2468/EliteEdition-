@@ -361,6 +361,109 @@ const setupSockets = (io) => {
       }
     });
 
+    // Handle production stage transitions for Job Cards & automated Bot logs
+    socket.on('update-production-stage', async (data) => {
+      try {
+        const { jobCardId, newStage, actorId, actorName } = data;
+        const JobCardModel = require('../db/models').JobCard;
+        const ChatMessageModel = require('../db/models').ChatMessage;
+        const ChatRoomModel = require('../db/models').ChatRoom;
+        const OrderActivityLogModel = require('../db/models').OrderActivityLog;
+
+        const card = await JobCardModel.findById(jobCardId);
+        if (!card) return;
+
+        const prevStage = card.productionStage || 'Order Received';
+        card.productionStage = newStage;
+        await card.save();
+
+        // Create Activity Log
+        await OrderActivityLogModel.create({
+          jobCardId,
+          jobNo: card.jobNo,
+          actor: actorId || undefined,
+          actorName: actorName || 'System Bot',
+          action: 'Production Stage Update',
+          previousStage: prevStage,
+          newStage: newStage
+        });
+
+        // Ensure order contextual chat room exists
+        let roomId = card.orderChatRoomId;
+        if (!roomId) {
+          const newRoom = await ChatRoomModel.create({
+            name: `Order #${card.jobNo} (${card.party || 'Client'})`,
+            type: 'group'
+          });
+          card.orderChatRoomId = newRoom._id;
+          await card.save();
+          roomId = newRoom._id;
+        }
+
+        // Post automated Bot Message into contextual chat thread
+        const botMessageContent = `🤖 **Bot Log:** Job Card **#${card.jobNo}** stage changed to **'${newStage}'** by ${actorName || 'Operator'}.`;
+        const botMsg = await ChatMessageModel.create({
+          roomId,
+          senderId: actorId || card.orderChatRoomId,
+          content: botMessageContent,
+          type: 'text',
+          readBy: [actorId].filter(Boolean)
+        });
+
+        const populatedBotMsg = await ChatMessageModel.findById(botMsg._id)
+          .populate('senderId', 'name username email');
+
+        io.to(String(roomId)).emit('receive-message', populatedBotMsg);
+        io.emit('job-stage-updated', { jobCardId, jobNo: card.jobNo, newStage, prevStage });
+      } catch (err) {
+        console.error('Error updating production stage socket:', err);
+      }
+    });
+
+    // Handle Proofing & Artwork Approval pipeline events
+    socket.on('update-proof-approval', async (data) => {
+      try {
+        const { jobCardId, status, clientFeedback, actorName } = data;
+        const JobCardModel = require('../db/models').JobCard;
+        const ChatMessageModel = require('../db/models').ChatMessage;
+        const ChatRoomModel = require('../db/models').ChatRoom;
+
+        const card = await JobCardModel.findById(jobCardId);
+        if (!card) return;
+
+        if (!card.proofing) card.proofing = {};
+        card.proofing.approvalStatus = status;
+        if (clientFeedback) card.proofing.clientFeedback = clientFeedback;
+        if (status === 'Approved') card.proofing.approvedAt = new Date();
+
+        await card.save();
+
+        let roomId = card.orderChatRoomId;
+        if (!roomId) {
+          const newRoom = await ChatRoomModel.create({
+            name: `Order #${card.jobNo} (${card.party || 'Client'})`,
+            type: 'group'
+          });
+          card.orderChatRoomId = newRoom._id;
+          await card.save();
+          roomId = newRoom._id;
+        }
+
+        const botMessageContent = `🤖 **Proofing Update:** Artwork for Job Card **#${card.jobNo}** has been **${status.toUpperCase()}** by ${actorName || 'Client'}.${clientFeedback ? ` Note: "${clientFeedback}"` : ''}`;
+        const botMsg = await ChatMessageModel.create({
+          roomId,
+          senderId: roomId,
+          content: botMessageContent,
+          type: 'text'
+        });
+
+        io.to(String(roomId)).emit('receive-message', botMsg);
+        io.emit('proof-status-updated', { jobCardId, jobNo: card.jobNo, status, clientFeedback });
+      } catch (err) {
+        console.error('Error updating proof approval socket:', err);
+      }
+    });
+
     socket.on('disconnect', () => {
       console.log(`User disconnected from socket: ${socket.id}`);
       activeUsers.delete(socket.id);

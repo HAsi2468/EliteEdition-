@@ -501,7 +501,143 @@ const downloadJobCardPdf = async (req, res) => {
   }
 };
 
+// ─── Module 1: Dynamic Custom Calculator Endpoint ──────────────────────────────
+const calculatePrintCost = async (req, res) => {
+  try {
+    const {
+      width = 0,
+      height = 0,
+      unit = 'inch', // 'inch' or 'ft'
+      materialType = 'Sublimation',
+      resolutionPass = '4 Pass',
+      wastageFactorPct = 5,
+      quantity = 1
+    } = req.body;
+
+    const w = parseFloat(width) || 0;
+    const h = parseFloat(height) || 0;
+    const qty = parseInt(quantity) || 1;
+    const wastage = parseFloat(wastageFactorPct) || 0;
+
+    // Convert dimensions to feet
+    const widthFt = unit === 'inch' ? w / 12 : w;
+    const heightFt = unit === 'inch' ? h / 12 : h;
+
+    const baseSqFtPerUnit = widthFt * heightFt;
+    const rawTotalSqFt = baseSqFtPerUnit * qty;
+
+    const wastageSqFt = rawTotalSqFt * (wastage / 100);
+    const billableSqFt = parseFloat((rawTotalSqFt + wastageSqFt).toFixed(2));
+    const billableSqMtr = parseFloat((billableSqFt * 0.092903).toFixed(2));
+
+    // Base rates per Sq. Ft (INR) by material
+    const MATERIAL_RATES = {
+      Sublimation: 45,
+      Cotton: 85,
+      Vinyl: 65,
+      Satin: 55,
+      Silk: 120,
+      Polyester: 40
+    };
+
+    // Pass multiplier
+    const PASS_MULTIPLIER = {
+      '1 Pass': 1.0,
+      '2 Pass': 1.1,
+      '4 Pass': 1.25,
+      '6 Pass': 1.4,
+      '8 Pass': 1.6
+    };
+
+    const baseRate = MATERIAL_RATES[materialType] || 45;
+    const passMult = PASS_MULTIPLIER[resolutionPass] || 1.25;
+    const ratePerSqFt = parseFloat((baseRate * passMult).toFixed(2));
+
+    const totalCalculatedCost = Math.round(billableSqFt * ratePerSqFt);
+    const costPerUnit = qty > 0 ? Math.round(totalCalculatedCost / qty) : totalCalculatedCost;
+
+    res.json({
+      success: true,
+      data: {
+        widthFt: parseFloat(widthFt.toFixed(2)),
+        heightFt: parseFloat(heightFt.toFixed(2)),
+        baseSqFtPerUnit: parseFloat(baseSqFtPerUnit.toFixed(2)),
+        rawTotalSqFt: parseFloat(rawTotalSqFt.toFixed(2)),
+        wastageSqFt: parseFloat(wastageSqFt.toFixed(2)),
+        billableSqFt,
+        billableSqMtr,
+        ratePerSqFt,
+        totalCalculatedCost,
+        costPerUnit
+      }
+    });
+  } catch (err) {
+    logger.error('calculatePrintCost error: %o', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─── Module 1: Update Production Stage ──────────────────────────────────────
+const updateProductionStage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newStage, notes } = req.body;
+    const currentUser = req.user || {};
+
+    const card = await db.JobCard.findById(id);
+    if (!card) return res.status(404).json({ error: 'Job card not found' });
+
+    const prevStage = card.productionStage || 'Order Received';
+    card.productionStage = newStage;
+    await card.save();
+
+    await db.OrderActivityLog.create({
+      jobCardId: card._id,
+      jobNo: card.jobNo,
+      actor: currentUser._id,
+      actorName: currentUser.name || currentUser.username || 'System Operator',
+      action: 'Stage Transition',
+      previousStage: prevStage,
+      newStage,
+      notes: notes || ''
+    });
+
+    res.json({ success: true, data: card });
+  } catch (err) {
+    logger.error('updateProductionStage error: %o', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ─── Module 1: Update Proofing Approval Status ────────────────────────────────
+const updateProofingStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { artworkUrl, artworkFileName, approvalStatus, clientFeedback } = req.body;
+
+    const card = await db.JobCard.findById(id);
+    if (!card) return res.status(404).json({ error: 'Job card not found' });
+
+    if (!card.proofing) card.proofing = {};
+    if (artworkUrl !== undefined) card.proofing.artworkUrl = artworkUrl;
+    if (artworkFileName !== undefined) card.proofing.artworkFileName = artworkFileName;
+    if (approvalStatus !== undefined) card.proofing.approvalStatus = approvalStatus;
+    if (clientFeedback !== undefined) card.proofing.clientFeedback = clientFeedback;
+
+    if (approvalStatus === 'Approved') {
+      card.proofing.approvedAt = new Date();
+    }
+
+    await card.save();
+    res.json({ success: true, data: card });
+  } catch (err) {
+    logger.error('updateProofingStatus error: %o', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   getAllJobCards, getJobCard, createJobCard, updateJobCard,
-  deleteJobCard, calcExpTimeEndpoint, getNextJobCardNumber, downloadJobCardPdf
+  deleteJobCard, calcExpTimeEndpoint, getNextJobCardNumber, downloadJobCardPdf,
+  calculatePrintCost, updateProductionStage, updateProofingStatus
 };
