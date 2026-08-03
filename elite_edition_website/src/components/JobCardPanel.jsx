@@ -12,6 +12,7 @@ import PrintSettings from './PrintSettings';
 import ReportsCenter from './ReportsCenter';
 import FabricInventoryPanel from './FabricInventoryPanel';
 import RawMaterialsPanel from './RawMaterialsPanel';
+import EliteBillingDepartment from './EliteBillingDepartment';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
 import { triggerPushNotification } from './NotificationToast';
 
@@ -1649,6 +1650,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
         <DesignMaster />
       ) : activeSubTab === 'fabric' ? (
         <FabricInventoryPanel />
+      ) : activeSubTab === 'billing' ? (
+        <EliteBillingDepartment />
       ) : activeSubTab === 'raw_materials' ? (
         <RawMaterialsPanel />
       ) : activeSubTab === 'tracking' ? (

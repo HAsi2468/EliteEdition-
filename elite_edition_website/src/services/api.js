@@ -1184,4 +1184,97 @@ export const api = {
       method: 'POST',
     });
   },
+
+  // ── Billing & Invoicing Department ───────────────────────────────────────
+  async getBillingDashboardStats() {
+    return request('/billing/dashboard-stats');
+  },
+
+  async getBillingInvoices(params = {}) {
+    const query = new URLSearchParams(params);
+    return request(`/billing/invoices?${query.toString()}`);
+  },
+
+  async getNextInvoiceNo() {
+    return request('/billing/invoices/next-no');
+  },
+
+  async getBillingInvoiceById(id) {
+    return request(`/billing/invoices/${id}`);
+  },
+
+  async createBillingInvoice(data) {
+    return request('/billing/invoices', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateBillingInvoice(id, data) {
+    return request(`/billing/invoices/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteBillingInvoice(id) {
+    return request(`/billing/invoices/${id}`, { method: 'DELETE' });
+  },
+
+  async recordInvoicePayment(id, data) {
+    return request(`/billing/invoices/${id}/payment`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async downloadInvoicePdf(id, invoiceNo) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const response = await fetch(`${baseUrl}/billing/invoices/${id}/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate Invoice PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Tax_Invoice_${invoiceNo || 'Draft'}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
+  // Billing Customers
+  async getBillingCustomers() {
+    return request('/billing/customers');
+  },
+
+  async createBillingCustomer(data) {
+    return request('/billing/customers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteBillingCustomer(id) {
+    return request(`/billing/customers/${id}`, { method: 'DELETE' });
+  },
+
+  // Billing Items
+  async getBillingItems() {
+    return request('/billing/items');
+  },
+
+  async createBillingItem(data) {
+    return request('/billing/items', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteBillingItem(id) {
+    return request(`/billing/items/${id}`, { method: 'DELETE' });
+  },
 };
