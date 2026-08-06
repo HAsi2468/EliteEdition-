@@ -50,6 +50,9 @@ export default function JobPrintingLog() {
   const [dateStart, setDateStart] = useState(() => new Date().toISOString().split('T')[0]);
   const [dateEnd, setDateEnd] = useState(() => new Date().toISOString().split('T')[0]);
 
+  const user = api.getCurrentUser();
+  const accountFullName = user ? (user.name || user.fullName || user.username || '') : '';
+
   // Form State
   const [selectedJob, setSelectedJob] = useState(null);
   const [form, setForm] = useState({
@@ -59,7 +62,7 @@ export default function JobPrintingLog() {
     pass: '4 Pass (High Quality)',
     meters: '',
     date: new Date().toISOString().split('T')[0],
-    operatorName: '', // BY DEFAULT OPERATOR NAME REMOVED (blank)
+    operatorName: accountFullName, // BY DEFAULT PRE-FILLED WITH ACCOUNT FULL NAME
     shift: getAutoShift(), // AUTOMATICALLY SET BASED ON TIME (Morning/Night)
     notes: ''
   });
@@ -517,12 +520,12 @@ export default function JobPrintingLog() {
             {/* Row 4: Operator Name (blank by default) & Remarks */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.75rem' }}>
               <div>
-                <label style={labelStyle}>OPERATOR NAME (OPTIONAL)</label>
+                <label style={labelStyle}>OPERATOR NAME</label>
                 <input
                   type="text"
                   value={form.operatorName}
                   onChange={e => setForm(f => ({ ...f, operatorName: e.target.value }))}
-                  placeholder="Type operator name..."
+                  placeholder="Operator Name (Default: Account Name)"
                   style={inputStyle}
                 />
               </div>
