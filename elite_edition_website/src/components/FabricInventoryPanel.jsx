@@ -3134,16 +3134,16 @@ export default function FabricInventoryPanel() {
             <table className="data-table" style={{ width: '100%', fontSize: '0.78rem', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-light)' }}>
-                  <th style={{ padding: '0.45rem 0.5rem', whiteSpace: 'nowrap' }}>Ch. No</th>
-                  <th style={{ padding: '0.45rem 0.5rem', whiteSpace: 'nowrap' }}>Date</th>
-                  <th style={{ padding: '0.45rem 0.5rem' }}>Bill To</th>
-                  <th style={{ padding: '0.45rem 0.5rem', whiteSpace: 'nowrap' }}>Lot No</th>
-                  <th style={{ padding: '0.45rem 0.5rem' }}>Fabric</th>
-                  <th style={{ padding: '0.45rem 0.5rem', whiteSpace: 'nowrap' }}>Job No</th>
-                  <th style={{ padding: '0.45rem 0.5rem', whiteSpace: 'nowrap' }}>Panna</th>
-                  <th style={{ padding: '0.45rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>TP</th>
-                  <th style={{ padding: '0.45rem 0.5rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Total Mtr</th>
-                  <th style={{ padding: '0.45rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Actions</th>
+                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '90px' }}>Ch. No</th>
+                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '90px' }}>Date</th>
+                  <th style={{ padding: '0.45rem 0.4rem' }}>Bill To</th>
+                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '70px' }}>Lot No</th>
+                  <th style={{ padding: '0.45rem 0.4rem' }}>Fabric</th>
+                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '75px' }}>Job No</th>
+                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '60px' }}>Panna</th>
+                  <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center', whiteSpace: 'nowrap', width: '45px' }}>TP</th>
+                  <th style={{ padding: '0.45rem 0.4rem', textAlign: 'right', whiteSpace: 'nowrap', width: '95px' }}>Total Mtr</th>
+                  <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center', whiteSpace: 'nowrap', width: '180px' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -3152,16 +3152,16 @@ export default function FabricInventoryPanel() {
                 )}
                 {challans.map(ch => (
                   <tr key={ch._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <td style={{ padding: '0.45rem 0.5rem', fontWeight: 800, color: 'var(--primary)', whiteSpace: 'nowrap' }}>EDP-{ch.challanNo}</td>
-                    <td style={{ padding: '0.45rem 0.5rem', whiteSpace: 'nowrap' }}>{formatDateDDMMYYYY(ch.date)}</td>
-                    <td style={{ padding: '0.45rem 0.5rem', fontWeight: 700, color: '#a78bfa' }}>{ch.billTo || ch.partyName || '—'}</td>
-                    <td style={{ padding: '0.45rem 0.5rem', whiteSpace: 'nowrap' }}>{ch.lotNo != null ? `#${ch.lotNo}` : '—'}</td>
-                    <td style={{ padding: '0.45rem 0.5rem' }}>{ch.fabricName || '—'}</td>
-                    <td style={{ padding: '0.45rem 0.5rem', color: 'var(--primary)', fontWeight: 700, whiteSpace: 'nowrap' }}>{ch.jobNo ? `#${ch.jobNo}` : '—'}</td>
-                    <td style={{ padding: '0.45rem 0.5rem', whiteSpace: 'nowrap' }}>{ch.panna || '—'}</td>
-                    <td style={{ padding: '0.45rem 0.5rem', textAlign: 'center', fontWeight: 700 }}>{ch.totalTp}</td>
-                    <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right', fontWeight: 800, color: 'var(--success)', whiteSpace: 'nowrap' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
-                    <td style={{ padding: '0.35rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '0.45rem 0.4rem', fontWeight: 800, color: 'var(--primary)', whiteSpace: 'nowrap' }}>EDP-{ch.challanNo}</td>
+                    <td style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap' }}>{formatDateDDMMYYYY(ch.date)}</td>
+                    <td style={{ padding: '0.45rem 0.4rem', fontWeight: 700, color: '#a78bfa' }}>{ch.billTo || ch.partyName || '—'}</td>
+                    <td style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap' }}>{ch.lotNo != null ? `#${ch.lotNo}` : '—'}</td>
+                    <td style={{ padding: '0.45rem 0.4rem' }}>{ch.fabricName || '—'}</td>
+                    <td style={{ padding: '0.45rem 0.4rem', color: 'var(--primary)', fontWeight: 700, whiteSpace: 'nowrap' }}>{ch.jobNo ? `#${String(ch.jobNo).trim()}` : '—'}</td>
+                    <td style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap' }}>{ch.panna || '—'}</td>
+                    <td style={{ padding: '0.45rem 0.4rem', textAlign: 'center', fontWeight: 700 }}>{ch.totalTp}</td>
+                    <td style={{ padding: '0.45rem 0.4rem', textAlign: 'right', fontWeight: 800, color: 'var(--success)', whiteSpace: 'nowrap' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
+                    <td style={{ padding: '0.35rem 0.4rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center', alignItems: 'center' }}>
                         <button className="btn-icon" title="View Challan" style={{ color: '#38bdf8', padding: '0.25rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 4, cursor: 'pointer' }} onClick={() => setViewChallanModal(ch)}>
                           <Eye size={13} />
