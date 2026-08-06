@@ -3,7 +3,7 @@ import { api, getBaseUrl } from '../services/api';
 import {
   PlusCircle, Search, RefreshCw, Edit2, Trash2, FileText,
   Printer, ChevronLeft, ChevronRight, Clock, CheckCircle,
-  AlertCircle, Cpu, X, Save, Eye, Image, LayoutGrid, List, Send
+  AlertCircle, Cpu, X, Save, Eye, Image, LayoutGrid, List, Send, Download
 } from 'lucide-react';
 import DesignCatalogue from './DesignCatalogue';
 import DesignMaster from './DesignMaster';
@@ -614,7 +614,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
 
         <div style={{ display:'flex', gap:'0.75rem' }}>
           <button className="btn-primary" style={{ flex:1, justifyContent:'center' }} onClick={doPrint}>
-            <Printer size={15}/> Print / PDF
+            <Download size={15}/> Save as PDF
           </button>
           {onShare && (
             <button className="btn-secondary" style={{ flex:1, justifyContent:'center', color: '#60a5fa', borderColor: 'rgba(96,165,250,0.3)' }} onClick={() => onShare(card)}>
@@ -1467,8 +1467,8 @@ function JobCardForm({ card, onSave, onClose }) {
                 <button
                   type="button"
                   onClick={() => {
-                    const img1 = form.imageUrl1 || (selectedDesign && selectedDesign.imageUrl) || '';
-                    const img2 = form.imageUrl2 || (selectedDesign && selectedDesign.imageUrl2) || '';
+                    const img1 = (selectedDesign && selectedDesign.imageUrl) || form.imageUrl1 || '';
+                    const img2 = (selectedDesign && selectedDesign.imageUrl2) || form.imageUrl2 || '';
                     setForm(f => ({ ...f, imageUrl1: img1, imageUrl2: img2 }));
                   }}
                   style={{
@@ -1486,15 +1486,15 @@ function JobCardForm({ card, onSave, onClose }) {
                 <button
                   type="button"
                   onClick={() => {
-                    const img1 = form.imageUrl1 || (selectedDesign && selectedDesign.imageUrl) || form.imageUrl2 || '';
+                    const img1 = (selectedDesign && selectedDesign.imageUrl) || form.imageUrl1 || form.imageUrl2 || '';
                     setForm(f => ({ ...f, imageUrl1: img1, imageUrl2: '' }));
                   }}
                   style={{
                     padding: '0.2rem 0.55rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
                     border: '1px solid',
-                    borderColor: (!!form.imageUrl1 && !form.imageUrl2) ? '#38bdf8' : 'var(--border-light)',
-                    background: (!!form.imageUrl1 && !form.imageUrl2) ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
-                    color: (!!form.imageUrl1 && !form.imageUrl2) ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer'
+                    borderColor: (!!form.imageUrl1 && !form.imageUrl2 && (!selectedDesign || form.imageUrl1 !== selectedDesign.imageUrl2)) ? '#38bdf8' : 'var(--border-light)',
+                    background: (!!form.imageUrl1 && !form.imageUrl2 && (!selectedDesign || form.imageUrl1 !== selectedDesign.imageUrl2)) ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                    color: (!!form.imageUrl1 && !form.imageUrl2 && (!selectedDesign || form.imageUrl1 !== selectedDesign.imageUrl2)) ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer'
                   }}
                 >
                   🖼️ Img 1 Only
@@ -1504,15 +1504,15 @@ function JobCardForm({ card, onSave, onClose }) {
                 <button
                   type="button"
                   onClick={() => {
-                    const img2 = form.imageUrl2 || (selectedDesign && selectedDesign.imageUrl2) || form.imageUrl1 || '';
-                    setForm(f => ({ ...f, imageUrl1: '', imageUrl2: img2 }));
+                    const img2 = (selectedDesign && selectedDesign.imageUrl2) || form.imageUrl2 || form.imageUrl1 || '';
+                    setForm(f => ({ ...f, imageUrl1: img2, imageUrl2: '' }));
                   }}
                   style={{
                     padding: '0.2rem 0.55rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
                     border: '1px solid',
-                    borderColor: (!form.imageUrl1 && !!form.imageUrl2) ? '#38bdf8' : 'var(--border-light)',
-                    background: (!form.imageUrl1 && !!form.imageUrl2) ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
-                    color: (!form.imageUrl1 && !!form.imageUrl2) ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer'
+                    borderColor: (!!form.imageUrl1 && !form.imageUrl2 && selectedDesign && form.imageUrl1 === selectedDesign.imageUrl2) ? '#38bdf8' : 'var(--border-light)',
+                    background: (!!form.imageUrl1 && !form.imageUrl2 && selectedDesign && form.imageUrl1 === selectedDesign.imageUrl2) ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                    color: (!!form.imageUrl1 && !form.imageUrl2 && selectedDesign && form.imageUrl1 === selectedDesign.imageUrl2) ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer'
                   }}
                 >
                   🖼️ Img 2 Only
