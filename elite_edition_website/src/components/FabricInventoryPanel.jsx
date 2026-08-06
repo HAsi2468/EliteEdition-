@@ -201,7 +201,7 @@ export default function FabricInventoryPanel() {
       let totalOut = 0;
       transactions.forEach(t => {
         if (String(t.fabricQuality || '').trim().toUpperCase() === item.fabricQuality &&
-            String(t.panna || '').trim() === item.panna) {
+          String(t.panna || '').trim() === item.panna) {
           if (t.type === 'INWARD') totalIn += Number(t.qty || 0);
           else totalOut += Number(t.qty || 0);
         }
@@ -822,7 +822,7 @@ export default function FabricInventoryPanel() {
             return vNo;
           })
           .filter(Boolean);
-        
+
         // Remove duplicates and join with commas
         const uniqueChallans = [...new Set(vendorChallans)].join(', ');
 
@@ -1038,7 +1038,7 @@ export default function FabricInventoryPanel() {
     if (c.fabricName) {
       api.getFabricLotStock({ fabricQuality: c.fabricName }).then(res => {
         if (res.success && res.data) setAvailableLots(res.data);
-      }).catch(() => {});
+      }).catch(() => { });
     } else {
       setAvailableLots([]);
     }
@@ -1085,7 +1085,7 @@ export default function FabricInventoryPanel() {
       try {
         const custRes = await api.getBillingCustomers();
         const customerList = (custRes && custRes.data && Array.isArray(custRes.data)) ? custRes.data : Array.isArray(custRes) ? custRes : [];
-        const matched = customerList.find(c => 
+        const matched = customerList.find(c =>
           (c.businessName && c.businessName.trim().toLowerCase() === party.trim().toLowerCase()) ||
           (c.name && c.name.trim().toLowerCase() === party.trim().toLowerCase())
         );
@@ -1191,7 +1191,7 @@ export default function FabricInventoryPanel() {
     if (fName) {
       api.getFabricLotStock({ fabricQuality: fName }).then(res => {
         if (res && res.success) setSaAvailableLots(res.data || []);
-      }).catch(() => {});
+      }).catch(() => { });
     } else {
       setSaAvailableLots([]);
     }
@@ -1236,7 +1236,7 @@ export default function FabricInventoryPanel() {
     if (sa.fabricQuality) {
       api.getFabricLotStock({ fabricQuality: sa.fabricQuality }).then(res => {
         if (res && res.success) setSaAvailableLots(res.data || []);
-      }).catch(() => {});
+      }).catch(() => { });
     }
     setIsSaFormOpen(true);
   };
@@ -1244,17 +1244,17 @@ export default function FabricInventoryPanel() {
   const handleSaLotChange = (e) => {
     const selectedLotNo = e.target.value;
     const foundLot = saAvailableLots.find(l => String(l.lotNo) === String(selectedLotNo));
-    
+
     let rawChallan = foundLot?.vendorChallanNo || '';
     const vName = foundLot?.vendorName || saForm.partyName || '';
-    
+
     if (rawChallan && vName) {
       const shortName = getVendorShortForm(vName);
       if (shortName && !/^[A-Za-z0-9]{2,4}-/.test(rawChallan)) {
         rawChallan = `${shortName}-${rawChallan}`;
       }
     }
-    
+
     setSaForm(prev => ({
       ...prev,
       lotNo: selectedLotNo,
@@ -1465,9 +1465,9 @@ export default function FabricInventoryPanel() {
     if (!lotSearch) return true;
     const s = lotSearch.toLowerCase();
     return String(l.lotNo).toLowerCase().includes(s) ||
-           (l.fabricQuality || '').toLowerCase().includes(s) ||
-           (l.vendorName || '').toLowerCase().includes(s) ||
-           l.outwardTxs.some(ot => (ot.partyName || '').toLowerCase().includes(s) || (ot.jobNo || '').toLowerCase().includes(s));
+      (l.fabricQuality || '').toLowerCase().includes(s) ||
+      (l.vendorName || '').toLowerCase().includes(s) ||
+      l.outwardTxs.some(ot => (ot.partyName || '').toLowerCase().includes(s) || (ot.jobNo || '').toLowerCase().includes(s));
   });
 
   // Parse lot numbers from the comma-separated lotNo field
@@ -1892,7 +1892,7 @@ export default function FabricInventoryPanel() {
                     {isExpanded && (
                       <div style={{ borderTop: '1px solid var(--border-light)', padding: '1.25rem', background: 'rgba(0,0,0,0.15)' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
-                          
+
                           {/* Inward Transactions Box */}
                           <div style={{ background: 'rgba(16, 185, 129, 0.03)', border: '1px solid rgba(16, 185, 129, 0.15)', borderRadius: '8px', padding: '1rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
@@ -2112,9 +2112,9 @@ export default function FabricInventoryPanel() {
                     if (!transferSearch) return true;
                     const s = transferSearch.toLowerCase();
                     return (t.fabricQuality || '').toLowerCase().includes(s) ||
-                           String(t.sourceLotNo || '').includes(s) ||
-                           String(t.destLotNo || '').includes(s) ||
-                           (t.notes || '').toLowerCase().includes(s);
+                      String(t.sourceLotNo || '').includes(s) ||
+                      String(t.destLotNo || '').includes(s) ||
+                      (t.notes || '').toLowerCase().includes(s);
                   }).map((t, idx) => (
                     <tr key={t.transferRefId || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                       <td style={{ padding: '0.75rem 1rem' }}>{formatDateDDMMYYYY(t.date)}</td>
@@ -2155,15 +2155,15 @@ export default function FabricInventoryPanel() {
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <h2>Inward Transactions</h2>
                 {maxLotNo > 0 && (
-                  <span style={{ 
-                    fontSize: '0.85rem', 
-                    color: 'var(--success)', 
-                    background: 'rgba(16, 185, 129, 0.08)', 
-                    border: '1px solid rgba(16, 185, 129, 0.15)', 
-                    padding: '3px 10px', 
-                    borderRadius: '12px', 
-                    marginLeft: '12px', 
-                    fontWeight: 600 
+                  <span style={{
+                    fontSize: '0.85rem',
+                    color: 'var(--success)',
+                    background: 'rgba(16, 185, 129, 0.08)',
+                    border: '1px solid rgba(16, 185, 129, 0.15)',
+                    padding: '3px 10px',
+                    borderRadius: '12px',
+                    marginLeft: '12px',
+                    fontWeight: 600
                   }}>
                     Latest Lot: #{maxLotNo}
                   </span>
@@ -2208,7 +2208,7 @@ export default function FabricInventoryPanel() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th 
+                    <th
                       onClick={() => {
                         if (inwardSortBy === 'date') {
                           setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -2221,7 +2221,7 @@ export default function FabricInventoryPanel() {
                     >
                       Date {inwardSortBy === 'date' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                     </th>
-                    <th 
+                    <th
                       onClick={() => {
                         if (inwardSortBy === 'lotNo') {
                           setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -2234,7 +2234,7 @@ export default function FabricInventoryPanel() {
                     >
                       Lot No {inwardSortBy === 'lotNo' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                     </th>
-                    <th 
+                    <th
                       onClick={() => {
                         if (inwardSortBy === 'challanNo') {
                           setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -2247,7 +2247,7 @@ export default function FabricInventoryPanel() {
                     >
                       Challan No {inwardSortBy === 'challanNo' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                     </th>
-                    <th 
+                    <th
                       onClick={() => {
                         if (inwardSortBy === 'vendorName') {
                           setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -2260,7 +2260,7 @@ export default function FabricInventoryPanel() {
                     >
                       Vendor {inwardSortBy === 'vendorName' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                     </th>
-                    <th 
+                    <th
                       onClick={() => {
                         if (inwardSortBy === 'fabricQuality') {
                           setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -2274,7 +2274,7 @@ export default function FabricInventoryPanel() {
                       Fabric Quality {inwardSortBy === 'fabricQuality' ? (inwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                     </th>
                     <th>Panna</th>
-                    <th 
+                    <th
                       onClick={() => {
                         if (inwardSortBy === 'qty') {
                           setInwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -2382,7 +2382,7 @@ export default function FabricInventoryPanel() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th 
+                    <th
                       onClick={() => {
                         if (outwardSortBy === 'date') {
                           setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -2395,7 +2395,7 @@ export default function FabricInventoryPanel() {
                     >
                       Date {outwardSortBy === 'date' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                     </th>
-                    <th 
+                    <th
                       onClick={() => {
                         if (outwardSortBy === 'jobNo') {
                           setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -2408,7 +2408,7 @@ export default function FabricInventoryPanel() {
                     >
                       Job Card No {outwardSortBy === 'jobNo' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                     </th>
-                    <th 
+                    <th
                       onClick={() => {
                         if (outwardSortBy === 'challanNo') {
                           setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -2421,7 +2421,7 @@ export default function FabricInventoryPanel() {
                     >
                       Challan No {outwardSortBy === 'challanNo' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                     </th>
-                    <th 
+                    <th
                       onClick={() => {
                         if (outwardSortBy === 'partyName') {
                           setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -2434,7 +2434,7 @@ export default function FabricInventoryPanel() {
                     >
                       Party {outwardSortBy === 'partyName' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                     </th>
-                    <th 
+                    <th
                       onClick={() => {
                         if (outwardSortBy === 'fabricQuality') {
                           setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -2447,7 +2447,7 @@ export default function FabricInventoryPanel() {
                     >
                       Fabric Quality {outwardSortBy === 'fabricQuality' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                     </th>
-                    <th 
+                    <th
                       onClick={() => {
                         if (outwardSortBy === 'lotNo') {
                           setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -2461,7 +2461,7 @@ export default function FabricInventoryPanel() {
                       Lot No {outwardSortBy === 'lotNo' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                     </th>
                     <th>Panna</th>
-                    <th 
+                    <th
                       onClick={() => {
                         if (outwardSortBy === 'qty') {
                           setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
@@ -2512,13 +2512,13 @@ export default function FabricInventoryPanel() {
                                   </span>
                                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                     {badges.map((badge, bIdx) => (
-                                      <span key={bIdx} style={{ 
-                                        fontSize: '0.72rem', 
-                                        color: bIdx === 0 ? 'var(--primary-light)' : 'var(--success)', 
-                                        background: bIdx === 0 ? 'rgba(14, 165, 233, 0.08)' : 'rgba(16, 185, 129, 0.08)', 
+                                      <span key={bIdx} style={{
+                                        fontSize: '0.72rem',
+                                        color: bIdx === 0 ? 'var(--primary-light)' : 'var(--success)',
+                                        background: bIdx === 0 ? 'rgba(14, 165, 233, 0.08)' : 'rgba(16, 185, 129, 0.08)',
                                         border: bIdx === 0 ? '1px solid rgba(14, 165, 233, 0.15)' : '1px solid rgba(16, 185, 129, 0.15)',
-                                        padding: '2px 6px', 
-                                        borderRadius: '4px', 
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
                                         display: 'inline-block',
                                         marginTop: '2px',
                                         whiteSpace: 'nowrap'
@@ -3004,11 +3004,11 @@ export default function FabricInventoryPanel() {
                       if (!saSearch) return true;
                       const s = saSearch.toLowerCase();
                       return (sa.saNo || '').toLowerCase().includes(s) ||
-                             (sa.partyName || '').toLowerCase().includes(s) ||
-                             (sa.vendorChallanNo || '').toLowerCase().includes(s) ||
-                             (sa.fabricQuality || '').toLowerCase().includes(s) ||
-                             (sa.lotNo || '').toLowerCase().includes(s) ||
-                             (sa.reason || '').toLowerCase().includes(s);
+                        (sa.partyName || '').toLowerCase().includes(s) ||
+                        (sa.vendorChallanNo || '').toLowerCase().includes(s) ||
+                        (sa.fabricQuality || '').toLowerCase().includes(s) ||
+                        (sa.lotNo || '').toLowerCase().includes(s) ||
+                        (sa.reason || '').toLowerCase().includes(s);
                     });
 
                     if (filteredSa.length === 0) {
@@ -3136,10 +3136,10 @@ export default function FabricInventoryPanel() {
                 <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-light)' }}>
                   <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '85px' }}>Ch. No</th>
                   <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '85px' }}>Date</th>
-                  <th style={{ padding: '0.45rem 0.4rem', minWidth: '110px' }}>Bill To</th>
+                  <th style={{ padding: '0.45rem 0.4rem', maxWidth: '15ch', wordBreak: 'break-word' }}>Bill To</th>
                   <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '65px' }}>Lot No</th>
-                  <th style={{ padding: '0.45rem 0.4rem' }}>Fabric</th>
-                  <th style={{ padding: '0.45rem 0.4rem', minWidth: '110px' }}>Job No</th>
+                  <th style={{ padding: '0.45rem 0.4rem', maxWidth: '15ch', wordBreak: 'break-word' }}>Fabric</th>
+                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '75px' }}>Job No</th>
                   <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '55px' }}>Panna</th>
                   <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center', whiteSpace: 'nowrap', width: '40px' }}>TP</th>
                   <th style={{ padding: '0.45rem 0.4rem', textAlign: 'right', whiteSpace: 'nowrap', width: '90px' }}>Total Mtr</th>
@@ -3154,9 +3154,9 @@ export default function FabricInventoryPanel() {
                   <tr key={ch._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <td style={{ padding: '0.45rem 0.4rem', fontWeight: 800, color: 'var(--primary)', whiteSpace: 'nowrap' }}>EDP-{ch.challanNo}</td>
                     <td style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap' }}>{formatDateDDMMYYYY(ch.date)}</td>
-                    <td style={{ padding: '0.45rem 0.4rem', fontWeight: 700, color: '#a78bfa' }}>{ch.billTo || ch.partyName || '—'}</td>
+                    <td style={{ padding: '0.45rem 0.4rem', fontWeight: 700, color: '#a78bfa', maxWidth: '15ch', wordBreak: 'break-word', whiteSpace: 'normal' }}>{ch.billTo || ch.partyName || '—'}</td>
                     <td style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap' }}>{ch.lotNo != null ? `#${ch.lotNo}` : '—'}</td>
-                    <td style={{ padding: '0.45rem 0.4rem' }}>{ch.fabricName || '—'}</td>
+                    <td style={{ padding: '0.45rem 0.4rem', maxWidth: '15ch', wordBreak: 'break-word', whiteSpace: 'normal' }}>{ch.fabricName || '—'}</td>
                     <td style={{ padding: '0.45rem 0.4rem', color: 'var(--primary)', fontWeight: 700, whiteSpace: 'nowrap' }}>{ch.jobNo ? `#${String(ch.jobNo).trim()}` : '—'}</td>
                     <td style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap' }}>{ch.panna || '—'}</td>
                     <td style={{ padding: '0.45rem 0.4rem', textAlign: 'center', fontWeight: 700 }}>{ch.totalTp}</td>
@@ -3884,10 +3884,10 @@ export default function FabricInventoryPanel() {
                 )}
                 {!lotLoading && lotList.length > 0 && outwardForm.fabricQuality &&
                   lotList.filter(l => l.fabricQuality.toLowerCase().trim() === outwardForm.fabricQuality.toLowerCase().trim()).length === 0 && (
-                  <span style={{ fontSize: '0.75rem', color: '#f59e0b', marginTop: '0.3rem', display: 'block' }}>
-                    ⚠️ No lots found for "{outwardForm.fabricQuality}". Check fabric name spelling or add Inward first.
-                  </span>
-                )}
+                    <span style={{ fontSize: '0.75rem', color: '#f59e0b', marginTop: '0.3rem', display: 'block' }}>
+                      ⚠️ No lots found for "{outwardForm.fabricQuality}". Check fabric name spelling or add Inward first.
+                    </span>
+                  )}
                 {outwardForm.lotNo && lotList.find(l => String(l.lotNo) === String(outwardForm.lotNo)) && (
                   <span style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '0.25rem', display: 'block' }}>
                     ✓ Available stock: {Number(lotList.find(l => String(l.lotNo) === String(outwardForm.lotNo)).currentStock || 0).toFixed(2)} mtr
