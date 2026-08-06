@@ -52,6 +52,9 @@ export default function JobPrintingLog() {
   const [dateStart, setDateStart] = useState(() => new Date().toISOString().split('T')[0]);
   const [dateEnd, setDateEnd] = useState(() => new Date().toISOString().split('T')[0]);
 
+  // Edit Mode state
+  const [editingLogId, setEditingLogId] = useState(null);
+
   const user = api.getCurrentUser();
   const accountFullName = user ? (user.name || user.fullName || user.username || '') : '';
 
@@ -242,8 +245,15 @@ export default function JobPrintingLog() {
         ...form,
         meters: parseFloat(form.meters)
       };
-      const res = await api.createJobPrintLog(payload);
-      triggerPushNotification('🖨️ Print Run Logged', `Logged ${form.meters} mtr for Job #${form.jobNo} on ${form.machineName} (${form.shift} Shift)`, 'success');
+
+      if (editingLogId) {
+        await api.updateJobPrintLog(editingLogId, payload);
+        triggerPushNotification('✏️ Print Log Updated', `Updated print log for Job #${form.jobNo} (${form.meters} mtr)`, 'success');
+        setEditingLogId(null);
+      } else {
+        await api.createJobPrintLog(payload);
+        triggerPushNotification('🖨️ Print Run Logged', `Logged ${form.meters} mtr for Job #${form.jobNo} on ${form.machineName} (${form.shift} Shift)`, 'success');
+      }
 
       // Clear meters & notes for next log entry, but keep selected job card & machine
       setForm(prev => ({
@@ -260,10 +270,56 @@ export default function JobPrintingLog() {
         loadJobCardHistory(form.jobNo);
       }
     } catch (err) {
-      alert(err.message || 'Failed to submit print entry.');
+      alert(err.message || 'Failed to save print entry.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Start Editing a Log Entry
+  const handleStartEdit = (log) => {
+    setEditingLogId(log._id);
+    const matched = findMatchingJob(log.jobNo) || findMatchingJob(log.jobCardId);
+    if (matched) setSelectedJob(matched);
+
+    let parsedDate = new Date().toISOString().split('T')[0];
+    if (log.date) {
+      const d = new Date(log.date);
+      if (!isNaN(d.getTime())) {
+        parsedDate = d.toISOString().split('T')[0];
+      }
+    }
+
+    setForm({
+      jobNo: log.jobNo || '',
+      jobCardId: log.jobCardId || (matched ? matched._id : ''),
+      machineName: log.machineName || machinesList[0] || 'Machine 1',
+      pass: log.pass || '1 PASS',
+      meters: log.meters ? String(log.meters) : '',
+      date: parsedDate,
+      shift: log.shift || getAutoShift(),
+      operatorName: log.operatorName || '',
+      notes: log.notes || ''
+    });
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Cancel Editing
+  const handleCancelEdit = () => {
+    setEditingLogId(null);
+    setSelectedJob(null);
+    setForm({
+      jobNo: '',
+      jobCardId: '',
+      machineName: machinesList[0] || 'Machine 1',
+      pass: '1 PASS',
+      meters: '',
+      date: new Date().toISOString().split('T')[0],
+      shift: getAutoShift(),
+      operatorName: currentUser ? (currentUser.fullName || currentUser.name || '') : '',
+      notes: ''
+    });
   };
 
   // Delete Log Entry
@@ -386,10 +442,11 @@ export default function JobPrintingLog() {
       <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: selectedJob ? 'minmax(0, 1.4fr) minmax(0, 1fr)' : '1fr', gap: '1.25rem' }}>
         
         {/* Entry Form */}
-        <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: '4px solid #38bdf8' }}>
+        <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: `4px solid ${editingLogId ? '#f59e0b' : '#38bdf8'}` }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <PlusCircle size={16} /> New Machine Print Entry
+            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: editingLogId ? '#f59e0b' : '#38bdf8', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {editingLogId ? <Edit2 size={16} /> : <PlusCircle size={16} />}
+              {editingLogId ? 'Edit Machine Print Log' : 'New Machine Print Entry'}
             </div>
 
             {/* Live Shift Auto Badge */}
@@ -564,12 +621,24 @@ export default function JobPrintingLog() {
             </div>
 
             {/* Submit Button */}
-            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.4rem' }}>
-              <button type="submit" disabled={submitting} className="btn-primary" style={{ padding: '0.65rem 1.25rem', fontSize: '0.85rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <PlusCircle size={16} /> {submitting ? 'Saving Entry...' : 'Submit Print Entry Log'}
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+              <button type="submit" disabled={submitting} className="btn-primary" style={{ padding: '0.65rem 1.25rem', fontSize: '0.85rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', background: editingLogId ? 'linear-gradient(135deg, #f59e0b, #d97706)' : undefined }}>
+                {editingLogId ? <Edit2 size={16} /> : <PlusCircle size={16} />}
+                {submitting ? (editingLogId ? 'Updating Entry...' : 'Saving Entry...') : (editingLogId ? 'Update Print Log Entry' : 'Submit Print Entry Log')}
               </button>
 
-              {selectedJob && (
+              {editingLogId && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="btn-secondary"
+                  style={{ padding: '0.65rem 1rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <X size={15} /> Cancel Edit
+                </button>
+              )}
+
+              {selectedJob && !editingLogId && (
                 <button
                   type="button"
                   onClick={() => loadJobCardHistory(selectedJob.jobNo)}
@@ -736,6 +805,13 @@ export default function JobPrintingLog() {
                     <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{log.notes || '—'}</td>
                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                        <button
+                          onClick={() => handleStartEdit(log)}
+                          style={{ padding: '0.3rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.3)', color: '#38bdf8', borderRadius: 4, cursor: 'pointer' }}
+                          title="Edit Print Log Entry"
+                        >
+                          <Edit2 size={14} />
+                        </button>
                         <button
                           onClick={() => loadJobCardHistory(log.jobNo)}
                           className="btn-icon"
