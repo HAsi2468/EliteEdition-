@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
 import { Search, RefreshCw, Save, Check, Clipboard, ChevronLeft, ChevronRight } from 'lucide-react';
+import JobCardTooltip from './JobCardTooltip';
 
 export default function JobCardTracking({ onPreview }) {
   const [cards, setCards] = useState([]);
@@ -336,16 +337,18 @@ export default function JobCardTracking({ onPreview }) {
                   <tr key={c._id} style={{ borderBottom: '1px solid var(--border-light)', background: isModified ? 'rgba(56, 189, 248, 0.03)' : 'transparent' }}>
                     {/* Job Card No (Clickable for print preview) */}
                     <td style={tdStyle}>
-                      <button 
-                        onClick={() => onPreview(c)}
-                        style={{
-                          background: 'none', border: 'none', color: 'var(--primary)',
-                          fontWeight: 800, cursor: 'pointer', padding: 0, textDecoration: 'underline',
-                          fontSize: '0.8rem', outline: 'none'
-                        }}
-                      >
-                        {c.jobNo}
-                      </button>
+                      <JobCardTooltip card={c}>
+                        <button 
+                          onClick={() => onPreview(c)}
+                          style={{
+                            background: 'none', border: 'none', color: 'var(--primary)',
+                            fontWeight: 800, cursor: 'pointer', padding: 0, textDecoration: 'underline',
+                            fontSize: '0.8rem', outline: 'none'
+                          }}
+                        >
+                          {c.jobNo}
+                        </button>
+                      </JobCardTooltip>
                     </td>
 
                     {/* Party */}

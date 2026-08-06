@@ -18,6 +18,7 @@ import JobPrintingLog from './JobPrintingLog';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
 import { triggerPushNotification } from './NotificationToast';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
+import JobCardTooltip from './JobCardTooltip';
 
 // ─── EXP.TIME calculation (mirrors Apps Script exactly) ─────────────────────
 const SPEED_GRANDO = {
@@ -1950,12 +1951,14 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
                       onMouseLeave={e => e.currentTarget.style.backgroundColor = ''}
                     >
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <span>{c.jobNo}</span>
-                          {c.emergencyNotes && c.emergencyNotes.trim() && (
-                            <span title="Urgent" style={{ padding: '0.1rem 0.35rem', borderRadius: 4, fontSize: '0.6rem', background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>URGENT</span>
-                          )}
-                        </div>
+                        <JobCardTooltip card={c}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span style={{ color: 'var(--primary)', cursor: 'pointer' }}>{c.jobNo}</span>
+                            {c.emergencyNotes && c.emergencyNotes.trim() && (
+                              <span title="Urgent" style={{ padding: '0.1rem 0.35rem', borderRadius: 4, fontSize: '0.6rem', background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>URGENT</span>
+                            )}
+                          </div>
+                        </JobCardTooltip>
                       </td>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>{c.party || '—'}</td>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--primary)', fontWeight: 600 }}>{c.designName || c.designNo || '—'}</td>
@@ -2027,7 +2030,9 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
                   {/* Card header */}
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:'0.5rem', flexWrap:'wrap' }}>
-                      <span style={{ fontWeight:800, fontSize:'0.95rem', color:'var(--text-primary)' }}>{c.jobNo}</span>
+                      <JobCardTooltip card={c}>
+                        <span style={{ fontWeight:800, fontSize:'0.95rem', color:'var(--primary)', cursor: 'pointer' }}>{c.jobNo}</span>
+                      </JobCardTooltip>
                       {c.machineName && (
                         <span style={{ padding:'0.15rem 0.55rem', borderRadius:6, fontSize:'0.65rem', fontWeight:800,
                           background: c.machineName==='GRANDO' ? 'rgba(59,130,246,0.15)' : 'rgba(239,68,68,0.15)',

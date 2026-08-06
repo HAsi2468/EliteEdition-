@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
+import JobCardTooltip from './JobCardTooltip';
 
 // Automatic Shift Calculator:
 // Morning Shift: 9:00 AM (09:00) to 8:59 PM (20:59)
@@ -124,6 +125,13 @@ export default function JobPrintingLog() {
   useEffect(() => {
     fetchPrintConfig();
     fetchJobCards();
+
+    const handleDataRefresh = () => {
+      fetchJobCards();
+      fetchLogs();
+    };
+    window.addEventListener('elite-data-refresh', handleDataRefresh);
+    return () => window.removeEventListener('elite-data-refresh', handleDataRefresh);
   }, []);
 
   useEffect(() => {
@@ -442,24 +450,25 @@ export default function JobPrintingLog() {
                   const stats = getJobProgressStats(c);
                   const cleanJobNum = String(c.jobNo || '').replace(/^JOB\s*NO\.?\s*-?\s*/i, '');
                   return (
-                    <button
-                      key={c._id}
-                      type="button"
-                      onClick={() => handleJobSelect(c._id)}
-                      style={{
-                        padding: '0.2rem 0.5rem',
-                        borderRadius: 4,
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        border: '1px solid',
-                        borderColor: isSelected ? '#38bdf8' : 'var(--border-light)',
-                        background: isSelected ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.02)',
-                        color: isSelected ? '#38bdf8' : 'var(--text-muted)',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      #{cleanJobNum} ({stats.progressPct}%)
-                    </button>
+                    <JobCardTooltip key={c._id} card={c}>
+                      <button
+                        type="button"
+                        onClick={() => handleJobSelect(c._id)}
+                        style={{
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: 4,
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          border: '1px solid',
+                          borderColor: isSelected ? '#38bdf8' : 'var(--border-light)',
+                          background: isSelected ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.02)',
+                          color: isSelected ? '#38bdf8' : 'var(--text-muted)',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        #{cleanJobNum} ({stats.progressPct}%)
+                      </button>
+                    </JobCardTooltip>
                   );
                 })}
               </div>
