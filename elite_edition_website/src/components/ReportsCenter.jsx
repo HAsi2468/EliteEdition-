@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api, getBaseUrl } from '../services/api';
+import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { 
   BarChart2, 
   FileText, 
@@ -1056,7 +1057,7 @@ export default function ReportsCenter({ department }) {
                     {reportData.map((t, idx) => (
                       <tr key={t._id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
-                          {t.date ? new Date(t.date).toLocaleDateString('en-IN') : '—'}
+                          {formatDateDDMMYYYY(t.date)}
                         </td>
                         <td style={{ padding: '12px 16px', fontWeight: '700', color: '#fbbf24' }}>
                           {t.lotNo ? `#${t.lotNo}` : '—'}
@@ -1112,7 +1113,7 @@ export default function ReportsCenter({ department }) {
                       return (
                         <tr key={t._id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                           <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
-                            {t.date ? new Date(t.date).toLocaleDateString('en-IN') : '—'}
+                            {formatDateDDMMYYYY(t.date)}
                           </td>
                           <td style={{ padding: '12px 16px', fontWeight: '700', color: '#fbbf24' }}>
                             {t.lotNo ? `#${t.lotNo}` : '—'}
@@ -1227,7 +1228,7 @@ export default function ReportsCenter({ department }) {
                       <tr key={c._id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <td style={{ padding: '12px 16px', fontWeight: '700', color: '#38bdf8' }}>EDP-{c.challanNo}</td>
                         <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
-                          {c.date ? new Date(c.date).toLocaleDateString('en-IN') : '—'}
+                          {formatDateDDMMYYYY(c.date)}
                         </td>
                         <td style={{ padding: '12px 16px', fontWeight: '600', color: '#f8fafc' }}>{c.partyName || '—'}</td>
                         <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>

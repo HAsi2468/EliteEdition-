@@ -6,6 +6,7 @@ import {
   X, Download, Eye, Layers3, Activity, Tag, Sparkles
 } from 'lucide-react';
 import { triggerPushNotification } from './NotificationToast';
+import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
 
 // Automatic Shift Calculator:
 // Morning Shift: 9:00 AM (09:00) to 8:59 PM (20:59)
@@ -286,7 +287,7 @@ export default function JobPrintingLog() {
     if (logs.length === 0) return;
     const headers = ['Date', 'Job No', 'Machine Name', 'Pass', 'Meters Printed', 'Operator', 'Shift', 'Notes'];
     const rows = logs.map(l => [
-      new Date(l.date).toLocaleDateString('en-IN'),
+      formatDateDDMMYYYY(l.date),
       l.jobNo,
       `"${l.machineName}"`,
       `"${l.pass}"`,
@@ -694,7 +695,7 @@ export default function JobPrintingLog() {
               ) : (
                 logs.map(log => (
                   <tr key={log._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <td style={tdStyle}>{new Date(log.date || log.created_date_time).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td style={tdStyle}>{formatDateTimeDDMMYYYY(log.date || log.created_date_time)}</td>
                     <td style={{ ...tdStyle, fontWeight: 800, color: 'var(--text-primary)' }}>
                       <button
                         onClick={() => loadJobCardHistory(log.jobNo)}
@@ -798,7 +799,7 @@ export default function JobPrintingLog() {
                   {jobHistoryData.data.map((l, idx) => (
                     <tr key={l._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td style={tdStyle}>Run #{jobHistoryData.data.length - idx}</td>
-                      <td style={tdStyle}>{new Date(l.date).toLocaleDateString('en-IN')}</td>
+                      <td style={tdStyle}>{formatDateDDMMYYYY(l.date)}</td>
                       <td style={{ ...tdStyle, fontWeight: 700 }}>{l.machineName}</td>
                       <td style={tdStyle}>{l.pass}</td>
                       <td style={{ ...tdStyle, fontWeight: 800, color: '#34d399' }}>{Number(l.meters).toFixed(2)} mtr</td>

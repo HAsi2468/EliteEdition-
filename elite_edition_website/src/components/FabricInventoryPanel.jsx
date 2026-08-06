@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import CatalogManagerModal from './CatalogManagerModal';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
+import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import {
   RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
   Layers, Database, Settings, Trash2, FileDown, Search, X,
@@ -1778,7 +1779,7 @@ export default function FabricInventoryPanel() {
                                   <tbody>
                                     {lot.inwardTxs.map((inTx, iIdx) => (
                                       <tr key={inTx._id || iIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                                        <td style={{ padding: '0.35rem' }}>{new Date(inTx.date).toLocaleDateString()}</td>
+                                        <td style={{ padding: '0.35rem' }}>{formatDateDDMMYYYY(inTx.date)}</td>
                                         <td style={{ padding: '0.35rem' }}>{inTx.vendorName || '—'}</td>
                                         <td style={{ padding: '0.35rem' }}>{inTx.challanNo || '—'}</td>
                                         <td style={{ padding: '0.35rem', textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>
@@ -1819,7 +1820,7 @@ export default function FabricInventoryPanel() {
                                   <tbody>
                                     {lot.outwardTxs.map((outTx, oIdx) => (
                                       <tr key={outTx._id || oIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                                        <td style={{ padding: '0.35rem' }}>{new Date(outTx.date).toLocaleDateString()}</td>
+                                        <td style={{ padding: '0.35rem' }}>{formatDateDDMMYYYY(outTx.date)}</td>
                                         <td style={{ padding: '0.35rem' }}>{outTx.partyName || '—'}</td>
                                         <td style={{ padding: '0.35rem' }}>{outTx.jobNo || outTx.challanNo || '—'}</td>
                                         <td style={{ padding: '0.35rem', textAlign: 'right', fontWeight: 700, color: 'var(--danger)' }}>
@@ -1975,7 +1976,7 @@ export default function FabricInventoryPanel() {
                            (t.notes || '').toLowerCase().includes(s);
                   }).map((t, idx) => (
                     <tr key={t.transferRefId || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <td style={{ padding: '0.75rem 1rem' }}>{t.date ? new Date(t.date).toLocaleDateString('en-IN') : '—'}</td>
+                      <td style={{ padding: '0.75rem 1rem' }}>{formatDateDDMMYYYY(t.date)}</td>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>{t.fabricQuality}</td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
                         <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
@@ -2153,7 +2154,7 @@ export default function FabricInventoryPanel() {
                 <tbody>
                   {inwardTx.map(t => (
                     <tr key={t._id}>
-                      <td>{new Date(t.date).toLocaleDateString()}</td>
+                      <td>{formatDateDDMMYYYY(t.date)}</td>
                       <td><span style={{ fontWeight: 600 }}>#{t.lotNo}</span></td>
                       <td>{t.challanNo}</td>
                       <td>{t.vendorName}</td>
@@ -2339,7 +2340,7 @@ export default function FabricInventoryPanel() {
                 <tbody>
                   {outwardTx.map(t => (
                     <tr key={t._id}>
-                      <td>{new Date(t.date).toLocaleDateString()}</td>
+                      <td>{formatDateDDMMYYYY(t.date)}</td>
                       <td>{t.jobNo}</td>
                       <td>{t.challanNo || '-'}</td>
                       <td>{t.partyName}</td>
@@ -2875,7 +2876,7 @@ export default function FabricInventoryPanel() {
                       <tr key={idx}>
                         <td style={{ fontWeight: 700, color: 'var(--primary)' }}>{(sa.saNo || '').replace(/^SA-/i, 'RE-')}</td>
                         <td style={{ color: 'var(--text-muted)' }}>
-                          {sa.date ? new Date(sa.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                          {formatDateDDMMYYYY(sa.date)}
                         </td>
                         <td style={{ fontWeight: 600 }}>{sa.partyName || '—'}</td>
                         <td style={{ color: 'var(--text-muted)' }}>{sa.vendorChallanNo || '—'}</td>
@@ -3003,7 +3004,7 @@ export default function FabricInventoryPanel() {
                 {challans.map(ch => (
                   <tr key={ch._id}>
                     <td><span style={{ fontWeight: 700, color: 'var(--primary)' }}>EDP-{ch.challanNo}</span></td>
-                    <td>{new Date(ch.date).toLocaleDateString()}</td>
+                    <td>{formatDateDDMMYYYY(ch.date)}</td>
                     <td>{ch.partyName || '—'}</td>
                     <td>{ch.lotNo != null ? `#${ch.lotNo}` : '—'}</td>
                     <td>{ch.fabricName || '—'}</td>

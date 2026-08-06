@@ -314,8 +314,16 @@ const downloadInvoicePdf = async (req, res) => {
     doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
       .text(`Invoice No: ${invoice.invoiceNo}`, ML + 12, 106);
 
-    const invDateStr = invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString('en-IN') : '—';
-    const dueDateStr = invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('en-IN') : '—';
+    const formatDDMMYYYY = (d) => {
+      if (!d) return '—';
+      const dt = new Date(d);
+      if (isNaN(dt.getTime())) return String(d);
+      const day = String(dt.getDate()).padStart(2, '0');
+      const month = String(dt.getMonth() + 1).padStart(2, '0');
+      return `${day}/${month}/${dt.getFullYear()}`;
+    };
+    const invDateStr = formatDDMMYYYY(invoice.invoiceDate);
+    const dueDateStr = formatDDMMYYYY(invoice.dueDate);
 
     doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
       .text(`Date: ${invDateStr}`, ML + 300, 86, { width: contentWidth - 300, align: 'right' })

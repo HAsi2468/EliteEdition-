@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
+import { triggerPushNotification } from './NotificationToast';
+import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import {
   FileText,
   Plus,
@@ -581,7 +583,7 @@ export default function EliteBillingDepartment() {
                         {inv.customer?.gstin && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>GSTIN: {inv.customer.gstin}</div>}
                       </td>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>
-                        {inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString('en-IN') : '—'}
+                        {formatDateDDMMYYYY(inv.invoiceDate)}
                       </td>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>
                         {fmtINR(inv.grandTotal)}

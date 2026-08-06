@@ -17,6 +17,7 @@ import EliteDigitalPrintsSplitView from './EliteDigitalPrintsSplitView';
 import JobPrintingLog from './JobPrintingLog';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
 import { triggerPushNotification } from './NotificationToast';
+import { formatDateDDMMYYYY } from '../utils/dateUtils';
 
 // ─── EXP.TIME calculation (mirrors Apps Script exactly) ─────────────────────
 const SPEED_GRANDO = {
@@ -398,7 +399,7 @@ function JobCardPrintView({ card, onClose, onShare }) {
         <tr>
           <td class="label">JOB NO. :</td><td class="val">${card.jobNo || ''}</td>
           <td class="label">COLORS :</td><td class="val">${card.colors || ''}</td>
-          <td class="label">DATE :</td><td class="val">${card.date || ''}</td>
+          <td class="label">DATE :</td><td class="val">${formatDateDDMMYYYY(card.date)}</td>
         </tr>
         <tr>
           <td class="label">D. NO. :</td><td class="val">${card.designNo || card.designName || ''}</td>
@@ -1871,7 +1872,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>{c.colors || '—'}</td>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>{c.panna || '—'}</td>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 600 }}>{c.totalMtr || '—'}</td>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>{c.date || '—'}</td>
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>{formatDateDDMMYYYY(c.date)}</td>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem' }}><StatusBadge status={c.status} /></td>
                       <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
@@ -1957,7 +1958,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.35rem 0.6rem', fontSize:'0.8rem' }}>
                     {[
                       ['Party', c.party], ['Design', c.designName || c.designNo],
-                      ['Fabric', c.fabric], ['Date', c.date],
+                      ['Fabric', c.fabric], ['Date', formatDateDDMMYYYY(c.date)],
                       ['Designer', c.designer], ['C.Match', c.colourMatching],
                       ['Total Mtr', c.totalMtr], ['EXP.TIME', c.expTime],
                     ].map(([k,v])=>(
