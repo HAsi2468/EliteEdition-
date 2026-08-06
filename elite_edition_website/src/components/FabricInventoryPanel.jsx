@@ -377,6 +377,7 @@ export default function FabricInventoryPanel() {
 
   // Editing transaction
   const [editingTransaction, setEditingTransaction] = useState(null);
+  const [editingOutwardTransaction, setEditingOutwardTransaction] = useState(null);
 
   // Modals
   const [isInwardOpen, setIsInwardOpen] = useState(false);
@@ -581,16 +582,38 @@ export default function FabricInventoryPanel() {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.createFabricOutward(outwardForm);
-      triggerPushNotification('📦 Fabric Outward Recorded', `${outwardForm.qty || ''}M fabric outward recorded for Job #${outwardForm.jobNo}.`, 'success');
+      if (editingOutwardTransaction) {
+        await api.updateFabricTransaction(editingOutwardTransaction._id, outwardForm);
+        triggerPushNotification('📦 Outward Transaction Updated', `Outward transaction for Job #${outwardForm.jobNo} updated.`, 'info');
+      } else {
+        await api.createFabricOutward(outwardForm);
+        triggerPushNotification('📦 Fabric Outward Recorded', `${outwardForm.qty || ''}M fabric outward recorded for Job #${outwardForm.jobNo}.`, 'success');
+      }
       setIsOutwardOpen(false);
+      setEditingOutwardTransaction(null);
       setOutwardForm({ jobNo: '', partyName: '', fabricQuality: '', panna: '', lotNo: '', qty: '', date: new Date().toISOString().split('T')[0], notes: '' });
       triggerGlobalDataRefresh('fabric');
       fetchData();
     } catch (err) {
       alert(err.message);
+    } finally {
       setLoading(false);
     }
+  };
+
+  const startEditOutward = (t) => {
+    setEditingOutwardTransaction(t);
+    setOutwardForm({
+      jobNo: t.jobNo || '',
+      partyName: t.partyName || '',
+      fabricQuality: t.fabricQuality || '',
+      panna: t.panna || '58',
+      lotNo: t.lotNo ? String(t.lotNo) : '',
+      qty: t.qty != null ? String(t.qty) : '',
+      date: t.date ? new Date(t.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      notes: t.notes || ''
+    });
+    setIsOutwardOpen(true);
   };
 
   const handleTransferSubmit = async (e) => {
@@ -1051,8 +1074,21 @@ export default function FabricInventoryPanel() {
       const party = ch.billTo || ch.partyName || 'Client';
       const defaultRate = '25';
 
+      // Dynamic Item Name mapping based on Panna (36", 44", 58")
+      const pannaStr = String(ch.panna || '').trim();
+      let itemName = 'DIGITAL PRINT JOB WORK 58"';
+      if (pannaStr.includes('36')) {
+        itemName = 'DIGITAL PRINT JOB WORK 36"';
+      } else if (pannaStr.includes('44')) {
+        itemName = 'DIGITAL PRINT JOB WORK 44"';
+      } else if (pannaStr.includes('58')) {
+        itemName = 'DIGITAL PRINT JOB WORK 58"';
+      } else if (pannaStr) {
+        itemName = `DIGITAL PRINT JOB WORK ${pannaStr.replace(/['"]/g, '')}"`;
+      }
+
       const rateInput = window.prompt(
-        `🧾 CREATE BILL / INVOICE FROM CHALLAN #EDP-${ch.challanNo}\n\nParty: ${party}\nFabric: ${ch.fabricName || 'Fabric'} (${ch.panna || '58'}")\nTotal Meters: ${mtr.toFixed(2)} mtr\n\nEnter Rate per Meter (₹):`,
+        `🧾 CREATE BILL / INVOICE FROM CHALLAN #EDP-${ch.challanNo}\n\nParty (Billed To): ${party}\nItem: ${itemName}\nFabric: ${ch.fabricName || 'Fabric'}\nTotal Meters: ${mtr.toFixed(2)} mtr\n\nEnter Rate per Meter (₹):`,
         defaultRate
       );
 
@@ -1074,8 +1110,8 @@ export default function FabricInventoryPanel() {
         jobNo: ch.jobNo || '',
         date: new Date().toISOString().split('T')[0],
         items: [{
-          itemName: `${ch.fabricName || 'Sublimation Printing'} (${ch.panna || '58'}")`,
-          description: `Fabric Delivery Challan #EDP-${ch.challanNo}${ch.jobNo ? ` | Job #${ch.jobNo}` : ''}${ch.designNo ? ` | Design: ${ch.designNo}` : ''}`,
+          itemName: itemName,
+          description: `${ch.fabricName || 'Fabric'} Delivery Challan #EDP-${ch.challanNo}${ch.jobNo ? ` | Job #${ch.jobNo}` : ''}${ch.designNo ? ` | Design: ${ch.designNo}` : ''}`,
           hsnCode: '5407',
           qty: mtr,
           unit: 'Meters',
@@ -1722,7 +1758,7 @@ export default function FabricInventoryPanel() {
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        justify: 'space-between',
+                        justifyContent: 'space-between',
                         padding: '0.9rem 1.25rem',
                         cursor: 'pointer',
                         background: isExpanded ? 'rgba(124, 58, 237, 0.05)' : 'transparent',
@@ -2460,7 +2496,15 @@ export default function FabricInventoryPanel() {
                           return t.notes || '—';
                         })()}
                       </td>
-                      <td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <button
+                          className="btn-icon"
+                          title="Edit Outward Transaction"
+                          style={{ color: 'var(--primary)', marginRight: '0.5rem' }}
+                          onClick={() => startEditOutward(t)}
+                        >
+                          <Edit size={15} />
+                        </button>
                         <button
                           className="btn-icon"
                           title="Delete"
