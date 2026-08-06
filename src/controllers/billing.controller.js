@@ -165,6 +165,16 @@ const createInvoice = async (req, res) => {
       invoiceData.invoiceNo = `EDP-INV-${nextSeq}`;
     }
 
+    // Ensure customer object is present
+    if (!invoiceData.customer || !invoiceData.customer.name) {
+      invoiceData.customer = {
+        name: invoiceData.partyName || invoiceData.customerName || 'Walk-in Client',
+        businessName: invoiceData.partyName || '',
+        state: 'Gujarat',
+        stateCode: '24'
+      };
+    }
+
     // Auto-calculate balance due
     const grandTotal = parseFloat(invoiceData.grandTotal) || 0;
     const paidAmount = parseFloat(invoiceData.paidAmount) || 0;

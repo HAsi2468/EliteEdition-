@@ -1105,6 +1105,15 @@ export default function FabricInventoryPanel() {
       const grandTotal = Math.round(taxableAmount + taxAmount);
 
       const payload = {
+        customer: {
+          name: party,
+          businessName: party,
+          phone: ch.phone || '',
+          gstin: ch.gstin || '',
+          billingAddress: ch.address || '',
+          state: 'Gujarat',
+          stateCode: '24'
+        },
         partyName: party,
         challanNo: `EDP-${ch.challanNo}`,
         jobNo: ch.jobNo || '',
@@ -1121,6 +1130,7 @@ export default function FabricInventoryPanel() {
           taxAmount: taxAmount,
           totalAmount: grandTotal
         }],
+        subtotal: taxableAmount,
         subTotal: taxableAmount,
         taxRate: taxRate,
         totalTax: taxAmount,
