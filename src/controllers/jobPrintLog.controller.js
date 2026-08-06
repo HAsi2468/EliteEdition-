@@ -8,7 +8,7 @@ async function syncJobCardPrintTotals(jobCardId) {
   if (!jobCard) return null;
 
   // Aggregate total printed meters from JobPrintLog collection
-  const logs = await JobPrintLog.find({ jobCardId });
+  const logs = await JobPrintLog.find({ jobCardId }).sort({ date: -1, created_date_time: -1 });
   const totalPrintedMtr = logs.reduce((sum, log) => sum + (Number(log.meters) || 0), 0);
 
   // Parse target meters from Job Card totalMtr or consumption
@@ -18,6 +18,25 @@ async function syncJobCardPrintTotals(jobCardId) {
 
   jobCard.printMtr = `${totalPrintedMtr.toFixed(2)} mtr`;
   
+  if (logs.length > 0) {
+    const latestLog = logs[0];
+    if (latestLog.operatorName) {
+      jobCard.operatorName = latestLog.operatorName;
+    }
+    if (latestLog.machineName) {
+      jobCard.machineName = latestLog.machineName;
+    }
+    if (latestLog.pass) {
+      jobCard.pass = latestLog.pass;
+    }
+    if (latestLog.date) {
+      const dt = new Date(latestLog.date);
+      const day = String(dt.getDate()).padStart(2, '0');
+      const month = String(dt.getMonth() + 1).padStart(2, '0');
+      jobCard.printDate = `${day}/${month}/${dt.getFullYear()}`;
+    }
+  }
+
   if (totalPrintedMtr > 0) {
     if (targetMtr > 0 && totalPrintedMtr >= targetMtr) {
       jobCard.printStatus = 'Printing Done';

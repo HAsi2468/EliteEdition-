@@ -463,15 +463,15 @@ function JobCardPrintView({ card, onClose, onShare }) {
       <table style="width: 100%; margin-top: 1px;">
         <tr>
           <td class="label" style="width: 15%;">OPERATER:</td>
-          <td class="val" style="width: 35%;"></td>
+          <td class="val" style="width: 35%;">${card.operatorName || ''}</td>
           <td class="label" style="width: 15%;">PRINT DATE :</td>
-          <td class="val" style="width: 35%;"></td>
+          <td class="val" style="width: 35%;">${formatDateDDMMYYYY(card.printDate)}</td>
         </tr>
         <tr>
           <td class="label">ROLL NO. :</td>
           <td class="val"></td>
           <td class="label">PRINT METER :</td>
-          <td class="val"></td>
+          <td class="val" style="font-weight: 700;">${card.printMtr || ''}</td>
         </tr>
       </table>
 
