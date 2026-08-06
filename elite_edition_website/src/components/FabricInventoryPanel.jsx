@@ -3134,13 +3134,13 @@ export default function FabricInventoryPanel() {
             <table className="data-table" style={{ width: '100%', fontSize: '0.78rem', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-light)' }}>
-                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '85px' }}>Ch. No</th>
+                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '80px' }}>Ch. No</th>
                   <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '85px' }}>Date</th>
-                  <th style={{ padding: '0.45rem 0.4rem', minWidth: '110px' }}>Bill To</th>
+                  <th style={{ padding: '0.45rem 0.4rem' }}>Bill To</th>
                   <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '65px' }}>Lot No</th>
                   <th style={{ padding: '0.45rem 0.4rem' }}>Fabric</th>
-                  <th style={{ padding: '0.45rem 0.4rem', minWidth: '110px' }}>Job No</th>
-                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '55px' }}>Panna</th>
+                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '120px' }}>Job No</th>
+                  <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center', whiteSpace: 'nowrap', width: '55px' }}>Panna</th>
                   <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center', whiteSpace: 'nowrap', width: '40px' }}>TP</th>
                   <th style={{ padding: '0.45rem 0.4rem', textAlign: 'right', whiteSpace: 'nowrap', width: '90px' }}>Total Mtr</th>
                   <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center', whiteSpace: 'nowrap', width: '180px' }}>Actions</th>
