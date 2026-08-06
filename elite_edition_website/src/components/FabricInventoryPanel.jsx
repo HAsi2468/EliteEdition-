@@ -7,7 +7,7 @@ import {
   RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
   Layers, Database, Settings, Trash2, FileDown, Search, X,
   AlertTriangle, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Edit, FileText,
-  Check, Plus, ArrowRightLeft, Download
+  Check, Plus, ArrowRightLeft, Download, Eye, Receipt
 } from 'lucide-react';
 
 export default function FabricInventoryPanel() {
@@ -59,6 +59,7 @@ export default function FabricInventoryPanel() {
   const [editingChallan, setEditingChallan] = useState(null);
   const [challanLotLoading, setChallanLotLoading] = useState(false);
   const [challanDeleteTarget, setChallanDeleteTarget] = useState(null);
+  const [viewChallanModal, setViewChallanModal] = useState(null);
   const [availableLots, setAvailableLots] = useState([]);
   const [billToOptions, setBillToOptions] = useState([]);
   const [shipToOptions, setShipToOptions] = useState([]);
@@ -1040,6 +1041,72 @@ export default function FabricInventoryPanel() {
       await api.downloadFabricChallanPdf(id, challanNo);
     } catch (err) {
       alert('Failed to download PDF: ' + err.message);
+    }
+  };
+
+  // Create Bill / Tax Invoice directly from a Delivery Challan
+  const handleCreateBillFromChallan = async (ch) => {
+    try {
+      const mtr = parseFloat(ch.totalMtr || 0) || parseFloat(ch.pcs || 0) || 1;
+      const party = ch.partyName || 'Client';
+      const defaultRate = '25';
+
+      const rateInput = window.prompt(
+        `🧾 CREATE BILL / INVOICE FROM CHALLAN #EDP-${ch.challanNo}\n\nParty: ${party}\nFabric: ${ch.fabricName || 'Fabric'} (${ch.panna || '58'}")\nTotal Meters: ${mtr.toFixed(2)} mtr\n\nEnter Rate per Meter (₹):`,
+        defaultRate
+      );
+
+      if (rateInput === null) return;
+      const unitPrice = parseFloat(rateInput);
+      if (isNaN(unitPrice) || unitPrice < 0) {
+        alert('Please enter a valid numeric rate per meter.');
+        return;
+      }
+
+      const taxableAmount = Math.round((mtr * unitPrice) * 100) / 100;
+      const taxRate = 18;
+      const taxAmount = Math.round((taxableAmount * 0.18) * 100) / 100;
+      const grandTotal = Math.round(taxableAmount + taxAmount);
+
+      const payload = {
+        partyName: party,
+        challanNo: `EDP-${ch.challanNo}`,
+        jobNo: ch.jobNo || '',
+        date: new Date().toISOString().split('T')[0],
+        items: [{
+          itemName: `${ch.fabricName || 'Sublimation Printing'} (${ch.panna || '58'}")`,
+          description: `Fabric Delivery Challan #EDP-${ch.challanNo}${ch.jobNo ? ` | Job #${ch.jobNo}` : ''}${ch.designNo ? ` | Design: ${ch.designNo}` : ''}`,
+          hsnCode: '5407',
+          qty: mtr,
+          unit: 'Meters',
+          unitPrice: unitPrice,
+          taxRate: taxRate,
+          taxableAmount: taxableAmount,
+          taxAmount: taxAmount,
+          totalAmount: grandTotal
+        }],
+        subTotal: taxableAmount,
+        taxRate: taxRate,
+        totalTax: taxAmount,
+        grandTotal: grandTotal,
+        status: 'Unpaid',
+        paymentStatus: 'Unpaid',
+        notes: `Auto-generated from Delivery Challan #EDP-${ch.challanNo}`
+      };
+
+      const res = await api.createBillingInvoice(payload);
+      if (res && res.success) {
+        const invNo = res.data?.invoiceNo || '';
+        triggerPushNotification('🧾 Tax Bill Created', `Invoice ${invNo} generated for Challan #EDP-${ch.challanNo} (Total: ₹${grandTotal.toLocaleString('en-IN')})!`, 'success');
+        triggerGlobalDataRefresh('billing');
+        if (window.confirm(`✅ Tax Bill "${invNo}" created successfully for ₹${grandTotal.toLocaleString('en-IN')}!\n\nWould you like to open Billing & Invoicing to view/print it?`)) {
+          window.dispatchEvent(new CustomEvent('elite-navigate-tab', { detail: 'billing' }));
+        }
+      } else {
+        alert(res?.error || 'Failed to create bill');
+      }
+    } catch (err) {
+      alert('Error creating bill: ' + (err.message || err));
     }
   };
 
@@ -3013,17 +3080,21 @@ export default function FabricInventoryPanel() {
                     <td style={{ textAlign: 'center', fontWeight: 600 }}>{ch.totalTp}</td>
                     <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--success)' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
-                      <button className="btn-icon" title="Download PDF" style={{ color: 'var(--success)', marginRight: '0.5rem' }} onClick={() => handleDownloadChallanPdf(ch._id, ch.challanNo)}>
+                      <button className="btn-icon" title="View / Preview Challan" style={{ color: '#38bdf8', marginRight: '0.4rem' }} onClick={() => setViewChallanModal(ch)}>
+                        <Eye size={15} />
+                      </button>
+                      <button className="btn-icon" title="Download PDF" style={{ color: 'var(--success)', marginRight: '0.4rem' }} onClick={() => handleDownloadChallanPdf(ch._id, ch.challanNo)}>
                         <FileDown size={15} />
                       </button>
-                      <button className="btn-icon" title="Edit" style={{ color: 'var(--primary)', marginRight: '0.5rem' }} onClick={() => startEditChallan(ch)}>
+                      <button className="btn-secondary" title="Create Tax Bill from this Challan" style={{ padding: '0.25rem 0.55rem', fontSize: '0.73rem', fontWeight: 700, background: 'rgba(124,58,237,0.15)', color: '#a78bfa', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 4, marginRight: '0.4rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }} onClick={() => handleCreateBillFromChallan(ch)}>
+                        <Receipt size={13} /> Create Bill
+                      </button>
+                      <button className="btn-icon" title="Edit Challan" style={{ color: 'var(--primary)', marginRight: '0.4rem' }} onClick={() => startEditChallan(ch)}>
                         <Edit size={15} />
                       </button>
-                      {isAdmin && (
-                        <button className="btn-icon" title="Delete" style={{ color: 'var(--danger)' }} onClick={() => setChallanDeleteTarget({ id: ch._id, label: `Challan EDP-${ch.challanNo}` })}>
-                          <Trash2 size={15} />
-                        </button>
-                      )}
+                      <button className="btn-icon" title="Delete Challan" style={{ color: 'var(--danger)' }} onClick={() => setChallanDeleteTarget({ id: ch._id, label: `Challan EDP-${ch.challanNo}` })}>
+                        <Trash2 size={15} />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -3042,6 +3113,89 @@ export default function FabricInventoryPanel() {
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setChallanDeleteTarget(null)}>Cancel</button>
               <button className="btn-danger" style={{ flex: 1 }} onClick={handleChallanDelete}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Challan View Modal ── */}
+      {viewChallanModal && (
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', padding: '1.5rem', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 12 }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.85rem', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ margin: 0, color: 'var(--primary)', fontWeight: 800, fontSize: '1.1rem' }}>
+                  📄 Delivery Challan EDP-{viewChallanModal.challanNo}
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Date: {formatDateDDMMYYYY(viewChallanModal.date)}
+                </span>
+              </div>
+              <button className="btn-icon" onClick={() => setViewChallanModal(null)} style={{ padding: '0.35rem' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Details Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', fontSize: '0.85rem', marginBottom: '1.25rem', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-light)' }}>
+              <div><span style={{ color: 'var(--text-muted)' }}>Party Name:</span> <strong style={{ color: 'var(--text-primary)' }}>{viewChallanModal.partyName || '—'}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Job No:</span> <strong style={{ color: 'var(--primary)' }}>#{viewChallanModal.jobNo || '—'}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Design / Name:</span> <strong>{viewChallanModal.designNo || '—'}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Fabric Quality:</span> <strong>{viewChallanModal.fabricName || '—'}</strong> ({viewChallanModal.panna || '58'}")</div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Lot No:</span> <strong>{viewChallanModal.lotNo ? `#${viewChallanModal.lotNo}` : '—'}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Delivery By:</span> <strong>{viewChallanModal.deliveryBy || '—'}</strong></div>
+              {viewChallanModal.vendorChallanNo && <div><span style={{ color: 'var(--text-muted)' }}>Vendor Ch:</span> <strong>{viewChallanModal.vendorChallanNo}</strong></div>}
+              {viewChallanModal.pcs && <div><span style={{ color: 'var(--text-muted)' }}>PCS:</span> <strong>{viewChallanModal.pcs} pcs</strong></div>}
+            </div>
+
+            {/* TP Details List */}
+            {viewChallanModal.tpDetails && viewChallanModal.tpDetails.length > 0 && (
+              <div style={{ marginBottom: '1.25rem' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+                  TP / Roll Breakdown ({viewChallanModal.tpDetails.length} Rolls)
+                </div>
+                <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: 6 }}>
+                  <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)', textAlign: 'left' }}>
+                        <th style={{ padding: '0.4rem 0.6rem' }}>TP #</th>
+                        <th style={{ padding: '0.4rem 0.6rem', textAlign: 'right' }}>Meters (mtr)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewChallanModal.tpDetails.map((tp, idx) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                          <td style={{ padding: '0.35rem 0.6rem', fontWeight: 600 }}>TP-{tp.tpNo || (idx + 1)}</td>
+                          <td style={{ padding: '0.35rem 0.6rem', textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>{Number(tp.tpMeter || 0).toFixed(2)} mtr</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Summary Totals */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: 'rgba(16,185,129,0.06)', borderRadius: 8, border: '1px solid rgba(16,185,129,0.2)', marginBottom: '1.25rem' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>Total Outward Quantity:</span>
+              <span style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--success)' }}>
+                {parseFloat(viewChallanModal.totalMtr || 0).toFixed(2)} mtr ({viewChallanModal.totalTp || 0} Rolls)
+              </span>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button className="btn-secondary" onClick={() => setViewChallanModal(null)}>Close</button>
+              <button className="btn-primary" style={{ background: 'linear-gradient(135deg,#7c3aed,#6366f1)', display: 'inline-flex', alignItems: 'center', gap: '4px' }} onClick={() => { setViewChallanModal(null); handleCreateBillFromChallan(viewChallanModal); }}>
+                <Receipt size={15} /> Create Bill
+              </button>
+              <button className="btn-primary" style={{ background: 'linear-gradient(135deg,#10b981,#059669)', display: 'inline-flex', alignItems: 'center', gap: '4px' }} onClick={() => handleDownloadChallanPdf(viewChallanModal._id, viewChallanModal.challanNo)}>
+                <FileDown size={15} /> Download PDF
+              </button>
+              <button className="btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }} onClick={() => { setViewChallanModal(null); startEditChallan(viewChallanModal); }}>
+                <Edit size={15} /> Edit Challan
+              </button>
             </div>
           </div>
         </div>
