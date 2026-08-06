@@ -3048,20 +3048,20 @@ export default function FabricInventoryPanel() {
             </div>
           </div>
 
-          <div className="table-responsive">
-            <table className="data-table">
+          <div className="table-responsive" style={{ overflowX: 'auto', width: '100%' }}>
+            <table className="data-table" style={{ width: '100%', minWidth: '980px', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th>Ch.no.</th>
-                  <th>Date</th>
-                  <th>Party</th>
-                  <th>Lot No</th>
-                  <th>Fabric</th>
-                  <th>Job No</th>
-                  <th>Panna</th>
-                  <th>Total TP</th>
-                  <th>Total Mtr</th>
-                  <th>Action</th>
+                  <th style={{ minWidth: '85px' }}>Ch.no.</th>
+                  <th style={{ minWidth: '95px' }}>Date</th>
+                  <th style={{ minWidth: '130px' }}>Party</th>
+                  <th style={{ minWidth: '80px' }}>Lot No</th>
+                  <th style={{ minWidth: '130px' }}>Fabric</th>
+                  <th style={{ minWidth: '90px' }}>Job No</th>
+                  <th style={{ minWidth: '70px' }}>Panna</th>
+                  <th style={{ minWidth: '75px', textAlign: 'center' }}>Total TP</th>
+                  <th style={{ minWidth: '100px', textAlign: 'right' }}>Total Mtr</th>
+                  <th style={{ minWidth: '220px', textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -3072,29 +3072,31 @@ export default function FabricInventoryPanel() {
                   <tr key={ch._id}>
                     <td><span style={{ fontWeight: 700, color: 'var(--primary)' }}>EDP-{ch.challanNo}</span></td>
                     <td>{formatDateDDMMYYYY(ch.date)}</td>
-                    <td>{ch.partyName || '—'}</td>
+                    <td style={{ fontWeight: 600 }}>{ch.partyName || '—'}</td>
                     <td>{ch.lotNo != null ? `#${ch.lotNo}` : '—'}</td>
                     <td>{ch.fabricName || '—'}</td>
-                    <td style={{ color: 'var(--primary)' }}>{ch.jobNo || '—'}</td>
+                    <td style={{ color: 'var(--primary)', fontWeight: 700 }}>{ch.jobNo ? `#${ch.jobNo}` : '—'}</td>
                     <td>{ch.panna || '—'}</td>
                     <td style={{ textAlign: 'center', fontWeight: 600 }}>{ch.totalTp}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--success)' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      <button className="btn-icon" title="View / Preview Challan" style={{ color: '#38bdf8', marginRight: '0.4rem' }} onClick={() => setViewChallanModal(ch)}>
-                        <Eye size={15} />
-                      </button>
-                      <button className="btn-icon" title="Download PDF" style={{ color: 'var(--success)', marginRight: '0.4rem' }} onClick={() => handleDownloadChallanPdf(ch._id, ch.challanNo)}>
-                        <FileDown size={15} />
-                      </button>
-                      <button className="btn-secondary" title="Create Tax Bill from this Challan" style={{ padding: '0.25rem 0.55rem', fontSize: '0.73rem', fontWeight: 700, background: 'rgba(124,58,237,0.15)', color: '#a78bfa', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 4, marginRight: '0.4rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }} onClick={() => handleCreateBillFromChallan(ch)}>
-                        <Receipt size={13} /> Create Bill
-                      </button>
-                      <button className="btn-icon" title="Edit Challan" style={{ color: 'var(--primary)', marginRight: '0.4rem' }} onClick={() => startEditChallan(ch)}>
-                        <Edit size={15} />
-                      </button>
-                      <button className="btn-icon" title="Delete Challan" style={{ color: 'var(--danger)' }} onClick={() => setChallanDeleteTarget({ id: ch._id, label: `Challan EDP-${ch.challanNo}` })}>
-                        <Trash2 size={15} />
-                      </button>
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
+                    <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', alignItems: 'center' }}>
+                        <button className="btn-icon" title="View / Preview Challan" style={{ color: '#38bdf8', padding: '0.35rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 4, cursor: 'pointer' }} onClick={() => setViewChallanModal(ch)}>
+                          <Eye size={15} />
+                        </button>
+                        <button className="btn-icon" title="Download PDF" style={{ color: '#34d399', padding: '0.35rem', background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 4, cursor: 'pointer' }} onClick={() => handleDownloadChallanPdf(ch._id, ch.challanNo)}>
+                          <FileDown size={15} />
+                        </button>
+                        <button className="btn-secondary" title="Create Tax Bill from this Challan" style={{ padding: '0.25rem 0.55rem', fontSize: '0.73rem', fontWeight: 800, background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2))', color: '#a78bfa', border: '1px solid rgba(124,58,237,0.4)', borderRadius: 4, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }} onClick={() => handleCreateBillFromChallan(ch)}>
+                          <Receipt size={13} /> Create Bill
+                        </button>
+                        <button className="btn-icon" title="Edit Challan" style={{ color: 'var(--primary)', padding: '0.35rem', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 4, cursor: 'pointer' }} onClick={() => startEditChallan(ch)}>
+                          <Edit size={15} />
+                        </button>
+                        <button className="btn-icon" title="Delete Challan" style={{ color: '#f87171', padding: '0.35rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 4, cursor: 'pointer' }} onClick={() => setChallanDeleteTarget({ id: ch._id, label: `Challan EDP-${ch.challanNo}` })}>
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
