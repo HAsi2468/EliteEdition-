@@ -1074,6 +1074,33 @@ export default function FabricInventoryPanel() {
       const party = ch.billTo || ch.partyName || 'Client';
       const defaultRate = '25';
 
+      // Look up saved customer to map Contact Person Name, Business Name, Phone, GSTIN, Address
+      let contactPersonName = party;
+      let businessName = party;
+      let phone = ch.phone || '';
+      let gstin = ch.gstin || '';
+      let billingAddress = ch.address || '';
+      let customerId = null;
+
+      try {
+        const custRes = await api.getBillingCustomers();
+        const customerList = (custRes && custRes.data && Array.isArray(custRes.data)) ? custRes.data : Array.isArray(custRes) ? custRes : [];
+        const matched = customerList.find(c => 
+          (c.businessName && c.businessName.trim().toLowerCase() === party.trim().toLowerCase()) ||
+          (c.name && c.name.trim().toLowerCase() === party.trim().toLowerCase())
+        );
+        if (matched) {
+          contactPersonName = matched.name || party;
+          businessName = matched.businessName || party;
+          phone = matched.phone || phone;
+          gstin = matched.gstin || gstin;
+          billingAddress = matched.billingAddress || billingAddress;
+          customerId = matched._id;
+        }
+      } catch (e) {
+        console.warn('Customer lookup warning:', e);
+      }
+
       // Dynamic Item Name mapping based on Panna (36", 44", 58")
       const pannaStr = String(ch.panna || '').trim();
       let itemName = 'DIGITAL PRINT JOB WORK 58"';
@@ -1088,7 +1115,7 @@ export default function FabricInventoryPanel() {
       }
 
       const rateInput = window.prompt(
-        `🧾 CREATE BILL / INVOICE FROM CHALLAN #EDP-${ch.challanNo}\n\nParty (Billed To): ${party}\nItem: ${itemName}\nFabric: ${ch.fabricName || 'Fabric'}\nTotal Meters: ${mtr.toFixed(2)} mtr\n\nEnter Rate per Meter (₹):`,
+        `🧾 CREATE BILL / INVOICE FROM CHALLAN #EDP-${ch.challanNo}\n\nParty (Billed To): ${businessName} ${contactPersonName !== businessName ? `(${contactPersonName})` : ''}\nItem: ${itemName}\nFabric: ${ch.fabricName || 'Fabric'}\nTotal Meters: ${mtr.toFixed(2)} mtr\n\nEnter Rate per Meter (₹):`,
         defaultRate
       );
 
@@ -1106,15 +1133,16 @@ export default function FabricInventoryPanel() {
 
       const payload = {
         customer: {
-          name: party,
-          businessName: party,
-          phone: ch.phone || '',
-          gstin: ch.gstin || '',
-          billingAddress: ch.address || '',
+          customerId: customerId || undefined,
+          name: contactPersonName,
+          businessName: businessName,
+          phone: phone,
+          gstin: gstin,
+          billingAddress: billingAddress,
           state: 'Gujarat',
           stateCode: '24'
         },
-        partyName: party,
+        partyName: businessName || contactPersonName,
         challanNo: `EDP-${ch.challanNo}`,
         jobNo: ch.jobNo || '',
         date: new Date().toISOString().split('T')[0],
