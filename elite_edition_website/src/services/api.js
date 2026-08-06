@@ -1321,6 +1321,13 @@ export const api = {
     });
   },
 
+  async updateBillingCustomer(id, data) {
+    return request(`/billing/customers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
   async deleteBillingCustomer(id) {
     return request(`/billing/customers/${id}`, { method: 'DELETE' });
   },
@@ -1335,6 +1342,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  },
+
+  async updateBillingItem(id, data) {
+    return request(`/billing/items/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteBillingItem(id) {
+    return request(`/billing/items/${id}`, { method: 'DELETE' });
   },
 
   async deleteBillingItem(id) {

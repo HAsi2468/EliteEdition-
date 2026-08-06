@@ -129,12 +129,14 @@ export default function EliteBillingDepartment() {
 
   // New Customer Modal State
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [custForm, setCustForm] = useState({
     name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24'
   });
 
   // New Item Modal State
   const [showItemModal, setShowItemModal] = useState(false);
+  const [editingItemId, setEditingItemId] = useState(null);
   const [itemForm, setItemForm] = useState({
     itemName: '', hsnCode: '5407', unitPrice: '', unit: 'Meters', taxRate: 18, category: 'Printing Services'
   });
@@ -428,36 +430,80 @@ export default function EliteBillingDepartment() {
     }
   };
 
-  // Create Customer Handler
+  // Create / Update Customer Handler
   const handleSaveCustomer = async () => {
     if (!custForm.name) {
       alert('Customer Name is required');
       return;
     }
     try {
-      const res = await api.createBillingCustomer(custForm);
-      setCustomers(prev => [...prev, res.data]);
+      if (editingCustomerId) {
+        const res = await api.updateBillingCustomer(editingCustomerId, custForm);
+        setCustomers(prev => prev.map(c => c._id === editingCustomerId ? res.data : c));
+        triggerPushNotification('✏️ Customer Updated', `Customer "${custForm.name}" updated.`, 'success');
+      } else {
+        const res = await api.createBillingCustomer(custForm);
+        setCustomers(prev => [...prev, res.data]);
+        triggerPushNotification('👥 Customer Created', `Customer "${custForm.name}" registered.`, 'success');
+      }
       setShowCustomerModal(false);
+      setEditingCustomerId(null);
       setCustForm({ name: '', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24' });
     } catch (err) {
-      alert(err.message || 'Failed to create customer');
+      alert(err.message || 'Failed to save customer');
     }
   };
 
-  // Create Item Handler
+  const handleEditCustomer = (c) => {
+    setEditingCustomerId(c._id);
+    setCustForm({
+      name: c.name || '',
+      businessName: c.businessName || '',
+      phone: c.phone || '',
+      email: c.email || '',
+      gstin: c.gstin || '',
+      billingAddress: c.billingAddress || '',
+      state: c.state || 'Gujarat',
+      stateCode: c.stateCode || '24'
+    });
+    setShowCustomerModal(true);
+  };
+
+  // Create / Update Item Handler
   const handleSaveItem = async () => {
     if (!itemForm.itemName || !itemForm.unitPrice) {
       alert('Item Name and Price are required');
       return;
     }
     try {
-      const res = await api.createBillingItem(itemForm);
-      setItemsList(prev => [...prev, res.data]);
+      if (editingItemId) {
+        const res = await api.updateBillingItem(editingItemId, itemForm);
+        setItemsList(prev => prev.map(i => i._id === editingItemId ? res.data : i));
+        triggerPushNotification('✏️ Product Updated', `Product "${itemForm.itemName}" updated.`, 'success');
+      } else {
+        const res = await api.createBillingItem(itemForm);
+        setItemsList(prev => [...prev, res.data]);
+        triggerPushNotification('📦 Product Created', `Product "${itemForm.itemName}" cataloged.`, 'success');
+      }
       setShowItemModal(false);
+      setEditingItemId(null);
       setItemForm({ itemName: '', hsnCode: '5407', unitPrice: '', unit: 'Meters', taxRate: 18, category: 'Printing Services' });
     } catch (err) {
-      alert(err.message || 'Failed to create billing item');
+      alert(err.message || 'Failed to save product');
     }
+  };
+
+  const handleEditItem = (item) => {
+    setEditingItemId(item._id);
+    setItemForm({
+      itemName: item.itemName || '',
+      hsnCode: item.hsnCode || '5407',
+      unitPrice: item.unitPrice != null ? item.unitPrice : '',
+      unit: item.unit || 'Meters',
+      taxRate: item.taxRate != null ? item.taxRate : 18,
+      category: item.category || 'Printing Services'
+    });
+    setShowItemModal(true);
   };
 
   return (
@@ -1137,9 +1183,14 @@ export default function EliteBillingDepartment() {
                         {c.billingAddress || '—'} ({c.state || 'Gujarat'})
                       </td>
                       <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
-                        <button onClick={() => handleDeleteCustomer(c._id, c.name)} className="btn-icon" title="Delete Customer">
-                          <Trash2 size={14} color="#f87171" />
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                          <button onClick={() => handleEditCustomer(c)} className="btn-icon" title="Edit Customer">
+                            <Edit2 size={14} color="var(--primary)" />
+                          </button>
+                          <button onClick={() => handleDeleteCustomer(c._id, c.name)} className="btn-icon" title="Delete Customer">
+                            <Trash2 size={14} color="#f87171" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -1197,9 +1248,14 @@ export default function EliteBillingDepartment() {
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: '#34d399' }}>₹ {item.unitPrice} / {item.unit || 'Meters'}</td>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>{item.taxRate || 18}%</td>
                       <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
-                        <button onClick={() => handleDeleteItem(item._id, item.itemName)} className="btn-icon" title="Delete Product">
-                          <Trash2 size={14} color="#f87171" />
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                          <button onClick={() => handleEditItem(item)} className="btn-icon" title="Edit Product">
+                            <Edit2 size={14} color="var(--primary)" />
+                          </button>
+                          <button onClick={() => handleDeleteItem(item._id, item.itemName)} className="btn-icon" title="Delete Product">
+                            <Trash2 size={14} color="#f87171" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
