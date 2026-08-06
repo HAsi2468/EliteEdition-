@@ -163,10 +163,16 @@ export default function JobCardTracking({ onPreview }) {
 
   // Get value for a cell, merging backend value with any local modifications
   const getValue = (card, field) => {
+    let val = card[field] ?? '';
     if (modifiedCards[card._id] && modifiedCards[card._id][field] !== undefined) {
-      return modifiedCards[card._id][field];
+      val = modifiedCards[card._id][field];
     }
-    return card[field] ?? '';
+    if ((field === 'printDate' || field === 'fusingDate' || field === 'deliveryDate') && val) {
+      if (typeof val === 'string' && val.includes('T')) {
+        return val.split('T')[0];
+      }
+    }
+    return val;
   };
 
   return (
