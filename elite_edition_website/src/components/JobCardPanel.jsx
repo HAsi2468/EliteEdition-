@@ -953,50 +953,6 @@ function JobCardForm({ card, onSave, onClose }) {
     }
   }, [card, designsList]);
 
-  // Auto-resolve images when 2 design names are entered in form
-  useEffect(() => {
-    if (!designsList || designsList.length === 0) return;
-    const rawKey = form.designName || form.designNo || '';
-    const names = extractDesignNames(rawKey);
-
-    if (names.length >= 2) {
-      const d1 = designsList.find(d =>
-        (d.designName && d.designName.toLowerCase() === names[0].toLowerCase()) ||
-        (d.designNo && String(d.designNo).toLowerCase() === names[0].toLowerCase())
-      );
-      const d2 = designsList.find(d =>
-        (d.designName && d.designName.toLowerCase() === names[1].toLowerCase()) ||
-        (d.designNo && String(d.designNo).toLowerCase() === names[1].toLowerCase())
-      );
-
-      let img1 = form.imageUrl1;
-      let img2 = form.imageUrl2;
-
-      if (d1 && (d1.imageUrl || d1.imageUrl2)) img1 = d1.imageUrl || d1.imageUrl2;
-      if (d2 && (d2.imageUrl || d2.imageUrl2)) img2 = d2.imageUrl || d2.imageUrl2;
-
-      if ((img1 && img1 !== form.imageUrl1) || (img2 && img2 !== form.imageUrl2)) {
-        setForm(f => ({
-          ...f,
-          imageUrl1: img1 || f.imageUrl1,
-          imageUrl2: img2 || f.imageUrl2,
-        }));
-      }
-    } else if (names.length === 1) {
-      const d1 = designsList.find(d =>
-        (d.designName && d.designName.toLowerCase() === names[0].toLowerCase()) ||
-        (d.designNo && String(d.designNo).toLowerCase() === names[0].toLowerCase())
-      );
-      if (d1 && d1.imageUrl && d1.imageUrl2 && !form.imageUrl1 && !form.imageUrl2) {
-        setForm(f => ({
-          ...f,
-          imageUrl1: d1.imageUrl,
-          imageUrl2: d1.imageUrl2
-        }));
-      }
-    }
-  }, [form.designName, form.designNo, designsList]);
-
   // Close suggestions when clicking outside
   useEffect(() => {
     const clickOutside = (e) => {
