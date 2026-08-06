@@ -1048,7 +1048,7 @@ export default function FabricInventoryPanel() {
   const handleCreateBillFromChallan = async (ch) => {
     try {
       const mtr = parseFloat(ch.totalMtr || 0) || parseFloat(ch.pcs || 0) || 1;
-      const party = ch.partyName || 'Client';
+      const party = ch.billTo || ch.partyName || 'Client';
       const defaultRate = '25';
 
       const rateInput = window.prompt(
@@ -3141,7 +3141,8 @@ export default function FabricInventoryPanel() {
 
             {/* Details Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', fontSize: '0.85rem', marginBottom: '1.25rem', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-light)' }}>
-              <div><span style={{ color: 'var(--text-muted)' }}>Party Name:</span> <strong style={{ color: 'var(--text-primary)' }}>{viewChallanModal.partyName || '—'}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Billed To:</span> <strong style={{ color: '#a78bfa', fontWeight: 800 }}>{viewChallanModal.billTo || viewChallanModal.partyName || '—'}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Party / Delivery:</span> <strong style={{ color: 'var(--text-primary)' }}>{viewChallanModal.partyName || '—'}</strong></div>
               <div><span style={{ color: 'var(--text-muted)' }}>Job No:</span> <strong style={{ color: 'var(--primary)' }}>#{viewChallanModal.jobNo || '—'}</strong></div>
               <div><span style={{ color: 'var(--text-muted)' }}>Design / Name:</span> <strong>{viewChallanModal.designNo || '—'}</strong></div>
               <div><span style={{ color: 'var(--text-muted)' }}>Fabric Quality:</span> <strong>{viewChallanModal.fabricName || '—'}</strong> ({viewChallanModal.panna || '58'}")</div>
