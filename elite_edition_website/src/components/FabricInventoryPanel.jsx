@@ -3139,7 +3139,7 @@ export default function FabricInventoryPanel() {
                   <th style={{ padding: '0.45rem 0.4rem' }}>Bill To</th>
                   <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '65px' }}>Lot No</th>
                   <th style={{ padding: '0.45rem 0.4rem' }}>Fabric</th>
-                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '120px' }}>Job No</th>
+                  <th style={{ padding: '0.45rem 0.4rem', width: '95px' }}>Job No</th>
                   <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center', whiteSpace: 'nowrap', width: '55px' }}>Panna</th>
                   <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center', whiteSpace: 'nowrap', width: '40px' }}>TP</th>
                   <th style={{ padding: '0.45rem 0.4rem', textAlign: 'right', whiteSpace: 'nowrap', width: '90px' }}>Total Mtr</th>
@@ -3157,7 +3157,7 @@ export default function FabricInventoryPanel() {
                     <td style={{ padding: '0.45rem 0.4rem', fontWeight: 700, color: '#a78bfa' }}>{ch.billTo || ch.partyName || '—'}</td>
                     <td style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap' }}>{ch.lotNo != null ? `#${ch.lotNo}` : '—'}</td>
                     <td style={{ padding: '0.45rem 0.4rem' }}>{ch.fabricName || '—'}</td>
-                    <td style={{ padding: '0.45rem 0.4rem', color: 'var(--primary)', fontWeight: 700, whiteSpace: 'nowrap' }}>{ch.jobNo ? `#${String(ch.jobNo).trim()}` : '—'}</td>
+                    <td style={{ padding: '0.45rem 0.4rem', color: 'var(--primary)', fontWeight: 700, width: '95px', wordBreak: 'break-word', whiteSpace: 'normal' }}>{ch.jobNo ? `#${String(ch.jobNo).trim()}` : '—'}</td>
                     <td style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap' }}>{ch.panna || '—'}</td>
                     <td style={{ padding: '0.45rem 0.4rem', textAlign: 'center', fontWeight: 700 }}>{ch.totalTp}</td>
                     <td style={{ padding: '0.45rem 0.4rem', textAlign: 'right', fontWeight: 800, color: 'var(--success)', whiteSpace: 'nowrap' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
