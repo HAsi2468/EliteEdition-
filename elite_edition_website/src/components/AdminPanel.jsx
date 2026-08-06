@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { triggerPushNotification } from './NotificationToast';
 import {
   UserPlus,
   ShieldAlert,
@@ -21,22 +22,31 @@ import {
 } from 'lucide-react';
 
 const AVAILABLE_SCREENS = [
-  { id: 'dashboard', label: 'Dashboard Overview' },
-  { id: 'inventory', label: 'Store Inventory' },
-  { id: 'catalog', label: 'Product Catalog' },
-  { id: 'returns', label: 'Returns Department' },
-  { id: 'sales', label: 'Sales Orders Department' },
-  { id: 'reports', label: 'Reports Center' },
-  { id: 'unicommerce', label: 'Uniware Integrations' },
-  { id: 'myntra', label: 'Myntra Integrations' },
-  { id: 'jobcards', label: 'Elite Prints: Dashboard' },
-  { id: 'jobcards_list', label: 'Elite Prints: Job Card' },
-  { id: 'jobcards_catalogue', label: 'Elite Prints: Design Catalog' },
-  { id: 'jobcards_tracking', label: 'Elite Prints: Job Card Tracking' },
-  { id: 'jobcards_master', label: 'Elite Prints: Design Master' },
-  { id: 'jobcards_fabric', label: 'Elite Prints: Fabric Management' },
-  { id: 'jobcards_raw_materials', label: 'Elite Prints: Raw Materials' },
-  { id: 'jobcards_settings', label: 'Elite Prints: Settings' },
+  // General & Core
+  { id: 'dashboard', label: 'Dashboard Overview', category: 'General' },
+  { id: 'workspace', label: 'Workspace / Chat', category: 'General' },
+  { id: 'reports', label: 'Reports Center', category: 'General' },
+  { id: 'unicommerce', label: 'Uniware Integrations', category: 'General' },
+  { id: 'myntra', label: 'Myntra Integrations', category: 'General' },
+
+  // Elite Edition (E-Commerce)
+  { id: 'elite_online', label: 'Elite Online: Dashboard', category: 'Elite Edition' },
+  { id: 'inventory', label: 'Elite Online: Store Inventory', category: 'Elite Edition' },
+  { id: 'catalog', label: 'Elite Online: Product Catalog', category: 'Elite Edition' },
+  { id: 'returns', label: 'Elite Online: Returns Department', category: 'Elite Edition' },
+  { id: 'sales', label: 'Elite Online: Sales Orders', category: 'Elite Edition' },
+
+  // Elite Digital Print
+  { id: 'jobcards', label: 'Elite Prints: Dashboard', category: 'Elite Digital Print' },
+  { id: 'jobcards_list', label: 'Elite Prints: Job Card', category: 'Elite Digital Print' },
+  { id: 'jobcards_catalogue', label: 'Elite Prints: Design Catalog', category: 'Elite Digital Print' },
+  { id: 'jobcards_tracking', label: 'Elite Prints: Job Card Tracking', category: 'Elite Digital Print' },
+  { id: 'jobcards_printing_log', label: 'Elite Prints: Machine Printing Entry Log', category: 'Elite Digital Print' },
+  { id: 'jobcards_master', label: 'Elite Prints: Design Master (100 Pic)', category: 'Elite Digital Print' },
+  { id: 'jobcards_fabric', label: 'Elite Prints: Fabric Management', category: 'Elite Digital Print' },
+  { id: 'jobcards_raw_materials', label: 'Elite Prints: Raw Materials', category: 'Elite Digital Print' },
+  { id: 'jobcards_billing', label: 'Elite Prints: Billing & Invoicing', category: 'Elite Digital Print' },
+  { id: 'jobcards_settings', label: 'Elite Prints: Settings', category: 'Elite Digital Print' },
 ];
 
 export default function AdminPanel() {
@@ -274,8 +284,18 @@ export default function AdminPanel() {
           updatePayload.password = formData.password;
         }
 
-        await api.updateUser(editingUser.id, updatePayload);
+        const updatedRes = await api.updateUser(editingUser.id, updatePayload);
+        const loggedUser = api.getCurrentUser();
+        if (loggedUser && (loggedUser.id === editingUser.id || loggedUser._id === editingUser.id)) {
+          if (updatedRes && updatedRes.user) {
+            localStorage.setItem('elite_user', JSON.stringify(updatedRes.user));
+          } else {
+            localStorage.setItem('elite_user', JSON.stringify({ ...loggedUser, ...updatePayload }));
+          }
+          await api.refreshCurrentUser();
+        }
         setSuccess(`User "${formData.name}" updated successfully.`);
+        triggerPushNotification('🛡️ Admin Update', `User "${formData.name}" permissions updated!`, 'info');
       } else {
         // Create user payload
         await api.createUser({
@@ -286,6 +306,7 @@ export default function AdminPanel() {
           permissions: formData.permissions
         });
         setSuccess(`User "${formData.name}" created successfully.`);
+        triggerPushNotification('👤 User Account Created', `User "${formData.name}" added successfully!`, 'success');
       }
 
       handleCancelEdit();
@@ -532,33 +553,89 @@ export default function AdminPanel() {
               </div>
 
               <div style={styles.formGroup}>
-                <label style={styles.label}>Functionality Access (Allowed Screens)</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <label style={styles.label}>Functionality Access (Allowed Screens)</label>
+                  {formData.role !== 'admin' && (
+                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(p => ({ ...p, permissions: AVAILABLE_SCREENS.map(s => s.id) }))}
+                        className="btn-secondary"
+                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem' }}
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(p => ({ ...p, permissions: [] }))}
+                        className="btn-secondary"
+                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem' }}
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <p style={styles.helpText}>
                   Select which screens and operational tabs this user is permitted to see.
                 </p>
-                <div style={styles.checkboxGrid}>
-                  {AVAILABLE_SCREENS.map(screen => {
-                    const isChecked = formData.permissions.includes(screen.id);
-                    return (
-                      <label
-                        key={screen.id}
-                        style={{
-                          ...styles.checkboxLabel,
-                          ...(formData.role === 'admin' ? styles.checkboxLabelDisabled : {})
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          disabled={formData.role === 'admin'}
-                          onChange={() => handlePermissionCheckbox(screen.id)}
-                          style={styles.checkbox}
-                        />
-                        <span style={{ fontSize: '0.85rem' }}>{screen.label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
+
+                {['General', 'Elite Edition', 'Elite Digital Print'].map(cat => {
+                  const catScreens = AVAILABLE_SCREENS.filter(s => s.category === cat);
+                  const allChecked = catScreens.every(s => formData.permissions.includes(s.id));
+
+                  return (
+                    <div key={cat} style={{ marginBottom: '1rem', background: 'rgba(0,0,0,0.15)', padding: '0.65rem 0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          {cat === 'General' ? '⚙️ Core & General' : cat === 'Elite Edition' ? '🛍️ Elite Edition (E-Commerce)' : '🖨️ Elite Digital Print'}
+                        </span>
+                        {formData.role !== 'admin' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const ids = catScreens.map(s => s.id);
+                              setFormData(prev => {
+                                const hasAll = ids.every(id => prev.permissions.includes(id));
+                                const updated = hasAll
+                                  ? prev.permissions.filter(id => !ids.includes(id))
+                                  : Array.from(new Set([...prev.permissions, ...ids]));
+                                return { ...prev, permissions: updated };
+                              });
+                            }}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.72rem', cursor: 'pointer', textDecoration: 'underline' }}
+                          >
+                            {allChecked ? 'Deselect Category' : 'Select Category'}
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={styles.checkboxGrid}>
+                        {catScreens.map(screen => {
+                          const isChecked = formData.permissions.includes(screen.id);
+                          return (
+                            <label
+                              key={screen.id}
+                              style={{
+                                ...styles.checkboxLabel,
+                                ...(formData.role === 'admin' ? styles.checkboxLabelDisabled : {})
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                disabled={formData.role === 'admin'}
+                                onChange={() => handlePermissionCheckbox(screen.id)}
+                                style={styles.checkbox}
+                              />
+                              <span style={{ fontSize: '0.83rem', color: isChecked ? 'var(--text-primary)' : 'var(--text-muted)' }}>{screen.label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               <div style={styles.formActions}>

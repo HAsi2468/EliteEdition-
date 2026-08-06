@@ -368,7 +368,7 @@ export default function JobPrintingLog() {
       </div>
 
       {/* ── 2. NEW MACHINE PRINT ENTRY FORM (CHALLAN-STYLE JOB SELECTION) ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: selectedJob ? 'minmax(0, 1.4fr) minmax(0, 1fr)' : '1fr', gap: '1.25rem' }}>
+      <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: selectedJob ? 'minmax(0, 1.4fr) minmax(0, 1fr)' : '1fr', gap: '1.25rem' }}>
         
         {/* Entry Form */}
         <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: '4px solid #38bdf8' }}>
@@ -457,7 +457,7 @@ export default function JobPrintingLog() {
             </div>
 
             {/* Row 2: Machine Name (takes from Print Settings) & Pass */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div>
                 <label style={labelStyle}>PRINTING MACHINE (FROM PRINT SETTINGS) <span style={{ color: '#ef4444' }}>*</span></label>
                 <select
@@ -486,7 +486,7 @@ export default function JobPrintingLog() {
             </div>
 
             {/* Row 3: Meters Printed, Date, Shift (Morning 9am-9pm / Night 9pm-9am) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '0.75rem' }}>
+            <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '0.75rem' }}>
               <div>
                 <label style={labelStyle}>METERS PRINTED IN THIS RUN (MTR) <span style={{ color: '#ef4444' }}>*</span></label>
                 <input
@@ -521,7 +521,7 @@ export default function JobPrintingLog() {
             </div>
 
             {/* Row 4: Operator Name (blank by default) & Remarks */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.75rem' }}>
+            <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.75rem' }}>
               <div>
                 <label style={labelStyle}>OPERATOR NAME</label>
                 <input
