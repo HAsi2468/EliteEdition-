@@ -225,7 +225,7 @@ export default function App() {
 
   // Department permission helpers
   const EE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
-  const EDP_PERMISSIONS = ['jobcards', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials'];
+  const EDP_PERMISSIONS = ['jobcards', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials'];
 
   const hasEliteEditionAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => EE_PERMISSIONS.includes(p)));
   const hasDigitalPrintAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => EDP_PERMISSIONS.includes(p) || p.startsWith('jobcards')));
@@ -233,7 +233,7 @@ export default function App() {
 
   const getFirstJobCardsTab = () => {
     if (!currentUser || currentUser.role === 'admin') return 'jobcards';
-    const subTabs = ['jobcards', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials'];
+    const subTabs = ['jobcards', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials'];
     const allowed = subTabs.filter(t => currentUser.permissions?.includes(t));
     return allowed[0] || 'jobcards';
   };
@@ -879,6 +879,12 @@ export default function App() {
                       <BarChart3 size={18} /><span>Prints Dashboard</span>
                     </button>
                   )}
+                  {/* 2. Machine Print Entry Log */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_printing_log')) && (
+                    <button onClick={() => { setActiveTab('jobcards_printing_log'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_printing_log' ? styles.navItemActive : {}) }}>
+                      <Printer size={18} /><span>Machine Print Entry Log</span>
+                    </button>
+                  )}
                   {/* 2. Fabric Management */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) && (
                     <button onClick={() => { setActiveTab('jobcards_fabric'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_fabric' ? styles.navItemActive : {}) }}>
@@ -1043,6 +1049,12 @@ export default function App() {
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards')) && (
                   <button onClick={() => handleNavClick('jobcards')} style={{ ...styles.navItem, ...(activeTab === 'jobcards' ? styles.navItemActive : {}) }}>
                     <BarChart3 size={18} /><span>Prints Dashboard & Reports</span>
+                  </button>
+                )}
+                {/* 2. Machine Print Entry Log */}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_printing_log')) && (
+                  <button onClick={() => handleNavClick('jobcards_printing_log')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_printing_log' ? styles.navItemActive : {}) }}>
+                    <Printer size={18} /><span>Machine Print Entry Log</span>
                   </button>
                 )}
                 {/* 2. Fabric Management */}

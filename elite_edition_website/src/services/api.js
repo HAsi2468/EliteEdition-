@@ -608,6 +608,26 @@ export const api = {
     return request(`/jobCards/${id}/proofing`, { method: 'PATCH', body: JSON.stringify(data) });
   },
 
+  // ─── Machine Print Logs ──────────────────────────────────────────────────
+  async createJobPrintLog(data) {
+    return request('/jobPrintLogs', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async getJobPrintLogs(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/jobPrintLogs${qs}`);
+  },
+  async getJobCardPrintLogs(jobNoOrId) {
+    return request(`/jobPrintLogs/job/${jobNoOrId}`);
+  },
+  async updateJobPrintLog(id, data) {
+    return request(`/jobPrintLogs/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  },
+  async deleteJobPrintLog(id) {
+    return request(`/jobPrintLogs/${id}`, { method: 'DELETE' });
+  },
+
   // ─── Design Catalogue ──────────────────────────────────────────────────────
   async uploadImage(file) {
     const formData = new FormData();

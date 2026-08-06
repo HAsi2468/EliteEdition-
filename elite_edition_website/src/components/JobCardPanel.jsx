@@ -14,6 +14,7 @@ import FabricInventoryPanel from './FabricInventoryPanel';
 import RawMaterialsPanel from './RawMaterialsPanel';
 import EliteBillingDepartment from './EliteBillingDepartment';
 import EliteDigitalPrintsSplitView from './EliteDigitalPrintsSplitView';
+import JobPrintingLog from './JobPrintingLog';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
 import { triggerPushNotification } from './NotificationToast';
 
@@ -1653,6 +1654,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
         <FabricInventoryPanel />
       ) : activeSubTab === 'billing' ? (
         <EliteBillingDepartment />
+      ) : activeSubTab === 'printing_log' || activeSubTab === 'print_entry' ? (
+        <JobPrintingLog />
       ) : activeSubTab === 'engine' || activeSubTab === 'split_view' ? (
         <EliteDigitalPrintsSplitView />
       ) : activeSubTab === 'raw_materials' ? (
