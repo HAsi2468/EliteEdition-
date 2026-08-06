@@ -308,6 +308,13 @@ export default function JobPrintingLog() {
   const activeMachinesCount = new Set(logs.map(l => l.machineName)).size;
   const uniqueJobCardsCount = new Set(logs.map(l => l.jobNo)).size;
 
+  // Filter out Job Cards that have completed printing for entry selection
+  const activeJobCards = jobCards.filter(c => {
+    if (c.printStatus === 'Printing Done') return false;
+    const stats = getJobProgressStats(c);
+    return stats.progressPct < 100;
+  });
+
   // Selected Job Progress Stats
   const selectedJobStats = selectedJob ? getJobProgressStats(selectedJob) : null;
 
@@ -391,8 +398,8 @@ export default function JobPrintingLog() {
                   style={{ ...inputStyle, flex: 1, fontWeight: 700 }}
                   required
                 >
-                  <option value="">-- Choose Job Card (Party | Design | Target Mtr) --</option>
-                  {jobCards.map(c => {
+                  <option value="">-- Choose Job Card ({activeJobCards.length} Active Pending Jobs) --</option>
+                  {activeJobCards.map(c => {
                     const stats = getJobProgressStats(c);
                     return (
                       <option key={c._id} value={c._id}>
@@ -414,9 +421,9 @@ export default function JobPrintingLog() {
               {/* Quick Job Selector Pills (like Challan form) */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
                 <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, alignSelf: 'center', marginRight: '4px' }}>
-                  QUICK JOBS:
+                  PENDING JOBS:
                 </span>
-                {jobCards.slice(0, 8).map(c => {
+                {activeJobCards.slice(0, 10).map(c => {
                   const isSelected = selectedJob && selectedJob._id === c._id;
                   const stats = getJobProgressStats(c);
                   return (
