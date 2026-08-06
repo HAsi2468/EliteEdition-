@@ -1013,30 +1013,41 @@ function JobCardForm({ card, onSave, onClose }) {
     setShowSuggestions(true);
   };
 
-  const selectDesign = (d) => {
+  const selectDesign = (d, imageMode = 'both') => {
     setSelectedDesign(d);
 
     const existingNames = extractDesignNames(form.designName || form.designNo);
     const dName = d.designName || d.designNo;
 
     let newDesignName = dName;
-    let img1 = d.imageUrl || d.imageUrl2 || form.imageUrl1 || '';
-    let img2 = d.imageUrl2 || form.imageUrl2 || '';
+    let img1 = '';
+    let img2 = '';
 
-    if (existingNames.length > 0 && existingNames[0].toLowerCase() !== dName.toLowerCase()) {
-      // Multiple designs selected! Combine as "Design1, Design2"
-      newDesignName = `${existingNames[0]}, ${dName}`;
+    if (imageMode === 'img1') {
+      img1 = d.imageUrl || d.imageUrl2 || '';
+      img2 = '';
+    } else if (imageMode === 'img2') {
+      img1 = d.imageUrl2 || d.imageUrl || '';
+      img2 = '';
+    } else {
+      if (existingNames.length > 0 && existingNames[0].toLowerCase() !== dName.toLowerCase()) {
+        // Multiple designs selected! Combine as "Design1, Design2"
+        newDesignName = `${existingNames[0]}, ${dName}`;
 
-      const d1 = designsList.find(item =>
-        (item.designName && item.designName.toLowerCase() === existingNames[0].toLowerCase()) ||
-        (item.designNo && String(item.designNo).toLowerCase() === existingNames[0].toLowerCase())
-      );
+        const d1 = designsList.find(item =>
+          (item.designName && item.designName.toLowerCase() === existingNames[0].toLowerCase()) ||
+          (item.designNo && String(item.designNo).toLowerCase() === existingNames[0].toLowerCase())
+        );
 
-      img1 = (d1 && (d1.imageUrl || d1.imageUrl2)) || form.imageUrl1 || '';
-      img2 = d.imageUrl || d.imageUrl2 || '';
-    } else if (d.imageUrl && d.imageUrl2) {
-      img1 = d.imageUrl;
-      img2 = d.imageUrl2;
+        img1 = (d1 && (d1.imageUrl || d1.imageUrl2)) || form.imageUrl1 || '';
+        img2 = d.imageUrl || d.imageUrl2 || '';
+      } else if (d.imageUrl && d.imageUrl2) {
+        img1 = d.imageUrl;
+        img2 = d.imageUrl2;
+      } else {
+        img1 = d.imageUrl || d.imageUrl2 || '';
+        img2 = d.imageUrl2 && d.imageUrl2 !== img1 ? d.imageUrl2 : '';
+      }
     }
 
     // Auto-calculate standard values if pcs is already entered
@@ -1305,34 +1316,78 @@ function JobCardForm({ card, onSave, onClose }) {
                   zIndex:999,
                   marginTop:'4px'
                 }}>
-                  {filteredDesigns.map(d => (
-                    <div
-                      key={d._id}
-                      onClick={() => selectDesign(d)}
-                      style={{
-                        padding:'0.5rem 0.75rem',
-                        fontSize:'0.8rem',
-                        cursor:'pointer',
-                        borderBottom:'1px solid var(--border-light)',
-                        color:'var(--text-primary)',
-                        display:'flex',
-                        justifyContent:'space-between',
-                        alignItems:'center'
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span style={{ fontWeight:700, color:'var(--primary)' }}>{d.designName || d.designNo}</span>
-                        {d.designNo && d.designNo !== d.designName && (
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>({d.designNo})</span>
-                        )}
+                  {filteredDesigns.map(d => {
+                    const hasTwoImages = !!(d.imageUrl && d.imageUrl2);
+                    return (
+                      <div
+                        key={d._id}
+                        onClick={() => selectDesign(d, 'both')}
+                        style={{
+                          padding:'0.5rem 0.75rem',
+                          fontSize:'0.8rem',
+                          cursor:'pointer',
+                          borderBottom:'1px solid var(--border-light)',
+                          color:'var(--text-primary)',
+                          display:'flex',
+                          justifyContent:'space-between',
+                          alignItems:'center',
+                          gap: '0.5rem'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          {d.imageUrl && (
+                            <img src={d.imageUrl} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} />
+                          )}
+                          {d.imageUrl2 && (
+                            <img src={d.imageUrl2} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} />
+                          )}
+                          <div>
+                            <span style={{ fontWeight:700, color:'var(--primary)' }}>{d.designName || d.designNo}</span>
+                            {d.designNo && d.designNo !== d.designName && (
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: '4px' }}>({d.designNo})</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span style={{ fontSize:'0.7rem', color:'var(--text-muted)' }}>
+                            {d.fabricName ? `${d.fabricName} • ` : ''}{d.category || ''}
+                          </span>
+
+                          {hasTwoImages && (
+                            <div style={{ display: 'flex', gap: '3px' }} onClick={e => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => selectDesign(d, 'both')}
+                                title="Use Both Images"
+                                style={{ padding: '2px 6px', fontSize: '0.65rem', fontWeight: 700, background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: 3, cursor: 'pointer' }}
+                              >
+                                Both
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => selectDesign(d, 'img1')}
+                                title="Use Image 1 Only"
+                                style={{ padding: '2px 6px', fontSize: '0.65rem', fontWeight: 700, background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-muted)', border: '1px solid var(--border-light)', borderRadius: 3, cursor: 'pointer' }}
+                              >
+                                Img 1
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => selectDesign(d, 'img2')}
+                                title="Use Image 2 Only"
+                                style={{ padding: '2px 6px', fontSize: '0.65rem', fontWeight: 700, background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-muted)', border: '1px solid var(--border-light)', borderRadius: 3, cursor: 'pointer' }}
+                              >
+                                Img 2
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <span style={{ fontSize:'0.7rem', color:'var(--text-muted)' }}>
-                        {d.fabricName ? `${d.fabricName} • ` : ''}{d.category || ''} ({d.designerName || 'No Designer'})
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1444,7 +1499,80 @@ function JobCardForm({ card, onSave, onClose }) {
           </div>
 
           {/* Section: Images */}
-          <div style={sectionLabel}>🖼 Design Images</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={sectionLabel}>🖼 Design Images</div>
+            {(form.imageUrl1 || form.imageUrl2 || (selectedDesign && selectedDesign.imageUrl2)) && (
+              <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>IMAGE MODE:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedDesign && selectedDesign.imageUrl && selectedDesign.imageUrl2) {
+                      setForm(f => ({ ...f, imageUrl1: selectedDesign.imageUrl, imageUrl2: selectedDesign.imageUrl2 }));
+                    } else if (form.imageUrl1 && !form.imageUrl2 && selectedDesign && selectedDesign.imageUrl2) {
+                      setForm(f => ({ ...f, imageUrl2: selectedDesign.imageUrl2 }));
+                    }
+                  }}
+                  style={{
+                    padding: '0.2rem 0.55rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                    border: '1px solid',
+                    borderColor: (form.imageUrl1 && form.imageUrl2) ? '#38bdf8' : 'var(--border-light)',
+                    background: (form.imageUrl1 && form.imageUrl2) ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                    color: (form.imageUrl1 && form.imageUrl2) ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer'
+                  }}
+                >
+                  📸 Both Images
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const primary = form.imageUrl1 || (selectedDesign && selectedDesign.imageUrl) || '';
+                    setForm(f => ({ ...f, imageUrl1: primary, imageUrl2: '' }));
+                  }}
+                  style={{
+                    padding: '0.2rem 0.55rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                    border: '1px solid',
+                    borderColor: (form.imageUrl1 && !form.imageUrl2) ? '#38bdf8' : 'var(--border-light)',
+                    background: (form.imageUrl1 && !form.imageUrl2) ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                    color: (form.imageUrl1 && !form.imageUrl2) ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer'
+                  }}
+                >
+                  🖼️ Img 1 Only
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sec = form.imageUrl2 || (selectedDesign && selectedDesign.imageUrl2) || form.imageUrl1;
+                    setForm(f => ({ ...f, imageUrl1: sec, imageUrl2: '' }));
+                  }}
+                  style={{
+                    padding: '0.2rem 0.55rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                    border: '1px solid',
+                    borderColor: (!form.imageUrl1 && form.imageUrl2) ? '#38bdf8' : 'var(--border-light)',
+                    background: (!form.imageUrl1 && form.imageUrl2) ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                    color: (!form.imageUrl1 && form.imageUrl2) ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer'
+                  }}
+                >
+                  🖼️ Img 2 Only
+                </button>
+                {(form.imageUrl1 && form.imageUrl2) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm(f => ({ ...f, imageUrl1: f.imageUrl2, imageUrl2: f.imageUrl1 }));
+                    }}
+                    style={{
+                      padding: '0.2rem 0.55rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
+                      border: '1px solid var(--border-light)', background: 'rgba(255, 255, 255, 0.04)',
+                      color: 'var(--text-muted)', cursor: 'pointer'
+                    }}
+                  >
+                    🔄 Swap
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <div style={{ fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'0.6rem', lineHeight:1.5 }}>
             📂 From your Drive folder — open it, right-click any image → <strong>Share</strong> → <strong>Copy link</strong> → paste below.
           </div>
