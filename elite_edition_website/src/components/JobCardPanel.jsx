@@ -1458,61 +1458,67 @@ function JobCardForm({ card, onSave, onClose }) {
           {/* Section: Images */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div style={sectionLabel}>🖼 Design Images</div>
-            {(form.imageUrl1 || form.imageUrl2 || (selectedDesign && selectedDesign.imageUrl2)) && (
+            {(form.imageUrl1 || form.imageUrl2 || (selectedDesign && (selectedDesign.imageUrl || selectedDesign.imageUrl2))) && (
               <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>IMAGE MODE:</span>
+                
+                {/* Both Images Button */}
                 <button
                   type="button"
                   onClick={() => {
-                    if (selectedDesign && selectedDesign.imageUrl && selectedDesign.imageUrl2) {
-                      setForm(f => ({ ...f, imageUrl1: selectedDesign.imageUrl, imageUrl2: selectedDesign.imageUrl2 }));
-                    } else if (form.imageUrl1 && !form.imageUrl2 && selectedDesign && selectedDesign.imageUrl2) {
-                      setForm(f => ({ ...f, imageUrl2: selectedDesign.imageUrl2 }));
-                    }
+                    const img1 = form.imageUrl1 || (selectedDesign && selectedDesign.imageUrl) || '';
+                    const img2 = form.imageUrl2 || (selectedDesign && selectedDesign.imageUrl2) || '';
+                    setForm(f => ({ ...f, imageUrl1: img1, imageUrl2: img2 }));
                   }}
                   style={{
                     padding: '0.2rem 0.55rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
                     border: '1px solid',
-                    borderColor: (form.imageUrl1 && form.imageUrl2) ? '#38bdf8' : 'var(--border-light)',
-                    background: (form.imageUrl1 && form.imageUrl2) ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
-                    color: (form.imageUrl1 && form.imageUrl2) ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer'
+                    borderColor: (!!form.imageUrl1 && !!form.imageUrl2) ? '#38bdf8' : 'var(--border-light)',
+                    background: (!!form.imageUrl1 && !!form.imageUrl2) ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                    color: (!!form.imageUrl1 && !!form.imageUrl2) ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer'
                   }}
                 >
                   📸 Both Images
                 </button>
+
+                {/* Image 1 Only Button */}
                 <button
                   type="button"
                   onClick={() => {
-                    const primary = form.imageUrl1 || (selectedDesign && selectedDesign.imageUrl) || '';
-                    setForm(f => ({ ...f, imageUrl1: primary, imageUrl2: '' }));
+                    const img1 = form.imageUrl1 || (selectedDesign && selectedDesign.imageUrl) || form.imageUrl2 || '';
+                    setForm(f => ({ ...f, imageUrl1: img1, imageUrl2: '' }));
                   }}
                   style={{
                     padding: '0.2rem 0.55rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
                     border: '1px solid',
-                    borderColor: (form.imageUrl1 && !form.imageUrl2) ? '#38bdf8' : 'var(--border-light)',
-                    background: (form.imageUrl1 && !form.imageUrl2) ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
-                    color: (form.imageUrl1 && !form.imageUrl2) ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer'
+                    borderColor: (!!form.imageUrl1 && !form.imageUrl2) ? '#38bdf8' : 'var(--border-light)',
+                    background: (!!form.imageUrl1 && !form.imageUrl2) ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                    color: (!!form.imageUrl1 && !form.imageUrl2) ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer'
                   }}
                 >
                   🖼️ Img 1 Only
                 </button>
+
+                {/* Image 2 Only Button */}
                 <button
                   type="button"
                   onClick={() => {
-                    const sec = form.imageUrl2 || (selectedDesign && selectedDesign.imageUrl2) || form.imageUrl1;
-                    setForm(f => ({ ...f, imageUrl1: sec, imageUrl2: '' }));
+                    const img2 = form.imageUrl2 || (selectedDesign && selectedDesign.imageUrl2) || form.imageUrl1 || '';
+                    setForm(f => ({ ...f, imageUrl1: '', imageUrl2: img2 }));
                   }}
                   style={{
                     padding: '0.2rem 0.55rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700,
                     border: '1px solid',
-                    borderColor: (!form.imageUrl1 && form.imageUrl2) ? '#38bdf8' : 'var(--border-light)',
-                    background: (!form.imageUrl1 && form.imageUrl2) ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
-                    color: (!form.imageUrl1 && form.imageUrl2) ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer'
+                    borderColor: (!form.imageUrl1 && !!form.imageUrl2) ? '#38bdf8' : 'var(--border-light)',
+                    background: (!form.imageUrl1 && !!form.imageUrl2) ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                    color: (!form.imageUrl1 && !!form.imageUrl2) ? '#38bdf8' : 'var(--text-muted)', cursor: 'pointer'
                   }}
                 >
                   🖼️ Img 2 Only
                 </button>
-                {(form.imageUrl1 && form.imageUrl2) && (
+
+                {/* Swap Button */}
+                {(form.imageUrl1 || form.imageUrl2) && (
                   <button
                     type="button"
                     onClick={() => {
