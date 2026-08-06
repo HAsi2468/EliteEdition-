@@ -3,11 +3,19 @@ import { api } from '../services/api';
 import {
   Printer, PlusCircle, Search, RefreshCw, Trash2, Edit2, CheckCircle2,
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
-  X, Download, Eye, Layers3, Activity
+  X, Download, Eye, Layers3, Activity, Tag, Sparkles
 } from 'lucide-react';
 import { triggerPushNotification } from './NotificationToast';
 
-const COMMON_MACHINES = [
+// Automatic Shift Calculator:
+// Morning Shift: 9:00 AM (09:00) to 8:59 PM (20:59)
+// Night Shift:   9:00 PM (21:00) to 8:59 AM (08:59)
+function getAutoShift() {
+  const hours = new Date().getHours();
+  return (hours >= 9 && hours < 21) ? 'Morning' : 'Night';
+}
+
+const DEFAULT_MACHINES = [
   'Machine 1 (Grando)',
   'Machine 2 (Printdot)',
   'Homer 1',
@@ -15,8 +23,7 @@ const COMMON_MACHINES = [
   'Kyocera 1',
   'Kyocera 2',
   'DGI 1',
-  'Reggiani',
-  'Custom Machine'
+  'Reggiani'
 ];
 
 const PASS_OPTIONS = [
@@ -29,11 +36,10 @@ const PASS_OPTIONS = [
 ];
 
 export default function JobPrintingLog() {
-  const currentUser = api.getCurrentUser() || { name: 'Operator' };
-
   // Main Data States
   const [logs, setLogs] = useState([]);
   const [jobCards, setJobCards] = useState([]);
+  const [machinesList, setMachinesList] = useState(DEFAULT_MACHINES);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -49,12 +55,12 @@ export default function JobPrintingLog() {
   const [form, setForm] = useState({
     jobNo: '',
     jobCardId: '',
-    machineName: 'Machine 1 (Grando)',
+    machineName: '',
     pass: '4 Pass (High Quality)',
     meters: '',
     date: new Date().toISOString().split('T')[0],
-    operatorName: currentUser.name || currentUser.username || '',
-    shift: 'General',
+    operatorName: '', // BY DEFAULT OPERATOR NAME REMOVED (blank)
+    shift: getAutoShift(), // AUTOMATICALLY SET BASED ON TIME (Morning/Night)
     notes: ''
   });
 
@@ -63,13 +69,28 @@ export default function JobPrintingLog() {
   const [jobHistoryData, setJobHistoryData] = useState(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  // Edit Modal State
-  const [editingLog, setEditingLog] = useState(null);
+  // Load Machines from Print Settings Config
+  const fetchPrintConfig = async () => {
+    try {
+      const res = await api.getPrintConfig();
+      if (res && res.machines && Array.isArray(res.machines)) {
+        const mNames = res.machines.map(m => (typeof m === 'object' ? m.name : m)).filter(Boolean);
+        if (mNames.length > 0) {
+          setMachinesList(mNames);
+          if (!form.machineName) {
+            setForm(prev => ({ ...prev, machineName: mNames[0] }));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load machine list from Print Settings:', err);
+    }
+  };
 
-  // Load Job Cards for Dropdown Select
+  // Load Job Cards for Selection
   const fetchJobCards = async () => {
     try {
-      const res = await api.getJobCards({ limit: 200 });
+      const res = await api.getJobCards({ limit: 300 });
       if (res.data) setJobCards(res.data);
     } catch (err) {
       console.error('Failed to load job cards:', err);
@@ -97,6 +118,7 @@ export default function JobPrintingLog() {
   };
 
   useEffect(() => {
+    fetchPrintConfig();
     fetchJobCards();
   }, []);
 
@@ -104,21 +126,78 @@ export default function JobPrintingLog() {
     fetchLogs();
   }, [searchJob, filterMachine, dateStart, dateEnd]);
 
-  // Handle Job Card Selection in Form
-  const handleJobSelect = (jobIdOrNo) => {
-    const matched = jobCards.find(c => c._id === jobIdOrNo || c.jobNo === jobIdOrNo);
+  // Recalculate auto shift every minute or when date changes
+  useEffect(() => {
+    setForm(prev => ({ ...prev, shift: getAutoShift() }));
+  }, [form.date]);
+
+  // Find matching Job Card helper
+  const findMatchingJob = (val) => {
+    if (!val) return null;
+    const clean = String(val).trim().toUpperCase();
+    return jobCards.find(c => {
+      if (c._id === val) return true;
+      const jNo = String(c.jobNo || '').trim().toUpperCase();
+      return jNo === clean || jNo === `JOB-${clean}` || jNo === `EDP-${clean}` || `JOB-${jNo}` === clean;
+    });
+  };
+
+  // Calculate completion & pending meters for any job card
+  const getJobProgressStats = (job) => {
+    if (!job) return { targetMtr: 0, printedMtr: 0, remainingMtr: 0, progressPct: 0, statusText: 'Pending', statusColor: '#f59e0b' };
+
+    const targetMatch = String(job.totalMtr || job.consumption || '0').match(/[\d.]+/);
+    const targetMtr = targetMatch ? parseFloat(targetMatch[0]) : 0;
+
+    const printedMatch = String(job.printMtr || '0').match(/[\d.]+/);
+    let printedMtr = printedMatch ? parseFloat(printedMatch[0]) : 0;
+
+    // Calculate from current logs if present
+    const cardLogs = logs.filter(l => l.jobCardId === job._id || l.jobNo === job.jobNo);
+    if (cardLogs.length > 0) {
+      printedMtr = cardLogs.reduce((sum, l) => sum + (Number(l.meters) || 0), 0);
+    }
+
+    const remainingMtr = Math.max(0, targetMtr - printedMtr);
+    const progressPct = targetMtr > 0 ? Math.min(100, Math.round((printedMtr / targetMtr) * 100)) : 0;
+
+    let statusText = 'Pending';
+    let statusColor = '#f59e0b'; // Amber
+
+    if (progressPct >= 100) {
+      statusText = 'Completed (100%)';
+      statusColor = '#10b981'; // Green
+    } else if (printedMtr > 0) {
+      statusText = `In Progress (${progressPct}% Done • ${remainingMtr.toFixed(2)}m Pending)`;
+      statusColor = '#38bdf8'; // Blue
+    } else {
+      statusText = `Pending (0% Printed • ${targetMtr.toFixed(2)}m Target)`;
+      statusColor = '#f59e0b';
+    }
+
+    return { targetMtr, printedMtr, remainingMtr, progressPct, statusText, statusColor };
+  };
+
+  // Handle Job Selection Change (like Challan form)
+  const handleJobSelect = (val) => {
+    const matched = findMatchingJob(val);
+
     if (matched) {
       setSelectedJob(matched);
       setForm(prev => ({
         ...prev,
         jobNo: matched.jobNo,
         jobCardId: matched._id,
-        machineName: matched.machineName ? (COMMON_MACHINES.find(m => m.toLowerCase().includes(matched.machineName.toLowerCase())) || matched.machineName) : prev.machineName,
+        machineName: matched.machineName ? (machinesList.find(m => m.toLowerCase().includes(matched.machineName.toLowerCase())) || matched.machineName) : (prev.machineName || machinesList[0] || 'Machine 1'),
         pass: matched.pass ? (PASS_OPTIONS.find(p => p.toLowerCase().includes(matched.pass.toLowerCase())) || matched.pass) : prev.pass
       }));
     } else {
       setSelectedJob(null);
-      setForm(prev => ({ ...prev, jobNo: jobIdOrNo, jobCardId: '' }));
+      setForm(prev => ({
+        ...prev,
+        jobNo: val,
+        jobCardId: ''
+      }));
     }
   };
 
@@ -127,6 +206,10 @@ export default function JobPrintingLog() {
     e.preventDefault();
     if (!form.jobNo) {
       alert('Please select or enter a Job Card Number.');
+      return;
+    }
+    if (!form.machineName) {
+      alert('Please select a Printing Machine.');
       return;
     }
     if (!form.meters || parseFloat(form.meters) <= 0) {
@@ -141,9 +224,9 @@ export default function JobPrintingLog() {
         meters: parseFloat(form.meters)
       };
       const res = await api.createJobPrintLog(payload);
-      triggerPushNotification('Print Run Logged 🖨️', `Logged ${form.meters} mtr for Job #${form.jobNo} on ${form.machineName}`, 'success');
+      triggerPushNotification('🖨️ Print Run Logged', `Logged ${form.meters} mtr for Job #${form.jobNo} on ${form.machineName} (${form.shift} Shift)`, 'success');
 
-      // Reset form meters & notes but keep machine & operator for fast continuous entry
+      // Clear meters & notes for next log entry, but keep selected job card & machine
       setForm(prev => ({
         ...prev,
         meters: '',
@@ -153,7 +236,6 @@ export default function JobPrintingLog() {
       await fetchLogs();
       await fetchJobCards();
 
-      // If viewing history for this card, refresh history
       if (viewingJobHistory && viewingJobHistory.jobNo === form.jobNo) {
         loadJobCardHistory(form.jobNo);
       }
@@ -169,7 +251,7 @@ export default function JobPrintingLog() {
     if (!window.confirm(`Are you sure you want to delete this print log for Job #${jobNo}?`)) return;
     try {
       await api.deleteJobPrintLog(logId);
-      triggerPushNotification('Print Log Deleted 🗑️', `Removed entry for Job #${jobNo}`, 'info');
+      triggerPushNotification('🗑️ Print Log Deleted', `Removed entry for Job #${jobNo}`, 'info');
       await fetchLogs();
       await fetchJobCards();
       if (viewingJobHistory && viewingJobHistory.jobNo === jobNo) {
@@ -206,7 +288,7 @@ export default function JobPrintingLog() {
       `"${l.machineName}"`,
       `"${l.pass}"`,
       l.meters,
-      `"${l.operatorName}"`,
+      `"${l.operatorName || ''}"`,
       l.shift,
       `"${l.notes || ''}"`
     ]);
@@ -226,10 +308,13 @@ export default function JobPrintingLog() {
   const activeMachinesCount = new Set(logs.map(l => l.machineName)).size;
   const uniqueJobCardsCount = new Set(logs.map(l => l.jobNo)).size;
 
+  // Selected Job Progress Stats
+  const selectedJobStats = selectedJob ? getJobProgressStats(selectedJob) : null;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '2rem' }}>
       
-      {/* ── 1. HEADER & KPI STATS BANNER ── */}
+      {/* ── 1. HEADER BANNER ── */}
       <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#38bdf8,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(56,189,248,0.3)' }}>
@@ -238,7 +323,7 @@ export default function JobPrintingLog() {
           <div>
             <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>Machine Printing Entry & Logs</h2>
             <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 1 }}>
-              Log multiple machine printing runs per Job Card, track pass counts, and monitor meterage completion.
+              Log multiple machine runs per Job Card, monitor automatic shifts (Morning / Night), and track completion progress.
             </p>
           </div>
         </div>
@@ -257,99 +342,137 @@ export default function JobPrintingLog() {
         </div>
 
         <div className="glass-panel" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid #8b5cf6', background: 'rgba(139,92,246,0.03)' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>ACTIVE MACHINES</div>
-          <div style={{ fontSize: '1.35rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{activeMachinesCount} Machines</div>
-          <div style={{ fontSize: '0.72rem', color: '#a78bfa', marginTop: 2 }}>In Active Production Run</div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>CONFIGURED MACHINES</div>
+          <div style={{ fontSize: '1.35rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{machinesList.length} Machines</div>
+          <div style={{ fontSize: '0.72rem', color: '#a78bfa', marginTop: 2 }}>Loaded from Print Settings</div>
         </div>
 
         <div className="glass-panel" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid #10b981', background: 'rgba(16,185,129,0.03)' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>JOB CARDS TRACKED</div>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>ACTIVE JOB CARDS</div>
           <div style={{ fontSize: '1.35rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{uniqueJobCardsCount} Job Cards</div>
-          <div style={{ fontSize: '0.72rem', color: '#34d399', marginTop: 2 }}>With Multi-Run Printing Logs</div>
+          <div style={{ fontSize: '0.72rem', color: '#34d399', marginTop: 2 }}>With Machine Printing Runs</div>
         </div>
       </div>
 
-      {/* ── 2. NEW PRINT ENTRY FORM & JOB CARD PREVIEW split grid ── */}
+      {/* ── 2. NEW MACHINE PRINT ENTRY FORM (CHALLAN-STYLE JOB SELECTION) ── */}
       <div style={{ display: 'grid', gridTemplateColumns: selectedJob ? 'minmax(0, 1.4fr) minmax(0, 1fr)' : '1fr', gap: '1.25rem' }}>
         
         {/* Entry Form */}
         <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: '4px solid #38bdf8' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <PlusCircle size={16} /> New Machine Print Entry
             </div>
-            {selectedJob && (
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--success)', background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(16,185,129,0.2)' }}>
-                Target: {selectedJob.totalMtr || 'N/A'} | Print Status: {selectedJob.printStatus || 'Pending'}
-              </span>
-            )}
+
+            {/* Live Shift Auto Badge */}
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: form.shift === 'Morning' ? '#38bdf8' : '#a78bfa', background: form.shift === 'Morning' ? 'rgba(56,189,248,0.1)' : 'rgba(167,139,250,0.1)', padding: '3px 10px', borderRadius: 20, border: `1px solid ${form.shift === 'Morning' ? 'rgba(56,189,248,0.3)' : 'rgba(167,139,250,0.3)'}`, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Clock size={12} /> Auto Shift: {form.shift} ({form.shift === 'Morning' ? '9 AM - 9 PM' : '9 PM - 9 AM'})
+            </span>
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             
-            {/* Row 1: Job Card Select */}
+            {/* ── JOB CARD SELECTION (CHALLAN STYLE UX) ── */}
             <div>
-              <label style={labelStyle}>SELECT JOB CARD <span style={{ color: '#ef4444' }}>*</span></label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                <label style={labelStyle}>JOB CARD SELECTION <span style={{ color: '#ef4444' }}>*</span></label>
+                {selectedJobStats && (
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: selectedJobStats.statusColor }}>
+                    ⚡ {selectedJobStats.statusText}
+                  </span>
+                )}
+              </div>
+
+              {/* Input + Searchable Select Combo (Challan style) */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                 <select
                   value={form.jobCardId || form.jobNo}
                   onChange={e => handleJobSelect(e.target.value)}
                   style={{ ...inputStyle, flex: 1, fontWeight: 700 }}
                   required
                 >
-                  <option value="">-- Choose Job Card --</option>
-                  {jobCards.map(c => (
-                    <option key={c._id} value={c._id}>
-                      #{c.jobNo} — {c.party || 'Client'} | Design: {c.designName || c.designNo || 'Custom'} ({c.totalMtr || '0 mtr'})
-                    </option>
-                  ))}
+                  <option value="">-- Choose Job Card (Party | Design | Target Mtr) --</option>
+                  {jobCards.map(c => {
+                    const stats = getJobProgressStats(c);
+                    return (
+                      <option key={c._id} value={c._id}>
+                        #{c.jobNo} — {c.party || 'Client'} | Design: {c.designName || c.designNo || 'Custom'} [{stats.printedMtr.toFixed(1)}m / {stats.targetMtr.toFixed(1)}m — {stats.progressPct}%]
+                      </option>
+                    );
+                  })}
                 </select>
 
                 <input
                   type="text"
-                  placeholder="Or enter Job #"
+                  placeholder="Type Job #"
                   value={form.jobNo}
                   onChange={e => handleJobSelect(e.target.value)}
                   style={{ ...inputStyle, width: '130px', fontWeight: 700 }}
                 />
               </div>
+
+              {/* Quick Job Selector Pills (like Challan form) */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, alignSelf: 'center', marginRight: '4px' }}>
+                  QUICK JOBS:
+                </span>
+                {jobCards.slice(0, 8).map(c => {
+                  const isSelected = selectedJob && selectedJob._id === c._id;
+                  const stats = getJobProgressStats(c);
+                  return (
+                    <button
+                      key={c._id}
+                      type="button"
+                      onClick={() => handleJobSelect(c._id)}
+                      style={{
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: 4,
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        border: '1px solid',
+                        borderColor: isSelected ? '#38bdf8' : 'var(--border-light)',
+                        background: isSelected ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.02)',
+                        color: isSelected ? '#38bdf8' : 'var(--text-muted)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      #{c.jobNo} ({stats.progressPct}%)
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Row 2: Machine Name & Pass Count */}
+            {/* Row 2: Machine Name (takes from Print Settings) & Pass */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div>
-                <label style={labelStyle}>PRINTING MACHINE <span style={{ color: '#ef4444' }}>*</span></label>
-                <input
-                  type="text"
-                  list="machine-list"
+                <label style={labelStyle}>PRINTING MACHINE (FROM PRINT SETTINGS) <span style={{ color: '#ef4444' }}>*</span></label>
+                <select
                   value={form.machineName}
                   onChange={e => setForm(f => ({ ...f, machineName: e.target.value }))}
-                  placeholder="Select or type machine..."
                   style={inputStyle}
                   required
-                />
-                <datalist id="machine-list">
-                  {COMMON_MACHINES.map(m => <option key={m} value={m} />)}
-                </datalist>
+                >
+                  <option value="">-- Select Machine --</option>
+                  {machinesList.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label style={labelStyle}>PASS COUNT / RESOLUTION</label>
-                <input
-                  type="text"
-                  list="pass-list"
+                <select
                   value={form.pass}
                   onChange={e => setForm(f => ({ ...f, pass: e.target.value }))}
-                  placeholder="Select or type pass..."
                   style={inputStyle}
-                />
-                <datalist id="pass-list">
-                  {PASS_OPTIONS.map(p => <option key={p} value={p} />)}
-                </datalist>
+                >
+                  {PASS_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
               </div>
             </div>
 
-            {/* Row 3: Meters Printed, Date, Shift */}
+            {/* Row 3: Meters Printed, Date, Shift (Morning 9am-9pm / Night 9pm-9am) */}
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '0.75rem' }}>
               <div>
                 <label style={labelStyle}>METERS PRINTED IN THIS RUN (MTR) <span style={{ color: '#ef4444' }}>*</span></label>
@@ -376,25 +499,23 @@ export default function JobPrintingLog() {
               </div>
 
               <div>
-                <label style={labelStyle}>SHIFT</label>
+                <label style={labelStyle}>SHIFT (AUTO-DETECTED)</label>
                 <select value={form.shift} onChange={e => setForm(f => ({ ...f, shift: e.target.value }))} style={inputStyle}>
-                  <option value="General">General Shift</option>
-                  <option value="Morning">Morning Shift</option>
-                  <option value="Evening">Evening Shift</option>
-                  <option value="Night">Night Shift</option>
+                  <option value="Morning">Morning Shift (9 AM - 9 PM)</option>
+                  <option value="Night">Night Shift (9 PM - 9 AM)</option>
                 </select>
               </div>
             </div>
 
-            {/* Row 4: Operator & Notes */}
+            {/* Row 4: Operator Name (blank by default) & Remarks */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.75rem' }}>
               <div>
-                <label style={labelStyle}>OPERATOR NAME</label>
+                <label style={labelStyle}>OPERATOR NAME (OPTIONAL)</label>
                 <input
                   type="text"
                   value={form.operatorName}
                   onChange={e => setForm(f => ({ ...f, operatorName: e.target.value }))}
-                  placeholder="Operator Name"
+                  placeholder="Type operator name..."
                   style={inputStyle}
                 />
               </div>
@@ -405,7 +526,7 @@ export default function JobPrintingLog() {
                   type="text"
                   value={form.notes}
                   onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="Optional remarks e.g. First 50m done, roll change..."
+                  placeholder="Optional notes e.g. Roll #2, fabric inspection ok..."
                   style={inputStyle}
                 />
               </div>
@@ -432,14 +553,35 @@ export default function JobPrintingLog() {
           </form>
         </div>
 
-        {/* Selected Job Card Overview & Live Progress Panel */}
-        {selectedJob && (
-          <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', background: 'rgba(56,189,248,0.02)', borderLeft: '4px solid #10b981' }}>
+        {/* Selected Job Card Status Card (Completion & Pending Indicator) */}
+        {selectedJob && selectedJobStats && (
+          <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', background: 'rgba(56,189,248,0.02)', borderLeft: `4px solid ${selectedJobStats.statusColor}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase' }}>
-                📊 Job Card Progress Overview
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: selectedJobStats.statusColor, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Activity size={16} /> Completion Status
               </div>
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8' }}>#{selectedJob.jobNo}</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>#{selectedJob.jobNo}</span>
+            </div>
+
+            {/* Large Progress Indicator Badge */}
+            <div style={{ padding: '0.85rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid var(--border-light)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.4rem', fontWeight: 700 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Progress: <strong style={{ color: 'var(--text-primary)' }}>{selectedJobStats.progressPct}%</strong></span>
+                <span style={{ color: selectedJobStats.statusColor }}>{selectedJobStats.statusText}</span>
+              </div>
+
+              {/* Progress Line */}
+              <div style={{ width: '100%', height: 10, borderRadius: 5, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    width: `${selectedJobStats.progressPct}%`,
+                    height: '100%',
+                    background: selectedJobStats.statusColor,
+                    borderRadius: 5,
+                    transition: 'width 0.3s ease'
+                  }}
+                />
+              </div>
             </div>
 
             {/* Field Details */}
@@ -448,17 +590,18 @@ export default function JobPrintingLog() {
               <div><span style={{ color: 'var(--text-muted)' }}>Fabric:</span> <strong style={{ color: 'var(--text-primary)' }}>{selectedJob.fabric || '—'}</strong></div>
               <div><span style={{ color: 'var(--text-muted)' }}>Design:</span> <strong style={{ color: 'var(--primary)' }}>{selectedJob.designName || selectedJob.designNo || '—'}</strong></div>
               <div><span style={{ color: 'var(--text-muted)' }}>Panna:</span> <strong style={{ color: 'var(--text-primary)' }}>{selectedJob.panna || '—'}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Target Mtr:</span> <strong style={{ color: '#f59e0b' }}>{selectedJob.totalMtr || '0 mtr'}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Logged Print Mtr:</span> <strong style={{ color: '#38bdf8' }}>{selectedJob.printMtr || '0 mtr'}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Target Mtr:</span> <strong style={{ color: '#f59e0b' }}>{selectedJobStats.targetMtr.toFixed(2)} mtr</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Total Printed:</span> <strong style={{ color: '#38bdf8' }}>{selectedJobStats.printedMtr.toFixed(2)} mtr</strong></div>
+              <div style={{ gridColumn: 'span 2' }}><span style={{ color: 'var(--text-muted)' }}>Pending Remaining:</span> <strong style={{ color: selectedJobStats.remainingMtr > 0 ? '#ef4444' : '#10b981' }}>{selectedJobStats.remainingMtr.toFixed(2)} mtr</strong></div>
             </div>
 
-            {/* Quick action button to inspect full history */}
+            {/* Action button */}
             <button
               onClick={() => loadJobCardHistory(selectedJob.jobNo)}
               className="btn-secondary"
               style={{ marginTop: 'auto', width: '100%', padding: '0.55rem', fontSize: '0.8rem', justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <Eye size={14} /> Inspect Full Multi-Run Audit History
+              <Eye size={14} /> Inspect Full Multi-Run History
             </button>
           </div>
         )}
@@ -487,7 +630,7 @@ export default function JobPrintingLog() {
             style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: 6, color: 'var(--text-primary)' }}
           >
             <option value="">All Machines</option>
-            {COMMON_MACHINES.map(m => <option key={m} value={m}>{m}</option>)}
+            {machinesList.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -554,7 +697,11 @@ export default function JobPrintingLog() {
                     <td style={tdStyle}>{log.pass}</td>
                     <td style={{ ...tdStyle, fontWeight: 900, color: '#34d399' }}>{Number(log.meters).toFixed(2)} mtr</td>
                     <td style={tdStyle}>{log.operatorName || '—'}</td>
-                    <td style={tdStyle}>{log.shift || 'General'}</td>
+                    <td style={tdStyle}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: log.shift === 'Morning' ? 'rgba(56,189,248,0.1)' : 'rgba(167,139,250,0.1)', color: log.shift === 'Morning' ? '#38bdf8' : '#a78bfa' }}>
+                        {log.shift || 'Morning'}
+                      </span>
+                    </td>
                     <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{log.notes || '—'}</td>
                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
@@ -632,6 +779,7 @@ export default function JobPrintingLog() {
                     <th style={thStyle}>Machine</th>
                     <th style={thStyle}>Pass</th>
                     <th style={thStyle}>Meters</th>
+                    <th style={thStyle}>Shift</th>
                     <th style={thStyle}>Operator</th>
                     <th style={{ ...thStyle, textAlign: 'center' }}>Action</th>
                   </tr>
@@ -644,6 +792,7 @@ export default function JobPrintingLog() {
                       <td style={{ ...tdStyle, fontWeight: 700 }}>{l.machineName}</td>
                       <td style={tdStyle}>{l.pass}</td>
                       <td style={{ ...tdStyle, fontWeight: 800, color: '#34d399' }}>{Number(l.meters).toFixed(2)} mtr</td>
+                      <td style={tdStyle}>{l.shift}</td>
                       <td style={tdStyle}>{l.operatorName || '—'}</td>
                       <td style={{ ...tdStyle, textAlign: 'center' }}>
                         <button
