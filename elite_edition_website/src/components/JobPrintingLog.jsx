@@ -94,7 +94,7 @@ export default function JobPrintingLog() {
   // Load Job Cards for Selection
   const fetchJobCards = async () => {
     try {
-      const res = await api.getJobCards({ limit: 300 });
+      const res = await api.getJobCards({ limit: 1000 });
       if (res.data) setJobCards(res.data);
     } catch (err) {
       console.error('Failed to load job cards:', err);
@@ -139,10 +139,17 @@ export default function JobPrintingLog() {
   const findMatchingJob = (val) => {
     if (!val) return null;
     const clean = String(val).trim().toUpperCase();
+    const digitsOnly = clean.replace(/[^\d]/g, '');
+
     return jobCards.find(c => {
       if (c._id === val) return true;
       const jNo = String(c.jobNo || '').trim().toUpperCase();
-      return jNo === clean || jNo === `JOB-${clean}` || jNo === `EDP-${clean}` || `JOB-${jNo}` === clean;
+      const jDigits = jNo.replace(/[^\d]/g, '');
+
+      if (jNo === clean) return true;
+      if (digitsOnly && jDigits === digitsOnly) return true;
+      if (jNo.includes(clean)) return true;
+      return false;
     });
   };
 
@@ -407,9 +414,10 @@ export default function JobPrintingLog() {
                   <option value="">-- Choose Job Card ({activeJobCards.length} Active Pending Jobs) --</option>
                   {activeJobCards.map(c => {
                     const stats = getJobProgressStats(c);
+                    const cleanJobNum = String(c.jobNo || '').replace(/^JOB\s*NO\.?\s*-?\s*/i, '');
                     return (
                       <option key={c._id} value={c._id}>
-                        #{c.jobNo} — {c.party || 'Client'} | Design: {c.designName || c.designNo || 'Custom'} [{stats.printedMtr.toFixed(1)}m / {stats.targetMtr.toFixed(1)}m — {stats.progressPct}%]
+                        #{cleanJobNum} — {c.party || 'Client'} | Design: {c.designName || c.designNo || 'Custom'} [{stats.printedMtr.toFixed(1)}m / {stats.targetMtr.toFixed(1)}m — {stats.progressPct}%]
                       </option>
                     );
                   })}
@@ -429,9 +437,10 @@ export default function JobPrintingLog() {
                 <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, alignSelf: 'center', marginRight: '4px' }}>
                   PENDING JOBS:
                 </span>
-                {activeJobCards.slice(0, 10).map(c => {
+                {activeJobCards.slice(0, 15).map(c => {
                   const isSelected = selectedJob && selectedJob._id === c._id;
                   const stats = getJobProgressStats(c);
+                  const cleanJobNum = String(c.jobNo || '').replace(/^JOB\s*NO\.?\s*-?\s*/i, '');
                   return (
                     <button
                       key={c._id}
@@ -449,7 +458,7 @@ export default function JobPrintingLog() {
                         cursor: 'pointer'
                       }}
                     >
-                      #{c.jobNo} ({stats.progressPct}%)
+                      #{cleanJobNum} ({stats.progressPct}%)
                     </button>
                   );
                 })}
