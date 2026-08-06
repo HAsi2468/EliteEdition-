@@ -5,7 +5,7 @@ import {
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
   X, Download, Eye, Layers3, Activity, Tag, Sparkles
 } from 'lucide-react';
-import { triggerPushNotification } from './NotificationToast';
+import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
 
 // Automatic Shift Calculator:
@@ -239,6 +239,7 @@ export default function JobPrintingLog() {
 
       await fetchLogs();
       await fetchJobCards();
+      triggerGlobalDataRefresh('jobcards');
 
       if (viewingJobHistory && viewingJobHistory.jobNo === form.jobNo) {
         loadJobCardHistory(form.jobNo);
@@ -258,6 +259,7 @@ export default function JobPrintingLog() {
       triggerPushNotification('🗑️ Print Log Deleted', `Removed entry for Job #${jobNo}`, 'info');
       await fetchLogs();
       await fetchJobCards();
+      triggerGlobalDataRefresh('jobcards');
       if (viewingJobHistory && viewingJobHistory.jobNo === jobNo) {
         loadJobCardHistory(jobNo);
       }

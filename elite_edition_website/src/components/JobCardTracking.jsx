@@ -52,8 +52,13 @@ export default function JobCardTracking({ onPreview }) {
 
   useEffect(() => {
     fetchCards();
-    const interval = setInterval(fetchCards, 30000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchCards, 10000);
+    const handleDataRefresh = () => fetchCards();
+    window.addEventListener('elite-data-refresh', handleDataRefresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('elite-data-refresh', handleDataRefresh);
+    };
   }, [fetchCards]);
 
   // Handle local cell modifications
@@ -391,12 +396,13 @@ export default function JobCardTracking({ onPreview }) {
                     {/* Print Mtr */}
                     <td style={tdStyle}>
                       <input
-                        type="number"
+                        type="text"
                         value={getValue(c, 'printMtr')}
-                        onChange={e => handleCellChange(c._id, 'printMtr', parseFloat(e.target.value) || 0)}
-                        onBlur={e => handleAutoSave(c._id, 'printMtr', parseFloat(e.target.value) || 0)}
+                        onChange={e => handleCellChange(c._id, 'printMtr', e.target.value)}
+                        onBlur={e => handleAutoSave(c._id, 'printMtr', e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && e.target.blur()}
-                        style={{ ...inputStyle, width: '70px' }}
+                        placeholder="0 mtr"
+                        style={{ ...inputStyle, width: '95px', fontWeight: 700, color: '#38bdf8' }}
                       />
                     </td>
 
