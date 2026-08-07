@@ -428,12 +428,10 @@ export default function JobPrintingLog() {
           </div>
         </div>
 
-        {/* TIME & OPERATOR METADATA STRIP */}
+        {/* OPERATOR & PERIOD METADATA STRIP */}
         <div class="time-strip">
           <div class="time-item"><span>OPERATOR:</span> <strong>${rawOperator || 'All Operators'}</strong></div>
           <div class="time-item"><span>SHIFT:</span> <strong>${reportShift || rawShift || 'All Shifts'}</strong></div>
-          <div class="time-item"><span>START TIME:</span> <strong class="badge-start">${rawStartTime || '—'}</strong></div>
-          <div class="time-item"><span>STOP TIME:</span> <strong class="badge-stop">${rawStopTime || '—'}</strong></div>
           <div class="time-item"><span>DATE PERIOD:</span> <strong>${formatDateDDMMYYYY(reportStartDate)} to ${formatDateDDMMYYYY(reportEndDate)}</strong></div>
         </div>
 
@@ -556,14 +554,14 @@ export default function JobPrintingLog() {
         <table>
           <thead>
             <tr>
-              <th style="width: 45px; text-align: center;">SHIFT</th>
-              <th style="width: 75px;">JOB CARD #</th>
-              <th>PARTY / CLIENT NAME</th>
-              <th>DESIGN NAME / #</th>
-              <th style="width: 55px; text-align: center;">MACHINE</th>
-              <th style="width: 45px; text-align: center;">PASS</th>
-              <th class="text-right" style="width: 95px;">METERS PRINTED</th>
-              <th style="width: 95px;">OPERATOR</th>
+              <th style="width: 40px; text-align: center;">SHIFT</th>
+              <th style="width: 70px;">JOB CARD #</th>
+              <th style="width: 140px;">PARTY / CLIENT NAME</th>
+              <th style="width: 80px;">DESIGN NAME</th>
+              <th style="width: 50px; text-align: center;">MACHINE</th>
+              <th style="width: 40px; text-align: center;">PASS</th>
+              <th class="text-right" style="width: 90px;">METERS PRINTED</th>
+              <th style="width: 85px;">OPERATOR</th>
             </tr>
           </thead>
           <tbody>

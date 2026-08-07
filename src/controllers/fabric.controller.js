@@ -1865,11 +1865,11 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           doc.text('SHIFT', ML + 4, currentY + 5, { width: 35, align: 'center' });
           doc.text('JOB CARD #', ML + 41, currentY + 5, { width: 65 });
           doc.text('PARTY / CLIENT', ML + 108, currentY + 5, { width: 105 });
-          doc.text('DESIGN NAME', ML + 215, currentY + 5, { width: 105 });
-          doc.text('MACHINE', ML + 322, currentY + 5, { width: 45, align: 'center' });
-          doc.text('PASS', ML + 369, currentY + 5, { width: 35, align: 'center' });
-          doc.text('METERS PRINTED', ML + 406, currentY + 5, { width: 65, align: 'right' });
-          doc.text('OPERATOR', ML + 473, currentY + 5, { width: 58 });
+          doc.text('DESIGN NAME', ML + 215, currentY + 5, { width: 80 });
+          doc.text('MACHINE', ML + 300, currentY + 5, { width: 45, align: 'center' });
+          doc.text('PASS', ML + 347, currentY + 5, { width: 35, align: 'center' });
+          doc.text('METERS PRINTED', ML + 384, currentY + 5, { width: 65, align: 'right' });
+          doc.text('OPERATOR', ML + 451, currentY + 5, { width: 75 });
           currentY += 18;
         };
 
@@ -1901,11 +1901,9 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
           doc.fillColor('#334155').font('Helvetica');
           doc.text(log.party, ML + 108, currentY + 4.5, { width: 105, lineBreak: false });
-          doc.text(log.design, ML + 215, currentY + 4.5, { width: 105, lineBreak: false });
+          doc.text(log.design, ML + 215, currentY + 4.5, { width: 80, lineBreak: false });
 
           doc.fillColor('#000000').font('Helvetica-Bold');
-          doc.text(machineShort, ML + 322, currentY + 4.5, { width: 45, align: 'center', lineBreak: false });
-          doc.text(passNum, ML + 369, currentY + 4.5, { width: 35, align: 'center', lineBreak: false });
 
           doc.fillColor('#047857').font('Helvetica-Bold');
           doc.text(`${log.meters.toFixed(2)} mtr`, ML + 406, currentY + 4.5, { width: 65, align: 'right', lineBreak: false });
