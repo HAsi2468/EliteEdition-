@@ -919,11 +919,30 @@ const downloadMachineProductionReportPdf = async (req, res) => {
     logger.info('Generating Production Report PDF %s → %s', dateStart, dateEnd);
 
     let query = {};
+    let logQuery = {};
     if (dateStart && dateEnd) {
       query.date = { $gte: dateStart, $lte: dateEnd };
+      const start = new Date(dateStart);
+      const end = new Date(dateEnd);
+      end.setHours(23, 59, 59, 999);
+      logQuery.date = { $gte: start, $lte: end };
     }
 
     const items = await db.JobCard.find(query).sort({ created_date_time: -1 }).lean();
+    const printLogs = await db.JobPrintLog.find(logQuery).sort({ date: -1 }).lean();
+
+    if (printLogs.length > 0) {
+      printLogs.forEach(l => {
+        items.push({
+          jobNo: l.jobNo,
+          machineName: l.machineName,
+          pass: l.pass,
+          totalMtr: l.meters,
+          date: l.date ? new Date(l.date).toLocaleDateString('en-IN') : '',
+          status: `${l.shift || 'Log'} (${l.pass || 'Run'})`
+        });
+      });
+    }
     
     let totalMtrs = 0;
     let grandoMtrs = 0;
@@ -933,9 +952,9 @@ const downloadMachineProductionReportPdf = async (req, res) => {
     items.forEach(item => {
       const mtr = Number(item.totalMtr) || 0;
       totalMtrs += mtr;
-      if (item.machineName === 'GRANDO') grandoMtrs += mtr;
-      if (item.machineName === 'PRINTDOT') printdotMtrs += mtr;
-      if (item.status === 'Done') completedCards += 1;
+      if (item.machineName && item.machineName.toUpperCase().includes('GRANDO')) grandoMtrs += mtr;
+      if (item.machineName && item.machineName.toUpperCase().includes('PRINTDOT')) printdotMtrs += mtr;
+      if (item.status === 'Done' || item.status.includes('Log')) completedCards += 1;
     });
 
     const doc = new PDFDocument({ margin: M, size: 'A4', bufferPages: true,

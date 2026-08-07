@@ -53,7 +53,7 @@ export default function ReportsCenter({ department }) {
 
   // Combined Multi-Report Modal state
   const [isCombinedModalOpen, setIsCombinedModalOpen] = useState(false);
-  const [selectedCombinedReports, setSelectedCombinedReports] = useState(['challan', 'inward', 'outward', 'lotwise', 'stock']);
+  const [selectedCombinedReports, setSelectedCombinedReports] = useState(['challan', 'inward', 'outward', 'lotwise', 'stock', 'machine']);
   const [combinedLoading, setCombinedLoading] = useState(false);
 
   // Fetch rooms list for sharing
@@ -2536,6 +2536,7 @@ export default function ReportsCenter({ department }) {
                     { id: 'challan', label: 'Fabric Challans Dispatch Outwards', desc: 'Dispatched meters, party name, billing name & TP rolls' },
                     { id: 'inward', label: 'Fabric Inwards Summary', desc: 'Supplier receipts, vendor details & inward meters' },
                     { id: 'outward', label: 'Fabric Consumption Summary', desc: 'Fabric consumed, job dispatches & shortage %' },
+                    { id: 'machine', label: 'Machine Printing Entry & Logs', desc: 'Machine & pass-wise meterage, total printed meters & jobcard count' },
                     { id: 'lotwise', label: 'Lot-Wise Fabric Stock Balance Summary', desc: 'Lot-level stock balance & net remaining meters' },
                     { id: 'stock', label: 'Fabric Current Stock Summary', desc: 'Available fabric quality stock levels & status' }
                   ].map(rep => (

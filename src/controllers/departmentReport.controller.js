@@ -1,4 +1,4 @@
-const { JobCard, Design, RawMaterialTransaction } = require('../db/models');
+const { JobCard, Design, RawMaterialTransaction, JobPrintLog } = require('../db/models');
 const FabricTransaction = require('../db/models/fabricTransaction.model');
 
 /**
@@ -18,6 +18,18 @@ const getElitePrintReports = async (req, res) => {
       matchStage.date = {};
       if (cleanDateStart) matchStage.date.$gte = cleanDateStart;
       if (cleanDateEnd) matchStage.date.$lte = cleanDateEnd;
+    }
+
+    // Match stage for JobPrintLog
+    const logDateMatch = {};
+    if (dateStart || dateEnd) {
+      logDateMatch.date = {};
+      if (dateStart) logDateMatch.date.$gte = new Date(dateStart);
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        logDateMatch.date.$lte = end;
+      }
     }
 
     // Match stage for Design (which uses Date object `created_date_time`)
@@ -47,21 +59,46 @@ const getElitePrintReports = async (req, res) => {
       { $sort: { count: -1 } }
     ]);
 
-    // 3. Machine Speed & Meterage Report (from JobCard Collection)
-    const machineMeterage = await JobCard.aggregate([
-      { $match: matchStage },
+    // 3. Machine Speed & Meterage Report (from JobPrintLog & JobCard)
+    let machineMeterage = await JobPrintLog.aggregate([
+      { $match: logDateMatch },
       {
         $group: {
           _id: {
             machineName: "$machineName",
-            speed: "$speed",
             pass: "$pass"
           },
-          totalMtr: { $sum: { $convert: { input: "$printMtr", to: "double", onError: 0, onNull: 0 } } }
+          totalMtr: { $sum: "$meters" },
+          uniqueJobNos: { $addToSet: "$jobNo" }
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          totalMtr: 1,
+          totalJobs: { $size: "$uniqueJobNos" }
         }
       },
       { $sort: { totalMtr: -1 } }
     ]);
+
+    if (machineMeterage.length === 0) {
+      machineMeterage = await JobCard.aggregate([
+        { $match: matchStage },
+        {
+          $group: {
+            _id: {
+              machineName: "$machineName",
+              speed: "$speed",
+              pass: "$pass"
+            },
+            totalMtr: { $sum: { $convert: { input: "$printMtr", to: "double", onError: 0, onNull: 0 } } },
+            totalJobs: { $sum: 1 }
+          }
+        },
+        { $sort: { totalMtr: -1 } }
+      ]);
+    }
 
     // 4. Fusing Operator Throughput
     const fusingMatchStage = { fusingStatus: "Fusing Done" };
@@ -416,17 +453,49 @@ const downloadElitePrintPdf = async (req, res) => {
       if (cleanDateEnd) matchStage.date.$lte = cleanDateEnd;
     }
 
-    const machineMeterage = await JobCard.aggregate([
-      { $match: matchStage },
+    const logDateMatch = {};
+    if (dateStart || dateEnd) {
+      logDateMatch.date = {};
+      if (dateStart) logDateMatch.date.$gte = new Date(dateStart);
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        logDateMatch.date.$lte = end;
+      }
+    }
+
+    let machineMeterage = await JobPrintLog.aggregate([
+      { $match: logDateMatch },
       {
         $group: {
           _id: { machineName: "$machineName", pass: "$pass" },
-          totalMtr: { $sum: { $convert: { input: "$printMtr", to: "double", onError: 0, onNull: 0 } } },
-          totalJobs: { $sum: 1 }
+          totalMtr: { $sum: "$meters" },
+          uniqueJobNos: { $addToSet: "$jobNo" }
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          totalMtr: 1,
+          totalJobs: { $size: "$uniqueJobNos" }
         }
       },
       { $sort: { totalMtr: -1 } }
     ]);
+
+    if (machineMeterage.length === 0) {
+      machineMeterage = await JobCard.aggregate([
+        { $match: matchStage },
+        {
+          $group: {
+            _id: { machineName: "$machineName", pass: "$pass" },
+            totalMtr: { $sum: { $convert: { input: "$printMtr", to: "double", onError: 0, onNull: 0 } } },
+            totalJobs: { $sum: 1 }
+          }
+        },
+        { $sort: { totalMtr: -1 } }
+      ]);
+    }
 
     const topDesigns = await JobCard.aggregate([
       { $match: { ...matchStage, designName: { $exists: true, $ne: "" } } },

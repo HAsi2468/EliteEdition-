@@ -1301,10 +1301,12 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     const fs = require('fs');
 
     const FabricChallan = require('../db/models/fabricChallan.model');
+    const JobPrintLog = require('../db/models/jobPrintLog.model');
+    const JobCard = require('../db/models/jobCard.model');
 
     const selectedReports = reports
       ? reports.split(',').map(s => s.trim().toLowerCase())
-      : ['challan', 'inward', 'outward', 'lotwise', 'stock'];
+      : ['challan', 'inward', 'outward', 'lotwise', 'stock', 'machine'];
 
     const dateFilter = {};
     if (dateStart || dateEnd) {
@@ -1366,6 +1368,136 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       stockSummaryData = await FabricTransaction.aggregate(stockPipeline);
     }
 
+    let machineData = [];
+    let totalMachinePrintedMtr = 0;
+    let totalMachineJobCardCount = 0;
+
+    if (selectedReports.includes('machine') || selectedReports.includes('machine_print')) {
+      let logDateFilter = {};
+      if (dateStart || dateEnd) {
+        const dateConditions = [];
+        const ds = dateStart ? new Date(dateStart) : null;
+        if (ds) ds.setHours(0, 0, 0, 0);
+        const de = dateEnd ? new Date(dateEnd) : null;
+        if (de) de.setHours(23, 59, 59, 999);
+
+        if (ds && de) {
+          dateConditions.push({ date: { $gte: ds, $lte: de } });
+          dateConditions.push({ created_date_time: { $gte: ds, $lte: de } });
+        } else if (ds) {
+          dateConditions.push({ date: { $gte: ds } });
+          dateConditions.push({ created_date_time: { $gte: ds } });
+        } else if (de) {
+          dateConditions.push({ date: { $lte: de } });
+          dateConditions.push({ created_date_time: { $lte: de } });
+        }
+        if (dateConditions.length > 0) {
+          logDateFilter = { $or: dateConditions };
+        }
+      }
+
+      // 1. Fetch print logs from JobPrintLog collection (Machine Printing Entry & Logs Screen)
+      const printLogs = await JobPrintLog.find(logDateFilter).sort({ date: -1 }).lean();
+
+      // 2. Fetch job cards with machineName assigned
+      const cleanDateStart = dateStart ? dateStart.split('T')[0] : '';
+      const cleanDateEnd = dateEnd ? dateEnd.split('T')[0] : '';
+      const jcDateFilter = { machineName: { $exists: true, $ne: '' } };
+      if (cleanDateStart || cleanDateEnd) {
+        jcDateFilter.date = {};
+        if (cleanDateStart) jcDateFilter.date.$gte = cleanDateStart;
+        if (cleanDateEnd) jcDateFilter.date.$lte = cleanDateEnd;
+      }
+      const jobCards = await JobCard.find(jcDateFilter).lean();
+
+      // Map to group by machineName + pass
+      const machineMap = {};
+      const globalJobSet = new Set();
+
+      // Process JobPrintLog entries (from Machine Printing Entry & Logs Screen)
+      printLogs.forEach(log => {
+        const mName = (log.machineName || 'Unknown Machine').trim();
+        const passName = (log.pass || 'Standard').trim();
+        const key = `${mName.toUpperCase()}__${passName.toUpperCase()}`;
+
+        if (!machineMap[key]) {
+          machineMap[key] = {
+            machineName: mName,
+            pass: passName,
+            totalMtr: 0,
+            jobNos: new Set(),
+            logCount: 0,
+            hasLogs: true
+          };
+        }
+
+        const mtr = Number(log.meters) || 0;
+        machineMap[key].totalMtr += mtr;
+        machineMap[key].logCount += 1;
+        if (log.jobNo) {
+          machineMap[key].jobNos.add(log.jobNo);
+          globalJobSet.add(log.jobNo);
+        }
+      });
+
+      // Process JobCard entries (for any job cards with machine info that don't have log entries)
+      const loggedJobCardIds = new Set(printLogs.map(l => String(l.jobCardId)).filter(Boolean));
+
+      jobCards.forEach(jc => {
+        // If this JobCard already has print logs, its meters were counted from JobPrintLog above
+        if (loggedJobCardIds.has(String(jc._id))) {
+          return;
+        }
+
+        const mName = (jc.machineName || 'Unknown Machine').trim();
+        const passName = (jc.pass || 'Standard').trim();
+        const key = `${mName.toUpperCase()}__${passName.toUpperCase()}`;
+
+        if (!machineMap[key]) {
+          machineMap[key] = {
+            machineName: mName,
+            pass: passName,
+            totalMtr: 0,
+            jobNos: new Set(),
+            logCount: 0,
+            hasLogs: false
+          };
+        }
+
+        const parseMtr = (val) => {
+          if (!val) return 0;
+          const match = String(val).match(/[\d.]+/);
+          return match ? parseFloat(match[0]) : 0;
+        };
+
+        const mtr = parseMtr(jc.printMtr) || parseMtr(jc.totalMtr) || 0;
+        if (mtr > 0) {
+          machineMap[key].totalMtr += mtr;
+          if (jc.jobNo) {
+            machineMap[key].jobNos.add(jc.jobNo);
+            globalJobSet.add(jc.jobNo);
+          }
+        }
+      });
+
+      // Convert machineMap to array and calculate totals
+      machineData = Object.values(machineMap).map(item => {
+        totalMachinePrintedMtr += item.totalMtr;
+        return {
+          machineName: item.machineName,
+          pass: item.pass,
+          totalMtr: item.totalMtr,
+          jobCardCount: item.jobNos.size,
+          logCount: item.logCount
+        };
+      });
+
+      // Sort by machineName then pass
+      machineData.sort((a, b) => a.machineName.localeCompare(b.machineName) || a.pass.localeCompare(b.pass));
+
+      totalMachineJobCardCount = globalJobSet.size;
+    }
+
     const totalInwardMtr = inwardData.reduce((s, r) => s + (r.qty || 0), 0);
     const totalOutwardMtr = outwardData.reduce((s, r) => s + (r.qty || 0), 0);
     const totalChallanMtr = challanData.reduce((s, c) => s + (c.totalMtr || 0), 0);
@@ -1422,6 +1554,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       selectedReports.includes('challan') && { label: 'CHALLAN DISPATCHES', val: `${totalChallanMtr.toFixed(2)} mtr`, sub: `${challanData.length} Challans (${totalChallanTp} TP)` },
       selectedReports.includes('inward') && { label: 'FABRIC INWARD', val: `${totalInwardMtr.toFixed(2)} mtr`, sub: `${inwardData.length} Receipts` },
       selectedReports.includes('outward') && { label: 'FABRIC CONSUMPTION', val: `${totalOutwardMtr.toFixed(2)} mtr`, sub: `${outwardData.length} Dispatches` },
+      (selectedReports.includes('machine') || selectedReports.includes('machine_print')) && { label: 'MACHINE PRINTED', val: `${totalMachinePrintedMtr.toFixed(2)} mtr`, sub: `${totalMachineJobCardCount} Job Cards` },
     ].filter(Boolean);
 
     const cardCount1 = periodSections.length || 1;
@@ -1640,6 +1773,72 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         doc.text(`${parseFloat(r.qty || 0).toFixed(2)}`, ML + 495, currentY + 4.5, { width: 36, align: 'right', lineBreak: false });
         currentY += 18;
       });
+
+      currentY += 12;
+    }
+
+    // ── 4. MACHINE PRINTING ENTRY & LOGS SUMMARY (MACHINE & PASS WISE) ──
+    if (selectedReports.includes('machine') || selectedReports.includes('machine_print')) {
+      checkAddPage(60);
+
+      doc.rect(ML, currentY, contentWidth, 20).fill('#ede9fe').stroke('#ddd6fe');
+      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
+        .text('4. MACHINE PRINTING ENTRY & LOGS (MACHINE & PASS WISE)', ML + 8, currentY + 5, { lineBreak: false });
+      doc.fillColor('#5b21b6').fontSize(8.5).font('Helvetica-Bold')
+        .text(`Total: ${totalMachinePrintedMtr.toFixed(2)} mtr (${totalMachineJobCardCount} Job Cards)`, ML + contentWidth - 250, currentY + 5, { width: 240, align: 'right', lineBreak: false });
+
+      currentY += 24;
+
+      const drawMachineHeaders = () => {
+        doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
+        doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
+        doc.text('MACHINE NAME', ML + 4, currentY + 5, { width: 170 });
+        doc.text('PASS / CONFIG', ML + 178, currentY + 5, { width: 140 });
+        doc.text('JOBCARD COUNT', ML + 322, currentY + 5, { width: 90, align: 'center' });
+        doc.text('TOTAL METERS PRINTED', ML + 416, currentY + 5, { width: 115, align: 'right' });
+        currentY += 18;
+      };
+
+      drawMachineHeaders();
+
+      if (machineData.length === 0) {
+        doc.rect(ML, currentY, contentWidth, 18).fill('#ffffff');
+        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
+        doc.fillColor('#64748b').fontSize(7.5).font('Helvetica').text('No machine printing entry logs found for selected period.', ML + 4, currentY + 4.5, { width: contentWidth - 8, align: 'center' });
+        currentY += 18;
+      } else {
+        machineData.forEach((row, idx) => {
+          if (checkAddPage(20)) {
+            drawMachineHeaders();
+          }
+          const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
+          doc.rect(ML, currentY, contentWidth, 18).fill(bg);
+          doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
+
+          doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
+          doc.text(row.machineName, ML + 4, currentY + 4.5, { width: 170, lineBreak: false });
+          doc.fillColor('#334155').font('Helvetica');
+          doc.text(row.pass, ML + 178, currentY + 4.5, { width: 140, lineBreak: false });
+          doc.fillColor('#0284c7').font('Helvetica-Bold');
+          doc.text(`${row.jobCardCount} Job Cards`, ML + 322, currentY + 4.5, { width: 90, align: 'center', lineBreak: false });
+          doc.fillColor('#047857').font('Helvetica-Bold');
+          doc.text(`${parseFloat(row.totalMtr || 0).toFixed(2)} mtr`, ML + 416, currentY + 4.5, { width: 115, align: 'right', lineBreak: false });
+          currentY += 18;
+        });
+
+        // Summary Total Row
+        if (checkAddPage(20)) {
+          drawMachineHeaders();
+        }
+        doc.rect(ML, currentY, contentWidth, 18).fill('#f1f5f9').stroke('#cbd5e1');
+        doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
+        doc.text('TOTAL MACHINE PRINTING:', ML + 4, currentY + 4.5, { width: 310, lineBreak: false });
+        doc.fillColor('#0284c7').font('Helvetica-Bold');
+        doc.text(`${totalMachineJobCardCount} Job Cards`, ML + 322, currentY + 4.5, { width: 90, align: 'center', lineBreak: false });
+        doc.fillColor('#047857').font('Helvetica-Bold');
+        doc.text(`${totalMachinePrintedMtr.toFixed(2)} mtr`, ML + 416, currentY + 4.5, { width: 115, align: 'right', lineBreak: false });
+        currentY += 18;
+      }
 
       currentY += 12;
     }
