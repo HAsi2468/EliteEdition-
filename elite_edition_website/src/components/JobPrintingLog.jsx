@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import {
-  Printer, PlusCircle, Search, RefreshCw, Trash2, Edit2, CheckCircle2,
+  Printer, PlusCircle, Search, RefreshCw, Trash2, Edit2, Edit, CheckCircle2,
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
   X, Download, Eye, Layers3, Activity, Tag, Sparkles, FileText
 } from 'lucide-react';
