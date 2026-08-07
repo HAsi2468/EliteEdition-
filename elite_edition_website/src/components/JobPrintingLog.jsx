@@ -144,6 +144,7 @@ export default function JobPrintingLog() {
         const grando = { C: 0, M: 0, Y: 0, K: 0 };
         const printdot = { C: 0, M: 0, Y: 0, K: 0 };
         const pannaMap = {};
+        const paperList = [];
 
         filtered.forEach(t => {
           const mName = (t.materialName || '').toLowerCase();
@@ -162,6 +163,13 @@ export default function JobPrintingLog() {
           } else if (mName.includes('paper') || t.panna) {
             const pKey = t.panna ? (t.panna.toLowerCase().includes('panna') || t.panna.includes('"') ? t.panna : `${t.panna} Panna`) : 'Paper Roll';
             pannaMap[pKey] = (pannaMap[pKey] || 0) + q;
+            paperList.push({
+              id: paperList.length + 1,
+              paperType: t.materialName || 'Sublimation Paper',
+              paperPanna: t.panna ? (t.panna.toLowerCase().includes('panna') || t.panna.includes('"') ? t.panna : `${t.panna} Panna`) : '44" Panna',
+              paperCustomPanna: '',
+              paperRollsQty: q ? q.toString() : ''
+            });
           }
         });
 
@@ -170,6 +178,35 @@ export default function JobPrintingLog() {
           printdotInk: printdot,
           paperPanna: pannaMap
         });
+
+        // Sync input state for editable summary table when Date Filter changes
+        setGrandoInkC(grando.C > 0 ? grando.C.toString() : '');
+        setGrandoInkM(grando.M > 0 ? grando.M.toString() : '');
+        setGrandoInkY(grando.Y > 0 ? grando.Y.toString() : '');
+        setGrandoInkK(grando.K > 0 ? grando.K.toString() : '');
+
+        setPrintdotInkC(printdot.C > 0 ? printdot.C.toString() : '');
+        setPrintdotInkM(printdot.M > 0 ? printdot.M.toString() : '');
+        setPrintdotInkY(printdot.Y > 0 ? printdot.Y.toString() : '');
+        setPrintdotInkK(printdot.K > 0 ? printdot.K.toString() : '');
+
+        if (paperList.length > 0) {
+          while (paperList.length < 2) {
+            paperList.push({
+              id: paperList.length + 1,
+              paperType: 'Sublimation Paper',
+              paperPanna: '44" Panna',
+              paperCustomPanna: '',
+              paperRollsQty: ''
+            });
+          }
+          setPaperEntries(paperList);
+        } else {
+          setPaperEntries([
+            { id: 1, paperType: 'Sublimation Paper', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' },
+            { id: 2, paperType: 'Sublimation Paper', paperPanna: '58" Panna', paperCustomPanna: '', paperRollsQty: '' }
+          ]);
+        }
       }
     } catch (err) {
       console.warn('Failed to fetch raw material summary:', err);
@@ -1368,7 +1405,7 @@ export default function JobPrintingLog() {
       <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: '4px solid #10b981', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Sparkles size={16} /> Raw Material Consumption Summary (Editable)
+            <Sparkles size={16} /> Raw Material Consumption Summary
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
