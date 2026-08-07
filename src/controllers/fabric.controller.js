@@ -1424,9 +1424,15 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       // 1. Fetch print logs strictly from JobPrintLog collection (Machine Printing Entry & Logs Screen)
       const printLogs = await JobPrintLog.find(logDateFilter).sort({ date: -1, created_date_time: -1 }).lean();
 
-      // 1B. Fetch Raw Material Outward Usage logs for selected date range
+      // 1B. Fetch Raw Material Outward Usage logs for selected date range (strictly by date range)
       const RawMaterialTransaction = require('../db/models/rawMaterialTransaction.model');
-      var rawMaterialLogs = await RawMaterialTransaction.find({ type: 'OUTWARD', ...logDateFilter }).sort({ date: -1, createdAt: -1 }).lean();
+      const rawMaterialDateFilter = { type: 'OUTWARD' };
+      if (dateStart || dateEnd) {
+        rawMaterialDateFilter.date = {};
+        if (dateStart) rawMaterialDateFilter.date.$gte = new Date(dateStart + 'T00:00:00.000Z');
+        if (dateEnd) rawMaterialDateFilter.date.$lte = new Date(dateEnd + 'T23:59:59.999Z');
+      }
+      var rawMaterialLogs = await RawMaterialTransaction.find(rawMaterialDateFilter).sort({ date: -1, createdAt: -1 }).lean();
 
       // 2. Fetch all job cards to map client/party name and design name
       const allJobCardsList = await JobCard.find({}).select('jobNo party designName designNo').lean();
