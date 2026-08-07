@@ -1375,21 +1375,32 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     if (selectedReports.includes('machine') || selectedReports.includes('machine_print')) {
       let logDateFilter = {};
       if (dateStart || dateEnd) {
-        const dateConditions = [];
-        const ds = dateStart ? new Date(dateStart) : null;
-        if (ds) ds.setHours(0, 0, 0, 0);
-        const de = dateEnd ? new Date(dateEnd) : null;
-        if (de) de.setHours(23, 59, 59, 999);
+        const dsStr = dateStart ? dateStart.split('T')[0] : '';
+        const deStr = dateEnd ? dateEnd.split('T')[0] : '';
 
-        if (ds && de) {
-          dateConditions.push({ date: { $gte: ds, $lte: de } });
-          dateConditions.push({ created_date_time: { $gte: ds, $lte: de } });
-        } else if (ds) {
-          dateConditions.push({ date: { $gte: ds } });
-          dateConditions.push({ created_date_time: { $gte: ds } });
-        } else if (de) {
-          dateConditions.push({ date: { $lte: de } });
-          dateConditions.push({ created_date_time: { $lte: de } });
+        const dsLocal = dsStr ? new Date(`${dsStr}T00:00:00.000`) : null;
+        const deLocal = deStr ? new Date(`${deStr}T23:59:59.999`) : null;
+
+        const dsUtc = dsStr ? new Date(`${dsStr}T00:00:00.000Z`) : null;
+        const deUtc = deStr ? new Date(`${deStr}T23:59:59.999Z`) : null;
+
+        const dateConditions = [];
+        if (dsStr && deStr) {
+          dateConditions.push({ date: { $gte: dsLocal, $lte: deLocal } });
+          dateConditions.push({ date: { $gte: dsUtc, $lte: deUtc } });
+          dateConditions.push({ created_date_time: { $gte: dsLocal, $lte: deLocal } });
+          dateConditions.push({ created_date_time: { $gte: dsUtc, $lte: deUtc } });
+          dateConditions.push({ date: { $gte: dsStr, $lte: deStr } });
+        } else if (dsStr) {
+          dateConditions.push({ date: { $gte: dsLocal } });
+          dateConditions.push({ date: { $gte: dsUtc } });
+          dateConditions.push({ created_date_time: { $gte: dsLocal } });
+          dateConditions.push({ date: { $gte: dsStr } });
+        } else if (deStr) {
+          dateConditions.push({ date: { $lte: deLocal } });
+          dateConditions.push({ date: { $lte: deUtc } });
+          dateConditions.push({ created_date_time: { $lte: deLocal } });
+          dateConditions.push({ date: { $lte: deStr } });
         }
         if (dateConditions.length > 0) {
           logDateFilter = { $or: dateConditions };
@@ -1410,21 +1421,10 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         logDateFilter.pass = { $regex: qPass.trim(), $options: 'i' };
       }
 
-      // 1. Fetch print logs from JobPrintLog collection (Machine Printing Entry & Logs Screen)
-      const printLogs = await JobPrintLog.find(logDateFilter).sort({ date: -1 }).lean();
+      // 1. Fetch print logs strictly from JobPrintLog collection (Machine Printing Entry & Logs Screen)
+      const printLogs = await JobPrintLog.find(logDateFilter).sort({ date: -1, created_date_time: -1 }).lean();
 
-      // 2. Fetch job cards with machineName assigned
-      const cleanDateStart = dateStart ? dateStart.split('T')[0] : '';
-      const cleanDateEnd = dateEnd ? dateEnd.split('T')[0] : '';
-      const jcDateFilter = { machineName: { $exists: true, $ne: '' } };
-      if (cleanDateStart || cleanDateEnd) {
-        jcDateFilter.date = {};
-        if (cleanDateStart) jcDateFilter.date.$gte = cleanDateStart;
-        if (cleanDateEnd) jcDateFilter.date.$lte = cleanDateEnd;
-      }
-      const jobCards = await JobCard.find(jcDateFilter).lean();
-
-      // Map matching job card party & design
+      // 2. Fetch all job cards to map client/party name and design name
       const allJobCardsList = await JobCard.find({}).select('jobNo party designName designNo').lean();
       const jobCardMapByNo = {};
       const jobCardMapById = {};
@@ -1449,11 +1449,10 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         };
       });
 
-      // Map to group by machineName + pass
+      // Map to group strictly by machineName + pass from actual JobPrintLog entries
       const machineMap = {};
       const globalJobSet = new Set();
 
-      // Process JobPrintLog entries (from Machine Printing Entry & Logs Screen)
       printLogs.forEach(log => {
         const mName = (log.machineName || 'Unknown Machine').trim();
         const passName = (log.pass || 'Standard').trim();
@@ -1465,8 +1464,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
             pass: passName,
             totalMtr: 0,
             jobNos: new Set(),
-            logCount: 0,
-            hasLogs: true
+            logCount: 0
           };
         }
 
@@ -1479,47 +1477,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         }
       });
 
-      // Process JobCard entries (for any job cards with machine info that don't have log entries)
-      const loggedJobCardIds = new Set(printLogs.map(l => String(l.jobCardId)).filter(Boolean));
-
-      jobCards.forEach(jc => {
-        // If this JobCard already has print logs, its meters were counted from JobPrintLog above
-        if (loggedJobCardIds.has(String(jc._id))) {
-          return;
-        }
-
-        const mName = (jc.machineName || 'Unknown Machine').trim();
-        const passName = (jc.pass || 'Standard').trim();
-        const key = `${mName.toUpperCase()}__${passName.toUpperCase()}`;
-
-        if (!machineMap[key]) {
-          machineMap[key] = {
-            machineName: mName,
-            pass: passName,
-            totalMtr: 0,
-            jobNos: new Set(),
-            logCount: 0,
-            hasLogs: false
-          };
-        }
-
-        const parseMtr = (val) => {
-          if (!val) return 0;
-          const match = String(val).match(/[\d.]+/);
-          return match ? parseFloat(match[0]) : 0;
-        };
-
-        const mtr = parseMtr(jc.printMtr) || parseMtr(jc.totalMtr) || 0;
-        if (mtr > 0) {
-          machineMap[key].totalMtr += mtr;
-          if (jc.jobNo) {
-            machineMap[key].jobNos.add(jc.jobNo);
-            globalJobSet.add(jc.jobNo);
-          }
-        }
-      });
-
-      // Convert machineMap to array and calculate totals
+      // Convert machineMap to array and calculate exact totals
       machineData = Object.values(machineMap).map(item => {
         totalMachinePrintedMtr += item.totalMtr;
         return {
