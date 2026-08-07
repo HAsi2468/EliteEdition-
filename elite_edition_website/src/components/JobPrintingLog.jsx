@@ -530,12 +530,23 @@ export default function JobPrintingLog() {
               const printdotY = printdotInkY ? Number(printdotInkY).toFixed(2) : (rawMaterialSummary.printdotInk.Y ? rawMaterialSummary.printdotInk.Y.toFixed(2) : '');
               const printdotK = printdotInkK ? Number(printdotInkK).toFixed(2) : (rawMaterialSummary.printdotInk.K ? rawMaterialSummary.printdotInk.K.toFixed(2) : '');
 
-              const row1Paper = paperEntries[0] || {};
-              const row2Paper = paperEntries[1] || {};
-              const extraPapers = paperEntries.slice(2);
+              // Aggregate paper entries by Paper Type + Panna to avoid duplicate paper rows
+              const paperAggMap = {};
+              paperEntries.forEach(p => {
+                const pType = p.paperType || 'Sublimation Paper';
+                const pPanna = p.paperPanna === 'Custom' ? (p.paperCustomPanna || '44" Panna') : (p.paperPanna || '44" Panna');
+                const q = Number(p.paperRollsQty) || 0;
+                const key = `${pType}__${pPanna}`;
+                if (!paperAggMap[key]) {
+                  paperAggMap[key] = { paperType: pType, paperPanna: pPanna, paperRollsQty: 0 };
+                }
+                paperAggMap[key].paperRollsQty += q;
+              });
 
-              const row1Panno = row1Paper.paperPanna === 'Custom' ? (row1Paper.paperCustomPanna || '') : (row1Paper.paperPanna || '');
-              const row2Panno = row2Paper.paperPanna === 'Custom' ? (row2Paper.paperCustomPanna || '') : (row2Paper.paperPanna || '');
+              const aggPapersList = Object.values(paperAggMap);
+              const row1Paper = aggPapersList[0] || {};
+              const row2Paper = aggPapersList[1] || {};
+              const extraPapers = aggPapersList.slice(2);
 
               return `
                 <tr>
@@ -545,8 +556,8 @@ export default function JobPrintingLog() {
                   <td class="text-right bold" style="color:#ca8a04;">${grandoY}</td>
                   <td class="text-right bold" style="color:#334155;">${grandoK}</td>
                   <td>${row1Paper.paperType || ''}</td>
-                  <td>${row1Panno}</td>
-                  <td class="text-right bold">${row1Paper.paperRollsQty ? `${row1Paper.paperRollsQty} Rolls` : ''}</td>
+                  <td>${row1Paper.paperPanna || ''}</td>
+                  <td class="text-right bold">${row1Paper.paperRollsQty > 0 ? `${row1Paper.paperRollsQty} Rolls` : ''}</td>
                 </tr>
                 <tr>
                   <td class="bold">PRINTDOT</td>
@@ -555,16 +566,16 @@ export default function JobPrintingLog() {
                   <td class="text-right bold" style="color:#ca8a04;">${printdotY}</td>
                   <td class="text-right bold" style="color:#334155;">${printdotK}</td>
                   <td>${row2Paper.paperType || ''}</td>
-                  <td>${row2Panno}</td>
-                  <td class="text-right bold">${row2Paper.paperRollsQty ? `${row2Paper.paperRollsQty} Rolls` : ''}</td>
+                  <td>${row2Paper.paperPanna || ''}</td>
+                  <td class="text-right bold">${row2Paper.paperRollsQty > 0 ? `${row2Paper.paperRollsQty} Rolls` : ''}</td>
                 </tr>
                 ${extraPapers.map(p => `
                   <tr>
                     <td class="bold"></td>
                     <td></td><td></td><td></td><td></td>
                     <td>${p.paperType || ''}</td>
-                    <td>${p.paperPanna === 'Custom' ? p.paperCustomPanna : (p.paperPanna || '')}</td>
-                    <td class="text-right bold">${p.paperRollsQty ? `${p.paperRollsQty} Rolls` : ''}</td>
+                    <td>${p.paperPanna || ''}</td>
+                    <td class="text-right bold">${p.paperRollsQty > 0 ? `${p.paperRollsQty} Rolls` : ''}</td>
                   </tr>
                 `).join('')}
               `;

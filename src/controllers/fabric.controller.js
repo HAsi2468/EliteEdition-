@@ -1533,6 +1533,21 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     const endDateStr = dateEnd ? new Date(dateEnd).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Present';
     const logoPath = path.join(__dirname, 'Logo.png');
 
+    let startTimeVal = startTime || '';
+    let stopTimeVal = stopTime || '';
+
+    if ((!startTimeVal || !stopTimeVal) && typeof rawMaterialLogs !== 'undefined' && rawMaterialLogs && rawMaterialLogs.length > 0) {
+      rawMaterialLogs.forEach(log => {
+        if (log.notes) {
+          const tm = log.notes.match(/Time:\s*([^\s|]+(?:\s*[AP]M)?)\s*to\s*([^\s|]+(?:\s*[AP]M)?)/i);
+          if (tm) {
+            if (!startTimeVal) startTimeVal = tm[1];
+            if (!stopTimeVal) stopTimeVal = tm[2];
+          }
+        }
+      });
+    }
+
     const drawPageHeader = (isFirstPage = false) => {
       if (fs.existsSync(logoPath)) {
         doc.image(logoPath, ML, 14, { width: 110 });
@@ -1542,7 +1557,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         .text('ELITE DIGITAL PRINTS — PRINTING REPORT', ML + 130, 16, { width: contentWidth - 130, align: 'right' });
 
       let timeText = `Report Period: ${startDateStr} to ${endDateStr}`;
-      if (startTime || stopTime) timeText += ` | Shift Time: ${startTime || '—'} to ${stopTime || '—'}`;
+      if (startTimeVal || stopTimeVal) timeText += ` | Shift Time: ${startTimeVal || '—'} to ${stopTimeVal || '—'}`;
       if (operator) timeText += ` | Operator: ${operator}`;
 
       doc.fillColor('#475569').fontSize(8).font('Helvetica-Bold')
@@ -1929,14 +1944,14 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         currentY += 18;
       }
 
-      // ── 4C. RAW MATERIAL CONSUMPTION SUMMARY TABLE (LIKE USER IMAGE LAYOUT) ──
+      // ── 4C. RAW MATERIAL CONSUMPTION SUMMARY TABLE (AGGREGATED NO DUPLICATES) ──
       if (typeof rawMaterialLogs !== 'undefined' && rawMaterialLogs && rawMaterialLogs.length > 0) {
         currentY += 12;
         checkAddPage(70);
 
         const grandoInk = { C: 0, M: 0, Y: 0, K: 0 };
         const printdotInk = { C: 0, M: 0, Y: 0, K: 0 };
-        const paperRowsList = [];
+        const paperMap = {};
 
         rawMaterialLogs.forEach(t => {
           const mName = (t.materialName || '').toLowerCase();
@@ -1953,10 +1968,21 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
             else if (mName.includes('yellow') || t.color === 'Yellow') printdotInk.Y += q;
             else if (mName.includes('black') || t.color === 'Black') printdotInk.K += q;
           } else if (mName.includes('paper') || t.panna) {
-            const pKey = t.panna ? (t.panna.toLowerCase().includes('panna') || t.panna.includes('"') ? t.panna : `${t.panna} PANNA`) : 'PAPER';
-            paperRowsList.push({ paperType: t.materialName || 'Sublimation Paper', panno: pKey, qty: `${q} Rolls` });
+            const pType = t.materialName || 'Sublimation Paper';
+            const pKey = t.panna ? (t.panna.toLowerCase().includes('panna') || t.panna.includes('"') ? t.panna : `${t.panna} PANNA`) : '44 PANNA';
+            const groupKey = `${pType}__${pKey}`;
+            if (!paperMap[groupKey]) {
+              paperMap[groupKey] = { paperType: pType, panno: pKey, qty: 0 };
+            }
+            paperMap[groupKey].qty += q;
           }
         });
+
+        const paperRowsList = Object.values(paperMap).map(p => ({
+          paperType: p.paperType,
+          panno: p.panno,
+          qty: p.qty > 0 ? `${p.qty} Rolls` : ''
+        }));
 
         doc.rect(ML, currentY, contentWidth, 18).fill('#dcfce7').stroke('#86efac');
         doc.fillColor('#14532d').fontSize(8).font('Helvetica-Bold')
