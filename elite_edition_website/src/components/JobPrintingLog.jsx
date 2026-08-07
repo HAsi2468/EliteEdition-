@@ -78,6 +78,17 @@ export default function JobPrintingLog() {
   const [jobHistoryData, setJobHistoryData] = useState(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // Dedicated Digital Operator Report Modal State
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportStartDate, setReportStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [reportEndDate, setReportEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [reportMachine, setReportMachine] = useState('');
+  const [reportShift, setReportShift] = useState('');
+  const [reportOperator, setReportOperator] = useState('');
+  const [reportPass, setReportPass] = useState('');
+  const [reportSearchJob, setReportSearchJob] = useState('');
+  const [reportLoadingPdf, setReportLoadingPdf] = useState(false);
+
   // Load Machines from Print Settings Config
   const fetchPrintConfig = async () => {
     try {
@@ -458,10 +469,7 @@ export default function JobPrintingLog() {
               {/* Button 1: Report */}
               <button
                 type="button"
-                onClick={() => {
-                  window.dispatchEvent(new CustomEvent('elite-navigate-tab', { detail: 'jobcards' }));
-                  api.downloadFabricCombinedReportPdf(dateStart, dateEnd, ['machine'], `Printing_Report_${dateStart}_to_${dateEnd}.pdf`);
-                }}
+                onClick={() => setShowReportModal(true)}
                 className="btn-primary"
                 style={{
                   padding: '0.4rem 0.85rem',
@@ -924,6 +932,401 @@ export default function JobPrintingLog() {
                 Close History Window
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 5. DEDICATED DIGITAL OPERATOR PRINTING REPORT MODAL ── */}
+      {showReportModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1000,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(5px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div className="glass-panel" style={{
+            width: '100%',
+            maxWidth: '1100px',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            background: 'var(--bg-card, #131722)',
+            borderRadius: '16px',
+            border: '1px solid var(--border-light, #2a324b)',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.7)',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid var(--border-light)',
+              display: 'flex',
+              justify: 'space-between',
+              alignItems: 'center',
+              background: 'linear-gradient(135deg, rgba(124,58,237,0.15) 0%, rgba(56,189,248,0.05) 100%)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
+                  background: 'linear-gradient(135deg, #7c3aed, #4c1d95)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justify: 'center',
+                  boxShadow: '0 4px 14px rgba(124,58,237,0.35)'
+                }}>
+                  <Activity size={22} color="#fff" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                    Digital Operator Printing Production Report
+                  </h3>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2, margin: 0 }}>
+                    Filter date range, machine & shift to preview complete printing details and generate official PDF.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowReportModal(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid var(--border-light)',
+                  color: 'var(--text-muted)',
+                  borderRadius: '50%',
+                  width: 36,
+                  height: 36,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justify: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body - Scrollable Content */}
+            <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem', flex: 1 }}>
+              
+              {/* ── FILTER CONTROLS BAR ── */}
+              <div style={{
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid var(--border-light)',
+                borderRadius: '12px',
+                padding: '1rem 1.25rem',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                gap: '0.75rem',
+                alignItems: 'end'
+              }}>
+                <div>
+                  <label style={labelStyle}>FROM DATE</label>
+                  <input
+                    type="date"
+                    value={reportStartDate}
+                    onChange={e => setReportStartDate(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>TO DATE</label>
+                  <input
+                    type="date"
+                    value={reportEndDate}
+                    onChange={e => setReportEndDate(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>MACHINE</label>
+                  <select
+                    value={reportMachine}
+                    onChange={e => setReportMachine(e.target.value)}
+                    style={inputStyle}
+                  >
+                    <option value="">All Machines</option>
+                    {machinesList.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>SHIFT</label>
+                  <select
+                    value={reportShift}
+                    onChange={e => setReportShift(e.target.value)}
+                    style={inputStyle}
+                  >
+                    <option value="">All Shifts</option>
+                    <option value="Morning">Morning Shift</option>
+                    <option value="Night">Night Shift</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>PASS</label>
+                  <select
+                    value={reportPass}
+                    onChange={e => setReportPass(e.target.value)}
+                    style={inputStyle}
+                  >
+                    <option value="">All Passes</option>
+                    {PASS_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>OPERATOR</label>
+                  <input
+                    type="text"
+                    placeholder="Operator Name"
+                    value={reportOperator}
+                    onChange={e => setReportOperator(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>JOB CARD #</label>
+                  <input
+                    type="text"
+                    placeholder="Job #"
+                    value={reportSearchJob}
+                    onChange={e => setReportSearchJob(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportStartDate(new Date().toISOString().split('T')[0]);
+                      setReportEndDate(new Date().toISOString().split('T')[0]);
+                      setReportMachine('');
+                      setReportShift('');
+                      setReportOperator('');
+                      setReportPass('');
+                      setReportSearchJob('');
+                    }}
+                    className="btn-secondary"
+                    style={{ width: '100%', padding: '0.48rem', fontSize: '0.78rem', justifyContent: 'center' }}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* ── LIVE ANALYTICS & DETAILED SUMMARY ── */}
+              {(() => {
+                const repLogs = logs.filter(l => {
+                  if (reportMachine && !String(l.machineName || '').toLowerCase().includes(reportMachine.toLowerCase())) return false;
+                  if (reportShift && l.shift !== reportShift) return false;
+                  if (reportPass && l.pass !== reportPass) return false;
+                  if (reportOperator && !String(l.operatorName || '').toLowerCase().includes(reportOperator.toLowerCase())) return false;
+                  if (reportSearchJob && !String(l.jobNo || '').toLowerCase().includes(reportSearchJob.toLowerCase())) return false;
+                  if (reportStartDate || reportEndDate) {
+                    if (!l.date) return true;
+                    const dStr = new Date(l.date).toISOString().split('T')[0];
+                    if (reportStartDate && dStr < reportStartDate) return false;
+                    if (reportEndDate && dStr > reportEndDate) return false;
+                  }
+                  return true;
+                });
+
+                const repTotalMeters = repLogs.reduce((s, l) => s + (Number(l.meters) || 0), 0);
+                const repUniqueJobCount = new Set(repLogs.map(l => l.jobNo)).size;
+                const repMorningMeters = repLogs.filter(l => l.shift === 'Morning').reduce((s, l) => s + (Number(l.meters) || 0), 0);
+                const repNightMeters = repLogs.filter(l => l.shift === 'Night').reduce((s, l) => s + (Number(l.meters) || 0), 0);
+
+                return (
+                  <>
+                    {/* Live KPI Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem' }}>
+                      <div style={{ padding: '0.9rem 1.1rem', borderRadius: 10, background: 'rgba(56,189,248,0.05)', border: '1px solid rgba(56,189,248,0.2)' }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>TOTAL PRINTED METERS</div>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#38bdf8', marginTop: 2 }}>
+                          {repTotalMeters.toLocaleString('en-IN', { minimumFractionDigits: 2 })} mtr
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>{repLogs.length} Logged Runs</div>
+                      </div>
+
+                      <div style={{ padding: '0.9rem 1.1rem', borderRadius: 10, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>JOB CARDS PROCESSED</div>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#a78bfa', marginTop: 2 }}>
+                          {repUniqueJobCount} Job Cards
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>Distinct Active Jobs</div>
+                      </div>
+
+                      <div style={{ padding: '0.9rem 1.1rem', borderRadius: 10, background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>MORNING SHIFT</div>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#34d399', marginTop: 2 }}>
+                          {repMorningMeters.toLocaleString('en-IN', { minimumFractionDigits: 2 })} mtr
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>9:00 AM – 9:00 PM</div>
+                      </div>
+
+                      <div style={{ padding: '0.9rem 1.1rem', borderRadius: 10, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>NIGHT SHIFT</div>
+                        <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#fbbf24', marginTop: 2 }}>
+                          {repNightMeters.toLocaleString('en-IN', { minimumFractionDigits: 2 })} mtr
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 2 }}>9:00 PM – 9:00 AM</div>
+                      </div>
+                    </div>
+
+                    {/* ── COMPLETE PRINTING DETAILS TABLE ── */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', textTransform: 'uppercase' }}>
+                          Complete Printing Details ({repLogs.length} Log Entries)
+                        </div>
+                      </div>
+
+                      <div style={{ overflowX: 'auto', border: '1px solid var(--border-light)', borderRadius: 10 }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                          <thead>
+                            <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)' }}>
+                              <th style={{ ...thStyle, textAlign: 'left' }}>Date & Shift</th>
+                              <th style={{ ...thStyle, textAlign: 'left' }}>Job Card #</th>
+                              <th style={{ ...thStyle, textAlign: 'left' }}>Machine & Pass</th>
+                              <th style={{ ...thStyle, textAlign: 'right' }}>Meters Printed</th>
+                              <th style={{ ...thStyle, textAlign: 'left' }}>Operator</th>
+                              <th style={{ ...thStyle, textAlign: 'left' }}>Remarks</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {repLogs.length === 0 ? (
+                              <tr>
+                                <td colSpan="6" style={{ ...tdStyle, textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                                  No printing logs found for selected filters. Try adjusting date range or machine filters.
+                                </td>
+                              </tr>
+                            ) : (
+                              repLogs.map(l => {
+                                const matched = jobCards.find(c => c._id === l.jobCardId || c.jobNo === l.jobNo);
+                                return (
+                                  <tr key={l._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                                    <td style={tdStyle}>
+                                      <div style={{ fontWeight: 700 }}>{formatDateDDMMYYYY(l.date)}</div>
+                                      <span style={{ fontSize: '0.68rem', color: l.shift === 'Morning' ? '#38bdf8' : '#a78bfa', fontWeight: 700 }}>
+                                        {l.shift || 'General'}
+                                      </span>
+                                    </td>
+                                    <td style={{ ...tdStyle, fontWeight: 800, color: '#38bdf8' }}>
+                                      #{l.jobNo}
+                                      {matched && (
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                                          {matched.party || ''} {matched.designName ? `| ${matched.designName}` : ''}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td style={tdStyle}>
+                                      <div style={{ fontWeight: 700 }}>{l.machineName}</div>
+                                      <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{l.pass}</span>
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, color: '#34d399', fontSize: '0.92rem' }}>
+                                      {Number(l.meters).toFixed(2)} mtr
+                                    </td>
+                                    <td style={tdStyle}>{l.operatorName || '—'}</td>
+                                    <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{l.notes || '—'}</td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid var(--border-light)',
+              display: 'flex',
+              justify: 'space-between',
+              alignItems: 'center',
+              background: 'rgba(0,0,0,0.2)',
+              flexWrap: 'wrap',
+              gap: '0.75rem'
+            }}>
+              <button
+                type="button"
+                onClick={() => setShowReportModal(false)}
+                className="btn-secondary"
+                style={{ padding: '0.55rem 1.1rem', fontSize: '0.82rem' }}
+              >
+                Close Window
+              </button>
+
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                <button
+                  type="button"
+                  onClick={handleExportCSV}
+                  className="btn-secondary"
+                  style={{ padding: '0.55rem 1.1rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Download size={15} /> Export CSV
+                </button>
+
+                <button
+                  type="button"
+                  disabled={reportLoadingPdf}
+                  onClick={async () => {
+                    setReportLoadingPdf(true);
+                    try {
+                      await api.downloadFabricCombinedReportPdf(
+                        reportStartDate,
+                        reportEndDate,
+                        ['machine'],
+                        `Digital_Operator_Printing_Report_${reportStartDate}_to_${reportEndDate}.pdf`,
+                        {
+                          machineName: reportMachine,
+                          shift: reportShift,
+                          operatorName: reportOperator,
+                          pass: reportPass
+                        }
+                      );
+                    } catch (err) {
+                      alert(err.message || 'Failed to download PDF report.');
+                    } finally {
+                      setReportLoadingPdf(false);
+                    }
+                  }}
+                  className="btn-primary"
+                  style={{
+                    padding: '0.55rem 1.25rem',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    boxShadow: '0 2px 10px rgba(124, 58, 237, 0.35)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <FileText size={15} /> {reportLoadingPdf ? 'Generating PDF Report...' : 'Download PDF Report'}
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}

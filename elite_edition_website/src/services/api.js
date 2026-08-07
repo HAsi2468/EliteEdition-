@@ -1069,13 +1069,18 @@ export const api = {
     window.URL.revokeObjectURL(url);
   },
 
-  async downloadFabricCombinedReportPdf(dateStart, dateEnd, reportsArray, fileName) {
+  async downloadFabricCombinedReportPdf(dateStart, dateEnd, reportsArray, fileName, filters = {}) {
     const baseUrl = getBaseUrl();
     const token = localStorage.getItem('elite_auth_token');
     const query = new URLSearchParams();
     if (dateStart) query.append('dateStart', dateStart);
     if (dateEnd) query.append('dateEnd', dateEnd);
     if (reportsArray && reportsArray.length > 0) query.append('reports', reportsArray.join(','));
+    if (filters.machineName) query.append('machineName', filters.machineName);
+    if (filters.shift) query.append('shift', filters.shift);
+    if (filters.operatorName) query.append('operatorName', filters.operatorName);
+    if (filters.pass) query.append('pass', filters.pass);
+
     const qs = query.toString() ? `?${query.toString()}` : '';
     const response = await fetch(`${baseUrl}/fabric/report/combined-pdf${qs}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},

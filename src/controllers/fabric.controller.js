@@ -1396,6 +1396,20 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         }
       }
 
+      const { machineName: qMachine, shift: qShift, operatorName: qOperator, pass: qPass } = req.query;
+      if (qMachine) {
+        logDateFilter.machineName = { $regex: qMachine.trim(), $options: 'i' };
+      }
+      if (qShift) {
+        logDateFilter.shift = qShift.trim();
+      }
+      if (qOperator) {
+        logDateFilter.operatorName = { $regex: qOperator.trim(), $options: 'i' };
+      }
+      if (qPass) {
+        logDateFilter.pass = { $regex: qPass.trim(), $options: 'i' };
+      }
+
       // 1. Fetch print logs from JobPrintLog collection (Machine Printing Entry & Logs Screen)
       const printLogs = await JobPrintLog.find(logDateFilter).sort({ date: -1 }).lean();
 
