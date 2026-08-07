@@ -1418,9 +1418,27 @@ export default function JobPrintingLog() {
             <Sparkles size={16} /> Raw Material Consumption Summary
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-              ✏️ Direct live editing — values reflect in report
-            </span>
+            <button
+              type="button"
+              onClick={() => setShowRawMaterialModal(true)}
+              className="btn-primary"
+              style={{
+                padding: '0.35rem 0.85rem',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                boxShadow: '0 3px 10px rgba(16, 185, 129, 0.3)',
+                cursor: 'pointer'
+              }}
+            >
+              <Edit size={14} /> Edit Data
+            </button>
             <button
               type="button"
               onClick={handleAddPaperEntry}
