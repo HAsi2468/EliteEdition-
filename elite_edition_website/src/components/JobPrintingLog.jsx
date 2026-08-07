@@ -518,7 +518,7 @@ export default function JobPrintingLog() {
                 />
               </div>
 
-              {/* Jobcard Type / Selection */}
+              {/* Jobcard Type / Selection (Direct Input) */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
                   <label style={labelStyle}>JOBCARD TYPE <span style={{ color: '#ef4444' }}>*</span></label>
@@ -529,33 +529,14 @@ export default function JobPrintingLog() {
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <select
-                    value={form.jobCardId || form.jobNo}
-                    onChange={e => handleJobSelect(e.target.value)}
-                    style={{ ...inputStyle, flex: 1, fontWeight: 700 }}
-                    required
-                  >
-                    <option value="">-- Choose Job Card ({activeJobCards.length} Pending) --</option>
-                    {activeJobCards.map(c => {
-                      const stats = getJobProgressStats(c);
-                      const cleanJobNum = String(c.jobNo || '').replace(/^JOB\s*NO\.?\s*-?\s*/i, '');
-                      return (
-                        <option key={c._id} value={c._id}>
-                          #{cleanJobNum} — {c.party || 'Client'} | Design: {c.designName || c.designNo || 'Custom'} [{stats.printedMtr.toFixed(1)}m / {stats.targetMtr.toFixed(1)}m]
-                        </option>
-                      );
-                    })}
-                  </select>
-
-                  <input
-                    type="text"
-                    placeholder="Job #"
-                    value={form.jobNo}
-                    onChange={e => handleJobSelect(e.target.value)}
-                    style={{ ...inputStyle, width: '110px', fontWeight: 700 }}
-                  />
-                </div>
+                <input
+                  type="text"
+                  placeholder="Type Job Card No. (e.g. 1001)"
+                  value={form.jobNo}
+                  onChange={e => handleJobSelect(e.target.value)}
+                  style={{ ...inputStyle, width: '100%', fontWeight: 700, fontSize: '0.9rem' }}
+                  required
+                />
               </div>
 
               {/* Shift */}
@@ -566,39 +547,6 @@ export default function JobPrintingLog() {
                   <option value="Night">Night</option>
                 </select>
               </div>
-            </div>
-
-            {/* Quick Job Selector Pills */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, alignSelf: 'center', marginRight: '4px' }}>
-                PENDING JOBS:
-              </span>
-              {activeJobCards.slice(0, 15).map(c => {
-                const isSelected = selectedJob && selectedJob._id === c._id;
-                const stats = getJobProgressStats(c);
-                const cleanJobNum = String(c.jobNo || '').replace(/^JOB\s*NO\.?\s*-?\s*/i, '');
-                return (
-                  <JobCardTooltip key={c._id} card={c}>
-                    <button
-                      type="button"
-                      onClick={() => handleJobSelect(c._id)}
-                      style={{
-                        padding: '0.2rem 0.5rem',
-                        borderRadius: 4,
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        border: '1px solid',
-                        borderColor: isSelected ? '#38bdf8' : 'var(--border-light)',
-                        background: isSelected ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.02)',
-                        color: isSelected ? '#38bdf8' : 'var(--text-muted)',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      #{cleanJobNum} ({stats.progressPct}%)
-                    </button>
-                  </JobCardTooltip>
-                );
-              })}
             </div>
 
             {/* ── LINE 2: PRINTING MACHINE, PASS, METERS PRINTED ── */}
