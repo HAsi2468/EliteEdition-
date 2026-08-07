@@ -135,64 +135,7 @@ function StatusBadge({ status }) {
 }
 
 // ─── Print / PDF template (matches the physical job card layout) ─────────────
-function JobCardPrintView({ card, onClose, onShare }) {
-  const printRef = useRef();
-  const [resolvedImages, setResolvedImages] = useState({
-    imageUrl1: card.imageUrl1 || '',
-    imageUrl2: card.imageUrl2 || '',
-  });
-
-  useEffect(() => {
-    const resolveImages = async () => {
-      if (!card) return;
-
-      const rawName = card.designName || card.designNo || '';
-      const names = extractDesignNames(rawName);
-
-      let img1 = card.imageUrl1 || '';
-      let img2 = card.imageUrl2 || '';
-
-      try {
-        // If no stored image 1, look up in catalog
-        if (!img1 && names[0]) {
-          const res1 = await api.getDesigns({ search: names[0], limit: 5 });
-          if (res1 && res1.data && res1.data.length > 0) {
-            const matched1 = res1.data.find(d =>
-              d.designName?.toLowerCase() === names[0].toLowerCase() ||
-              String(d.designNo || '').toLowerCase() === names[0].toLowerCase()
-            ) || res1.data[0];
-            img1 = matched1.imageUrl || matched1.imageUrl2 || '';
-            if (!img2 && matched1.imageUrl2 && matched1.imageUrl !== matched1.imageUrl2) {
-              img2 = matched1.imageUrl2;
-            }
-          }
-        }
-
-        // If 2 design names were entered and img2 isn't set, resolve design 2 image
-        if (!img2 && names.length > 1 && names[1]) {
-          const res2 = await api.getDesigns({ search: names[1], limit: 5 });
-          if (res2 && res2.data && res2.data.length > 0) {
-            const matched2 = res2.data.find(d =>
-              d.designName?.toLowerCase() === names[1].toLowerCase() ||
-              String(d.designNo || '').toLowerCase() === names[1].toLowerCase()
-            ) || res2.data[0];
-            img2 = matched2.imageUrl || matched2.imageUrl2 || '';
-          }
-        }
-
-        setResolvedImages({ imageUrl1: img1, imageUrl2: img2 });
-      } catch (err) {
-        console.error('Failed to resolve design images for print:', err);
-        setResolvedImages({
-          imageUrl1: card.imageUrl1 || '',
-          imageUrl2: showTwoImages ? (card.imageUrl2 || '') : '',
-        });
-      }
-    };
-    resolveImages();
-  }, [card]);
-
-function triggerJobCardPrint(card) {
+export function triggerJobCardPrint(card) {
   if (!card) return;
   let imageUrl1 = card.imageUrl1 || '';
   let imageUrl2 = card.imageUrl2 || '';
@@ -583,401 +526,65 @@ function triggerJobCardPrint(card) {
   win.document.close();
 }
 
-  const handleDownloadPdf = async () => {
-    setDownloadingPdf(true);
-    try {
-      await api.downloadJobCardPdf(card._id, card.jobNo);
-    } catch (err) {
-      console.warn('Direct PDF download failed, fallback to print:', err);
-      doPrint();
-    } finally {
-      setDownloadingPdf(false);
-    }
-  };
+function JobCardPrintView({ card, onClose, onShare }) {
+  const printRef = useRef();
+  const [resolvedImages, setResolvedImages] = useState({
+    imageUrl1: card.imageUrl1 || '',
+    imageUrl2: card.imageUrl2 || '',
+  });
 
-  const doPrint = () => {
-    // Convert Drive links to direct embeddable URLs for print
-    const img1 = convertDriveUrl(resolvedImages.imageUrl1);
-    const img2 = convertDriveUrl(resolvedImages.imageUrl2);
+  useEffect(() => {
+    const resolveImages = async () => {
+      if (!card) return;
 
-    
-    // Dynamic image container layout based on existence of image 2
-    let imgAreaHtml = '';
-    if (img1 && img2) {
-      imgAreaHtml = `
-      <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
-        <div style="flex: 1; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-          <img src="${img1}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
-        </div>
-        <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-          <img src="${img2}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
-        </div>
-      </div>`;
-    } else if (img1) {
-      imgAreaHtml = `
-      <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
-        <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-          <img src="${img1}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
-        </div>
-      </div>`;
-    } else if (img2) {
-      imgAreaHtml = `
-      <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
-        <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-          <img src="${img2}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
-        </div>
-      </div>`;
-    } else {
-      imgAreaHtml = `
-      <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
-        <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 2px;">
-          <span style="color:#ccc; font-size: 10pt; font-weight: bold;">NO DESIGN IMAGE</span>
-        </div>
-      </div>`;
-    }
+      const rawName = card.designName || card.designNo || '';
+      const names = extractDesignNames(rawName);
 
-    const win = window.open('', '_blank', 'width=600,height=800');
-    win.document.write(`<!DOCTYPE html><html><head>
-      <title>Job Card ${card.jobNo}</title>
-      <style>
-        @page { size: A5; margin: 8mm; }
-        @media print {
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
-        body { background: #fff; color: #000; font-size: 9pt; line-height: 1.2; position: relative; padding-left: 12mm; }
-        .wrap { width: 100%; display: flex; flex-direction: column; gap: 1px; }
-        
-        /* Header styles */
-        .header { display: flex; align-items: stretch; border: 1.5px solid #000; height: 44px; margin-bottom: 1px; }
-        .logo-box {
-          width: 140px;
-          padding: 4px 6px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-right: 1.5px solid #000;
-        }
-        .logo-box-right {
-          width: 140px;
-          padding: 4px 6px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-left: 1.5px solid #000;
-        }
-        .center-box {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 2px 0;
-          text-align: center;
-        }
-        .center-title {
-          font-size: 15.5pt;
-          font-weight: 900;
-          letter-spacing: 0.5px;
-          color: #000;
-          text-transform: uppercase;
-        }
-        .machine-box {
-          width: 90%;
-          border: 1px solid #000;
-          font-size: 9pt;
-          font-weight: 900;
-          letter-spacing: 1.5px;
-          padding: 1px 0;
-          margin-top: 1px;
-          text-transform: uppercase;
-          text-align: center;
-          background: ${card.machineName === 'GRANDO' ? '#0b5394' : card.machineName === 'PRINTDOT' ? '#cc0000' : '#fff'};
-          color: ${card.machineName ? '#fff' : '#000'};
-        }
+      let img1 = card.imageUrl1 || '';
+      let img2 = card.imageUrl2 || '';
 
-        /* Tables */
-        table { width: 100%; border-collapse: collapse; margin-top: 1px; }
-        td, th { border: 1.2px solid #000; padding: 3px 5px; font-size: 9pt; vertical-align: middle; }
-        .label { font-weight: 800; white-space: nowrap; width: 1%; background: #fff; }
-        .val { font-weight: 500; }
-
-        /* Notes Section */
-        .notes-container {
-          width: 100%;
-          border-left: 1.2px solid #000;
-          border-right: 1.2px solid #000;
-          margin-top: 1px;
-        }
-        .note-row {
-          background: #f3f3f3;
-          border-bottom: 1.2px solid #000;
-          padding: 3px 6px;
-          font-size: 9pt;
-          font-weight: 700;
-          min-height: 18px;
-        }
-        .note-row-emergency {
-          background: #f3f3f3;
-          border-bottom: 1.2px solid #000;
-          padding: 3px 6px;
-          font-size: 9pt;
-          font-weight: 700;
-          color: #cc0000;
-          min-height: 18px;
-        }
-
-        /* T.P. Meter styles */
-        .tp-table { width: 100%; border-collapse: collapse; margin-top: 2px; }
-        .tp-table td { text-align: center; padding: 2px 4px; font-size: 8.5pt; border: 1.2px solid #000; height: 26px; }
-        .tp-table th { font-size: 9pt; font-weight: 800; border: 1.2px solid #000; background: #fff; padding: 3px; }
-        .tp-label { font-weight: 700; width: 1%; white-space: nowrap; }
-        .tp-val { width: 14%; }
-        .tp-val { width: 14%; }
-
-        /* Punch Guide */
-        .punch-guide {
-          position: absolute;
-          left: 2mm;
-          top: 90mm; /* Center of A5 height relative to top of body */
-          width: 8mm;
-          z-index: 100;
-        }
-        .punch-hole {
-          position: absolute;
-          left: 1mm;
-          width: 6mm;
-          height: 6mm;
-          border: 1px solid #9ca3af;
-          border-radius: 50%;
-          box-sizing: border-box;
-        }
-        .punch-hole.top { top: -43mm; }
-        .punch-hole.bottom { top: 37mm; }
-        .punch-center {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 10mm;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          transform: translateY(-50%);
-        }
-        .punch-text {
-          font-size: 5pt;
-          color: #9ca3af;
-          margin-top: 2px;
-        }
-      </style>
-    </head><body>
-      <!-- PUNCH GUIDE -->
-      <div class="punch-guide">
-        <div class="punch-hole top"></div>
-        <div class="punch-center">
-          <svg width="10" height="8" viewBox="0 0 10 8">
-            <line x1="0" y1="4" x2="10" y2="4" stroke="#9ca3af" stroke-width="1.5"/>
-            <polyline points="7,1 10,4 7,7" fill="none" stroke="#9ca3af" stroke-width="1.5"/>
-          </svg>
-          <div class="punch-text">PUNCH</div>
-        </div>
-        <div class="punch-hole bottom"></div>
-      </div>
-      
-      <div class="wrap">
-      <!-- HEADER -->
-      <div class="header">
-        <div class="logo-box">
-          <img src="${window.location.origin}/DigitalLogo.png" alt="Elite Digital Prints" style="height: 36px; object-fit: contain; filter: invert(0);">
-        </div>
-        <div class="center-box">
-          <div class="center-title">ELITE DIGITAL</div>
-          <div class="machine-box">${card.machineName || '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}</div>
-        </div>
-        <div class="logo-box-right">
-          <img src="${window.location.origin}/DigitalLogo.png" alt="Elite Digital Prints" style="height: 36px; object-fit: contain;">
-        </div>
-      </div>
-
-      <!-- MAIN FIELDS TABLE -->
-      <table style="margin-top:1px">
-        <tr>
-          <td class="label">JOB NO. :</td><td class="val">${card.jobNo || ''}</td>
-          <td class="label">COLORS :</td><td class="val">${card.colors || ''}</td>
-          <td class="label">DATE :</td><td class="val">${formatDateDDMMYYYY(card.date)}</td>
-        </tr>
-        <tr>
-          <td class="label">D. NO. :</td><td class="val">${card.designNo || card.designName || ''}</td>
-          <td class="label">PANNA :</td><td class="val">${card.panna || ''}</td>
-          <td class="label">PASS :</td><td class="val">${card.pass || ''}</td>
-        </tr>
-        <tr>
-          <td class="label">FABRIC :</td><td class="val">${card.fabric || ''}</td>
-          <td class="label">CON. :</td><td class="val">${card.consumption || ''}</td>
-          <td class="label">ALL OVER :</td><td class="val">${card.allover || ''}</td>
-        </tr>
-        <tr>
-          <td class="label">PCS :</td><td class="val">${card.pcs || ''}</td>
-          <td class="label">BOTTOM :</td><td class="val">${card.bottom || ''}</td>
-          <td class="label">PN/KM :</td><td class="val">${card.pnKm || ''}</td>
-        </tr>
-        <tr>
-          <td class="label">TOP :</td><td class="val">${card.top || ''}</td>
-          <td class="label">DUPATTA :</td><td class="val">${card.dupatta || ''}</td>
-          <td class="label">SET-COPY :</td><td class="val">${card.setCopy || ''}</td>
-        </tr>
-        <tr>
-          <td class="label">SLEEVE :</td><td class="val">${card.sleeve || ''}</td>
-          <td class="label">CUT :</td><td class="val">${card.cut || ''}</td>
-          <td colspan="2" style="text-align: center; font-weight: 800; background: #fff;">TOTAL MTR</td>
-        </tr>
-        <tr>
-          <td class="label">PARTY:</td><td colspan="3" class="val">${card.party || ''}</td>
-          <td colspan="2" style="font-weight: 900; font-size: 11.5pt; padding-left: 10px;">: ${card.totalMtr || ''}</td>
-        </tr>
-      </table>
-
-      <!-- IMAGE AREA CONTAINER (Side-by-side or Single) -->
-      ${imgAreaHtml}
-
-
-      <!-- NOTES CONTAINER (Three stripes) -->
-      <div class="notes-container">
-        <div class="note-row">NOTE 1 : ${card.note1 || ''}</div>
-        <div class="note-row-emergency">EMRG. NOTE : ${card.emergencyNotes || ''}</div>
-        <div class="note-row">NOTE 2 : ${card.note2 || ''}</div>
-      </div>
-
-      <!-- DETAILS TABLE 1 -->
-      <table style="width: 100%; margin-top: 1px;">
-        <tr>
-          <td class="label" style="width: 15%;">DESIGNER :</td>
-          <td class="val" style="width: 35%;">${card.designer || ''}</td>
-          <td class="label" style="width: 15%;">C. M.:</td>
-          <td class="val" style="width: 35%;">${card.colourMatching || ''}</td>
-        </tr>
-        <tr>
-          <td class="label">EXP. TIME :</td>
-          <td class="val">${card.expTime || ''}</td>
-          <td class="label">PAPER TYPE :</td>
-          <td class="val">${card.paperType || ''}</td>
-        </tr>
-      </table>
-
-      <!-- DETAILS TABLE 2 (OPERATOR) -->
-      <table style="width: 100%; margin-top: 1px;">
-        <tr>
-          <td class="label" style="width: 15%;">OPERATER:</td>
-          <td class="val" style="width: 35%;">${card.operatorName || ''}</td>
-          <td class="label" style="width: 15%;">PRINT DATE :</td>
-          <td class="val" style="width: 35%;">${formatDateDDMMYYYY(card.printDate)}</td>
-        </tr>
-        <tr>
-          <td class="label">ROLL NO. :</td>
-          <td class="val"></td>
-          <td class="label">PRINT METER :</td>
-          <td class="val" style="font-weight: 700;">${card.printMtr || ''}</td>
-        </tr>
-      </table>
-
-      <!-- DETAILS TABLE 3 (FUSING) -->
-      <table style="width: 100%; margin-top: 1px;">
-        <tr>
-          <td class="label" style="width: 15%; text-align: center; font-weight: 800;">FUSING</td>
-          <td class="label" style="width: 15%;">TEMP. :</td>
-          <td class="val" style="width: 20%; text-align: center; font-weight: 800;">${card.temperature || ''}</td>
-          <td class="label" style="width: 15%;">SPEED :</td>
-          <td class="val" style="width: 35%; text-align: center; font-weight: 800;">${card.speed || ''}</td>
-        </tr>
-        <tr>
-          <td class="label" style="text-align: center; font-weight: 800;">NAME:</td>
-          <td class="val" colspan="2"></td>
-          <td class="label">DATE :</td>
-          <td class="val"></td>
-        </tr>
-      </table>
-
-      <!-- T.P. METER TABLE -->
-      <table class="tp-table">
-        <tr>
-          <th colspan="10" style="text-align: center; font-weight: 800;">T.P. METER</th>
-          <th colspan="2" style="font-size: 6.5pt; font-weight: 800; line-height: 1.1; padding: 2px;">T.P.<br/>WESTAGE<br/>METER</th>
-        </tr>
-        <tr>
-          <td class="tp-label">1)</td><td class="tp-val"></td>
-          <td class="tp-label">6)</td><td class="tp-val"></td>
-          <td class="tp-label">11)</td><td class="tp-val"></td>
-          <td class="tp-label">16)</td><td class="tp-val"></td>
-          <td class="tp-label">20)</td><td class="tp-val"></td>
-          <td class="tp-label" style="width: 25px;">1)</td><td class="tp-val"></td>
-        </tr>
-        <tr>
-          <td class="tp-label">2)</td><td class="tp-val"></td>
-          <td class="tp-label">7)</td><td class="tp-val"></td>
-          <td class="tp-label">12)</td><td class="tp-val"></td>
-          <td class="tp-label">17)</td><td class="tp-val"></td>
-          <td class="tp-label">21)</td><td class="tp-val"></td>
-          <td class="tp-label">2)</td><td class="tp-val"></td>
-        </tr>
-        <tr>
-          <td class="tp-label">3)</td><td class="tp-val"></td>
-          <td class="tp-label">8)</td><td class="tp-val"></td>
-          <td class="tp-label">13)</td><td class="tp-val"></td>
-          <td class="tp-label">18)</td><td class="tp-val"></td>
-          <td class="tp-label">22)</td><td class="tp-val"></td>
-          <td class="tp-label">3)</td><td class="tp-val"></td>
-        </tr>
-        <tr>
-          <td class="tp-label">4)</td><td class="tp-val"></td>
-          <td class="tp-label">9)</td><td class="tp-val"></td>
-          <td class="tp-label">14)</td><td class="tp-val"></td>
-          <td class="tp-label">19)</td><td class="tp-val"></td>
-          <td class="tp-label">23)</td><td class="tp-val"></td>
-          <td class="tp-label"></td><td class="tp-val"></td>
-        </tr>
-        <tr>
-          <td class="tp-label">5)</td><td class="tp-val"></td>
-          <td class="tp-label">10)</td><td class="tp-val"></td>
-          <td class="tp-label">15)</td><td class="tp-val"></td>
-          <td colspan="3" style="font-weight: 800; font-size: 7.2pt; text-align: right; padding-right: 5px;">TOTAL :-</td><td class="tp-val"></td>
-          <td class="tp-label"></td><td class="tp-val"></td>
-        </tr>
-      </table>
-    </div>
-    <script>
-      window.onload = function() {
-        var imgs = document.getElementsByTagName('img');
-        var loaded = 0;
-        var total = imgs.length;
-        function triggerPrint() {
-          setTimeout(function() {
-            window.focus();
-            window.print();
-          }, 300);
-        }
-        if (total === 0) {
-          triggerPrint();
-          return;
-        }
-        for (var i = 0; i < total; i++) {
-          if (imgs[i].complete) {
-            loaded++;
-            if (loaded >= total) triggerPrint();
-          } else {
-            imgs[i].onload = function() {
-              loaded++;
-              if (loaded >= total) triggerPrint();
-            };
-            imgs[i].onerror = function() {
-              loaded++;
-              if (loaded >= total) triggerPrint();
-            };
+      try {
+        // If no stored image 1, look up in catalog
+        if (!img1 && names[0]) {
+          const res1 = await api.getDesigns({ search: names[0], limit: 5 });
+          if (res1 && res1.data && res1.data.length > 0) {
+            const matched1 = res1.data.find(d =>
+              d.designName?.toLowerCase() === names[0].toLowerCase() ||
+              String(d.designNo || '').toLowerCase() === names[0].toLowerCase()
+            ) || res1.data[0];
+            img1 = matched1.imageUrl || matched1.imageUrl2 || '';
+            if (!img2 && matched1.imageUrl2 && matched1.imageUrl !== matched1.imageUrl2) {
+              img2 = matched1.imageUrl2;
+            }
           }
         }
-      };
-    </script>
-    </body></html>`);
-    win.document.close();
+
+        // If 2 design names were entered and img2 isn't set, resolve design 2 image
+        if (!img2 && names.length > 1 && names[1]) {
+          const res2 = await api.getDesigns({ search: names[1], limit: 5 });
+          if (res2 && res2.data && res2.data.length > 0) {
+            const matched2 = res2.data.find(d =>
+              d.designName?.toLowerCase() === names[1].toLowerCase() ||
+              String(d.designNo || '').toLowerCase() === names[1].toLowerCase()
+            ) || res2.data[0];
+            img2 = matched2.imageUrl || matched2.imageUrl2 || '';
+          }
+        }
+
+        setResolvedImages({ imageUrl1: img1, imageUrl2: img2 });
+      } catch (err) {
+        console.error('Failed to resolve design images for print:', err);
+        setResolvedImages({
+          imageUrl1: card.imageUrl1 || '',
+          imageUrl2: (names.length >= 2) ? (card.imageUrl2 || '') : '',
+        });
+      }
+    };
+    resolveImages();
+  }, [card]);
+
+  const doPrint = () => {
+    triggerJobCardPrint(card);
   };
 
   return (
