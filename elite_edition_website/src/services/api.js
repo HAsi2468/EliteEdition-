@@ -1095,8 +1095,10 @@ export const api = {
     if (reportsArray && reportsArray.length > 0) query.append('reports', reportsArray.join(','));
     if (filters.machineName) query.append('machineName', filters.machineName);
     if (filters.shift) query.append('shift', filters.shift);
-    if (filters.operatorName) query.append('operatorName', filters.operatorName);
+    if (filters.operatorName || filters.operator) query.append('operator', filters.operatorName || filters.operator);
     if (filters.pass) query.append('pass', filters.pass);
+    if (filters.startTime) query.append('startTime', filters.startTime);
+    if (filters.stopTime) query.append('stopTime', filters.stopTime);
 
     const qs = query.toString() ? `?${query.toString()}` : '';
     const response = await fetch(`${baseUrl}/fabric/report/combined-pdf${qs}`, {

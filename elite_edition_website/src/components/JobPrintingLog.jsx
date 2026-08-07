@@ -333,8 +333,28 @@ export default function JobPrintingLog() {
         return;
       }
 
+      // 🧹 CLEAN PREVIOUS OUTWARD LOGS FOR THIS DATE SO EDITING REPLACES INSTEAD OF ACCUMULATING/MULTIPLYING
+      try {
+        const existingRes = await api.getRawMaterialTransactions();
+        if (existingRes && existingRes.data && Array.isArray(existingRes.data)) {
+          const oldOutwards = existingRes.data.filter(t => {
+            if (t.type !== 'OUTWARD' || !t.date) return false;
+            const tDate = new Date(t.date).toISOString().split('T')[0];
+            return tDate === rawDate;
+          });
+          for (const oldLog of oldOutwards) {
+            if (oldLog._id) {
+              await api.deleteRawMaterialTransaction(oldLog._id);
+            }
+          }
+        }
+      } catch (cleanErr) {
+        console.warn('Could not clean previous raw material entries:', cleanErr);
+      }
+
       await api.createRawMaterialOutward(payload);
       triggerPushNotification('📦 Raw Material Logged', `Recorded ${payload.length} material consumption entries successfully!`, 'success');
+      await fetchRawMaterialSummary();
 
       // Clear fields
       setGrandoInkC(''); setGrandoInkM(''); setGrandoInkY(''); setGrandoInkK('');
@@ -1713,7 +1733,15 @@ export default function JobPrintingLog() {
                       reportStartDate,
                       reportEndDate,
                       ['machine'],
-                      `Printing_Production_Report_${reportStartDate}_to_${reportEndDate}.pdf`
+                      `Printing_Production_Report_${reportStartDate}_to_${reportEndDate}.pdf`,
+                      {
+                        startTime: rawStartTime,
+                        stopTime: rawStopTime,
+                        operator: rawOperator,
+                        shift: reportShift || rawShift,
+                        machineName: reportMachine,
+                        pass: reportPass
+                      }
                     );
                     setShowReportModal(false);
                   } catch (err) {

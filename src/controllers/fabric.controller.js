@@ -1904,12 +1904,14 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           doc.text(log.design, ML + 215, currentY + 4.5, { width: 80, lineBreak: false });
 
           doc.fillColor('#000000').font('Helvetica-Bold');
+          doc.text(machineShort, ML + 300, currentY + 4.5, { width: 45, align: 'center', lineBreak: false });
+          doc.text(passNum, ML + 347, currentY + 4.5, { width: 35, align: 'center', lineBreak: false });
 
           doc.fillColor('#047857').font('Helvetica-Bold');
-          doc.text(`${log.meters.toFixed(2)} mtr`, ML + 406, currentY + 4.5, { width: 65, align: 'right', lineBreak: false });
+          doc.text(`${log.meters.toFixed(2)} mtr`, ML + 384, currentY + 4.5, { width: 65, align: 'right', lineBreak: false });
 
           doc.fillColor('#334155').font('Helvetica');
-          doc.text(log.operatorName, ML + 473, currentY + 4.5, { width: 58, lineBreak: false });
+          doc.text(log.operatorName, ML + 451, currentY + 4.5, { width: 75, lineBreak: false });
 
           subtotalMtr += log.meters;
           currentY += 18;
