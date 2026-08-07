@@ -1693,18 +1693,6 @@ export default function JobPrintingLog() {
                       style={inputStyle}
                     />
                   </div>
-
-                  <div>
-                    <label style={labelStyle}>METERS USED (PER ROLL / TOTAL)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="Meters Used"
-                      value={paperMetersUsed}
-                      onChange={e => setPaperMetersUsed(e.target.value)}
-                      style={inputStyle}
-                    />
-                  </div>
                 </div>
               </div>
 

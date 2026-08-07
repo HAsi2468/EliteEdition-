@@ -1424,6 +1424,10 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       // 1. Fetch print logs strictly from JobPrintLog collection (Machine Printing Entry & Logs Screen)
       const printLogs = await JobPrintLog.find(logDateFilter).sort({ date: -1, created_date_time: -1 }).lean();
 
+      // 1B. Fetch Raw Material Outward Usage logs for selected date range
+      const RawMaterialTransaction = require('../db/models/rawMaterialTransaction.model');
+      var rawMaterialLogs = await RawMaterialTransaction.find({ type: 'OUTWARD', ...logDateFilter }).sort({ date: -1, createdAt: -1 }).lean();
+
       // 2. Fetch all job cards to map client/party name and design name
       const allJobCardsList = await JobCard.find({}).select('jobNo party designName designNo').lean();
       const jobCardMapByNo = {};
@@ -1908,6 +1912,61 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         doc.fillColor('#047857').font('Helvetica-Bold');
         doc.text(`${subtotalMtr.toFixed(2)} mtr`, ML + 384, currentY + 4.5, { width: 55, align: 'right', lineBreak: false });
         currentY += 18;
+      }
+
+      // ── 4C. RAW MATERIAL CONSUMPTION SUMMARY (INK & PAPER PANNA WISE ROLL) ──
+      if (typeof rawMaterialLogs !== 'undefined' && rawMaterialLogs && rawMaterialLogs.length > 0) {
+        currentY += 12;
+        checkAddPage(60);
+
+        doc.rect(ML, currentY, contentWidth, 18).fill('#dcfce7').stroke('#86efac');
+        doc.fillColor('#14532d').fontSize(8).font('Helvetica-Bold')
+          .text('RAW MATERIAL CONSUMPTION SUMMARY (INK & PAPER PANNA WISE ROLL)', ML + 8, currentY + 4.5, { lineBreak: false });
+        doc.fillColor('#15803d').fontSize(7.5).font('Helvetica-Bold')
+          .text(`Total Usage Logs: ${rawMaterialLogs.length}`, ML + contentWidth - 150, currentY + 4.5, { width: 140, align: 'right', lineBreak: false });
+        currentY += 22;
+
+        const drawRawHeaders = () => {
+          doc.rect(ML, currentY, contentWidth, 18).fill('#064e3b').stroke('#022c22');
+          doc.fillColor('#ffffff').fontSize(7).font('Helvetica-Bold');
+          doc.text('DATE', ML + 4, currentY + 5, { width: 60 });
+          doc.text('MATERIAL / ITEM NAME', ML + 66, currentY + 5, { width: 165 });
+          doc.text('PANNA / COLOR', ML + 233, currentY + 5, { width: 90 });
+          doc.text('QTY CONSUMED', ML + 325, currentY + 5, { width: 70, align: 'center' });
+          doc.text('UNIT', ML + 397, currentY + 5, { width: 45 });
+          doc.text('OPERATOR & REMARKS', ML + 444, currentY + 5, { width: 87 });
+          currentY += 18;
+        };
+
+        drawRawHeaders();
+
+        rawMaterialLogs.forEach((rm, idx) => {
+          if (checkAddPage(18)) {
+            drawRawHeaders();
+          }
+          const bg = idx % 2 === 0 ? '#ffffff' : '#f0fdf4';
+          doc.rect(ML, currentY, contentWidth, 18).fill(bg);
+          doc.strokeColor('#dcfce7').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
+
+          const dStr = rm.date ? new Date(rm.date).toLocaleDateString('en-IN') : '—';
+          doc.fillColor('#000000').fontSize(6.8).font('Helvetica-Bold');
+          doc.text(dStr, ML + 4, currentY + 4.5, { width: 60, lineBreak: false });
+
+          doc.fillColor('#0f766e').font('Helvetica-Bold');
+          doc.text(rm.materialName || '—', ML + 66, currentY + 4.5, { width: 165, lineBreak: false });
+
+          doc.fillColor('#334155').font('Helvetica');
+          doc.text(rm.panna || rm.color || '—', ML + 233, currentY + 4.5, { width: 90, lineBreak: false });
+
+          doc.fillColor('#047857').font('Helvetica-Bold');
+          doc.text(`${rm.qty}`, ML + 325, currentY + 4.5, { width: 70, align: 'center', lineBreak: false });
+
+          doc.fillColor('#334155').font('Helvetica');
+          doc.text(rm.unit || '—', ML + 397, currentY + 4.5, { width: 45, lineBreak: false });
+          doc.text(rm.notes || '—', ML + 444, currentY + 4.5, { width: 87, lineBreak: false });
+
+          currentY += 18;
+        });
       }
 
       currentY += 12;
