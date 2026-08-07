@@ -1424,6 +1424,31 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       }
       const jobCards = await JobCard.find(jcDateFilter).lean();
 
+      // Map matching job card party & design
+      const allJobCardsList = await JobCard.find({}).select('jobNo party designName designNo').lean();
+      const jobCardMapByNo = {};
+      const jobCardMapById = {};
+      allJobCardsList.forEach(c => {
+        if (c.jobNo) jobCardMapByNo[String(c.jobNo).trim()] = c;
+        if (c._id) jobCardMapById[String(c._id)] = c;
+      });
+
+      var detailedPrintLogsList = printLogs.map(l => {
+        const matched = (l.jobCardId && jobCardMapById[String(l.jobCardId)]) || (l.jobNo && jobCardMapByNo[String(l.jobNo).trim()]);
+        return {
+          dateStr: l.date ? new Date(l.date).toLocaleDateString('en-IN') : '—',
+          shift: l.shift || 'General',
+          jobNo: l.jobNo || '—',
+          party: matched ? (matched.party || '—') : '—',
+          design: matched ? (matched.designName || matched.designNo || '—') : '—',
+          machineName: l.machineName || '—',
+          pass: l.pass || '—',
+          meters: Number(l.meters) || 0,
+          operatorName: l.operatorName || '—',
+          notes: l.notes || '—'
+        };
+      });
+
       // Map to group by machineName + pass
       const machineMap = {};
       const globalJobSet = new Set();
@@ -1846,11 +1871,84 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         }
         doc.rect(ML, currentY, contentWidth, 18).fill('#f1f5f9').stroke('#cbd5e1');
         doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
-        doc.text('TOTAL MACHINE PRINTING:', ML + 4, currentY + 4.5, { width: 310, lineBreak: false });
+        doc.text('TOTAL MACHINE PRINTING SUMMARY:', ML + 4, currentY + 4.5, { width: 310, lineBreak: false });
         doc.fillColor('#0284c7').font('Helvetica-Bold');
         doc.text(`${totalMachineJobCardCount} Job Cards`, ML + 322, currentY + 4.5, { width: 90, align: 'center', lineBreak: false });
         doc.fillColor('#047857').font('Helvetica-Bold');
         doc.text(`${totalMachinePrintedMtr.toFixed(2)} mtr`, ML + 416, currentY + 4.5, { width: 115, align: 'right', lineBreak: false });
+        currentY += 18;
+      }
+
+      // ── 4B. COMPLETE DETAILED PRINTING LOGS & RUN ENTRIES TABLE ──
+      if (typeof detailedPrintLogsList !== 'undefined' && detailedPrintLogsList && detailedPrintLogsList.length > 0) {
+        currentY += 10;
+        checkAddPage(60);
+
+        doc.rect(ML, currentY, contentWidth, 18).fill('#e0e7ff').stroke('#c7d2fe');
+        doc.fillColor('#3730a3').fontSize(8).font('Helvetica-Bold')
+          .text('COMPLETE DETAILED PRINTING RUN LOGS', ML + 8, currentY + 4.5, { lineBreak: false });
+        doc.fillColor('#4338ca').fontSize(7.5).font('Helvetica-Bold')
+          .text(`Total Entries: ${detailedPrintLogsList.length}`, ML + contentWidth - 150, currentY + 4.5, { width: 140, align: 'right', lineBreak: false });
+        currentY += 22;
+
+        const drawDetailHeaders = () => {
+          doc.rect(ML, currentY, contentWidth, 18).fill('#1e293b').stroke('#0f172a');
+          doc.fillColor('#ffffff').fontSize(7).font('Helvetica-Bold');
+          doc.text('DATE & SHIFT', ML + 4, currentY + 5, { width: 65 });
+          doc.text('JOB CARD #', ML + 71, currentY + 5, { width: 45 });
+          doc.text('PARTY / CLIENT', ML + 118, currentY + 5, { width: 85 });
+          doc.text('DESIGN NAME', ML + 205, currentY + 5, { width: 80 });
+          doc.text('MACHINE & PASS', ML + 287, currentY + 5, { width: 95 });
+          doc.text('METERS PRINTED', ML + 384, currentY + 5, { width: 55, align: 'right' });
+          doc.text('OPERATOR', ML + 441, currentY + 5, { width: 45 });
+          doc.text('REMARKS', ML + 488, currentY + 5, { width: 43 });
+          currentY += 18;
+        };
+
+        drawDetailHeaders();
+
+        let subtotalMtr = 0;
+        detailedPrintLogsList.forEach((log, idx) => {
+          if (checkAddPage(18)) {
+            drawDetailHeaders();
+          }
+          const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+          doc.rect(ML, currentY, contentWidth, 18).fill(bg);
+          doc.strokeColor('#e2e8f0').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
+
+          doc.fillColor('#000000').fontSize(6.8).font('Helvetica-Bold');
+          doc.text(`${log.dateStr} (${log.shift})`, ML + 4, currentY + 4.5, { width: 65, lineBreak: false });
+
+          doc.fillColor('#0284c7').font('Helvetica-Bold');
+          doc.text(`#${log.jobNo}`, ML + 71, currentY + 4.5, { width: 45, lineBreak: false });
+
+          doc.fillColor('#334155').font('Helvetica');
+          doc.text(log.party, ML + 118, currentY + 4.5, { width: 85, lineBreak: false });
+          doc.text(log.design, ML + 205, currentY + 4.5, { width: 80, lineBreak: false });
+
+          doc.fillColor('#000000').font('Helvetica-Bold');
+          doc.text(`${log.machineName} (${log.pass})`, ML + 287, currentY + 4.5, { width: 95, lineBreak: false });
+
+          doc.fillColor('#047857').font('Helvetica-Bold');
+          doc.text(`${log.meters.toFixed(2)} mtr`, ML + 384, currentY + 4.5, { width: 55, align: 'right', lineBreak: false });
+
+          doc.fillColor('#334155').font('Helvetica');
+          doc.text(log.operatorName, ML + 441, currentY + 4.5, { width: 45, lineBreak: false });
+          doc.text(log.notes, ML + 488, currentY + 4.5, { width: 43, lineBreak: false });
+
+          subtotalMtr += log.meters;
+          currentY += 18;
+        });
+
+        // Detailed Total Row
+        if (checkAddPage(20)) {
+          drawDetailHeaders();
+        }
+        doc.rect(ML, currentY, contentWidth, 18).fill('#e2e8f0').stroke('#cbd5e1');
+        doc.fillColor('#0f172a').fontSize(7.2).font('Helvetica-Bold');
+        doc.text(`GRAND TOTAL PRINTED METERS (${detailedPrintLogsList.length} LOGS):`, ML + 4, currentY + 4.5, { width: 378, lineBreak: false });
+        doc.fillColor('#047857').font('Helvetica-Bold');
+        doc.text(`${subtotalMtr.toFixed(2)} mtr`, ML + 384, currentY + 4.5, { width: 55, align: 'right', lineBreak: false });
         currentY += 18;
       }
 
