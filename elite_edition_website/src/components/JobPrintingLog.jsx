@@ -219,6 +219,7 @@ export default function JobPrintingLog() {
     setRawMaterialSubmitting(true);
     try {
       const payload = [];
+      const timeInfo = (rawStartTime || rawStopTime) ? ` | Time: ${rawStartTime || '—'} to ${rawStopTime || '—'}` : '';
 
       // 1. Grando Ink entries (C, M, Y, K in Liters)
       if (grandoInkC && Number(grandoInkC) > 0) {
@@ -229,7 +230,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Grando | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
       if (grandoInkM && Number(grandoInkM) > 0) {
@@ -240,7 +241,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Grando | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
       if (grandoInkY && Number(grandoInkY) > 0) {
@@ -251,7 +252,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Grando | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
       if (grandoInkK && Number(grandoInkK) > 0) {
@@ -262,7 +263,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Grando | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
 
@@ -275,7 +276,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Printdot | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
       if (printdotInkM && Number(printdotInkM) > 0) {
@@ -286,7 +287,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Printdot | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
       if (printdotInkY && Number(printdotInkY) > 0) {
@@ -297,7 +298,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Printdot | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
       if (printdotInkK && Number(printdotInkK) > 0) {
@@ -308,7 +309,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Printdot | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
 
@@ -322,7 +323,7 @@ export default function JobPrintingLog() {
             qty: Number(entry.paperRollsQty),
             unit: 'Rolls',
             date: rawDate,
-            notes: `[Panna: ${selPanna} | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+            notes: `[Panna: ${selPanna} | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
           });
         }
       });
@@ -427,10 +428,12 @@ export default function JobPrintingLog() {
           </div>
         </div>
 
-        {/* OPERATOR & PERIOD METADATA STRIP */}
+        {/* TIME & OPERATOR METADATA STRIP */}
         <div class="time-strip">
           <div class="time-item"><span>OPERATOR:</span> <strong>${rawOperator || 'All Operators'}</strong></div>
           <div class="time-item"><span>SHIFT:</span> <strong>${reportShift || rawShift || 'All Shifts'}</strong></div>
+          <div class="time-item"><span>START TIME:</span> <strong class="badge-start">${rawStartTime || '—'}</strong></div>
+          <div class="time-item"><span>STOP TIME:</span> <strong class="badge-stop">${rawStopTime || '—'}</strong></div>
           <div class="time-item"><span>DATE PERIOD:</span> <strong>${formatDateDDMMYYYY(reportStartDate)} to ${formatDateDDMMYYYY(reportEndDate)}</strong></div>
         </div>
 
@@ -1821,6 +1824,26 @@ export default function JobPrintingLog() {
                     <option value="Morning">Morning Shift (9 AM - 9 PM)</option>
                     <option value="Night">Night Shift (9 PM - 9 AM)</option>
                   </select>
+                </div>
+
+                <div>
+                  <label style={{ ...labelStyle, color: '#38bdf8' }}>START TIME</label>
+                  <input
+                    type="time"
+                    value={rawStartTime}
+                    onChange={e => setRawStartTime(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ ...labelStyle, color: '#a78bfa' }}>STOP TIME</label>
+                  <input
+                    type="time"
+                    value={rawStopTime}
+                    onChange={e => setRawStopTime(e.target.value)}
+                    style={inputStyle}
+                  />
                 </div>
 
                 <div>
