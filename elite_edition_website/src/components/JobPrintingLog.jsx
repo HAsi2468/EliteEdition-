@@ -89,6 +89,168 @@ export default function JobPrintingLog() {
   const [reportSearchJob, setReportSearchJob] = useState('');
   const [reportLoadingPdf, setReportLoadingPdf] = useState(false);
 
+  // Dedicated Raw Material Usage Form Modal State
+  const [showRawMaterialModal, setShowRawMaterialModal] = useState(false);
+  const [rawMaterialSubmitting, setRawMaterialSubmitting] = useState(false);
+
+  const [rawDate, setRawDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [rawShift, setRawShift] = useState(() => getAutoShift());
+  const [rawOperator, setRawOperator] = useState(() => accountFullName || '');
+  const [rawNotes, setRawNotes] = useState('');
+
+  // Section 1: INK CONSUMPTION (LITERS)
+  // Grando Machine Ink (C, M, Y, K in Liters)
+  const [grandoInkC, setGrandoInkC] = useState('');
+  const [grandoInkM, setGrandoInkM] = useState('');
+  const [grandoInkY, setGrandoInkY] = useState('');
+  const [grandoInkK, setGrandoInkK] = useState('');
+
+  // Printdot Machine Ink (C, M, Y, K in Liters)
+  const [printdotInkC, setPrintdotInkC] = useState('');
+  const [printdotInkM, setPrintdotInkM] = useState('');
+  const [printdotInkY, setPrintdotInkY] = useState('');
+  const [printdotInkK, setPrintdotInkK] = useState('');
+
+  // Section 2: PAPER PANNA WISE ROLL CONSUMPTION
+  const [paperPanna, setPaperPanna] = useState('44" Panna');
+  const [paperCustomPanna, setPaperCustomPanna] = useState('');
+  const [paperType, setPaperType] = useState('Sublimation Paper');
+  const [paperRollsQty, setPaperRollsQty] = useState('');
+  const [paperMetersUsed, setPaperMetersUsed] = useState('');
+
+  // Save Raw Material Outward Usage
+  const handleSaveRawMaterialUsage = async (e) => {
+    if (e) e.preventDefault();
+    setRawMaterialSubmitting(true);
+    try {
+      const payload = [];
+      const selPanna = paperPanna === 'Custom' ? (paperCustomPanna || '44" Panna') : paperPanna;
+
+      // 1. Grando Ink entries (C, M, Y, K in Liters)
+      if (grandoInkC && Number(grandoInkC) > 0) {
+        payload.push({
+          materialName: 'Grando Ink - Cyan (C)',
+          color: 'Cyan',
+          qty: Number(grandoInkC),
+          unit: 'Liters',
+          canSize: 1,
+          date: rawDate,
+          notes: `[Machine: Grando | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+        });
+      }
+      if (grandoInkM && Number(grandoInkM) > 0) {
+        payload.push({
+          materialName: 'Grando Ink - Magenta (M)',
+          color: 'Magenta',
+          qty: Number(grandoInkM),
+          unit: 'Liters',
+          canSize: 1,
+          date: rawDate,
+          notes: `[Machine: Grando | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+        });
+      }
+      if (grandoInkY && Number(grandoInkY) > 0) {
+        payload.push({
+          materialName: 'Grando Ink - Yellow (Y)',
+          color: 'Yellow',
+          qty: Number(grandoInkY),
+          unit: 'Liters',
+          canSize: 1,
+          date: rawDate,
+          notes: `[Machine: Grando | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+        });
+      }
+      if (grandoInkK && Number(grandoInkK) > 0) {
+        payload.push({
+          materialName: 'Grando Ink - Black (K)',
+          color: 'Black',
+          qty: Number(grandoInkK),
+          unit: 'Liters',
+          canSize: 1,
+          date: rawDate,
+          notes: `[Machine: Grando | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+        });
+      }
+
+      // 2. Printdot Ink entries (C, M, Y, K in Liters)
+      if (printdotInkC && Number(printdotInkC) > 0) {
+        payload.push({
+          materialName: 'Printdot Ink - Cyan (C)',
+          color: 'Cyan',
+          qty: Number(printdotInkC),
+          unit: 'Liters',
+          canSize: 1,
+          date: rawDate,
+          notes: `[Machine: Printdot | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+        });
+      }
+      if (printdotInkM && Number(printdotInkM) > 0) {
+        payload.push({
+          materialName: 'Printdot Ink - Magenta (M)',
+          color: 'Magenta',
+          qty: Number(printdotInkM),
+          unit: 'Liters',
+          canSize: 1,
+          date: rawDate,
+          notes: `[Machine: Printdot | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+        });
+      }
+      if (printdotInkY && Number(printdotInkY) > 0) {
+        payload.push({
+          materialName: 'Printdot Ink - Yellow (Y)',
+          color: 'Yellow',
+          qty: Number(printdotInkY),
+          unit: 'Liters',
+          canSize: 1,
+          date: rawDate,
+          notes: `[Machine: Printdot | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+        });
+      }
+      if (printdotInkK && Number(printdotInkK) > 0) {
+        payload.push({
+          materialName: 'Printdot Ink - Black (K)',
+          color: 'Black',
+          qty: Number(printdotInkK),
+          unit: 'Liters',
+          canSize: 1,
+          date: rawDate,
+          notes: `[Machine: Printdot | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+        });
+      }
+
+      // 3. Paper Panna Roll Consumption
+      if (paperRollsQty && Number(paperRollsQty) > 0) {
+        payload.push({
+          materialName: paperType,
+          panna: selPanna,
+          qty: Number(paperRollsQty),
+          unit: 'Rolls',
+          metersPerRoll: paperMetersUsed ? Number(paperMetersUsed) : undefined,
+          date: rawDate,
+          notes: `[Panna: ${selPanna} | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+        });
+      }
+
+      if (payload.length === 0) {
+        alert('Please enter at least one Ink quantity (in Liters) or Paper Roll quantity.');
+        return;
+      }
+
+      await api.createRawMaterialOutward(payload);
+      triggerPushNotification('📦 Raw Material Logged', `Recorded ${payload.length} material consumption entries successfully!`, 'success');
+
+      // Clear fields
+      setGrandoInkC(''); setGrandoInkM(''); setGrandoInkY(''); setGrandoInkK('');
+      setPrintdotInkC(''); setPrintdotInkM(''); setPrintdotInkY(''); setPrintdotInkK('');
+      setPaperRollsQty(''); setPaperMetersUsed(''); setRawNotes('');
+      setShowRawMaterialModal(false);
+    } catch (err) {
+      alert(err.message || 'Failed to save raw material usage.');
+    } finally {
+      setRawMaterialSubmitting(false);
+    }
+  };
+
   // ⚡ INSTANT OPERATOR REPORT PRINT / PDF GENERATOR (0.02s SPEED)
   const handlePrintOperatorReport = (repLogs) => {
     if (!repLogs || repLogs.length === 0) {
@@ -677,9 +839,7 @@ export default function JobPrintingLog() {
               {/* Button 2: Raw Material Usage */}
               <button
                 type="button"
-                onClick={() => {
-                  window.dispatchEvent(new CustomEvent('elite-navigate-tab', { detail: 'jobcards_raw_materials' }));
-                }}
+                onClick={() => setShowRawMaterialModal(true)}
                 className="btn-primary"
                 style={{
                   padding: '0.4rem 0.85rem',
@@ -1243,6 +1403,355 @@ export default function JobPrintingLog() {
                 <Download size={16} /> {reportLoadingPdf ? 'Generating PDF...' : 'Download Report'}
               </button>
             </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ── 6. NEW RAW MATERIAL USAGE FORM MODAL ── */}
+      {showRawMaterialModal && (
+        <div className="modal-overlay" onClick={() => setShowRawMaterialModal(false)}>
+          <div className="modal-content" style={{
+            maxWidth: '750px',
+            width: '94%',
+            maxHeight: '92vh',
+            background: 'var(--bg-card, #131722)',
+            borderRadius: '16px',
+            border: '1px solid var(--border-light, #2a324b)',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.7)',
+            padding: '1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.2rem',
+            overflowY: 'auto'
+          }} onClick={e => e.stopPropagation()}>
+            
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.85rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  background: 'linear-gradient(135deg, #059669, #047857)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justify: 'center'
+                }}>
+                  <Sparkles size={20} color="#fff" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                    Raw Material Usage Entry Form
+                  </h3>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2, margin: 0 }}>
+                    Log Ink Consumption (Liters) & Sublimation/Butter Paper Roll Consumption (Panna Wise)
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowRawMaterialModal(false)} className="btn-icon"><X size={18} /></button>
+            </div>
+
+            <form onSubmit={handleSaveRawMaterialUsage} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+              
+              {/* Header Info: Date, Shift, Operator */}
+              <div style={{
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px solid var(--border-light)',
+                borderRadius: '10px',
+                padding: '0.85rem 1rem',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gap: '0.75rem'
+              }}>
+                <div>
+                  <label style={labelStyle}>ENTRY DATE <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input
+                    type="date"
+                    value={rawDate}
+                    onChange={e => setRawDate(e.target.value)}
+                    style={inputStyle}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>SHIFT <span style={{ color: '#ef4444' }}>*</span></label>
+                  <select
+                    value={rawShift}
+                    onChange={e => setRawShift(e.target.value)}
+                    style={inputStyle}
+                    required
+                  >
+                    <option value="Morning">Morning Shift (9 AM - 9 PM)</option>
+                    <option value="Night">Night Shift (9 PM - 9 AM)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>OPERATOR NAME</label>
+                  <input
+                    type="text"
+                    placeholder="Operator Name"
+                    value={rawOperator}
+                    onChange={e => setRawOperator(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              {/* ── DIV 1: INK CONSUMPTION (LITERS) ── */}
+              <div style={{
+                background: 'rgba(56, 189, 248, 0.03)',
+                border: '1px solid rgba(56, 189, 248, 0.2)',
+                borderRadius: '12px',
+                padding: '1.1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem'
+              }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  💧 DIV 1: INK CONSUMPTION (ENTER INDIVIDUAL COLOR IN LITERS)
+                </div>
+
+                {/* Sub-Section 1: GRANDO MACHINE INK */}
+                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#a78bfa', marginBottom: '0.6rem', textTransform: 'uppercase' }}>
+                    🖨️ GRANDO MACHINE INK (IN LITERS)
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+                    <div>
+                      <label style={{ ...labelStyle, color: '#0284c7', fontWeight: 800 }}>CYAN (C) - LITERS</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00 L"
+                        value={grandoInkC}
+                        onChange={e => setGrandoInkC(e.target.value)}
+                        style={{ ...inputStyle, borderColor: 'rgba(56,189,248,0.4)', fontWeight: 700 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, color: '#ec4899', fontWeight: 800 }}>MAGENTA (M) - LITERS</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00 L"
+                        value={grandoInkM}
+                        onChange={e => setGrandoInkM(e.target.value)}
+                        style={{ ...inputStyle, borderColor: 'rgba(236,72,153,0.4)', fontWeight: 700 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, color: '#eab308', fontWeight: 800 }}>YELLOW (Y) - LITERS</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00 L"
+                        value={grandoInkY}
+                        onChange={e => setGrandoInkY(e.target.value)}
+                        style={{ ...inputStyle, borderColor: 'rgba(234,179,8,0.4)', fontWeight: 700 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, color: '#94a3b8', fontWeight: 800 }}>BLACK (K) - LITERS</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00 L"
+                        value={grandoInkK}
+                        onChange={e => setGrandoInkK(e.target.value)}
+                        style={{ ...inputStyle, borderColor: 'rgba(148,163,184,0.4)', fontWeight: 700 }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sub-Section 2: PRINTDOT MACHINE INK */}
+                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#a78bfa', marginBottom: '0.6rem', textTransform: 'uppercase' }}>
+                    🖨️ PRINTDOT MACHINE INK (IN LITERS)
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+                    <div>
+                      <label style={{ ...labelStyle, color: '#0284c7', fontWeight: 800 }}>CYAN (C) - LITERS</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00 L"
+                        value={printdotInkC}
+                        onChange={e => setPrintdotInkC(e.target.value)}
+                        style={{ ...inputStyle, borderColor: 'rgba(56,189,248,0.4)', fontWeight: 700 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, color: '#ec4899', fontWeight: 800 }}>MAGENTA (M) - LITERS</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00 L"
+                        value={printdotInkM}
+                        onChange={e => setPrintdotInkM(e.target.value)}
+                        style={{ ...inputStyle, borderColor: 'rgba(236,72,153,0.4)', fontWeight: 700 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, color: '#eab308', fontWeight: 800 }}>YELLOW (Y) - LITERS</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00 L"
+                        value={printdotInkY}
+                        onChange={e => setPrintdotInkY(e.target.value)}
+                        style={{ ...inputStyle, borderColor: 'rgba(234,179,8,0.4)', fontWeight: 700 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, color: '#94a3b8', fontWeight: 800 }}>BLACK (K) - LITERS</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00 L"
+                        value={printdotInkK}
+                        onChange={e => setPrintdotInkK(e.target.value)}
+                        style={{ ...inputStyle, borderColor: 'rgba(148,163,184,0.4)', fontWeight: 700 }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* ── DIV 2: PAPER CONSUMPTION (PANNA WISE ROLL) ── */}
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.03)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                borderRadius: '12px',
+                padding: '1.1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.85rem'
+              }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase' }}>
+                  📜 DIV 2: PAPER CONSUMPTION (PANNA WISE ROLL)
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
+                  <div>
+                    <label style={labelStyle}>PAPER TYPE</label>
+                    <select
+                      value={paperType}
+                      onChange={e => setPaperType(e.target.value)}
+                      style={inputStyle}
+                    >
+                      <option value="Sublimation Paper">Sublimation Paper</option>
+                      <option value="Butter Paper">Butter Paper</option>
+                      <option value="Tissue Paper">Tissue Paper</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>PAPER PANNA (WIDTH)</label>
+                    <select
+                      value={paperPanna}
+                      onChange={e => setPaperPanna(e.target.value)}
+                      style={inputStyle}
+                    >
+                      <option value='44" Panna'>44" Panna</option>
+                      <option value='54" Panna'>54" Panna</option>
+                      <option value='60" Panna'>60" Panna</option>
+                      <option value='64" Panna'>64" Panna</option>
+                      <option value='72" Panna'>72" Panna</option>
+                      <option value="Custom">Custom Panna Width</option>
+                    </select>
+                  </div>
+
+                  {paperPanna === 'Custom' && (
+                    <div>
+                      <label style={labelStyle}>CUSTOM PANNA WIDTH</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 50 inch"
+                        value={paperCustomPanna}
+                        onChange={e => setPaperCustomPanna(e.target.value)}
+                        style={inputStyle}
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label style={labelStyle}>ROLLS USED (QTY)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      placeholder="Number of Rolls"
+                      value={paperRollsQty}
+                      onChange={e => setPaperRollsQty(e.target.value)}
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>METERS USED (PER ROLL / TOTAL)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Meters Used"
+                      value={paperMetersUsed}
+                      onChange={e => setPaperMetersUsed(e.target.value)}
+                      style={inputStyle}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Remarks / Notes */}
+              <div>
+                <label style={labelStyle}>REMARKS / NOTES</label>
+                <input
+                  type="text"
+                  placeholder="Additional notes, batch info or job card reference..."
+                  value={rawNotes}
+                  onChange={e => setRawNotes(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+
+              {/* Modal Footer Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', borderTop: '1px solid var(--border-light)', paddingTop: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowRawMaterialModal(false)}
+                  className="btn-secondary"
+                  style={{ padding: '0.6rem 1.25rem', fontSize: '0.85rem', fontWeight: 700 }}
+                >
+                  Close Window
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={rawMaterialSubmitting}
+                  className="btn-primary"
+                  style={{
+                    padding: '0.6rem 1.4rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 14px rgba(5, 150, 105, 0.4)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Sparkles size={16} /> {rawMaterialSubmitting ? 'Saving Usage...' : 'Save Raw Material Usage'}
+                </button>
+              </div>
+
+            </form>
 
           </div>
         </div>
