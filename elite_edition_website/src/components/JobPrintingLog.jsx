@@ -65,7 +65,7 @@ export default function JobPrintingLog() {
     jobNo: '',
     jobCardId: '',
     machineName: '',
-    pass: '4 PASS',
+    pass: '1 PASS',
     meters: '',
     date: new Date().toISOString().split('T')[0],
     operatorName: accountFullName, // BY DEFAULT PRE-FILLED WITH ACCOUNT FULL NAME
@@ -95,6 +95,8 @@ export default function JobPrintingLog() {
 
   const [rawDate, setRawDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [rawShift, setRawShift] = useState(() => getAutoShift());
+  const [rawStartTime, setRawStartTime] = useState('');
+  const [rawStopTime, setRawStopTime] = useState('');
   const [rawOperator, setRawOperator] = useState(() => accountFullName || '');
   const [rawNotes, setRawNotes] = useState('');
 
@@ -111,13 +113,12 @@ export default function JobPrintingLog() {
   const [printdotInkY, setPrintdotInkY] = useState('');
   const [printdotInkK, setPrintdotInkK] = useState('');
 
-  // Section 2: PAPER PANNA WISE ROLL CONSUMPTION
+  // Section 2: PAPER CONSUMPTION (PANNA WISE ROLL CONSUMPTION)
   const [pannaOptionsList, setPannaOptionsList] = useState([]);
-  const [paperPanna, setPaperPanna] = useState('44" Panna');
-  const [paperCustomPanna, setPaperCustomPanna] = useState('');
-  const [paperType, setPaperType] = useState('Sublimation Paper');
-  const [paperRollsQty, setPaperRollsQty] = useState('');
-  const [paperMetersUsed, setPaperMetersUsed] = useState('');
+  const [paperTypesList, setPaperTypesList] = useState(['Sublimation Paper', 'Butter Paper', 'Tissue Paper']);
+  const [paperEntries, setPaperEntries] = useState([
+    { id: 1, paperType: 'Sublimation Paper', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+  ]);
 
   // Raw Material Summary State for Displaying on Screen & Reports
   const [rawMaterialSummary, setRawMaterialSummary] = useState({
@@ -181,7 +182,7 @@ export default function JobPrintingLog() {
     setRawMaterialSubmitting(true);
     try {
       const payload = [];
-      const selPanna = paperPanna === 'Custom' ? (paperCustomPanna || '44" Panna') : paperPanna;
+      const timeInfo = (rawStartTime || rawStopTime) ? ` | Time: ${rawStartTime || '—'} to ${rawStopTime || '—'}` : '';
 
       // 1. Grando Ink entries (C, M, Y, K in Liters)
       if (grandoInkC && Number(grandoInkC) > 0) {
@@ -192,7 +193,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Grando | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
       if (grandoInkM && Number(grandoInkM) > 0) {
@@ -203,7 +204,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Grando | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
       if (grandoInkY && Number(grandoInkY) > 0) {
@@ -214,7 +215,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Grando | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
       if (grandoInkK && Number(grandoInkK) > 0) {
@@ -225,7 +226,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Grando | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
 
@@ -238,7 +239,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Printdot | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
       if (printdotInkM && Number(printdotInkM) > 0) {
@@ -249,7 +250,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Printdot | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
       if (printdotInkY && Number(printdotInkY) > 0) {
@@ -260,7 +261,7 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Printdot | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
       if (printdotInkK && Number(printdotInkK) > 0) {
@@ -271,22 +272,24 @@ export default function JobPrintingLog() {
           unit: 'Liters',
           canSize: 1,
           date: rawDate,
-          notes: `[Machine: Printdot | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
         });
       }
 
-      // 3. Paper Panna Roll Consumption
-      if (paperRollsQty && Number(paperRollsQty) > 0) {
-        payload.push({
-          materialName: paperType,
-          panna: selPanna,
-          qty: Number(paperRollsQty),
-          unit: 'Rolls',
-          metersPerRoll: paperMetersUsed ? Number(paperMetersUsed) : undefined,
-          date: rawDate,
-          notes: `[Panna: ${selPanna} | Shift: ${rawShift} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
-        });
-      }
+      // 3. Dynamic Paper Consumption Entries
+      paperEntries.forEach(entry => {
+        if (entry.paperRollsQty && Number(entry.paperRollsQty) > 0) {
+          const selPanna = entry.paperPanna === 'Custom' ? (entry.paperCustomPanna || '44" Panna') : entry.paperPanna;
+          payload.push({
+            materialName: entry.paperType || 'Sublimation Paper',
+            panna: selPanna,
+            qty: Number(entry.paperRollsQty),
+            unit: 'Rolls',
+            date: rawDate,
+            notes: `[Panna: ${selPanna} | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          });
+        }
+      });
 
       if (payload.length === 0) {
         alert('Please enter at least one Ink quantity (in Liters) or Paper Roll quantity.');
@@ -299,7 +302,10 @@ export default function JobPrintingLog() {
       // Clear fields
       setGrandoInkC(''); setGrandoInkM(''); setGrandoInkY(''); setGrandoInkK('');
       setPrintdotInkC(''); setPrintdotInkM(''); setPrintdotInkY(''); setPrintdotInkK('');
-      setPaperRollsQty(''); setPaperMetersUsed(''); setRawNotes('');
+      setRawStartTime(''); setRawStopTime(''); setRawNotes('');
+      setPaperEntries([
+        { id: 1, paperType: paperTypesList[0] || 'Sublimation Paper', paperPanna: pannaOptionsList[0] || '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+      ]);
       setShowRawMaterialModal(false);
     } catch (err) {
       alert(err.message || 'Failed to save raw material usage.');
@@ -493,7 +499,30 @@ export default function JobPrintingLog() {
     printWindow.document.close();
   };
 
-  // Load Machines & Widths (Panna) from Print Settings Config
+  // Paper Entry Handlers for Multiple Paper Rows
+  const handleAddPaperEntry = () => {
+    setPaperEntries(prev => [
+      ...prev,
+      {
+        id: Date.now() + Math.random(),
+        paperType: paperTypesList[0] || 'Sublimation Paper',
+        paperPanna: pannaOptionsList[0] || '44" Panna',
+        paperCustomPanna: '',
+        paperRollsQty: ''
+      }
+    ]);
+  };
+
+  const handleRemovePaperEntry = (id) => {
+    if (paperEntries.length === 1) return;
+    setPaperEntries(prev => prev.filter(p => p.id !== id));
+  };
+
+  const handlePaperEntryChange = (id, field, value) => {
+    setPaperEntries(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+  };
+
+  // Load Machines, Widths (Panna) & Paper Types from Print Settings Config
   const fetchPrintConfig = async () => {
     try {
       const res = await api.getPrintConfig();
@@ -508,10 +537,12 @@ export default function JobPrintingLog() {
       }
       if (res && res.widths && Array.isArray(res.widths) && res.widths.length > 0) {
         setPannaOptionsList(res.widths);
-        setPaperPanna(res.widths[0]);
+      }
+      if (res && res.paperTypes && Array.isArray(res.paperTypes) && res.paperTypes.length > 0) {
+        setPaperTypesList(res.paperTypes);
       }
     } catch (err) {
-      console.warn('Failed to load machine/width list from Print Settings:', err);
+      console.warn('Failed to load print config options from Print Settings:', err);
     }
   };
 
@@ -900,7 +931,7 @@ export default function JobPrintingLog() {
                 <Activity size={14} /> Report
               </button>
 
-              {/* Button 2: Raw Material Usage */}
+              {/* Button 2: GENERATE REPORT */}
               <button
                 type="button"
                 onClick={() => setShowRawMaterialModal(true)}
@@ -920,15 +951,15 @@ export default function JobPrintingLog() {
                   cursor: 'pointer'
                 }}
               >
-                <Sparkles size={14} /> Raw Material Usage
+                <Sparkles size={14} /> GENERATE REPORT
               </button>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             
-            {/* ── LINE 1: DATE, JOBCARD TYPE, SHIFT ── */}
-            <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2.2fr 1fr', gap: '0.75rem' }}>
+            {/* ── LINE 1: DATE, SHIFT, JOB TYPE ── */}
+            <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2.2fr', gap: '0.75rem' }}>
               
               {/* Date */}
               <div>
@@ -942,10 +973,19 @@ export default function JobPrintingLog() {
                 />
               </div>
 
+              {/* Shift */}
+              <div>
+                <label style={labelStyle}>SHIFT <span style={{ color: '#ef4444' }}>*</span></label>
+                <select value={form.shift} onChange={e => setForm(f => ({ ...f, shift: e.target.value }))} style={inputStyle}>
+                  <option value="Morning">Morning</option>
+                  <option value="Night">Night</option>
+                </select>
+              </div>
+
               {/* Jobcard Type / Selection (Direct Input) */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                  <label style={labelStyle}>JOBCARD TYPE <span style={{ color: '#ef4444' }}>*</span></label>
+                  <label style={labelStyle}>JOB TYPE / JOBCARD NO. <span style={{ color: '#ef4444' }}>*</span></label>
                   {selectedJobStats && (
                     <span style={{ fontSize: '0.72rem', fontWeight: 800, color: selectedJobStats.statusColor }}>
                       ⚡ {selectedJobStats.statusText}
@@ -961,15 +1001,6 @@ export default function JobPrintingLog() {
                   style={{ ...inputStyle, width: '100%', fontWeight: 700, fontSize: '0.9rem' }}
                   required
                 />
-              </div>
-
-              {/* Shift */}
-              <div>
-                <label style={labelStyle}>SHIFT <span style={{ color: '#ef4444' }}>*</span></label>
-                <select value={form.shift} onChange={e => setForm(f => ({ ...f, shift: e.target.value }))} style={inputStyle}>
-                  <option value="Morning">Morning</option>
-                  <option value="Night">Night</option>
-                </select>
               </div>
             </div>
 
@@ -1557,12 +1588,12 @@ export default function JobPrintingLog() {
         </div>
       )}
 
-      {/* ── 6. NEW RAW MATERIAL USAGE FORM MODAL ── */}
+      {/* ── 6. GENERATE REPORT / RAW MATERIAL USAGE FORM MODAL ── */}
       {showRawMaterialModal && (
         <div className="modal-overlay" onClick={() => setShowRawMaterialModal(false)}>
           <div className="modal-content" style={{
-            maxWidth: '750px',
-            width: '94%',
+            maxWidth: '820px',
+            width: '95%',
             maxHeight: '92vh',
             background: 'var(--bg-card, #131722)',
             borderRadius: '16px',
@@ -1585,13 +1616,13 @@ export default function JobPrintingLog() {
                   background: 'linear-gradient(135deg, #059669, #047857)',
                   display: 'flex',
                   alignItems: 'center',
-                  justify: 'center'
+                  justifyContent: 'center'
                 }}>
                   <Sparkles size={20} color="#fff" />
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                    Raw Material Usage Entry Form
+                    GENERATE REPORT / RAW MATERIAL USAGE
                   </h3>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2, margin: 0 }}>
                     Log Ink Consumption (Liters) & Sublimation/Butter Paper Roll Consumption (Panna Wise)
@@ -1603,14 +1634,14 @@ export default function JobPrintingLog() {
 
             <form onSubmit={handleSaveRawMaterialUsage} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
               
-              {/* Header Info: Date, Shift, Operator */}
+              {/* Header Info: Date, Shift, Start Time, Stop Time, Operator */}
               <div style={{
-                background: 'rgba(255,255,255,0.02)',
+                background: 'rgba(255,255,255,0.03)',
                 border: '1px solid var(--border-light)',
                 borderRadius: '10px',
                 padding: '0.85rem 1rem',
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
                 gap: '0.75rem'
               }}>
                 <div>
@@ -1638,6 +1669,26 @@ export default function JobPrintingLog() {
                 </div>
 
                 <div>
+                  <label style={{ ...labelStyle, color: '#38bdf8' }}>START TIME</label>
+                  <input
+                    type="time"
+                    value={rawStartTime}
+                    onChange={e => setRawStartTime(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ ...labelStyle, color: '#a78bfa' }}>STOP TIME</label>
+                  <input
+                    type="time"
+                    value={rawStopTime}
+                    onChange={e => setRawStopTime(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
                   <label style={labelStyle}>OPERATOR NAME</label>
                   <input
                     type="text"
@@ -1649,121 +1700,123 @@ export default function JobPrintingLog() {
                 </div>
               </div>
 
-              {/* ── DIV 1: INK CONSUMPTION (LITERS) ── */}
+              {/* ── DIV 1: INK CONSUMPTION (BACKGROUND COLOUR: WHITE) ── */}
               <div style={{
-                background: 'rgba(56, 189, 248, 0.03)',
-                border: '1px solid rgba(56, 189, 248, 0.2)',
+                background: '#ffffff',
+                color: '#0f172a',
+                border: '1.5px solid #cbd5e1',
                 borderRadius: '12px',
                 padding: '1.1rem',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '1rem'
+                gap: '1rem',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
               }}>
-                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  💧 DIV 1: INK CONSUMPTION (ENTER INDIVIDUAL COLOR IN LITERS)
+                <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#0284c7', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem' }}>
+                  💧 INK CONSUMPTION
                 </div>
 
                 {/* Sub-Section 1: GRANDO MACHINE INK */}
-                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#a78bfa', marginBottom: '0.6rem', textTransform: 'uppercase' }}>
-                    🖨️ GRANDO MACHINE INK (IN LITERS)
+                <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', marginBottom: '0.6rem', textTransform: 'uppercase' }}>
+                    🖨️ GRANDO C, M, Y, K INK (IN LITERS)
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
                     <div>
-                      <label style={{ ...labelStyle, color: '#0284c7', fontWeight: 800 }}>CYAN (C) - LITERS</label>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7', display: 'block', marginBottom: '0.2rem' }}>CYAN (C) - LITERS</label>
                       <input
                         type="number"
                         step="0.01"
                         placeholder="0.00 L"
                         value={grandoInkC}
                         onChange={e => setGrandoInkC(e.target.value)}
-                        style={{ ...inputStyle, borderColor: 'rgba(56,189,248,0.4)', fontWeight: 700 }}
+                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #0284c7', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
                       />
                     </div>
                     <div>
-                      <label style={{ ...labelStyle, color: '#ec4899', fontWeight: 800 }}>MAGENTA (M) - LITERS</label>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#db2777', display: 'block', marginBottom: '0.2rem' }}>MAGENTA (M) - LITERS</label>
                       <input
                         type="number"
                         step="0.01"
                         placeholder="0.00 L"
                         value={grandoInkM}
                         onChange={e => setGrandoInkM(e.target.value)}
-                        style={{ ...inputStyle, borderColor: 'rgba(236,72,153,0.4)', fontWeight: 700 }}
+                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #db2777', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
                       />
                     </div>
                     <div>
-                      <label style={{ ...labelStyle, color: '#eab308', fontWeight: 800 }}>YELLOW (Y) - LITERS</label>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#ca8a04', display: 'block', marginBottom: '0.2rem' }}>YELLOW (Y) - LITERS</label>
                       <input
                         type="number"
                         step="0.01"
                         placeholder="0.00 L"
                         value={grandoInkY}
                         onChange={e => setGrandoInkY(e.target.value)}
-                        style={{ ...inputStyle, borderColor: 'rgba(234,179,8,0.4)', fontWeight: 700 }}
+                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #ca8a04', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
                       />
                     </div>
                     <div>
-                      <label style={{ ...labelStyle, color: '#94a3b8', fontWeight: 800 }}>BLACK (K) - LITERS</label>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#334155', display: 'block', marginBottom: '0.2rem' }}>BLACK (K) - LITERS</label>
                       <input
                         type="number"
                         step="0.01"
                         placeholder="0.00 L"
                         value={grandoInkK}
                         onChange={e => setGrandoInkK(e.target.value)}
-                        style={{ ...inputStyle, borderColor: 'rgba(148,163,184,0.4)', fontWeight: 700 }}
+                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #334155', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* Sub-Section 2: PRINTDOT MACHINE INK */}
-                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#a78bfa', marginBottom: '0.6rem', textTransform: 'uppercase' }}>
-                    🖨️ PRINTDOT MACHINE INK (IN LITERS)
+                <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', marginBottom: '0.6rem', textTransform: 'uppercase' }}>
+                    🖨️ PRINTDOT C, M, Y, K INK (IN LITERS)
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
                     <div>
-                      <label style={{ ...labelStyle, color: '#0284c7', fontWeight: 800 }}>CYAN (C) - LITERS</label>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7', display: 'block', marginBottom: '0.2rem' }}>CYAN (C) - LITERS</label>
                       <input
                         type="number"
                         step="0.01"
                         placeholder="0.00 L"
                         value={printdotInkC}
                         onChange={e => setPrintdotInkC(e.target.value)}
-                        style={{ ...inputStyle, borderColor: 'rgba(56,189,248,0.4)', fontWeight: 700 }}
+                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #0284c7', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
                       />
                     </div>
                     <div>
-                      <label style={{ ...labelStyle, color: '#ec4899', fontWeight: 800 }}>MAGENTA (M) - LITERS</label>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#db2777', display: 'block', marginBottom: '0.2rem' }}>MAGENTA (M) - LITERS</label>
                       <input
                         type="number"
                         step="0.01"
                         placeholder="0.00 L"
                         value={printdotInkM}
                         onChange={e => setPrintdotInkM(e.target.value)}
-                        style={{ ...inputStyle, borderColor: 'rgba(236,72,153,0.4)', fontWeight: 700 }}
+                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #db2777', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
                       />
                     </div>
                     <div>
-                      <label style={{ ...labelStyle, color: '#eab308', fontWeight: 800 }}>YELLOW (Y) - LITERS</label>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#ca8a04', display: 'block', marginBottom: '0.2rem' }}>YELLOW (Y) - LITERS</label>
                       <input
                         type="number"
                         step="0.01"
                         placeholder="0.00 L"
                         value={printdotInkY}
                         onChange={e => setPrintdotInkY(e.target.value)}
-                        style={{ ...inputStyle, borderColor: 'rgba(234,179,8,0.4)', fontWeight: 700 }}
+                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #ca8a04', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
                       />
                     </div>
                     <div>
-                      <label style={{ ...labelStyle, color: '#94a3b8', fontWeight: 800 }}>BLACK (K) - LITERS</label>
+                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#334155', display: 'block', marginBottom: '0.2rem' }}>BLACK (K) - LITERS</label>
                       <input
                         type="number"
                         step="0.01"
                         placeholder="0.00 L"
                         value={printdotInkK}
                         onChange={e => setPrintdotInkK(e.target.value)}
-                        style={{ ...inputStyle, borderColor: 'rgba(148,163,184,0.4)', fontWeight: 700 }}
+                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #334155', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
                       />
                     </div>
                   </div>
@@ -1771,72 +1824,133 @@ export default function JobPrintingLog() {
 
               </div>
 
-              {/* ── DIV 2: PAPER CONSUMPTION (PANNA WISE ROLL) ── */}
+              {/* ── DIV 2: PAPER CONSUMPTION (MULTIPLE ENTRIES SUPPORTED) ── */}
               <div style={{
                 background: 'rgba(16, 185, 129, 0.03)',
-                border: '1px solid rgba(16, 185, 129, 0.2)',
+                border: '1px solid rgba(16, 185, 129, 0.25)',
                 borderRadius: '12px',
                 padding: '1.1rem',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '0.85rem'
+                gap: '1rem'
               }}>
-                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase' }}>
-                  📜 DIV 2: PAPER CONSUMPTION (PANNA WISE ROLL)
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    📜 PAPER CONSUMPTION
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddPaperEntry}
+                    style={{
+                      padding: '0.35rem 0.85rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      color: '#34d399',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <PlusCircle size={14} /> + Add More Paper Entry
+                  </button>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
-                  <div>
-                    <label style={labelStyle}>PAPER TYPE</label>
-                    <select
-                      value={paperType}
-                      onChange={e => setPaperType(e.target.value)}
-                      style={inputStyle}
+                {/* Render Dynamic Paper Entries */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  {paperEntries.map((entry, index) => (
+                    <div
+                      key={entry.id}
+                      style={{
+                        background: 'rgba(0,0,0,0.2)',
+                        border: '1px solid var(--border-light)',
+                        borderRadius: '8px',
+                        padding: '0.85rem',
+                        position: 'relative'
+                      }}
                     >
-                      <option value="Sublimation Paper">Sublimation Paper</option>
-                      <option value="Butter Paper">Butter Paper</option>
-                      <option value="Tissue Paper">Tissue Paper</option>
-                    </select>
-                  </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34d399' }}>
+                          Paper Entry #{index + 1}
+                        </span>
+                        {paperEntries.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePaperEntry(entry.id)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#f87171',
+                              cursor: 'pointer',
+                              padding: '0.2rem',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                            title="Remove Paper Entry"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
 
-                  <div>
-                    <label style={labelStyle}>PAPER PANNA (WIDTH)</label>
-                    <select
-                      value={paperPanna}
-                      onChange={e => setPaperPanna(e.target.value)}
-                      style={inputStyle}
-                    >
-                      {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, idx) => (
-                        <option key={idx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>
-                      ))}
-                      <option value="Custom">Custom Panna Width</option>
-                    </select>
-                  </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
+                        <div>
+                          <label style={labelStyle}>PAPER TYPE</label>
+                          <select
+                            value={entry.paperType}
+                            onChange={e => handlePaperEntryChange(entry.id, 'paperType', e.target.value)}
+                            style={inputStyle}
+                          >
+                            {(paperTypesList.length > 0 ? paperTypesList : ['Sublimation Paper', 'Butter Paper', 'Tissue Paper']).map((p, pIdx) => (
+                              <option key={pIdx} value={p}>{p}</option>
+                            ))}
+                          </select>
+                        </div>
 
-                  {paperPanna === 'Custom' && (
-                    <div>
-                      <label style={labelStyle}>CUSTOM PANNA WIDTH</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. 50 inch"
-                        value={paperCustomPanna}
-                        onChange={e => setPaperCustomPanna(e.target.value)}
-                        style={inputStyle}
-                      />
+                        <div>
+                          <label style={labelStyle}>PAPER PANNA (WIDTH)</label>
+                          <select
+                            value={entry.paperPanna}
+                            onChange={e => handlePaperEntryChange(entry.id, 'paperPanna', e.target.value)}
+                            style={inputStyle}
+                          >
+                            {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => (
+                              <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>
+                            ))}
+                            <option value="Custom">Custom Panna Width</option>
+                          </select>
+                        </div>
+
+                        {entry.paperPanna === 'Custom' && (
+                          <div>
+                            <label style={labelStyle}>CUSTOM PANNA WIDTH</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 50 inch"
+                              value={entry.paperCustomPanna}
+                              onChange={e => handlePaperEntryChange(entry.id, 'paperCustomPanna', e.target.value)}
+                              style={inputStyle}
+                            />
+                          </div>
+                        )}
+
+                        <div>
+                          <label style={labelStyle}>ROLLS USED (QTY)</label>
+                          <input
+                            type="number"
+                            step="1"
+                            placeholder="Number of Rolls"
+                            value={entry.paperRollsQty}
+                            onChange={e => handlePaperEntryChange(entry.id, 'paperRollsQty', e.target.value)}
+                            style={inputStyle}
+                          />
+                        </div>
+                      </div>
                     </div>
-                  )}
-
-                  <div>
-                    <label style={labelStyle}>ROLLS USED (QTY)</label>
-                    <input
-                      type="number"
-                      step="1"
-                      placeholder="Number of Rolls"
-                      value={paperRollsQty}
-                      onChange={e => setPaperRollsQty(e.target.value)}
-                      style={inputStyle}
-                    />
-                  </div>
+                  ))}
                 </div>
               </div>
 
