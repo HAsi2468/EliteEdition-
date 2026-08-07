@@ -89,6 +89,191 @@ export default function JobPrintingLog() {
   const [reportSearchJob, setReportSearchJob] = useState('');
   const [reportLoadingPdf, setReportLoadingPdf] = useState(false);
 
+  // ⚡ INSTANT OPERATOR REPORT PRINT / PDF GENERATOR (0.02s SPEED)
+  const handlePrintOperatorReport = (repLogs) => {
+    if (!repLogs || repLogs.length === 0) {
+      alert('No printing log entries found for the selected filter criteria.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to view/print report.');
+      return;
+    }
+
+    const totalMtr = repLogs.reduce((s, l) => s + (Number(l.meters) || 0), 0);
+    const uniqueJobs = new Set(repLogs.map(l => l.jobNo)).size;
+    const morningMtr = repLogs.filter(l => l.shift === 'Morning').reduce((s, l) => s + (Number(l.meters) || 0), 0);
+    const nightMtr = repLogs.filter(l => l.shift === 'Night').reduce((s, l) => s + (Number(l.meters) || 0), 0);
+
+    const machinePassSummary = {};
+    repLogs.forEach(l => {
+      const mName = l.machineName || 'Machine';
+      const pName = l.pass || '1 PASS';
+      const key = `${mName.toUpperCase()} __ ${pName.toUpperCase()}`;
+      if (!machinePassSummary[key]) {
+        machinePassSummary[key] = { machine: mName, pass: pName, mtr: 0, count: 0, jobs: new Set() };
+      }
+      machinePassSummary[key].mtr += Number(l.meters) || 0;
+      machinePassSummary[key].count += 1;
+      if (l.jobNo) machinePassSummary[key].jobs.add(l.jobNo);
+    });
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Digital_Operator_Printing_Report_${reportStartDate}_to_${reportEndDate}</title>
+        <style>
+          @page { size: A4 portrait; margin: 10mm; }
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; background: #fff; margin: 0; padding: 15px; font-size: 11px; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #6366f1; padding-bottom: 10px; margin-bottom: 12px; }
+          .title { font-size: 17px; font-weight: 900; color: #3730a3; text-transform: uppercase; letter-spacing: 0.5px; }
+          .subtitle { font-size: 10.5px; color: #64748b; margin-top: 2px; font-weight: 600; }
+          .meta { text-align: right; font-size: 9.5px; color: #475569; line-height: 1.4; }
+          .kpi-row { display: flex; gap: 8px; margin-bottom: 12px; }
+          .kpi-card { flex: 1; padding: 8px 10px; border-radius: 6px; background: #f8fafc; border: 1px solid #e2e8f0; }
+          .kpi-label { font-size: 8.5px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+          .kpi-val { font-size: 15px; font-weight: 900; color: #0f172a; margin-top: 2px; }
+          .section-title { font-size: 10.5px; font-weight: 800; text-transform: uppercase; color: #312e81; background: #e0e7ff; padding: 5px 8px; border-left: 4px solid #4338ca; margin: 12px 0 6px 0; border-radius: 2px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+          th { background: #1e293b; color: #fff; font-size: 8.5px; text-transform: uppercase; padding: 6px 7px; text-align: left; font-weight: 700; }
+          td { padding: 5.5px 7px; border-bottom: 1px solid #e2e8f0; font-size: 9.5px; color: #334155; }
+          tr:nth-child(even) td { background: #f8fafc; }
+          .bold { font-weight: 800; color: #0f172a; }
+          .text-right { text-align: right; }
+          .shift-badge { display: inline-block; padding: 2px 5px; border-radius: 3px; font-size: 8px; font-weight: 700; }
+          .morning { background: #e0f2fe; color: #0369a1; }
+          .night { background: #fef3c7; color: #b45309; }
+          .total-row { background: #cbd5e1 !important; font-weight: 900 !important; color: #0f172a !important; }
+          .footer { margin-top: 15px; border-top: 1px solid #cbd5e1; padding-top: 6px; font-size: 8.5px; color: #94a3b8; display: flex; justify-content: space-between; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="title">ELITE DIGITAL PRINTS — OPERATOR PRINTING PRODUCTION REPORT</div>
+            <div class="subtitle">Complete Machine Printing Log & Detailed Production Analytics</div>
+          </div>
+          <div class="meta">
+            <div><strong>Date Period:</strong> ${formatDateDDMMYYYY(reportStartDate)} to ${formatDateDDMMYYYY(reportEndDate)}</div>
+            <div><strong>Generated:</strong> ${new Date().toLocaleDateString('en-IN')} ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
+            <div><strong>Filters:</strong> ${reportMachine || 'All Machines'} | ${reportShift || 'All Shifts'} | ${reportPass || 'All Passes'}</div>
+          </div>
+        </div>
+
+        <div class="kpi-row">
+          <div class="kpi-card" style="border-left: 4px solid #0284c7;">
+            <div class="kpi-label">Total Printed Meters</div>
+            <div class="kpi-val">${totalMtr.toFixed(2)} mtr</div>
+          </div>
+          <div class="kpi-card" style="border-left: 4px solid #7c3aed;">
+            <div class="kpi-label">Job Cards Processed</div>
+            <div class="kpi-val">${uniqueJobs} Cards</div>
+          </div>
+          <div class="kpi-card" style="border-left: 4px solid #059669;">
+            <div class="kpi-label">Morning Shift Meters</div>
+            <div class="kpi-val">${morningMtr.toFixed(2)} mtr</div>
+          </div>
+          <div class="kpi-card" style="border-left: 4px solid #d97706;">
+            <div class="kpi-label">Night Shift Meters</div>
+            <div class="kpi-val">${nightMtr.toFixed(2)} mtr</div>
+          </div>
+        </div>
+
+        <div class="section-title">1. Machine & Pass Wise Summary</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Machine Name</th>
+              <th>Pass</th>
+              <th class="text-right">Job Cards Count</th>
+              <th class="text-right">Run Entries</th>
+              <th class="text-right">Total Printed Meters</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.values(machinePassSummary).map(m => `
+              <tr>
+                <td class="bold">${m.machine}</td>
+                <td>${m.pass}</td>
+                <td class="text-right">${m.jobs.size}</td>
+                <td class="text-right">${m.count}</td>
+                <td class="text-right bold" style="color:#047857;">${m.mtr.toFixed(2)} mtr</td>
+              </tr>
+            `).join('')}
+            <tr class="total-row">
+              <td colspan="4" class="bold" style="font-size:10px;">TOTAL MACHINE PRODUCTION SUMMARY</td>
+              <td class="text-right bold" style="font-size:10.5px; color:#047857;">${totalMtr.toFixed(2)} mtr</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="section-title" style="margin-top:10px;">2. Complete Printing Entry & Run Logs</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Date & Shift</th>
+              <th>Job Card #</th>
+              <th>Party / Client Name</th>
+              <th>Design Name / #</th>
+              <th>Machine</th>
+              <th>Pass</th>
+              <th class="text-right">Meters Printed</th>
+              <th>Operator</th>
+              <th>Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${repLogs.map(l => {
+              const matched = jobCards.find(c => c._id === l.jobCardId || c.jobNo === l.jobNo);
+              return `
+                <tr>
+                  <td>
+                    <strong>${formatDateDDMMYYYY(l.date)}</strong><br/>
+                    <span class="shift-badge ${l.shift === 'Morning' ? 'morning' : 'night'}">${l.shift || 'General'}</span>
+                  </td>
+                  <td class="bold" style="color:#0284c7;">#${l.jobNo}</td>
+                  <td>${matched ? (matched.party || '—') : '—'}</td>
+                  <td>${matched ? (matched.designName || matched.designNo || '—') : '—'}</td>
+                  <td class="bold">${l.machineName}</td>
+                  <td>${l.pass}</td>
+                  <td class="text-right bold" style="color:#059669; font-size:10px;">${Number(l.meters).toFixed(2)} mtr</td>
+                  <td>${l.operatorName || '—'}</td>
+                  <td style="color:#64748b;">${l.notes || '—'}</td>
+                </tr>
+              `;
+            }).join('')}
+            <tr class="total-row">
+              <td colSpan="6" class="bold" style="font-size:10.5px;">GRAND TOTAL PRINTED METERS (${repLogs.length} LOG ENTRIES)</td>
+              <td class="text-right bold" style="font-size:11px; color:#047857;">${totalMtr.toFixed(2)} mtr</td>
+              <td colSpan="2"></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <div>Elite Edition ERP — Digital Printing Operator Production Report</div>
+          <div>Printed On: ${new Date().toLocaleDateString('en-IN')}</div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 200);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   // Load Machines from Print Settings Config
   const fetchPrintConfig = async () => {
     try {
@@ -1243,6 +1428,17 @@ export default function JobPrintingLog() {
                                 );
                               })
                             )}
+                            {repLogs.length > 0 && (
+                              <tr style={{ background: 'rgba(56,189,248,0.1)', borderTop: '2px solid #38bdf8' }}>
+                                <td colSpan="3" style={{ ...tdStyle, fontWeight: 900, color: 'var(--text-primary)', fontSize: '0.85rem' }}>
+                                  GRAND TOTAL PRINTED METERS ({repLogs.length} ENTRIES)
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 900, color: '#34d399', fontSize: '0.95rem' }}>
+                                  {repTotalMeters.toFixed(2)} mtr
+                                </td>
+                                <td colSpan="2"></td>
+                              </tr>
+                            )}
                           </tbody>
                         </table>
                       </div>
@@ -1273,7 +1469,46 @@ export default function JobPrintingLog() {
                 Close Window
               </button>
 
-              <div style={{ display: 'flex', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                {/* Instant 0-second Print / Save PDF */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const filteredLogs = logs.filter(l => {
+                      if (reportMachine && !String(l.machineName || '').toLowerCase().includes(reportMachine.toLowerCase())) return false;
+                      if (reportShift && l.shift !== reportShift) return false;
+                      if (reportPass && l.pass !== reportPass) return false;
+                      if (reportOperator && !String(l.operatorName || '').toLowerCase().includes(reportOperator.toLowerCase())) return false;
+                      if (reportSearchJob && !String(l.jobNo || '').toLowerCase().includes(reportSearchJob.toLowerCase())) return false;
+                      if (reportStartDate || reportEndDate) {
+                        if (!l.date) return true;
+                        const dStr = new Date(l.date).toISOString().split('T')[0];
+                        if (reportStartDate && dStr < reportStartDate) return false;
+                        if (reportEndDate && dStr > reportEndDate) return false;
+                      }
+                      return true;
+                    });
+                    handlePrintOperatorReport(filteredLogs);
+                  }}
+                  className="btn-primary"
+                  style={{
+                    padding: '0.55rem 1.25rem',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    boxShadow: '0 2px 10px rgba(5, 150, 105, 0.35)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Printer size={15} /> Instant Print / Save PDF
+                </button>
+
                 <button
                   type="button"
                   onClick={handleExportCSV}
@@ -1307,22 +1542,18 @@ export default function JobPrintingLog() {
                       setReportLoadingPdf(false);
                     }
                   }}
-                  className="btn-primary"
+                  className="btn-secondary"
                   style={{
-                    padding: '0.55rem 1.25rem',
+                    padding: '0.55rem 1.1rem',
                     fontSize: '0.82rem',
-                    fontWeight: 800,
+                    fontWeight: 700,
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
-                    color: '#ffffff',
-                    border: 'none',
-                    boxShadow: '0 2px 10px rgba(124, 58, 237, 0.35)',
                     cursor: 'pointer'
                   }}
                 >
-                  <FileText size={15} /> {reportLoadingPdf ? 'Generating PDF Report...' : 'Download PDF Report'}
+                  <FileText size={15} /> {reportLoadingPdf ? 'Generating PDF...' : 'Download Backend PDF'}
                 </button>
               </div>
             </div>
