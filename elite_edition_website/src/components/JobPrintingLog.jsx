@@ -435,45 +435,119 @@ export default function JobPrintingLog() {
           </tbody>
         </table>
 
-        <div class="section-title" style="margin-top:10px;">2. Complete Printing Entry & Run Logs</div>
+        <div class="section-title" style="margin-top:10px;">2. Raw Material Consumption Summary</div>
         <table>
           <thead>
             <tr>
-              <th>Date & Shift</th>
-              <th>Job Card #</th>
-              <th>Party / Client Name</th>
-              <th>Design Name / #</th>
-              <th>Machine</th>
-              <th>Pass</th>
-              <th class="text-right">Meters Printed</th>
-              <th>Operator</th>
-              <th>Remarks</th>
+              <th style="font-weight: 800;">MACHIN NAME</th>
+              <th class="text-right" style="font-weight: 800; width: 55px;">C</th>
+              <th class="text-right" style="font-weight: 800; width: 55px;">M</th>
+              <th class="text-right" style="font-weight: 800; width: 55px;">Y</th>
+              <th class="text-right" style="font-weight: 800; width: 55px;">K</th>
+              <th style="font-weight: 800;">PAPER TYPE</th>
+              <th style="font-weight: 800;">PANNO</th>
+              <th class="text-right" style="font-weight: 800; width: 65px;">QTY</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(() => {
+              const grandoC = grandoInkC ? Number(grandoInkC).toFixed(2) : (rawMaterialSummary.grandoInk.C ? rawMaterialSummary.grandoInk.C.toFixed(2) : '');
+              const grandoM = grandoInkM ? Number(grandoInkM).toFixed(2) : (rawMaterialSummary.grandoInk.M ? rawMaterialSummary.grandoInk.M.toFixed(2) : '');
+              const grandoY = grandoInkY ? Number(grandoInkY).toFixed(2) : (rawMaterialSummary.grandoInk.Y ? rawMaterialSummary.grandoInk.Y.toFixed(2) : '');
+              const grandoK = grandoInkK ? Number(grandoInkK).toFixed(2) : (rawMaterialSummary.grandoInk.K ? rawMaterialSummary.grandoInk.K.toFixed(2) : '');
+
+              const printdotC = printdotInkC ? Number(printdotInkC).toFixed(2) : (rawMaterialSummary.printdotInk.C ? rawMaterialSummary.printdotInk.C.toFixed(2) : '');
+              const printdotM = printdotInkM ? Number(printdotInkM).toFixed(2) : (rawMaterialSummary.printdotInk.M ? rawMaterialSummary.printdotInk.M.toFixed(2) : '');
+              const printdotY = printdotInkY ? Number(printdotInkY).toFixed(2) : (rawMaterialSummary.printdotInk.Y ? rawMaterialSummary.printdotInk.Y.toFixed(2) : '');
+              const printdotK = printdotInkK ? Number(printdotInkK).toFixed(2) : (rawMaterialSummary.printdotInk.K ? rawMaterialSummary.printdotInk.K.toFixed(2) : '');
+
+              const row1Paper = paperEntries[0] || {};
+              const row2Paper = paperEntries[1] || {};
+              const extraPapers = paperEntries.slice(2);
+
+              const row1Panno = row1Paper.paperPanna === 'Custom' ? (row1Paper.paperCustomPanna || '') : (row1Paper.paperPanna || '');
+              const row2Panno = row2Paper.paperPanna === 'Custom' ? (row2Paper.paperCustomPanna || '') : (row2Paper.paperPanna || '');
+
+              return `
+                <tr>
+                  <td class="bold">GRANDO</td>
+                  <td class="text-right bold" style="color:#0284c7;">${grandoC}</td>
+                  <td class="text-right bold" style="color:#ec4899;">${grandoM}</td>
+                  <td class="text-right bold" style="color:#ca8a04;">${grandoY}</td>
+                  <td class="text-right bold" style="color:#334155;">${grandoK}</td>
+                  <td>${row1Paper.paperType || ''}</td>
+                  <td>${row1Panno}</td>
+                  <td class="text-right bold">${row1Paper.paperRollsQty ? `${row1Paper.paperRollsQty} Rolls` : ''}</td>
+                </tr>
+                <tr>
+                  <td class="bold">PRINTDOT</td>
+                  <td class="text-right bold" style="color:#0284c7;">${printdotC}</td>
+                  <td class="text-right bold" style="color:#ec4899;">${printdotM}</td>
+                  <td class="text-right bold" style="color:#ca8a04;">${printdotY}</td>
+                  <td class="text-right bold" style="color:#334155;">${printdotK}</td>
+                  <td>${row2Paper.paperType || ''}</td>
+                  <td>${row2Panno}</td>
+                  <td class="text-right bold">${row2Paper.paperRollsQty ? `${row2Paper.paperRollsQty} Rolls` : ''}</td>
+                </tr>
+                ${extraPapers.map(p => `
+                  <tr>
+                    <td class="bold"></td>
+                    <td></td><td></td><td></td><td></td>
+                    <td>${p.paperType || ''}</td>
+                    <td>${p.paperPanna === 'Custom' ? p.paperCustomPanna : (p.paperPanna || '')}</td>
+                    <td class="text-right bold">${p.paperRollsQty ? `${p.paperRollsQty} Rolls` : ''}</td>
+                  </tr>
+                `).join('')}
+              `;
+            })()}
+          </tbody>
+        </table>
+
+        <div class="section-title" style="margin-top:10px;">3. Complete Printing Entry & Run Logs</div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 45px; text-align: center;">SHIFT</th>
+              <th style="width: 75px;">JOB CARD #</th>
+              <th>PARTY / CLIENT NAME</th>
+              <th>DESIGN NAME / #</th>
+              <th style="width: 55px; text-align: center;">MACHINE</th>
+              <th style="width: 45px; text-align: center;">PASS</th>
+              <th class="text-right" style="width: 95px;">METERS PRINTED</th>
+              <th style="width: 95px;">OPERATOR</th>
             </tr>
           </thead>
           <tbody>
             ${repLogs.map(l => {
               const matched = jobCards.find(c => c._id === l.jobCardId || c.jobNo === l.jobNo);
+              const cleanJobNo = String(l.jobNo || '').replace(/[^\d]/g, '') || l.jobNo || '—';
+              const shiftShort = String(l.shift || '').toLowerCase().includes('morn') ? 'M' :
+                                String(l.shift || '').toLowerCase().includes('night') ? 'N' :
+                                (l.shift ? l.shift.charAt(0).toUpperCase() : '—');
+              const machineShort = String(l.machineName || '').toUpperCase().includes('GRANDO') ? 'G' :
+                                   String(l.machineName || '').toUpperCase().includes('PRINTDOT') ? 'P' :
+                                   (l.machineName ? l.machineName.charAt(0).toUpperCase() : '—');
+              const passNum = (String(l.pass || '').match(/\d+/) || [l.pass || '1'])[0];
+
               return `
                 <tr>
-                  <td>
-                    <strong>${formatDateDDMMYYYY(l.date)}</strong><br/>
-                    <span class="shift-badge ${l.shift === 'Morning' ? 'morning' : 'night'}">${l.shift || 'General'}</span>
+                  <td style="text-align: center;" class="bold">
+                    <span class="shift-badge ${l.shift === 'Morning' ? 'morning' : 'night'}">${shiftShort}</span>
                   </td>
-                  <td class="bold" style="color:#0284c7;">#${l.jobNo}</td>
+                  <td class="bold" style="color:#0284c7;">${cleanJobNo}</td>
                   <td>${matched ? (matched.party || '—') : '—'}</td>
                   <td>${matched ? (matched.designName || matched.designNo || '—') : '—'}</td>
-                  <td class="bold">${l.machineName}</td>
-                  <td>${l.pass}</td>
+                  <td style="text-align: center;" class="bold">${machineShort}</td>
+                  <td style="text-align: center;" class="bold">${passNum}</td>
                   <td class="text-right bold" style="color:#059669; font-size:10px;">${Number(l.meters).toFixed(2)} mtr</td>
                   <td>${l.operatorName || '—'}</td>
-                  <td style="color:#64748b;">${l.notes || '—'}</td>
                 </tr>
               `;
             }).join('')}
             <tr class="total-row">
               <td colSpan="6" class="bold" style="font-size:10.5px;">GRAND TOTAL PRINTED METERS (${repLogs.length} LOG ENTRIES)</td>
               <td class="text-right bold" style="font-size:11px; color:#047857;">${totalMtr.toFixed(2)} mtr</td>
-              <td colSpan="2"></td>
+              <td></td>
             </tr>
           </tbody>
         </table>
