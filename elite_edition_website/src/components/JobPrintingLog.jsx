@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import {
   Printer, PlusCircle, Search, RefreshCw, Trash2, Edit2, CheckCircle2,
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
-  X, Download, Eye, Layers3, Activity, Tag, Sparkles
+  X, Download, Eye, Layers3, Activity, Tag, Sparkles, FileText
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
