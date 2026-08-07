@@ -1170,10 +1170,10 @@ export default function JobPrintingLog() {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                    Digital Operator Printing Production Report
+                    Printing Report Generator
                   </h3>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2, margin: 0 }}>
-                    Filter date range, machine & shift to preview complete printing details and generate official PDF.
+                    Select From Date & To Date to preview printing details and download report.
                   </p>
                 </div>
               </div>
@@ -1200,124 +1200,41 @@ export default function JobPrintingLog() {
             {/* Modal Body - Scrollable Content */}
             <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem', flex: 1 }}>
               
-              {/* ── FILTER CONTROLS BAR ── */}
+              {/* ── ONLY 2 DATES CONTROLS BAR ── */}
               <div style={{
-                background: 'rgba(255,255,255,0.02)',
+                background: 'rgba(255,255,255,0.03)',
                 border: '1px solid var(--border-light)',
                 borderRadius: '12px',
-                padding: '1rem 1.25rem',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                gap: '0.75rem',
-                alignItems: 'end'
+                padding: '1.25rem 1.5rem',
+                display: 'flex',
+                gap: '1.5rem',
+                alignItems: 'center',
+                flexWrap: 'wrap'
               }}>
-                <div>
-                  <label style={labelStyle}>FROM DATE</label>
+                <div style={{ flex: 1, minWidth: '180px' }}>
+                  <label style={{ ...labelStyle, fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8' }}>FROM DATE</label>
                   <input
                     type="date"
                     value={reportStartDate}
                     onChange={e => setReportStartDate(e.target.value)}
-                    style={inputStyle}
+                    style={{ ...inputStyle, fontSize: '0.9rem', padding: '0.55rem 0.75rem', fontWeight: 700 }}
                   />
                 </div>
 
-                <div>
-                  <label style={labelStyle}>TO DATE</label>
+                <div style={{ flex: 1, minWidth: '180px' }}>
+                  <label style={{ ...labelStyle, fontSize: '0.75rem', fontWeight: 800, color: '#a78bfa' }}>TO DATE</label>
                   <input
                     type="date"
                     value={reportEndDate}
                     onChange={e => setReportEndDate(e.target.value)}
-                    style={inputStyle}
+                    style={{ ...inputStyle, fontSize: '0.9rem', padding: '0.55rem 0.75rem', fontWeight: 700 }}
                   />
-                </div>
-
-                <div>
-                  <label style={labelStyle}>MACHINE</label>
-                  <select
-                    value={reportMachine}
-                    onChange={e => setReportMachine(e.target.value)}
-                    style={inputStyle}
-                  >
-                    <option value="">All Machines</option>
-                    {machinesList.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>SHIFT</label>
-                  <select
-                    value={reportShift}
-                    onChange={e => setReportShift(e.target.value)}
-                    style={inputStyle}
-                  >
-                    <option value="">All Shifts</option>
-                    <option value="Morning">Morning Shift</option>
-                    <option value="Night">Night Shift</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>PASS</label>
-                  <select
-                    value={reportPass}
-                    onChange={e => setReportPass(e.target.value)}
-                    style={inputStyle}
-                  >
-                    <option value="">All Passes</option>
-                    {PASS_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>OPERATOR</label>
-                  <input
-                    type="text"
-                    placeholder="Operator Name"
-                    value={reportOperator}
-                    onChange={e => setReportOperator(e.target.value)}
-                    style={inputStyle}
-                  />
-                </div>
-
-                <div>
-                  <label style={labelStyle}>JOB CARD #</label>
-                  <input
-                    type="text"
-                    placeholder="Job #"
-                    value={reportSearchJob}
-                    onChange={e => setReportSearchJob(e.target.value)}
-                    style={inputStyle}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setReportStartDate(new Date().toISOString().split('T')[0]);
-                      setReportEndDate(new Date().toISOString().split('T')[0]);
-                      setReportMachine('');
-                      setReportShift('');
-                      setReportOperator('');
-                      setReportPass('');
-                      setReportSearchJob('');
-                    }}
-                    className="btn-secondary"
-                    style={{ width: '100%', padding: '0.48rem', fontSize: '0.78rem', justifyContent: 'center' }}
-                  >
-                    Reset
-                  </button>
                 </div>
               </div>
 
               {/* ── LIVE ANALYTICS & DETAILED SUMMARY ── */}
               {(() => {
                 const repLogs = logs.filter(l => {
-                  if (reportMachine && !String(l.machineName || '').toLowerCase().includes(reportMachine.toLowerCase())) return false;
-                  if (reportShift && l.shift !== reportShift) return false;
-                  if (reportPass && l.pass !== reportPass) return false;
-                  if (reportOperator && !String(l.operatorName || '').toLowerCase().includes(reportOperator.toLowerCase())) return false;
-                  if (reportSearchJob && !String(l.jobNo || '').toLowerCase().includes(reportSearchJob.toLowerCase())) return false;
                   if (reportStartDate || reportEndDate) {
                     if (!l.date) return true;
                     const dStr = new Date(l.date).toISOString().split('T')[0];
@@ -1475,11 +1392,6 @@ export default function JobPrintingLog() {
                   type="button"
                   onClick={() => {
                     const filteredLogs = logs.filter(l => {
-                      if (reportMachine && !String(l.machineName || '').toLowerCase().includes(reportMachine.toLowerCase())) return false;
-                      if (reportShift && l.shift !== reportShift) return false;
-                      if (reportPass && l.pass !== reportPass) return false;
-                      if (reportOperator && !String(l.operatorName || '').toLowerCase().includes(reportOperator.toLowerCase())) return false;
-                      if (reportSearchJob && !String(l.jobNo || '').toLowerCase().includes(reportSearchJob.toLowerCase())) return false;
                       if (reportStartDate || reportEndDate) {
                         if (!l.date) return true;
                         const dStr = new Date(l.date).toISOString().split('T')[0];
