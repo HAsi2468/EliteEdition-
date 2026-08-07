@@ -29,12 +29,13 @@ const DEFAULT_MACHINES = [
 ];
 
 const PASS_OPTIONS = [
-  '1 Pass (Draft)',
-  '2 Pass (Standard)',
-  '4 Pass (High Quality)',
-  '6 Pass (Fine Detail)',
-  '8 Pass (Ultra HD)',
-  '12 Pass (Maximum)'
+  '1 PASS',
+  '2 PASS',
+  '3 PASS',
+  '4 PASS',
+  '6 PASS',
+  '8 PASS',
+  '12 PASS'
 ];
 
 export default function JobPrintingLog() {
@@ -64,7 +65,7 @@ export default function JobPrintingLog() {
     jobNo: '',
     jobCardId: '',
     machineName: '',
-    pass: '4 Pass (High Quality)',
+    pass: '4 PASS',
     meters: '',
     date: new Date().toISOString().split('T')[0],
     operatorName: accountFullName, // BY DEFAULT PRE-FILLED WITH ACCOUNT FULL NAME
@@ -119,7 +120,7 @@ export default function JobPrintingLog() {
       });
       if (res.data) setLogs(res.data);
     } catch (err) {
-      setError(err.message || 'Failed to load machine print logs.');
+      setError(err.message || 'Failed to load printing logs.');
     } finally {
       setLoading(false);
     }
@@ -211,7 +212,7 @@ export default function JobPrintingLog() {
         jobNo: matched.jobNo,
         jobCardId: matched._id,
         machineName: matched.machineName ? (machinesList.find(m => m.toLowerCase().includes(matched.machineName.toLowerCase())) || matched.machineName) : (prev.machineName || machinesList[0] || 'Machine 1'),
-        pass: matched.pass ? (PASS_OPTIONS.find(p => p.toLowerCase().includes(matched.pass.toLowerCase())) || matched.pass) : prev.pass
+        pass: matched.pass ? (PASS_OPTIONS.find(p => p.toUpperCase() === matched.pass.toUpperCase()) || matched.pass) : prev.pass
       }));
     } else {
       setSelectedJob(null);
@@ -294,7 +295,7 @@ export default function JobPrintingLog() {
       jobNo: log.jobNo || '',
       jobCardId: log.jobCardId || (matched ? matched._id : ''),
       machineName: log.machineName || machinesList[0] || 'Machine 1',
-      pass: log.pass || '1 PASS',
+      pass: log.pass || '4 PASS',
       meters: log.meters ? String(log.meters) : '',
       date: parsedDate,
       shift: log.shift || getAutoShift(),
@@ -313,11 +314,11 @@ export default function JobPrintingLog() {
       jobNo: '',
       jobCardId: '',
       machineName: machinesList[0] || 'Machine 1',
-      pass: '1 PASS',
+      pass: '4 PASS',
       meters: '',
       date: new Date().toISOString().split('T')[0],
       shift: getAutoShift(),
-      operatorName: currentUser ? (currentUser.fullName || currentUser.name || '') : '',
+      operatorName: accountFullName,
       notes: ''
     });
   };
@@ -374,7 +375,7 @@ export default function JobPrintingLog() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Machine_Printing_Logs_${dateStart}_to_${dateEnd}.csv`);
+    link.setAttribute('download', `Printing_Logs_${dateStart}_to_${dateEnd}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -405,16 +406,66 @@ export default function JobPrintingLog() {
             <Printer size={22} color="#fff" />
           </div>
           <div>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>Machine Printing Entry & Logs</h2>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>Printing Entry & Logs</h2>
             <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 1 }}>
-              Log multiple machine runs per Job Card, monitor automatic shifts (Morning / Night), and track completion progress.
+              Log multiple machine runs per Job Card, monitor shifts, and track completion progress.
             </p>
           </div>
         </div>
 
-        <button onClick={handleExportCSV} className="btn-secondary" style={{ padding: '0.55rem 1.1rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Download size={15} /> Export CSV Report
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          {/* Button 1: Report */}
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('elite-navigate-tab', { detail: 'jobcards' }));
+              api.downloadFabricCombinedReportPdf(dateStart, dateEnd, ['machine'], `Printing_Report_${dateStart}_to_${dateEnd}.pdf`);
+            }}
+            className="btn-primary"
+            style={{
+              padding: '0.55rem 1.1rem',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
+              color: '#ffffff',
+              border: 'none',
+              boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)'
+            }}
+          >
+            <Activity size={15} /> Report
+          </button>
+
+          {/* Button 2: Raw Material Usage */}
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('elite-navigate-tab', { detail: 'jobcards_raw_materials' }));
+            }}
+            className="btn-primary"
+            style={{
+              padding: '0.55rem 1.1rem',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+              color: '#ffffff',
+              border: 'none',
+              boxShadow: '0 2px 8px rgba(5, 150, 105, 0.3)'
+            }}
+          >
+            <Sparkles size={15} /> Raw Material Usage
+          </button>
+
+          {/* Export CSV */}
+          <button onClick={handleExportCSV} className="btn-secondary" style={{ padding: '0.55rem 1.1rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Download size={15} /> Export CSV Report
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -434,11 +485,11 @@ export default function JobPrintingLog() {
         <div className="glass-panel" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid #10b981', background: 'rgba(16,185,129,0.03)' }}>
           <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>ACTIVE JOB CARDS</div>
           <div style={{ fontSize: '1.35rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{uniqueJobCardsCount} Job Cards</div>
-          <div style={{ fontSize: '0.72rem', color: '#34d399', marginTop: 2 }}>With Machine Printing Runs</div>
+          <div style={{ fontSize: '0.72rem', color: '#34d399', marginTop: 2 }}>With Printing Runs</div>
         </div>
       </div>
 
-      {/* ── 2. NEW MACHINE PRINT ENTRY FORM (CHALLAN-STYLE JOB SELECTION) ── */}
+      {/* ── 2. NEW PRINTING ENTRY FORM ── */}
       <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: selectedJob ? 'minmax(0, 1.4fr) minmax(0, 1fr)' : '1fr', gap: '1.25rem' }}>
         
         {/* Entry Form */}
@@ -446,95 +497,114 @@ export default function JobPrintingLog() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div style={{ fontSize: '0.9rem', fontWeight: 800, color: editingLogId ? '#f59e0b' : '#38bdf8', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
               {editingLogId ? <Edit2 size={16} /> : <PlusCircle size={16} />}
-              {editingLogId ? 'Edit Machine Print Log' : 'New Machine Print Entry'}
+              {editingLogId ? 'Edit Printing Log' : 'New Printing Entry'}
             </div>
-
-            {/* Live Shift Auto Badge */}
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: form.shift === 'Morning' ? '#38bdf8' : '#a78bfa', background: form.shift === 'Morning' ? 'rgba(56,189,248,0.1)' : 'rgba(167,139,250,0.1)', padding: '3px 10px', borderRadius: 20, border: `1px solid ${form.shift === 'Morning' ? 'rgba(56,189,248,0.3)' : 'rgba(167,139,250,0.3)'}`, display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Clock size={12} /> Auto Shift: {form.shift} ({form.shift === 'Morning' ? '9 AM - 9 PM' : '9 PM - 9 AM'})
-            </span>
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             
-            {/* ── JOB CARD SELECTION (CHALLAN STYLE UX) ── */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                <label style={labelStyle}>JOB CARD SELECTION <span style={{ color: '#ef4444' }}>*</span></label>
-                {selectedJobStats && (
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: selectedJobStats.statusColor }}>
-                    ⚡ {selectedJobStats.statusText}
-                  </span>
-                )}
-              </div>
-
-              {/* Input + Searchable Select Combo (Challan style) */}
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <select
-                  value={form.jobCardId || form.jobNo}
-                  onChange={e => handleJobSelect(e.target.value)}
-                  style={{ ...inputStyle, flex: 1, fontWeight: 700 }}
-                  required
-                >
-                  <option value="">-- Choose Job Card ({activeJobCards.length} Active Pending Jobs) --</option>
-                  {activeJobCards.map(c => {
-                    const stats = getJobProgressStats(c);
-                    const cleanJobNum = String(c.jobNo || '').replace(/^JOB\s*NO\.?\s*-?\s*/i, '');
-                    return (
-                      <option key={c._id} value={c._id}>
-                        #{cleanJobNum} — {c.party || 'Client'} | Design: {c.designName || c.designNo || 'Custom'} [{stats.printedMtr.toFixed(1)}m / {stats.targetMtr.toFixed(1)}m — {stats.progressPct}%]
-                      </option>
-                    );
-                  })}
-                </select>
-
+            {/* ── LINE 1: DATE, JOBCARD TYPE, SHIFT ── */}
+            <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2.2fr 1fr', gap: '0.75rem' }}>
+              
+              {/* Date */}
+              <div>
+                <label style={labelStyle}>DATE <span style={{ color: '#ef4444' }}>*</span></label>
                 <input
-                  type="text"
-                  placeholder="Type Job #"
-                  value={form.jobNo}
-                  onChange={e => handleJobSelect(e.target.value)}
-                  style={{ ...inputStyle, width: '130px', fontWeight: 700 }}
+                  type="date"
+                  value={form.date}
+                  onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                  style={inputStyle}
+                  required
                 />
               </div>
 
-              {/* Quick Job Selector Pills (like Challan form) */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, alignSelf: 'center', marginRight: '4px' }}>
-                  PENDING JOBS:
-                </span>
-                {activeJobCards.slice(0, 15).map(c => {
-                  const isSelected = selectedJob && selectedJob._id === c._id;
-                  const stats = getJobProgressStats(c);
-                  const cleanJobNum = String(c.jobNo || '').replace(/^JOB\s*NO\.?\s*-?\s*/i, '');
-                  return (
-                    <JobCardTooltip key={c._id} card={c}>
-                      <button
-                        type="button"
-                        onClick={() => handleJobSelect(c._id)}
-                        style={{
-                          padding: '0.2rem 0.5rem',
-                          borderRadius: 4,
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          border: '1px solid',
-                          borderColor: isSelected ? '#38bdf8' : 'var(--border-light)',
-                          background: isSelected ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.02)',
-                          color: isSelected ? '#38bdf8' : 'var(--text-muted)',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        #{cleanJobNum} ({stats.progressPct}%)
-                      </button>
-                    </JobCardTooltip>
-                  );
-                })}
+              {/* Jobcard Type / Selection */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                  <label style={labelStyle}>JOBCARD TYPE <span style={{ color: '#ef4444' }}>*</span></label>
+                  {selectedJobStats && (
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: selectedJobStats.statusColor }}>
+                      ⚡ {selectedJobStats.statusText}
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <select
+                    value={form.jobCardId || form.jobNo}
+                    onChange={e => handleJobSelect(e.target.value)}
+                    style={{ ...inputStyle, flex: 1, fontWeight: 700 }}
+                    required
+                  >
+                    <option value="">-- Choose Job Card ({activeJobCards.length} Pending) --</option>
+                    {activeJobCards.map(c => {
+                      const stats = getJobProgressStats(c);
+                      const cleanJobNum = String(c.jobNo || '').replace(/^JOB\s*NO\.?\s*-?\s*/i, '');
+                      return (
+                        <option key={c._id} value={c._id}>
+                          #{cleanJobNum} — {c.party || 'Client'} | Design: {c.designName || c.designNo || 'Custom'} [{stats.printedMtr.toFixed(1)}m / {stats.targetMtr.toFixed(1)}m]
+                        </option>
+                      );
+                    })}
+                  </select>
+
+                  <input
+                    type="text"
+                    placeholder="Job #"
+                    value={form.jobNo}
+                    onChange={e => handleJobSelect(e.target.value)}
+                    style={{ ...inputStyle, width: '110px', fontWeight: 700 }}
+                  />
+                </div>
+              </div>
+
+              {/* Shift */}
+              <div>
+                <label style={labelStyle}>SHIFT <span style={{ color: '#ef4444' }}>*</span></label>
+                <select value={form.shift} onChange={e => setForm(f => ({ ...f, shift: e.target.value }))} style={inputStyle}>
+                  <option value="Morning">Morning</option>
+                  <option value="Night">Night</option>
+                </select>
               </div>
             </div>
 
-            {/* Row 2: Machine Name (takes from Print Settings) & Pass */}
-            <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            {/* Quick Job Selector Pills */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, alignSelf: 'center', marginRight: '4px' }}>
+                PENDING JOBS:
+              </span>
+              {activeJobCards.slice(0, 15).map(c => {
+                const isSelected = selectedJob && selectedJob._id === c._id;
+                const stats = getJobProgressStats(c);
+                const cleanJobNum = String(c.jobNo || '').replace(/^JOB\s*NO\.?\s*-?\s*/i, '');
+                return (
+                  <JobCardTooltip key={c._id} card={c}>
+                    <button
+                      type="button"
+                      onClick={() => handleJobSelect(c._id)}
+                      style={{
+                        padding: '0.2rem 0.5rem',
+                        borderRadius: 4,
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        border: '1px solid',
+                        borderColor: isSelected ? '#38bdf8' : 'var(--border-light)',
+                        background: isSelected ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.02)',
+                        color: isSelected ? '#38bdf8' : 'var(--text-muted)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      #{cleanJobNum} ({stats.progressPct}%)
+                    </button>
+                  </JobCardTooltip>
+                );
+              })}
+            </div>
+
+            {/* ── LINE 2: PRINTING MACHINE, PASS, METERS PRINTED ── */}
+            <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: '0.75rem' }}>
               <div>
-                <label style={labelStyle}>PRINTING MACHINE (FROM PRINT SETTINGS) <span style={{ color: '#ef4444' }}>*</span></label>
+                <label style={labelStyle}>PRINTING MACHINE <span style={{ color: '#ef4444' }}>*</span></label>
                 <select
                   value={form.machineName}
                   onChange={e => setForm(f => ({ ...f, machineName: e.target.value }))}
@@ -549,7 +619,7 @@ export default function JobPrintingLog() {
               </div>
 
               <div>
-                <label style={labelStyle}>PASS COUNT / RESOLUTION</label>
+                <label style={labelStyle}>PASS</label>
                 <select
                   value={form.pass}
                   onChange={e => setForm(f => ({ ...f, pass: e.target.value }))}
@@ -558,12 +628,9 @@ export default function JobPrintingLog() {
                   {PASS_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
-            </div>
 
-            {/* Row 3: Meters Printed, Date, Shift (Morning 9am-9pm / Night 9pm-9am) */}
-            <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '0.75rem' }}>
               <div>
-                <label style={labelStyle}>METERS PRINTED IN THIS RUN (MTR) <span style={{ color: '#ef4444' }}>*</span></label>
+                <label style={labelStyle}>METERS PRINTED (MTR) <span style={{ color: '#ef4444' }}>*</span></label>
                 <input
                   type="number"
                   step="0.01"
@@ -575,27 +642,9 @@ export default function JobPrintingLog() {
                   required
                 />
               </div>
-
-              <div>
-                <label style={labelStyle}>ENTRY DATE</label>
-                <input
-                  type="date"
-                  value={form.date}
-                  onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                  style={inputStyle}
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>SHIFT (AUTO-DETECTED)</label>
-                <select value={form.shift} onChange={e => setForm(f => ({ ...f, shift: e.target.value }))} style={inputStyle}>
-                  <option value="Morning">Morning Shift (9 AM - 9 PM)</option>
-                  <option value="Night">Night Shift (9 PM - 9 AM)</option>
-                </select>
-              </div>
             </div>
 
-            {/* Row 4: Operator Name (blank by default) & Remarks */}
+            {/* ── LINE 3: OPERATOR NAME & REMARKS ── */}
             <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.75rem' }}>
               <div>
                 <label style={labelStyle}>OPERATOR NAME</label>
@@ -603,7 +652,7 @@ export default function JobPrintingLog() {
                   type="text"
                   value={form.operatorName}
                   onChange={e => setForm(f => ({ ...f, operatorName: e.target.value }))}
-                  placeholder="Operator Name (Default: Account Name)"
+                  placeholder="Operator Name"
                   style={inputStyle}
                 />
               </div>
@@ -614,7 +663,7 @@ export default function JobPrintingLog() {
                   type="text"
                   value={form.notes}
                   onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="Optional notes e.g. Roll #2, fabric inspection ok..."
+                  placeholder="Optional notes e.g. Roll #2..."
                   style={inputStyle}
                 />
               </div>

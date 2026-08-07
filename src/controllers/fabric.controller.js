@@ -1777,13 +1777,13 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       currentY += 12;
     }
 
-    // ── 4. MACHINE PRINTING ENTRY & LOGS SUMMARY (MACHINE & PASS WISE) ──
+    // ── 4. PRINTING ENTRY & LOGS SUMMARY (MACHINE & PASS WISE) ──
     if (selectedReports.includes('machine') || selectedReports.includes('machine_print')) {
       checkAddPage(60);
 
       doc.rect(ML, currentY, contentWidth, 20).fill('#ede9fe').stroke('#ddd6fe');
       doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
-        .text('4. MACHINE PRINTING ENTRY & LOGS (MACHINE & PASS WISE)', ML + 8, currentY + 5, { lineBreak: false });
+        .text('4. PRINTING ENTRY & LOGS (MACHINE & PASS WISE)', ML + 8, currentY + 5, { lineBreak: false });
       doc.fillColor('#5b21b6').fontSize(8.5).font('Helvetica-Bold')
         .text(`Total: ${totalMachinePrintedMtr.toFixed(2)} mtr (${totalMachineJobCardCount} Job Cards)`, ML + contentWidth - 250, currentY + 5, { width: 240, align: 'right', lineBreak: false });
 

@@ -48,18 +48,18 @@ import NotificationToastContainer, { triggerPushNotification, requestNotificatio
 // ─── Theme definitions ─────────────────────────────────────────────────────
 const THEMES = [
   {
-    id: 'midnight',
-    name: 'Premium Midnight',
-    desc: 'Sleek dark mode — #0b0f19 canvas',
-    swatchClass: 'swatch-midnight',
-    accent: '#38bdf8',
-  },
-  {
     id: 'enterprise',
     name: 'Enterprise Classic',
     desc: 'Professional light mode — #f8fafc canvas',
     swatchClass: 'swatch-enterprise',
     accent: '#2563eb',
+  },
+  {
+    id: 'midnight',
+    name: 'Premium Midnight',
+    desc: 'Sleek dark mode — #0b0f19 canvas',
+    swatchClass: 'swatch-midnight',
+    accent: '#38bdf8',
   },
   {
     id: 'cyberpunk',
@@ -219,8 +219,8 @@ export default function App() {
     (currentUser.name && currentUser.name.toLowerCase().includes('hasi'))
   );
 
-  // Theme state — persisted to localStorage
-  const [theme, setTheme] = useState(() => localStorage.getItem('elite_theme') || 'midnight');
+  // Theme state — persisted to localStorage (default: Enterprise Classic)
+  const [theme, setTheme] = useState(() => localStorage.getItem('elite_theme') || 'enterprise');
   const [isEliteOnlineOpen, setIsEliteOnlineOpen] = useState(true);
 
   // Department permission helpers
@@ -252,6 +252,16 @@ export default function App() {
       setActiveDepartment('elite_edition');
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    const handleNavTab = (e) => {
+      if (e && e.detail) {
+        setActiveTab(e.detail);
+      }
+    };
+    window.addEventListener('elite-navigate-tab', handleNavTab);
+    return () => window.removeEventListener('elite-navigate-tab', handleNavTab);
+  }, []);
 
   // Auto-switch department if user lacks permission for current activeDepartment
   useEffect(() => {
@@ -879,10 +889,10 @@ export default function App() {
                       <BarChart3 size={18} /><span>Prints Dashboard</span>
                     </button>
                   )}
-                  {/* 2. Machine Print Entry Log */}
+                  {/* 2. Printing Entry & Logs */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_printing_log')) && (
                     <button onClick={() => { setActiveTab('jobcards_printing_log'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_printing_log' ? styles.navItemActive : {}) }}>
-                      <Printer size={18} /><span>Machine Print Entry Log</span>
+                      <Printer size={18} /><span>Printing Entry & Logs</span>
                     </button>
                   )}
                   {/* 2. Fabric Management */}
@@ -1051,10 +1061,10 @@ export default function App() {
                     <BarChart3 size={18} /><span>Prints Dashboard & Reports</span>
                   </button>
                 )}
-                {/* 2. Machine Print Entry Log */}
+                {/* 2. Printing Entry & Logs */}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_printing_log')) && (
                   <button onClick={() => handleNavClick('jobcards_printing_log')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_printing_log' ? styles.navItemActive : {}) }}>
-                    <Printer size={18} /><span>Machine Print Entry Log</span>
+                    <Printer size={18} /><span>Printing Entry & Logs</span>
                   </button>
                 )}
                 {/* 2. Fabric Management */}
