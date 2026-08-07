@@ -414,53 +414,6 @@ export default function JobPrintingLog() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-          {/* Button 1: Report */}
-          <button
-            type="button"
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent('elite-navigate-tab', { detail: 'jobcards' }));
-              api.downloadFabricCombinedReportPdf(dateStart, dateEnd, ['machine'], `Printing_Report_${dateStart}_to_${dateEnd}.pdf`);
-            }}
-            className="btn-primary"
-            style={{
-              padding: '0.55rem 1.1rem',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
-              color: '#ffffff',
-              border: 'none',
-              boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)'
-            }}
-          >
-            <Activity size={15} /> Report
-          </button>
-
-          {/* Button 2: Raw Material Usage */}
-          <button
-            type="button"
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent('elite-navigate-tab', { detail: 'jobcards_raw_materials' }));
-            }}
-            className="btn-primary"
-            style={{
-              padding: '0.55rem 1.1rem',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-              color: '#ffffff',
-              border: 'none',
-              boxShadow: '0 2px 8px rgba(5, 150, 105, 0.3)'
-            }}
-          >
-            <Sparkles size={15} /> Raw Material Usage
-          </button>
-
           {/* Export CSV */}
           <button onClick={handleExportCSV} className="btn-secondary" style={{ padding: '0.55rem 1.1rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Download size={15} /> Export CSV Report
@@ -498,6 +451,60 @@ export default function JobPrintingLog() {
             <div style={{ fontSize: '0.9rem', fontWeight: 800, color: editingLogId ? '#f59e0b' : '#38bdf8', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
               {editingLogId ? <Edit2 size={16} /> : <PlusCircle size={16} />}
               {editingLogId ? 'Edit Printing Log' : 'New Printing Entry'}
+            </div>
+
+            {/* Right-aligned Buttons in Form Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {/* Button 1: Report */}
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('elite-navigate-tab', { detail: 'jobcards' }));
+                  api.downloadFabricCombinedReportPdf(dateStart, dateEnd, ['machine'], `Printing_Report_${dateStart}_to_${dateEnd}.pdf`);
+                }}
+                className="btn-primary"
+                style={{
+                  padding: '0.4rem 0.85rem',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Activity size={14} /> Report
+              </button>
+
+              {/* Button 2: Raw Material Usage */}
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('elite-navigate-tab', { detail: 'jobcards_raw_materials' }));
+                }}
+                className="btn-primary"
+                style={{
+                  padding: '0.4rem 0.85rem',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Sparkles size={14} /> Raw Material Usage
+              </button>
             </div>
           </div>
 
