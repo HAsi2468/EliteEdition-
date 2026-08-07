@@ -112,6 +112,7 @@ export default function JobPrintingLog() {
   const [printdotInkK, setPrintdotInkK] = useState('');
 
   // Section 2: PAPER PANNA WISE ROLL CONSUMPTION
+  const [pannaOptionsList, setPannaOptionsList] = useState([]);
   const [paperPanna, setPaperPanna] = useState('44" Panna');
   const [paperCustomPanna, setPaperCustomPanna] = useState('');
   const [paperType, setPaperType] = useState('Sublimation Paper');
@@ -436,7 +437,7 @@ export default function JobPrintingLog() {
     printWindow.document.close();
   };
 
-  // Load Machines from Print Settings Config
+  // Load Machines & Widths (Panna) from Print Settings Config
   const fetchPrintConfig = async () => {
     try {
       const res = await api.getPrintConfig();
@@ -449,8 +450,12 @@ export default function JobPrintingLog() {
           }
         }
       }
+      if (res && res.widths && Array.isArray(res.widths) && res.widths.length > 0) {
+        setPannaOptionsList(res.widths);
+        setPaperPanna(res.widths[0]);
+      }
     } catch (err) {
-      console.warn('Failed to load machine list from Print Settings:', err);
+      console.warn('Failed to load machine/width list from Print Settings:', err);
     }
   };
 
@@ -1657,11 +1662,9 @@ export default function JobPrintingLog() {
                       onChange={e => setPaperPanna(e.target.value)}
                       style={inputStyle}
                     >
-                      <option value='44" Panna'>44" Panna</option>
-                      <option value='54" Panna'>54" Panna</option>
-                      <option value='60" Panna'>60" Panna</option>
-                      <option value='64" Panna'>64" Panna</option>
-                      <option value='72" Panna'>72" Panna</option>
+                      {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, idx) => (
+                        <option key={idx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>
+                      ))}
                       <option value="Custom">Custom Panna Width</option>
                     </select>
                   </div>
