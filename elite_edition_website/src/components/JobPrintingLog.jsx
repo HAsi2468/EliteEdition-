@@ -388,24 +388,28 @@ export default function JobPrintingLog() {
       <head>
         <title>Digital_Operator_Printing_Report_${reportStartDate}_to_${reportEndDate}</title>
         <style>
-          @page { size: A4 portrait; margin: 10mm; }
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; background: #fff; margin: 0; padding: 15px; font-size: 11px; }
-          .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #6366f1; padding-bottom: 10px; margin-bottom: 12px; }
-          .title { font-size: 17px; font-weight: 900; color: #3730a3; text-transform: uppercase; letter-spacing: 0.5px; }
-          .subtitle { font-size: 10.5px; color: #64748b; margin-top: 2px; font-weight: 600; }
-          .meta { text-align: right; font-size: 9.5px; color: #475569; line-height: 1.4; }
-          .kpi-row { display: flex; gap: 8px; margin-bottom: 12px; }
-          .kpi-card { flex: 1; padding: 8px 10px; border-radius: 6px; background: #f8fafc; border: 1px solid #e2e8f0; }
-          .kpi-label { font-size: 8.5px; font-weight: 700; color: #64748b; text-transform: uppercase; }
-          .kpi-val { font-size: 15px; font-weight: 900; color: #0f172a; margin-top: 2px; }
-          .section-title { font-size: 10.5px; font-weight: 800; text-transform: uppercase; color: #312e81; background: #e0e7ff; padding: 5px 8px; border-left: 4px solid #4338ca; margin: 12px 0 6px 0; border-radius: 2px; }
+          @page { size: A4 portrait; margin: 8mm; }
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; background: #fff; margin: 0; padding: 12px; font-size: 11px; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #4f46e5; padding-bottom: 10px; margin-bottom: 10px; }
+          .title { font-size: 16.5px; font-weight: 900; color: #312e81; text-transform: uppercase; letter-spacing: 0.5px; }
+          .subtitle { font-size: 10px; color: #64748b; margin-top: 2px; font-weight: 600; }
+          .meta { text-align: right; font-size: 9px; color: #475569; line-height: 1.4; }
+          .time-strip { display: flex; gap: 12px; justify-content: space-between; align-items: center; background: #f8fafc; border: 1.5px solid #e2e8f0; padding: 7px 12px; border-radius: 6px; margin-bottom: 10px; font-size: 9.5px; }
+          .time-item span { color: #64748b; font-weight: 700; text-transform: uppercase; font-size: 8.5px; }
+          .badge-start { background: #e0e7ff; color: #3730a3; padding: 2px 7px; border-radius: 4px; font-weight: 800; }
+          .badge-stop { background: #fee2e2; color: #991b1b; padding: 2px 7px; border-radius: 4px; font-weight: 800; }
+          .kpi-row { display: flex; gap: 8px; margin-bottom: 10px; }
+          .kpi-card { flex: 1; padding: 7px 10px; border-radius: 6px; background: #f8fafc; border: 1px solid #e2e8f0; }
+          .kpi-label { font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+          .kpi-val { font-size: 14.5px; font-weight: 900; color: #0f172a; margin-top: 2px; }
+          .section-title { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #1e1b4b; background: #eeef2a; background: linear-gradient(90deg, #e0e7ff, #f1f5f9); padding: 5px 8px; border-left: 4px solid #4338ca; margin: 10px 0 5px 0; border-radius: 2px; }
           table { width: 100%; border-collapse: collapse; margin-top: 4px; }
-          th { background: #1e293b; color: #fff; font-size: 8.5px; text-transform: uppercase; padding: 6px 7px; text-align: left; font-weight: 700; }
-          td { padding: 5.5px 7px; border-bottom: 1px solid #e2e8f0; font-size: 9.5px; color: #334155; }
+          th { background: #0f172a; color: #fff; font-size: 8.5px; text-transform: uppercase; padding: 6px 7px; text-align: left; font-weight: 700; }
+          td { padding: 5px 7px; border-bottom: 1px solid #e2e8f0; font-size: 9.5px; color: #334155; }
           tr:nth-child(even) td { background: #f8fafc; }
           .bold { font-weight: 800; color: #0f172a; }
           .text-right { text-align: right; }
-          .shift-badge { display: inline-block; padding: 2px 5px; border-radius: 3px; font-size: 8px; font-weight: 700; }
+          .shift-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 8.5px; font-weight: 800; }
           .morning { background: #e0f2fe; color: #0369a1; }
           .night { background: #fef3c7; color: #b45309; }
           .total-row { background: #cbd5e1 !important; font-weight: 900 !important; color: #0f172a !important; }
@@ -415,14 +419,22 @@ export default function JobPrintingLog() {
       <body>
         <div class="header">
           <div>
-            <div class="title">ELITE DIGITAL PRINTS — OPERATOR PRINTING PRODUCTION REPORT</div>
-            <div class="subtitle">Complete Machine Printing Log & Detailed Production Analytics</div>
+            <div class="title">ELITE DIGITAL PRINTS — PRINTING PRODUCTION REPORT</div>
+            <div class="subtitle">Complete Printing Log & Raw Material Usage Summary</div>
           </div>
           <div class="meta">
-            <div><strong>Date Period:</strong> ${formatDateDDMMYYYY(reportStartDate)} to ${formatDateDDMMYYYY(reportEndDate)}</div>
             <div><strong>Generated:</strong> ${new Date().toLocaleDateString('en-IN')} ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
             <div><strong>Filters:</strong> ${reportMachine || 'All Machines'} | ${reportShift || 'All Shifts'} | ${reportPass || 'All Passes'}</div>
           </div>
+        </div>
+
+        {/* TIME & OPERATOR METADATA STRIP */}
+        <div class="time-strip">
+          <div class="time-item"><span>OPERATOR:</span> <strong>${rawOperator || 'All Operators'}</strong></div>
+          <div class="time-item"><span>SHIFT:</span> <strong>${reportShift || rawShift || 'All Shifts'}</strong></div>
+          <div class="time-item"><span>START TIME:</span> <strong class="badge-start">${rawStartTime || '—'}</strong></div>
+          <div class="time-item"><span>STOP TIME:</span> <strong class="badge-stop">${rawStopTime || '—'}</strong></div>
+          <div class="time-item"><span>DATE PERIOD:</span> <strong>${formatDateDDMMYYYY(reportStartDate)} to ${formatDateDDMMYYYY(reportEndDate)}</strong></div>
         </div>
 
         <div class="kpi-row">

@@ -1295,7 +1295,7 @@ const getFabricLotWiseReportData = async (req, res) => {
 
 const downloadFabricCombinedReportPdf = async (req, res) => {
   try {
-    const { dateStart, dateEnd, reports } = req.query;
+    const { dateStart, dateEnd, reports, startTime, stopTime, operator } = req.query;
     const PDFDocument = require('pdfkit');
     const path = require('path');
     const fs = require('fs');
@@ -1539,12 +1539,18 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       }
 
       doc.fillColor('#000000').fontSize(13).font('Helvetica-Bold')
-        .text('ELITE DIGITAL PRINTS — 1 PAGE REPORT', ML + 130, 20, { width: contentWidth - 130, align: 'right' });
+        .text('ELITE DIGITAL PRINTS — PRINTING REPORT', ML + 130, 16, { width: contentWidth - 130, align: 'right' });
 
-      doc.fillColor('#475569').fontSize(8.5).font('Helvetica-Bold')
-        .text(`Report Period: ${startDateStr} to ${endDateStr}  |  Generated: ${new Date().toLocaleDateString('en-IN')}`, ML + 130, 38, { width: contentWidth - 130, align: 'right' });
+      let timeText = `Report Period: ${startDateStr} to ${endDateStr}`;
+      if (startTime || stopTime) timeText += ` | Shift Time: ${startTime || '—'} to ${stopTime || '—'}`;
+      if (operator) timeText += ` | Operator: ${operator}`;
 
-      // Line drawn cleanly at y = 62, below the logo image!
+      doc.fillColor('#475569').fontSize(8).font('Helvetica-Bold')
+        .text(timeText, ML + 130, 34, { width: contentWidth - 130, align: 'right' });
+
+      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
+        .text(`Generated: ${new Date().toLocaleDateString('en-IN')} ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`, ML + 130, 47, { width: contentWidth - 130, align: 'right' });
+
       doc.moveTo(ML, 62).lineTo(PW - MR, 62).strokeColor('#ddd6fe').lineWidth(1.2).stroke();
     };
 
