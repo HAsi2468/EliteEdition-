@@ -1364,88 +1364,127 @@ export default function JobPrintingLog() {
 
       </div>
 
-      {/* ── 3B. RAW MATERIAL CONSUMPTION SUMMARY CARD (DISPLAYED ON SCREEN AFTER MACHINE LOGS) ── */}
+      {/* ── 3B. RAW MATERIAL CONSUMPTION SUMMARY CARD (EDITABLE TABLE ON SCREEN) ── */}
       <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: '4px solid #10b981', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Sparkles size={16} /> Raw Material Consumption Summary
+            <Sparkles size={16} /> Raw Material Consumption Summary (Editable)
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-            Period: {dateStart || 'All'} to {dateEnd || 'Today'}
-          </span>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+              ✏️ Direct live editing — values reflect in report
+            </span>
+            <button
+              type="button"
+              onClick={handleAddPaperEntry}
+              className="btn-secondary"
+              style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              <PlusCircle size={13} /> Add Paper Row
+            </button>
+          </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-          
-          {/* GRANDO INK */}
-          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.85rem', borderRadius: 8, border: '1px solid var(--border-light)' }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
-              🖨️ GRANDO INK (LITERS)
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
-                <span style={{ color: '#0284c7', fontWeight: 700 }}>GRANDO C</span>
-                <strong>{rawMaterialSummary.grandoInk.C.toFixed(2)} Liters</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
-                <span style={{ color: '#ec4899', fontWeight: 700 }}>GRANDO M</span>
-                <strong>{rawMaterialSummary.grandoInk.M.toFixed(2)} Liters</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
-                <span style={{ color: '#eab308', fontWeight: 700 }}>GRANDO Y</span>
-                <strong>{rawMaterialSummary.grandoInk.Y.toFixed(2)} Liters</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#94a3b8', fontWeight: 700 }}>GRANDO K</span>
-                <strong>{rawMaterialSummary.grandoInk.K.toFixed(2)} Liters</strong>
-              </div>
-            </div>
-          </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+            <thead>
+              <tr style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1.5px solid var(--border-light)' }}>
+                <th style={{ padding: '0.6rem', textAlign: 'left', fontWeight: 800, width: 110 }}>MACHIN NAME</th>
+                <th style={{ padding: '0.6rem', textAlign: 'center', fontWeight: 800, color: '#0284c7', width: 95 }}>C</th>
+                <th style={{ padding: '0.6rem', textAlign: 'center', fontWeight: 800, color: '#ec4899', width: 95 }}>M</th>
+                <th style={{ padding: '0.6rem', textAlign: 'center', fontWeight: 800, color: '#eab308', width: 95 }}>Y</th>
+                <th style={{ padding: '0.6rem', textAlign: 'center', fontWeight: 800, color: '#94a3b8', width: 95 }}>K</th>
+                <th style={{ padding: '0.6rem', textAlign: 'left', fontWeight: 800 }}>PAPER TYPE</th>
+                <th style={{ padding: '0.6rem', textAlign: 'left', fontWeight: 800 }}>PANNO</th>
+                <th style={{ padding: '0.6rem', textAlign: 'center', fontWeight: 800, width: 100 }}>QTY (Rolls)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Row 1: GRANDO */}
+              <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <td style={{ padding: '0.5rem', fontWeight: 800, color: '#38bdf8' }}>GRANDO</td>
+                <td style={{ padding: '0.4rem' }}>
+                  <input type="number" step="0.01" placeholder="0.00" value={grandoInkC} onChange={e => setGrandoInkC(e.target.value)} style={{ ...inputStyle, textAlign: 'right', fontWeight: 700, borderColor: 'rgba(56,189,248,0.3)', background: 'var(--bg-input)' }} />
+                </td>
+                <td style={{ padding: '0.4rem' }}>
+                  <input type="number" step="0.01" placeholder="0.00" value={grandoInkM} onChange={e => setGrandoInkM(e.target.value)} style={{ ...inputStyle, textAlign: 'right', fontWeight: 700, borderColor: 'rgba(236,72,153,0.3)', background: 'var(--bg-input)' }} />
+                </td>
+                <td style={{ padding: '0.4rem' }}>
+                  <input type="number" step="0.01" placeholder="0.00" value={grandoInkY} onChange={e => setGrandoInkY(e.target.value)} style={{ ...inputStyle, textAlign: 'right', fontWeight: 700, borderColor: 'rgba(234,179,8,0.3)', background: 'var(--bg-input)' }} />
+                </td>
+                <td style={{ padding: '0.4rem' }}>
+                  <input type="number" step="0.01" placeholder="0.00" value={grandoInkK} onChange={e => setGrandoInkK(e.target.value)} style={{ ...inputStyle, textAlign: 'right', fontWeight: 700, borderColor: 'rgba(148,163,184,0.3)', background: 'var(--bg-input)' }} />
+                </td>
+                <td style={{ padding: '0.4rem' }}>
+                  <select value={paperEntries[0]?.paperType || paperTypesList[0]} onChange={e => handlePaperEntryChange(paperEntries[0]?.id || 1, 'paperType', e.target.value)} style={{ ...inputStyle, background: 'var(--bg-input)' }}>
+                    {paperTypesList.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </td>
+                <td style={{ padding: '0.4rem' }}>
+                  <select value={paperEntries[0]?.paperPanna || pannaOptionsList[0]} onChange={e => handlePaperEntryChange(paperEntries[0]?.id || 1, 'paperPanna', e.target.value)} style={{ ...inputStyle, background: 'var(--bg-input)' }}>
+                    {pannaOptionsList.map(w => <option key={w} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} PANNA`}</option>)}
+                  </select>
+                </td>
+                <td style={{ padding: '0.4rem' }}>
+                  <input type="number" step="1" placeholder="0" value={paperEntries[0]?.paperRollsQty || ''} onChange={e => handlePaperEntryChange(paperEntries[0]?.id || 1, 'paperRollsQty', e.target.value)} style={{ ...inputStyle, textAlign: 'right', fontWeight: 700, background: 'var(--bg-input)' }} />
+                </td>
+              </tr>
 
-          {/* PRINTDOT INK */}
-          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.85rem', borderRadius: 8, border: '1px solid var(--border-light)' }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#a78bfa', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
-              🖨️ PRINTDOT INK (LITERS)
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
-                <span style={{ color: '#0284c7', fontWeight: 700 }}>PRINTDOT C</span>
-                <strong>{rawMaterialSummary.printdotInk.C.toFixed(2)} Liters</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
-                <span style={{ color: '#ec4899', fontWeight: 700 }}>PRINTDOT M</span>
-                <strong>{rawMaterialSummary.printdotInk.M.toFixed(2)} Liters</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
-                <span style={{ color: '#eab308', fontWeight: 700 }}>PRINTDOT Y</span>
-                <strong>{rawMaterialSummary.printdotInk.Y.toFixed(2)} Liters</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#94a3b8', fontWeight: 700 }}>PRINTDOT K</span>
-                <strong>{rawMaterialSummary.printdotInk.K.toFixed(2)} Liters</strong>
-              </div>
-            </div>
-          </div>
+              {/* Row 2: PRINTDOT */}
+              <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <td style={{ padding: '0.5rem', fontWeight: 800, color: '#f87171' }}>PRINTDOT</td>
+                <td style={{ padding: '0.4rem' }}>
+                  <input type="number" step="0.01" placeholder="0.00" value={printdotInkC} onChange={e => setPrintdotInkC(e.target.value)} style={{ ...inputStyle, textAlign: 'right', fontWeight: 700, borderColor: 'rgba(56,189,248,0.3)', background: 'var(--bg-input)' }} />
+                </td>
+                <td style={{ padding: '0.4rem' }}>
+                  <input type="number" step="0.01" placeholder="0.00" value={printdotInkM} onChange={e => setPrintdotInkM(e.target.value)} style={{ ...inputStyle, textAlign: 'right', fontWeight: 700, borderColor: 'rgba(236,72,153,0.3)', background: 'var(--bg-input)' }} />
+                </td>
+                <td style={{ padding: '0.4rem' }}>
+                  <input type="number" step="0.01" placeholder="0.00" value={printdotInkY} onChange={e => setPrintdotInkY(e.target.value)} style={{ ...inputStyle, textAlign: 'right', fontWeight: 700, borderColor: 'rgba(234,179,8,0.3)', background: 'var(--bg-input)' }} />
+                </td>
+                <td style={{ padding: '0.4rem' }}>
+                  <input type="number" step="0.01" placeholder="0.00" value={printdotInkK} onChange={e => setPrintdotInkK(e.target.value)} style={{ ...inputStyle, textAlign: 'right', fontWeight: 700, borderColor: 'rgba(148,163,184,0.3)', background: 'var(--bg-input)' }} />
+                </td>
+                <td style={{ padding: '0.4rem' }}>
+                  <select value={paperEntries[1]?.paperType || paperTypesList[0]} onChange={e => handlePaperEntryChange(paperEntries[1]?.id || (paperEntries[0]?.id ? paperEntries[0].id + 1 : 2), 'paperType', e.target.value)} style={{ ...inputStyle, background: 'var(--bg-input)' }}>
+                    {paperTypesList.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </td>
+                <td style={{ padding: '0.4rem' }}>
+                  <select value={paperEntries[1]?.paperPanna || pannaOptionsList[0]} onChange={e => handlePaperEntryChange(paperEntries[1]?.id || (paperEntries[0]?.id ? paperEntries[0].id + 1 : 2), 'paperPanna', e.target.value)} style={{ ...inputStyle, background: 'var(--bg-input)' }}>
+                    {pannaOptionsList.map(w => <option key={w} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} PANNA`}</option>)}
+                  </select>
+                </td>
+                <td style={{ padding: '0.4rem' }}>
+                  <input type="number" step="1" placeholder="0" value={paperEntries[1]?.paperRollsQty || ''} onChange={e => handlePaperEntryChange(paperEntries[1]?.id || (paperEntries[0]?.id ? paperEntries[0].id + 1 : 2), 'paperRollsQty', e.target.value)} style={{ ...inputStyle, textAlign: 'right', fontWeight: 700, background: 'var(--bg-input)' }} />
+                </td>
+              </tr>
 
-          {/* PAPER PANNA ROLLS */}
-          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.85rem', borderRadius: 8, border: '1px solid var(--border-light)' }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#34d399', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
-              📜 PAPER PANNA ROLLS
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem' }}>
-              {Object.keys(rawMaterialSummary.paperPanna).length === 0 ? (
-                <div style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.78rem' }}>No paper rolls logged for period.</div>
-              ) : (
-                Object.entries(rawMaterialSummary.paperPanna).map(([pannaName, qty]) => (
-                  <div key={pannaName} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
-                    <span style={{ color: '#34d399', fontWeight: 700 }}>{pannaName}</span>
-                    <strong>{qty} Rolls</strong>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
+              {/* Extra Paper Rows if any */}
+              {paperEntries.slice(2).map((entry, idx) => (
+                <tr key={entry.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                  <td style={{ padding: '0.5rem', fontWeight: 700, color: 'var(--text-muted)' }}>PAPER #{idx + 3}</td>
+                  <td colSpan="4" style={{ padding: '0.4rem', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.75rem', textAlign: 'center' }}>— No ink associated —</td>
+                  <td style={{ padding: '0.4rem' }}>
+                    <select value={entry.paperType} onChange={e => handlePaperEntryChange(entry.id, 'paperType', e.target.value)} style={{ ...inputStyle, background: 'var(--bg-input)' }}>
+                      {paperTypesList.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </td>
+                  <td style={{ padding: '0.4rem' }}>
+                    <select value={entry.paperPanna} onChange={e => handlePaperEntryChange(entry.id, 'paperPanna', e.target.value)} style={{ ...inputStyle, background: 'var(--bg-input)' }}>
+                      {pannaOptionsList.map(w => <option key={w} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} PANNA`}</option>)}
+                    </select>
+                  </td>
+                  <td style={{ padding: '0.4rem', display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                    <input type="number" step="1" placeholder="0" value={entry.paperRollsQty} onChange={e => handlePaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ ...inputStyle, textAlign: 'right', fontWeight: 700, background: 'var(--bg-input)' }} />
+                    <button type="button" onClick={() => handleRemovePaperEntry(entry.id)} style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px' }}>
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
