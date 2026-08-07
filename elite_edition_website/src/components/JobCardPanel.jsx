@@ -192,6 +192,20 @@ function JobCardPrintView({ card, onClose, onShare }) {
     resolveImages();
   }, [card]);
 
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      await api.downloadJobCardPdf(card._id, card.jobNo);
+    } catch (err) {
+      console.warn('Direct PDF download failed, fallback to print:', err);
+      doPrint();
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   const doPrint = () => {
     // Convert Drive links to direct embeddable URLs for print
     const img1 = convertDriveUrl(resolvedImages.imageUrl1);
@@ -613,8 +627,13 @@ function JobCardPrintView({ card, onClose, onShare }) {
         </div>
 
         <div style={{ display:'flex', gap:'0.75rem' }}>
-          <button className="btn-primary" style={{ flex:1, justifyContent:'center' }} onClick={doPrint}>
-            <Download size={15}/> Save as PDF
+          <button
+            className="btn-primary"
+            style={{ flex:1, justifyContent:'center', background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}
+            onClick={handleDownloadPdf}
+            disabled={downloadingPdf}
+          >
+            <Download size={15}/> {downloadingPdf ? 'Downloading PDF...' : 'Download Job Card PDF'}
           </button>
           {onShare && (
             <button className="btn-secondary" style={{ flex:1, justifyContent:'center', color: '#60a5fa', borderColor: 'rgba(96,165,250,0.3)' }} onClick={() => onShare(card)}>
@@ -1970,6 +1989,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem' }}><StatusBadge status={c.status} /></td>
                       <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                          <button onClick={() => api.downloadJobCardPdf(c._id, c.jobNo)} className="btn-icon" title="Download PDF" style={{ padding: '0.3rem', color: '#10b981' }}><Download size={13} /></button>
                           <button onClick={() => setPreviewCard(c)} className="btn-icon" title="Preview" style={{ padding: '0.3rem' }}><Eye size={13} /></button>
                           <button onClick={() => openEdit(c)} className="btn-icon" title="Edit" style={{ padding: '0.3rem' }}><Edit2 size={13} /></button>
                           <button 
@@ -2070,6 +2090,10 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
 
                   {/* Actions */}
                   <div style={{ display:'flex', gap:'0.5rem', borderTop:'1px solid var(--border-light)', paddingTop:'0.7rem' }}>
+                    <button onClick={()=>api.downloadJobCardPdf(c._id, c.jobNo)} className="btn-secondary"
+                      style={{ flex:1, padding:'0.4rem', fontSize:'0.78rem', justifyContent:'center', color: '#10b981', borderColor: 'rgba(16,185,129,0.3)' }}>
+                      <Download size={13}/> PDF
+                    </button>
                     <button onClick={()=>setPreviewCard(c)} className="btn-secondary"
                       style={{ flex:1, padding:'0.4rem', fontSize:'0.78rem', justifyContent:'center' }}>
                       <Eye size={13}/> Preview

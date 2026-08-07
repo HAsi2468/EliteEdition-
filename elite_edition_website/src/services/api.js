@@ -591,6 +591,23 @@ export const api = {
   async deleteJobCard(id) {
     return request(`/jobCards/${id}`, { method: 'DELETE' });
   },
+  async downloadJobCardPdf(id, jobNo = '') {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token') || localStorage.getItem('token');
+    const response = await fetch(`${baseUrl}/jobCards/pdf/${id}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to download Job Card PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `JobCard_${jobNo || 'preview'}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    if (link.parentNode) link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
   async getNextJobCardNo() {
     return request('/jobCards/next-number');
   },
