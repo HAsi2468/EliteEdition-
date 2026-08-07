@@ -1914,56 +1914,78 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         currentY += 18;
       }
 
-      // ── 4C. RAW MATERIAL CONSUMPTION SUMMARY (INK & PAPER PANNA WISE ROLL) ──
+      // ── 4C. RAW MATERIAL CONSUMPTION SUMMARY (GRANDO INK, PRINTDOT INK & PAPER PANNA) ──
       if (typeof rawMaterialLogs !== 'undefined' && rawMaterialLogs && rawMaterialLogs.length > 0) {
         currentY += 12;
-        checkAddPage(60);
+        checkAddPage(70);
+
+        const grandoInk = { C: 0, M: 0, Y: 0, K: 0 };
+        const printdotInk = { C: 0, M: 0, Y: 0, K: 0 };
+        const paperPannaSummary = {};
+
+        rawMaterialLogs.forEach(t => {
+          const mName = (t.materialName || '').toLowerCase();
+          const q = Number(t.qty) || 0;
+
+          if (mName.includes('grando')) {
+            if (mName.includes('cyan') || t.color === 'Cyan') grandoInk.C += q;
+            else if (mName.includes('magenta') || t.color === 'Magenta') grandoInk.M += q;
+            else if (mName.includes('yellow') || t.color === 'Yellow') grandoInk.Y += q;
+            else if (mName.includes('black') || t.color === 'Black') grandoInk.K += q;
+          } else if (mName.includes('printdot')) {
+            if (mName.includes('cyan') || t.color === 'Cyan') printdotInk.C += q;
+            else if (mName.includes('magenta') || t.color === 'Magenta') printdotInk.M += q;
+            else if (mName.includes('yellow') || t.color === 'Yellow') printdotInk.Y += q;
+            else if (mName.includes('black') || t.color === 'Black') printdotInk.K += q;
+          } else if (mName.includes('paper') || t.panna) {
+            const pKey = t.panna ? (t.panna.toLowerCase().includes('panna') || t.panna.includes('"') ? t.panna : `${t.panna} PANNA`) : 'PAPER ROLL';
+            paperPannaSummary[pKey] = (paperPannaSummary[pKey] || 0) + q;
+          }
+        });
 
         doc.rect(ML, currentY, contentWidth, 18).fill('#dcfce7').stroke('#86efac');
         doc.fillColor('#14532d').fontSize(8).font('Helvetica-Bold')
-          .text('RAW MATERIAL CONSUMPTION SUMMARY (INK & PAPER PANNA WISE ROLL)', ML + 8, currentY + 4.5, { lineBreak: false });
-        doc.fillColor('#15803d').fontSize(7.5).font('Helvetica-Bold')
-          .text(`Total Usage Logs: ${rawMaterialLogs.length}`, ML + contentWidth - 150, currentY + 4.5, { width: 140, align: 'right', lineBreak: false });
+          .text('RAW MATERIAL CONSUMPTION SUMMARY (GRANDO INK, PRINTDOT INK & PAPER PANNA)', ML + 8, currentY + 4.5, { lineBreak: false });
         currentY += 22;
 
-        const drawRawHeaders = () => {
+        const drawRawSummaryHeaders = () => {
           doc.rect(ML, currentY, contentWidth, 18).fill('#064e3b').stroke('#022c22');
-          doc.fillColor('#ffffff').fontSize(7).font('Helvetica-Bold');
-          doc.text('DATE', ML + 4, currentY + 5, { width: 60 });
-          doc.text('MATERIAL / ITEM NAME', ML + 66, currentY + 5, { width: 165 });
-          doc.text('PANNA / COLOR', ML + 233, currentY + 5, { width: 90 });
-          doc.text('QTY CONSUMED', ML + 325, currentY + 5, { width: 70, align: 'center' });
-          doc.text('UNIT', ML + 397, currentY + 5, { width: 45 });
-          doc.text('OPERATOR & REMARKS', ML + 444, currentY + 5, { width: 87 });
+          doc.fillColor('#ffffff').fontSize(7.2).font('Helvetica-Bold');
+          doc.text('MATERIAL / ITEM DESCRIPTION', ML + 8, currentY + 5, { width: 340 });
+          doc.text('TOTAL CONSUMED QTY & UNIT', ML + 356, currentY + 5, { width: 170, align: 'right' });
           currentY += 18;
         };
 
-        drawRawHeaders();
+        drawRawSummaryHeaders();
 
-        rawMaterialLogs.forEach((rm, idx) => {
+        const summaryRows = [
+          { label: 'GRANDO C', val: `${grandoInk.C.toFixed(2)} Liters` },
+          { label: 'GRANDO M', val: `${grandoInk.M.toFixed(2)} Liters` },
+          { label: 'GRANDO Y', val: `${grandoInk.Y.toFixed(2)} Liters` },
+          { label: 'GRANDO K', val: `${grandoInk.K.toFixed(2)} Liters` },
+          { label: 'PRINTDOT C', val: `${printdotInk.C.toFixed(2)} Liters` },
+          { label: 'PRINTDOT M', val: `${printdotInk.M.toFixed(2)} Liters` },
+          { label: 'PRINTDOT Y', val: `${printdotInk.Y.toFixed(2)} Liters` },
+          { label: 'PRINTDOT K', val: `${printdotInk.K.toFixed(2)} Liters` },
+        ];
+
+        Object.entries(paperPannaSummary).forEach(([pannaName, qty]) => {
+          summaryRows.push({ label: `PAPER ${pannaName.toUpperCase()}`, val: `${qty} Rolls` });
+        });
+
+        summaryRows.forEach((row, idx) => {
           if (checkAddPage(18)) {
-            drawRawHeaders();
+            drawRawSummaryHeaders();
           }
           const bg = idx % 2 === 0 ? '#ffffff' : '#f0fdf4';
           doc.rect(ML, currentY, contentWidth, 18).fill(bg);
           doc.strokeColor('#dcfce7').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
 
-          const dStr = rm.date ? new Date(rm.date).toLocaleDateString('en-IN') : '—';
-          doc.fillColor('#000000').fontSize(6.8).font('Helvetica-Bold');
-          doc.text(dStr, ML + 4, currentY + 4.5, { width: 60, lineBreak: false });
+          doc.fillColor('#0f766e').fontSize(7.2).font('Helvetica-Bold');
+          doc.text(row.label, ML + 8, currentY + 4.5, { width: 340, lineBreak: false });
 
-          doc.fillColor('#0f766e').font('Helvetica-Bold');
-          doc.text(rm.materialName || '—', ML + 66, currentY + 4.5, { width: 165, lineBreak: false });
-
-          doc.fillColor('#334155').font('Helvetica');
-          doc.text(rm.panna || rm.color || '—', ML + 233, currentY + 4.5, { width: 90, lineBreak: false });
-
-          doc.fillColor('#047857').font('Helvetica-Bold');
-          doc.text(`${rm.qty}`, ML + 325, currentY + 4.5, { width: 70, align: 'center', lineBreak: false });
-
-          doc.fillColor('#334155').font('Helvetica');
-          doc.text(rm.unit || '—', ML + 397, currentY + 4.5, { width: 45, lineBreak: false });
-          doc.text(rm.notes || '—', ML + 444, currentY + 4.5, { width: 87, lineBreak: false });
+          doc.fillColor('#047857').fontSize(7.5).font('Helvetica-Bold');
+          doc.text(row.val, ML + 356, currentY + 4.5, { width: 170, align: 'right', lineBreak: false });
 
           currentY += 18;
         });

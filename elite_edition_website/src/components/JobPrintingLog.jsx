@@ -119,6 +119,62 @@ export default function JobPrintingLog() {
   const [paperRollsQty, setPaperRollsQty] = useState('');
   const [paperMetersUsed, setPaperMetersUsed] = useState('');
 
+  // Raw Material Summary State for Displaying on Screen & Reports
+  const [rawMaterialSummary, setRawMaterialSummary] = useState({
+    grandoInk: { C: 0, M: 0, Y: 0, K: 0 },
+    printdotInk: { C: 0, M: 0, Y: 0, K: 0 },
+    paperPanna: {}
+  });
+
+  const fetchRawMaterialSummary = async () => {
+    try {
+      const res = await api.getRawMaterialTransactions();
+      if (res && res.data && Array.isArray(res.data)) {
+        const outwardLogs = res.data.filter(t => t.type === 'OUTWARD');
+        
+        const filtered = outwardLogs.filter(t => {
+          if (!t.date) return true;
+          const dStr = new Date(t.date).toISOString().split('T')[0];
+          if (dateStart && dStr < dateStart) return false;
+          if (dateEnd && dStr > dateEnd) return false;
+          return true;
+        });
+
+        const grando = { C: 0, M: 0, Y: 0, K: 0 };
+        const printdot = { C: 0, M: 0, Y: 0, K: 0 };
+        const pannaMap = {};
+
+        filtered.forEach(t => {
+          const mName = (t.materialName || '').toLowerCase();
+          const q = Number(t.qty) || 0;
+
+          if (mName.includes('grando')) {
+            if (mName.includes('cyan') || t.color === 'Cyan') grando.C += q;
+            else if (mName.includes('magenta') || t.color === 'Magenta') grando.M += q;
+            else if (mName.includes('yellow') || t.color === 'Yellow') grando.Y += q;
+            else if (mName.includes('black') || t.color === 'Black') grando.K += q;
+          } else if (mName.includes('printdot')) {
+            if (mName.includes('cyan') || t.color === 'Cyan') printdot.C += q;
+            else if (mName.includes('magenta') || t.color === 'Magenta') printdot.M += q;
+            else if (mName.includes('yellow') || t.color === 'Yellow') printdot.Y += q;
+            else if (mName.includes('black') || t.color === 'Black') printdot.K += q;
+          } else if (mName.includes('paper') || t.panna) {
+            const pKey = t.panna ? (t.panna.toLowerCase().includes('panna') || t.panna.includes('"') ? t.panna : `${t.panna} Panna`) : 'Paper Roll';
+            pannaMap[pKey] = (pannaMap[pKey] || 0) + q;
+          }
+        });
+
+        setRawMaterialSummary({
+          grandoInk: grando,
+          printdotInk: printdot,
+          paperPanna: pannaMap
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to fetch raw material summary:', err);
+    }
+  };
+
   // Save Raw Material Outward Usage
   const handleSaveRawMaterialUsage = async (e) => {
     if (e) e.preventDefault();
@@ -482,6 +538,7 @@ export default function JobPrintingLog() {
         limit: 200
       });
       if (res.data) setLogs(res.data);
+      await fetchRawMaterialSummary();
     } catch (err) {
       setError(err.message || 'Failed to load printing logs.');
     } finally {
@@ -492,10 +549,12 @@ export default function JobPrintingLog() {
   useEffect(() => {
     fetchPrintConfig();
     fetchJobCards();
+    fetchRawMaterialSummary();
 
     const handleDataRefresh = () => {
       fetchJobCards();
       fetchLogs();
+      fetchRawMaterialSummary();
     };
     window.addEventListener('elite-data-refresh', handleDataRefresh);
     return () => window.removeEventListener('elite-data-refresh', handleDataRefresh);
@@ -1198,6 +1257,91 @@ export default function JobPrintingLog() {
           </table>
         </div>
 
+      </div>
+
+      {/* ── 3B. RAW MATERIAL CONSUMPTION SUMMARY CARD (DISPLAYED ON SCREEN AFTER MACHINE LOGS) ── */}
+      <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: '4px solid #10b981', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Sparkles size={16} /> Raw Material Consumption Summary
+          </div>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+            Period: {dateStart || 'All'} to {dateEnd || 'Today'}
+          </span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+          
+          {/* GRANDO INK */}
+          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.85rem', borderRadius: 8, border: '1px solid var(--border-light)' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#38bdf8', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+              🖨️ GRANDO INK (LITERS)
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
+                <span style={{ color: '#0284c7', fontWeight: 700 }}>GRANDO C</span>
+                <strong>{rawMaterialSummary.grandoInk.C.toFixed(2)} Liters</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
+                <span style={{ color: '#ec4899', fontWeight: 700 }}>GRANDO M</span>
+                <strong>{rawMaterialSummary.grandoInk.M.toFixed(2)} Liters</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
+                <span style={{ color: '#eab308', fontWeight: 700 }}>GRANDO Y</span>
+                <strong>{rawMaterialSummary.grandoInk.Y.toFixed(2)} Liters</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#94a3b8', fontWeight: 700 }}>GRANDO K</span>
+                <strong>{rawMaterialSummary.grandoInk.K.toFixed(2)} Liters</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* PRINTDOT INK */}
+          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.85rem', borderRadius: 8, border: '1px solid var(--border-light)' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#a78bfa', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+              🖨️ PRINTDOT INK (LITERS)
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
+                <span style={{ color: '#0284c7', fontWeight: 700 }}>PRINTDOT C</span>
+                <strong>{rawMaterialSummary.printdotInk.C.toFixed(2)} Liters</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
+                <span style={{ color: '#ec4899', fontWeight: 700 }}>PRINTDOT M</span>
+                <strong>{rawMaterialSummary.printdotInk.M.toFixed(2)} Liters</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
+                <span style={{ color: '#eab308', fontWeight: 700 }}>PRINTDOT Y</span>
+                <strong>{rawMaterialSummary.printdotInk.Y.toFixed(2)} Liters</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#94a3b8', fontWeight: 700 }}>PRINTDOT K</span>
+                <strong>{rawMaterialSummary.printdotInk.K.toFixed(2)} Liters</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* PAPER PANNA ROLLS */}
+          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.85rem', borderRadius: 8, border: '1px solid var(--border-light)' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#34d399', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+              📜 PAPER PANNA ROLLS
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.82rem' }}>
+              {Object.keys(rawMaterialSummary.paperPanna).length === 0 ? (
+                <div style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.78rem' }}>No paper rolls logged for period.</div>
+              ) : (
+                Object.entries(rawMaterialSummary.paperPanna).map(([pannaName, qty]) => (
+                  <div key={pannaName} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
+                    <span style={{ color: '#34d399', fontWeight: 700 }}>{pannaName}</span>
+                    <strong>{qty} Rolls</strong>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+        </div>
       </div>
 
       {/* ── 4. JOB CARD MULTI-RUN HISTORY MODAL ── */}
