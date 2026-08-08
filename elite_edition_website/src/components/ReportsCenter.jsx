@@ -2536,7 +2536,7 @@ export default function ReportsCenter({ department }) {
                     { id: 'challan', label: 'Fabric Challans Dispatch Outwards', desc: 'Dispatched meters, party name, billing name & TP rolls' },
                     { id: 'inward', label: 'Fabric Inwards Summary', desc: 'Supplier receipts, vendor details & inward meters' },
                     { id: 'outward', label: 'Fabric Consumption Summary', desc: 'Fabric consumed, job dispatches & shortage %' },
-                    { id: 'machine', label: 'Printing Entry & Logs', desc: 'Machine & pass-wise meterage, total printed meters & jobcard count' },
+                    { id: 'machine', label: 'Printing Dipartment', desc: 'Machine & pass-wise meterage, total printed meters & jobcard count' },
                     { id: 'lotwise', label: 'Lot-Wise Fabric Stock Balance Summary', desc: 'Lot-level stock balance & net remaining meters' },
                     { id: 'stock', label: 'Fabric Current Stock Summary', desc: 'Available fabric quality stock levels & status' }
                   ].map(rep => (

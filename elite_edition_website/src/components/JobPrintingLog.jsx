@@ -17,6 +17,15 @@ function getAutoShift() {
   return (hours >= 9 && hours < 21) ? 'Morning' : 'Night';
 }
 
+function isOlderThan36Hours(dateVal) {
+  if (!dateVal) return false;
+  const itemDate = new Date(dateVal).getTime();
+  if (isNaN(itemDate)) return false;
+  const now = Date.now();
+  const diffInHours = (now - itemDate) / (1000 * 60 * 60);
+  return diffInHours > 36;
+}
+
 const DEFAULT_MACHINES = [
   'Machine 1 (Grando)',
   'Machine 2 (Printdot)',
@@ -850,6 +859,10 @@ export default function JobPrintingLog() {
 
   // Start Editing a Log Entry
   const handleStartEdit = (log) => {
+    if (isOlderThan36Hours(log.created_date_time || log.createdAt || log.date)) {
+      alert("This log entry is older than 36 hours and can no longer be edited.");
+      return;
+    }
     setEditingLogId(log._id);
     const matched = findMatchingJob(log.jobNo) || findMatchingJob(log.jobCardId);
     if (matched) setSelectedJob(matched);
@@ -977,7 +990,7 @@ export default function JobPrintingLog() {
             <Printer size={22} color="#fff" />
           </div>
           <div>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>Printing Entry & Logs</h2>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>Printing Dipartment</h2>
             <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 1 }}>
               Log multiple machine runs per Job Card, monitor shifts, and track completion progress.
             </p>
@@ -989,27 +1002,6 @@ export default function JobPrintingLog() {
           <button onClick={handleExportCSV} className="btn-secondary" style={{ padding: '0.55rem 1.1rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Download size={15} /> Export CSV Report
           </button>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-        <div className="glass-panel" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid #38bdf8', background: 'rgba(56,189,248,0.03)' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>TOTAL METERS LOGGED</div>
-          <div style={{ fontSize: '1.35rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{totalMetersLogged.toLocaleString('en-IN', { minimumFractionDigits: 2 })} mtr</div>
-          <div style={{ fontSize: '0.72rem', color: '#38bdf8', marginTop: 2 }}>{logs.length} Total Print Runs Logged</div>
-        </div>
-
-        <div className="glass-panel" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid #8b5cf6', background: 'rgba(139,92,246,0.03)' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>CONFIGURED MACHINES</div>
-          <div style={{ fontSize: '1.35rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{machinesList.length} Machines</div>
-          <div style={{ fontSize: '0.72rem', color: '#a78bfa', marginTop: 2 }}>Loaded from Print Settings</div>
-        </div>
-
-        <div className="glass-panel" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid #10b981', background: 'rgba(16,185,129,0.03)' }}>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>ACTIVE JOB CARDS</div>
-          <div style={{ fontSize: '1.35rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{uniqueJobCardsCount} Job Cards</div>
-          <div style={{ fontSize: '0.72rem', color: '#34d399', marginTop: 2 }}>With Printing Runs</div>
         </div>
       </div>
 
@@ -1026,30 +1018,7 @@ export default function JobPrintingLog() {
 
             {/* Right-aligned Buttons in Form Header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {/* Button 1: Report */}
-              <button
-                type="button"
-                onClick={() => setShowReportModal(true)}
-                className="btn-primary"
-                style={{
-                  padding: '0.4rem 0.85rem',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
-                  cursor: 'pointer'
-                }}
-              >
-                <Activity size={14} /> Report
-              </button>
-
-              {/* Button 2: GENERATE REPORT */}
+              {/* Button 1: GENERATE REPORT */}
               <button
                 type="button"
                 onClick={() => setShowRawMaterialModal(true)}
@@ -1070,6 +1039,29 @@ export default function JobPrintingLog() {
                 }}
               >
                 <Sparkles size={14} /> GENERATE REPORT
+              </button>
+
+              {/* Button 2: Download Report */}
+              <button
+                type="button"
+                onClick={() => setShowReportModal(true)}
+                className="btn-primary"
+                style={{
+                  padding: '0.4rem 0.85rem',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Download size={14} /> Download Report
               </button>
             </div>
           </div>
@@ -1375,13 +1367,15 @@ export default function JobPrintingLog() {
                     <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{log.notes || '—'}</td>
                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                       <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                        <button
-                          onClick={() => handleStartEdit(log)}
-                          style={{ padding: '0.3rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.3)', color: '#38bdf8', borderRadius: 4, cursor: 'pointer' }}
-                          title="Edit Print Log Entry"
-                        >
-                          <Edit2 size={14} />
-                        </button>
+                        {!isOlderThan36Hours(log.created_date_time || log.createdAt || log.date) && (
+                          <button
+                            onClick={() => handleStartEdit(log)}
+                            style={{ padding: '0.3rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.3)', color: '#38bdf8', borderRadius: 4, cursor: 'pointer' }}
+                            title="Edit Print Log Entry"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                        )}
                         <button
                           onClick={() => loadJobCardHistory(log.jobNo)}
                           className="btn-icon"
@@ -1414,27 +1408,29 @@ export default function JobPrintingLog() {
           <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Sparkles size={16} /> Raw Material Consumption Summary
           </div>
-          <button
-            type="button"
-            onClick={() => setShowRawMaterialModal(true)}
-            className="btn-primary"
-            style={{
-              padding: '0.4rem 0.9rem',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              boxShadow: '0 3px 10px rgba(16, 185, 129, 0.3)',
-              cursor: 'pointer'
-            }}
-          >
-            <Edit size={14} /> Edit Data
-          </button>
+          {!isOlderThan36Hours(dateEnd || dateStart) && (
+            <button
+              type="button"
+              onClick={() => setShowRawMaterialModal(true)}
+              className="btn-primary"
+              style={{
+                padding: '0.4rem 0.9rem',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                boxShadow: '0 3px 10px rgba(16, 185, 129, 0.3)',
+                cursor: 'pointer'
+              }}
+            >
+              <Edit size={14} /> Edit Data
+            </button>
+          )}
         </div>
 
         <div style={{ overflowX: 'auto' }}>
@@ -1985,39 +1981,43 @@ export default function JobPrintingLog() {
 
               </div>
 
-              {/* ── DIV 2: PAPER CONSUMPTION (MULTIPLE ENTRIES SUPPORTED) ── */}
+              {/* ── DIV 2: PAPER CONSUMPTION (BACKGROUND COLOUR: WHITE) ── */}
               <div style={{
-                background: 'rgba(16, 185, 129, 0.03)',
-                border: '1px solid rgba(16, 185, 129, 0.25)',
+                background: '#ffffff',
+                color: '#0f172a',
+                border: '1.5px solid #cbd5e1',
                 borderRadius: '12px',
                 padding: '1.1rem',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '1rem'
+                gap: '1rem',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#059669', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     📜 PAPER CONSUMPTION
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAddPaperEntry}
-                    style={{
-                      padding: '0.35rem 0.85rem',
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                      background: 'rgba(16, 185, 129, 0.15)',
-                      color: '#34d399',
-                      border: '1px solid rgba(16, 185, 129, 0.3)',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    <PlusCircle size={14} /> + Add More Paper Entry
-                  </button>
+                  {!isOlderThan36Hours(rawDate) && (
+                    <button
+                      type="button"
+                      onClick={handleAddPaperEntry}
+                      style={{
+                        padding: '0.35rem 0.85rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        background: '#ecfdf5',
+                        color: '#059669',
+                        border: '1.5px solid #a7f3d0',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <PlusCircle size={14} /> + Add More Paper Entry
+                    </button>
+                  )}
                 </div>
 
                 {/* Render Dynamic Paper Entries */}
@@ -2026,25 +2026,25 @@ export default function JobPrintingLog() {
                     <div
                       key={entry.id}
                       style={{
-                        background: 'rgba(0,0,0,0.2)',
-                        border: '1px solid var(--border-light)',
+                        background: '#f8fafc',
+                        border: '1.5px solid #cbd5e1',
                         borderRadius: '8px',
                         padding: '0.85rem',
                         position: 'relative'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#34d399' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#059669' }}>
                           Paper Entry #{index + 1}
                         </span>
-                        {paperEntries.length > 1 && (
+                        {paperEntries.length > 1 && !isOlderThan36Hours(rawDate) && (
                           <button
                             type="button"
                             onClick={() => handleRemovePaperEntry(entry.id)}
                             style={{
                               background: 'transparent',
                               border: 'none',
-                              color: '#f87171',
+                              color: '#ef4444',
                               cursor: 'pointer',
                               padding: '0.2rem',
                               display: 'flex',
@@ -2059,11 +2059,12 @@ export default function JobPrintingLog() {
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
                         <div>
-                          <label style={labelStyle}>PAPER TYPE</label>
+                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#334155', display: 'block', marginBottom: '0.2rem' }}>PAPER TYPE</label>
                           <select
                             value={entry.paperType}
                             onChange={e => handlePaperEntryChange(entry.id, 'paperType', e.target.value)}
-                            style={inputStyle}
+                            disabled={isOlderThan36Hours(rawDate)}
+                            style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #059669', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
                           >
                             {(paperTypesList.length > 0 ? paperTypesList : ['Sublimation Paper', 'Butter Paper', 'Tissue Paper']).map((p, pIdx) => (
                               <option key={pIdx} value={p}>{p}</option>
@@ -2072,7 +2073,7 @@ export default function JobPrintingLog() {
                         </div>
 
                         <div>
-                          <label style={labelStyle}>PAPER PANNA (WIDTH)</label>
+                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#334155', display: 'block', marginBottom: '0.2rem' }}>PAPER PANNA (WIDTH)</label>
                           <select
                             value={(() => {
                               if (!entry.paperPanna) return (pannaOptionsList[0] || '44" Panna');
@@ -2085,7 +2086,8 @@ export default function JobPrintingLog() {
                               return match || entry.paperPanna;
                             })()}
                             onChange={e => handlePaperEntryChange(entry.id, 'paperPanna', e.target.value)}
-                            style={inputStyle}
+                            disabled={isOlderThan36Hours(rawDate)}
+                            style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #059669', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
                           >
                             {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => (
                               <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>
@@ -2096,26 +2098,28 @@ export default function JobPrintingLog() {
 
                         {entry.paperPanna === 'Custom' && (
                           <div>
-                            <label style={labelStyle}>CUSTOM PANNA WIDTH</label>
+                            <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#334155', display: 'block', marginBottom: '0.2rem' }}>CUSTOM PANNA WIDTH</label>
                             <input
                               type="text"
                               placeholder="e.g. 50 inch"
                               value={entry.paperCustomPanna}
                               onChange={e => handlePaperEntryChange(entry.id, 'paperCustomPanna', e.target.value)}
-                              style={inputStyle}
+                              disabled={isOlderThan36Hours(rawDate)}
+                              style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #059669', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
                             />
                           </div>
                         )}
 
                         <div>
-                          <label style={labelStyle}>ROLLS USED (QTY)</label>
+                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#334155', display: 'block', marginBottom: '0.2rem' }}>ROLLS USED (QTY)</label>
                           <input
                             type="number"
                             step="1"
                             placeholder="Number of Rolls"
                             value={entry.paperRollsQty}
                             onChange={e => handlePaperEntryChange(entry.id, 'paperRollsQty', e.target.value)}
-                            style={inputStyle}
+                            disabled={isOlderThan36Hours(rawDate)}
+                            style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #059669', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
                           />
                         </div>
                       </div>
@@ -2137,6 +2141,12 @@ export default function JobPrintingLog() {
               </div>
 
               {/* Modal Footer Buttons */}
+              {isOlderThan36Hours(rawDate) && (
+                <div style={{ color: '#f87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '0.6rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, textAlign: 'center' }}>
+                  ⚠️ Entries older than 36 hours cannot be modified.
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', borderTop: '1px solid var(--border-light)', paddingTop: '1rem' }}>
                 <button
                   type="button"
@@ -2147,27 +2157,29 @@ export default function JobPrintingLog() {
                   Close Window
                 </button>
 
-                <button
-                  type="submit"
-                  disabled={rawMaterialSubmitting}
-                  className="btn-primary"
-                  style={{
-                    padding: '0.6rem 1.4rem',
-                    fontSize: '0.85rem',
-                    fontWeight: 800,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    boxShadow: '0 4px 14px rgba(5, 150, 105, 0.4)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Sparkles size={16} /> {rawMaterialSubmitting ? 'Saving Usage...' : 'Save Raw Material Usage'}
-                </button>
+                {!isOlderThan36Hours(rawDate) && (
+                  <button
+                    type="submit"
+                    disabled={rawMaterialSubmitting}
+                    className="btn-primary"
+                    style={{
+                      padding: '0.6rem 1.4rem',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      boxShadow: '0 4px 14px rgba(5, 150, 105, 0.4)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Sparkles size={16} /> {rawMaterialSubmitting ? 'Saving Usage...' : 'Save Raw Material Usage'}
+                  </button>
+                )}
               </div>
 
             </form>

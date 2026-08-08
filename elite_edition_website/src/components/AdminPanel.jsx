@@ -41,7 +41,7 @@ const AVAILABLE_SCREENS = [
   { id: 'jobcards_list', label: 'Elite Prints: Job Card', category: 'Elite Digital Print' },
   { id: 'jobcards_catalogue', label: 'Elite Prints: Design Catalog', category: 'Elite Digital Print' },
   { id: 'jobcards_tracking', label: 'Elite Prints: Job Card Tracking', category: 'Elite Digital Print' },
-  { id: 'jobcards_printing_log', label: 'Elite Prints: Printing Entry & Logs', category: 'Elite Digital Print' },
+  { id: 'jobcards_printing_log', label: 'Elite Prints: Printing Dipartment', category: 'Elite Digital Print' },
   { id: 'jobcards_master', label: 'Elite Prints: Design Master (100 Pic)', category: 'Elite Digital Print' },
   { id: 'jobcards_fabric', label: 'Elite Prints: Fabric Management', category: 'Elite Digital Print' },
   { id: 'jobcards_raw_materials', label: 'Elite Prints: Raw Materials', category: 'Elite Digital Print' },
