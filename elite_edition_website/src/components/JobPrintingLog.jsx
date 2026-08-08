@@ -476,35 +476,7 @@ export default function JobPrintingLog() {
           </div>
         </div>
 
-        <div class="section-title">1. Machine & Pass Wise Summary</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Machine Name</th>
-              <th>Pass</th>
-              <th class="text-right">Job Cards Count</th>
-              <th class="text-right">Run Entries</th>
-              <th class="text-right">Total Printed Meters</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${Object.values(machinePassSummary).map(m => `
-              <tr>
-                <td class="bold">${m.machine}</td>
-                <td>${m.pass}</td>
-                <td class="text-right">${m.jobs.size}</td>
-                <td class="text-right">${m.count}</td>
-                <td class="text-right bold" style="color:#047857;">${m.mtr.toFixed(2)} mtr</td>
-              </tr>
-            `).join('')}
-            <tr class="total-row">
-              <td colspan="4" class="bold" style="font-size:10px;">TOTAL MACHINE PRODUCTION SUMMARY</td>
-              <td class="text-right bold" style="font-size:10.5px; color:#047857;">${totalMtr.toFixed(2)} mtr</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div class="section-title" style="margin-top:10px;">2. Raw Material Consumption Summary</div>
+        <div class="section-title" style="margin-top:10px;">1. Raw Material Consumption Summary</div>
         <table>
           <thead>
             <tr>
@@ -575,7 +547,7 @@ export default function JobPrintingLog() {
           </tbody>
         </table>
 
-        <div class="section-title" style="margin-top:10px;">3. Complete Printing Entry & Run Logs</div>
+        <div class="section-title" style="margin-top:10px;">2. Complete Printing Entry & Run Logs</div>
         <table>
           <thead>
             <tr>

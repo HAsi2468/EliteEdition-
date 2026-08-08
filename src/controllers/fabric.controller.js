@@ -1805,69 +1805,6 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       currentY += 12;
     }
 
-    // ── 4. PRINTING ENTRY & LOGS SUMMARY (MACHINE & PASS WISE) ──
-    if (selectedReports.includes('machine') || selectedReports.includes('machine_print')) {
-      checkAddPage(60);
-
-      doc.rect(ML, currentY, contentWidth, 20).fill('#ede9fe').stroke('#ddd6fe');
-      doc.fillColor('#000000').fontSize(9).font('Helvetica-Bold')
-        .text('4. PRINTING ENTRY & LOGS (MACHINE & PASS WISE)', ML + 8, currentY + 5, { lineBreak: false });
-      doc.fillColor('#5b21b6').fontSize(8.5).font('Helvetica-Bold')
-        .text(`Total: ${totalMachinePrintedMtr.toFixed(2)} mtr (${totalMachineJobCardCount} Job Cards)`, ML + contentWidth - 250, currentY + 5, { width: 240, align: 'right', lineBreak: false });
-
-      currentY += 24;
-
-      const drawMachineHeaders = () => {
-        doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
-        doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
-        doc.text('MACHINE NAME', ML + 4, currentY + 5, { width: 170 });
-        doc.text('PASS / CONFIG', ML + 178, currentY + 5, { width: 140 });
-        doc.text('JOBCARD COUNT', ML + 322, currentY + 5, { width: 90, align: 'center' });
-        doc.text('TOTAL METERS PRINTED', ML + 416, currentY + 5, { width: 115, align: 'right' });
-        currentY += 18;
-      };
-
-      drawMachineHeaders();
-
-      if (machineData.length === 0) {
-        doc.rect(ML, currentY, contentWidth, 18).fill('#ffffff');
-        doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
-        doc.fillColor('#64748b').fontSize(7.5).font('Helvetica').text('No machine printing entry logs found for selected period.', ML + 4, currentY + 4.5, { width: contentWidth - 8, align: 'center' });
-        currentY += 18;
-      } else {
-        machineData.forEach((row, idx) => {
-          if (checkAddPage(20)) {
-            drawMachineHeaders();
-          }
-          const bg = idx % 2 === 0 ? '#ffffff' : '#fcfaff';
-          doc.rect(ML, currentY, contentWidth, 18).fill(bg);
-          doc.strokeColor('#f1f5f9').lineWidth(0.5).rect(ML, currentY, contentWidth, 18).stroke();
-
-          doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
-          doc.text(row.machineName, ML + 4, currentY + 4.5, { width: 170, lineBreak: false });
-          doc.fillColor('#334155').font('Helvetica');
-          doc.text(row.pass, ML + 178, currentY + 4.5, { width: 140, lineBreak: false });
-          doc.fillColor('#0284c7').font('Helvetica-Bold');
-          doc.text(`${row.jobCardCount} Job Cards`, ML + 322, currentY + 4.5, { width: 90, align: 'center', lineBreak: false });
-          doc.fillColor('#047857').font('Helvetica-Bold');
-          doc.text(`${parseFloat(row.totalMtr || 0).toFixed(2)} mtr`, ML + 416, currentY + 4.5, { width: 115, align: 'right', lineBreak: false });
-          currentY += 18;
-        });
-
-        // Summary Total Row
-        if (checkAddPage(20)) {
-          drawMachineHeaders();
-        }
-        doc.rect(ML, currentY, contentWidth, 18).fill('#f1f5f9').stroke('#cbd5e1');
-        doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold');
-        doc.text('TOTAL MACHINE PRINTING SUMMARY:', ML + 4, currentY + 4.5, { width: 310, lineBreak: false });
-        doc.fillColor('#0284c7').font('Helvetica-Bold');
-        doc.text(`${totalMachineJobCardCount} Job Cards`, ML + 322, currentY + 4.5, { width: 90, align: 'center', lineBreak: false });
-        doc.fillColor('#047857').font('Helvetica-Bold');
-        doc.text(`${totalMachinePrintedMtr.toFixed(2)} mtr`, ML + 416, currentY + 4.5, { width: 115, align: 'right', lineBreak: false });
-        currentY += 18;
-      }
-
       // ── 4B. COMPLETE DETAILED PRINTING LOGS & RUN ENTRIES TABLE ──
       if (typeof detailedPrintLogsList !== 'undefined' && detailedPrintLogsList && detailedPrintLogsList.length > 0) {
         currentY += 10;
