@@ -1954,27 +1954,33 @@ export default function FabricInventoryPanel() {
                                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-muted)', textAlign: 'left' }}>
                                       <th style={{ padding: '0.35rem' }}>Date</th>
                                       <th style={{ padding: '0.35rem' }}>Party Name</th>
-                                      <th style={{ padding: '0.35rem' }}>Job / Ch.</th>
+                                      <th style={{ padding: '0.35rem' }}>Challan No.</th>
                                       <th style={{ padding: '0.35rem', textAlign: 'right' }}>Qty (mtr)</th>
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {lot.outwardTxs.map((outTx, oIdx) => (
-                                      <tr key={outTx._id || oIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                                        <td style={{ padding: '0.35rem' }}>{formatDateDDMMYYYY(outTx.date)}</td>
-                                        <td style={{ padding: '0.35rem' }}>{outTx.partyName || '—'}</td>
-                                        <td style={{ padding: '0.35rem' }}>{outTx.jobNo || outTx.challanNo || '—'}</td>
-                                        <td style={{ padding: '0.35rem', textAlign: 'right', fontWeight: 700, color: 'var(--danger)' }}>
-                                          -{Number(outTx.qty || 0).toFixed(2)}
-                                          {(outTx.notes || '').includes('+2% French Crepe Applied') && (
-                                            <span style={{ fontSize: '0.65rem', background: 'rgba(124, 58, 237, 0.15)', color: '#8b5cf6', padding: '1px 4px', borderRadius: '4px', marginLeft: '4px', border: '1px solid rgba(124, 58, 237, 0.3)' }}>+2%</span>
-                                          )}
-                                          {(outTx.notes || '').includes('Remnant Stock Auto-Clear') && (
-                                            <span style={{ fontSize: '0.65rem', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '1px 4px', borderRadius: '4px', marginLeft: '4px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>Cleared (≤5m)</span>
-                                          )}
-                                        </td>
-                                      </tr>
-                                    ))}
+                                    {lot.outwardTxs.map((outTx, oIdx) => {
+                                      const displayChallan = outTx.challanNo
+                                        || (outTx.notes && outTx.notes.match(/(EDP-\d+|Challan\s*#?\s*\d+)/i)?.[0])
+                                        || outTx.jobNo
+                                        || '—';
+                                      return (
+                                        <tr key={outTx._id || oIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                          <td style={{ padding: '0.35rem' }}>{formatDateDDMMYYYY(outTx.date)}</td>
+                                          <td style={{ padding: '0.35rem' }}>{outTx.partyName || '—'}</td>
+                                          <td style={{ padding: '0.35rem', fontWeight: 600 }}>{displayChallan}</td>
+                                          <td style={{ padding: '0.35rem', textAlign: 'right', fontWeight: 700, color: 'var(--danger)' }}>
+                                            -{Number(outTx.qty || 0).toFixed(2)}
+                                            {(outTx.notes || '').includes('+2% French Crepe Applied') && (
+                                              <span style={{ fontSize: '0.65rem', background: 'rgba(124, 58, 237, 0.15)', color: '#8b5cf6', padding: '1px 4px', borderRadius: '4px', marginLeft: '4px', border: '1px solid rgba(124, 58, 237, 0.3)' }}>+2%</span>
+                                            )}
+                                            {(outTx.notes || '').includes('Remnant Stock Auto-Clear') && (
+                                              <span style={{ fontSize: '0.65rem', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '1px 4px', borderRadius: '4px', marginLeft: '4px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>Cleared (≤5m)</span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
                                   </tbody>
                                 </table>
                               </div>
