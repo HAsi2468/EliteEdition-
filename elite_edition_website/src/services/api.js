@@ -1104,7 +1104,14 @@ export const api = {
     const response = await fetch(`${baseUrl}/fabric/report/combined-pdf${qs}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
-    if (!response.ok) throw new Error('Failed to generate Combined Multi-Report PDF');
+    if (!response.ok) {
+      let errText = 'Failed to generate Combined Multi-Report PDF';
+      try {
+        const errJson = await response.json();
+        if (errJson && errJson.message) errText = errJson.message;
+      } catch (e) {}
+      throw new Error(errText);
+    }
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');

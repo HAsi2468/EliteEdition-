@@ -1576,6 +1576,13 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       });
     }
 
+    if ((selectedReports.includes('machine') || selectedReports.includes('machine_print')) && (!startTimeVal || !stopTimeVal)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter Start Time and Stop Time on this date in Generate Report first.'
+      });
+    }
+
     const drawPageHeader = (isFirstPage = false) => {
       if (fs.existsSync(logoPath)) {
         doc.image(logoPath, ML, 14, { width: 110 });

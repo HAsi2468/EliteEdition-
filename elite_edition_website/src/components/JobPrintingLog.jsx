@@ -1654,7 +1654,7 @@ export default function JobPrintingLog() {
               <button onClick={() => setShowReportModal(false)} className="btn-icon"><X size={18} /></button>
             </div>
 
-            {/* Modal Body: DATES + MANDATORY START & END TIME */}
+            {/* Modal Body: DATES ONLY */}
             <div style={{
               background: 'rgba(255,255,255,0.02)',
               border: '1px solid var(--border-light)',
@@ -1685,60 +1685,9 @@ export default function JobPrintingLog() {
                   />
                 </div>
               </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                <div>
-                  <label style={{ ...labelStyle, fontSize: '0.75rem', fontWeight: 800, color: '#34d399' }}>
-                    START TIME <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <input
-                    type="time"
-                    value={reportStartTime || rawStartTime}
-                    onChange={e => {
-                      setReportStartTime(e.target.value);
-                      setRawStartTime(e.target.value);
-                    }}
-                    style={{ ...inputStyle, fontSize: '0.85rem', padding: '0.55rem 0.75rem', fontWeight: 700, border: (!reportStartTime && !rawStartTime) ? '1.5px solid #ef4444' : '1px solid var(--border-light)' }}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label style={{ ...labelStyle, fontSize: '0.75rem', fontWeight: 800, color: '#fbbf24' }}>
-                    END TIME <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <input
-                    type="time"
-                    value={reportEndTime || rawStopTime}
-                    onChange={e => {
-                      setReportEndTime(e.target.value);
-                      setRawStopTime(e.target.value);
-                    }}
-                    style={{ ...inputStyle, fontSize: '0.85rem', padding: '0.55rem 0.75rem', fontWeight: 700, border: (!reportEndTime && !rawStopTime) ? '1.5px solid #ef4444' : '1px solid var(--border-light)' }}
-                    required
-                  />
-                </div>
-              </div>
-
-              {(!reportStartTime && !rawStartTime || !reportEndTime && !rawStopTime) && (
-                <div style={{
-                  padding: '0.6rem 0.85rem',
-                  background: 'rgba(239, 68, 68, 0.12)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  borderRadius: '8px',
-                  color: '#f87171',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}>
-                  ⚠️ Start Time and End Time are mandatory to download the report.
-                </div>
-              )}
             </div>
 
-            {/* Modal Footer: EXACTLY 2 BUTTONS (DOWNLOAD REPORT & CLOSE WINDOW) */}
+            {/* Modal Footer: DOWNLOAD REPORT & CLOSE WINDOW */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem' }}>
               <button
                 type="button"
@@ -1751,16 +1700,8 @@ export default function JobPrintingLog() {
 
               <button
                 type="button"
-                disabled={reportLoadingPdf || (!reportStartTime && !rawStartTime) || (!reportEndTime && !rawStopTime)}
+                disabled={reportLoadingPdf}
                 onClick={async () => {
-                  const finalStart = reportStartTime || rawStartTime;
-                  const finalEnd = reportEndTime || rawStopTime;
-
-                  if (!finalStart || !finalEnd) {
-                    alert('Please enter both Start Time and End Time before downloading the report.');
-                    return;
-                  }
-
                   setReportLoadingPdf(true);
                   try {
                     await api.downloadFabricCombinedReportPdf(
@@ -1769,8 +1710,8 @@ export default function JobPrintingLog() {
                       ['machine'],
                       `Printing_Production_Report_${reportStartDate}_to_${reportEndDate}.pdf`,
                       {
-                        startTime: finalStart,
-                        stopTime: finalEnd,
+                        startTime: rawStartTime,
+                        stopTime: rawStopTime,
                         operator: rawOperator,
                         shift: reportShift || rawShift,
                         machineName: reportMachine,
@@ -1779,7 +1720,7 @@ export default function JobPrintingLog() {
                     );
                     setShowReportModal(false);
                   } catch (err) {
-                    alert(err.message || 'Failed to download PDF report.');
+                    alert(err.message || 'Please enter Start Time and Stop Time on this date in Generate Report first.');
                   } finally {
                     setReportLoadingPdf(false);
                   }
