@@ -94,6 +94,7 @@ export default function JobPrintingLog() {
   });
 
   // Selected Job Card History Drawer / Details State
+  const [showJobSuggestions, setShowJobSuggestions] = useState(false);
   const [viewingJobHistory, setViewingJobHistory] = useState(null);
   const [jobHistoryData, setJobHistoryData] = useState(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -1016,6 +1017,23 @@ export default function JobPrintingLog() {
     return stats.progressPct < 100;
   });
 
+  // Filter suggestions based on input or show all available job cards
+  const filteredJobSuggestions = useMemo(() => {
+    if (!jobCards || jobCards.length === 0) return [];
+    if (!form.jobNo || !form.jobNo.trim()) return jobCards.slice(0, 25);
+
+    const q = form.jobNo.toLowerCase().trim();
+    const digits = q.replace(/[^\d]/g, '');
+
+    return jobCards.filter(c => {
+      const jNo = String(c.jobNo || '').toLowerCase();
+      const jDigits = jNo.replace(/[^\d]/g, '');
+      const party = String(c.partyName || c.clientName || '').toLowerCase();
+      const design = String(c.designName || c.designNo || '').toLowerCase();
+      return jNo.includes(q) || (digits && jDigits.includes(digits)) || party.includes(q) || design.includes(q);
+    }).slice(0, 25);
+  }, [form.jobNo, jobCards]);
+
   // Selected Job Progress Stats
   const selectedJobStats = selectedJob ? getJobProgressStats(selectedJob) : null;
 
@@ -1131,8 +1149,8 @@ export default function JobPrintingLog() {
                 </select>
               </div>
 
-              {/* Jobcard Type / Selection (Direct Input) */}
-              <div>
+              {/* Jobcard Type / Selection (Input with Live Suggestions Dropdown & Datalist) */}
+              <div style={{ position: 'relative' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
                   <label style={labelStyle}>JOB TYPE / JOBCARD NO. <span style={{ color: '#ef4444' }}>*</span></label>
                   {selectedJobStats && (
@@ -1144,12 +1162,94 @@ export default function JobPrintingLog() {
 
                 <input
                   type="text"
-                  placeholder="Type Job Card No. (e.g. 1001)"
+                  list="active-jobcards-list"
+                  placeholder="Type or select Job Card No. (e.g. 1001)"
                   value={form.jobNo}
-                  onChange={e => handleJobSelect(e.target.value)}
+                  onFocus={() => setShowJobSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowJobSuggestions(false), 200)}
+                  onChange={e => {
+                    handleJobSelect(e.target.value);
+                    setShowJobSuggestions(true);
+                  }}
                   style={{ ...inputStyle, width: '100%', fontWeight: 700, fontSize: '0.9rem' }}
                   required
                 />
+
+                {/* Native HTML5 Datalist Fallback */}
+                <datalist id="active-jobcards-list">
+                  {jobCards.map(c => (
+                    <option key={c._id || c.jobNo} value={c.jobNo}>
+                      {c.jobNo} {c.partyName ? `(${c.partyName})` : ''} {c.designName ? `- ${c.designName}` : ''}
+                    </option>
+                  ))}
+                </datalist>
+
+                {/* Custom Interactive Floating Auto-complete Dropdown */}
+                {showJobSuggestions && filteredJobSuggestions.length > 0 && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      maxHeight: '230px',
+                      overflowY: 'auto',
+                      background: 'var(--panel-bg, #1e293b)',
+                      border: '1px solid var(--border-color, #334155)',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                      zIndex: 1000,
+                      marginTop: '4px'
+                    }}
+                  >
+                    <div style={{ padding: '4px 10px', fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid #334155' }}>
+                      SELECT FROM ACTIVE JOBCARDS ({filteredJobSuggestions.length}):
+                    </div>
+                    {filteredJobSuggestions.map(c => {
+                      const stats = getJobProgressStats(c);
+                      return (
+                        <div
+                          key={c._id || c.jobNo}
+                          onMouseDown={() => {
+                            handleJobSelect(c.jobNo);
+                            setShowJobSuggestions(false);
+                          }}
+                          style={{
+                            padding: '8px 12px',
+                            borderBottom: '1px solid rgba(255,255,255,0.06)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justify: 'space-between',
+                            alignItems: 'center',
+                            transition: 'background 0.15s ease'
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.12)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 800, color: '#38bdf8', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>JobCard #{c.jobNo}</span>
+                              {c.partyName && <span style={{ color: '#94a3b8', fontWeight: 500, fontSize: '0.78rem' }}>({c.partyName})</span>}
+                            </div>
+                            {c.designName && (
+                              <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: 1 }}>
+                                Design: {c.designName}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: stats.statusColor }}>
+                              {stats.printedMtr}/{stats.targetMtr} mtr
+                            </div>
+                            <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                              {c.machineName || 'Any Machine'}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
