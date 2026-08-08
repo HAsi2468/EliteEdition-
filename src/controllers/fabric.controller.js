@@ -1910,10 +1910,8 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         const grandoTotal = grando1Pass + grando2Pass;
         const printdotTotal = printdot1Pass + printdot2Pass;
 
-        // ── 1. INK CONSUMPTION TABLE (IMAGE 1: SIDE BY SIDE FOR BOTH MACHINES) ──
-        // ── 1. INK CONSUMPTION TABLE (SIDE BY SIDE WITH MATCHING REPORT THEME) ──
+        // ── 1. INK CONSUMPTION TABLE (LIGHT PASTEL COLORS & TOTALS) ──
         checkAddPage(75);
-        currentY += 8;
 
         const leftX = ML;
         const tableW = 260;
@@ -1922,141 +1920,191 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         const inkCols = ['C', 'M', 'Y', 'K', 'TOTAL'];
         const colW = tableW / 5;
 
-        // GRANDO Table Header Row 1 (Indigo theme)
-        doc.rect(leftX, currentY, tableW, 16).fill('#4338ca').stroke('#3730a3');
-        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
-          .text('GRANDO', leftX, currentY + 4, { width: tableW, align: 'center' });
+        // GRANDO Table Header Row 1 (Light Soft Purple)
+        doc.rect(leftX, currentY, tableW, 15).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
+          .text('GRANDO', leftX, currentY + 3.5, { width: tableW, align: 'center' });
 
-        // PRINTDOT Table Header Row 1 (Teal theme)
-        doc.rect(rightX, currentY, tableW, 16).fill('#0f766e').stroke('#115e59');
-        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
-          .text('PRINTDOT', rightX, currentY + 4, { width: tableW, align: 'center' });
-        currentY += 16;
+        // PRINTDOT Table Header Row 1 (Light Soft Green)
+        doc.rect(rightX, currentY, tableW, 15).fill('#f0fdf4').stroke('#bbf7d0');
+        doc.fillColor('#15803d').fontSize(8).font('Helvetica-Bold')
+          .text('PRINTDOT', rightX, currentY + 3.5, { width: tableW, align: 'center' });
+        currentY += 15;
 
         // Header Row 2: C | M | Y | K | TOTAL
         inkCols.forEach((col, i) => {
-          doc.rect(leftX + i * colW, currentY, colW, 15).fill('#f1f5f9').stroke('#cbd5e1');
-          doc.fillColor('#1e293b').fontSize(8).font('Helvetica-Bold')
-            .text(col, leftX + i * colW, currentY + 3.5, { width: colW, align: 'center' });
+          doc.rect(leftX + i * colW, currentY, colW, 14).fill('#f8fafc').stroke('#cbd5e1');
+          doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
+            .text(col, leftX + i * colW, currentY + 3, { width: colW, align: 'center' });
 
-          doc.rect(rightX + i * colW, currentY, colW, 15).fill('#f1f5f9').stroke('#cbd5e1');
-          doc.fillColor('#1e293b').fontSize(8).font('Helvetica-Bold')
-            .text(col, rightX + i * colW, currentY + 3.5, { width: colW, align: 'center' });
+          doc.rect(rightX + i * colW, currentY, colW, 14).fill('#f8fafc').stroke('#cbd5e1');
+          doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
+            .text(col, rightX + i * colW, currentY + 3, { width: colW, align: 'center' });
         });
-        currentY += 15;
+        currentY += 14;
 
         // Data Row: Values
+        const grandoTotInk = grandoInk.C + grandoInk.M + grandoInk.Y + grandoInk.K;
+        const printdotTotInk = printdotInk.C + printdotInk.M + printdotInk.Y + printdotInk.K;
+        const deptTotInk = grandoTotInk + printdotTotInk;
+
         const grandoVals = [
           grandoInk.C > 0 ? grandoInk.C.toFixed(2) : '0.00',
           grandoInk.M > 0 ? grandoInk.M.toFixed(2) : '0.00',
           grandoInk.Y > 0 ? grandoInk.Y.toFixed(2) : '0.00',
           grandoInk.K > 0 ? grandoInk.K.toFixed(2) : '0.00',
-          (grandoInk.C + grandoInk.M + grandoInk.Y + grandoInk.K).toFixed(2)
+          grandoTotInk.toFixed(2)
         ];
         const printdotVals = [
           printdotInk.C > 0 ? printdotInk.C.toFixed(2) : '0.00',
           printdotInk.M > 0 ? printdotInk.M.toFixed(2) : '0.00',
           printdotInk.Y > 0 ? printdotInk.Y.toFixed(2) : '0.00',
           printdotInk.K > 0 ? printdotInk.K.toFixed(2) : '0.00',
-          (printdotInk.C + printdotInk.M + printdotInk.Y + printdotInk.K).toFixed(2)
+          printdotTotInk.toFixed(2)
         ];
 
         grandoVals.forEach((val, i) => {
           const isTot = i === 4;
-          const bg = isTot ? '#e0e7ff' : '#ffffff';
-          const stroke = isTot ? '#c7d2fe' : '#cbd5e1';
-          const textColor = isTot ? '#3730a3' : '#0f172a';
-          doc.rect(leftX + i * colW, currentY, colW, 16).fill(bg).stroke(stroke);
-          doc.fillColor(textColor).fontSize(7.8).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
-            .text(val, leftX + i * colW, currentY + 4, { width: colW, align: 'center' });
+          const bg = isTot ? '#ede9fe' : '#ffffff';
+          const stroke = isTot ? '#ddd6fe' : '#cbd5e1';
+          const textColor = isTot ? '#5b21b6' : '#0f172a';
+          doc.rect(leftX + i * colW, currentY, colW, 15).fill(bg).stroke(stroke);
+          doc.fillColor(textColor).fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
+            .text(val, leftX + i * colW, currentY + 3.5, { width: colW, align: 'center' });
         });
 
         printdotVals.forEach((val, i) => {
           const isTot = i === 4;
-          const bg = isTot ? '#ccfbf1' : '#ffffff';
-          const stroke = isTot ? '#99f6e4' : '#cbd5e1';
-          const textColor = isTot ? '#0f766e' : '#0f172a';
-          doc.rect(rightX + i * colW, currentY, colW, 16).fill(bg).stroke(stroke);
-          doc.fillColor(textColor).fontSize(7.8).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
-            .text(val, rightX + i * colW, currentY + 4, { width: colW, align: 'center' });
+          const bg = isTot ? '#dcfce7' : '#ffffff';
+          const stroke = isTot ? '#bbf7d0' : '#cbd5e1';
+          const textColor = isTot ? '#15803d' : '#0f172a';
+          doc.rect(rightX + i * colW, currentY, colW, 15).fill(bg).stroke(stroke);
+          doc.fillColor(textColor).fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
+            .text(val, rightX + i * colW, currentY + 3.5, { width: colW, align: 'center' });
         });
-        currentY += 24;
+        currentY += 15;
 
-        // ── 2. PAPER CONSUMPTION TABLE (MATCHING REPORT THEME) ──
+        // INK TOTAL SUMMARY BAR Across Both Machines
+        doc.rect(ML, currentY, contentWidth, 15).fill('#f8fafc').stroke('#cbd5e1');
+        doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
+          .text(`TOTAL INK USED BY PRINTING DEPARTMENT: ${deptTotInk.toFixed(2)} Ltr`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center' });
+        currentY += 21;
+
+
+        // ── 2. PAPER CONSUMPTION TABLE (LIGHT PASTEL COLORS & TOTALS) ──
         checkAddPage(90);
 
-        doc.rect(ML, currentY, contentWidth, 16).fill('#1e293b').stroke('#0f172a');
-        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
-          .text('PAPER', ML, currentY + 4, { width: contentWidth, align: 'center' });
-        currentY += 16;
-
-        const typeColW = 115;
-        const pannaColW = (contentWidth - typeColW) / pannaCols.length;
-
-        doc.rect(ML, currentY, typeColW, 15).fill('#f1f5f9').stroke('#cbd5e1');
+        doc.rect(ML, currentY, contentWidth, 15).fill('#f1f5f9').stroke('#cbd5e1');
         doc.fillColor('#1e293b').fontSize(8).font('Helvetica-Bold')
-          .text('PAPER TYPE', ML, currentY + 3.5, { width: typeColW, align: 'center' });
+          .text('PAPER CONSUMPTION SUMMARY', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
+        currentY += 15;
+
+        const typeColW = 95;
+        const totalColW = 60;
+        const pannaColW = (contentWidth - typeColW - totalColW) / pannaCols.length;
+
+        doc.rect(ML, currentY, typeColW, 14).fill('#f8fafc').stroke('#cbd5e1');
+        doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
+          .text('PAPER TYPE', ML, currentY + 3, { width: typeColW, align: 'center' });
 
         pannaCols.forEach((panna, i) => {
           const x = ML + typeColW + i * pannaColW;
-          doc.rect(x, currentY, pannaColW, 15).fill('#f1f5f9').stroke('#cbd5e1');
-          doc.fillColor('#1e293b').fontSize(8).font('Helvetica-Bold')
-            .text(panna, x, currentY + 3.5, { width: pannaColW, align: 'center' });
+          doc.rect(x, currentY, pannaColW, 14).fill('#f8fafc').stroke('#cbd5e1');
+          doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
+            .text(panna, x, currentY + 3, { width: pannaColW, align: 'center' });
         });
-        currentY += 15;
+
+        doc.rect(ML + typeColW + pannaCols.length * pannaColW, currentY, totalColW, 14).fill('#f8fafc').stroke('#cbd5e1');
+        doc.fillColor('#1e293b').fontSize(7.5).font('Helvetica-Bold')
+          .text('TOTAL', ML + typeColW + pannaCols.length * pannaColW, currentY + 3, { width: totalColW, align: 'center' });
+
+        currentY += 14;
 
         const displayPaperTypes = Object.keys(paperTypeMap).length > 0
           ? Object.keys(paperTypeMap)
           : ['A++', 'A+', 'A'];
 
+        const colTotals = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
+        let grandTotalPaperRolls = 0;
+
         displayPaperTypes.forEach((pType, pIdx) => {
           const bg = pIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
-          doc.rect(ML, currentY, typeColW, 15).fill(bg).stroke('#cbd5e1');
-          doc.fillColor('#0f172a').fontSize(7.8).font('Helvetica-Bold')
-            .text(pType, ML, currentY + 3.5, { width: typeColW, align: 'center' });
+          doc.rect(ML, currentY, typeColW, 14).fill(bg).stroke('#cbd5e1');
+          doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
+            .text(pType, ML, currentY + 3, { width: typeColW, align: 'center' });
 
+          let rowRollTotal = 0;
           pannaCols.forEach((panna, i) => {
             const x = ML + typeColW + i * pannaColW;
             const qtyVal = (paperTypeMap[pType] && paperTypeMap[pType][panna]) ? paperTypeMap[pType][panna] : 0;
+            rowRollTotal += qtyVal;
+            colTotals[panna] = (colTotals[panna] || 0) + qtyVal;
+
             const valStr = qtyVal > 0 ? `${qtyVal}` : '';
 
-            doc.rect(x, currentY, pannaColW, 15).fill(bg).stroke('#cbd5e1');
-            doc.fillColor(qtyVal > 0 ? '#047857' : '#94a3b8').fontSize(7.8).font(qtyVal > 0 ? 'Helvetica-Bold' : 'Helvetica')
-              .text(valStr, x, currentY + 3.5, { width: pannaColW, align: 'center' });
+            doc.rect(x, currentY, pannaColW, 14).fill(bg).stroke('#cbd5e1');
+            doc.fillColor(qtyVal > 0 ? '#047857' : '#94a3b8').fontSize(7.5).font(qtyVal > 0 ? 'Helvetica-Bold' : 'Helvetica')
+              .text(valStr, x, currentY + 3, { width: pannaColW, align: 'center' });
           });
-          currentY += 15;
+
+          grandTotalPaperRolls += rowRollTotal;
+          const totX = ML + typeColW + pannaCols.length * pannaColW;
+          doc.rect(totX, currentY, totalColW, 14).fill(bg).stroke('#cbd5e1');
+          doc.fillColor('#047857').fontSize(7.5).font('Helvetica-Bold')
+            .text(rowRollTotal > 0 ? `${rowRollTotal}` : '0', totX, currentY + 3, { width: totalColW, align: 'center' });
+
+          currentY += 14;
         });
 
-        currentY += 12;
+        // PAPER TOTAL BOTTOM ROW
+        doc.rect(ML, currentY, typeColW, 15).fill('#dcfce7').stroke('#a7f3d0');
+        doc.fillColor('#15803d').fontSize(7.5).font('Helvetica-Bold')
+          .text('TOTAL ROLLS', ML, currentY + 3.5, { width: typeColW, align: 'center' });
 
-        // ── 3. MACHINE WISE REPORT TABLE (MATCHING REPORT THEME) ──
+        pannaCols.forEach((panna, i) => {
+          const x = ML + typeColW + i * pannaColW;
+          const cTot = colTotals[panna] || 0;
+          doc.rect(x, currentY, pannaColW, 15).fill('#dcfce7').stroke('#a7f3d0');
+          doc.fillColor('#15803d').fontSize(7.5).font('Helvetica-Bold')
+            .text(cTot > 0 ? `${cTot}` : '0', x, currentY + 3.5, { width: pannaColW, align: 'center' });
+        });
+
+        const totX = ML + typeColW + pannaCols.length * pannaColW;
+        doc.rect(totX, currentY, totalColW, 15).fill('#dcfce7').stroke('#a7f3d0');
+        doc.fillColor('#15803d').fontSize(7.8).font('Helvetica-Bold')
+          .text(`${grandTotalPaperRolls}`, totX, currentY + 3.5, { width: totalColW, align: 'center' });
+
+        currentY += 21;
+
+
+        // ── 3. MACHINE WISE REPORT TABLE (LIGHT PASTEL COLORS & BOTH MACHINES TOTAL) ──
         checkAddPage(80);
 
-        doc.rect(ML, currentY, contentWidth, 16).fill('#1e293b').stroke('#0f172a');
-        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
-          .text('MACHINE WISE REPORT', ML, currentY + 4, { width: contentWidth, align: 'center' });
-        currentY += 16;
+        doc.rect(ML, currentY, contentWidth, 15).fill('#f1f5f9').stroke('#cbd5e1');
+        doc.fillColor('#1e293b').fontSize(8).font('Helvetica-Bold')
+          .text('MACHINE WISE REPORT', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
+        currentY += 15;
 
         const halfW = contentWidth / 2;
         const subColW = halfW / 3;
 
-        doc.rect(ML, currentY, halfW, 15).fill('#4338ca').stroke('#3730a3');
-        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
+        doc.rect(ML, currentY, halfW, 15).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
           .text('GRANDO', ML, currentY + 3.5, { width: halfW, align: 'center' });
 
-        doc.rect(ML + halfW, currentY, halfW, 15).fill('#0f766e').stroke('#115e59');
-        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
+        doc.rect(ML + halfW, currentY, halfW, 15).fill('#f0fdf4').stroke('#bbf7d0');
+        doc.fillColor('#15803d').fontSize(8).font('Helvetica-Bold')
           .text('PRINTDOT', ML + halfW, currentY + 3.5, { width: halfW, align: 'center' });
         currentY += 15;
 
         const machineCols = ['1PASS MTR', '2 PASS MTR', 'TOTAL MTR', '1PASS MTR', '2 PASS MTR', 'TOTAL MTR'];
         machineCols.forEach((col, i) => {
           const x = ML + i * subColW;
-          doc.rect(x, currentY, subColW, 15).fill('#f1f5f9').stroke('#cbd5e1');
-          doc.fillColor('#1e293b').fontSize(7.5).font('Helvetica-Bold')
-            .text(col, x, currentY + 3.5, { width: subColW, align: 'center' });
+          doc.rect(x, currentY, subColW, 14).fill('#f8fafc').stroke('#cbd5e1');
+          doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
+            .text(col, x, currentY + 3, { width: subColW, align: 'center' });
         });
-        currentY += 15;
+        currentY += 14;
 
         const mtrVals = [
           grando1Pass.toFixed(2),
@@ -2069,16 +2117,22 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         mtrVals.forEach((val, i) => {
           const x = ML + i * subColW;
           const isTot = i === 2 || i === 5;
-          const bg = isTot ? (i === 2 ? '#e0e7ff' : '#ccfbf1') : '#ffffff';
-          const stroke = isTot ? (i === 2 ? '#c7d2fe' : '#99f6e4') : '#cbd5e1';
-          const textColor = isTot ? (i === 2 ? '#3730a3' : '#0f766e') : '#0f172a';
+          const bg = isTot ? (i === 2 ? '#ede9fe' : '#dcfce7') : '#ffffff';
+          const stroke = isTot ? (i === 2 ? '#ddd6fe' : '#bbf7d0') : '#cbd5e1';
+          const textColor = isTot ? (i === 2 ? '#5b21b6' : '#15803d') : '#0f172a';
 
-          doc.rect(x, currentY, subColW, 16).fill(bg).stroke(stroke);
-          doc.fillColor(textColor).fontSize(7.8).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
-            .text(val, x, currentY + 4, { width: subColW, align: 'center' });
+          doc.rect(x, currentY, subColW, 15).fill(bg).stroke(stroke);
+          doc.fillColor(textColor).fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
+            .text(val, x, currentY + 3.5, { width: subColW, align: 'center' });
         });
+        currentY += 15;
 
-        currentY += 24;
+        // BOTH MACHINES PRINTED METERS TOTAL BAR
+        const totalBothMtr = grandoTotal + printdotTotal;
+        doc.rect(ML, currentY, contentWidth, 15).fill('#eff6ff').stroke('#bfdbfe');
+        doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
+          .text(`TOTAL PRINTED METERS (BOTH MACHINES): ${totalBothMtr.toFixed(2)} mtr`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center' });
+        currentY += 21;
 
         // ── 4. DETAILS OF PRINTING JOBCARD (FORMERLY COMPLETE DETAILED PRINTING RUN LOGS) ──
         if (typeof detailedPrintLogsList !== 'undefined' && detailedPrintLogsList && detailedPrintLogsList.length > 0) {
