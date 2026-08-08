@@ -18,6 +18,17 @@ function getAutoShift() {
 }
 
 function isOlderThan36Hours(dateVal) {
+  try {
+    const userStr = localStorage.getItem('elite_user');
+    if (!userStr) return false;
+    const user = JSON.parse(userStr);
+    if (!user || user.role === 'admin') {
+      return false; // Admin can edit ALL dates without 36-hour restriction!
+    }
+  } catch (e) {
+    return false;
+  }
+
   if (!dateVal) return false;
   const itemDate = new Date(dateVal).getTime();
   if (isNaN(itemDate)) return false;
