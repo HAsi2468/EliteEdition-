@@ -1149,13 +1149,8 @@ export default function JobPrintingLog() {
 
               {/* Jobcard Type / Selection (Input with Live Suggestions Dropdown & Datalist) */}
               <div style={{ position: 'relative' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                <div style={{ marginBottom: '0.3rem' }}>
                   <label style={labelStyle}>JOB TYPE / JOBCARD NO. <span style={{ color: '#ef4444' }}>*</span></label>
-                  {selectedJobStats && (
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: selectedJobStats.statusColor }}>
-                      ⚡ {selectedJobStats.statusText}
-                    </span>
-                  )}
                 </div>
 
                 <input
@@ -1819,6 +1814,19 @@ export default function JobPrintingLog() {
                     style={{ ...inputStyle, fontSize: '0.85rem', padding: '0.55rem 0.75rem', fontWeight: 700 }}
                   />
                 </div>
+              </div>
+
+              <div>
+                <label style={{ ...labelStyle, fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b' }}>SHIFT REPORT</label>
+                <select
+                  value={reportShift}
+                  onChange={e => setReportShift(e.target.value)}
+                  style={{ ...inputStyle, fontSize: '0.85rem', padding: '0.55rem 0.75rem', fontWeight: 700, width: '100%' }}
+                >
+                  <option value="">All Shifts (Morning & Night)</option>
+                  <option value="Morning">Morning Shift Only</option>
+                  <option value="Night">Night Shift Only</option>
+                </select>
               </div>
             </div>
 

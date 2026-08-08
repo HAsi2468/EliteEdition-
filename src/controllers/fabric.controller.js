@@ -1462,6 +1462,8 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       // Map to group strictly by machineName + pass from actual JobPrintLog entries
       const machineMap = {};
       const globalJobSet = new Set();
+      let morningMachinePrintedMtr = 0;
+      let nightMachinePrintedMtr = 0;
 
       printLogs.forEach(log => {
         const mName = (log.machineName || 'Unknown Machine').trim();
@@ -1484,6 +1486,13 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         if (log.jobNo) {
           machineMap[key].jobNos.add(log.jobNo);
           globalJobSet.add(log.jobNo);
+        }
+
+        const sStr = String(log.shift || '').toLowerCase();
+        if (sStr.includes('night')) {
+          nightMachinePrintedMtr += mtr;
+        } else {
+          morningMachinePrintedMtr += mtr;
         }
       });
 
@@ -1625,30 +1634,51 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     let currentY = 68;
 
     if (isPrintingReportOnly) {
-      // Single horizontal line with 3 Cards Side-by-Side: MACHINE PRINTED, PRINTED (WTD), PRINTED (MTD)
+      // Single horizontal line with 5 Cards Side-by-Side: Morning, Night, Total, WTD, MTD
       const printingKpiCards = [
+        { label: 'PRINTED (MORNING)', val: `${morningMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Morning Shift' },
+        { label: 'PRINTED (NIGHT)', val: `${nightMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Night Shift' },
         { label: 'MACHINE PRINTED', val: `${totalMachinePrintedMtr.toFixed(2)} mtr`, sub: `${totalMachineJobCardCount} Job Cards` },
         { label: 'PRINTED (WTD)', val: `${wtdMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Week To Till Date' },
         { label: 'PRINTED (MTD)', val: `${mtdMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Month To Till Date' }
       ];
 
-      const kpiCardW = (contentWidth - 16) / 3;
+      const gapW = 5;
+      const kpiCardW = (contentWidth - (5 - 1) * gapW) / 5;
       let cardX = ML;
 
       printingKpiCards.forEach((card, idx) => {
-        const bg = idx === 0 ? '#f5f3ff' : (idx === 1 ? '#eff6ff' : '#f0fdf4');
-        const stroke = idx === 0 ? '#ddd6fe' : (idx === 1 ? '#bfdbfe' : '#bbf7d0');
-        const labelColor = idx === 0 ? '#5b21b6' : (idx === 1 ? '#1e40af' : '#15803d');
+        let bg = '#fef3c7';
+        let stroke = '#fde68a';
+        let labelColor = '#b45309';
+
+        if (idx === 1) {
+          bg = '#f1f5f9';
+          stroke = '#cbd5e1';
+          labelColor = '#334155';
+        } else if (idx === 2) {
+          bg = '#f5f3ff';
+          stroke = '#ddd6fe';
+          labelColor = '#5b21b6';
+        } else if (idx === 3) {
+          bg = '#eff6ff';
+          stroke = '#bfdbfe';
+          labelColor = '#1e40af';
+        } else if (idx === 4) {
+          bg = '#f0fdf4';
+          stroke = '#bbf7d0';
+          labelColor = '#15803d';
+        }
 
         doc.rect(cardX, currentY, kpiCardW, 38).fill(bg).stroke(stroke);
-        doc.fillColor(labelColor).fontSize(7.5).font('Helvetica-Bold')
-          .text(card.label, cardX + 4, currentY + 5, { width: kpiCardW - 8, align: 'center' });
-        doc.fillColor('#0f172a').fontSize(10.5).font('Helvetica-Bold')
-          .text(card.val, cardX + 4, currentY + 15, { width: kpiCardW - 8, align: 'center' });
-        doc.fillColor('#475569').fontSize(6.5).font('Helvetica')
-          .text(card.sub, cardX + 4, currentY + 27, { width: kpiCardW - 8, align: 'center' });
+        doc.fillColor(labelColor).fontSize(6.5).font('Helvetica-Bold')
+          .text(card.label, cardX + 2, currentY + 5, { width: kpiCardW - 4, align: 'center' });
+        doc.fillColor('#0f172a').fontSize(9.2).font('Helvetica-Bold')
+          .text(card.val, cardX + 2, currentY + 15, { width: kpiCardW - 4, align: 'center' });
+        doc.fillColor('#475569').fontSize(5.8).font('Helvetica')
+          .text(card.sub, cardX + 2, currentY + 26, { width: kpiCardW - 4, align: 'center' });
 
-        cardX += kpiCardW + 8;
+        cardX += kpiCardW + gapW;
       });
 
       currentY += 46;
