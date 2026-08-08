@@ -1817,41 +1817,11 @@ export default function JobPrintingLog() {
                 </div>
               </div>
 
-              {/* Night Shift Report Checkbox */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.65rem',
-                background: isNightReport || reportShift === 'Night' ? 'rgba(124, 58, 237, 0.12)' : 'rgba(255,255,255,0.03)',
-                padding: '0.65rem 0.85rem',
-                borderRadius: '8px',
-                border: isNightReport || reportShift === 'Night' ? '1px solid #8b5cf6' : '1px solid var(--border-light)',
-                transition: 'all 0.2s ease'
-              }}>
-                <input
-                  type="checkbox"
-                  id="night-report-checkbox"
-                  checked={isNightReport || reportShift === 'Night'}
-                  onChange={e => {
-                    const checked = e.target.checked;
-                    setIsNightReport(checked);
-                    setReportShift(checked ? 'Night' : '');
-                  }}
-                  style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#7c3aed' }}
-                />
-                <label htmlFor="night-report-checkbox" style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  🌙 Night Shift Report Only
-                </label>
-              </div>
-
               <div>
                 <label style={{ ...labelStyle, fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b' }}>SHIFT REPORT</label>
                 <select
                   value={reportShift}
-                  onChange={e => {
-                    setReportShift(e.target.value);
-                    setIsNightReport(e.target.value === 'Night');
-                  }}
+                  onChange={e => setReportShift(e.target.value)}
                   style={{ ...inputStyle, fontSize: '0.85rem', padding: '0.55rem 0.75rem', fontWeight: 700, width: '100%' }}
                 >
                   <option value="">All Shifts (Morning & Night)</option>
@@ -1878,16 +1848,22 @@ export default function JobPrintingLog() {
                 onClick={async () => {
                   setReportLoadingPdf(true);
                   try {
+                    let shiftTag = 'All_Shifts';
+                    if (reportShift === 'Morning') shiftTag = 'Morning_Shift';
+                    else if (reportShift === 'Night') shiftTag = 'Night_Shift';
+
+                    const fileName = `Printing_Production_Report_${shiftTag}_${reportStartDate}_to_${reportEndDate}.pdf`;
+
                     await api.downloadFabricCombinedReportPdf(
                       reportStartDate,
                       reportEndDate,
                       ['machine'],
-                      `Printing_Production_Report_${reportStartDate}_to_${reportEndDate}.pdf`,
+                      fileName,
                       {
                         startTime: rawStartTime,
                         stopTime: rawStopTime,
                         operator: rawOperator,
-                        shift: reportShift || rawShift,
+                        shift: reportShift,
                         machineName: reportMachine,
                         pass: reportPass
                       }

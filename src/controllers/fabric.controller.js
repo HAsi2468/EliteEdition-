@@ -1413,8 +1413,8 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       if (qMachine) {
         logDateFilter.machineName = { $regex: qMachine.trim(), $options: 'i' };
       }
-      if (qShift) {
-        logDateFilter.shift = qShift.trim();
+      if (qShift && qShift.trim() !== '' && qShift.toLowerCase() !== 'all') {
+        logDateFilter.shift = { $regex: qShift.trim(), $options: 'i' };
       }
       if (qOperator) {
         logDateFilter.operatorName = { $regex: qOperator.trim(), $options: 'i' };
