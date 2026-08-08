@@ -821,7 +821,7 @@ export default function JobPrintingLog() {
     return { targetMtr, printedMtr, remainingMtr, progressPct, statusText, statusColor };
   };
 
-  // Handle Job Selection Change (like Challan form)
+  // Handle Job Selection Change
   const handleJobSelect = (val) => {
     const matched = findMatchingJob(val);
 
@@ -829,10 +829,8 @@ export default function JobPrintingLog() {
       setSelectedJob(matched);
       setForm(prev => ({
         ...prev,
-        jobNo: matched.jobNo,
-        jobCardId: matched._id,
-        machineName: matched.machineName ? (machinesList.find(m => m.toLowerCase().includes(matched.machineName.toLowerCase())) || matched.machineName) : (prev.machineName || machinesList[0] || 'Machine 1'),
-        pass: matched.pass ? (PASS_OPTIONS.find(p => p.toUpperCase() === matched.pass.toUpperCase()) || matched.pass) : prev.pass
+        jobNo: val,
+        jobCardId: matched._id
       }));
     } else {
       setSelectedJob(null);
