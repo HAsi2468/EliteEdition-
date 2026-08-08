@@ -1650,27 +1650,11 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       let cardX = ML;
 
       printingKpiCards.forEach((card, idx) => {
-        let bg = '#fef3c7';
-        let stroke = '#fde68a';
-        let labelColor = '#b45309';
-
-        if (idx === 1) {
-          bg = '#f1f5f9';
-          stroke = '#cbd5e1';
-          labelColor = '#334155';
-        } else if (idx === 2) {
-          bg = '#f5f3ff';
-          stroke = '#ddd6fe';
-          labelColor = '#5b21b6';
-        } else if (idx === 3) {
-          bg = '#eff6ff';
-          stroke = '#bfdbfe';
-          labelColor = '#1e40af';
-        } else if (idx === 4) {
-          bg = '#f0fdf4';
-          stroke = '#bbf7d0';
-          labelColor = '#15803d';
-        }
+        // Alternating sequence: Light Blue, Light Purple, Light Blue, Light Purple, Light Blue
+        const isBlue = idx % 2 === 0;
+        const bg = isBlue ? '#eff6ff' : '#f5f3ff';
+        const stroke = isBlue ? '#bfdbfe' : '#ddd6fe';
+        const labelColor = isBlue ? '#1e40af' : '#5b21b6';
 
         doc.rect(cardX, currentY, kpiCardW, 38).fill(bg).stroke(stroke);
         doc.fillColor(labelColor).fontSize(6.5).font('Helvetica-Bold')
@@ -1975,7 +1959,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         const grandoTotal = grando1Pass + grando2Pass;
         const printdotTotal = printdot1Pass + printdot2Pass;
 
-        // ── 1. INK CONSUMPTION TABLE (LIGHT PASTEL COLORS & TOTALS) ──
+        // ── 1. INK CONSUMPTION TABLE (LIGHT BLUE & LIGHT PURPLE THEME) ──
         checkAddPage(75);
 
         const leftX = ML;
@@ -1985,14 +1969,14 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         const inkCols = ['C', 'M', 'Y', 'K', 'TOTAL'];
         const colW = tableW / 5;
 
-        // GRANDO Table Header Row 1 (Light Soft Purple)
-        doc.rect(leftX, currentY, tableW, 15).fill('#f5f3ff').stroke('#ddd6fe');
-        doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
+        // GRANDO Table Header Row 1 (Light Blue)
+        doc.rect(leftX, currentY, tableW, 15).fill('#eff6ff').stroke('#bfdbfe');
+        doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold')
           .text('GRANDO', leftX, currentY + 3.5, { width: tableW, align: 'center' });
 
-        // PRINTDOT Table Header Row 1 (Light Soft Green)
-        doc.rect(rightX, currentY, tableW, 15).fill('#f0fdf4').stroke('#bbf7d0');
-        doc.fillColor('#15803d').fontSize(8).font('Helvetica-Bold')
+        // PRINTDOT Table Header Row 1 (Light Purple)
+        doc.rect(rightX, currentY, tableW, 15).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
           .text('PRINTDOT', rightX, currentY + 3.5, { width: tableW, align: 'center' });
         currentY += 15;
 
@@ -2030,9 +2014,9 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
         grandoVals.forEach((val, i) => {
           const isTot = i === 4;
-          const bg = isTot ? '#ede9fe' : '#ffffff';
-          const stroke = isTot ? '#ddd6fe' : '#cbd5e1';
-          const textColor = isTot ? '#5b21b6' : '#0f172a';
+          const bg = isTot ? '#eff6ff' : '#ffffff';
+          const stroke = isTot ? '#bfdbfe' : '#cbd5e1';
+          const textColor = isTot ? '#1e40af' : '#0f172a';
           doc.rect(leftX + i * colW, currentY, colW, 15).fill(bg).stroke(stroke);
           doc.fillColor(textColor).fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
             .text(val, leftX + i * colW, currentY + 3.5, { width: colW, align: 'center' });
@@ -2040,27 +2024,27 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
         printdotVals.forEach((val, i) => {
           const isTot = i === 4;
-          const bg = isTot ? '#dcfce7' : '#ffffff';
-          const stroke = isTot ? '#bbf7d0' : '#cbd5e1';
-          const textColor = isTot ? '#15803d' : '#0f172a';
+          const bg = isTot ? '#f5f3ff' : '#ffffff';
+          const stroke = isTot ? '#ddd6fe' : '#cbd5e1';
+          const textColor = isTot ? '#5b21b6' : '#0f172a';
           doc.rect(rightX + i * colW, currentY, colW, 15).fill(bg).stroke(stroke);
           doc.fillColor(textColor).fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
             .text(val, rightX + i * colW, currentY + 3.5, { width: colW, align: 'center' });
         });
         currentY += 15;
 
-        // INK TOTAL SUMMARY BAR Across Both Machines
-        doc.rect(ML, currentY, contentWidth, 15).fill('#f8fafc').stroke('#cbd5e1');
-        doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
+        // INK TOTAL SUMMARY BAR Across Both Machines (Light Blue)
+        doc.rect(ML, currentY, contentWidth, 15).fill('#eff6ff').stroke('#bfdbfe');
+        doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
           .text(`TOTAL INK USED BY PRINTING DEPARTMENT: ${deptTotInk.toFixed(2)} Ltr`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center' });
         currentY += 21;
 
 
-        // ── 2. PAPER CONSUMPTION TABLE (LIGHT PASTEL COLORS & TOTALS) ──
+        // ── 2. PAPER CONSUMPTION TABLE (LIGHT PURPLE & LIGHT BLUE THEME) ──
         checkAddPage(90);
 
-        doc.rect(ML, currentY, contentWidth, 15).fill('#f1f5f9').stroke('#cbd5e1');
-        doc.fillColor('#1e293b').fontSize(8).font('Helvetica-Bold')
+        doc.rect(ML, currentY, contentWidth, 15).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
           .text('PAPER CONSUMPTION SUMMARY', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
         currentY += 15;
 
@@ -2108,45 +2092,45 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
             const valStr = qtyVal > 0 ? `${qtyVal}` : '';
 
             doc.rect(x, currentY, pannaColW, 14).fill(bg).stroke('#cbd5e1');
-            doc.fillColor(qtyVal > 0 ? '#047857' : '#94a3b8').fontSize(7.5).font(qtyVal > 0 ? 'Helvetica-Bold' : 'Helvetica')
+            doc.fillColor(qtyVal > 0 ? '#1e40af' : '#94a3b8').fontSize(7.5).font(qtyVal > 0 ? 'Helvetica-Bold' : 'Helvetica')
               .text(valStr, x, currentY + 3, { width: pannaColW, align: 'center' });
           });
 
           grandTotalPaperRolls += rowRollTotal;
           const totX = ML + typeColW + pannaCols.length * pannaColW;
           doc.rect(totX, currentY, totalColW, 14).fill(bg).stroke('#cbd5e1');
-          doc.fillColor('#047857').fontSize(7.5).font('Helvetica-Bold')
+          doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
             .text(rowRollTotal > 0 ? `${rowRollTotal}` : '0', totX, currentY + 3, { width: totalColW, align: 'center' });
 
           currentY += 14;
         });
 
-        // PAPER TOTAL BOTTOM ROW
-        doc.rect(ML, currentY, typeColW, 15).fill('#dcfce7').stroke('#a7f3d0');
-        doc.fillColor('#15803d').fontSize(7.5).font('Helvetica-Bold')
+        // PAPER TOTAL BOTTOM ROW (Light Blue)
+        doc.rect(ML, currentY, typeColW, 15).fill('#eff6ff').stroke('#bfdbfe');
+        doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
           .text('TOTAL ROLLS', ML, currentY + 3.5, { width: typeColW, align: 'center' });
 
         pannaCols.forEach((panna, i) => {
           const x = ML + typeColW + i * pannaColW;
           const cTot = colTotals[panna] || 0;
-          doc.rect(x, currentY, pannaColW, 15).fill('#dcfce7').stroke('#a7f3d0');
-          doc.fillColor('#15803d').fontSize(7.5).font('Helvetica-Bold')
+          doc.rect(x, currentY, pannaColW, 15).fill('#eff6ff').stroke('#bfdbfe');
+          doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
             .text(cTot > 0 ? `${cTot}` : '0', x, currentY + 3.5, { width: pannaColW, align: 'center' });
         });
 
         const totX = ML + typeColW + pannaCols.length * pannaColW;
-        doc.rect(totX, currentY, totalColW, 15).fill('#dcfce7').stroke('#a7f3d0');
-        doc.fillColor('#15803d').fontSize(7.8).font('Helvetica-Bold')
+        doc.rect(totX, currentY, totalColW, 15).fill('#eff6ff').stroke('#bfdbfe');
+        doc.fillColor('#1e40af').fontSize(7.8).font('Helvetica-Bold')
           .text(`${grandTotalPaperRolls}`, totX, currentY + 3.5, { width: totalColW, align: 'center' });
 
         currentY += 21;
 
 
-        // ── 3. MACHINE WISE REPORT TABLE (LIGHT PASTEL COLORS & BOTH MACHINES TOTAL) ──
+        // ── 3. MACHINE WISE REPORT TABLE (LIGHT BLUE & LIGHT PURPLE THEME) ──
         checkAddPage(80);
 
-        doc.rect(ML, currentY, contentWidth, 15).fill('#f1f5f9').stroke('#cbd5e1');
-        doc.fillColor('#1e293b').fontSize(8).font('Helvetica-Bold')
+        doc.rect(ML, currentY, contentWidth, 15).fill('#eff6ff').stroke('#bfdbfe');
+        doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold')
           .text('MACHINE WISE REPORT', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
         currentY += 15;
 
@@ -2157,8 +2141,8 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
           .text('GRANDO', ML, currentY + 3.5, { width: halfW, align: 'center' });
 
-        doc.rect(ML + halfW, currentY, halfW, 15).fill('#f0fdf4').stroke('#bbf7d0');
-        doc.fillColor('#15803d').fontSize(8).font('Helvetica-Bold')
+        doc.rect(ML + halfW, currentY, halfW, 15).fill('#eff6ff').stroke('#bfdbfe');
+        doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold')
           .text('PRINTDOT', ML + halfW, currentY + 3.5, { width: halfW, align: 'center' });
         currentY += 15;
 
@@ -2182,9 +2166,9 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         mtrVals.forEach((val, i) => {
           const x = ML + i * subColW;
           const isTot = i === 2 || i === 5;
-          const bg = isTot ? (i === 2 ? '#ede9fe' : '#dcfce7') : '#ffffff';
-          const stroke = isTot ? (i === 2 ? '#ddd6fe' : '#bbf7d0') : '#cbd5e1';
-          const textColor = isTot ? (i === 2 ? '#5b21b6' : '#15803d') : '#0f172a';
+          const bg = isTot ? (i === 2 ? '#f5f3ff' : '#eff6ff') : '#ffffff';
+          const stroke = isTot ? (i === 2 ? '#ddd6fe' : '#bfdbfe') : '#cbd5e1';
+          const textColor = isTot ? (i === 2 ? '#5b21b6' : '#1e40af') : '#0f172a';
 
           doc.rect(x, currentY, subColW, 15).fill(bg).stroke(stroke);
           doc.fillColor(textColor).fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
@@ -2192,10 +2176,10 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         });
         currentY += 15;
 
-        // BOTH MACHINES PRINTED METERS TOTAL BAR
+        // BOTH MACHINES PRINTED METERS TOTAL BAR (Light Purple)
         const totalBothMtr = grandoTotal + printdotTotal;
-        doc.rect(ML, currentY, contentWidth, 15).fill('#eff6ff').stroke('#bfdbfe');
-        doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
+        doc.rect(ML, currentY, contentWidth, 15).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
           .text(`TOTAL PRINTED METERS (BOTH MACHINES): ${totalBothMtr.toFixed(2)} mtr`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center' });
         currentY += 21;
 
