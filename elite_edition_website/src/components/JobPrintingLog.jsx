@@ -168,6 +168,32 @@ export default function JobPrintingLog() {
         const pannaMap = {};
         const paperList = [];
 
+        let foundStart = '';
+        let foundStop = '';
+        let foundShift = '';
+        let foundOperator = '';
+
+        outwardLogs.forEach(t => {
+          if (t.notes) {
+            const tm = t.notes.match(/Time:\s*([^\s|]+(?:\s*[AP]M)?)\s*(?:to|-)\s*([^\s|]+(?:\s*[AP]M)?)/i) ||
+                       t.notes.match(/(\d{1,2}:\d{2}(?:\s*[AP]M)?)\s*(?:to|-)\s*(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i);
+            if (tm) {
+              if (!foundStart) foundStart = tm[1];
+              if (!foundStop) foundStop = tm[2];
+            }
+            const sh = t.notes.match(/Shift:\s*([^|\]]+)/i);
+            if (sh && !foundShift) foundShift = sh[1].trim();
+
+            const op = t.notes.match(/Operator:\s*([^|\]]+)/i);
+            if (op && !foundOperator && op[1].trim() !== '—') foundOperator = op[1].trim();
+          }
+        });
+
+        if (foundStart) setRawStartTime(foundStart);
+        if (foundStop) setRawStopTime(foundStop);
+        if (foundShift) setRawShift(foundShift);
+        if (foundOperator) setRawOperator(foundOperator);
+
         filtered.forEach(t => {
           const mName = (t.materialName || '').toLowerCase();
           const q = Number(t.qty) || 0;

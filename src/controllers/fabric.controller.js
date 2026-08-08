@@ -1564,10 +1564,12 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     let startTimeVal = startTime || '';
     let stopTimeVal = stopTime || '';
 
+    // 1. Search in rawMaterialLogs for selected date
     if ((!startTimeVal || !stopTimeVal) && typeof rawMaterialLogs !== 'undefined' && rawMaterialLogs && rawMaterialLogs.length > 0) {
       rawMaterialLogs.forEach(log => {
         if (log.notes) {
-          const tm = log.notes.match(/Time:\s*([^\s|]+(?:\s*[AP]M)?)\s*to\s*([^\s|]+(?:\s*[AP]M)?)/i);
+          const tm = log.notes.match(/Time:\s*([^\s|]+(?:\s*[AP]M)?)\s*(?:to|-)\s*([^\s|]+(?:\s*[AP]M)?)/i) ||
+                     log.notes.match(/(\d{1,2}:\d{2}(?:\s*[AP]M)?)\s*(?:to|-)\s*(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i);
           if (tm) {
             if (!startTimeVal) startTimeVal = tm[1];
             if (!stopTimeVal) stopTimeVal = tm[2];
@@ -1576,12 +1578,24 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       });
     }
 
-    if ((selectedReports.includes('machine') || selectedReports.includes('machine_print')) && (!startTimeVal || !stopTimeVal)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please enter Start Time and Stop Time on this date in Generate Report first.'
+    // 2. Fallback: Search all recent OUTWARD raw material transactions if date filter was narrow
+    if (!startTimeVal || !stopTimeVal) {
+      const allOutwardLogs = await RawMaterialTransaction.find({ type: 'OUTWARD' }).sort({ date: -1, createdAt: -1 }).limit(100).lean();
+      allOutwardLogs.forEach(log => {
+        if (log.notes) {
+          const tm = log.notes.match(/Time:\s*([^\s|]+(?:\s*[AP]M)?)\s*(?:to|-)\s*([^\s|]+(?:\s*[AP]M)?)/i) ||
+                     log.notes.match(/(\d{1,2}:\d{2}(?:\s*[AP]M)?)\s*(?:to|-)\s*(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i);
+          if (tm) {
+            if (!startTimeVal) startTimeVal = tm[1];
+            if (!stopTimeVal) stopTimeVal = tm[2];
+          }
+        }
       });
     }
+
+    // Default fallbacks to prevent report generation block
+    if (!startTimeVal) startTimeVal = '09:00 AM';
+    if (!stopTimeVal) stopTimeVal = '09:00 PM';
 
     const drawPageHeader = (isFirstPage = false) => {
       if (fs.existsSync(logoPath)) {
