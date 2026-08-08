@@ -2017,7 +2017,6 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       }
 
       currentY += 12;
-    }
 
     // ── 5. FABRIC CURRENT STOCK SUMMARY (NEW TABLE) ──
     if (selectedReports.includes('stock') && stockSummaryData.length > 0) {
