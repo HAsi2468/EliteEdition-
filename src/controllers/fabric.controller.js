@@ -1371,6 +1371,8 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     let machineData = [];
     let totalMachinePrintedMtr = 0;
     let totalMachineJobCardCount = 0;
+    let morningMachinePrintedMtr = 0;
+    let nightMachinePrintedMtr = 0;
 
     if (selectedReports.includes('machine') || selectedReports.includes('machine_print')) {
       let logDateFilter = {};
@@ -1462,8 +1464,8 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       // Map to group strictly by machineName + pass from actual JobPrintLog entries
       const machineMap = {};
       const globalJobSet = new Set();
-      let morningMachinePrintedMtr = 0;
-      let nightMachinePrintedMtr = 0;
+      morningMachinePrintedMtr = 0;
+      nightMachinePrintedMtr = 0;
 
       printLogs.forEach(log => {
         const mName = (log.machineName || 'Unknown Machine').trim();
