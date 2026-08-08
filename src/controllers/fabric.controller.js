@@ -1911,6 +1911,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         const printdotTotal = printdot1Pass + printdot2Pass;
 
         // ── 1. INK CONSUMPTION TABLE (IMAGE 1: SIDE BY SIDE FOR BOTH MACHINES) ──
+        // ── 1. INK CONSUMPTION TABLE (SIDE BY SIDE WITH MATCHING REPORT THEME) ──
         checkAddPage(75);
         currentY += 8;
 
@@ -1921,25 +1922,25 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         const inkCols = ['C', 'M', 'Y', 'K', 'TOTAL'];
         const colW = tableW / 5;
 
-        // GRANDO Table Header Row 1
-        doc.rect(leftX, currentY, tableW, 16).fillAndStroke('#ffffff', '#000000');
-        doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold')
+        // GRANDO Table Header Row 1 (Indigo theme)
+        doc.rect(leftX, currentY, tableW, 16).fill('#4338ca').stroke('#3730a3');
+        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
           .text('GRANDO', leftX, currentY + 4, { width: tableW, align: 'center' });
 
-        // PRINTDOT Table Header Row 1
-        doc.rect(rightX, currentY, tableW, 16).fillAndStroke('#ffffff', '#000000');
-        doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold')
+        // PRINTDOT Table Header Row 1 (Teal theme)
+        doc.rect(rightX, currentY, tableW, 16).fill('#0f766e').stroke('#115e59');
+        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
           .text('PRINTDOT', rightX, currentY + 4, { width: tableW, align: 'center' });
         currentY += 16;
 
-        // GRANDO & PRINTDOT Header Row 2: C | M | Y | K | TOTAL
+        // Header Row 2: C | M | Y | K | TOTAL
         inkCols.forEach((col, i) => {
-          doc.rect(leftX + i * colW, currentY, colW, 15).fillAndStroke('#ffffff', '#000000');
-          doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold')
+          doc.rect(leftX + i * colW, currentY, colW, 15).fill('#f1f5f9').stroke('#cbd5e1');
+          doc.fillColor('#1e293b').fontSize(8).font('Helvetica-Bold')
             .text(col, leftX + i * colW, currentY + 3.5, { width: colW, align: 'center' });
 
-          doc.rect(rightX + i * colW, currentY, colW, 15).fillAndStroke('#ffffff', '#000000');
-          doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold')
+          doc.rect(rightX + i * colW, currentY, colW, 15).fill('#f1f5f9').stroke('#cbd5e1');
+          doc.fillColor('#1e293b').fontSize(8).font('Helvetica-Bold')
             .text(col, rightX + i * colW, currentY + 3.5, { width: colW, align: 'center' });
         });
         currentY += 15;
@@ -1961,37 +1962,45 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         ];
 
         grandoVals.forEach((val, i) => {
-          doc.rect(leftX + i * colW, currentY, colW, 16).fillAndStroke('#ffffff', '#000000');
-          doc.fillColor('#000000').fontSize(7.8).font('Helvetica')
+          const isTot = i === 4;
+          const bg = isTot ? '#e0e7ff' : '#ffffff';
+          const stroke = isTot ? '#c7d2fe' : '#cbd5e1';
+          const textColor = isTot ? '#3730a3' : '#0f172a';
+          doc.rect(leftX + i * colW, currentY, colW, 16).fill(bg).stroke(stroke);
+          doc.fillColor(textColor).fontSize(7.8).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
             .text(val, leftX + i * colW, currentY + 4, { width: colW, align: 'center' });
         });
 
         printdotVals.forEach((val, i) => {
-          doc.rect(rightX + i * colW, currentY, colW, 16).fillAndStroke('#ffffff', '#000000');
-          doc.fillColor('#000000').fontSize(7.8).font('Helvetica')
+          const isTot = i === 4;
+          const bg = isTot ? '#ccfbf1' : '#ffffff';
+          const stroke = isTot ? '#99f6e4' : '#cbd5e1';
+          const textColor = isTot ? '#0f766e' : '#0f172a';
+          doc.rect(rightX + i * colW, currentY, colW, 16).fill(bg).stroke(stroke);
+          doc.fillColor(textColor).fontSize(7.8).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
             .text(val, rightX + i * colW, currentY + 4, { width: colW, align: 'center' });
         });
         currentY += 24;
 
-        // ── 2. PAPER CONSUMPTION TABLE (IMAGE 2: PAPER TYPE VS PANNA WIDTHS) ──
+        // ── 2. PAPER CONSUMPTION TABLE (MATCHING REPORT THEME) ──
         checkAddPage(90);
 
-        doc.rect(ML, currentY, contentWidth, 16).fillAndStroke('#ffffff', '#000000');
-        doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold')
+        doc.rect(ML, currentY, contentWidth, 16).fill('#1e293b').stroke('#0f172a');
+        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
           .text('PAPER', ML, currentY + 4, { width: contentWidth, align: 'center' });
         currentY += 16;
 
         const typeColW = 115;
         const pannaColW = (contentWidth - typeColW) / pannaCols.length;
 
-        doc.rect(ML, currentY, typeColW, 15).fillAndStroke('#ffffff', '#000000');
-        doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold')
+        doc.rect(ML, currentY, typeColW, 15).fill('#f1f5f9').stroke('#cbd5e1');
+        doc.fillColor('#1e293b').fontSize(8).font('Helvetica-Bold')
           .text('PAPER TYPE', ML, currentY + 3.5, { width: typeColW, align: 'center' });
 
         pannaCols.forEach((panna, i) => {
           const x = ML + typeColW + i * pannaColW;
-          doc.rect(x, currentY, pannaColW, 15).fillAndStroke('#ffffff', '#000000');
-          doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold')
+          doc.rect(x, currentY, pannaColW, 15).fill('#f1f5f9').stroke('#cbd5e1');
+          doc.fillColor('#1e293b').fontSize(8).font('Helvetica-Bold')
             .text(panna, x, currentY + 3.5, { width: pannaColW, align: 'center' });
         });
         currentY += 15;
@@ -2000,9 +2009,10 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           ? Object.keys(paperTypeMap)
           : ['A++', 'A+', 'A'];
 
-        displayPaperTypes.forEach(pType => {
-          doc.rect(ML, currentY, typeColW, 15).fillAndStroke('#ffffff', '#000000');
-          doc.fillColor('#000000').fontSize(7.8).font('Helvetica-Bold')
+        displayPaperTypes.forEach((pType, pIdx) => {
+          const bg = pIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
+          doc.rect(ML, currentY, typeColW, 15).fill(bg).stroke('#cbd5e1');
+          doc.fillColor('#0f172a').fontSize(7.8).font('Helvetica-Bold')
             .text(pType, ML, currentY + 3.5, { width: typeColW, align: 'center' });
 
           pannaCols.forEach((panna, i) => {
@@ -2010,8 +2020,8 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
             const qtyVal = (paperTypeMap[pType] && paperTypeMap[pType][panna]) ? paperTypeMap[pType][panna] : 0;
             const valStr = qtyVal > 0 ? `${qtyVal}` : '';
 
-            doc.rect(x, currentY, pannaColW, 15).fillAndStroke('#ffffff', '#000000');
-            doc.fillColor('#000000').fontSize(7.8).font('Helvetica')
+            doc.rect(x, currentY, pannaColW, 15).fill(bg).stroke('#cbd5e1');
+            doc.fillColor(qtyVal > 0 ? '#047857' : '#94a3b8').fontSize(7.8).font(qtyVal > 0 ? 'Helvetica-Bold' : 'Helvetica')
               .text(valStr, x, currentY + 3.5, { width: pannaColW, align: 'center' });
           });
           currentY += 15;
@@ -2019,31 +2029,31 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
         currentY += 12;
 
-        // ── 3. MACHINE WISE REPORT TABLE (IMAGE 3: GRANDO & PRINTDOT PASS METERAGE) ──
+        // ── 3. MACHINE WISE REPORT TABLE (MATCHING REPORT THEME) ──
         checkAddPage(80);
 
-        doc.rect(ML, currentY, contentWidth, 16).fillAndStroke('#ffffff', '#000000');
-        doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold')
+        doc.rect(ML, currentY, contentWidth, 16).fill('#1e293b').stroke('#0f172a');
+        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
           .text('MACHINE WISE REPORT', ML, currentY + 4, { width: contentWidth, align: 'center' });
         currentY += 16;
 
         const halfW = contentWidth / 2;
         const subColW = halfW / 3;
 
-        doc.rect(ML, currentY, halfW, 15).fillAndStroke('#ffffff', '#000000');
-        doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold')
+        doc.rect(ML, currentY, halfW, 15).fill('#4338ca').stroke('#3730a3');
+        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
           .text('GRANDO', ML, currentY + 3.5, { width: halfW, align: 'center' });
 
-        doc.rect(ML + halfW, currentY, halfW, 15).fillAndStroke('#ffffff', '#000000');
-        doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold')
+        doc.rect(ML + halfW, currentY, halfW, 15).fill('#0f766e').stroke('#115e59');
+        doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
           .text('PRINTDOT', ML + halfW, currentY + 3.5, { width: halfW, align: 'center' });
         currentY += 15;
 
         const machineCols = ['1PASS MTR', '2 PASS MTR', 'TOTAL MTR', '1PASS MTR', '2 PASS MTR', 'TOTAL MTR'];
         machineCols.forEach((col, i) => {
           const x = ML + i * subColW;
-          doc.rect(x, currentY, subColW, 15).fillAndStroke('#ffffff', '#000000');
-          doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold')
+          doc.rect(x, currentY, subColW, 15).fill('#f1f5f9').stroke('#cbd5e1');
+          doc.fillColor('#1e293b').fontSize(7.5).font('Helvetica-Bold')
             .text(col, x, currentY + 3.5, { width: subColW, align: 'center' });
         });
         currentY += 15;
@@ -2058,8 +2068,13 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         ];
         mtrVals.forEach((val, i) => {
           const x = ML + i * subColW;
-          doc.rect(x, currentY, subColW, 16).fillAndStroke('#ffffff', '#000000');
-          doc.fillColor('#000000').fontSize(7.8).font('Helvetica')
+          const isTot = i === 2 || i === 5;
+          const bg = isTot ? (i === 2 ? '#e0e7ff' : '#ccfbf1') : '#ffffff';
+          const stroke = isTot ? (i === 2 ? '#c7d2fe' : '#99f6e4') : '#cbd5e1';
+          const textColor = isTot ? (i === 2 ? '#3730a3' : '#0f766e') : '#0f172a';
+
+          doc.rect(x, currentY, subColW, 16).fill(bg).stroke(stroke);
+          doc.fillColor(textColor).fontSize(7.8).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
             .text(val, x, currentY + 4, { width: subColW, align: 'center' });
         });
 
