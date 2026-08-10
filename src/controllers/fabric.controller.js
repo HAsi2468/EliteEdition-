@@ -1654,14 +1654,14 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     if (isPrintingReportOnly) {
       // Single horizontal line with 5 Cards Side-by-Side: Morning, Night, Total, WTD, MTD
       const printingKpiCards = [
-        { label: 'PRINTED (MORNING)', val: `${morningMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Morning Shift' },
-        { label: 'PRINTED (NIGHT)', val: `${nightMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Night Shift' },
+        { label: 'MORNING SHIFT', val: `${morningMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Morning Shift' },
+        { label: 'NIGHT SHIFT', val: `${nightMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Night Shift' },
         { label: 'MACHINE PRINTED', val: `${totalMachinePrintedMtr.toFixed(2)} mtr`, sub: `${totalMachineJobCardCount} Job Cards` },
-        { label: 'PRINTED (WTD)', val: `${wtdMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Week To Till Date' },
-        { label: 'PRINTED (MTD)', val: `${mtdMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Month To Till Date' }
+        { label: 'WTD PRINTED', val: `${wtdMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Week To Till Date' },
+        { label: 'MTD PRINTED', val: `${mtdMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Month To Till Date' }
       ];
 
-      const gapW = 5;
+      const gapW = 6;
       const kpiCardW = (contentWidth - (5 - 1) * gapW) / 5;
       let cardX = ML;
 
@@ -1672,18 +1672,18 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         const stroke = isBlue ? '#bfdbfe' : '#ddd6fe';
         const labelColor = isBlue ? '#1e40af' : '#5b21b6';
 
-        doc.rect(cardX, currentY, kpiCardW, 38).fill(bg).stroke(stroke);
-        doc.fillColor(labelColor).fontSize(6.5).font('Helvetica-Bold')
-          .text(card.label, cardX + 2, currentY + 5, { width: kpiCardW - 4, align: 'center' });
-        doc.fillColor('#0f172a').fontSize(9.2).font('Helvetica-Bold')
-          .text(card.val, cardX + 2, currentY + 15, { width: kpiCardW - 4, align: 'center' });
-        doc.fillColor('#475569').fontSize(5.8).font('Helvetica')
-          .text(card.sub, cardX + 2, currentY + 26, { width: kpiCardW - 4, align: 'center' });
+        doc.rect(cardX, currentY, kpiCardW, 40).fill(bg).stroke(stroke);
+        doc.fillColor(labelColor).fontSize(6.8).font('Helvetica-Bold')
+          .text(card.label, cardX + 3, currentY + 4, { width: kpiCardW - 6, align: 'center', lineBreak: false });
+        doc.fillColor('#0f172a').fontSize(9.0).font('Helvetica-Bold')
+          .text(card.val, cardX + 3, currentY + 16, { width: kpiCardW - 6, align: 'center', lineBreak: false });
+        doc.fillColor('#475569').fontSize(6.0).font('Helvetica')
+          .text(card.sub, cardX + 3, currentY + 28, { width: kpiCardW - 6, align: 'center', lineBreak: false });
 
         cardX += kpiCardW + gapW;
       });
 
-      currentY += 46;
+      currentY += 48;
     } else {
       // Multi-report selected (Challan, Inward, Outward, Machine)
       const periodSections = [
@@ -1694,44 +1694,44 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       ].filter(Boolean);
 
       const cardCount1 = periodSections.length || 1;
-      const cardWidth1 = (contentWidth - (cardCount1 - 1) * 8) / cardCount1;
+      const cardWidth1 = (contentWidth - (cardCount1 - 1) * 6) / cardCount1;
       let cardX1 = ML;
 
       periodSections.forEach(card => {
-        doc.rect(cardX1, 68, cardWidth1, 38).fill('#f5f3ff').stroke('#ddd6fe');
-        doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
-          .text(card.label, cardX1 + 5, 72, { width: cardWidth1 - 10, align: 'center' });
-        doc.fillColor('#000000').fontSize(10.5).font('Helvetica-Bold')
-          .text(card.val, cardX1 + 5, 82, { width: cardWidth1 - 10, align: 'center' });
-        doc.fillColor('#475569').fontSize(6.5).font('Helvetica')
-          .text(card.sub, cardX1 + 5, 94, { width: cardWidth1 - 10, align: 'center' });
-        cardX1 += cardWidth1 + 8;
+        doc.rect(cardX1, 66, cardWidth1, 40).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.fillColor('#5b21b6').fontSize(6.8).font('Helvetica-Bold')
+          .text(card.label, cardX1 + 3, 70, { width: cardWidth1 - 6, align: 'center', lineBreak: false });
+        doc.fillColor('#000000').fontSize(9.2).font('Helvetica-Bold')
+          .text(card.val, cardX1 + 3, 82, { width: cardWidth1 - 6, align: 'center', lineBreak: false });
+        doc.fillColor('#475569').fontSize(6.0).font('Helvetica')
+          .text(card.sub, cardX1 + 3, 94, { width: cardWidth1 - 6, align: 'center', lineBreak: false });
+        cardX1 += cardWidth1 + 6;
       });
 
       const mtdSections = [
-        selectedReports.includes('challan') && { label: 'MTD CHALLAN DISPATCHES', val: `${mtdTotalChallanMtr.toFixed(2)} mtr`, sub: `${mtdChallanData.length} Challans (${mtdTotalChallanTp} TP)` },
-        selectedReports.includes('inward') && { label: 'MTD FABRIC INWARD', val: `${mtdTotalInwardMtr.toFixed(2)} mtr`, sub: `${mtdInwardData.length} Receipts` },
-        selectedReports.includes('outward') && { label: 'MTD FABRIC CONSUMPTION', val: `${mtdTotalOutwardMtr.toFixed(2)} mtr`, sub: `${mtdOutwardData.length} Dispatches` },
-        (selectedReports.includes('machine') || selectedReports.includes('machine_print')) && { label: 'PRINTED (WTD)', val: `${wtdMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Week To Till Date' },
-        (selectedReports.includes('machine') || selectedReports.includes('machine_print')) && { label: 'PRINTED (MTD)', val: `${mtdMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Month To Till Date' },
+        selectedReports.includes('challan') && { label: 'MTD DISPATCHES', val: `${mtdTotalChallanMtr.toFixed(2)} mtr`, sub: `${mtdChallanData.length} Challans (${mtdTotalChallanTp} TP)` },
+        selectedReports.includes('inward') && { label: 'MTD INWARD', val: `${mtdTotalInwardMtr.toFixed(2)} mtr`, sub: `${mtdInwardData.length} Receipts` },
+        selectedReports.includes('outward') && { label: 'MTD CONSUMPTION', val: `${mtdTotalOutwardMtr.toFixed(2)} mtr`, sub: `${mtdOutwardData.length} Dispatches` },
+        (selectedReports.includes('machine') || selectedReports.includes('machine_print')) && { label: 'WTD PRINTED', val: `${wtdMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Week To Till Date' },
+        (selectedReports.includes('machine') || selectedReports.includes('machine_print')) && { label: 'MTD PRINTED', val: `${mtdMachinePrintedMtr.toFixed(2)} mtr`, sub: 'Month To Till Date' },
       ].filter(Boolean);
 
       const cardCount2 = mtdSections.length || 1;
-      const cardWidth2 = (contentWidth - (cardCount2 - 1) * 8) / cardCount2;
+      const cardWidth2 = (contentWidth - (cardCount2 - 1) * 6) / cardCount2;
       let cardX2 = ML;
 
       mtdSections.forEach(card => {
-        doc.rect(cardX2, 112, cardWidth2, 38).fill('#eff6ff').stroke('#bfdbfe');
-        doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-          .text(card.label, cardX2 + 5, 116, { width: cardWidth2 - 10, align: 'center' });
-        doc.fillColor('#000000').fontSize(10.5).font('Helvetica-Bold')
-          .text(card.val, cardX2 + 5, 126, { width: cardWidth2 - 10, align: 'center' });
-        doc.fillColor('#475569').fontSize(6.5).font('Helvetica')
-          .text(card.sub, cardX2 + 5, 138, { width: cardWidth2 - 10, align: 'center' });
-        cardX2 += cardWidth2 + 8;
+        doc.rect(cardX2, 112, cardWidth2, 40).fill('#eff6ff').stroke('#bfdbfe');
+        doc.fillColor('#1e40af').fontSize(6.8).font('Helvetica-Bold')
+          .text(card.label, cardX2 + 3, 116, { width: cardWidth2 - 6, align: 'center', lineBreak: false });
+        doc.fillColor('#000000').fontSize(9.2).font('Helvetica-Bold')
+          .text(card.val, cardX2 + 3, 128, { width: cardWidth2 - 6, align: 'center', lineBreak: false });
+        doc.fillColor('#475569').fontSize(6.0).font('Helvetica')
+          .text(card.sub, cardX2 + 3, 140, { width: cardWidth2 - 6, align: 'center', lineBreak: false });
+        cardX2 += cardWidth2 + 6;
       });
 
-      currentY = 158;
+      currentY = 160;
     }
 
     const checkAddPage = (heightNeeded) => {
