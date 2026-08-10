@@ -591,20 +591,23 @@ export default function ReportsCenter({ department }) {
               <Send size={14} />
               <span>Share to Chat</span>
             </button>
-            <button 
-              onClick={() => setIsCombinedModalOpen(true)} 
-              className="btn-primary" 
-              style={{
-                ...styles.actionBtn,
-                background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
-                color: '#ffffff',
-                border: 'none',
-                boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)',
-              }}
-            >
-              <FileText size={14} />
-              <span>Multiple Reports</span>
-            </button>
+            {activeDepartment === 'elite-print' && (
+              <button 
+                onClick={() => setIsCombinedModalOpen(true)} 
+                className="btn-primary" 
+                style={{
+                  ...styles.actionBtn,
+                  background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)',
+                }}
+                title="Multiple Reports (Elite Digital Prints)"
+              >
+                <FileText size={14} />
+                <span>Multiple Reports</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
