@@ -1108,7 +1108,7 @@ export const api = {
       let errText = 'Failed to generate Combined Multi-Report PDF';
       try {
         const errJson = await response.json();
-        if (errJson && errJson.message) errText = errJson.message;
+        if (errJson && (errJson.message || errJson.error)) errText = errJson.message || errJson.error;
       } catch (e) {}
       throw new Error(errText);
     }

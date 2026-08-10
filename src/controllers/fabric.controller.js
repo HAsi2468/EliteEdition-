@@ -1018,14 +1018,23 @@ const downloadFabricOutwardPdf = async (req, res) => {
 
 // Helper: Compute lot-wise inventory balance with shortage and date range filtering
 async function computeLotWiseData(dateStart, dateEnd, vendorRegex = null) {
+  const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
+  const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
+
   const dateFilter = {};
-  if (dateStart || dateEnd) {
+  if (dsStr || deStr) {
     dateFilter.date = {};
-    if (dateStart) dateFilter.date.$gte = new Date(dateStart);
-    if (dateEnd) {
-      const end = new Date(dateEnd);
-      end.setHours(23, 59, 59, 999);
-      dateFilter.date.$lte = end;
+    if (dsStr) {
+      const dLocal = new Date(`${dsStr}T00:00:00.000`);
+      const dUtc = new Date(`${dsStr}T00:00:00.000Z`);
+      const minStart = !isNaN(dLocal.getTime()) && !isNaN(dUtc.getTime()) ? (dLocal < dUtc ? dLocal : dUtc) : (dLocal || dUtc);
+      if (minStart && !isNaN(minStart.getTime())) dateFilter.date.$gte = minStart;
+    }
+    if (deStr) {
+      const dLocal = new Date(`${deStr}T23:59:59.999`);
+      const dUtc = new Date(`${deStr}T23:59:59.999Z`);
+      const maxEnd = !isNaN(dLocal.getTime()) && !isNaN(dUtc.getTime()) ? (dLocal > dUtc ? dLocal : dUtc) : (dLocal || dUtc);
+      if (maxEnd && !isNaN(maxEnd.getTime())) dateFilter.date.$lte = maxEnd;
     }
   }
 
@@ -1038,7 +1047,7 @@ async function computeLotWiseData(dateStart, dateEnd, vendorRegex = null) {
 
   // Find distinct lot numbers active in date range (if dateStart/dateEnd provided)
   let activeLotNos = null;
-  if (dateStart || dateEnd) {
+  if (dsStr || deStr) {
     activeLotNos = await FabricTransaction.distinct('lotNo', {
       lotNo: { $ne: null },
       ...dateFilter,
@@ -1050,10 +1059,9 @@ async function computeLotWiseData(dateStart, dateEnd, vendorRegex = null) {
   const txFilter = { lotNo: { $ne: null }, ...vendorQuery };
   if (activeLotNos !== null) {
     txFilter.lotNo = { $in: activeLotNos };
-  } else if (dateEnd) {
-    const end = new Date(dateEnd);
-    end.setHours(23, 59, 59, 999);
-    txFilter.date = { $lte: end };
+  } else if (deStr) {
+    const end = new Date(`${deStr}T23:59:59.999Z`);
+    if (!isNaN(end.getTime())) txFilter.date = { $lte: end };
   }
 
   const allTxs = await FabricTransaction.find(txFilter).sort({ lotNo: 1, date: 1 }).lean();
@@ -1303,19 +1311,29 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     const FabricChallan = require('../db/models/fabricChallan.model');
     const JobPrintLog = require('../db/models/jobPrintLog.model');
     const JobCard = require('../db/models/jobCard.model');
+    const RawMaterialTransaction = require('../db/models/rawMaterialTransaction.model');
 
     const selectedReports = reports
       ? reports.split(',').map(s => s.trim().toLowerCase())
       : ['challan', 'inward', 'outward', 'lotwise', 'stock', 'machine'];
 
+    const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
+    const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
+
     const dateFilter = {};
-    if (dateStart || dateEnd) {
+    if (dsStr || deStr) {
       dateFilter.date = {};
-      if (dateStart) dateFilter.date.$gte = new Date(dateStart);
-      if (dateEnd) {
-        const end = new Date(dateEnd);
-        end.setHours(23, 59, 59, 999);
-        dateFilter.date.$lte = end;
+      if (dsStr) {
+        const dLocal = new Date(`${dsStr}T00:00:00.000`);
+        const dUtc = new Date(`${dsStr}T00:00:00.000Z`);
+        const minStart = !isNaN(dLocal.getTime()) && !isNaN(dUtc.getTime()) ? (dLocal < dUtc ? dLocal : dUtc) : (dLocal || dUtc);
+        if (minStart && !isNaN(minStart.getTime())) dateFilter.date.$gte = minStart;
+      }
+      if (deStr) {
+        const dLocal = new Date(`${deStr}T23:59:59.999`);
+        const dUtc = new Date(`${deStr}T23:59:59.999Z`);
+        const maxEnd = !isNaN(dLocal.getTime()) && !isNaN(dUtc.getTime()) ? (dLocal > dUtc ? dLocal : dUtc) : (dLocal || dUtc);
+        if (maxEnd && !isNaN(maxEnd.getTime())) dateFilter.date.$lte = maxEnd;
       }
     }
 
@@ -1373,13 +1391,12 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     let totalMachineJobCardCount = 0;
     let morningMachinePrintedMtr = 0;
     let nightMachinePrintedMtr = 0;
+    let rawMaterialLogs = [];
+    let detailedPrintLogsList = [];
 
     if (selectedReports.includes('machine') || selectedReports.includes('machine_print')) {
       let logDateFilter = {};
-      if (dateStart || dateEnd) {
-        const dsStr = dateStart ? dateStart.split('T')[0] : '';
-        const deStr = dateEnd ? dateEnd.split('T')[0] : '';
-
+      if (dsStr || deStr) {
         const dsLocal = dsStr ? new Date(`${dsStr}T00:00:00.000`) : null;
         const deLocal = deStr ? new Date(`${deStr}T23:59:59.999`) : null;
 
@@ -1427,14 +1444,13 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       const printLogs = await JobPrintLog.find(logDateFilter).sort({ date: -1, created_date_time: -1 }).lean();
 
       // 1B. Fetch Raw Material Outward Usage logs for selected date range (strictly by date range)
-      const RawMaterialTransaction = require('../db/models/rawMaterialTransaction.model');
       const rawMaterialDateFilter = { type: 'OUTWARD' };
-      if (dateStart || dateEnd) {
+      if (dsStr || deStr) {
         rawMaterialDateFilter.date = {};
-        if (dateStart) rawMaterialDateFilter.date.$gte = new Date(dateStart + 'T00:00:00.000Z');
-        if (dateEnd) rawMaterialDateFilter.date.$lte = new Date(dateEnd + 'T23:59:59.999Z');
+        if (dsStr) rawMaterialDateFilter.date.$gte = new Date(`${dsStr}T00:00:00.000Z`);
+        if (deStr) rawMaterialDateFilter.date.$lte = new Date(`${deStr}T23:59:59.999Z`);
       }
-      var rawMaterialLogs = await RawMaterialTransaction.find(rawMaterialDateFilter).sort({ date: -1, createdAt: -1 }).lean();
+      rawMaterialLogs = await RawMaterialTransaction.find(rawMaterialDateFilter).sort({ date: -1, createdAt: -1 }).lean();
 
       // 2. Fetch all job cards to map client/party name and design name
       const allJobCardsList = await JobCard.find({}).select('jobNo party designName designNo').lean();
@@ -1445,7 +1461,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         if (c._id) jobCardMapById[String(c._id)] = c;
       });
 
-      var detailedPrintLogsList = printLogs.map(l => {
+      detailedPrintLogsList = printLogs.map(l => {
         const matched = (l.jobCardId && jobCardMapById[String(l.jobCardId)]) || (l.jobNo && jobCardMapByNo[String(l.jobNo).trim()]);
         return {
           dateStr: l.date ? new Date(l.date).toLocaleDateString('en-IN') : '—',
@@ -1568,8 +1584,8 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     const contentWidth = PW - ML - MR;
     const maxY = 770;
 
-    const startDateStr = dateStart ? new Date(dateStart).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'All Time';
-    const endDateStr = dateEnd ? new Date(dateEnd).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Present';
+    const startDateStr = dsStr ? new Date(`${dsStr}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'All Time';
+    const endDateStr = deStr ? new Date(`${deStr}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Present';
     const logoPath = path.join(__dirname, 'Logo.png');
 
     let startTimeVal = startTime || '';
@@ -2331,7 +2347,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
   } catch (err) {
     console.error('Error generating combined fabric PDF:', err);
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Internal Server Error' });
+      res.status(500).json({ error: err.message || 'Internal Server Error' });
     }
   }
 };
