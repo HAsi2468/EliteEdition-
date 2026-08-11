@@ -164,12 +164,6 @@ const downloadInvoicePdf = async (req, res) => {
         .text(`GST: ${companyGstin}   Phone: ${companyPhone}   State: ${companyState}, Code: ${companyStateCode}`,
               PAD + 110, Y + 33, { width: CW - 116, align: 'right' });
 
-      // Copy label badge
-      const badgeW = 130, badgeH2 = 14;
-      doc.rect(PAD + CW - badgeW, Y, badgeW, badgeH2).fill(PRP);
-      doc.fillColor(WHT).fontSize(7).font('Helvetica-Bold')
-        .text(copyLabel, PAD + CW - badgeW, Y + 3, { width: badgeW, align: 'center' });
-
       Y += hdrH;
 
       // ── TAX INVOICE TITLE ─────────────────────────────────────────────────────
