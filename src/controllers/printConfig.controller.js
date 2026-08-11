@@ -45,6 +45,26 @@ const getConfig = async () => {
       config.inkCanSizes = ['1 Ltr', '5 Ltr', '10 Ltr'];
       changed = true;
     }
+    if (!config.stitchingCategories || config.stitchingCategories.length === 0) {
+      config.stitchingCategories = ['SUIT', 'KURTI', 'DUPATTA', 'TOP', 'BOTTOM', 'LEHENGA', 'STITCHING SET', 'KIDS', 'ETHNIC'];
+      changed = true;
+    }
+    if (!config.stitchingLabels || config.stitchingLabels.length === 0) {
+      config.stitchingLabels = ['Elite Edition', 'Private Label', 'Custom Brand'];
+      changed = true;
+    }
+    if (!config.finishingOptions || config.finishingOptions.length === 0) {
+      config.finishingOptions = ['Standard Finishing', 'Iron & Pack', 'Overlock', 'Embroidery Finish', 'Premium Box'];
+      changed = true;
+    }
+    if (!config.stitchingParties || config.stitchingParties.length === 0) {
+      config.stitchingParties = ['Wholesale Party', 'Direct Client', 'Retailer'];
+      changed = true;
+    }
+    if (!config.stitchingDeliveryBy || config.stitchingDeliveryBy.length === 0) {
+      config.stitchingDeliveryBy = ['Party Delivery', 'Self Pickup', 'Courier / Cargo'];
+      changed = true;
+    }
     if (changed) {
       await config.save();
     }
@@ -95,7 +115,8 @@ const updatePrintConfig = async (req, res) => {
       'machine_profile', 'temperatures', 'speeds', 'startingJobNo', 'rawMaterials',
       'sublimationPanna', 'sublimationQualities', 'butterPanna', 'inkColors', 'inkCanSizes',
       'deliveryOptions', 'lotPartyMap', 'companyName', 'companyGstin', 'companyAddress',
-      'companyPhone', 'companyEmail', 'companyBankName', 'companyAccountNo', 'companyIfscCode', 'companyTerms'
+      'companyPhone', 'companyEmail', 'companyBankName', 'companyAccountNo', 'companyIfscCode', 'companyTerms',
+      'stitchingCategories', 'stitchingLabels', 'finishingOptions', 'stitchingParties', 'stitchingBillTo', 'stitchingShipTo', 'stitchingDeliveryBy'
     ];
     if (!validFields.includes(field)) {
       return res.status(httpStatus.BAD_REQUEST).send('Invalid field');

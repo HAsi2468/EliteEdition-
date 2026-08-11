@@ -17,6 +17,7 @@ import EliteDigitalPrintsSplitView from './EliteDigitalPrintsSplitView';
 import JobPrintingLog from './JobPrintingLog';
 import GarmentJobCardDashboard from './GarmentJobCardDashboard';
 import StitchingChallanPanel from './StitchingChallanPanel';
+import StitchingSettings from './StitchingSettings';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
 import { triggerPushNotification } from './NotificationToast';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
@@ -1792,8 +1793,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         <RawMaterialsPanel />
       ) : effectiveSubTab === 'tracking' ? (
         <JobCardTracking onPreview={setPreviewCard} />
-      ) : effectiveSubTab === 'settings' ? (
-        <PrintSettings />
+      ) : effectiveSubTab === 'settings' || effectiveSubTab === 'stitching_settings' ? (
+        department === 'stitching' ? <StitchingSettings /> : <PrintSettings />
       ) : effectiveSubTab === 'jobcards' ? (
         <ReportsCenter department="elite-print" />
       ) : (

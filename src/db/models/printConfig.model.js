@@ -94,6 +94,34 @@ const printConfigSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    stitchingCategories: {
+      type: [String],
+      default: ['SUIT', 'KURTI', 'DUPATTA', 'TOP', 'BOTTOM', 'LEHENGA', 'STITCHING SET', 'KIDS', 'ETHNIC'],
+    },
+    stitchingLabels: {
+      type: [String],
+      default: ['Elite Edition', 'Private Label', 'Custom Brand'],
+    },
+    finishingOptions: {
+      type: [String],
+      default: ['Standard Finishing', 'Iron & Pack', 'Overlock', 'Embroidery Finish', 'Premium Box'],
+    },
+    stitchingParties: {
+      type: [String],
+      default: ['Wholesale Party', 'Direct Client', 'Retailer'],
+    },
+    stitchingBillTo: {
+      type: [String],
+      default: [],
+    },
+    stitchingShipTo: {
+      type: [String],
+      default: [],
+    },
+    stitchingDeliveryBy: {
+      type: [String],
+      default: ['Party Delivery', 'Self Pickup', 'Courier / Cargo'],
+    },
     lotPartyMap: {
       type: Map,
       of: String,

@@ -1126,7 +1126,7 @@ export default function DesignCatalogue({ department }) {
                 name="category"
                 value={formVal.category}
                 onChange={handleFormChange}
-                options={department === 'stitching' ? ['', 'SUIT', 'KURTI', 'DUPATTA', 'TOP', 'LEHENGA', 'STITCHING_SET', 'KIDS', 'ETHNIC', 'OTHER'] : ['', ...printConfig.categories]}
+                options={department === 'stitching' ? ['', ...(printConfig.stitchingCategories?.length ? printConfig.stitchingCategories : ['SUIT', 'KURTI', 'DUPATTA', 'TOP', 'BOTTOM', 'LEHENGA', 'STITCHING SET', 'KIDS', 'ETHNIC', 'OTHER'])] : ['', ...(printConfig.categories || [])]}
               />
 
               {/* STITCHING ONLY: Size-Wise Sales Rates */}

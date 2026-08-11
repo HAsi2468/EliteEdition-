@@ -15,6 +15,7 @@ import UnicommerceHub from './components/UnicommerceHub';
 import MyntraHub from './components/MyntraHub';
 import ReturnsManager from './components/ReturnsManager';
 import JobCardPanel from './components/JobCardPanel';
+import StitchingSettings from './components/StitchingSettings';
 import AdminPanel from './components/AdminPanel';
 import Workspace from './components/Workspace';
 import { 
@@ -928,6 +929,12 @@ export default function App() {
                       <Database size={18} /><span>Challan</span>
                     </button>
                   )}
+                  {/* 4. Settings */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings')) && (
+                    <button onClick={() => { setActiveTab('jobcards_stitching_settings'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_stitching_settings' ? styles.navItemActive : {}) }}>
+                      <Settings size={18} /><span>Settings</span>
+                    </button>
+                  )}
                 </>
               ) : activeDepartment === 'digital_print' ? (
                 <>
@@ -1124,6 +1131,12 @@ export default function App() {
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric') || currentUser.permissions?.includes('jobcards_stitching_challan')) && (
                   <button onClick={() => handleNavClick('jobcards_stitching_challan')} style={{ ...styles.navItem, ...((activeTab === 'jobcards_stitching_challan' || activeTab === 'jobcards_fabric') ? styles.navItemActive : {}) }}>
                     <Database size={18} /><span>Challan</span>
+                  </button>
+                )}
+                {/* 4. Settings */}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings')) && (
+                  <button onClick={() => handleNavClick('jobcards_stitching_settings')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_stitching_settings' ? styles.navItemActive : {}) }}>
+                    <Settings size={18} /><span>Settings</span>
                   </button>
                 )}
               </>
