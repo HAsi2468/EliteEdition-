@@ -447,10 +447,10 @@ const downloadInvoicePdf = async (req, res) => {
 
       Y += hdrH;
 
-      // ── INVOICE TITLE ─────────────────────────────────────────────────────────
+      // ── TAX INVOICE TITLE ─────────────────────────────────────────────────────
       const titleH = 22;
       doc.rect(PAD, Y, CW, titleH).fill(PRPL);
-      doc.fillColor(PRP).fontSize(14).font('Helvetica-Bold').text('INVOICE', PAD, Y + 4, { width: CW, align: 'center' });
+      doc.fillColor(PRP).fontSize(14).font('Helvetica-Bold').text('TAX INVOICE', PAD, Y + 4, { width: CW, align: 'center' });
 
       doc.fillColor(S900).fontSize(10).font('Helvetica-Bold')
         .text(`Date: ${formatDate(invoice.invoiceDate)}`, PAD + CW - 180, Y + 5, { width: 175, align: 'right' });
@@ -482,7 +482,7 @@ const downloadInvoicePdf = async (req, res) => {
         .text('SELLER / DISPATCH DETAILS', rx + 5, Y + 3, { width: CW - halfCW - 10 });
       const metaW = (CW - halfCW) / 2 - 5;
       const pairs = [
-        ['Order No.', invoice.orderNo || '--', 'Invoice No.', invoice.invoiceNo || '--'],
+        ['Order No.', invoice.orderNo || '--', 'Tax Invoice No.', invoice.invoiceNo || '--'],
         ['Dispatch Doc', invoice.dispatchDocNo || '--', 'Challan No.', invoice.ourChallanNo || invoice.challanNo || '--'],
         ['Terms of Delivery', 'By Road', 'Place of Supply', `${cust.state || 'Gujarat'} (${cust.stateCode || '24'})`],
       ];
