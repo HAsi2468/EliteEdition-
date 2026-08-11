@@ -228,11 +228,15 @@ export default function App() {
   // Department permission helpers
   const EE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
   const EDP_PERMISSIONS = ['jobcards', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials'];
-  const STITCHING_PERMISSIONS = ['jobcards_list', 'jobcards_catalogue', 'jobcards_fabric'];
+  const STITCHING_PERMISSIONS = [
+    'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
+    'jobcards_list', 'jobcards_catalogue', 'jobcards_fabric',
+    'jobcards_stitching_challan', 'jobcards_stitching_settings'
+  ];
 
   const hasEliteEditionAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => EE_PERMISSIONS.includes(p)));
-  const hasDigitalPrintAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => EDP_PERMISSIONS.includes(p) || p.startsWith('jobcards')));
-  const hasStitchingAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => STITCHING_PERMISSIONS.includes(p)));
+  const hasDigitalPrintAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => (EDP_PERMISSIONS.includes(p) || p.startsWith('jobcards')) && !p.startsWith('stitching_')));
+  const hasStitchingAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => STITCHING_PERMISSIONS.includes(p) || p.startsWith('stitching_')));
   const hasWorkspaceAccess = !currentUser || currentUser.role === 'admin' || !currentUser.permissions || currentUser.permissions.length === 0 || currentUser.permissions.includes('workspace');
 
   const getFirstJobCardsTab = () => {
@@ -248,8 +252,22 @@ export default function App() {
     return allowed[0] || 'dashboard';
   };
 
+  const getFirstStitchingTab = () => {
+    if (!currentUser || currentUser.role === 'admin') return 'jobcards_list';
+    const perms = currentUser.permissions || [];
+    if (perms.includes('stitching_jobcards') || perms.includes('jobcards_list')) return 'jobcards_list';
+    if (perms.includes('stitching_design') || perms.includes('jobcards_catalogue')) return 'jobcards_catalogue';
+    if (perms.includes('stitching_fabric') || perms.includes('jobcards_stitching_challan') || perms.includes('jobcards_fabric')) return 'jobcards_stitching_challan';
+    if (perms.includes('stitching_settings') || perms.includes('jobcards_stitching_settings')) return 'jobcards_stitching_settings';
+    return 'jobcards_list';
+  };
+
   // Sync activeDepartment when activeTab changes
   useEffect(() => {
+    if (activeTab === 'jobcards_stitching_challan' || activeTab === 'jobcards_stitching_settings') {
+      setActiveDepartment('stitching');
+      return;
+    }
     if (activeDepartment === 'stitching') return;
     if (activeTab.startsWith('jobcards')) {
       setActiveDepartment('digital_print');
@@ -272,15 +290,22 @@ export default function App() {
   useEffect(() => {
     if (!currentUser || currentUser.role === 'admin') return;
     if (currentUser.permissions && currentUser.permissions.length > 0) {
-      if (!hasDigitalPrintAccess && hasEliteEditionAccess && activeDepartment === 'digital_print') {
-        setActiveDepartment('elite_edition');
-        if (activeTab !== 'workspace') setActiveTab(getFirstEETab());
-      } else if (!hasEliteEditionAccess && hasDigitalPrintAccess && activeDepartment === 'elite_edition') {
-        setActiveDepartment('digital_print');
-        if (activeTab !== 'workspace') setActiveTab(getFirstJobCardsTab());
+      const allowedDepts = [];
+      if (hasDigitalPrintAccess) allowedDepts.push('digital_print');
+      if (hasStitchingAccess) allowedDepts.push('stitching');
+      if (hasEliteEditionAccess) allowedDepts.push('elite_edition');
+
+      if (allowedDepts.length > 0 && !allowedDepts.includes(activeDepartment)) {
+        const targetDept = allowedDepts[0];
+        setActiveDepartment(targetDept);
+        if (activeTab !== 'workspace') {
+          if (targetDept === 'stitching') setActiveTab(getFirstStitchingTab());
+          else if (targetDept === 'digital_print') setActiveTab(getFirstJobCardsTab());
+          else if (targetDept === 'elite_edition') setActiveTab(getFirstEETab());
+        }
       }
     }
-  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), hasDigitalPrintAccess, hasEliteEditionAccess]);
+  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), hasDigitalPrintAccess, hasStitchingAccess, hasEliteEditionAccess]);
 
   const handleNavClick = (tab) => {
     setActiveTab(tab);
@@ -295,7 +320,8 @@ export default function App() {
       const firstTab = getFirstJobCardsTab();
       setActiveTab(firstTab);
     } else if (dept === 'stitching') {
-      setActiveTab('jobcards_list');
+      const firstTab = getFirstStitchingTab();
+      setActiveTab(firstTab);
     } else {
       const firstTab = getFirstEETab();
       setActiveTab(firstTab);
@@ -321,7 +347,8 @@ export default function App() {
 
     const ALL_SYSTEM_TABS = [
       'dashboard', 'workspace', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
-      'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings'
+      'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
+      'jobcards_stitching_challan', 'jobcards_stitching_settings'
     ];
 
     if (currentUser.role === 'admin') {
@@ -334,18 +361,31 @@ export default function App() {
       const isAllowed = currentUser.permissions.some(p => {
         if (p === activeTab) return true;
         if (activeTab === 'catalog' && p === 'inventory') return true;
+        if (activeTab === 'jobcards_list' && (p === 'stitching_jobcards' || p === 'jobcards_list' || p === 'jobcards')) return true;
+        if (activeTab === 'jobcards_catalogue' && (p === 'stitching_design' || p === 'jobcards_catalogue' || p === 'jobcards')) return true;
+        if ((activeTab === 'jobcards_stitching_challan' || activeTab === 'jobcards_fabric') && (p === 'stitching_fabric' || p === 'jobcards_stitching_challan' || p === 'jobcards_fabric')) return true;
+        if (activeTab === 'jobcards_stitching_settings' && (p === 'stitching_settings' || p === 'jobcards_stitching_settings')) return true;
         if (activeTab.startsWith('jobcards_') && (p === 'jobcards' || p === activeTab)) return true;
         if (activeTab === 'jobcards' && p.startsWith('jobcards')) return true;
+        if (activeTab.startsWith('stitching_') && (p.startsWith('stitching_') || p === 'jobcards')) return true;
         return false;
       });
 
       if (!isAllowed && !['workspace', 'dashboard'].includes(activeTab)) {
-        setActiveTab(currentUser.permissions[0]);
+        if (hasStitchingAccess && activeDepartment === 'stitching') {
+          setActiveTab(getFirstStitchingTab());
+        } else if (hasDigitalPrintAccess && activeDepartment === 'digital_print') {
+          setActiveTab(getFirstJobCardsTab());
+        } else if (hasEliteEditionAccess && activeDepartment === 'elite_edition') {
+          setActiveTab(getFirstEETab());
+        } else {
+          setActiveTab(currentUser.permissions[0]);
+        }
       }
     } else {
       setActiveTab('no-access');
     }
-  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), isAuthenticated]);
+  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), isAuthenticated, activeDepartment]);
 
   // Apply theme to <html> element
   useEffect(() => {
@@ -912,25 +952,25 @@ export default function App() {
                   </div>
 
                   {/* 1. Jobcard */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list') || currentUser.permissions?.includes('stitching_jobcards')) && (
                     <button onClick={() => { setActiveTab('jobcards_list'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
                       <FileText size={18} /><span>Jobcard</span>
                     </button>
                   )}
                   {/* 2. Design room */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) && (
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('stitching_design')) && (
                     <button onClick={() => { setActiveTab('jobcards_catalogue'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_catalogue' ? styles.navItemActive : {}) }}>
                       <BookOpen size={18} /><span>Design room</span>
                     </button>
                   )}
                   {/* 3. Challan */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric') || currentUser.permissions?.includes('jobcards_stitching_challan')) && (
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric') || currentUser.permissions?.includes('jobcards_stitching_challan') || currentUser.permissions?.includes('stitching_fabric')) && (
                     <button onClick={() => { setActiveTab('jobcards_stitching_challan'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...((activeTab === 'jobcards_stitching_challan' || activeTab === 'jobcards_fabric') ? styles.navItemActive : {}) }}>
                       <Database size={18} /><span>Challan</span>
                     </button>
                   )}
                   {/* 4. Settings */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings')) && (
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings') || currentUser.permissions?.includes('stitching_settings')) && (
                     <button onClick={() => { setActiveTab('jobcards_stitching_settings'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_stitching_settings' ? styles.navItemActive : {}) }}>
                       <Settings size={18} /><span>Settings</span>
                     </button>
@@ -1116,25 +1156,25 @@ export default function App() {
                 </div>
 
                 {/* 1. Jobcard */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list') || currentUser.permissions?.includes('stitching_jobcards')) && (
                   <button onClick={() => handleNavClick('jobcards_list')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
                     <FileText size={18} /><span>Jobcard</span>
                   </button>
                 )}
                 {/* 2. Design room */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) && (
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('stitching_design')) && (
                   <button onClick={() => handleNavClick('jobcards_catalogue')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_catalogue' ? styles.navItemActive : {}) }}>
                     <BookOpen size={18} /><span>Design room</span>
                   </button>
                 )}
                 {/* 3. Challan */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric') || currentUser.permissions?.includes('jobcards_stitching_challan')) && (
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric') || currentUser.permissions?.includes('jobcards_stitching_challan') || currentUser.permissions?.includes('stitching_fabric')) && (
                   <button onClick={() => handleNavClick('jobcards_stitching_challan')} style={{ ...styles.navItem, ...((activeTab === 'jobcards_stitching_challan' || activeTab === 'jobcards_fabric') ? styles.navItemActive : {}) }}>
                     <Database size={18} /><span>Challan</span>
                   </button>
                 )}
                 {/* 4. Settings */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings')) && (
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings') || currentUser.permissions?.includes('stitching_settings')) && (
                   <button onClick={() => handleNavClick('jobcards_stitching_settings')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_stitching_settings' ? styles.navItemActive : {}) }}>
                     <Settings size={18} /><span>Settings</span>
                   </button>

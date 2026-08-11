@@ -53,6 +53,7 @@ const AVAILABLE_SCREENS = [
   { id: 'stitching_jobcards', label: 'Elite Stitching: Job Card Tracking', category: 'Elite Stitching' },
   { id: 'stitching_design', label: 'Elite Stitching: Design Room', category: 'Elite Stitching' },
   { id: 'stitching_fabric', label: 'Elite Stitching: Fabric Challans', category: 'Elite Stitching' },
+  { id: 'stitching_settings', label: 'Elite Stitching: Settings', category: 'Elite Stitching' },
 ];
 
 export default function AdminPanel() {
