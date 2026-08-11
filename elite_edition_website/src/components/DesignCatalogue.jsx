@@ -948,21 +948,26 @@ export default function DesignCatalogue({ department }) {
                       )}
                     </div>
 
-                    {d.partySkuId && (
+                    {/* STITCHING ONLY: Party SKU ID badge */}
+                    {department === 'stitching' && d.partySkuId && (
                       <div style={{ fontSize: '0.73rem', color: '#60a5fa', fontWeight: 800, background: 'rgba(59,130,246,0.12)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(59,130,246,0.25)', width: 'fit-content' }}>
                         Party SKU: {d.partySkuId}
                       </div>
                     )}
 
+                    {/* Parameters grid */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem 0.5rem', fontSize: '0.78rem', borderTop: '1px dashed var(--border-light)', paddingTop: '0.5rem' }}>
-                      {[
+                      {(department === 'stitching' ? [
+                        ['Fabric', d.fabricName],
+                        ['Category', d.category]
+                      ] : [
                         ['Colour Match', d.colourMatching],
                         ['Fabric', d.fabricName],
                         ['Fusing Temp', d.fusingTemp],
                         ['Speed', d.speed],
                         ['Colors', d.colors],
                         ['Panna/Pass', d.panna && d.pass ? `${d.panna}" / ${d.pass}P` : d.panna || d.pass || '—']
-                      ].map(([k, v]) => (
+                      ]).map(([k, v]) => (
                         <div key={k} style={{ display: 'flex', flexDirection: 'column' }}>
                           <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{k}</span>
                           {k === 'Colors' && v ? (
@@ -991,7 +996,8 @@ export default function DesignCatalogue({ department }) {
                       ))}
                     </div>
 
-                    {d.sizeSalesRates && Object.values(d.sizeSalesRates).some(v => Number(v) > 0) && (
+                    {/* STITCHING ONLY: Size Sales Rates display */}
+                    {department === 'stitching' && d.sizeSalesRates && Object.values(d.sizeSalesRates).some(v => Number(v) > 0) && (
                       <div style={{ width: '100%', marginTop: '0.4rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.4rem' }}>
                         <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>
                           💰 Size Sales Rates (₹):
@@ -1086,8 +1092,19 @@ export default function DesignCatalogue({ department }) {
                 </div>
               )}
 
-              <FormField label="Design Name (e.g. ED1, ED2, PKD-1001)" name="designName" value={formVal.designName} onChange={handleFormChange} required placeholder="PKD-1001" />
-              <FormField label="Party SKU ID" name="partySkuId" value={formVal.partySkuId} onChange={handleFormChange} placeholder="e.g. SKU-9042" />
+              <FormField
+                label={department === 'stitching' ? "Design Name (e.g. PKD-1001)" : "Design Name (e.g. ED1, ED2)"}
+                name="designName"
+                value={formVal.designName}
+                onChange={handleFormChange}
+                required
+                placeholder={department === 'stitching' ? "PKD-1001" : "ED1"}
+              />
+
+              {department === 'stitching' && (
+                <FormField label="Party SKU ID" name="partySkuId" value={formVal.partySkuId} onChange={handleFormChange} placeholder="e.g. SKU-9042" />
+              )}
+
               {(() => {
                 const nameExists = allDesignsList.some(d => 
                   d.designName.toLowerCase() === formVal.designName.trim().toLowerCase() && 
@@ -1102,210 +1119,175 @@ export default function DesignCatalogue({ department }) {
                 }
                 return null;
               })()}
+
               <FormField label="Designer Name" name="designerName" value={formVal.designerName} onChange={handleFormChange} options={['', ...(printConfig.designers || [])]} placeholder="e.g. Rahul" />
-              <FormField label="Colour Matching Name" name="colourMatching" value={formVal.colourMatching} onChange={handleFormChange} options={['', ...(printConfig.designers || [])]} placeholder="e.g. Green Matching" />
+
+              {department !== 'stitching' && (
+                <FormField label="Colour Matching Name" name="colourMatching" value={formVal.colourMatching} onChange={handleFormChange} options={['', ...(printConfig.designers || [])]} placeholder="e.g. Green Matching" />
+              )}
+
               <FormField label="Fabric Name" name="fabricName" value={formVal.fabricName} onChange={handleFormChange} options={['', ...(printConfig.fabrics || [])]} />
-              <FormField label="Paper Type" name="paperType" value={formVal.paperType} onChange={handleFormChange} options={['', ...(printConfig.paperTypes || [])]} />
 
-              {/* Section: Size-wise Sales Rates */}
-              <div style={{
-                fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
-                color: 'var(--primary)', marginBottom: '0.4rem', marginTop: '0.8rem', width: '100%',
-                borderBottom: '1px solid var(--border-light)', paddingBottom: '0.2rem',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-              }}>
-                <span>💰 Size-Wise Sales Rates (₹) — Taken from Stitching Sizes</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const rate = prompt('Enter Sales Rate (₹) to apply across ALL sizes:');
-                    if (rate !== null && rate !== '') handleApplyAllSalesRates(rate);
-                  }}
-                  style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', fontSize: '0.68rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '4px', cursor: 'pointer' }}
-                >
-                  ⚡ Set All Sizes Rate
-                </button>
-              </div>
+              {department !== 'stitching' && (
+                <FormField label="Paper Type" name="paperType" value={formVal.paperType} onChange={handleFormChange} options={['', ...(printConfig.paperTypes || [])]} />
+              )}
 
-              <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '0.6rem' }}>
-                {[
-                  { key: 'xs_34', label: 'XS-34' },
-                  { key: 's_36',  label: 'S-36' },
-                  { key: 'm_38',  label: 'M-38' },
-                  { key: 'l_40',  label: 'L-40' },
-                  { key: 'xl_42', label: 'XL-42' },
-                  { key: 'xl2_44',label: '2XL-44' },
-                  { key: 'xl3_46',label: '3XL-46' },
-                  { key: 'xl4_48',label: '4XL-48' },
-                  { key: 'xl5_50',label: '5XL-50' },
-                  { key: 'xl6_52',label: '6XL-52' }
-                ].map(s => (
-                  <div key={s.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-                    <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}>
-                      {s.label}
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={(formVal.sizeSalesRates || {})[s.key] || ''}
-                      onChange={e => handleSizeSalesRateChange(s.key, e.target.value)}
-                      placeholder="0.00"
-                      style={{ width: '100%', textAlign: 'center', fontWeight: 700, fontSize: '0.82rem', padding: '0.3rem 0.2rem', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '4px', color: 'var(--text-primary)' }}
-                    />
-                  </div>
-                ))}
-              </div>
+              <FormField
+                label="Category"
+                name="category"
+                value={formVal.category}
+                onChange={handleFormChange}
+                options={department === 'stitching' ? ['', 'SUIT', 'KURTI', 'DUPATTA', 'TOP', 'LEHENGA', 'STITCHING_SET', 'KIDS', 'ETHNIC', 'OTHER'] : ['', ...printConfig.categories]}
+              />
 
-              {/* Section: Fusing Configuration */}
-              <div style={{
-                fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
-                color: 'var(--primary)', marginBottom: '0.4rem', marginTop: '0.8rem', width: '100%',
-                borderBottom: '1px solid var(--border-light)', paddingBottom: '0.2rem'
-              }}>
-                🔥 Fusing Configuration
-              </div>
-              <FormField label="Fusing Temperature" name="fusingTemp" value={formVal.fusingTemp} onChange={handleFormChange} options={['', ...(printConfig.temperatures || [])]} />
-              <FormField label="Speed" name="speed" value={formVal.speed} onChange={handleFormChange} options={['', ...(printConfig.speeds || [])]} />
-
-              {/* Section: Print Configuration */}
-              <div style={{
-                fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
-                color: 'var(--primary)', marginBottom: '0.4rem', marginTop: '0.8rem', width: '100%',
-                borderBottom: '1px solid var(--border-light)', paddingBottom: '0.2rem'
-              }}>
-                🖨 Print Configuration
-              </div>
-              <FormField label="Colour" name="colors" value={formVal.colors} onChange={handleFormChange} options={COLOR_NAMES} placeholder="Select or type colour..." />
-
-              {/* Auto-detect color from image button */}
-              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <button
-                  type="button"
-                  onClick={handleAutoDetectColor}
-                  disabled={detectingColor || !formVal.imageUrl}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    fontFamily: 'var(--font-sans)',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid',
-                    borderColor: !formVal.imageUrl ? 'var(--border-light)' : 'rgba(139,92,246,0.4)',
-                    background: !formVal.imageUrl ? 'rgba(255,255,255,0.02)' : 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(56,189,248,0.15))',
-                    color: !formVal.imageUrl ? 'var(--text-muted)' : '#a78bfa',
-                    cursor: !formVal.imageUrl ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    transition: 'all 0.2s',
-                    width: 'fit-content'
-                  }}
-                  onMouseEnter={e => { if (formVal.imageUrl) { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.7)'; e.currentTarget.style.boxShadow = '0 0 12px rgba(139,92,246,0.2)'; } }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = !formVal.imageUrl ? 'var(--border-light)' : 'rgba(139,92,246,0.4)'; e.currentTarget.style.boxShadow = 'none'; }}
-                >
-                  {detectingColor ? (
-                    <><RefreshCw size={14} className="spin-loader" /> Detecting colours...</>
-                  ) : (
-                    <><span style={{ fontSize: '1rem' }}>🪄</span> Auto-detect Colour from Image</>
-                  )}
-                </button>
-
-                {!formVal.imageUrl && (
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    Upload or paste an image above first to enable auto-detection
-                  </span>
-                )}
-
-                {/* Detected colors result swatches */}
-                {detectedColors && detectedColors.length > 0 && (
+              {/* STITCHING ONLY: Size-Wise Sales Rates */}
+              {department === 'stitching' && (
+                <>
                   <div style={{
-                    display: 'flex', flexDirection: 'column', gap: '0.4rem',
-                    background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)',
-                    borderRadius: 'var(--radius-sm)', padding: '0.6rem 0.8rem'
+                    fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
+                    color: 'var(--primary)', marginBottom: '0.4rem', marginTop: '0.8rem', width: '100%',
+                    borderBottom: '1px solid var(--border-light)', paddingBottom: '0.2rem',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                   }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Detected Colours (click to select)
-                    </span>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      {detectedColors.map((c, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => setFormVal(prev => ({ ...prev, colors: c.name }))}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: '0.4rem',
-                            padding: '0.35rem 0.7rem', borderRadius: 'var(--radius-sm)',
-                            border: formVal.colors === c.name ? '2px solid var(--primary)' : '1px solid var(--border-light)',
-                            background: formVal.colors === c.name ? 'var(--nav-active-bg)' : 'rgba(255,255,255,0.03)',
-                            cursor: 'pointer', transition: 'all 0.15s',
-                            fontFamily: 'var(--font-sans)'
-                          }}
-                        >
-                          <span style={{
-                            width: '16px', height: '16px', borderRadius: '3px',
-                            backgroundColor: c.hex, border: '1px solid rgba(255,255,255,0.2)',
-                            flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
-                          }} />
-                          <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {c.name}
-                          </span>
-                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                            {c.percentage}%
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+                    <span>💰 Size-Wise Sales Rates (₹) — Taken from Stitching Sizes</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const rate = prompt('Enter Sales Rate (₹) to apply across ALL sizes:');
+                        if (rate !== null && rate !== '') handleApplyAllSalesRates(rate);
+                      }}
+                      style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', fontSize: '0.68rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      ⚡ Set All Sizes Rate
+                    </button>
                   </div>
-                )}
-              </div>
-              <FormField label="Panna (width)" name="panna" value={formVal.panna} onChange={handleFormChange} options={['', ...(printConfig.widths || [])]} />
-              
-              {printConfig.machines?.map(machine => (
-                <FormField 
-                  key={machine.name}
-                  label={`${machine.name} Profile`} 
-                  name={`profile_${machine.name}`} 
-                  value={(formVal.machineProfiles || {})[machine.name] || ''} 
-                  onChange={e => handleMachineProfileChange(machine.name, e.target.value)} 
-                  options={['', ...(machine.profiles || [])]} 
-                />
-              ))}
 
-              <FormField label="Pass" name="pass" value={formVal.pass} onChange={handleFormChange} options={['', ...printConfig.passes]} />
-              <FormField label="Category" name="category" value={formVal.category} onChange={handleFormChange} options={['', ...printConfig.categories]} />
+                  <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '0.6rem' }}>
+                    {[
+                      { key: 'xs_34', label: 'XS-34' },
+                      { key: 's_36',  label: 'S-36' },
+                      { key: 'm_38',  label: 'M-38' },
+                      { key: 'l_40',  label: 'L-40' },
+                      { key: 'xl_42', label: 'XL-42' },
+                      { key: 'xl2_44',label: '2XL-44' },
+                      { key: 'xl3_46',label: '3XL-46' },
+                      { key: 'xl4_48',label: '4XL-48' },
+                      { key: 'xl5_50',label: '5XL-50' },
+                      { key: 'xl6_52',label: '6XL-52' }
+                    ].map(s => (
+                      <div key={s.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+                        <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}>
+                          {s.label}
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={(formVal.sizeSalesRates || {})[s.key] || ''}
+                          onChange={e => handleSizeSalesRateChange(s.key, e.target.value)}
+                          placeholder="0.00"
+                          style={{ width: '100%', textAlign: 'center', fontWeight: 700, fontSize: '0.82rem', padding: '0.3rem 0.2rem', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
 
-              <DesignImageField label="Primary Design Image URL (Google Drive Share Link)" name="imageUrl" value={formVal.imageUrl} onChange={handleFormChange} placeholder="Paste Drive link..." />
-              {(() => {
-                const imageExists = formVal.imageUrl && allDesignsList.find(d => 
-                  d.imageUrl === formVal.imageUrl && 
-                  (!formDesign || d._id !== formDesign._id)
-                );
-                if (imageExists) {
-                  return (
-                    <div style={{ color: '#fbbf24', fontSize: '0.72rem', fontWeight: 600, width: '100%', marginTop: '-0.4rem', paddingLeft: '4px' }}>
-                      ⚠️ Notice: This image is already used by design "{imageExists.designName}".
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-              <DesignImageField label="Secondary Design Image URL (Optional)" name="imageUrl2" value={formVal.imageUrl2} onChange={handleFormChange} placeholder="Paste Drive link..." />
+              {/* Design Image Field */}
+              <DesignImageField label="Primary Design Image (Upload File or Drive Link)" name="imageUrl" value={formVal.imageUrl} onChange={handleFormChange} placeholder="Paste Drive link or upload file..." />
 
-              {/* Section: 100 Pcs Standards */}
-              <div style={{
-                fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
-                color: 'var(--primary)', marginBottom: '0.4rem', marginTop: '0.8rem', width: '100%',
-                borderBottom: '1px solid var(--border-light)', paddingBottom: '0.2rem'
-              }}>
-                👗 100 Pcs Standards (for Job Card auto-calculations)
-              </div>
-              <FormField label="Top (100 Pcs)" name="top100" value={formVal.top100} onChange={handleFormChange} type="number" placeholder="e.g. 250" />
-              <FormField label="Sleeve (100 Pcs)" name="sleeve100" value={formVal.sleeve100} onChange={handleFormChange} type="number" placeholder="e.g. 60" />
-              <FormField label="Bottom (100 Pcs)" name="bottom100" value={formVal.bottom100} onChange={handleFormChange} type="number" placeholder="e.g. 200" />
-              <FormField label="Dupatta (100 Pcs)" name="dupatta100" value={formVal.dupatta100} onChange={handleFormChange} type="number" placeholder="e.g. 225" />
-              <FormField label="Cut (100 Pcs)" name="cut100" value={formVal.cut100} onChange={handleFormChange} type="number" placeholder="e.g. 735" />
-              <FormField label="Total Mtr (mtr per 100 pcs)" name="totalMtr100" value={formVal.totalMtr100} onChange={handleFormChange} type="number" placeholder="e.g. 735" />
-              <FormField label="Set Copy (100 Pcs)" name="setCopy100" value={formVal.setCopy100} onChange={handleFormChange} type="number" placeholder="e.g. 100" />
+              {department !== 'stitching' && (
+                <DesignImageField label="Secondary Design Image URL (Optional)" name="imageUrl2" value={formVal.imageUrl2} onChange={handleFormChange} placeholder="Paste Drive link..." />
+              )}
+
+              {/* DIGITAL PRINT ONLY SECTIONS */}
+              {department !== 'stitching' && (
+                <>
+                  {/* Section: Fusing Configuration */}
+                  <div style={{
+                    fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
+                    color: 'var(--primary)', marginBottom: '0.4rem', marginTop: '0.8rem', width: '100%',
+                    borderBottom: '1px solid var(--border-light)', paddingBottom: '0.2rem'
+                  }}>
+                    🔥 Fusing Configuration
+                  </div>
+                  <FormField label="Fusing Temperature" name="fusingTemp" value={formVal.fusingTemp} onChange={handleFormChange} options={['', ...(printConfig.temperatures || [])]} />
+                  <FormField label="Speed" name="speed" value={formVal.speed} onChange={handleFormChange} options={['', ...(printConfig.speeds || [])]} />
+
+                  {/* Section: Print Configuration */}
+                  <div style={{
+                    fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
+                    color: 'var(--primary)', marginBottom: '0.4rem', marginTop: '0.8rem', width: '100%',
+                    borderBottom: '1px solid var(--border-light)', paddingBottom: '0.2rem'
+                  }}>
+                    🖨 Print Configuration
+                  </div>
+                  <FormField label="Colour" name="colors" value={formVal.colors} onChange={handleFormChange} options={COLOR_NAMES} placeholder="Select or type colour..." />
+
+                  {/* Auto-detect color from image button */}
+                  <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={handleAutoDetectColor}
+                      disabled={detectingColor || !formVal.imageUrl}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        fontFamily: 'var(--font-sans)',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid',
+                        borderColor: !formVal.imageUrl ? 'var(--border-light)' : 'rgba(139,92,246,0.4)',
+                        background: !formVal.imageUrl ? 'rgba(255,255,255,0.02)' : 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(56,189,248,0.15))',
+                        color: !formVal.imageUrl ? 'var(--text-muted)' : '#a78bfa',
+                        cursor: !formVal.imageUrl ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        transition: 'all 0.2s',
+                        width: 'fit-content'
+                      }}
+                    >
+                      {detectingColor ? (
+                        <><RefreshCw size={14} className="spin-loader" /> Detecting colours...</>
+                      ) : (
+                        <><span style={{ fontSize: '1rem' }}>🪄</span> Auto-detect Colour from Image</>
+                      )}
+                    </button>
+                  </div>
+
+                  <FormField label="Panna (width)" name="panna" value={formVal.panna} onChange={handleFormChange} options={['', ...(printConfig.widths || [])]} />
+
+                  {printConfig.machines?.map(machine => (
+                    <FormField 
+                      key={machine.name}
+                      label={`${machine.name} Profile`} 
+                      name={`profile_${machine.name}`} 
+                      value={(formVal.machineProfiles || {})[machine.name] || ''} 
+                      onChange={e => handleMachineProfileChange(machine.name, e.target.value)} 
+                      options={['', ...(machine.profiles || [])]} 
+                    />
+                  ))}
+
+                  <FormField label="Pass" name="pass" value={formVal.pass} onChange={handleFormChange} options={['', ...printConfig.passes]} />
+
+                  {/* Section: 100 Pcs Standards */}
+                  <div style={{
+                    fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
+                    color: 'var(--primary)', marginBottom: '0.4rem', marginTop: '0.8rem', width: '100%',
+                    borderBottom: '1px solid var(--border-light)', paddingBottom: '0.2rem'
+                  }}>
+                    👗 100 Pcs Standards (for Job Card auto-calculations)
+                  </div>
+                  <FormField label="Top (100 Pcs)" name="top100" value={formVal.top100} onChange={handleFormChange} type="number" placeholder="e.g. 250" />
+                  <FormField label="Sleeve (100 Pcs)" name="sleeve100" value={formVal.sleeve100} onChange={handleFormChange} type="number" placeholder="e.g. 60" />
+                  <FormField label="Bottom (100 Pcs)" name="bottom100" value={formVal.bottom100} onChange={handleFormChange} type="number" placeholder="e.g. 200" />
+                  <FormField label="Dupatta (100 Pcs)" name="dupatta100" value={formVal.dupatta100} onChange={handleFormChange} type="number" placeholder="e.g. 225" />
+                  <FormField label="Cut (100 Pcs)" name="cut100" value={formVal.cut100} onChange={handleFormChange} type="number" placeholder="e.g. 735" />
+                  <FormField label="Total Mtr (mtr per 100 pcs)" name="totalMtr100" value={formVal.totalMtr100} onChange={handleFormChange} type="number" placeholder="e.g. 735" />
+                  <FormField label="Set Copy (100 Pcs)" name="setCopy100" value={formVal.setCopy100} onChange={handleFormChange} type="number" placeholder="e.g. 100" />
+                </>
+              )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', width: '100%' }}>
                 <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Notes / Printing Instructions</label>
