@@ -138,7 +138,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
   const [showItemModal, setShowItemModal] = useState(false);
   const [editingItemId, setEditingItemId] = useState(null);
   const [itemForm, setItemForm] = useState({
-    itemName: '', hsnCode: '5407', unitPrice: '', unit: 'Meters', taxRate: 18, category: 'Printing Services'
+    itemName: '', hsnCode: '998821', unitPrice: '', unit: 'Meters', taxRate: 18, category: 'Printing Services'
   });
 
   // ── INVOICE EDITOR STATE (myBillBook style) ──────────────────────────────
@@ -146,6 +146,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
   const [invoiceForm, setInvoiceForm] = useState({
     invoiceNo: '',
     invoiceSeq: 1001,
+    ourChallanNo: '',
     invoiceDate: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
     customer: {
@@ -161,7 +162,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       stateCode: '24'
     },
     items: [
-      { itemName: 'Digital Printing Service (Fabric)', hsnCode: '5407', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 18, butterPaper: false, jobNo: '', lotNo: '', partyChallan: '', imageUrl: '', totalAmount: 4500 }
+      { itemName: 'Digital Printing Service (Fabric)', hsnCode: '998821', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 18, butterPaper: false, jobNo: '', lotNo: '', partyChallan: '', ourChallanNo: '', imageUrl: '', totalAmount: 4500 }
     ],
     isButterPaperUsed: false,
     enableRoundOff: true,
@@ -249,6 +250,18 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
         console.warn('Customer lookup error:', e);
       }
 
+      // Fetch catalog items to ensure exact HSN Code, Unit Price & Default GST % match from saved products
+      let catalogItems = itemsList;
+      try {
+        const itemRes = await api.getBillingItems();
+        if (itemRes && itemRes.data && Array.isArray(itemRes.data)) {
+          catalogItems = itemRes.data;
+          setItemsList(itemRes.data);
+        }
+      } catch (e) {
+        console.warn('Billing items catalog lookup error:', e);
+      }
+
       // Build Items from Challan Data
       let preparedItems = [];
 
@@ -257,21 +270,24 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
         preparedItems = ch.items.map(it => {
           const pcs = parseFloat(it.pcs) || 1;
           const rate = parseFloat(it.rate) || 0;
+          const name = it.designNo ? `Design ${it.designNo}` : (it.particulars || 'Garment Goods');
+          const matched = catalogItems.find(cat => cat.itemName.trim().toLowerCase() === name.trim().toLowerCase());
           return {
-            itemName: it.designNo ? `Design ${it.designNo}` : (it.particulars || 'Garment Goods'),
+            itemName: name,
             description: `Challan ${ch.challanNo} | ${it.particulars || 'Stitching'}`,
             jobNo: ch.jobNo || it.jobNo || '',
             lotNo: ch.lotNo || it.lotNo || '',
             partyChallan: ch.challanNo ? String(ch.challanNo) : '',
+            ourChallanNo: String(ch.challanNo ? (String(ch.challanNo).startsWith('PCH') ? ch.challanNo : `EDP-${ch.challanNo}`) : ''),
             imageUrl: it.imageUrl || ch.imageUrl || ch.designImage || '',
-            hsnCode: '6204',
+            hsnCode: matched?.hsnCode || '998821',
             qty: pcs,
-            unit: 'Pcs',
-            unitPrice: rate,
+            unit: matched?.unit || 'Pcs',
+            unitPrice: matched?.unitPrice != null ? matched.unitPrice : rate,
             discountPct: 0,
-            taxRate: 18,
+            taxRate: matched?.taxRate != null ? matched.taxRate : 5,
             butterPaper: false,
-            totalAmount: parseFloat((pcs * rate).toFixed(2))
+            totalAmount: parseFloat((pcs * (matched?.unitPrice != null ? matched.unitPrice : rate)).toFixed(2))
           };
         });
       } else {
@@ -284,21 +300,28 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
         else if (pannaStr.includes('58')) itemName = 'DIGITAL PRINT JOB WORK 58"';
         else if (pannaStr) itemName = `DIGITAL PRINT JOB WORK ${pannaStr.replace(/['"]/g, '')}"`;
 
+        const matched = catalogItems.find(cat => cat.itemName.trim().toLowerCase() === itemName.trim().toLowerCase());
+        const hsnCode = matched?.hsnCode || '998821';
+        const unitPrice = matched?.unitPrice != null ? matched.unitPrice : 25;
+        const taxRate = matched?.taxRate != null ? matched.taxRate : 5;
+        const unit = matched?.unit || 'Meters';
+
         preparedItems = [{
           itemName,
           description: `Fabric: ${ch.fabricName || 'Fabric'}`,
           jobNo: ch.jobNo || '',
           lotNo: ch.lotNo || '',
           partyChallan: ch.challanNo ? String(ch.challanNo) : '',
+          ourChallanNo: String(ch.challanNo ? (String(ch.challanNo).startsWith('PCH') ? ch.challanNo : `EDP-${ch.challanNo}`) : ''),
           imageUrl: ch.imageUrl || ch.designImage || '',
-          hsnCode: '5407',
+          hsnCode: hsnCode,
           qty: mtr,
-          unit: 'Meters',
-          unitPrice: 25,
+          unit: unit,
+          unitPrice: unitPrice,
           discountPct: 0,
-          taxRate: 18,
+          taxRate: taxRate,
           butterPaper: false,
-          totalAmount: mtr * 25
+          totalAmount: parseFloat((mtr * unitPrice).toFixed(2))
         }];
       }
 
@@ -311,6 +334,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       setInvoiceForm({
         invoiceNo: nextRes.invoiceNo || 'EDP-INV-1001',
         invoiceSeq: nextRes.nextSeq || 1001,
+        ourChallanNo: challanTag,
         invoiceDate: new Date().toISOString().split('T')[0],
         dueDate: new Date(Date.now() + dueDays * 86400000).toISOString().split('T')[0],
         customer: selectedCust,
@@ -342,8 +366,17 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
   const handleOpenCreateTab = async (invoiceToEdit = null) => {
     if (invoiceToEdit) {
       setEditingInvoiceId(invoiceToEdit._id);
+      const cleanedItems = (invoiceToEdit.items || []).map(it => {
+        let hsn = it.hsnCode;
+        if (!hsn || hsn === '5407') {
+          const matched = itemsList.find(cat => cat.itemName.trim().toLowerCase() === (it.itemName || '').trim().toLowerCase());
+          hsn = matched?.hsnCode || '998821';
+        }
+        return { ...it, hsnCode: hsn };
+      });
       setInvoiceForm({
         ...invoiceToEdit,
+        items: cleanedItems,
         invoiceDate: invoiceToEdit.invoiceDate ? invoiceToEdit.invoiceDate.split('T')[0] : '',
         dueDate: invoiceToEdit.dueDate ? invoiceToEdit.dueDate.split('T')[0] : ''
       });
@@ -365,7 +398,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
             customerId: '', name: 'Walk-in Client', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24'
           },
           items: [
-            { itemName: 'Digital Printing Service (Fabric)', hsnCode: '5407', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 18, totalAmount: 4500 }
+            { itemName: 'Digital Printing Service (Fabric)', hsnCode: '998821', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 18, totalAmount: 4500 }
           ],
           discountType: 'flat',
           discountValue: 0,
@@ -464,20 +497,26 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
     const newItems = [...invoiceForm.items];
     newItems[index][field] = value;
 
-    // If item selected from dropdown, fill default metadata
+    // If item selected from dropdown or typed, fill default metadata
     if (field === 'itemName') {
-      const matched = itemsList.find(i => i.itemName === value);
+      const matched = itemsList.find(i => i.itemName.trim().toLowerCase() === value.trim().toLowerCase());
       if (matched) {
-        newItems[index].hsnCode = matched.hsnCode || '5407';
-        newItems[index].unitPrice = matched.unitPrice || 0;
+        newItems[index].hsnCode = matched.hsnCode || '998821';
+        newItems[index].unitPrice = matched.unitPrice != null ? matched.unitPrice : newItems[index].unitPrice;
         newItems[index].unit = matched.unit || 'Meters';
-        newItems[index].taxRate = matched.taxRate || 18;
+        newItems[index].taxRate = matched.taxRate != null ? matched.taxRate : 5;
       }
+    }
+
+    // Failsafe: if HSN is 5407 or empty, correct to product catalog HSN or 998821
+    if (newItems[index].hsnCode === '5407' || !newItems[index].hsnCode) {
+      const matched = itemsList.find(i => i.itemName.trim().toLowerCase() === (newItems[index].itemName || '').trim().toLowerCase());
+      newItems[index].hsnCode = matched?.hsnCode || '998821';
     }
 
     // HSN Code Change Auto-Sync to Saved Product
     if (field === 'hsnCode' && newItems[index].itemName) {
-      const matched = itemsList.find(i => i.itemName.toLowerCase() === newItems[index].itemName.toLowerCase());
+      const matched = itemsList.find(i => i.itemName.trim().toLowerCase() === newItems[index].itemName.trim().toLowerCase());
       if (matched && matched._id) {
         try {
           await api.updateBillingItem(matched._id, { ...matched, hsnCode: value });
@@ -496,7 +535,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       ...prev,
       items: [
         ...prev.items,
-        { itemName: '', hsnCode: '5407', qty: 1, unit: 'Meters', unitPrice: 0, discountPct: 0, taxRate: 18, totalAmount: 0 }
+        { itemName: '', hsnCode: '998821', qty: 1, unit: 'Meters', unitPrice: 0, discountPct: 0, taxRate: 18, totalAmount: 0 }
       ]
     }));
   };
@@ -659,7 +698,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       }
       setShowItemModal(false);
       setEditingItemId(null);
-      setItemForm({ itemName: '', hsnCode: '5407', unitPrice: '', unit: 'Meters', taxRate: 18, category: 'Printing Services' });
+      setItemForm({ itemName: '', hsnCode: '998821', unitPrice: '', unit: 'Meters', taxRate: 18, category: 'Printing Services' });
     } catch (err) {
       alert(err.message || 'Failed to save product');
     }
@@ -669,7 +708,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
     setEditingItemId(item._id);
     setItemForm({
       itemName: item.itemName || '',
-      hsnCode: item.hsnCode || '5407',
+      hsnCode: item.hsnCode || '998821',
       unitPrice: item.unitPrice != null ? item.unitPrice : '',
       unit: item.unit || 'Meters',
       taxRate: item.taxRate != null ? item.taxRate : 18,
@@ -926,13 +965,23 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
           </div>
 
           {/* Core Metadata */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
             <div>
               <label style={labelStyle}>Invoice No. *</label>
               <input
                 type="text"
                 value={invoiceForm.invoiceNo}
                 onChange={e => setInvoiceForm(f => ({ ...f, invoiceNo: e.target.value }))}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Our Challan No.</label>
+              <input
+                type="text"
+                value={invoiceForm.ourChallanNo || ''}
+                onChange={e => setInvoiceForm(f => ({ ...f, ourChallanNo: e.target.value }))}
+                placeholder="e.g. EDP-101"
                 style={inputStyle}
               />
             </div>
@@ -1079,8 +1128,8 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                         </datalist>
                       </div>
 
-                      {/* Sub-inputs: Job No, Lot No, Party Challan, Image URL */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr 1.5fr', gap: '0.3rem' }}>
+                      {/* Sub-inputs: Job No, Lot No, Party Challan, Our Challan, Image URL */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1.5fr', gap: '0.3rem' }}>
                         <input
                           type="text"
                           value={it.jobNo || ''}
@@ -1100,6 +1149,13 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                           value={it.partyChallan || ''}
                           onChange={e => handleItemChange(idx, 'partyChallan', e.target.value)}
                           placeholder="Party Challan #"
+                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                        />
+                        <input
+                          type="text"
+                          value={it.ourChallanNo || ''}
+                          onChange={e => handleItemChange(idx, 'ourChallanNo', e.target.value)}
+                          placeholder="Our Challan #"
                           style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
                         />
                         <input
@@ -1356,7 +1412,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                     <div key={item._id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: '0.82rem' }}>
                       <div>
                         <div style={{ fontWeight: 700 }}>{item.itemName}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>HSN: {item.hsnCode || '5407'}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>HSN: {item.hsnCode || '998821'}</div>
                       </div>
                       <div style={{ fontWeight: 800, color: '#a78bfa' }}>₹ {item.unitPrice}/{item.unit}</div>
                     </div>
@@ -1481,7 +1537,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                     <tr key={item._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.itemName}</td>
                       <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{item.category || 'Printing Services'}</td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#a78bfa' }}>{item.hsnCode || '5407'}</td>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#a78bfa' }}>{item.hsnCode || '998821'}</td>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: '#34d399' }}>₹ {item.unitPrice} / {item.unit || 'Meters'}</td>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>{item.taxRate || 18}%</td>
                       <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
@@ -1506,7 +1562,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       {/* ── TAX INVOICE PREVIEW / VIEW MODAL ────────────────────────────────── */}
       {viewInvoiceModal && (
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '720px', maxHeight: '92vh', overflowY: 'auto', padding: '1.5rem', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 12 }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '750px', maxHeight: '92vh', overflowY: 'auto', padding: '1.5rem', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 12 }}>
             
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.85rem', marginBottom: '1rem' }}>
@@ -1516,6 +1572,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                 </h3>
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                   Invoice Date: {formatDateDDMMYYYY(viewInvoiceModal.invoiceDate)} {viewInvoiceModal.dueDate ? `| Due Date: ${formatDateDDMMYYYY(viewInvoiceModal.dueDate)}` : ''}
+                  {(viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo) ? ` | Our Challan No: ${viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo}` : ''}
                 </span>
               </div>
               <button className="btn-icon" onClick={() => setViewInvoiceModal(null)} style={{ padding: '0.35rem' }}>
@@ -1534,7 +1591,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
               </div>
 
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>INVOICE STATUS</div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>INVOICE DETAILS & STATUS</div>
                 <span style={{
                   padding: '4px 10px',
                   borderRadius: 6,
@@ -1547,7 +1604,12 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                 }}>
                   {viewInvoiceModal.paymentStatus || 'UNPAID'}
                 </span>
-                <div style={{ marginTop: '0.6rem', fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-primary)' }}>
+                {(viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo) && (
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#38bdf8', marginTop: 4 }}>
+                    Our Challan #: {viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo}
+                  </div>
+                )}
+                <div style={{ marginTop: '0.4rem', fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-primary)' }}>
                   Total: {fmtINR(viewInvoiceModal.grandTotal)}
                 </div>
                 {viewInvoiceModal.balanceDue > 0 && (
@@ -1564,7 +1626,8 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                 <thead>
                   <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)' }}>
                     <th style={{ padding: '0.5rem 0.6rem', color: 'var(--text-muted)' }}>#</th>
-                    <th style={{ padding: '0.5rem 0.6rem', color: 'var(--text-muted)' }}>Item Description</th>
+                    <th style={{ padding: '0.5rem 0.6rem', color: 'var(--text-muted)', width: '50px' }}>Image</th>
+                    <th style={{ padding: '0.5rem 0.6rem', color: 'var(--text-muted)' }}>Item Description & Details</th>
                     <th style={{ padding: '0.5rem 0.6rem', color: 'var(--text-muted)' }}>HSN</th>
                     <th style={{ padding: '0.5rem 0.6rem', textAlign: 'right', color: 'var(--text-muted)' }}>Qty</th>
                     <th style={{ padding: '0.5rem 0.6rem', textAlign: 'right', color: 'var(--text-muted)' }}>Rate</th>
@@ -1572,19 +1635,39 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {(viewInvoiceModal.items || []).map((it, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <td style={{ padding: '0.45rem 0.6rem', color: 'var(--text-muted)' }}>{idx + 1}</td>
-                      <td style={{ padding: '0.45rem 0.6rem' }}>
-                        <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{it.itemName}</div>
-                        {it.description && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{it.description}</div>}
-                      </td>
-                      <td style={{ padding: '0.45rem 0.6rem', fontWeight: 600 }}>{it.hsnCode || '5407'}</td>
-                      <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 700 }}>{it.qty} {it.unit || 'Meters'}</td>
-                      <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right' }}>₹ {it.unitPrice}</td>
-                      <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 800, color: 'var(--text-primary)' }}>₹ {Number(it.totalAmount || 0).toFixed(2)}</td>
-                    </tr>
-                  ))}
+                  {(viewInvoiceModal.items || []).map((it, idx) => {
+                    const metaList = [];
+                    if (it.jobNo) metaList.push(`Job #${it.jobNo}`);
+                    if (it.lotNo) metaList.push(`Lot #${it.lotNo}`);
+                    if (it.partyChallan) metaList.push(`Party Challan #${it.partyChallan}`);
+                    if (it.ourChallanNo) metaList.push(`Our Challan #${it.ourChallanNo}`);
+
+                    return (
+                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', verticalAlign: 'middle' }}>
+                        <td style={{ padding: '0.45rem 0.6rem', color: 'var(--text-muted)' }}>{idx + 1}</td>
+                        <td style={{ padding: '0.45rem 0.6rem' }}>
+                          {it.imageUrl ? (
+                            <img src={it.imageUrl} alt="Item" style={{ width: 34, height: 34, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--border-light)' }} />
+                          ) : (
+                            <div style={{ width: 34, height: 34, borderRadius: 4, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: 'var(--text-muted)' }}>No Img</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.45rem 0.6rem' }}>
+                          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{it.itemName}</div>
+                          {metaList.length > 0 && (
+                            <div style={{ fontSize: '0.72rem', color: '#a78bfa', marginTop: 2, fontWeight: 600 }}>
+                              {metaList.join(' | ')}
+                            </div>
+                          )}
+                          {it.description && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{it.description}</div>}
+                        </td>
+                        <td style={{ padding: '0.45rem 0.6rem', fontWeight: 700, color: '#a78bfa' }}>{it.hsnCode || '998821'}</td>
+                        <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 700 }}>{it.qty} {it.unit || 'Meters'}</td>
+                        <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right' }}>₹ {it.unitPrice}</td>
+                        <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 800, color: 'var(--text-primary)' }}>₹ {Number(it.totalAmount || 0).toFixed(2)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1625,6 +1708,13 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                     </div>
                   </>
                 )}
+
+                {/* Round Off Details Row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#a78bfa', fontWeight: 600 }}>
+                  <span>Round Off:</span>
+                  <span>{viewInvoiceModal.roundOff != null ? (viewInvoiceModal.roundOff > 0 ? '+' : '') + ' ₹ ' + Number(viewInvoiceModal.roundOff).toFixed(2) : '₹ 0.00'}</span>
+                </div>
+
                 <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.35rem', display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '0.95rem', color: '#a78bfa' }}>
                   <span>Grand Total:</span>
                   <span>{fmtINR(viewInvoiceModal.grandTotal)}</span>

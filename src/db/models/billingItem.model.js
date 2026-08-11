@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const billingItemSchema = new mongoose.Schema(
   {
     itemName: { type: String, required: true },
-    hsnCode: { type: String, default: '5407' }, // Default HSN for woven/printed fabrics
+    hsnCode: { type: String, default: '998821' }, // Default HSN/SAC for Printing Services
     unitPrice: { type: Number, required: true, default: 0 },
     unit: { type: String, default: 'Meters' },
     taxRate: { type: Number, default: 18 }, // GST %

@@ -2,10 +2,17 @@ const mongoose = require('mongoose');
 
 const invoiceItemSchema = new mongoose.Schema({
   itemName: { type: String, required: true },
-  hsnCode: { type: String, default: '' },
+  description: { type: String, default: '' },
+  jobNo: { type: String, default: '' },
+  lotNo: { type: String, default: '' },
+  partyChallan: { type: String, default: '' },
+  ourChallanNo: { type: String, default: '' },
+  imageUrl: { type: String, default: '' },
+  hsnCode: { type: String, default: '998821' },
   qty: { type: Number, required: true, default: 1 },
   unit: { type: String, default: 'Meters' },
   unitPrice: { type: Number, required: true, default: 0 },
+  butterPaper: { type: Boolean, default: false },
   discountPct: { type: Number, default: 0 },
   discountAmt: { type: Number, default: 0 },
   taxRate: { type: Number, default: 18 }, // GST %
@@ -18,6 +25,7 @@ const billingInvoiceSchema = new mongoose.Schema(
     invoiceNo: { type: String, required: true, unique: true },
     invoicePrefix: { type: String, default: 'EDP-INV-' },
     invoiceSeq: { type: Number, required: true },
+    ourChallanNo: { type: String, default: '' },
     invoiceDate: { type: Date, default: Date.now },
     dueDate: { type: Date },
 
@@ -38,6 +46,10 @@ const billingInvoiceSchema = new mongoose.Schema(
     // Line Items
     items: [invoiceItemSchema],
 
+    // Features
+    isButterPaperUsed: { type: Boolean, default: false },
+    enableRoundOff: { type: Boolean, default: true },
+
     // Calculations
     subtotal: { type: Number, required: true, default: 0 },
     discountType: { type: String, enum: ['percentage', 'flat'], default: 'flat' },
@@ -51,7 +63,8 @@ const billingInvoiceSchema = new mongoose.Schema(
     igstAmount: { type: Number, default: 0 },
     totalTax: { type: Number, default: 0 },
 
-    // Financial Totals
+    // Round Off & Financial Totals
+    roundOff: { type: Number, default: 0 },
     grandTotal: { type: Number, required: true, default: 0 },
     paidAmount: { type: Number, default: 0 },
     balanceDue: { type: Number, default: 0 },
