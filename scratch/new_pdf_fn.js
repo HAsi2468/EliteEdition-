@@ -327,13 +327,16 @@ const downloadInvoicePdf = async (req, res) => {
       });
 
       // ── ROUND OFF ROW ────────────────────────────────────────────────────────
-      const roundOff = Number(invoice.roundOff || 0);
+      const computedRoundOff = (invoice.roundOff !== undefined && invoice.roundOff !== null && !isNaN(Number(invoice.roundOff)))
+        ? Number(invoice.roundOff)
+        : Number((Number(invoice.grandTotal || 0) - (totalTaxable + totalTax)).toFixed(2));
       const roH = 16;
       doc.rect(PAD, Y, CW, roH).fill(PRPL).stroke(S200);
-      doc.fillColor(S900).fontSize(8.5).font('Helvetica-Bold')
+      doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
         .text('Round Off', colX[6] - 20, Y + 4, { width: COL[6] + COL[7] + 16, align: 'right' });
-      doc.fillColor(S900).font('Helvetica-Bold').fontSize(9)
-        .text(`${roundOff >= 0 ? '+' : ''}${roundOff.toFixed(2)}`, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+      const roStr = computedRoundOff > 0 ? `+${computedRoundOff.toFixed(2)}` : computedRoundOff.toFixed(2);
+      doc.fillColor(PRP).font('Helvetica-Bold').fontSize(9)
+        .text(roStr, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
       Y += roH;
 
       // ── GRAND TOTAL ───────────────────────────────────────────────────────────
