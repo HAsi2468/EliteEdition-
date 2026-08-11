@@ -169,10 +169,9 @@ const downloadInvoicePdf = async (req, res) => {
       // ── INVOICE TITLE ─────────────────────────────────────────────────────────
       const titleH = 22;
       doc.rect(PAD, Y, CW, titleH).fill(PRPL);
-      doc.fillColor(PRP).fontSize(13).font('Helvetica-Bold').text('INVOICE', PAD + 8, Y + 5);
+      doc.fillColor(PRP).fontSize(14).font('Helvetica-Bold').text('INVOICE', PAD, Y + 4, { width: CW, align: 'center' });
 
       doc.fillColor(S900).fontSize(10).font('Helvetica-Bold')
-        .text(`Invoice No: ${invoice.invoiceNo}`, PAD + 140, Y + 5, { width: 220 })
         .text(`Date: ${formatDate(invoice.invoiceDate)}`, PAD + CW - 180, Y + 5, { width: 175, align: 'right' });
       Y += titleH;
 
@@ -329,15 +328,13 @@ const downloadInvoicePdf = async (req, res) => {
 
       // ── ROUND OFF ROW ────────────────────────────────────────────────────────
       const roundOff = Number(invoice.roundOff || 0);
-      if (Math.abs(roundOff) > 0) {
-        const roH = 16;
-        doc.rect(PAD, Y, CW, roH).fill(PRPL).stroke(S200);
-        doc.fillColor(S900).fontSize(8.5).font('Helvetica-Bold')
-          .text('Round Off', colX[6] - 20, Y + 4, { width: COL[6] + COL[7] + 16, align: 'right' });
-        doc.fillColor(S900).font('Helvetica-Bold').fontSize(9)
-          .text(`${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}`, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
-        Y += roH;
-      }
+      const roH = 16;
+      doc.rect(PAD, Y, CW, roH).fill(PRPL).stroke(S200);
+      doc.fillColor(S900).fontSize(8.5).font('Helvetica-Bold')
+        .text('Round Off', colX[6] - 20, Y + 4, { width: COL[6] + COL[7] + 16, align: 'right' });
+      doc.fillColor(S900).font('Helvetica-Bold').fontSize(9)
+        .text(`${roundOff >= 0 ? '+' : ''}${roundOff.toFixed(2)}`, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+      Y += roH;
 
       // ── GRAND TOTAL ───────────────────────────────────────────────────────────
       const totH = 22;
