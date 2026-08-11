@@ -8,17 +8,20 @@ const getAll = async (req, res) => {
     if (status && status !== 'All') filter.status = status;
     if (category && category !== 'All') filter.category = category;
     if (colors && colors !== 'All') filter.colors = { $regex: colors, $options: 'i' };
+
+    let deptOr = null;
     if (department === 'stitching') {
-      filter.$or = [
+      deptOr = [
         { department: 'stitching' },
         { category: { $regex: 'stitching', $options: 'i' } }
       ];
     } else if (department === 'digital_print') {
       filter.department = { $ne: 'stitching' };
-      filter.category = { $not: { $regex: '^stitching$', $options: 'i' } };
+      filter.category = { $ne: 'Stitching' };
     }
+
     if (search) {
-      filter.$or = [
+      const searchOr = [
         { designName:     { $regex: search, $options: 'i' } },
         { designerName:   { $regex: search, $options: 'i' } },
         { fabricName:     { $regex: search, $options: 'i' } },
@@ -26,6 +29,14 @@ const getAll = async (req, res) => {
         { category:       { $regex: search, $options: 'i' } },
         { colors:         { $regex: search, $options: 'i' } },
       ];
+      if (deptOr) {
+        filter.$and = [{ $or: deptOr }, { $or: searchOr }];
+      } else {
+        filter.$or = searchOr;
+      }
+    } else if (deptOr) {
+      filter.$or = deptOr;
+    }
     }
     const skip = (Number(page) - 1) * Number(limit);
     let sort = { designName: -1 };

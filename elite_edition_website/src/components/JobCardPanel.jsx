@@ -945,12 +945,12 @@ function JobCardForm({ card, onSave, onClose, department }) {
     };
     fetchAllDesigns();
 
-    if (!card) {
+    if (!card || !card._id || !card.jobNo) {
       const fetchNextNo = async () => {
         try {
           const res = await api.getNextJobCardNo();
           if (res && res.nextJobNo) {
-            setForm(f => ({ ...f, jobNo: String(res.nextJobNo) }));
+            setForm(f => ({ ...f, jobNo: f.jobNo || String(res.nextJobNo) }));
           }
         } catch (err) {
           console.error('Failed to fetch next job number:', err);
@@ -1748,7 +1748,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
   };
 
   const openNew  = () => {
-    setFormCard({ ...BLANK, category: department === 'stitching' ? 'Stitching' : '' });
+    setFormCard(null);
     setShowForm(true);
   };
   const openEdit = (c) => { setFormCard(c); setShowForm(true); };

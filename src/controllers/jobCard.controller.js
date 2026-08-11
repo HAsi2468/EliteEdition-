@@ -87,28 +87,39 @@ const getAllJobCards = async (req, res) => {
     const filter = {};
     if (status && status !== 'All') filter.status = status;
     if (category && category !== 'All') filter.category = category;
+
+    let deptOr = null;
     if (department === 'stitching') {
-      filter.$or = [
+      deptOr = [
         { department: 'stitching' },
         { category: { $regex: 'stitching', $options: 'i' } }
       ];
     } else if (department === 'digital_print') {
       filter.department = { $ne: 'stitching' };
-      filter.category = { $not: { $regex: '^stitching$', $options: 'i' } };
+      filter.category = { $ne: 'Stitching' };
     }
+
     if (dateStart || dateEnd) {
       filter.date = {};
       if (dateStart) filter.date.$gte = dateStart;
       if (dateEnd)   filter.date.$lte = dateEnd;
     }
+
     if (search) {
-      filter.$or = [
+      const searchOr = [
         { jobNo:       { $regex: search, $options: 'i' } },
         { party:       { $regex: search, $options: 'i' } },
         { designNo:    { $regex: search, $options: 'i' } },
         { machineName: { $regex: search, $options: 'i' } },
         { billNo:      { $regex: search, $options: 'i' } },
       ];
+      if (deptOr) {
+        filter.$and = [{ $or: deptOr }, { $or: searchOr }];
+      } else {
+        filter.$or = searchOr;
+      }
+    } else if (deptOr) {
+      filter.$or = deptOr;
     }
     const skip  = (Number(page)-1) * Number(limit);
     const total = await db.JobCard.countDocuments(filter);
