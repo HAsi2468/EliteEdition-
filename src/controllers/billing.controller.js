@@ -426,30 +426,16 @@ const downloadInvoicePdf = async (req, res) => {
       // ── TOP ACCENT BAR ────────────────────────────────────────────────────────
       doc.rect(PAD, Y, CW, 4).fill(PRP);
 
-      // ── DUPLICATE DIAGONAL WATERMARK (B&W only) ───────────────────────────────
-      if (bw) {
-        doc.save();
-        doc.fillColor('#e0e0e0').font('Helvetica-Bold').fontSize(60)
-          .opacity(0.18);
-        doc.rotate(-45, { origin: [PW/2, PH/2] });
-        doc.text('DUPLICATE COPY', PW/2 - 200, PH/2 - 30);
-        doc.restore();
-        doc.opacity(1);
-      }
 
       Y += 4;
+
 
       // ── HEADER: LOGO LEFT / COMPANY RIGHT ─────────────────────────────────────
       const hdrH = 52;
       doc.rect(PAD, Y, CW, hdrH).fill(S50);
 
-      if (!bw && fs.existsSync(logoPath)) {
+      if (fs.existsSync(logoPath)) {
         try { doc.image(logoPath, PAD + 6, Y + 6, { width: 80, height: 40, fit: [80, 40] }); } catch(e) {}
-      } else if (bw) {
-        // Company initial box placeholder
-        doc.rect(PAD + 6, Y + 6, 40, 40).fill('#e0e0e0');
-        doc.fillColor('#333').fontSize(14).font('Helvetica-Bold')
-          .text(companyName.charAt(0), PAD + 6, Y + 18, { width: 40, align: 'center' });
       }
 
       doc.fillColor(S900).fontSize(11).font('Helvetica-Bold')
@@ -560,7 +546,7 @@ const downloadInvoicePdf = async (req, res) => {
           doc.font(m.font).fontSize(m.size);
           descH += doc.heightOfString(m.text, { width: COL[2] - 6 }) + 1;
         });
-        const rowH = Math.max(38, descH + 10);
+        const rowH = Math.max(80, descH + 12);
 
         doc.rect(PAD, Y, CW, rowH).fill(rowBg).stroke(S200);
         drawColSeps(Y, rowH);
@@ -568,16 +554,19 @@ const downloadInvoicePdf = async (req, res) => {
         doc.fillColor(S700).fontSize(8.5).font('Helvetica-Bold')
           .text(String(idx + 1), colX[0] + 3, Y + 6, { width: COL[0] - 3 });
 
-        // Image (skip in B&W to keep it clean, show placeholder box)
+        // Image (shown in both color and B&W)
         const imgPath = itemImages[idx];
-        if (!bw && imgPath && fs.existsSync(imgPath)) {
+        if (imgPath && fs.existsSync(imgPath)) {
           try {
-            const imgSz = Math.min(rowH - 4, 30);
-            doc.image(imgPath, colX[1] + 3, Y + 2, { fit: [imgSz, imgSz], align: 'center', valign: 'center' });
-          } catch(e) {}
+            const imgSz = Math.min(rowH - 8, 68);
+            doc.image(imgPath, colX[1] + 3, Y + 4, { fit: [imgSz, imgSz], align: 'center', valign: 'center' });
+          } catch(e) {
+            doc.fillColor(S200).fontSize(6).font('Helvetica')
+              .text('N/A', colX[1], Y + rowH/2 - 4, { width: COL[1], align: 'center' });
+          }
         } else {
           doc.fillColor(S200).fontSize(6).font('Helvetica')
-            .text('IMG', colX[1], Y + rowH/2 - 4, { width: COL[1], align: 'center' });
+            .text('N/A', colX[1], Y + rowH/2 - 4, { width: COL[1], align: 'center' });
         }
 
         let textY = Y + 5;
