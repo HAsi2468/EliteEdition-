@@ -357,7 +357,7 @@ const downloadInvoicePdf = async (req, res) => {
 
     // ── COLUMN WIDTHS ────────────────────────────────────────────────────────────
     // Sr | IMG | Description | HSN | GST% | Qty | Rate | Per | Amount
-    const COL = [18, 36, 196, 54, 34, 60, 60, 30, 71]; // sum=559 ✓
+    const COL = [18, 70, 162, 54, 34, 60, 60, 30, 71]; // sum=559 ✓
     const colX = COL.reduce((acc, w, i) => { acc.push((acc[i-1]||PAD) + (i>0?COL[i-1]:0)); return acc; }, []);
 
     // ── PRE-LOAD IMAGES ──────────────────────────────────────────────────────────
@@ -554,19 +554,19 @@ const downloadInvoicePdf = async (req, res) => {
         doc.fillColor(S700).fontSize(8.5).font('Helvetica-Bold')
           .text(String(idx + 1), colX[0] + 3, Y + 6, { width: COL[0] - 3 });
 
-        // Image (shown in both color and B&W)
+        // Image — top-aligned, constrained to image column width
         const imgPath = itemImages[idx];
+        const imgMaxSz = COL[1] - 4; // max = column width minus padding
         if (imgPath && fs.existsSync(imgPath)) {
           try {
-            const imgSz = Math.min(rowH - 8, 68);
-            doc.image(imgPath, colX[1] + 3, Y + 4, { fit: [imgSz, imgSz], align: 'center', valign: 'center' });
+            doc.image(imgPath, colX[1] + 2, Y + 4, { fit: [imgMaxSz, imgMaxSz] });
           } catch(e) {
             doc.fillColor(S200).fontSize(6).font('Helvetica')
-              .text('N/A', colX[1], Y + rowH/2 - 4, { width: COL[1], align: 'center' });
+              .text('N/A', colX[1], Y + 8, { width: COL[1], align: 'center' });
           }
         } else {
           doc.fillColor(S200).fontSize(6).font('Helvetica')
-            .text('N/A', colX[1], Y + rowH/2 - 4, { width: COL[1], align: 'center' });
+            .text('N/A', colX[1], Y + 8, { width: COL[1], align: 'center' });
         }
 
         let textY = Y + 5;
