@@ -360,9 +360,9 @@ const downloadInvoicePdf = async (req, res) => {
     doc.text('ITEM / DESCRIPTION', ML + 30, tableY + 5, { width: 180 });
     doc.text('HSN', ML + 215, tableY + 5, { width: 45, align: 'center' });
     doc.text('QTY', ML + 265, tableY + 5, { width: 45, align: 'center' });
-    doc.text('RATE (₹)', ML + 315, tableY + 5, { width: 60, align: 'right' });
+    doc.text('RATE (Rs.)', ML + 315, tableY + 5, { width: 60, align: 'right' });
     doc.text('GST %', ML + 380, tableY + 5, { width: 45, align: 'center' });
-    doc.text('AMOUNT (₹)', ML + 430, tableY + 5, { width: contentWidth - 436, align: 'right' });
+    doc.text('AMOUNT (Rs.)', ML + 430, tableY + 5, { width: contentWidth - 436, align: 'right' });
 
     tableY += 20;
 
@@ -394,26 +394,26 @@ const downloadInvoicePdf = async (req, res) => {
     doc.fillColor('#475569').fontSize(8).font('Helvetica');
 
     doc.text('Subtotal:', summaryBoxX + 10, sumY);
-    doc.text(`₹ ${Number(invoice.subtotal || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 200, align: 'right' });
+    doc.text(`Rs. ${Number(invoice.subtotal || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 200, align: 'right' });
     sumY += 14;
 
     if (invoice.discountTotal > 0) {
       doc.text('Discount:', summaryBoxX + 10, sumY);
-      doc.text(`- ₹ ${Number(invoice.discountTotal || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 200, align: 'right' });
+      doc.text(`- Rs. ${Number(invoice.discountTotal || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 200, align: 'right' });
       sumY += 14;
     }
 
     if (invoice.taxType === 'IGST') {
       doc.text('IGST Amount:', summaryBoxX + 10, sumY);
-      doc.text(`₹ ${Number(invoice.igstAmount || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 200, align: 'right' });
+      doc.text(`Rs. ${Number(invoice.igstAmount || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 200, align: 'right' });
       sumY += 14;
     } else {
       doc.text('CGST Amount:', summaryBoxX + 10, sumY);
-      doc.text(`₹ ${Number(invoice.cgstAmount || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 200, align: 'right' });
+      doc.text(`Rs. ${Number(invoice.cgstAmount || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 200, align: 'right' });
       sumY += 14;
 
       doc.text('SGST Amount:', summaryBoxX + 10, sumY);
-      doc.text(`₹ ${Number(invoice.sgstAmount || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 200, align: 'right' });
+      doc.text(`Rs. ${Number(invoice.sgstAmount || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 200, align: 'right' });
       sumY += 14;
     }
 
@@ -422,7 +422,7 @@ const downloadInvoicePdf = async (req, res) => {
 
     doc.fillColor('#6b21a8').fontSize(9.5).font('Helvetica-Bold');
     doc.text('Grand Total:', summaryBoxX + 10, sumY);
-    doc.text(`₹ ${Number(invoice.grandTotal || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 200, align: 'right' });
+    doc.text(`Rs. ${Number(invoice.grandTotal || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 200, align: 'right' });
 
     // Amount in Words
     doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold')
@@ -430,35 +430,32 @@ const downloadInvoicePdf = async (req, res) => {
     doc.fillColor('#475569').fontSize(8).font('Helvetica')
       .text(numToWords(invoice.grandTotal), ML, tableY + 18, { width: contentWidth - 230 });
 
-    // Payment Details / Bank Details Box
-    tableY += 105;
-    doc.fillColor('#0f172a').fontSize(9).font('Helvetica-Bold')
-      .text('PAYMENT & BANK DETAILS:', ML, tableY);
-    tableY += 12;
+    // ── FIXED BOTTOM FOOTER (Payment & Bank Details, Terms, Signature) ────────
+    const footerY = PH - 130;
 
-    let payDetailsStr = `Paid Amount: ₹ ${Number(invoice.paidAmount || 0).toFixed(2)}   |   Balance Due: ₹ ${Number(invoice.balanceDue || 0).toFixed(2)}`;
+    doc.fillColor('#0f172a').fontSize(9).font('Helvetica-Bold')
+      .text('PAYMENT & BANK DETAILS:', ML, footerY);
+
+    let payDetailsStr = `Paid Amount: Rs. ${Number(invoice.paidAmount || 0).toFixed(2)}   |   Balance Due: Rs. ${Number(invoice.balanceDue || 0).toFixed(2)}`;
     if (config.companyBankName || config.companyAccountNo) {
       payDetailsStr += `\nBank: ${config.companyBankName || 'N/A'}  |  A/C No: ${config.companyAccountNo || 'N/A'}  |  IFSC: ${config.companyIfscCode || 'N/A'}`;
     }
 
     doc.fillColor('#475569').fontSize(8).font('Helvetica')
-      .text(payDetailsStr, ML, tableY, { width: contentWidth });
+      .text(payDetailsStr, ML, footerY + 13, { width: contentWidth });
 
     // Terms & Authorized Signatory Footer
-    tableY += 35;
-    doc.moveTo(ML, tableY).lineTo(PW - MR, tableY).strokeColor('#e2e8f0').lineWidth(1).stroke();
-    tableY += 10;
+    const termY = footerY + 45;
+    doc.moveTo(ML, termY).lineTo(PW - MR, termY).strokeColor('#e2e8f0').lineWidth(1).stroke();
 
     doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
-      .text('Terms & Conditions:', ML, tableY)
-      .text(companyTerms, ML, tableY + 10, { width: 300 });
+      .text('Terms & Conditions:', ML, termY + 8)
+      .text(companyTerms, ML, termY + 18, { width: 300 });
 
     doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold')
-      .text(`For ${companyName.toUpperCase()}`, ML + 350, tableY, { width: contentWidth - 350, align: 'right' });
+      .text(`For ${companyName.toUpperCase()}`, ML + 350, termY + 8, { width: contentWidth - 350, align: 'right' });
     doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
-      .text('Authorized Signatory', ML + 350, tableY + 35, { width: contentWidth - 350, align: 'right' });
-    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
-      .text('Authorized Signatory', ML + 350, tableY + 35, { width: contentWidth - 350, align: 'right' });
+      .text('Authorized Signatory', ML + 350, termY + 40, { width: contentWidth - 350, align: 'right' });
 
     doc.end();
   } catch (error) {
