@@ -50,7 +50,7 @@ function numToWords(amount) {
   return 'Rupees ' + convert(num) + ' Only';
 }
 
-export default function EliteBillingDepartment() {
+export default function EliteBillingDepartment({ initialChallanData = null }) {
   const [activeTab, setActiveTab] = useState('invoices'); // 'dashboard', 'invoices', 'create', 'customers', 'items'
   const [stats, setStats] = useState({
     totalInvoices: 0,
@@ -197,6 +197,129 @@ export default function EliteBillingDepartment() {
   useEffect(() => {
     loadData();
   }, [search, statusFilter]);
+
+  // Auto-populate Invoice from Challan with Saved Customer Auto-Selection
+  const loadInvoiceFromChallan = async (ch) => {
+    if (!ch) return;
+    try {
+      const partyStr = (ch.billTo || ch.partyName || 'Client').trim();
+
+      // Look up saved customer matching billTo / partyName
+      let selectedCust = {
+        customerId: '',
+        name: partyStr,
+        businessName: partyStr,
+        phone: ch.phone || '',
+        email: '',
+        gstin: ch.gstin || '',
+        billingAddress: ch.address || '',
+        shippingAddress: ch.address || '',
+        state: 'Gujarat',
+        stateCode: '24'
+      };
+
+      try {
+        const custRes = await api.getBillingCustomers();
+        const custs = (custRes && custRes.data && Array.isArray(custRes.data)) ? custRes.data : Array.isArray(custRes) ? custRes : customers;
+        if (custs && custs.length > 0) {
+          const matched = custs.find(c =>
+            (c.businessName && c.businessName.trim().toLowerCase() === partyStr.toLowerCase()) ||
+            (c.name && c.name.trim().toLowerCase() === partyStr.toLowerCase()) ||
+            (c.businessName && partyStr.toLowerCase().includes(c.businessName.toLowerCase())) ||
+            (c.name && partyStr.toLowerCase().includes(c.name.toLowerCase()))
+          );
+          if (matched) {
+            selectedCust = {
+              customerId: matched._id,
+              name: matched.name || partyStr,
+              businessName: matched.businessName || matched.name || partyStr,
+              phone: matched.phone || '',
+              email: matched.email || '',
+              gstin: matched.gstin || '',
+              billingAddress: matched.billingAddress || '',
+              shippingAddress: matched.shippingAddress || matched.billingAddress || '',
+              state: matched.state || 'Gujarat',
+              stateCode: matched.stateCode || '24'
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Customer lookup error:', e);
+      }
+
+      // Build Items from Challan Data
+      let preparedItems = [];
+
+      if (Array.isArray(ch.items) && ch.items.length > 0) {
+        // Stitching Challan or multi-item Challan
+        preparedItems = ch.items.map(it => {
+          const pcs = parseFloat(it.pcs) || 1;
+          const rate = parseFloat(it.rate) || 0;
+          return {
+            itemName: it.designNo ? `Design ${it.designNo}` : (it.particulars || 'Garment Goods'),
+            description: `Challan ${ch.challanNo} | ${it.particulars || 'Stitching'}`,
+            hsnCode: '6204',
+            qty: pcs,
+            unit: 'Pcs',
+            unitPrice: rate,
+            discountPct: 0,
+            taxRate: 18,
+            totalAmount: parseFloat((pcs * rate).toFixed(2))
+          };
+        });
+      } else {
+        // Digital Print Fabric Challan
+        const mtr = parseFloat(ch.totalMtr || ch.pcs || 1);
+        const pannaStr = String(ch.panna || '').trim();
+        let itemName = 'DIGITAL PRINT JOB WORK 58"';
+        if (pannaStr.includes('36')) itemName = 'DIGITAL PRINT JOB WORK 36"';
+        else if (pannaStr.includes('44')) itemName = 'DIGITAL PRINT JOB WORK 44"';
+        else if (pannaStr.includes('58')) itemName = 'DIGITAL PRINT JOB WORK 58"';
+        else if (pannaStr) itemName = `DIGITAL PRINT JOB WORK ${pannaStr.replace(/['"]/g, '')}"`;
+
+        preparedItems = [{
+          itemName,
+          description: `Fabric: ${ch.fabricName || 'Fabric'} | Delivery Challan EDP-${ch.challanNo}${ch.jobNo ? ` | Job #${ch.jobNo}` : ''}${ch.designNo ? ` | Design: ${ch.designNo}` : ''}`,
+          hsnCode: '5407',
+          qty: mtr,
+          unit: 'Meters',
+          unitPrice: 25,
+          discountPct: 0,
+          taxRate: 18,
+          totalAmount: mtr * 25
+        }];
+      }
+
+      const nextRes = await api.getNextInvoiceNo();
+      const challanTag = String(ch.challanNo || '').startsWith('PCH') ? ch.challanNo : `EDP-${ch.challanNo}`;
+
+      setInvoiceForm({
+        invoiceNo: nextRes.invoiceNo || 'EDP-INV-1001',
+        invoiceSeq: nextRes.nextSeq || 1001,
+        invoiceDate: new Date().toISOString().split('T')[0],
+        dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+        customer: selectedCust,
+        items: preparedItems,
+        discountType: 'flat',
+        discountValue: 0,
+        taxType: selectedCust.stateCode && selectedCust.stateCode !== '24' ? 'IGST' : 'CGST_SGST',
+        paidAmount: 0,
+        notes: `Auto-generated from Delivery Challan #${challanTag}`,
+        terms: 'Payment due within 15 days from invoice date. Subject to Surat jurisdiction.'
+      });
+
+      setEditingInvoiceId(null);
+      setActiveTab('create');
+    } catch (e) {
+      console.error('Error loading invoice from challan:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (initialChallanData) {
+      loadInvoiceFromChallan(initialChallanData);
+    }
+  }, [initialChallanData]);
 
   // Load next invoice number when opening create tab
   const handleOpenCreateTab = async (invoiceToEdit = null) => {

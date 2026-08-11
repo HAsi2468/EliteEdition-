@@ -430,7 +430,7 @@ export default function DesignCatalogue({ department }) {
         sortBy,
         sortOrder,
         page,
-        limit: 12
+        limit: 1000
       });
       if (res && res.data) {
         setDesigns(res.data);
@@ -1044,18 +1044,7 @@ export default function DesignCatalogue({ department }) {
             })}
           </div>
 
-          {/* Pagination */}
-          {pages > 1 && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginTop: '1.5rem' }}>
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-icon">
-                <ChevronLeft size={14} />
-              </button>
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Page {page} of {pages}</span>
-              <button onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages} className="btn-icon">
-                <ChevronRight size={14} />
-              </button>
-            </div>
-          )}
+          {/* Single-Page Infinite Grid */}
         </>
       )}
 

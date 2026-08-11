@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Filter, Download, Eye, Edit, Trash2, Printer, X, Save, RefreshCw, FileText, CheckCircle } from 'lucide-react';
+import { Plus, Search, Filter, Download, Eye, Edit, Trash2, Printer, X, Save, RefreshCw, FileText, CheckCircle, Receipt } from 'lucide-react';
 import { api } from '../services/api';
 
 const MAX_ITEMS = 30;
@@ -12,7 +12,7 @@ const DEFAULT_ITEM = () => ({
   amount: 0
 });
 
-export default function StitchingChallanPanel() {
+export default function StitchingChallanPanel({ onNavigateToBilling }) {
   const [challans, setChallans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -344,6 +344,13 @@ export default function StitchingChallanPanel() {
                           title="Download PDF"
                         >
                           <Download size={13} /> PDF
+                        </button>
+                        <button
+                          onClick={() => onNavigateToBilling && onNavigateToBilling(c)}
+                          style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2))', border: '1px solid rgba(124,58,237,0.4)', color: '#a78bfa', padding: '0.35rem 0.6rem', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          title="Create Tax Invoice / Bill"
+                        >
+                          <Receipt size={13} /> Bill
                         </button>
                         <button
                           onClick={() => openEdit(c)}

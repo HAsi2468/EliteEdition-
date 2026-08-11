@@ -10,7 +10,7 @@ import {
   Check, Plus, ArrowRightLeft, Download, Eye, Receipt
 } from 'lucide-react';
 
-export default function FabricInventoryPanel({ department }) {
+export default function FabricInventoryPanel({ department, onNavigateToBilling }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const currentUser = api.getCurrentUser();
 
@@ -1071,6 +1071,10 @@ export default function FabricInventoryPanel({ department }) {
 
   // Create Bill / Tax Invoice directly from a Delivery Challan
   const handleCreateBillFromChallan = async (ch) => {
+    if (onNavigateToBilling) {
+      onNavigateToBilling(ch);
+      return;
+    }
     try {
       const mtr = parseFloat(ch.totalMtr || 0) || parseFloat(ch.pcs || 0) || 1;
       const party = ch.billTo || ch.partyName || 'Client';

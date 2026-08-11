@@ -1609,6 +1609,14 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
   const [showForm, setShowForm] = useState(false);
   const [previewCard, setPreviewCard] = useState(null);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [billingChallanData, setBillingChallanData] = useState(null);
+  const [overrideSubTab, setOverrideSubTab] = useState(null);
+
+  const effectiveSubTab = overrideSubTab || activeSubTab;
+
+  useEffect(() => {
+    setOverrideSubTab(null);
+  }, [activeSubTab]);
 
   // Sharing to Chat states
   const [showShareModal, setShowShareModal] = useState(false);
@@ -1764,29 +1772,29 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'1.2rem' }}>
-      {department === 'stitching' && (activeSubTab === 'list' || activeSubTab === 'jobcards') ? (
+      {department === 'stitching' && (effectiveSubTab === 'list' || effectiveSubTab === 'jobcards') ? (
         <GarmentJobCardDashboard />
-      ) : department === 'stitching' && (activeSubTab === 'challan' || activeSubTab === 'fabric_challan' || activeSubTab === 'stitching_challan' || activeSubTab === 'fabric') ? (
-        <StitchingChallanPanel />
-      ) : activeSubTab === 'catalogue' ? (
+      ) : department === 'stitching' && (effectiveSubTab === 'challan' || effectiveSubTab === 'fabric_challan' || effectiveSubTab === 'stitching_challan' || effectiveSubTab === 'fabric') ? (
+        <StitchingChallanPanel onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); }} />
+      ) : effectiveSubTab === 'catalogue' ? (
         <DesignCatalogue department={department} />
-      ) : activeSubTab === 'master' ? (
+      ) : effectiveSubTab === 'master' ? (
         <DesignMaster />
-      ) : activeSubTab === 'fabric' ? (
-        <FabricInventoryPanel department={department} />
-      ) : activeSubTab === 'billing' ? (
-        <EliteBillingDepartment />
-      ) : activeSubTab === 'printing_log' || activeSubTab === 'print_entry' ? (
+      ) : effectiveSubTab === 'fabric' ? (
+        <FabricInventoryPanel department={department} onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); }} />
+      ) : effectiveSubTab === 'billing' ? (
+        <EliteBillingDepartment initialChallanData={billingChallanData} />
+      ) : effectiveSubTab === 'printing_log' || effectiveSubTab === 'print_entry' ? (
         <JobPrintingLog />
-      ) : activeSubTab === 'engine' || activeSubTab === 'split_view' ? (
+      ) : effectiveSubTab === 'engine' || effectiveSubTab === 'split_view' ? (
         <EliteDigitalPrintsSplitView />
-      ) : activeSubTab === 'raw_materials' ? (
+      ) : effectiveSubTab === 'raw_materials' ? (
         <RawMaterialsPanel />
-      ) : activeSubTab === 'tracking' ? (
+      ) : effectiveSubTab === 'tracking' ? (
         <JobCardTracking onPreview={setPreviewCard} />
-      ) : activeSubTab === 'settings' ? (
+      ) : effectiveSubTab === 'settings' ? (
         <PrintSettings />
-      ) : activeSubTab === 'jobcards' ? (
+      ) : effectiveSubTab === 'jobcards' ? (
         <ReportsCenter department="elite-print" />
       ) : (
         <>
