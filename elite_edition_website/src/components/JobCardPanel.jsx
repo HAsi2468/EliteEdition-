@@ -1585,7 +1585,7 @@ const rowStyle = {
 };
 
 // ─── MAIN PANEL ──────────────────────────────────────────────────────────────
-export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
+export default function JobCardPanel({ activeSubTab = 'jobcards', department }) {
   const [cards, setCards] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -1741,7 +1741,10 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
     }
   };
 
-  const openNew  = () => { setFormCard(null); setShowForm(true); };
+  const openNew  = () => {
+    setFormCard({ ...BLANK, category: department === 'stitching' ? 'Stitching' : '' });
+    setShowForm(true);
+  };
   const openEdit = (c) => { setFormCard(c); setShowForm(true); };
   const onSaved  = () => {
     setShowForm(false);
@@ -1754,11 +1757,11 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'1.2rem' }}>
       {activeSubTab === 'catalogue' ? (
-        <DesignCatalogue />
+        <DesignCatalogue department={department} />
       ) : activeSubTab === 'master' ? (
         <DesignMaster />
       ) : activeSubTab === 'fabric' ? (
-        <FabricInventoryPanel />
+        <FabricInventoryPanel department={department} />
       ) : activeSubTab === 'billing' ? (
         <EliteBillingDepartment />
       ) : activeSubTab === 'printing_log' || activeSubTab === 'print_entry' ? (
@@ -1784,9 +1787,11 @@ export default function JobCardPanel({ activeSubTab = 'jobcards' }) {
                   <FileText size={22} color="#fff"/>
                 </div>
                 <div>
-                  <h2 style={{ fontSize:'1.2rem', fontWeight:800, color:'var(--text-primary)' }}>Elite Digital Prints</h2>
+                  <h2 style={{ fontSize:'1.2rem', fontWeight:800, color:'var(--text-primary)' }}>
+                    {department === 'stitching' ? 'Elite Stitching' : 'Elite Digital Prints'}
+                  </h2>
                   <p style={{ fontSize:'0.78rem', color:'var(--text-muted)', marginTop:1 }}>
-                    Job Card Management — {total} total cards
+                    {department === 'stitching' ? 'Stitching Job Card Management' : 'Job Card Management'} — {total} total cards
                   </p>
                 </div>
               </div>

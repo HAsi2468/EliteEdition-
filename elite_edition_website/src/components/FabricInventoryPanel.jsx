@@ -10,7 +10,7 @@ import {
   Check, Plus, ArrowRightLeft, Download, Eye, Receipt
 } from 'lucide-react';
 
-export default function FabricInventoryPanel() {
+export default function FabricInventoryPanel({ department }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const currentUser = api.getCurrentUser();
 
@@ -1492,6 +1492,16 @@ export default function FabricInventoryPanel() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+      {department === 'stitching' && (
+        <div className="glass-panel" style={{ padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: '4px solid var(--primary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>Elite Stitching — Fabric Management & Challans</span>
+          </div>
+          <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: '4px', background: 'rgba(56,189,248,0.15)', color: 'var(--primary)', fontWeight: 700 }}>
+            Stitching Department
+          </span>
+        </div>
+      )}
       {/* Header & Navigation */}
       <div className="glass-panel" style={{ display: 'flex', gap: '1rem', padding: '0.75rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', overflowX: 'auto' }}>

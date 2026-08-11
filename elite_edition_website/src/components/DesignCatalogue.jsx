@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { COLOR_NAMES, getColorHex, detectDominantColors } from '../utils/colors';
 import imageCompression from 'browser-image-compression';
+import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 
 // Copy convertDriveUrl helper
 function convertDriveUrl(link) {
@@ -327,7 +328,7 @@ function DesignImageField({ label, name, value, onChange, placeholder }) {
   );
 }
 
-export default function DesignCatalogue() {
+export default function DesignCatalogue({ department }) {
   const [designs, setDesigns] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -339,7 +340,7 @@ export default function DesignCatalogue() {
   const [colorFilter, setColorFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('Active');
   const [sortBy, setSortBy] = useState('designName');
-  const [sortOrder, setSortOrder] = useState('asc');
+  const [sortOrder, setSortOrder] = useState('desc');
   
   // Pagination
   const [page, setPage] = useState(1);
@@ -401,8 +402,14 @@ export default function DesignCatalogue() {
     };
 
     loadAll();
-    const interval = setInterval(loadAll, 30000);
-    return () => clearInterval(interval);
+    const interval = setInterval(loadAll, 10000);
+    const handleDataRefresh = () => loadAll();
+    window.addEventListener('elite-data-refresh', handleDataRefresh);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('elite-data-refresh', handleDataRefresh);
+    };
   }, [search, categoryFilter, colorFilter, statusFilter, page, sortBy, sortOrder]);
 
   const fetchDesigns = async () => {
@@ -442,7 +449,7 @@ export default function DesignCatalogue() {
 
   const openNew = () => {
     setFormDesign(null);
-    setFormVal({ ...BLANK_DESIGN });
+    setFormVal({ ...BLANK_DESIGN, category: department === 'stitching' ? 'Stitching' : '' });
     setFormError('');
     setDetectedColors(null);
     setShowForm(true);
@@ -524,10 +531,13 @@ export default function DesignCatalogue() {
 
       if (formDesign) {
         await api.updateDesign(formDesign._id, sanitizedVal);
+        triggerPushNotification('🎨 Design Updated', `Design "${sanitizedVal.designName}" updated.`, 'info');
       } else {
         await api.createDesign(sanitizedVal);
+        triggerPushNotification('🎨 Design Created', `New design "${sanitizedVal.designName}" added.`, 'success');
       }
       setShowForm(false);
+      triggerGlobalDataRefresh('catalog');
       fetchDesigns();
       fetchCategories();
     } catch (err) {
@@ -541,6 +551,8 @@ export default function DesignCatalogue() {
     if (!window.confirm(`Are you sure you want to delete design "${name}"?`)) return;
     try {
       await api.deleteDesign(id);
+      triggerPushNotification('🗑️ Design Deleted', `Design "${name}" removed.`, 'warning');
+      triggerGlobalDataRefresh('catalog');
       fetchDesigns();
       fetchCategories();
     } catch (err) {
@@ -626,9 +638,11 @@ export default function DesignCatalogue() {
               <Image size={22} color="#fff" />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>Design Catalogue</h2>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                {department === 'stitching' ? 'Elite Stitching — Design Room' : 'Design Catalogue'}
+              </h2>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 1 }}>
-                Store & display master designs — {total} total designs
+                {department === 'stitching' ? 'Store & display master designs for Stitching department' : 'Store & display master designs'} — {total} total designs
               </p>
             </div>
           </div>
