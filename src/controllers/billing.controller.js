@@ -402,84 +402,131 @@ const downloadInvoicePdf = async (req, res) => {
       .text(`State: ${cust.state || 'Gujarat'} (${cust.stateCode || '24'})`, ML + colW + 18, custY + 30, { width: colW - 16, lineBreak: false, ellipsis: true })
       .text(`Address: ${shipAddr}`, ML + colW + 18, custY + 42, { width: colW - 16, lineBreak: false, ellipsis: true });
 
+    // Helper to format job card display string
+    const cleanJobDisplay = (jobStr) => {
+      if (!jobStr) return '';
+      const str = String(jobStr);
+      const matches = str.match(/\d+/g);
+      if (matches && matches.length > 0) {
+        const unique = [...new Set(matches)];
+        if (unique.length === 1) return `Job Card: ${unique[0]}`;
+        return `Job Cards: ${unique.join(', ')}`;
+      }
+      return str.replace(/JOB NO\.-?\s*/gi, '').replace(/Job\s*#?\s*/gi, '').trim();
+    };
+
     // Items Table Header
     let tableY = 194;
-    doc.rect(ML, tableY, contentWidth, 20).fill('#6b21a8');
+    doc.rect(ML, tableY, contentWidth, 22).fill('#4c1d95');
 
-    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
-    doc.text('#', ML + 4, tableY + 5, { width: 16 });
-    doc.text('IMAGE', ML + 22, tableY + 5, { width: 34, align: 'center' });
-    doc.text('ITEM DESCRIPTION & DETAILS', ML + 60, tableY + 5, { width: 200 });
-    doc.text('HSN/SAC', ML + 265, tableY + 5, { width: 50, align: 'center' });
-    doc.text('QTY / MTRS', ML + 320, tableY + 5, { width: 55, align: 'center' });
-    doc.text('RATE (Rs.)', ML + 380, tableY + 5, { width: 65, align: 'right' });
-    doc.text('AMOUNT (Rs.)', ML + 450, tableY + 5, { width: contentWidth - 455, align: 'right' });
+    doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold');
+    doc.text('#', ML + 4, tableY + 6, { width: 16 });
+    doc.text('IMAGE', ML + 22, tableY + 6, { width: 36, align: 'center' });
+    doc.text('ITEM DESCRIPTION & DETAILS', ML + 62, tableY + 6, { width: 198 });
+    doc.text('HSN/SAC', ML + 265, tableY + 6, { width: 50, align: 'center' });
+    doc.text('QTY / MTRS', ML + 320, tableY + 6, { width: 60, align: 'center' });
+    doc.text('RATE (Rs.)', ML + 385, tableY + 6, { width: 60, align: 'right' });
+    doc.text('AMOUNT (Rs.)', ML + 450, tableY + 6, { width: contentWidth - 455, align: 'right' });
 
-    tableY += 20;
+    tableY += 22;
 
-    // Items Rows (Render Image Thumbnail, Job No, Lot No, Party Challan, Our Challan)
+    // Items Rows (Render Image Thumbnail, Clean Job Cards, Lot No, Party Challan, Our Challan)
     const items = invoice.items || [];
     for (let idx = 0; idx < items.length; idx++) {
       const item = items[idx];
       const rowBg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
-      
-      const metaParts = [];
-      if (item.jobNo) metaParts.push(`Job #${item.jobNo}`);
-      if (item.lotNo) metaParts.push(`Lot #${item.lotNo}`);
-      if (item.partyChallan) metaParts.push(`Party Challan #${item.partyChallan}`);
-      if (item.ourChallanNo) metaParts.push(`Our Challan #${item.ourChallanNo}`);
-      if (item.description) metaParts.push(item.description);
 
-      // Determine image path for item if present
+      // Build clean multi-line metadata structure
+      const metaLines = [];
+      const formattedJobs = cleanJobDisplay(item.jobNo);
+      if (formattedJobs) metaLines.push(formattedJobs);
+
+      const secondaryBadges = [];
+      if (item.lotNo) secondaryBadges.push(`Lot #: ${item.lotNo}`);
+      if (item.partyChallan) secondaryBadges.push(`Party Challan #: ${item.partyChallan}`);
+      if (item.ourChallanNo) secondaryBadges.push(`Our Challan #: ${item.ourChallanNo}`);
+
+      if (secondaryBadges.length > 0) metaLines.push(secondaryBadges.join('   •   '));
+      if (item.description) metaLines.push(item.description);
+
+      // Multi-Job Image Lookup
       let resolvedImgPath = resolveImagePath(item.imageUrl);
       if (!resolvedImgPath && item.jobNo) {
         try {
-          const jobDoc = await JobCard.findOne({ jobNo: item.jobNo }).lean();
-          if (jobDoc && (jobDoc.imageUrl1 || jobDoc.imageUrl2)) {
-            resolvedImgPath = resolveImagePath(jobDoc.imageUrl1 || jobDoc.imageUrl2);
+          const nums = String(item.jobNo).match(/\d+/g) || [];
+          for (const num of nums) {
+            const jobDoc = await JobCard.findOne({
+              $or: [
+                { jobNo: num },
+                { jobNo: `JOB NO.- ${num}` },
+                { jobNo: `JOB NO.-${num}` },
+                { jobNo: { $regex: num, $options: 'i' } }
+              ]
+            }).lean();
+
+            if (jobDoc) {
+              const imgUrl = jobDoc.imageUrl1 || jobDoc.imageUrl2 || jobDoc.proofing?.artworkUrl;
+              if (imgUrl) {
+                resolvedImgPath = resolveImagePath(imgUrl);
+                if (resolvedImgPath) break;
+              }
+            }
           }
         } catch (e) {}
       }
 
-      const rowHeight = (metaParts.length > 0 || resolvedImgPath) ? 36 : 24;
+      // Calculate dynamic row height
+      const totalTextLines = 1 + metaLines.length; // Item title + metadata lines
+      const rowHeight = Math.max(42, 14 + (totalTextLines * 13));
 
       doc.rect(ML, tableY, contentWidth, rowHeight).fill(rowBg).stroke('#e2e8f0');
 
-      doc.fillColor('#334155').fontSize(8).font('Helvetica');
-      doc.text(String(idx + 1), ML + 4, tableY + (rowHeight === 36 ? 12 : 6), { width: 16 });
+      // Row Index #
+      doc.fillColor('#334155').fontSize(9).font('Helvetica-Bold');
+      doc.text(String(idx + 1), ML + 4, tableY + 8, { width: 16 });
 
-      // Image Column
+      // Thumbnail Image
       if (resolvedImgPath && fs.existsSync(resolvedImgPath)) {
         try {
-          doc.image(resolvedImgPath, ML + 25, tableY + 4, {
-            fit: [28, 28],
+          const imgBoxSize = Math.min(32, rowHeight - 8);
+          doc.image(resolvedImgPath, ML + 24, tableY + 4, {
+            fit: [imgBoxSize, imgBoxSize],
             align: 'center',
             valign: 'center'
           });
         } catch (e) {
-          doc.fillColor('#94a3b8').fontSize(6.5).font('Helvetica')
-            .text('N/A', ML + 22, tableY + 12, { width: 34, align: 'center' });
+          doc.fillColor('#94a3b8').fontSize(7).font('Helvetica')
+            .text('N/A', ML + 22, tableY + 12, { width: 36, align: 'center' });
         }
       } else {
-        doc.fillColor('#cbd5e1').fontSize(6.5).font('Helvetica')
-          .text('—', ML + 22, tableY + (rowHeight === 36 ? 12 : 6), { width: 34, align: 'center' });
+        doc.fillColor('#cbd5e1').fontSize(7).font('Helvetica')
+          .text('—', ML + 22, tableY + (rowHeight / 2 - 4), { width: 36, align: 'center' });
       }
 
-      // Item Name
-      doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(8)
-        .text(item.itemName || '—', ML + 60, tableY + 4, { width: 200, lineBreak: false, ellipsis: true });
+      // Item Title (Bold 9pt)
+      let textY = tableY + 6;
+      doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(9)
+        .text(item.itemName || '—', ML + 62, textY, { width: 198, lineBreak: false, ellipsis: true });
 
-      // Meta Sub-text
-      if (metaParts.length > 0) {
-        doc.font('Helvetica').fontSize(7.2).fillColor('#64748b')
-          .text(metaParts.join(' | '), ML + 60, tableY + 18, { width: 200, lineBreak: false, ellipsis: true });
-      }
+      textY += 13;
 
-      doc.fillColor('#334155').fontSize(8).font('Helvetica');
-      doc.text(item.hsnCode || '998821', ML + 265, tableY + (rowHeight === 36 ? 12 : 6), { width: 50, align: 'center' });
-      doc.text(`${item.qty} ${item.unit || ''}`, ML + 320, tableY + (rowHeight === 36 ? 12 : 6), { width: 55, align: 'center' });
-      doc.text(Number(item.unitPrice || 0).toFixed(2), ML + 380, tableY + (rowHeight === 36 ? 12 : 6), { width: 65, align: 'right' });
-      doc.text(Number(item.totalAmount || 0).toFixed(2), ML + 450, tableY + (rowHeight === 36 ? 12 : 6), { width: contentWidth - 455, align: 'right' });
+      // Meta Lines (8.2pt, structured)
+      metaLines.forEach((mLine, mIdx) => {
+        const isJobLine = mIdx === 0 && formattedJobs;
+        doc.font(isJobLine ? 'Helvetica-Bold' : 'Helvetica')
+          .fontSize(8.2)
+          .fillColor(isJobLine ? '#6b21a8' : '#475569')
+          .text(mLine, ML + 62, textY, { width: 198, lineBreak: false, ellipsis: true });
+        textY += 12;
+      });
+
+      // HSN, Qty, Rate, Amount (Centered / Vertically aligned)
+      const alignY = tableY + 6;
+      doc.fillColor('#1e293b').fontSize(9).font('Helvetica');
+      doc.text(item.hsnCode || '998821', ML + 265, alignY, { width: 50, align: 'center' });
+      doc.font('Helvetica-Bold').text(`${item.qty} ${item.unit || ''}`, ML + 320, alignY, { width: 60, align: 'center' });
+      doc.font('Helvetica').text(Number(item.unitPrice || 0).toFixed(2), ML + 385, alignY, { width: 60, align: 'right' });
+      doc.font('Helvetica-Bold').fillColor('#0f172a').text(Number(item.totalAmount || 0).toFixed(2), ML + 450, alignY, { width: contentWidth - 455, align: 'right' });
 
       tableY += rowHeight;
     }

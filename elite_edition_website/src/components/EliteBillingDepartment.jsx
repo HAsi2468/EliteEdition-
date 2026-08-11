@@ -50,6 +50,19 @@ function numToWords(amount) {
   return 'Rupees ' + convert(num) + ' Only';
 }
 
+// Helper to format job card display string cleanly
+function formatJobDisplay(jobStr) {
+  if (!jobStr) return '';
+  const str = String(jobStr);
+  const matches = str.match(/\d+/g);
+  if (matches && matches.length > 0) {
+    const unique = [...new Set(matches)];
+    if (unique.length === 1) return `Job Card: ${unique[0]}`;
+    return `Job Cards: ${unique.join(', ')}`;
+  }
+  return str.replace(/JOB NO\.-?\s*/gi, '').replace(/Job\s*#?\s*/gi, '').trim();
+}
+
 export default function EliteBillingDepartment({ initialChallanData = null }) {
   const [activeTab, setActiveTab] = useState('invoices'); // 'dashboard', 'invoices', 'create', 'customers', 'items'
   const [stats, setStats] = useState({
@@ -1636,35 +1649,44 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                 </thead>
                 <tbody>
                   {(viewInvoiceModal.items || []).map((it, idx) => {
-                    const metaList = [];
-                    if (it.jobNo) metaList.push(`Job #${it.jobNo}`);
-                    if (it.lotNo) metaList.push(`Lot #${it.lotNo}`);
-                    if (it.partyChallan) metaList.push(`Party Challan #${it.partyChallan}`);
-                    if (it.ourChallanNo) metaList.push(`Our Challan #${it.ourChallanNo}`);
+                    const jobDisplay = formatJobDisplay(it.jobNo);
+                    const secondaryBadges = [];
+                    if (it.lotNo) secondaryBadges.push(`Lot #: ${it.lotNo}`);
+                    if (it.partyChallan) secondaryBadges.push(`Party Challan #: ${it.partyChallan}`);
+                    if (it.ourChallanNo) secondaryBadges.push(`Our Challan #: ${it.ourChallanNo}`);
 
                     return (
-                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', verticalAlign: 'middle' }}>
-                        <td style={{ padding: '0.45rem 0.6rem', color: 'var(--text-muted)' }}>{idx + 1}</td>
-                        <td style={{ padding: '0.45rem 0.6rem' }}>
+                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', verticalAlign: 'top' }}>
+                        <td style={{ padding: '0.6rem', color: 'var(--text-muted)' }}>{idx + 1}</td>
+                        <td style={{ padding: '0.6rem' }}>
                           {it.imageUrl ? (
-                            <img src={it.imageUrl} alt="Item" style={{ width: 34, height: 34, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--border-light)' }} />
+                            <img src={it.imageUrl} alt="Item" style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--border-light)' }} />
                           ) : (
-                            <div style={{ width: 34, height: 34, borderRadius: 4, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: 'var(--text-muted)' }}>No Img</div>
+                            <div style={{ width: 38, height: 38, borderRadius: 6, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: 'var(--text-muted)' }}>No Img</div>
                           )}
                         </td>
-                        <td style={{ padding: '0.45rem 0.6rem' }}>
-                          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{it.itemName}</div>
-                          {metaList.length > 0 && (
-                            <div style={{ fontSize: '0.72rem', color: '#a78bfa', marginTop: 2, fontWeight: 600 }}>
-                              {metaList.join(' | ')}
+                        <td style={{ padding: '0.6rem' }}>
+                          <div style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-primary)' }}>{it.itemName}</div>
+                          {jobDisplay && (
+                            <div style={{ fontSize: '0.75rem', color: '#a78bfa', fontWeight: 700, marginTop: 3 }}>
+                              📋 {jobDisplay}
                             </div>
                           )}
-                          {it.description && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{it.description}</div>}
+                          {secondaryBadges.length > 0 && (
+                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: 4 }}>
+                              {secondaryBadges.map((b, bIdx) => (
+                                <span key={bIdx} style={{ fontSize: '0.7rem', padding: '2px 7px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', border: '1px solid var(--border-light)' }}>
+                                  {b}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {it.description && <div style={{ fontSize: '0.73rem', color: '#94a3b8', marginTop: 4 }}>{it.description}</div>}
                         </td>
-                        <td style={{ padding: '0.45rem 0.6rem', fontWeight: 700, color: '#a78bfa' }}>{it.hsnCode || '998821'}</td>
-                        <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 700 }}>{it.qty} {it.unit || 'Meters'}</td>
-                        <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right' }}>₹ {it.unitPrice}</td>
-                        <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 800, color: 'var(--text-primary)' }}>₹ {Number(it.totalAmount || 0).toFixed(2)}</td>
+                        <td style={{ padding: '0.6rem', fontWeight: 700, color: '#a78bfa' }}>{it.hsnCode || '998821'}</td>
+                        <td style={{ padding: '0.6rem', textAlign: 'right', fontWeight: 700 }}>{it.qty} {it.unit || 'Meters'}</td>
+                        <td style={{ padding: '0.6rem', textAlign: 'right' }}>₹ {it.unitPrice}</td>
+                        <td style={{ padding: '0.6rem', textAlign: 'right', fontWeight: 800, color: 'var(--text-primary)' }}>₹ {Number(it.totalAmount || 0).toFixed(2)}</td>
                       </tr>
                     );
                   })}
