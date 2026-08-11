@@ -1086,7 +1086,7 @@ export default function DesignCatalogue({ department }) {
                 </div>
               )}
 
-              <FormField label="Design Name (e.g. ED1, ED2, PKD-1)" name="designName" value={formVal.designName} onChange={handleFormChange} required placeholder="PKD-1" />
+              <FormField label="Design Name (e.g. ED1, ED2, PKD-1001)" name="designName" value={formVal.designName} onChange={handleFormChange} required placeholder="PKD-1001" />
               <FormField label="Party SKU ID" name="partySkuId" value={formVal.partySkuId} onChange={handleFormChange} placeholder="e.g. SKU-9042" />
               {(() => {
                 const nameExists = allDesignsList.some(d => 

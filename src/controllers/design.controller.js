@@ -100,7 +100,7 @@ const remove = async (req, res) => {
   }
 };
 
-// Get next sequential design number (PKD-1, PKD-2 for stitching, ED-1, ED-2 for digital_print)
+// Get next sequential design number (PKD-1001, PKD-1002 for stitching, ED-1, ED-2 for digital_print)
 const getNextDesignNumber = async (req, res) => {
   try {
     const { department = 'stitching' } = req.query;
@@ -112,7 +112,7 @@ const getNextDesignNumber = async (req, res) => {
 
     const designs = await db.Design.find(filter, { designName: 1 }).lean();
 
-    let maxNo = 0;
+    let maxNo = department === 'stitching' ? 1000 : 0;
     designs.forEach(d => {
       if (!d.designName) return;
       const match = String(d.designName).match(new RegExp(`^${prefix}-(\\d+)`, 'i'));
