@@ -302,18 +302,18 @@ const downloadInvoicePdf = async (req, res) => {
           textY += doc.heightOfString(m.text, { width: COL[2] - 6 }) + 1;
         });
 
-        const midY    = Y + rowH / 2 - 5;
+        const numY    = Y + 5;
         const taxRate = item.taxRate || 18;
         doc.fillColor(S700).font('Helvetica').fontSize(8)
-          .text(item.hsnCode || '998821', colX[3] + 2, midY, { width: COL[3] - 4, align: 'center' })
-          .text(`${taxRate}%`,            colX[4] + 2, midY, { width: COL[4] - 4, align: 'center' });
+          .text(item.hsnCode || '998821', colX[3] + 2, numY, { width: COL[3] - 4, align: 'center' })
+          .text(`${taxRate}%`,            colX[4] + 2, numY, { width: COL[4] - 4, align: 'center' });
         doc.fillColor(S900).font('Helvetica-Bold').fontSize(8.5)
-          .text(`${Number(item.qty||0).toFixed(2)} ${item.unit||'Mtr'}`, colX[5]+2, midY, { width: COL[5]-4, align:'center' })
-          .text(Number(item.unitPrice||0).toFixed(2), colX[6]+2, midY, { width: COL[6]-4, align:'right' });
+          .text(`${Number(item.qty||0).toFixed(2)} ${item.unit||'Mtr'}`, colX[5]+2, numY, { width: COL[5]-4, align:'center' })
+          .text(Number(item.unitPrice||0).toFixed(2), colX[6]+2, numY, { width: COL[6]-4, align:'right' });
         doc.fillColor(S500).font('Helvetica').fontSize(7.5)
-          .text(item.unit || 'Mtr', colX[7]+2, midY, { width: COL[7]-4, align:'center' });
+          .text(item.unit || 'Mtr', colX[7]+2, numY, { width: COL[7]-4, align:'center' });
         doc.fillColor(S900).font('Helvetica-Bold').fontSize(8.5)
-          .text(Number(item.totalAmount||0).toFixed(2), colX[8]+2, midY, { width: COL[8]-4, align:'right' });
+          .text(Number(item.totalAmount||0).toFixed(2), colX[8]+2, numY, { width: COL[8]-4, align:'right' });
         Y += rowH;
       });
 
