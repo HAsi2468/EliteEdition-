@@ -23,6 +23,8 @@ export default function StitchingSettings() {
   // Form input states
   const [newCategory, setNewCategory] = useState('');
   const [newLabel, setNewLabel] = useState('');
+  const [newFabric, setNewFabric] = useState('');
+  const [newSize, setNewSize] = useState('');
   const [newFinishingOption, setNewFinishingOption] = useState('');
   const [newParty, setNewParty] = useState('');
   const [newVendor, setNewVendor] = useState('');
@@ -188,7 +190,7 @@ export default function StitchingSettings() {
 
       {/* Section 1: Garment & Product Master Settings */}
       <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
-        {renderSectionHeader('👗 Garment & Design Master Dropdowns', 'garment', '#a78bfa')}
+        {renderSectionHeader('👗 Garment, Fabric & Size Master Dropdowns', 'garment', '#a78bfa')}
         {expandedSections.garment && (
           <div style={{ padding: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
             {renderSection(
@@ -206,6 +208,22 @@ export default function StitchingSettings() {
               setNewLabel,
               config?.labels,
               <Tag size={16} color="#38bdf8" />
+            )}
+            {renderSection(
+              'Fabrics (Fabric Types)',
+              'fabrics',
+              newFabric,
+              setNewFabric,
+              config?.fabrics,
+              <Tag size={16} color="#ec4899" />
+            )}
+            {renderSection(
+              'Stitching Sizes (Garment Sizes)',
+              'sizes',
+              newSize,
+              setNewSize,
+              config?.sizes,
+              <Layers size={16} color="#10b981" />
             )}
           </div>
         )}

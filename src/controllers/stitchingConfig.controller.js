@@ -32,6 +32,14 @@ const getStitchingConfigDocument = async () => {
       config.finishingOptions = ['Standard Finishing', 'Iron & Pack', 'Overlock', 'Embroidery Finish', 'Premium Box'];
       changed = true;
     }
+    if (!config.fabrics || config.fabrics.length === 0) {
+      config.fabrics = ['Cotton', 'Silk', 'Georgette', 'Chiffon', 'Organza', 'Velvet', 'Rayon', 'Crepe'];
+      changed = true;
+    }
+    if (!config.sizes || config.sizes.length === 0) {
+      config.sizes = ['XS (34)', 'S (36)', 'M (38)', 'L (40)', 'XL (42)', '2XL (44)', '3XL (46)', '4XL (48)', '5XL (50)', '6XL (52)', 'FREE SIZE', 'UNSTITCHED'];
+      changed = true;
+    }
     if (!config.parties || config.parties.length === 0) {
       config.parties = ['Wholesale Party', 'Direct Client', 'Retailer'];
       changed = true;
@@ -71,7 +79,7 @@ const updateStitchingConfig = async (req, res) => {
     }
 
     const validFields = [
-      'categories', 'labels', 'finishingOptions', 'parties', 'vendors', 'billToOptions',
+      'categories', 'labels', 'finishingOptions', 'fabrics', 'sizes', 'parties', 'vendors', 'billToOptions',
       'shipToOptions', 'deliveryOptions', 'startingJobNo', 'startingChallanNo', 'notes'
     ];
 

@@ -19,6 +19,14 @@ const stitchingConfigSchema = new mongoose.Schema(
       type: [String],
       default: ['Standard Finishing', 'Iron & Pack', 'Overlock', 'Embroidery Finish', 'Premium Box'],
     },
+    fabrics: {
+      type: [String],
+      default: ['Cotton', 'Silk', 'Georgette', 'Chiffon', 'Organza', 'Velvet', 'Rayon', 'Crepe'],
+    },
+    sizes: {
+      type: [String],
+      default: ['XS (34)', 'S (36)', 'M (38)', 'L (40)', 'XL (42)', '2XL (44)', '3XL (46)', '4XL (48)', '5XL (50)', '6XL (52)', 'FREE SIZE', 'UNSTITCHED'],
+    },
     parties: {
       type: [String],
       default: ['Wholesale Party', 'Direct Client', 'Retailer'],

@@ -941,11 +941,6 @@ export default function DesignCatalogue({ department }) {
                       <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>
                         {d.designName}
                       </span>
-                      {d.designerName && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                          By: {d.designerName}
-                        </span>
-                      )}
                     </div>
 
                     {/* STITCHING ONLY: Party SKU ID badge */}
@@ -1109,13 +1104,17 @@ export default function DesignCatalogue({ department }) {
                 return null;
               })()}
 
-              <FormField label="Designer Name" name="designerName" value={formVal.designerName} onChange={handleFormChange} options={['', ...(printConfig.designers || [])]} placeholder="e.g. Rahul" />
-
               {department !== 'stitching' && (
                 <FormField label="Colour Matching Name" name="colourMatching" value={formVal.colourMatching} onChange={handleFormChange} options={['', ...(printConfig.designers || [])]} placeholder="e.g. Green Matching" />
               )}
 
-              <FormField label="Fabric Name" name="fabricName" value={formVal.fabricName} onChange={handleFormChange} options={['', ...(printConfig.fabrics || [])]} />
+              <FormField 
+                label="Fabric Name" 
+                name="fabricName" 
+                value={formVal.fabricName} 
+                onChange={handleFormChange} 
+                options={department === 'stitching' ? ['', ...(printConfig.fabrics?.length ? printConfig.fabrics : ['Cotton', 'Silk', 'Georgette', 'Chiffon', 'Organza', 'Velvet', 'Rayon', 'Crepe'])] : ['', ...(printConfig.fabrics || [])]} 
+              />
 
               {department !== 'stitching' && (
                 <FormField label="Paper Type" name="paperType" value={formVal.paperType} onChange={handleFormChange} options={['', ...(printConfig.paperTypes || [])]} />
@@ -1129,55 +1128,66 @@ export default function DesignCatalogue({ department }) {
                 options={department === 'stitching' ? ['', ...(printConfig.categories?.length ? printConfig.categories : ['SUIT', 'KURTI', 'DUPATTA', 'TOP', 'BOTTOM', 'LEHENGA', 'STITCHING SET', 'KIDS', 'ETHNIC', 'OTHER'])] : ['', ...(printConfig.categories || [])]}
               />
 
-              {/* STITCHING ONLY: Size-Wise Sales Rates */}
+              {/* STITCHING ONLY: Dynamic Size-Wise Sales Rates (Dropdown & Grid from Stitching Settings) */}
               {department === 'stitching' && (
                 <>
                   <div style={{
                     fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
                     color: 'var(--primary)', marginBottom: '0.4rem', marginTop: '0.8rem', width: '100%',
                     borderBottom: '1px solid var(--border-light)', paddingBottom: '0.2rem',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem'
                   }}>
                     <span>💰 Size-Wise Sales Rates (₹) — Taken from Stitching Sizes</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const rate = prompt('Enter Sales Rate (₹) to apply across ALL sizes:');
-                        if (rate !== null && rate !== '') handleApplyAllSalesRates(rate);
-                      }}
-                      style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', fontSize: '0.68rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '4px', cursor: 'pointer' }}
-                    >
-                      ⚡ Set All Sizes Rate
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <select
+                        onChange={(e) => {
+                          if (!e.target.value) return;
+                          const sizeKey = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                          const currentVal = (formVal.sizeSalesRates || {})[sizeKey] || '';
+                          const rate = prompt(`Enter Sales Rate (₹) for ${e.target.value}:`, currentVal);
+                          if (rate !== null && rate !== '') handleSizeSalesRateChange(sizeKey, rate);
+                          e.target.value = '';
+                        }}
+                        style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa', fontSize: '0.7rem', fontWeight: 700, padding: '0.25rem 0.5rem', borderRadius: '4px', cursor: 'pointer', outline: 'none' }}
+                      >
+                        <option value="" style={{ background: '#1e293b', color: '#fff' }}>+ Select Size to Set Rate...</option>
+                        {(printConfig.sizes?.length ? printConfig.sizes : ['XS (34)', 'S (36)', 'M (38)', 'L (40)', 'XL (42)', '2XL (44)', '3XL (46)', '4XL (48)', '5XL (50)', '6XL (52)', 'FREE SIZE', 'UNSTITCHED']).map(sz => (
+                          <option key={sz} value={sz} style={{ background: '#1e293b', color: '#fff' }}>{sz}</option>
+                        ))}
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const rate = prompt('Enter Sales Rate (₹) to apply across ALL sizes:');
+                          if (rate !== null && rate !== '') handleApplyAllSalesRates(rate);
+                        }}
+                        style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', fontSize: '0.68rem', fontWeight: 700, padding: '0.25rem 0.5rem', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        ⚡ Set All Sizes Rate
+                      </button>
+                    </div>
                   </div>
 
-                  <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '0.6rem' }}>
-                    {[
-                      { key: 'xs_34', label: 'XS-34' },
-                      { key: 's_36',  label: 'S-36' },
-                      { key: 'm_38',  label: 'M-38' },
-                      { key: 'l_40',  label: 'L-40' },
-                      { key: 'xl_42', label: 'XL-42' },
-                      { key: 'xl2_44',label: '2XL-44' },
-                      { key: 'xl3_46',label: '3XL-46' },
-                      { key: 'xl4_48',label: '4XL-48' },
-                      { key: 'xl5_50',label: '5XL-50' },
-                      { key: 'xl6_52',label: '6XL-52' }
-                    ].map(s => (
-                      <div key={s.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-                        <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}>
-                          {s.label}
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={(formVal.sizeSalesRates || {})[s.key] || ''}
-                          onChange={e => handleSizeSalesRateChange(s.key, e.target.value)}
-                          placeholder="0.00"
-                          style={{ width: '100%', textAlign: 'center', fontWeight: 700, fontSize: '0.82rem', padding: '0.3rem 0.2rem', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '4px', color: 'var(--text-primary)' }}
-                        />
-                      </div>
-                    ))}
+                  <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(105px, 1fr))', gap: '0.6rem' }}>
+                    {(printConfig.sizes?.length ? printConfig.sizes : ['XS (34)', 'S (36)', 'M (38)', 'L (40)', 'XL (42)', '2XL (44)', '3XL (46)', '4XL (48)', '5XL (50)', '6XL (52)', 'FREE SIZE', 'UNSTITCHED']).map(sz => {
+                      const key = sz.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                      return (
+                        <div key={sz} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+                          <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={sz}>
+                            {sz}
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={(formVal.sizeSalesRates || {})[key] || ''}
+                            onChange={e => handleSizeSalesRateChange(key, e.target.value)}
+                            placeholder="0.00"
+                            style={{ width: '100%', textAlign: 'center', fontWeight: 700, fontSize: '0.82rem', padding: '0.3rem 0.2rem', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 </>
               )}
