@@ -40,7 +40,8 @@ import {
   FileText,
   Menu,
   X,
-  Bell
+  Bell,
+  Scissors
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
@@ -226,9 +227,11 @@ export default function App() {
   // Department permission helpers
   const EE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
   const EDP_PERMISSIONS = ['jobcards', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials'];
+  const STITCHING_PERMISSIONS = ['jobcards_list', 'jobcards_catalogue', 'jobcards_fabric'];
 
   const hasEliteEditionAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => EE_PERMISSIONS.includes(p)));
   const hasDigitalPrintAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => EDP_PERMISSIONS.includes(p) || p.startsWith('jobcards')));
+  const hasStitchingAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => STITCHING_PERMISSIONS.includes(p)));
   const hasWorkspaceAccess = !currentUser || currentUser.role === 'admin' || !currentUser.permissions || currentUser.permissions.length === 0 || currentUser.permissions.includes('workspace');
 
   const getFirstJobCardsTab = () => {
@@ -246,6 +249,7 @@ export default function App() {
 
   // Sync activeDepartment when activeTab changes
   useEffect(() => {
+    if (activeDepartment === 'stitching') return;
     if (activeTab.startsWith('jobcards')) {
       setActiveDepartment('digital_print');
     } else if (EE_PERMISSIONS.includes(activeTab)) {
@@ -284,11 +288,13 @@ export default function App() {
 
   const handleSwitchDepartment = (dept) => {
     setActiveDepartment(dept);
-    const deptName = dept === 'digital_print' ? 'Elite Digital Print' : 'Elite Edition';
+    const deptName = dept === 'digital_print' ? 'Elite Digital Print' : dept === 'stitching' ? 'Elite Stitching' : 'Elite Edition';
     triggerPushNotification('Switched Department 🔄', `Now viewing ${deptName} modules.`, 'info');
     if (dept === 'digital_print') {
       const firstTab = getFirstJobCardsTab();
       setActiveTab(firstTab);
+    } else if (dept === 'stitching') {
+      setActiveTab('jobcards_list');
     } else {
       const firstTab = getFirstEETab();
       setActiveTab(firstTab);
@@ -643,14 +649,14 @@ export default function App() {
           </button>
 
           <div style={styles.logoBadge}>
-            {activeTab === 'workspace' ? 'WS' : activeDepartment === 'digital_print' ? 'EDP' : 'EE'}
+            {activeTab === 'workspace' ? 'WS' : activeDepartment === 'digital_print' ? 'EDP' : activeDepartment === 'stitching' ? 'ES' : 'EE'}
           </div>
           <div>
             <h1 style={styles.brandTitle}>
-              {activeTab === 'workspace' ? 'Workspace & Operations' : activeDepartment === 'digital_print' ? 'Elite Digital Print' : 'Elite Edition'}
+              {activeTab === 'workspace' ? 'Workspace & Operations' : activeDepartment === 'digital_print' ? 'Elite Digital Print' : activeDepartment === 'stitching' ? 'Elite Stitching' : 'Elite Edition'}
             </h1>
             <p style={styles.brandSubtitle}>
-              {activeTab === 'workspace' ? 'Team Collaboration & Real-Time Chat' : activeDepartment === 'digital_print' ? 'Digital Printing & Job Cards' : 'Inventory Control Center'}
+              {activeTab === 'workspace' ? 'Team Collaboration & Real-Time Chat' : activeDepartment === 'digital_print' ? 'Digital Printing & Job Cards' : activeDepartment === 'stitching' ? 'Job Cards, Design Room & Fabric Challans' : 'Inventory Control Center'}
             </p>
           </div>
 
@@ -675,6 +681,17 @@ export default function App() {
               >
                 <Printer size={15} />
                 <span>Elite Digital Print</span>
+              </button>
+            )}
+
+            {hasStitchingAccess && (
+              <button
+                onClick={() => handleSwitchDepartment('stitching')}
+                className={`dept-switch-btn ${activeDepartment === 'stitching' && activeTab !== 'workspace' ? 'active' : ''}`}
+                title="Switch to Elite Stitching Department"
+              >
+                <Scissors size={15} />
+                <span>Elite Stitching</span>
               </button>
             )}
 
@@ -852,6 +869,16 @@ export default function App() {
                   <span>Elite Digital Print</span>
                 </button>
               )}
+              {hasStitchingAccess && (
+                <button
+                  onClick={() => { handleSwitchDepartment('stitching'); setMobileMenuOpen(false); }}
+                  className={`dept-switch-btn ${activeDepartment === 'stitching' && activeTab !== 'workspace' ? 'active' : ''}`}
+                  style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
+                >
+                  <Scissors size={16} />
+                  <span>Elite Stitching</span>
+                </button>
+              )}
               {hasWorkspaceAccess && (
                 <button
                   onClick={() => { setActiveTab('workspace'); setMobileMenuOpen(false); }}
@@ -876,6 +903,32 @@ export default function App() {
                     Access chats, channels & team updates in main view.
                   </p>
                 </div>
+              ) : activeDepartment === 'stitching' ? (
+                <>
+                  <div style={styles.sidebarSectionHeader}>
+                    <Scissors size={14} color="var(--primary)" />
+                    <span>Elite Stitching Modules</span>
+                  </div>
+
+                  {/* 1. Jobcard */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
+                    <button onClick={() => { setActiveTab('jobcards_list'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
+                      <FileText size={18} /><span>Jobcard</span>
+                    </button>
+                  )}
+                  {/* 2. Design room */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) && (
+                    <button onClick={() => { setActiveTab('jobcards_catalogue'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_catalogue' ? styles.navItemActive : {}) }}>
+                      <BookOpen size={18} /><span>Design room</span>
+                    </button>
+                  )}
+                  {/* 3. Challan */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) && (
+                    <button onClick={() => { setActiveTab('jobcards_fabric'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_fabric' ? styles.navItemActive : {}) }}>
+                      <Database size={18} /><span>Challan</span>
+                    </button>
+                  )}
+                </>
               ) : activeDepartment === 'digital_print' ? (
                 <>
                   <div style={styles.sidebarSectionHeader}>
@@ -1047,6 +1100,33 @@ export default function App() {
                   Collaborate in real time, view task boards, and chat with team members.
                 </p>
               </div>
+            ) : activeDepartment === 'stitching' ? (
+              /* ── ELITE STITCHING MODULES ── */
+              <>
+                <div style={styles.sidebarSectionHeader}>
+                  <Scissors size={14} color="var(--primary)" />
+                  <span>Elite Stitching Modules</span>
+                </div>
+
+                {/* 1. Jobcard */}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
+                  <button onClick={() => handleNavClick('jobcards_list')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
+                    <FileText size={18} /><span>Jobcard</span>
+                  </button>
+                )}
+                {/* 2. Design room */}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) && (
+                  <button onClick={() => handleNavClick('jobcards_catalogue')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_catalogue' ? styles.navItemActive : {}) }}>
+                    <BookOpen size={18} /><span>Design room</span>
+                  </button>
+                )}
+                {/* 3. Challan */}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) && (
+                  <button onClick={() => handleNavClick('jobcards_fabric')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_fabric' ? styles.navItemActive : {}) }}>
+                    <Database size={18} /><span>Challan</span>
+                  </button>
+                )}
+              </>
             ) : activeDepartment === 'digital_print' ? (
               /* ── ELITE DIGITAL PRINT MODULES ── */
               <>
