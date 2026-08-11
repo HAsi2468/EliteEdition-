@@ -350,19 +350,19 @@ const downloadInvoicePdf = async (req, res) => {
         doc.fillColor(S500).fontSize(7.5).font('Helvetica')
           .text(`Round Off: ${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}`, PAD + CW - 120, Y + 4, { width: 115, align: 'right' });
       }
-      Y += wordsH + 6;
+      Y += wordsH;
 
-      // ── GST TAX SUMMARY TABLE ─────────────────────────────────────────────────
-      const TC = [58, 90, 40, 76, 40, 76];
+      // ── 9. GST TAX SUMMARY TABLE ─────────────────────────────────────────────
+      const TC = [58, 86, 44, 74, 44, 74];
       TC.push(CW - TC.reduce((a,b) => a+b, 0));
       const TX = TC.reduce((acc, w, i) => { acc.push((acc[i-1]||PAD) + (i>0?TC[i-1]:0)); return acc; }, []);
 
-      const tHdrH2 = 20;
+      const tHdrH2 = 18;
       doc.rect(PAD, Y, CW, tHdrH2).fill(PRP);
       doc.fillColor(WHT).fontSize(7.5).font('Helvetica-Bold');
-      ['HSN/SAC','Taxable Value','CGST Rate','CGST Amount','SGST Rate','SGST Amount','Total Tax'].forEach((h, i) => {
+      ['HSN/SAC','Taxable Value','CGST %','CGST Amount','SGST %','SGST Amount','Total Tax'].forEach((h, i) => {
         const align = i === 0 ? 'left' : (i === 2 || i === 4 ? 'center' : 'right');
-        doc.text(h, TX[i] + 2, Y + 6, { width: TC[i] - 4, align });
+        doc.text(h, TX[i] + 2, Y + 5, { width: TC[i] - 4, align });
       });
       Y += tHdrH2;
 
