@@ -15,6 +15,7 @@ import RawMaterialsPanel from './RawMaterialsPanel';
 import EliteBillingDepartment from './EliteBillingDepartment';
 import EliteDigitalPrintsSplitView from './EliteDigitalPrintsSplitView';
 import JobPrintingLog from './JobPrintingLog';
+import GarmentJobCardDashboard from './GarmentJobCardDashboard';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
 import { triggerPushNotification } from './NotificationToast';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
@@ -1762,7 +1763,9 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'1.2rem' }}>
-      {activeSubTab === 'catalogue' ? (
+      {department === 'stitching' && (activeSubTab === 'list' || activeSubTab === 'jobcards') ? (
+        <GarmentJobCardDashboard />
+      ) : activeSubTab === 'catalogue' ? (
         <DesignCatalogue department={department} />
       ) : activeSubTab === 'master' ? (
         <DesignMaster />

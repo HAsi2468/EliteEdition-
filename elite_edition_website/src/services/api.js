@@ -625,6 +625,35 @@ export const api = {
     return request(`/jobCards/${id}/proofing`, { method: 'PATCH', body: JSON.stringify(data) });
   },
 
+  // ─── Garment Manufacturing ERP (Elite Stitching) ─────────────────────────
+  async getGarmentJobCards(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/garment-jobcards${qs}`);
+  },
+  async getGarmentJobCardById(id) {
+    return request(`/garment-jobcards/${id}`);
+  },
+  async createGarmentJobCard(payload) {
+    return request('/garment-jobcards', { method: 'POST', body: JSON.stringify(payload) });
+  },
+  async updateGarmentJobCard(id, payload) {
+    return request(`/garment-jobcards/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+  },
+  async deleteGarmentJobCard(id) {
+    return request(`/garment-jobcards/${id}`, { method: 'DELETE' });
+  },
+  async getNextGarmentJobNumber() {
+    return request('/garment-jobcards/next-number');
+  },
+  async getGarmentJobCardAnalytics(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/garment-jobcards/analytics${qs}`);
+  },
+
   // ─── Machine Print Logs ──────────────────────────────────────────────────
   async createJobPrintLog(data) {
     return request('/jobPrintLogs', { method: 'POST', body: JSON.stringify(data) });

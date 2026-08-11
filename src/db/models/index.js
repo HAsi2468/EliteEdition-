@@ -37,6 +37,7 @@ const db = {
   Party: require('./party.model'),
   StockOut: require('./stockOut.model'),
   JobCard: require('./jobCard.model'),
+  GarmentJobCard: require('./garmentJobCard.model'),
   JobPrintLog: require('./jobPrintLog.model'),
   Design: require('./design.model'),
   MyntraConfig: require('./myntraConfig.model'),
