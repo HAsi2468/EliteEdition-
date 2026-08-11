@@ -359,7 +359,7 @@ const downloadInvoicePdf = async (req, res) => {
     const ourChallanStr = invoice.ourChallanNo || invoice.challanNo || '';
     doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
       .text(`Invoice No: ${invoice.invoiceNo}`, ML + 12, 90)
-      .text(ourChallanStr ? `Our Challan No: ${ourChallanStr}` : '', ML + 150, 90);
+      .text(ourChallanStr ? `Challan No: ${ourChallanStr}` : '', ML + 150, 90);
 
     const formatDDMMYYYY = (d) => {
       if (!d) return '—';
@@ -451,9 +451,9 @@ const downloadInvoicePdf = async (req, res) => {
         metaLineObjs.push({ text: line1Parts.join('   |   '), font: 'Helvetica', size: 8.8, color: '#334155' });
       }
 
-      // Line for Our Challan & Description
+      // Line for Challan & Description
       const line2Parts = [];
-      if (item.ourChallanNo) line2Parts.push(`Our Challan: ${item.ourChallanNo}`);
+      if (item.ourChallanNo) line2Parts.push(`Challan: ${item.ourChallanNo}`);
       if (item.description) line2Parts.push(item.description);
       if (line2Parts.length > 0) {
         metaLineObjs.push({ text: line2Parts.join('   |   '), font: 'Helvetica', size: 8.8, color: '#334155' });

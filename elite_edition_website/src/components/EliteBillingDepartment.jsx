@@ -989,7 +989,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
               />
             </div>
             <div>
-              <label style={labelStyle}>Our Challan No.</label>
+              <label style={labelStyle}>Challan No.</label>
               <input
                 type="text"
                 value={invoiceForm.ourChallanNo || ''}
@@ -1585,7 +1585,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                 </h3>
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                   Invoice Date: {formatDateDDMMYYYY(viewInvoiceModal.invoiceDate)} {viewInvoiceModal.dueDate ? `| Due Date: ${formatDateDDMMYYYY(viewInvoiceModal.dueDate)}` : ''}
-                  {(viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo) ? ` | Our Challan No: ${viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo}` : ''}
+                  {(viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo) ? ` | Challan No: ${viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo}` : ''}
                 </span>
               </div>
               <button className="btn-icon" onClick={() => setViewInvoiceModal(null)} style={{ padding: '0.35rem' }}>
@@ -1619,7 +1619,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                 </span>
                 {(viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo) && (
                   <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#38bdf8', marginTop: 4 }}>
-                    Our Challan #: {viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo}
+                    Challan No: {viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo}
                   </div>
                 )}
                 <div style={{ marginTop: '0.4rem', fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-primary)' }}>
@@ -1638,7 +1638,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
               <table style={{ width: '100%', fontSize: '0.82rem', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)' }}>
-                    <th style={{ padding: '0.5rem 0.6rem', color: 'var(--text-muted)' }}>#</th>
+                    <th style={{ padding: '0.5rem 0.6rem', color: 'var(--text-muted)' }}>Sr.</th>
                     <th style={{ padding: '0.5rem 0.6rem', color: 'var(--text-muted)', width: '50px' }}>Image</th>
                     <th style={{ padding: '0.5rem 0.6rem', color: 'var(--text-muted)' }}>Item Description & Details</th>
                     <th style={{ padding: '0.5rem 0.6rem', color: 'var(--text-muted)' }}>HSN</th>
@@ -1653,7 +1653,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                     const secondaryBadges = [];
                     if (it.lotNo) secondaryBadges.push(`Lot: ${it.lotNo}`);
                     if (it.partyChallan) secondaryBadges.push(`Party Challan: ${it.partyChallan}`);
-                    if (it.ourChallanNo) secondaryBadges.push(`Our Challan: ${it.ourChallanNo}`);
+                    if (it.ourChallanNo) secondaryBadges.push(`Challan: ${it.ourChallanNo}`);
 
                     return (
                       <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', verticalAlign: 'top' }}>

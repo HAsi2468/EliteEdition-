@@ -48,6 +48,11 @@ const AVAILABLE_SCREENS = [
   { id: 'jobcards_raw_materials', label: 'Elite Prints: Raw Materials', category: 'Elite Digital Print' },
   { id: 'jobcards_billing', label: 'Elite Prints: Billing & Invoicing', category: 'Elite Digital Print' },
   { id: 'jobcards_settings', label: 'Elite Prints: Settings', category: 'Elite Digital Print' },
+
+  // Elite Stitching
+  { id: 'stitching_jobcards', label: 'Elite Stitching: Job Card Tracking', category: 'Elite Stitching' },
+  { id: 'stitching_design', label: 'Elite Stitching: Design Room', category: 'Elite Stitching' },
+  { id: 'stitching_fabric', label: 'Elite Stitching: Fabric Challans', category: 'Elite Stitching' },
 ];
 
 export default function AdminPanel() {
@@ -590,15 +595,19 @@ export default function AdminPanel() {
                   Select which screens and operational tabs this user is permitted to see.
                 </p>
 
-                {['General', 'Elite Edition', 'Elite Digital Print'].map(cat => {
+                {Array.from(new Set(AVAILABLE_SCREENS.map(s => s.category))).map(cat => {
                   const catScreens = AVAILABLE_SCREENS.filter(s => s.category === cat);
                   const allChecked = catScreens.every(s => formData.permissions.includes(s.id));
+                  const catTitle = cat === 'General' ? '⚙️ Core & General' :
+                                   cat === 'Elite Edition' ? '🛍️ Elite Edition (E-Commerce)' :
+                                   cat === 'Elite Digital Print' ? '🖨️ Elite Digital Print' :
+                                   cat === 'Elite Stitching' ? '✂️ Elite Stitching' : `📁 ${cat}`;
 
                   return (
                     <div key={cat} style={{ marginBottom: '1rem', background: 'rgba(0,0,0,0.15)', padding: '0.65rem 0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                         <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          {cat === 'General' ? '⚙️ Core & General' : cat === 'Elite Edition' ? '🛍️ Elite Edition (E-Commerce)' : '🖨️ Elite Digital Print'}
+                          {catTitle}
                         </span>
                         {formData.role !== 'admin' && (
                           <button
