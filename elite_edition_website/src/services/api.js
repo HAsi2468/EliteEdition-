@@ -708,6 +708,12 @@ export const api = {
   async getDesignCategories() {
     return request('/designs/categories');
   },
+  async getNextDesignNumber(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/designs/next-number${qs}`);
+  },
 
   // ─── Analytics ──────────────────────────────────────────────────────────────
   async getVariantAnalytics(params = {}) {

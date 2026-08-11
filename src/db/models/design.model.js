@@ -19,6 +19,19 @@ const designSchema = new mongoose.Schema(
     paperType:      { type: String, default: '', trim: true },
     notes:          { type: String, default: '', trim: true },
     status:         { type: String, default: 'Active', enum: ['Active', 'Inactive'] },
+    partySkuId:     { type: String, default: '', trim: true },
+    sizeSalesRates: {
+      xs_34:  { type: Number, default: 0 },
+      s_36:   { type: Number, default: 0 },
+      m_38:   { type: Number, default: 0 },
+      l_40:   { type: Number, default: 0 },
+      xl_42:  { type: Number, default: 0 },
+      xl2_44: { type: Number, default: 0 },
+      xl3_46: { type: Number, default: 0 },
+      xl4_48: { type: Number, default: 0 },
+      xl5_50: { type: Number, default: 0 },
+      xl6_52: { type: Number, default: 0 }
+    },
     
     // 100 Pcs Standards for auto-calculations
     top100:         { type: Number, default: 0 },

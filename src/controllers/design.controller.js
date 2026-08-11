@@ -100,6 +100,34 @@ const remove = async (req, res) => {
   }
 };
 
+// Get next sequential design number (PKD-1, PKD-2 for stitching, ED-1, ED-2 for digital_print)
+const getNextDesignNumber = async (req, res) => {
+  try {
+    const { department = 'stitching' } = req.query;
+    const prefix = department === 'stitching' ? 'PKD' : 'ED';
+
+    const filter = department === 'stitching'
+      ? { $or: [{ department: 'stitching' }, { category: /stitching/i }, { designName: /^PKD-/i }] }
+      : { department: { $ne: 'stitching' }, designName: /^ED-/i };
+
+    const designs = await db.Design.find(filter, { designName: 1 }).lean();
+
+    let maxNo = 0;
+    designs.forEach(d => {
+      if (!d.designName) return;
+      const match = String(d.designName).match(new RegExp(`^${prefix}-(\\d+)`, 'i'));
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNo) maxNo = num;
+      }
+    });
+
+    res.json({ nextDesignNo: `${prefix}-${maxNo + 1}` });
+  } catch (err) {
+    logger.error('design.getNextDesignNumber error: %o', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
 // Get all distinct categories for filter dropdown
 const getCategories = async (req, res) => {
   try {
@@ -110,4 +138,4 @@ const getCategories = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getOne, create, update, remove, getCategories };
+module.exports = { getAll, getOne, create, update, remove, getCategories, getNextDesignNumber };

@@ -96,6 +96,11 @@ const BLANK_DESIGN = {
   imageUrl2: '',
   notes: '',
   status: 'Active',
+  partySkuId: '',
+  sizeSalesRates: {
+    xs_34: 0, s_36: 0, m_38: 0, l_40: 0, xl_42: 0,
+    xl2_44: 0, xl3_46: 0, xl4_48: 0, xl5_50: 0, xl6_52: 0
+  },
   top100: '',
   sleeve100: '',
   bottom100: '',
@@ -448,17 +453,30 @@ export default function DesignCatalogue({ department }) {
     }
   };
 
-  const openNew = () => {
+  const openNew = async () => {
     setFormDesign(null);
     setFormVal({ ...BLANK_DESIGN, category: department === 'stitching' ? 'Stitching' : '' });
     setFormError('');
     setDetectedColors(null);
     setShowForm(true);
+
+    try {
+      const res = await api.getNextDesignNumber({ department: department || 'digital_print' });
+      if (res && res.nextDesignNo) {
+        setFormVal(prev => ({ ...prev, designName: res.nextDesignNo }));
+      }
+    } catch (e) {
+      console.warn('Failed to fetch next design number:', e);
+    }
   };
 
   const openEdit = (d) => {
     setFormDesign(d);
-    setFormVal({ ...BLANK_DESIGN, ...d });
+    setFormVal({
+      ...BLANK_DESIGN,
+      ...d,
+      sizeSalesRates: d.sizeSalesRates || { ...BLANK_DESIGN.sizeSalesRates }
+    });
     setFormError('');
     setDetectedColors(null);
     setShowForm(true);
@@ -498,6 +516,29 @@ export default function DesignCatalogue({ department }) {
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setFormVal(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSizeSalesRateChange = (key, val) => {
+    const num = parseFloat(val) || 0;
+    setFormVal(prev => ({
+      ...prev,
+      sizeSalesRates: {
+        ...(prev.sizeSalesRates || {}),
+        [key]: num
+      }
+    }));
+  };
+
+  const handleApplyAllSalesRates = (val) => {
+    const num = parseFloat(val) || 0;
+    const updated = {};
+    ['xs_34', 's_36', 'm_38', 'l_40', 'xl_42', 'xl2_44', 'xl3_46', 'xl4_48', 'xl5_50', 'xl6_52'].forEach(k => {
+      updated[k] = num;
+    });
+    setFormVal(prev => ({
+      ...prev,
+      sizeSalesRates: updated
+    }));
   };
 
   const handleMachineProfileChange = (machineName, profileValue) => {
@@ -907,6 +948,12 @@ export default function DesignCatalogue({ department }) {
                       )}
                     </div>
 
+                    {d.partySkuId && (
+                      <div style={{ fontSize: '0.73rem', color: '#60a5fa', fontWeight: 800, background: 'rgba(59,130,246,0.12)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(59,130,246,0.25)', width: 'fit-content' }}>
+                        Party SKU: {d.partySkuId}
+                      </div>
+                    )}
+
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.3rem 0.5rem', fontSize: '0.78rem', borderTop: '1px dashed var(--border-light)', paddingTop: '0.5rem' }}>
                       {[
                         ['Colour Match', d.colourMatching],
@@ -943,6 +990,24 @@ export default function DesignCatalogue({ department }) {
                         </div>
                       ))}
                     </div>
+
+                    {d.sizeSalesRates && Object.values(d.sizeSalesRates).some(v => Number(v) > 0) && (
+                      <div style={{ width: '100%', marginTop: '0.4rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.4rem' }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>
+                          💰 Size Sales Rates (₹):
+                        </span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', fontSize: '0.68rem' }}>
+                          {[
+                            ['xs_34','XS'],['s_36','S'],['m_38','M'],['l_40','L'],['xl_42','XL'],
+                            ['xl2_44','2XL'],['xl3_46','3XL'],['xl4_48','4XL'],['xl5_50','5XL'],['xl6_52','6XL']
+                          ].map(([k, lbl]) => Number(d.sizeSalesRates[k]) > 0 ? (
+                            <span key={k} style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', color: '#34d399', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
+                              {lbl}: ₹{d.sizeSalesRates[k]}
+                            </span>
+                          ) : null)}
+                        </div>
+                      </div>
+                    )}
 
                     {d.notes && (
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', padding: '0.35rem 0.5rem', borderRadius: 4, fontStyle: 'italic' }}>
@@ -1021,7 +1086,8 @@ export default function DesignCatalogue({ department }) {
                 </div>
               )}
 
-              <FormField label="Design Name (e.g. ED1, ED2)" name="designName" value={formVal.designName} onChange={handleFormChange} required placeholder="ED1" />
+              <FormField label="Design Name (e.g. ED1, ED2, PKD-1)" name="designName" value={formVal.designName} onChange={handleFormChange} required placeholder="PKD-1" />
+              <FormField label="Party SKU ID" name="partySkuId" value={formVal.partySkuId} onChange={handleFormChange} placeholder="e.g. SKU-9042" />
               {(() => {
                 const nameExists = allDesignsList.some(d => 
                   d.designName.toLowerCase() === formVal.designName.trim().toLowerCase() && 
@@ -1040,6 +1106,55 @@ export default function DesignCatalogue({ department }) {
               <FormField label="Colour Matching Name" name="colourMatching" value={formVal.colourMatching} onChange={handleFormChange} options={['', ...(printConfig.designers || [])]} placeholder="e.g. Green Matching" />
               <FormField label="Fabric Name" name="fabricName" value={formVal.fabricName} onChange={handleFormChange} options={['', ...(printConfig.fabrics || [])]} />
               <FormField label="Paper Type" name="paperType" value={formVal.paperType} onChange={handleFormChange} options={['', ...(printConfig.paperTypes || [])]} />
+
+              {/* Section: Size-wise Sales Rates */}
+              <div style={{
+                fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em',
+                color: 'var(--primary)', marginBottom: '0.4rem', marginTop: '0.8rem', width: '100%',
+                borderBottom: '1px solid var(--border-light)', paddingBottom: '0.2rem',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+              }}>
+                <span>💰 Size-Wise Sales Rates (₹) — Taken from Stitching Sizes</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const rate = prompt('Enter Sales Rate (₹) to apply across ALL sizes:');
+                    if (rate !== null && rate !== '') handleApplyAllSalesRates(rate);
+                  }}
+                  style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', fontSize: '0.68rem', fontWeight: 700, padding: '0.2rem 0.5rem', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  ⚡ Set All Sizes Rate
+                </button>
+              </div>
+
+              <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '0.6rem' }}>
+                {[
+                  { key: 'xs_34', label: 'XS-34' },
+                  { key: 's_36',  label: 'S-36' },
+                  { key: 'm_38',  label: 'M-38' },
+                  { key: 'l_40',  label: 'L-40' },
+                  { key: 'xl_42', label: 'XL-42' },
+                  { key: 'xl2_44',label: '2XL-44' },
+                  { key: 'xl3_46',label: '3XL-46' },
+                  { key: 'xl4_48',label: '4XL-48' },
+                  { key: 'xl5_50',label: '5XL-50' },
+                  { key: 'xl6_52',label: '6XL-52' }
+                ].map(s => (
+                  <div key={s.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', background: 'rgba(255,255,255,0.03)', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+                    <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}>
+                      {s.label}
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={(formVal.sizeSalesRates || {})[s.key] || ''}
+                      onChange={e => handleSizeSalesRateChange(s.key, e.target.value)}
+                      placeholder="0.00"
+                      style={{ width: '100%', textAlign: 'center', fontWeight: 700, fontSize: '0.82rem', padding: '0.3rem 0.2rem', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '4px', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                ))}
+              </div>
 
               {/* Section: Fusing Configuration */}
               <div style={{
