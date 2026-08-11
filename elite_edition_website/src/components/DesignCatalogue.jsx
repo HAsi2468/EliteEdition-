@@ -393,10 +393,10 @@ export default function DesignCatalogue({ department }) {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const cfg = await api.getPrintConfig();
+        const cfg = department === 'stitching' ? await api.getStitchingConfig() : await api.getPrintConfig();
         setPrintConfig(cfg);
       } catch (err) {
-        console.error('Failed to load print settings:', err);
+        console.error('Failed to load settings:', err);
       }
     };
 
@@ -1126,7 +1126,7 @@ export default function DesignCatalogue({ department }) {
                 name="category"
                 value={formVal.category}
                 onChange={handleFormChange}
-                options={department === 'stitching' ? ['', ...(printConfig.stitchingCategories?.length ? printConfig.stitchingCategories : ['SUIT', 'KURTI', 'DUPATTA', 'TOP', 'BOTTOM', 'LEHENGA', 'STITCHING SET', 'KIDS', 'ETHNIC', 'OTHER'])] : ['', ...(printConfig.categories || [])]}
+                options={department === 'stitching' ? ['', ...(printConfig.categories?.length ? printConfig.categories : ['SUIT', 'KURTI', 'DUPATTA', 'TOP', 'BOTTOM', 'LEHENGA', 'STITCHING SET', 'KIDS', 'ETHNIC', 'OTHER'])] : ['', ...(printConfig.categories || [])]}
               />
 
               {/* STITCHING ONLY: Size-Wise Sales Rates */}

@@ -21,13 +21,13 @@ export default function StitchingSettings() {
   };
 
   // Form input states
-  const [newStitchingCategory, setNewStitchingCategory] = useState('');
-  const [newStitchingLabel, setNewStitchingLabel] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [newLabel, setNewLabel] = useState('');
   const [newFinishingOption, setNewFinishingOption] = useState('');
-  const [newStitchingParty, setNewStitchingParty] = useState('');
-  const [newStitchingBillTo, setNewStitchingBillTo] = useState('');
-  const [newStitchingShipTo, setNewStitchingShipTo] = useState('');
-  const [newStitchingDeliveryBy, setNewStitchingDeliveryBy] = useState('');
+  const [newParty, setNewParty] = useState('');
+  const [newBillTo, setNewBillTo] = useState('');
+  const [newShipTo, setNewShipTo] = useState('');
+  const [newDeliveryBy, setNewDeliveryBy] = useState('');
 
   useEffect(() => {
     fetchConfig();
@@ -38,10 +38,10 @@ export default function StitchingSettings() {
   const fetchConfig = async () => {
     try {
       setLoading(true);
-      const data = await api.getPrintConfig();
+      const data = await api.getStitchingConfig();
       setConfig(data);
     } catch (err) {
-      console.error('Failed to fetch Stitching config:', err);
+      console.error('Failed to fetch Stitching config from stitching_configs:', err);
     } finally {
       setLoading(false);
     }
@@ -51,7 +51,7 @@ export default function StitchingSettings() {
     if (!value.trim()) return;
     try {
       setActionLoading(true);
-      const updated = await api.updatePrintConfig({ action: 'add', field, value: value.trim() });
+      const updated = await api.updateStitchingConfig({ action: 'add', field, value: value.trim() });
       setConfig(updated);
       setter(''); // clear input
     } catch (err) {
@@ -65,7 +65,7 @@ export default function StitchingSettings() {
     if (!window.confirm(`Are you sure you want to remove "${value}" from ${field}?`)) return;
     try {
       setActionLoading(true);
-      const updated = await api.updatePrintConfig({ action: 'remove', field, value });
+      const updated = await api.updateStitchingConfig({ action: 'remove', field, value });
       setConfig(updated);
     } catch (err) {
       console.error(`Failed to remove ${field}:`, err);
@@ -78,7 +78,7 @@ export default function StitchingSettings() {
     return (
       <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-primary)' }}>
         <RefreshCw className="spin-loader" size={24} style={{ marginBottom: '0.5rem', color: 'var(--primary)' }} />
-        <div>Loading Elite Stitching Settings...</div>
+        <div>Loading Elite Stitching Settings (stitching_configs table)...</div>
       </div>
     );
   }
@@ -173,9 +173,9 @@ export default function StitchingSettings() {
               <Scissors size={22} color="#fff" />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-primary)' }}>Elite Stitching — Dynamic Dropdown Settings</h2>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-primary)' }}>Elite Stitching Settings (`stitching_configs` Table)</h2>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                Configure dynamic dropdown options for Garment Categories, Brand Labels, Finishing Types, Parties & Delivery Methods.
+                Configure dynamic dropdown options for Garment Categories, Brand Labels, Finishing Types, Parties & Delivery Methods stored in a dedicated database table.
               </p>
             </div>
           </div>
@@ -192,18 +192,18 @@ export default function StitchingSettings() {
           <div style={{ padding: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
             {renderSection(
               'Stitching Categories',
-              'stitchingCategories',
-              newStitchingCategory,
-              setNewStitchingCategory,
-              config?.stitchingCategories,
+              'categories',
+              newCategory,
+              setNewCategory,
+              config?.categories,
               <Layers size={16} color="#a78bfa" />
             )}
             {renderSection(
               'Brand / Package Labels',
-              'stitchingLabels',
-              newStitchingLabel,
-              setNewStitchingLabel,
-              config?.stitchingLabels,
+              'labels',
+              newLabel,
+              setNewLabel,
+              config?.labels,
               <Tag size={16} color="#38bdf8" />
             )}
           </div>
@@ -234,34 +234,34 @@ export default function StitchingSettings() {
           <div style={{ padding: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
             {renderSection(
               'Parties & Client Names',
-              'stitchingParties',
-              newStitchingParty,
-              setNewStitchingParty,
-              config?.stitchingParties || config?.parties,
+              'parties',
+              newParty,
+              setNewParty,
+              config?.parties,
               <Tag size={16} color="#fbbf24" />
             )}
             {renderSection(
               'Delivery By Options',
-              'stitchingDeliveryBy',
-              newStitchingDeliveryBy,
-              setNewStitchingDeliveryBy,
-              config?.stitchingDeliveryBy || config?.deliveryOptions,
+              'deliveryOptions',
+              newDeliveryBy,
+              setNewDeliveryBy,
+              config?.deliveryOptions,
               <Truck size={16} color="#f43f5e" />
             )}
             {renderSection(
               'Bill To Options',
-              'stitchingBillTo',
-              newStitchingBillTo,
-              setNewStitchingBillTo,
-              config?.stitchingBillTo || config?.billToOptions,
+              'billToOptions',
+              newBillTo,
+              setNewBillTo,
+              config?.billToOptions,
               <FileText size={16} color="#a855f7" />
             )}
             {renderSection(
               'Ship To Options',
-              'stitchingShipTo',
-              newStitchingShipTo,
-              setNewStitchingShipTo,
-              config?.stitchingShipTo || config?.shipToOptions,
+              'shipToOptions',
+              newShipTo,
+              setNewShipTo,
+              config?.shipToOptions,
               <Package size={16} color="#38bdf8" />
             )}
           </div>

@@ -818,6 +818,18 @@ export const api = {
     });
   },
 
+  // --- Stitching Settings Engine ---
+  async getStitchingConfig() {
+    return request('/stitching-config');
+  },
+
+  async updateStitchingConfig(data) {
+    return request('/stitching-config/update', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   // --- Workspace (Chat & Task) ---
   async getRooms(userId) {
     const url = userId ? `/workspace/rooms?userId=${userId}` : '/workspace/rooms';

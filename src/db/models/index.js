@@ -44,6 +44,7 @@ const db = {
   MyntraConfig: require('./myntraConfig.model'),
   ReturnRecord: require('./returnRecord.model'),
   PrintConfig: require('./printConfig.model'),
+  StitchingConfig: require('./stitchingConfig.model'),
   RawMaterialTransaction: require('./rawMaterialTransaction.model'),
   ChatRoom: require('./chat.model').ChatRoom,
   ChatMessage: require('./chat.model').ChatMessage,
