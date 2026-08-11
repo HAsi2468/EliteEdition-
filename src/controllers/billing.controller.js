@@ -431,26 +431,26 @@ const downloadInvoicePdf = async (req, res) => {
 
 
       // ── HEADER: LOGO LEFT / COMPANY RIGHT ─────────────────────────────────────
-      const hdrH = 52;
+      const hdrH = 62;
       doc.rect(PAD, Y, CW, hdrH).fill(S50);
 
       if (fs.existsSync(logoPath)) {
-        try { doc.image(logoPath, PAD + 6, Y + 6, { width: 80, height: 40, fit: [80, 40] }); } catch(e) {}
+        try { doc.image(logoPath, PAD + 6, Y + 6, { width: 110, height: 50, fit: [110, 50] }); } catch(e) {}
       }
 
       doc.fillColor(S900).fontSize(12).font('Helvetica-Bold')
-        .text(companyName.toUpperCase(), PAD + 110, Y + 6, { width: CW - 116, align: 'right' });
+        .text(companyName.toUpperCase(), PAD + 120, Y + 6, { width: CW - 126, align: 'right' });
       doc.fillColor(S500).fontSize(8).font('Helvetica')
-        .text(companyAddress, PAD + 110, Y + 22, { width: CW - 116, align: 'right' })
-        .text(`GST: ${companyGstin}   Phone: ${companyPhone}   State: ${companyState}, Code: ${companyStateCode}`,
-              PAD + 110, Y + 33, { width: CW - 116, align: 'right' });
+        .text('G.F., PLOT NO-B/37, SIDDHESHWAR SOC., PUNAGAM MAIN ROAD, SURAT - 395010', PAD + 120, Y + 22, { width: CW - 126, align: 'right' })
+        .text(`GST: 24AANFE0044M   PHONE: +91 99098 66667   STATE: GUJARAT, CODE: 24`,
+              PAD + 120, Y + 34, { width: CW - 126, align: 'right' });
 
       Y += hdrH;
 
-      // ── TAX INVOICE TITLE ─────────────────────────────────────────────────────
+      // ── INVOICE TITLE ─────────────────────────────────────────────────────────
       const titleH = 22;
       doc.rect(PAD, Y, CW, titleH).fill(PRPL);
-      doc.fillColor(PRP).fontSize(13).font('Helvetica-Bold').text('TAX INVOICE', PAD + 8, Y + 5);
+      doc.fillColor(PRP).fontSize(13).font('Helvetica-Bold').text('INVOICE', PAD + 8, Y + 5);
 
       doc.fillColor(S900).fontSize(10).font('Helvetica-Bold')
         .text(`Invoice No: ${invoice.invoiceNo}`, PAD + 140, Y + 5, { width: 220 })
@@ -483,7 +483,7 @@ const downloadInvoicePdf = async (req, res) => {
         .text('SELLER / DISPATCH DETAILS', rx + 5, Y + 3, { width: CW - halfCW - 10 });
       const metaW = (CW - halfCW) / 2 - 5;
       const pairs = [
-        ['Order No.', invoice.orderNo || '--', 'e-Way Bill', invoice.ewayBillNo || '--'],
+        ['Order No.', invoice.orderNo || '--', 'Invoice No.', invoice.invoiceNo || '--'],
         ['Dispatch Doc', invoice.dispatchDocNo || '--', 'Challan No.', invoice.ourChallanNo || invoice.challanNo || '--'],
         ['Terms of Delivery', 'By Road', 'Place of Supply', `${cust.state || 'Gujarat'} (${cust.stateCode || '24'})`],
       ];
@@ -508,7 +508,7 @@ const downloadInvoicePdf = async (req, res) => {
       // ── ITEMS TABLE HEADER ───────────────────────────────────────────────────
       const tblHdrH = 22;
       doc.rect(PAD, Y, CW, tblHdrH).fill(PRP);
-      doc.fillColor(WHT).fontSize(7.5).font('Helvetica-Bold');
+      doc.fillColor(WHT).fontSize(9.5).font('Helvetica-Bold');
       const hdrs   = ['Sr.', 'Image', 'Description of Goods', 'HSN', 'GST%', 'Qty', 'Rate', 'Per', 'Amount'];
       const aligns = ['left','center','left','center','center','center','right','center','right'];
       hdrs.forEach((h, i) => doc.text(h, colX[i] + 2, Y + 7, { width: COL[i] - 4, align: aligns[i] }));
@@ -567,7 +567,7 @@ const downloadInvoicePdf = async (req, res) => {
         }
 
         let textY = Y + 5;
-        doc.fillColor(S900).font('Helvetica-Bold').fontSize(11);
+        doc.fillColor(S900).font('Helvetica').fontSize(11);
         doc.text(item.itemName || '--', colX[2] + 3, textY, { width: COL[2] - 6 });
         textY += doc.heightOfString(item.itemName || '--', { width: COL[2] - 6 }) + 2;
         metaLines.forEach(m => {
@@ -580,7 +580,7 @@ const downloadInvoicePdf = async (req, res) => {
         const taxRate = item.taxRate || 18;
         let u = (item.unit || 'MTR').trim();
         if (/meter|mtr/i.test(u)) u = 'MTR';
-        doc.fillColor(S700).font('Helvetica-Bold').fontSize(9.5)
+        doc.fillColor(S700).font('Helvetica').fontSize(9.5)
           .text(item.hsnCode || '998821', colX[3] + 2, numY, { width: COL[3] - 4, align: 'center' })
           .text(`${taxRate}%`,            colX[4] + 2, numY, { width: COL[4] - 4, align: 'center' });
         doc.fillColor(S900).font('Helvetica-Bold').fontSize(10)
@@ -600,22 +600,22 @@ const downloadInvoicePdf = async (req, res) => {
           const amt = type === 'CGST' ? row.cgst : row.sgst;
           const trH = 16;
           doc.rect(PAD, Y, CW, trH).fill(PRPL).stroke(S200);
-          doc.fillColor(PRPM).fontSize(8).font('Helvetica-Bold')
-            .text(`${type} @ ${halfRate}%`, colX[2] + 4, Y + 4, { width: COL[2]+COL[3]+COL[4]+COL[5]+COL[6]+COL[7]-4 });
-          doc.fillColor(PRP).font('Helvetica-Bold').fontSize(8.5)
+          doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
+            .text(`${type} @ ${halfRate}%`, colX[6] - 20, Y + 4, { width: COL[6] + COL[7] + 16, align: 'right' });
+          doc.fillColor(PRP).font('Helvetica-Bold').fontSize(9)
             .text(amt.toFixed(2), colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
           Y += trH;
         });
       });
 
-      // ── ROUND OFF ROW (UPPER OF TOTAL) ────────────────────────────────────────
+      // ── ROUND OFF ROW ────────────────────────────────────────────────────────
       const roundOff = Number(invoice.roundOff || 0);
       if (Math.abs(roundOff) > 0) {
         const roH = 16;
         doc.rect(PAD, Y, CW, roH).fill(PRPL).stroke(S200);
-        doc.fillColor(S900).fontSize(8).font('Helvetica-Bold')
-          .text('Round Off', colX[2] + 4, Y + 4, { width: 100 });
-        doc.fillColor(S900).font('Helvetica-Bold').fontSize(8.5)
+        doc.fillColor(S900).fontSize(8.5).font('Helvetica-Bold')
+          .text('Round Off', colX[6] - 20, Y + 4, { width: COL[6] + COL[7] + 16, align: 'right' });
+        doc.fillColor(S900).font('Helvetica-Bold').fontSize(9)
           .text(`${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}`, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
         Y += roH;
       }
@@ -624,7 +624,7 @@ const downloadInvoicePdf = async (req, res) => {
       const totH = 22;
       doc.rect(PAD, Y, CW, totH).fill(PRP);
       doc.fillColor(WHT).fontSize(10).font('Helvetica-Bold')
-        .text('Total', colX[2] + 4, Y + 6, { width: 100 })
+        .text('Total', colX[6] - 20, Y + 6, { width: COL[6] + COL[7] + 16, align: 'right' })
         .text(`Rs. ${Number(invoice.grandTotal||0).toFixed(2)}`, colX[8] + 2, Y + 6, { width: COL[8]-4, align: 'right' });
       Y += totH;
 
