@@ -337,29 +337,30 @@ const downloadInvoicePdf = async (req, res) => {
       return null;
     };
 
-    // 2% Page Top Padding / Header Logo & Company Info
+    // 50px Top Margin / Header Logo & Company Info
+    const topY = 50;
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, ML, 18, { width: 120 });
+      doc.image(logoPath, ML, topY, { width: 120 });
     }
 
     doc.fillColor('#0f172a').fontSize(15).font('Helvetica-Bold')
-      .text(companyName.toUpperCase(), ML + 140, 18, { width: contentWidth - 140, align: 'right' });
+      .text(companyName.toUpperCase(), ML + 140, topY, { width: contentWidth - 140, align: 'right' });
     doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
-      .text(companyAddress, ML + 140, 36, { width: contentWidth - 140, align: 'right' })
-      .text(`GSTIN: ${companyGstin}  |  Phone: ${companyPhone}`, ML + 140, 48, { width: contentWidth - 140, align: 'right' });
+      .text(companyAddress, ML + 140, topY + 18, { width: contentWidth - 140, align: 'right' })
+      .text(`GSTIN: ${companyGstin}  |  Phone: ${companyPhone}`, ML + 140, topY + 30, { width: contentWidth - 140, align: 'right' });
 
-    doc.moveTo(ML, 62).lineTo(PW - MR, 62).strokeColor('#7c3aed').lineWidth(1.5).stroke();
+    doc.moveTo(ML, topY + 44).lineTo(PW - MR, topY + 44).strokeColor('#7c3aed').lineWidth(1.5).stroke();
 
     // Tax Invoice Badge & Metadata Box
-    doc.rect(ML, 68, contentWidth, 48).fill('#f8fafc').stroke('#e2e8f0');
+    doc.rect(ML, topY + 50, contentWidth, 48).fill('#f8fafc').stroke('#e2e8f0');
 
     doc.fillColor('#6b21a8').fontSize(13).font('Helvetica-Bold')
-      .text('TAX INVOICE', ML + 12, 74);
+      .text('TAX INVOICE', ML + 12, topY + 56);
     
     const ourChallanStr = invoice.ourChallanNo || invoice.challanNo || '';
     doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
-      .text(`Invoice No: ${invoice.invoiceNo}`, ML + 12, 90)
-      .text(ourChallanStr ? `Challan No: ${ourChallanStr}` : '', ML + 150, 90);
+      .text(`Invoice No: ${invoice.invoiceNo}`, ML + 12, topY + 72)
+      .text(ourChallanStr ? `Challan No: ${ourChallanStr}` : '', ML + 150, topY + 72);
 
     const formatDDMMYYYY = (d) => {
       if (!d) return '—';
@@ -373,11 +374,11 @@ const downloadInvoicePdf = async (req, res) => {
     const dueDateStr = formatDDMMYYYY(invoice.dueDate);
 
     doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
-      .text(`Date: ${invDateStr}`, ML + 300, 74, { width: contentWidth - 300, align: 'right' })
-      .text(`Due Date: ${dueDateStr}`, ML + 300, 88, { width: contentWidth - 300, align: 'right' });
+      .text(`Date: ${invDateStr}`, ML + 300, topY + 56, { width: contentWidth - 300, align: 'right' })
+      .text(`Due Date: ${dueDateStr}`, ML + 300, topY + 70, { width: contentWidth - 300, align: 'right' });
 
     // Customer Details Box (BILLED TO & SHIPPED TO 2-Column Layout)
-    const custY = 122;
+    const custY = topY + 104;
     const colW = (contentWidth - 10) / 2; // 272.5px each
 
     // Left Column: BILLED TO
@@ -416,7 +417,7 @@ const downloadInvoicePdf = async (req, res) => {
     };
 
     // Items Table Header
-    let tableY = 194;
+    let tableY = topY + 176;
     doc.rect(ML, tableY, contentWidth, 22).fill('#4c1d95');
 
     doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold');
@@ -443,10 +444,10 @@ const downloadInvoicePdf = async (req, res) => {
         metaLineObjs.push({ text: formattedJobs, font: 'Helvetica-Bold', size: 9, color: '#6b21a8' });
       }
 
-      // Line for Lot No & Party Challan
+      // Line for Lot No & Vendor Challan
       const line1Parts = [];
       if (item.lotNo) line1Parts.push(`Lot: ${item.lotNo}`);
-      if (item.partyChallan) line1Parts.push(`Party Challan: ${item.partyChallan}`);
+      if (item.partyChallan) line1Parts.push(`Vendor Challan: ${item.partyChallan}`);
       if (line1Parts.length > 0) {
         metaLineObjs.push({ text: line1Parts.join('   |   '), font: 'Helvetica', size: 8.8, color: '#334155' });
       }
@@ -601,29 +602,32 @@ const downloadInvoicePdf = async (req, res) => {
     doc.fillColor('#334155').fontSize(9).font('Helvetica')
       .text(numToWords(invoice.grandTotal), ML, tableY + 20, { width: contentWidth - 240 });
 
-    // ── FIXED BOTTOM FOOTER ────────
-    const footerY = PH - 110;
+    // ── FIXED BOTTOM FOOTER (Payment Details Left | Authorized Signatory Right) ──
+    const footerY = PH - 95;
 
-    doc.fillColor('#0f172a').fontSize(9).font('Helvetica-Bold')
+    // Divider line above footer
+    doc.moveTo(ML, footerY - 8).lineTo(PW - MR, footerY - 8).strokeColor('#e2e8f0').lineWidth(1).stroke();
+
+    // LEFT SIDE: Payment & Bank Details + Terms
+    doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold')
       .text('PAYMENT & BANK DETAILS:', ML, footerY);
 
-    let payDetailsStr = `Bank: ${config.companyBankName || 'N/A'}  |  A/C No: ${config.companyAccountNo || 'N/A'}  |  IFSC: ${config.companyIfscCode || 'N/A'}`;
-
+    const payDetailsStr = `Bank: ${config.companyBankName || 'N/A'}  |  A/C No: ${config.companyAccountNo || 'N/A'}  |  IFSC: ${config.companyIfscCode || 'N/A'}`;
     doc.fillColor('#475569').fontSize(8).font('Helvetica')
-      .text(payDetailsStr, ML, footerY + 13, { width: contentWidth });
-
-    // Terms & Authorized Signatory Footer
-    const termY = footerY + 32;
-    doc.moveTo(ML, termY).lineTo(PW - MR, termY).strokeColor('#e2e8f0').lineWidth(1).stroke();
+      .text(payDetailsStr, ML, footerY + 13, { width: 330 });
 
     doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
-      .text('Terms & Conditions:', ML, termY + 6)
-      .text(companyTerms, ML, termY + 16, { width: 300 });
+      .text('Terms & Conditions: ' + companyTerms, ML, footerY + 28, { width: 330 });
 
-    doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold')
-      .text(`For ${companyName.toUpperCase()}`, ML + 350, termY + 6, { width: contentWidth - 350, align: 'right' });
-    doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
-      .text('Authorized Signatory', ML + 350, termY + 36, { width: contentWidth - 350, align: 'right' });
+    // RIGHT SIDE: Authorized Signatory
+    const rightColX = ML + 340;
+    const rightColW = contentWidth - 340;
+
+    doc.fillColor('#0f172a').fontSize(9).font('Helvetica-Bold')
+      .text(`For ${companyName.toUpperCase()}`, rightColX, footerY, { width: rightColW, align: 'right' });
+
+    doc.fillColor('#64748b').fontSize(8).font('Helvetica')
+      .text('Authorized Signatory', rightColX, footerY + 45, { width: rightColW, align: 'right' });
 
     doc.end();
   } catch (error) {

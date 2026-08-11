@@ -1161,14 +1161,14 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                           type="text"
                           value={it.partyChallan || ''}
                           onChange={e => handleItemChange(idx, 'partyChallan', e.target.value)}
-                          placeholder="Party Challan"
+                          placeholder="Vendor Challan"
                           style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
                         />
                         <input
                           type="text"
                           value={it.ourChallanNo || ''}
                           onChange={e => handleItemChange(idx, 'ourChallanNo', e.target.value)}
-                          placeholder="Our Challan #"
+                          placeholder="Challan"
                           style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
                         />
                         <input
@@ -1652,7 +1652,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                     const jobDisplay = formatJobDisplay(it.jobNo);
                     const secondaryBadges = [];
                     if (it.lotNo) secondaryBadges.push(`Lot: ${it.lotNo}`);
-                    if (it.partyChallan) secondaryBadges.push(`Party Challan: ${it.partyChallan}`);
+                    if (it.partyChallan) secondaryBadges.push(`Vendor Challan: ${it.partyChallan}`);
                     if (it.ourChallanNo) secondaryBadges.push(`Challan: ${it.ourChallanNo}`);
 
                     return (
