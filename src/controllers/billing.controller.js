@@ -608,9 +608,14 @@ const downloadInvoicePdf = async (req, res) => {
       });
 
       // ── ROUND OFF ROW ────────────────────────────────────────────────────────
-      const computedRoundOff = (invoice.roundOff !== undefined && invoice.roundOff !== null && !isNaN(Number(invoice.roundOff)))
-        ? Number(invoice.roundOff)
-        : Number((Number(invoice.grandTotal || 0) - (totalTaxable + totalTax)).toFixed(2));
+      let computedRoundOff = 0;
+      if (invoice.roundOff !== undefined && invoice.roundOff !== null && Number(invoice.roundOff) !== 0) {
+        computedRoundOff = Number(invoice.roundOff);
+      } else if (invoice.grandTotal) {
+        const rawSum = totalTaxable + totalCgst + totalSgst;
+        computedRoundOff = Number((Number(invoice.grandTotal) - rawSum).toFixed(2));
+      }
+
       const roH = 16;
       doc.rect(PAD, Y, CW, roH).fill(PRPL).stroke(S200);
       doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
