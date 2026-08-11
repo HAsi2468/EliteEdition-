@@ -76,7 +76,7 @@ const downloadInvoicePdf = async (req, res) => {
 
     // ── COLUMN WIDTHS ────────────────────────────────────────────────────────────
     // Sr | IMG | Description | HSN | GST% | Qty | Rate | Per | Amount
-    const COL = [18, 70, 162, 54, 34, 60, 60, 30, 71]; // sum=559 ✓
+    const COL = [18, 100, 132, 54, 34, 60, 60, 30, 71.28]; // sum=559.28 ✓
     const colX = COL.reduce((acc, w, i) => { acc.push((acc[i-1]||PAD) + (i>0?COL[i-1]:0)); return acc; }, []);
 
     // ── PRE-LOAD IMAGES ──────────────────────────────────────────────────────────
@@ -157,12 +157,12 @@ const downloadInvoicePdf = async (req, res) => {
         try { doc.image(logoPath, PAD + 6, Y + 6, { width: 80, height: 40, fit: [80, 40] }); } catch(e) {}
       }
 
-      doc.fillColor(S900).fontSize(11).font('Helvetica-Bold')
-        .text(companyName.toUpperCase(), PAD + 90, Y + 6, { width: CW - 96, align: 'right' });
-      doc.fillColor(S500).fontSize(7).font('Helvetica')
-        .text(companyAddress, PAD + 90, Y + 20, { width: CW - 96, align: 'right' })
+      doc.fillColor(S900).fontSize(12).font('Helvetica-Bold')
+        .text(companyName.toUpperCase(), PAD + 110, Y + 6, { width: CW - 116, align: 'right' });
+      doc.fillColor(S500).fontSize(8).font('Helvetica')
+        .text(companyAddress, PAD + 110, Y + 22, { width: CW - 116, align: 'right' })
         .text(`GST: ${companyGstin}   Phone: ${companyPhone}   State: ${companyState}, Code: ${companyStateCode}`,
-              PAD + 90, Y + 30, { width: CW - 96, align: 'right' });
+              PAD + 110, Y + 33, { width: CW - 116, align: 'right' });
 
       // Copy label badge
       const badgeW = 130, badgeH2 = 14;
@@ -189,23 +189,22 @@ const downloadInvoicePdf = async (req, res) => {
 
       // Left: Buyer
       doc.rect(PAD, Y, halfCW, infoH).fill(WHT).stroke(S200);
-      doc.rect(PAD, Y, halfCW, 13).fill(PRP);
-      doc.fillColor(WHT).fontSize(7.5).font('Helvetica-Bold')
+      doc.rect(PAD, Y, halfCW, 14).fill(PRP);
+      doc.fillColor(WHT).fontSize(8.5).font('Helvetica-Bold')
         .text('BUYER (BILLED TO)', PAD + 5, Y + 3, { width: halfCW - 10 });
-      doc.fillColor(S900).fontSize(8.5).font('Helvetica-Bold')
-        .text(cust.businessName || cust.name || '--', PAD + 5, Y + 15, { width: halfCW - 10 });
-      doc.fillColor(S700).fontSize(7.5).font('Helvetica')
-        .text(cust.billingAddress || '--', PAD + 5, Y + 26, { width: halfCW - 10 });
-      doc.fillColor(S500).fontSize(7).font('Helvetica')
+      doc.fillColor(S900).fontSize(10).font('Helvetica-Bold')
+        .text(cust.businessName || cust.name || '--', PAD + 5, Y + 16, { width: halfCW - 10 });
+      doc.fillColor(S700).fontSize(8.5).font('Helvetica')
+        .text(cust.billingAddress || '--', PAD + 5, Y + 28, { width: halfCW - 10 });
+      doc.fillColor(S500).fontSize(8).font('Helvetica')
         .text(`GST: ${cust.gstin || 'N/A'}`, PAD + 5, Y + 46)
-        .text(`State: ${cust.state || 'Gujarat'}, Code: ${cust.stateCode || '24'}`, PAD + 5, Y + 56)
-        .text(`Contact: ${cust.phone || '--'}`, PAD + 5, Y + 64);
+        .text(`State: ${cust.state || 'Gujarat'}, Code: ${cust.stateCode || '24'}`, PAD + 5, Y + 56);
 
       // Right: Seller/meta
       const rx = PAD + halfCW;
       doc.rect(rx, Y, CW - halfCW, infoH).fill(WHT).stroke(S200);
-      doc.rect(rx, Y, CW - halfCW, 13).fill(PRP);
-      doc.fillColor(WHT).fontSize(7.5).font('Helvetica-Bold')
+      doc.rect(rx, Y, CW - halfCW, 14).fill(PRP);
+      doc.fillColor(WHT).fontSize(8.5).font('Helvetica-Bold')
         .text('SELLER / DISPATCH DETAILS', rx + 5, Y + 3, { width: CW - halfCW - 10 });
       const metaW = (CW - halfCW) / 2 - 5;
       const pairs = [
@@ -213,14 +212,14 @@ const downloadInvoicePdf = async (req, res) => {
         ['Dispatch Doc', invoice.dispatchDocNo || '--', 'Challan No.', invoice.ourChallanNo || invoice.challanNo || '--'],
         ['Terms of Delivery', 'By Road', 'Place of Supply', `${cust.state || 'Gujarat'} (${cust.stateCode || '24'})`],
       ];
-      let metaY = Y + 15;
+      let metaY = Y + 16;
       pairs.forEach(([k1, v1, k2, v2]) => {
-        doc.fillColor(S500).fontSize(6.5).font('Helvetica')
+        doc.fillColor(S500).fontSize(7.5).font('Helvetica')
           .text(k1 + ':', rx + 4, metaY, { width: metaW })
           .text(k2 + ':', rx + metaW + 10, metaY, { width: metaW });
-        doc.fillColor(S900).fontSize(7.5).font('Helvetica-Bold')
-          .text(v1, rx + 4, metaY + 8, { width: metaW })
-          .text(v2, rx + metaW + 10, metaY + 8, { width: metaW });
+        doc.fillColor(S900).fontSize(8.5).font('Helvetica-Bold')
+          .text(v1, rx + 4, metaY + 9, { width: metaW })
+          .text(v2, rx + metaW + 10, metaY + 9, { width: metaW });
         metaY += 18;
       });
       Y += infoH;
@@ -252,66 +251,67 @@ const downloadInvoicePdf = async (req, res) => {
 
         const metaLines = [];
         const jd = cleanJobDisplay(item.jobNo);
-        if (jd) metaLines.push({ text: jd, font: 'Helvetica-Bold', size: 7, color: PRPM });
+        if (jd) metaLines.push({ text: jd, font: 'Helvetica-Bold', size: 8.5, color: PRPM });
         const p1 = [];
         if (item.lotNo)        p1.push(`Lot: ${item.lotNo}`);
         if (item.partyChallan) p1.push(`Vendor Challan: ${item.partyChallan}`);
-        if (p1.length) metaLines.push({ text: p1.join('  |  '), font: 'Helvetica', size: 7, color: S700 });
+        if (p1.length) metaLines.push({ text: p1.join('  |  '), font: 'Helvetica', size: 8, color: S700 });
         const p2 = [];
         if (item.description)  p2.push(item.description);
-        if (p2.length) metaLines.push({ text: p2.join('  |  '), font: 'Helvetica', size: 7, color: S700 });
-        if (item.fabric) metaLines.push({ text: `Fabric: ${item.fabric}`, font: 'Helvetica', size: 7, color: S500 });
+        if (p2.length) metaLines.push({ text: p2.join('  |  '), font: 'Helvetica', size: 8, color: S700 });
+        if (item.fabric) metaLines.push({ text: `Fabric: ${item.fabric}`, font: 'Helvetica', size: 8, color: S500 });
 
-        doc.font('Helvetica-Bold').fontSize(8.5);
+        doc.font('Helvetica-Bold').fontSize(11);
         let descH = doc.heightOfString(item.itemName || '--', { width: COL[2] - 6 });
         metaLines.forEach(m => {
           doc.font(m.font).fontSize(m.size);
-          descH += doc.heightOfString(m.text, { width: COL[2] - 6 }) + 1;
+          descH += doc.heightOfString(m.text, { width: COL[2] - 6 }) + 2;
         });
-        const rowH = Math.max(minRowHPerItem, descH + 12);
+        const rowH = Math.max(minRowHPerItem, descH + 14);
 
         doc.rect(PAD, Y, CW, rowH).fill(rowBg).stroke(S200);
         drawColSeps(Y, rowH);
 
-        doc.fillColor(S700).fontSize(8.5).font('Helvetica-Bold')
+        doc.fillColor(S700).fontSize(10).font('Helvetica-Bold')
           .text(String(idx + 1), colX[0] + 3, Y + 6, { width: COL[0] - 3 });
 
-        // Image — top-aligned, constrained to image column width
+        // Image — large thumbnail up to 110px
         const imgPath = itemImages[idx];
-        const imgMaxSz = COL[1] - 4; // max = column width minus padding
+        const imgMaxW = COL[1] - 6; // 94px
+        const imgMaxH = Math.min(rowH - 10, 115);
         if (imgPath && fs.existsSync(imgPath)) {
           try {
-            doc.image(imgPath, colX[1] + 2, Y + 4, { fit: [imgMaxSz, imgMaxSz] });
+            doc.image(imgPath, colX[1] + 3, Y + 5, { fit: [imgMaxW, imgMaxH] });
           } catch(e) {
-            doc.fillColor(S200).fontSize(6).font('Helvetica')
-              .text('N/A', colX[1], Y + 8, { width: COL[1], align: 'center' });
+            doc.fillColor(S200).fontSize(7).font('Helvetica')
+              .text('N/A', colX[1], Y + 12, { width: COL[1], align: 'center' });
           }
         } else {
-          doc.fillColor(S200).fontSize(6).font('Helvetica')
-            .text('N/A', colX[1], Y + 8, { width: COL[1], align: 'center' });
+          doc.fillColor(S200).fontSize(7).font('Helvetica')
+            .text('N/A', colX[1], Y + 12, { width: COL[1], align: 'center' });
         }
 
         let textY = Y + 5;
-        doc.fillColor(S900).font('Helvetica-Bold').fontSize(8.5);
+        doc.fillColor(S900).font('Helvetica-Bold').fontSize(11);
         doc.text(item.itemName || '--', colX[2] + 3, textY, { width: COL[2] - 6 });
-        textY += doc.heightOfString(item.itemName || '--', { width: COL[2] - 6 }) + 1;
+        textY += doc.heightOfString(item.itemName || '--', { width: COL[2] - 6 }) + 2;
         metaLines.forEach(m => {
           doc.font(m.font).fontSize(m.size).fillColor(m.color);
           doc.text(m.text, colX[2] + 3, textY, { width: COL[2] - 6 });
-          textY += doc.heightOfString(m.text, { width: COL[2] - 6 }) + 1;
+          textY += doc.heightOfString(m.text, { width: COL[2] - 6 }) + 2;
         });
 
-        const numY    = Y + 5;
+        const numY    = Y + 6;
         const taxRate = item.taxRate || 18;
-        doc.fillColor(S700).font('Helvetica').fontSize(8)
+        doc.fillColor(S700).font('Helvetica-Bold').fontSize(9.5)
           .text(item.hsnCode || '998821', colX[3] + 2, numY, { width: COL[3] - 4, align: 'center' })
           .text(`${taxRate}%`,            colX[4] + 2, numY, { width: COL[4] - 4, align: 'center' });
-        doc.fillColor(S900).font('Helvetica-Bold').fontSize(8.5)
+        doc.fillColor(S900).font('Helvetica-Bold').fontSize(10)
           .text(`${Number(item.qty||0).toFixed(2)} ${item.unit||'Mtr'}`, colX[5]+2, numY, { width: COL[5]-4, align:'center' })
           .text(Number(item.unitPrice||0).toFixed(2), colX[6]+2, numY, { width: COL[6]-4, align:'right' });
-        doc.fillColor(S500).font('Helvetica').fontSize(7.5)
+        doc.fillColor(S500).font('Helvetica-Bold').fontSize(8.5)
           .text(item.unit || 'Mtr', colX[7]+2, numY, { width: COL[7]-4, align:'center' });
-        doc.fillColor(S900).font('Helvetica-Bold').fontSize(8.5)
+        doc.fillColor(S900).font('Helvetica-Bold').fontSize(10.5)
           .text(Number(item.totalAmount||0).toFixed(2), colX[8]+2, numY, { width: COL[8]-4, align:'right' });
         Y += rowH;
       });
