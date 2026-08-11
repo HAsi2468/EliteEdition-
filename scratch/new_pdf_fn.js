@@ -297,14 +297,16 @@ const downloadInvoicePdf = async (req, res) => {
 
         const numY    = Y + 6;
         const taxRate = item.taxRate || 18;
+        let u = (item.unit || 'MTR').trim();
+        if (/meter|mtr/i.test(u)) u = 'MTR';
         doc.fillColor(S700).font('Helvetica-Bold').fontSize(9.5)
           .text(item.hsnCode || '998821', colX[3] + 2, numY, { width: COL[3] - 4, align: 'center' })
           .text(`${taxRate}%`,            colX[4] + 2, numY, { width: COL[4] - 4, align: 'center' });
         doc.fillColor(S900).font('Helvetica-Bold').fontSize(10)
-          .text(`${Number(item.qty||0).toFixed(2)} ${item.unit||'Mtr'}`, colX[5]+2, numY, { width: COL[5]-4, align:'center' })
+          .text(`${Number(item.qty||0).toFixed(2)} ${u}`, colX[5]+2, numY, { width: COL[5]-4, align:'center' })
           .text(Number(item.unitPrice||0).toFixed(2), colX[6]+2, numY, { width: COL[6]-4, align:'right' });
         doc.fillColor(S500).font('Helvetica-Bold').fontSize(8.5)
-          .text(item.unit || 'Mtr', colX[7]+2, numY, { width: COL[7]-4, align:'center' });
+          .text(u, colX[7]+2, numY, { width: COL[7]-4, align:'center' });
         doc.fillColor(S900).font('Helvetica-Bold').fontSize(10.5)
           .text(Number(item.totalAmount||0).toFixed(2), colX[8]+2, numY, { width: COL[8]-4, align:'right' });
         Y += rowH;
