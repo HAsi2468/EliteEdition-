@@ -37,7 +37,6 @@ const getAll = async (req, res) => {
     } else if (deptOr) {
       filter.$or = deptOr;
     }
-    }
     const skip = (Number(page) - 1) * Number(limit);
     let sort = { designName: -1 };
     if (sortBy) {
