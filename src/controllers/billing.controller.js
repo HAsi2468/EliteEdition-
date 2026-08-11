@@ -294,7 +294,7 @@ const downloadInvoicePdf = async (req, res) => {
     const companyGstin = config.companyGstin || '24AAAFE1234F1Z5';
     const companyAddress = config.companyAddress || 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, Surat - 395006';
     const companyPhone = config.companyPhone || '+91 98790 00000';
-    const companyTerms = invoice.terms || config.companyTerms || 'Payment due within 15 days from invoice date.';
+    const companyTerms = invoice.terms || config.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
 
     const doc = new PDFDocument({ margin: 18, size: 'A4', autoFirstPage: true, bufferPages: true });
 
@@ -617,7 +617,8 @@ const downloadInvoicePdf = async (req, res) => {
       .text(payDetailsStr, ML, footerY + 13, { width: 330 });
 
     doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
-      .text('Terms & Conditions: ' + companyTerms, ML, footerY + 28, { width: 330 });
+      .text('Terms & Conditions:', ML, footerY + 28, { width: 330 })
+      .text(companyTerms, ML, footerY + 38, { width: 330 });
 
     // RIGHT SIDE: Authorized Signatory
     const rightColX = ML + 340;
