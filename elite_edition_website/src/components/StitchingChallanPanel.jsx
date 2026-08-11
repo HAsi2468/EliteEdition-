@@ -7,7 +7,6 @@ const MAX_ITEMS = 30;
 const DEFAULT_ITEM = () => ({
   designNo: '',
   particulars: 'Garment Goods',
-  hsnCode: '6204',
   pcs: '',
   rate: '',
   amount: 0
@@ -88,7 +87,6 @@ export default function StitchingChallanPanel() {
     let items = Array.isArray(c.items) && c.items.length > 0 ? c.items.map(it => ({
       designNo: it.designNo || '',
       particulars: it.particulars || 'Garment Goods',
-      hsnCode: it.hsnCode || '6204',
       pcs: it.pcs != null ? it.pcs : '',
       rate: it.rate != null ? it.rate : '',
       amount: (parseFloat(it.pcs || 0) * parseFloat(it.rate || 0))
@@ -404,14 +402,18 @@ export default function StitchingChallanPanel() {
               {/* Top Details Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Challan No *</label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Challan No *</label>
+                    <span style={{ fontSize: '0.65rem', color: '#34d399', fontWeight: 800 }}>⚡ Auto PCH</span>
+                  </div>
                   <input
                     type="text"
                     value={formState.challanNo}
                     onChange={e => setFormState(prev => ({ ...prev, challanNo: e.target.value }))}
                     placeholder="PCH-1"
+                    readOnly
                     required
-                    style={{ padding: '0.45rem 0.7rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)' }}
+                    style={{ padding: '0.45rem 0.7rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--primary)', background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.3)', cursor: 'not-allowed' }}
                   />
                 </div>
 
@@ -494,9 +496,8 @@ export default function StitchingChallanPanel() {
                     <thead>
                       <tr style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid var(--border-light)' }}>
                         <th style={{ width: '35px', padding: '0.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>#</th>
-                        <th style={{ width: '120px', padding: '0.5rem', color: 'var(--text-muted)' }}>Design No</th>
+                        <th style={{ width: '130px', padding: '0.5rem', color: 'var(--text-muted)' }}>Design No</th>
                         <th style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>Particulars / Goods Description</th>
-                        <th style={{ width: '80px', padding: '0.5rem', color: 'var(--text-muted)' }}>HSN</th>
                         <th style={{ width: '90px', padding: '0.5rem', textAlign: 'right', color: 'var(--text-muted)' }}>Pcs (Qty)</th>
                         <th style={{ width: '90px', padding: '0.5rem', textAlign: 'right', color: 'var(--text-muted)' }}>Rate (₹)</th>
                         <th style={{ width: '100px', padding: '0.5rem', textAlign: 'right', color: 'var(--text-muted)' }}>Amount (₹)</th>
@@ -522,15 +523,6 @@ export default function StitchingChallanPanel() {
                               value={it.particulars}
                               onChange={e => handleItemChange(idx, 'particulars', e.target.value)}
                               placeholder="Garment Particulars"
-                              style={{ width: '100%', padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}
-                            />
-                          </td>
-                          <td style={{ padding: '0.35rem' }}>
-                            <input
-                              type="text"
-                              value={it.hsnCode}
-                              onChange={e => handleItemChange(idx, 'hsnCode', e.target.value)}
-                              placeholder="6204"
                               style={{ width: '100%', padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}
                             />
                           </td>
@@ -658,7 +650,6 @@ export default function StitchingChallanPanel() {
                     <th style={{ padding: '0.4rem', border: '1px solid #1e40af' }}>SR</th>
                     <th style={{ padding: '0.4rem', border: '1px solid #1e40af' }}>DESIGN NO</th>
                     <th style={{ padding: '0.4rem', border: '1px solid #1e40af' }}>PARTICULARS</th>
-                    <th style={{ padding: '0.4rem', border: '1px solid #1e40af' }}>HSN</th>
                     <th style={{ padding: '0.4rem', border: '1px solid #1e40af', textAlign: 'right' }}>PCS (QTY)</th>
                     <th style={{ padding: '0.4rem', border: '1px solid #1e40af', textAlign: 'right' }}>RATE (₹)</th>
                     <th style={{ padding: '0.4rem', border: '1px solid #1e40af', textAlign: 'right' }}>AMOUNT (₹)</th>
@@ -670,7 +661,6 @@ export default function StitchingChallanPanel() {
                       <td style={{ padding: '0.35rem', border: '1px solid #cbd5e1', textAlign: 'center' }}>{i + 1}</td>
                       <td style={{ padding: '0.35rem', border: '1px solid #cbd5e1', fontWeight: 'bold' }}>{it.designNo || '—'}</td>
                       <td style={{ padding: '0.35rem', border: '1px solid #cbd5e1' }}>{it.particulars || 'Garment Goods'}</td>
-                      <td style={{ padding: '0.35rem', border: '1px solid #cbd5e1' }}>{it.hsnCode || '6204'}</td>
                       <td style={{ padding: '0.35rem', border: '1px solid #cbd5e1', textAlign: 'right', fontWeight: 'bold' }}>{it.pcs || 0}</td>
                       <td style={{ padding: '0.35rem', border: '1px solid #cbd5e1', textAlign: 'right' }}>{it.rate ? `₹${it.rate.toFixed(2)}` : '—'}</td>
                       <td style={{ padding: '0.35rem', border: '1px solid #cbd5e1', textAlign: 'right', fontWeight: 'bold' }}>{it.amount ? `₹${it.amount.toFixed(2)}` : '—'}</td>

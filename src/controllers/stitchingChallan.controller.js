@@ -60,7 +60,6 @@ const createChallan = async (req, res) => {
         srNo: idx + 1,
         designNo: it.designNo || '',
         particulars: it.particulars || '',
-        hsnCode: it.hsnCode || '6204',
         pcs,
         rate,
         amount
@@ -156,7 +155,6 @@ const updateChallan = async (req, res) => {
           srNo: idx + 1,
           designNo: it.designNo || '',
           particulars: it.particulars || '',
-          hsnCode: it.hsnCode || '6204',
           pcs,
           rate,
           amount
@@ -283,12 +281,11 @@ const downloadChallanPdf = async (req, res) => {
     const tableTop = curY;
     const cols = [
       { name: 'SR', x: ML + 5, w: 25 },
-      { name: 'DESIGN NO', x: ML + 32, w: 85 },
-      { name: 'PARTICULARS / DESCRIPTION', x: ML + 120, w: 215 },
-      { name: 'HSN', x: ML + 338, w: 45 },
-      { name: 'PCS (QTY)', x: ML + 386, w: 55, align: 'right' },
-      { name: 'RATE (₹)', x: ML + 444, w: 45, align: 'right' },
-      { name: 'AMOUNT (₹)', x: ML + 492, w: 30, align: 'right' },
+      { name: 'DESIGN NO', x: ML + 32, w: 105 },
+      { name: 'PARTICULARS / DESCRIPTION', x: ML + 140, w: 220 },
+      { name: 'PCS (QTY)', x: ML + 365, w: 55, align: 'right' },
+      { name: 'RATE (₹)', x: ML + 425, w: 45, align: 'right' },
+      { name: 'AMOUNT (₹)', x: ML + 475, w: 45, align: 'right' },
     ];
 
     // Draw Table Header Row
@@ -309,10 +306,9 @@ const downloadChallanPdf = async (req, res) => {
       doc.text(String(index + 1), cols[0].x, curY + 4, { width: cols[0].w });
       doc.font('Helvetica-Bold').text(it.designNo || '—', cols[1].x, curY + 4, { width: cols[1].w });
       doc.font('Helvetica').text(it.particulars || 'Garment Stitching', cols[2].x, curY + 4, { width: cols[2].w });
-      doc.text(it.hsnCode || '6204', cols[3].x, curY + 4, { width: cols[3].w });
-      doc.text(String(it.pcs || 0), cols[4].x, curY + 4, { width: cols[4].w, align: 'right' });
-      doc.text(it.rate ? `₹${it.rate.toFixed(2)}` : '—', cols[5].x, curY + 4, { width: cols[5].w, align: 'right' });
-      doc.font('Helvetica-Bold').text(it.amount ? `₹${it.amount.toFixed(2)}` : '—', cols[6].x, curY + 4, { width: cols[6].w, align: 'right' });
+      doc.text(String(it.pcs || 0), cols[3].x, curY + 4, { width: cols[3].w, align: 'right' });
+      doc.text(it.rate ? `₹${it.rate.toFixed(2)}` : '—', cols[4].x, curY + 4, { width: cols[4].w, align: 'right' });
+      doc.font('Helvetica-Bold').text(it.amount ? `₹${it.amount.toFixed(2)}` : '—', cols[5].x, curY + 4, { width: cols[5].w, align: 'right' });
 
       curY += 16;
     });
