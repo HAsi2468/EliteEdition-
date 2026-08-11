@@ -904,7 +904,7 @@ function ImageField({ label, name, form, onChange, index }) {
 }
 
 // ─── JOB CARD FORM MODAL ─────────────────────────────────────────────────────
-function JobCardForm({ card, onSave, onClose }) {
+function JobCardForm({ card, onSave, onClose, department }) {
   const [form, setForm] = useState(card ? { ...card } : { ...BLANK });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -1143,12 +1143,17 @@ function JobCardForm({ card, onSave, onClose }) {
     e.preventDefault();
     if (!form.jobNo.trim()) { setError('Job No. is required.'); return; }
     setSaving(true); setError('');
+    const payload = {
+      ...form,
+      department: department || (card?.department) || 'digital_print',
+      category: form.category || (department === 'stitching' ? 'Stitching' : '')
+    };
     try {
       if (card?._id) {
-        await api.updateJobCard(card._id, form);
+        await api.updateJobCard(card._id, payload);
         triggerPushNotification('📝 Job Card Updated', `Job Card #${form.jobNo} saved successfully.`, 'info');
       } else {
-        await api.createJobCard(form);
+        await api.createJobCard(payload);
         triggerPushNotification('✨ Job Card Created', `Job Card #${form.jobNo} created successfully!`, 'success');
       }
       onSave();
@@ -1696,6 +1701,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
       const res = await api.getJobCards({
         search: debouncedSearch,
         status: statusFilter === 'All' ? '' : statusFilter,
+        department,
         page,
         limit: 25,
         sortBy,
@@ -1715,7 +1721,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, [debouncedSearch, statusFilter, page, activeSubTab, sortBy, sortOrder, dateStart, dateEnd]);
+  }, [debouncedSearch, statusFilter, page, activeSubTab, sortBy, sortOrder, dateStart, dateEnd, department]);
 
   useEffect(() => {
     fetchCards();
@@ -2139,7 +2145,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
 
       {/* Modals */}
       {showForm && (
-        <JobCardForm card={formCard} onSave={onSaved} onClose={()=>setShowForm(false)}/>
+        <JobCardForm card={formCard} onSave={onSaved} onClose={()=>setShowForm(false)} department={department}/>
       )}
       {previewCard && (
         <JobCardPrintView 

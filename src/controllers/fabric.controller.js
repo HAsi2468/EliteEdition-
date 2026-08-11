@@ -27,10 +27,19 @@ const normalizePanna = (val, fabricName = '') => {
   return clean;
 };
 
+const getDepartmentFilter = (dept) => {
+  if (dept === 'stitching') {
+    return { department: 'stitching' };
+  } else if (dept === 'digital_print') {
+    return { $or: [{ department: 'digital_print' }, { department: { $exists: false } }, { department: null }, { department: '' }] };
+  }
+  return {};
+};
+
 // Create a new INWARD transaction
 const createInward = async (req, res) => {
   try {
-    const { challanNo, vendorName, fabricQuality, panna, qty, date, notes, shortagePct } = req.body;
+    const { challanNo, vendorName, fabricQuality, panna, qty, date, notes, shortagePct, department } = req.body;
     
     if (!fabricQuality || qty == null || qty < 0) {
       return res.status(400).json({ success: false, error: 'Fabric Quality and a valid Quantity are required.' });
@@ -49,6 +58,7 @@ const createInward = async (req, res) => {
       date: date ? new Date(date) : new Date(),
       notes,
       shortagePct: shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null,
+      department: department || 'digital_print',
     });
 
     await transaction.save();
@@ -62,7 +72,7 @@ const createInward = async (req, res) => {
 // Create a new OUTWARD transaction
 const createOutward = async (req, res) => {
   try {
-    const { jobNo, challanNo, partyName, fabricQuality, panna, lotNo, qty, date, notes } = req.body;
+    const { jobNo, challanNo, partyName, fabricQuality, panna, lotNo, qty, date, notes, department } = req.body;
     
     if (!fabricQuality || qty == null || qty <= 0) {
       return res.status(400).json({ success: false, error: 'Fabric Quality and a valid Quantity (>0) are required.' });
@@ -90,7 +100,8 @@ const createOutward = async (req, res) => {
       lotNo: lotNo ? Number(lotNo) : undefined,
       qty: finalQty,
       date: date ? new Date(date) : new Date(),
-      notes: finalNotes
+      notes: finalNotes,
+      department: department || 'digital_print',
     });
 
     await transaction.save();
@@ -172,7 +183,8 @@ const createOutward = async (req, res) => {
 // Get all transactions
 const getTransactions = async (req, res) => {
   try {
-    const transactions = await FabricTransaction.find().sort({ date: -1, createdAt: -1 });
+    const deptFilter = getDepartmentFilter(req.query.department);
+    const transactions = await FabricTransaction.find(deptFilter).sort({ date: -1, createdAt: -1 });
     res.status(200).json({ success: true, data: transactions });
   } catch (error) {
     console.error('Error fetching fabric transactions:', error);
@@ -183,7 +195,9 @@ const getTransactions = async (req, res) => {
 // Get current stock overview grouped by fabric quality
 const getStockOverview = async (req, res) => {
   try {
+    const deptFilter = getDepartmentFilter(req.query.department);
     const pipeline = [
+      { $match: deptFilter },
       {
         $group: {
           _id: '$fabricQuality',
@@ -219,8 +233,8 @@ const getStockOverview = async (req, res) => {
 
 const getLotStock = async (req, res) => {
   try {
-    const { fabricQuality } = req.query;
-    const matchStage = {};
+    const { fabricQuality, department } = req.query;
+    const matchStage = getDepartmentFilter(department);
     if (fabricQuality) {
       const clean = fabricQuality.trim().toUpperCase();
       const candidates = [clean];
@@ -432,7 +446,9 @@ const downloadLedgerPdf = async (req, res) => {
 // Get stock grouped by fabricQuality + panna
 const getStockByPanna = async (req, res) => {
   try {
+    const deptFilter = getDepartmentFilter(req.query.department);
     const pipeline = [
+      { $match: deptFilter },
       {
         $group: {
           _id: { fabricQuality: '$fabricQuality', panna: { $ifNull: ['$panna', 'Unknown'] } },

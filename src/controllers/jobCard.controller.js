@@ -83,9 +83,19 @@ function calcExpTime(panna, passText, totalMtr, machineName) {
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 const getAllJobCards = async (req, res) => {
   try {
-    const { status, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder } = req.query;
+    const { status, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder, category, department } = req.query;
     const filter = {};
     if (status && status !== 'All') filter.status = status;
+    if (category && category !== 'All') filter.category = category;
+    if (department === 'stitching') {
+      filter.$or = [
+        { department: 'stitching' },
+        { category: { $regex: 'stitching', $options: 'i' } }
+      ];
+    } else if (department === 'digital_print') {
+      filter.department = { $ne: 'stitching' };
+      filter.category = { $not: { $regex: '^stitching$', $options: 'i' } };
+    }
     if (dateStart || dateEnd) {
       filter.date = {};
       if (dateStart) filter.date.$gte = dateStart;

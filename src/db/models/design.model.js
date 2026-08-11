@@ -13,6 +13,7 @@ const designSchema = new mongoose.Schema(
     panna:          { type: String, default: '', trim: true },
     pass:           { type: String, default: '', trim: true },
     category:       { type: String, default: '', trim: true },   // e.g. "SUIT", "DUPATTA"
+    department:     { type: String, default: 'digital_print', trim: true },
     imageUrl:       { type: String, default: '', trim: true },   // Main design image
     imageUrl2:      { type: String, default: '', trim: true },   // Optional second image
     paperType:      { type: String, default: '', trim: true },

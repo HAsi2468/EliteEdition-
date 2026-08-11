@@ -833,12 +833,18 @@ export const api = {
   },
 
   // Fabric Inventory
-  async getFabricTransactions() {
-    return request('/fabric/transactions');
+  async getFabricTransactions(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/fabric/transactions${qs}`);
   },
   
-  async getFabricStock() {
-    return request('/fabric/stock');
+  async getFabricStock(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/fabric/stock${qs}`);
   },
   
   async createFabricInward(payload) {
@@ -856,13 +862,17 @@ export const api = {
   },
   
   async getFabricLotStock(params = {}) {
-    const { fabricQuality } = params;
-    const qs = fabricQuality ? `?fabricQuality=${encodeURIComponent(fabricQuality)}` : '';
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
     return request(`/fabric/lot-stock${qs}`);
   },
 
-  async getFabricStockByPanna() {
-    return request('/fabric/stock-panna');
+  async getFabricStockByPanna(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/fabric/stock-panna${qs}`);
   },
 
   async downloadFabricLotWisePdf(dateStart = '', dateEnd = '', fileName = 'Fabric_LotWise_Stock_Report.pdf') {

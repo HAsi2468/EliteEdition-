@@ -433,15 +433,15 @@ export default function FabricInventoryPanel({ department }) {
         console.warn('Failed to fetch job cards', e);
       }
 
-      const stockRes = await api.getFabricStock();
+      const stockRes = await api.getFabricStock({ department });
       if (stockRes.success) setStock(stockRes.data);
 
-      const transRes = await api.getFabricTransactions();
+      const transRes = await api.getFabricTransactions({ department });
       if (transRes.success) setTransactions(transRes.data);
 
       // Panna-wise stock
       try {
-        const pRes = await api.getFabricStockByPanna();
+        const pRes = await api.getFabricStockByPanna({ department });
         if (pRes && pRes.success) setPannaStock(pRes.data || []);
       } catch (e) { console.warn('Failed to fetch panna stock', e); }
 
@@ -559,12 +559,13 @@ export default function FabricInventoryPanel({ department }) {
   const handleInwardSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    const payload = { ...inwardForm, department: department || 'digital_print' };
     try {
       if (editingTransaction) {
-        await api.updateFabricTransaction(editingTransaction._id, inwardForm);
+        await api.updateFabricTransaction(editingTransaction._id, payload);
         triggerPushNotification('🧵 Fabric Transaction Updated', 'Inward fabric transaction updated.', 'info');
       } else {
-        await api.createFabricInward(inwardForm);
+        await api.createFabricInward(payload);
         triggerPushNotification('🧵 Fabric Inward Added', `${inwardForm.qty || ''}M of ${inwardForm.fabricQuality} inward recorded!`, 'success');
       }
       setIsInwardOpen(false);
@@ -581,12 +582,13 @@ export default function FabricInventoryPanel({ department }) {
   const handleOutwardSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    const payload = { ...outwardForm, department: department || 'digital_print' };
     try {
       if (editingOutwardTransaction) {
-        await api.updateFabricTransaction(editingOutwardTransaction._id, outwardForm);
+        await api.updateFabricTransaction(editingOutwardTransaction._id, payload);
         triggerPushNotification('📦 Outward Transaction Updated', `Outward transaction for Job #${outwardForm.jobNo} updated.`, 'info');
       } else {
-        await api.createFabricOutward(outwardForm);
+        await api.createFabricOutward(payload);
         triggerPushNotification('📦 Fabric Outward Recorded', `${outwardForm.qty || ''}M fabric outward recorded for Job #${outwardForm.jobNo}.`, 'success');
       }
       setIsOutwardOpen(false);

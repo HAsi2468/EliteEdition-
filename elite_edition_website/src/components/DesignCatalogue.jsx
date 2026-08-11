@@ -421,6 +421,7 @@ export default function DesignCatalogue({ department }) {
         category: categoryFilter,
         colors: colorFilter,
         status: statusFilter,
+        department,
         sortBy,
         sortOrder,
         page,
@@ -520,6 +521,8 @@ export default function DesignCatalogue({ department }) {
     try {
       const sanitizedVal = {
         ...formVal,
+        department: department || (formDesign?.department) || 'digital_print',
+        category: formVal.category || (department === 'stitching' ? 'Stitching' : ''),
         top100: formVal.top100 === '' || formVal.top100 === null || formVal.top100 === undefined ? 0 : Number(formVal.top100),
         sleeve100: formVal.sleeve100 === '' || formVal.sleeve100 === null || formVal.sleeve100 === undefined ? 0 : Number(formVal.sleeve100),
         bottom100: formVal.bottom100 === '' || formVal.bottom100 === null || formVal.bottom100 === undefined ? 0 : Number(formVal.bottom100),

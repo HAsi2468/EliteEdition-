@@ -3,11 +3,20 @@ const logger = require('../config/logger');
 
 const getAll = async (req, res) => {
   try {
-    const { search, category, colors, status, page = 1, limit = 50, sortBy, sortOrder } = req.query;
+    const { search, category, colors, status, page = 1, limit = 50, sortBy, sortOrder, department } = req.query;
     const filter = {};
     if (status && status !== 'All') filter.status = status;
     if (category && category !== 'All') filter.category = category;
     if (colors && colors !== 'All') filter.colors = { $regex: colors, $options: 'i' };
+    if (department === 'stitching') {
+      filter.$or = [
+        { department: 'stitching' },
+        { category: { $regex: 'stitching', $options: 'i' } }
+      ];
+    } else if (department === 'digital_print') {
+      filter.department = { $ne: 'stitching' };
+      filter.category = { $not: { $regex: '^stitching$', $options: 'i' } };
+    }
     if (search) {
       filter.$or = [
         { designName:     { $regex: search, $options: 'i' } },
