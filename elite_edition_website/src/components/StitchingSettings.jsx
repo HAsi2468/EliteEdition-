@@ -176,9 +176,9 @@ export default function StitchingSettings() {
               <Scissors size={22} color="#fff" />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-primary)' }}>Elite Stitching Settings (`stitching_configs` Table)</h2>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-primary)' }}>Elite Stitching Settings</h2>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                Configure dynamic dropdown options for Garment Categories, Brand Labels, Finishing Types, Parties & Delivery Methods stored in a dedicated database table.
+                Configure dynamic dropdown options for Garment Categories, Brand Labels, Finishing Types, Parties & Delivery Methods.
               </p>
             </div>
           </div>
@@ -210,7 +210,7 @@ export default function StitchingSettings() {
               <Tag size={16} color="#38bdf8" />
             )}
             {renderSection(
-              'Fabrics (Fabric Types)',
+              'Fabrics',
               'fabrics',
               newFabric,
               setNewFabric,
@@ -218,7 +218,7 @@ export default function StitchingSettings() {
               <Tag size={16} color="#ec4899" />
             )}
             {renderSection(
-              'Stitching Sizes (Garment Sizes)',
+              'Stitching Sizes',
               'sizes',
               newSize,
               setNewSize,
@@ -248,11 +248,11 @@ export default function StitchingSettings() {
 
       {/* Section 3: Stitching Party, Vendor, Billing & Delivery Dropdowns */}
       <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
-        {renderSectionHeader('🏢 Parties (Clients) & 🏭 Vendors (Job Workers)', 'party', '#fbbf24')}
+        {renderSectionHeader('🏢 Parties & 🏭 Vendors', 'party', '#fbbf24')}
         {expandedSections.party && (
           <div style={{ padding: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
             {renderSection(
-              'Parties (Clients / Customers)',
+              'Parties',
               'parties',
               newParty,
               setNewParty,
@@ -260,7 +260,7 @@ export default function StitchingSettings() {
               <Tag size={16} color="#fbbf24" />
             )}
             {renderSection(
-              'Vendors (Suppliers & Job Workers)',
+              'Vendors',
               'vendors',
               newVendor,
               setNewVendor,
@@ -299,7 +299,7 @@ export default function StitchingSettings() {
       <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)' }}>
         <div>
           <h4 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: 700 }}>Party & Vendor Directory Management</h4>
-          <p style={{ margin: '2px 0 0', color: 'var(--text-muted)', fontSize: '0.78rem' }}>Manage saved customer profiles (Parties) and external suppliers/contractors (Vendors).</p>
+          <p style={{ margin: '2px 0 0', color: 'var(--text-muted)', fontSize: '0.78rem' }}>Manage saved customer profiles and external suppliers/contractors.</p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button className="btn-secondary" onClick={() => setIsVendorManagerOpen('parties')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
