@@ -1416,22 +1416,23 @@ export const api = {
     });
   },
 
-  async downloadInvoicePdf(id, invoiceNo) {
+  async downloadInvoicePdf(id, invoiceNo, duplicate = false) {
     const baseUrl = getBaseUrl();
     const token = localStorage.getItem('elite_auth_token');
-    const response = await fetch(`${baseUrl}/billing/invoices/${id}/pdf`, {
+    const url = `${baseUrl}/billing/invoices/${id}/pdf${duplicate ? '?duplicate=true' : ''}`;
+    const response = await fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!response.ok) throw new Error('Failed to generate Invoice PDF');
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
+    const objUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Tax_Invoice_${invoiceNo || 'Draft'}.pdf`);
+    link.href = objUrl;
+    link.setAttribute('download', `Tax_Invoice_${invoiceNo || 'Draft'}${duplicate ? '_with_Duplicate' : ''}.pdf`);
     document.body.appendChild(link);
     link.click();
     link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    window.URL.revokeObjectURL(objUrl);
   },
 
   // Billing Customers

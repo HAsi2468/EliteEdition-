@@ -285,6 +285,8 @@ const downloadInvoicePdf = async (req, res) => {
     const invoice = await BillingInvoice.findById(req.params.id).lean();
     if (!invoice) return res.status(404).send('Invoice not found');
 
+    const includeDuplicate = req.query.duplicate === 'true';
+
     const PrintConfig = require('../db/models/printConfig.model');
     const JobCard = require('../db/models/jobCard.model');
     const config = await PrintConfig.findOne({ isConfig: true }).lean() || {};
@@ -307,11 +309,11 @@ const downloadInvoicePdf = async (req, res) => {
     doc.pipe(res);
 
     const PW = 595.28, PH = 841.89;
-    const PAD = 18; // page margin
-    const CW = PW - PAD * 2; // content width = 559.28
+    const PAD = 18;
+    const CW = PW - PAD * 2;
     const logoPath = path.join(__dirname, 'Logo.png');
 
-    // ── HELPERS ────────────────────────────────────────────────────────────────
+    // ── HELPERS ─────────────────────────────────────────────────────────────────
     const formatDate = (d) => {
       if (!d) return '--';
       const dt = new Date(d);
@@ -353,24 +355,12 @@ const downloadInvoicePdf = async (req, res) => {
       return String(jobStr).replace(/JOB NO\.-?\s*/gi,'').replace(/Job\s*#?\s*/gi,'').trim();
     };
 
-    // ── COLOURS ────────────────────────────────────────────────────────────────
-    const PRP  = '#4c1d95';   // deep purple
-    const PRPM = '#6b21a8';   // mid purple
-    const PRPL = '#ede9fe';   // light purple bg
-    const S900 = '#0f172a';
-    const S700 = '#334155';
-    const S500 = '#64748b';
-    const S200 = '#e2e8f0';
-    const S50  = '#f8fafc';
-    const WHT  = '#ffffff';
-
-    // ── COLUMN WIDTHS ──────────────────────────────────────────────────────────
+    // ── COLUMN WIDTHS ────────────────────────────────────────────────────────────
     // Sr | IMG | Description | HSN | GST% | Qty | Rate | Per | Amount
     const COL = [18, 36, 196, 54, 34, 60, 60, 30, 71]; // sum=559 ✓
     const colX = COL.reduce((acc, w, i) => { acc.push((acc[i-1]||PAD) + (i>0?COL[i-1]:0)); return acc; }, []);
-    // colX[0]=18, colX[1]=36, colX[2]=72, colX[3]=268, ...
 
-    // Pre-compute image paths for items (async before PDF rendering)
+    // ── PRE-LOAD IMAGES ──────────────────────────────────────────────────────────
     const itemImages = [];
     const items = invoice.items || [];
     for (let i = 0; i < items.length; i++) {
@@ -394,7 +384,7 @@ const downloadInvoicePdf = async (req, res) => {
       itemImages.push(imgPath);
     }
 
-    // Compute tax breakdown grouped by rate
+    // ── TAX COMPUTATION ──────────────────────────────────────────────────────────
     const hsnMap = {};
     items.forEach(it => {
       const hsn  = it.hsnCode || '998821';
@@ -406,36 +396,62 @@ const downloadInvoicePdf = async (req, res) => {
       hsnMap[key].cgst   += taxable * (rate / 2 / 100);
       hsnMap[key].sgst   += taxable * (rate / 2 / 100);
     });
-    const hsnRows = Object.values(hsnMap);
+    const hsnRows      = Object.values(hsnMap);
     const totalTaxable = hsnRows.reduce((s, r) => s + r.taxable, 0);
     const totalCgst    = hsnRows.reduce((s, r) => s + r.cgst,    0);
     const totalSgst    = hsnRows.reduce((s, r) => s + r.sgst,    0);
     const totalTax     = totalCgst + totalSgst;
 
-    // ── PAGE RENDERER ──────────────────────────────────────────────────────────
-    const renderPage = (copyLabel) => {
+    // ── PAGE RENDERER ────────────────────────────────────────────────────────────
+    // bw = true → renders entire page in black & white (duplicate copy)
+    const renderPage = (copyLabel, bw = false) => {
+      // Colour palette — overridden to grayscale if bw=true
+      const c = (color, bwFallback) => bw ? (bwFallback || '#000000') : color;
+
+      const PRP  = c('#4c1d95', '#1a1a1a');  // deep purple   → near-black
+      const PRPM = c('#6b21a8', '#333333');  // mid purple    → dark gray
+      const PRPL = c('#ede9fe', '#f0f0f0');  // light purple  → light gray
+      const S900 = c('#0f172a', '#000000');
+      const S700 = c('#334155', '#222222');
+      const S500 = c('#64748b', '#555555');
+      const S200 = c('#e2e8f0', '#cccccc');
+      const S50  = c('#f8fafc', '#f9f9f9');
+      const WHT  = '#ffffff';
+
       let Y = PAD;
 
-      // ── 1. HEADER ────────────────────────────────────────────────────────────
-      // Outer border
+      // ── OUTER BORDER ──────────────────────────────────────────────────────────
       doc.rect(PAD, Y, CW, PH - PAD * 2).stroke(S200);
 
-      // Top purple accent strip
+      // ── TOP ACCENT BAR ────────────────────────────────────────────────────────
       doc.rect(PAD, Y, CW, 4).fill(PRP);
+
+      // ── DUPLICATE DIAGONAL WATERMARK (B&W only) ───────────────────────────────
+      if (bw) {
+        doc.save();
+        doc.fillColor('#e0e0e0').font('Helvetica-Bold').fontSize(60)
+          .opacity(0.18);
+        doc.rotate(-45, { origin: [PW/2, PH/2] });
+        doc.text('DUPLICATE COPY', PW/2 - 200, PH/2 - 30);
+        doc.restore();
+        doc.opacity(1);
+      }
+
       Y += 4;
 
-      // Logo left / Company right
+      // ── HEADER: LOGO LEFT / COMPANY RIGHT ─────────────────────────────────────
       const hdrH = 52;
       doc.rect(PAD, Y, CW, hdrH).fill(S50);
 
-      // Logo
-      if (fs.existsSync(logoPath)) {
-        try {
-          doc.image(logoPath, PAD + 6, Y + 6, { width: 80, height: 40, fit: [80, 40] });
-        } catch(e) {}
+      if (!bw && fs.existsSync(logoPath)) {
+        try { doc.image(logoPath, PAD + 6, Y + 6, { width: 80, height: 40, fit: [80, 40] }); } catch(e) {}
+      } else if (bw) {
+        // Company initial box placeholder
+        doc.rect(PAD + 6, Y + 6, 40, 40).fill('#e0e0e0');
+        doc.fillColor('#333').fontSize(14).font('Helvetica-Bold')
+          .text(companyName.charAt(0), PAD + 6, Y + 18, { width: 40, align: 'center' });
       }
 
-      // Company name & address (right side)
       doc.fillColor(S900).fontSize(11).font('Helvetica-Bold')
         .text(companyName.toUpperCase(), PAD + 90, Y + 6, { width: CW - 96, align: 'right' });
       doc.fillColor(S500).fontSize(7).font('Helvetica')
@@ -443,38 +459,35 @@ const downloadInvoicePdf = async (req, res) => {
         .text(`GSTIN/UIN: ${companyGstin}   Phone: ${companyPhone}   State: ${companyState}, Code: ${companyStateCode}`,
               PAD + 90, Y + 30, { width: CW - 96, align: 'right' });
 
-      // Copy label badge (top right of header)
-      const badgeW = 120, badgeH2 = 14;
+      // Copy label badge
+      const badgeW = 130, badgeH2 = 14;
       doc.rect(PAD + CW - badgeW, Y, badgeW, badgeH2).fill(PRP);
       doc.fillColor(WHT).fontSize(7).font('Helvetica-Bold')
         .text(copyLabel, PAD + CW - badgeW, Y + 3, { width: badgeW, align: 'center' });
 
       Y += hdrH;
 
-      // ── 2. TAX INVOICE TITLE ROW ─────────────────────────────────────────────
+      // ── TAX INVOICE TITLE ─────────────────────────────────────────────────────
       const titleH = 22;
       doc.rect(PAD, Y, CW, titleH).fill(PRPL);
-      doc.fillColor(PRP).fontSize(13).font('Helvetica-Bold')
-        .text('TAX INVOICE', PAD + 8, Y + 5);
+      doc.fillColor(PRP).fontSize(13).font('Helvetica-Bold').text('TAX INVOICE', PAD + 8, Y + 5);
 
-      const ourChallanStr = invoice.ourChallanNo || invoice.challanNo || '';
+      const challanStr = invoice.ourChallanNo || invoice.challanNo || '';
       doc.fillColor(S700).fontSize(8).font('Helvetica')
-        .text(`Invoice No: ${invoice.invoiceNo}${ourChallanStr ? '   Challan: ' + ourChallanStr : ''}`,
-              PAD + 130, Y + 5, { width: 200 })
+        .text(`Invoice No: ${invoice.invoiceNo}${challanStr ? '   Challan: ' + challanStr : ''}`, PAD + 130, Y + 5, { width: 200 })
         .text(`Date: ${formatDate(invoice.invoiceDate)}   Due: ${formatDate(invoice.dueDate)}`,
               PAD + CW - 175, Y + 5, { width: 170, align: 'right' });
-
       Y += titleH;
 
-      // ── 3. BUYER / SELLER INFO ───────────────────────────────────────────────
-      const cust    = invoice.customer || {};
-      const infoH   = 72;
-      const halfCW  = Math.floor(CW / 2);
+      // ── BUYER / SELLER INFO ───────────────────────────────────────────────────
+      const cust   = invoice.customer || {};
+      const infoH  = 72;
+      const halfCW = Math.floor(CW / 2);
 
       // Left: Buyer
       doc.rect(PAD, Y, halfCW, infoH).fill(WHT).stroke(S200);
+      doc.rect(PAD, Y, halfCW, 13).fill(PRP);
       doc.fillColor(WHT).fontSize(7.5).font('Helvetica-Bold')
-        .rect(PAD, Y, halfCW, 13).fill(PRP).fillColor(WHT)
         .text('BUYER (BILLED TO)', PAD + 5, Y + 3, { width: halfCW - 10 });
       doc.fillColor(S900).fontSize(8.5).font('Helvetica-Bold')
         .text(cust.businessName || cust.name || '--', PAD + 5, Y + 15, { width: halfCW - 10 });
@@ -485,18 +498,17 @@ const downloadInvoicePdf = async (req, res) => {
         .text(`State: ${cust.state || 'Gujarat'}, Code: ${cust.stateCode || '24'}`, PAD + 5, Y + 56)
         .text(`Contact: ${cust.phone || '--'}`, PAD + 5, Y + 64);
 
-      // Right: Seller / Invoice meta
+      // Right: Seller/meta
       const rx = PAD + halfCW;
       doc.rect(rx, Y, CW - halfCW, infoH).fill(WHT).stroke(S200);
       doc.rect(rx, Y, CW - halfCW, 13).fill(PRP);
       doc.fillColor(WHT).fontSize(7.5).font('Helvetica-Bold')
         .text('SELLER / DISPATCH DETAILS', rx + 5, Y + 3, { width: CW - halfCW - 10 });
-
       const metaW = (CW - halfCW) / 2 - 5;
       const pairs = [
-        ['Order No.', invoice.orderNo || '--',   'e-Way Bill', invoice.ewayBillNo || '--'],
+        ['Order No.', invoice.orderNo || '--', 'e-Way Bill', invoice.ewayBillNo || '--'],
         ['Dispatch Doc', invoice.dispatchDocNo || '--', 'Destination', cust.state || 'Gujarat'],
-        ['Terms of Delivery', 'By Road',         'Place of Supply', `${cust.state || 'Gujarat'} (${cust.stateCode || '24'})`],
+        ['Terms of Delivery', 'By Road', 'Place of Supply', `${cust.state || 'Gujarat'} (${cust.stateCode || '24'})`],
       ];
       let metaY = Y + 15;
       pairs.forEach(([k1, v1, k2, v2]) => {
@@ -508,47 +520,40 @@ const downloadInvoicePdf = async (req, res) => {
           .text(v2, rx + metaW + 10, metaY + 8, { width: metaW });
         metaY += 18;
       });
-
       Y += infoH;
 
-      // ── 4. ITEMS TABLE HEADER ─────────────────────────────────────────────────
+      // ── ITEMS TABLE HEADER ───────────────────────────────────────────────────
       const tblHdrH = 22;
       doc.rect(PAD, Y, CW, tblHdrH).fill(PRP);
       doc.fillColor(WHT).fontSize(7.5).font('Helvetica-Bold');
-      const hdrs = ['Sr.', 'Image', 'Description of Goods', 'HSN/SAC', 'GST%', 'Qty', 'Rate', 'Per', 'Amount'];
+      const hdrs   = ['Sr.', 'Image', 'Description of Goods', 'HSN/SAC', 'GST%', 'Qty', 'Rate', 'Per', 'Amount'];
       const aligns = ['left','center','left','center','center','center','right','center','right'];
-      hdrs.forEach((h, i) => {
-        doc.text(h, colX[i] + 2, Y + 7, { width: COL[i] - 4, align: aligns[i] });
-      });
+      hdrs.forEach((h, i) => doc.text(h, colX[i] + 2, Y + 7, { width: COL[i] - 4, align: aligns[i] }));
       Y += tblHdrH;
 
-      // vertical column separators helper
       const drawColSeps = (rowY, rowH) => {
         colX.slice(1).forEach(cx => {
-          doc.moveTo(cx, rowY).lineTo(cx, rowY + rowH)
-             .strokeColor(S200).lineWidth(0.4).stroke();
+          doc.moveTo(cx, rowY).lineTo(cx, rowY + rowH).strokeColor(S200).lineWidth(0.4).stroke();
         });
       };
 
-      // ── 5. ITEM ROWS ──────────────────────────────────────────────────────────
+      // ── ITEM ROWS ────────────────────────────────────────────────────────────
       items.forEach((item, idx) => {
         const rowBg = idx % 2 === 0 ? WHT : S50;
 
-        // Build meta lines for description
         const metaLines = [];
         const jd = cleanJobDisplay(item.jobNo);
         if (jd) metaLines.push({ text: jd, font: 'Helvetica-Bold', size: 7, color: PRPM });
         const p1 = [];
-        if (item.lotNo)       p1.push(`Lot: ${item.lotNo}`);
+        if (item.lotNo)        p1.push(`Lot: ${item.lotNo}`);
         if (item.partyChallan) p1.push(`Vendor Challan: ${item.partyChallan}`);
-        if (p1.length)        metaLines.push({ text: p1.join('  |  '), font: 'Helvetica', size: 7, color: S700 });
+        if (p1.length) metaLines.push({ text: p1.join('  |  '), font: 'Helvetica', size: 7, color: S700 });
         const p2 = [];
         if (item.ourChallanNo) p2.push(`Challan: ${item.ourChallanNo}`);
-        if (item.description) p2.push(item.description);
-        if (p2.length)        metaLines.push({ text: p2.join('  |  '), font: 'Helvetica', size: 7, color: S700 });
-        if (item.fabric)      metaLines.push({ text: `Fabric: ${item.fabric}`, font: 'Helvetica', size: 7, color: S500 });
+        if (item.description)  p2.push(item.description);
+        if (p2.length) metaLines.push({ text: p2.join('  |  '), font: 'Helvetica', size: 7, color: S700 });
+        if (item.fabric) metaLines.push({ text: `Fabric: ${item.fabric}`, font: 'Helvetica', size: 7, color: S500 });
 
-        // Measure description height
         doc.font('Helvetica-Bold').fontSize(8.5);
         let descH = doc.heightOfString(item.itemName || '--', { width: COL[2] - 6 });
         metaLines.forEach(m => {
@@ -560,23 +565,21 @@ const downloadInvoicePdf = async (req, res) => {
         doc.rect(PAD, Y, CW, rowH).fill(rowBg).stroke(S200);
         drawColSeps(Y, rowH);
 
-        // Sr
         doc.fillColor(S700).fontSize(8.5).font('Helvetica-Bold')
           .text(String(idx + 1), colX[0] + 3, Y + 6, { width: COL[0] - 3 });
 
-        // Image
+        // Image (skip in B&W to keep it clean, show placeholder box)
         const imgPath = itemImages[idx];
-        if (imgPath && fs.existsSync(imgPath)) {
+        if (!bw && imgPath && fs.existsSync(imgPath)) {
           try {
             const imgSz = Math.min(rowH - 4, 30);
             doc.image(imgPath, colX[1] + 3, Y + 2, { fit: [imgSz, imgSz], align: 'center', valign: 'center' });
           } catch(e) {}
         } else {
           doc.fillColor(S200).fontSize(6).font('Helvetica')
-            .text('N/A', colX[1], Y + rowH/2 - 4, { width: COL[1], align: 'center' });
+            .text('IMG', colX[1], Y + rowH/2 - 4, { width: COL[1], align: 'center' });
         }
 
-        // Description
         let textY = Y + 5;
         doc.fillColor(S900).font('Helvetica-Bold').fontSize(8.5);
         doc.text(item.itemName || '--', colX[2] + 3, textY, { width: COL[2] - 6 });
@@ -587,24 +590,22 @@ const downloadInvoicePdf = async (req, res) => {
           textY += doc.heightOfString(m.text, { width: COL[2] - 6 }) + 1;
         });
 
-        // Numeric columns (vertically centered)
-        const midY = Y + rowH / 2 - 5;
+        const midY    = Y + rowH / 2 - 5;
         const taxRate = item.taxRate || 18;
         doc.fillColor(S700).font('Helvetica').fontSize(8)
           .text(item.hsnCode || '998821', colX[3] + 2, midY, { width: COL[3] - 4, align: 'center' })
-          .text(`${taxRate}%`, colX[4] + 2, midY, { width: COL[4] - 4, align: 'center' });
+          .text(`${taxRate}%`,            colX[4] + 2, midY, { width: COL[4] - 4, align: 'center' });
         doc.fillColor(S900).font('Helvetica-Bold').fontSize(8.5)
-          .text(`${Number(item.qty||0).toFixed(2)} ${item.unit||'Mtr'}`, colX[5]+2, midY, { width: COL[5]-4, align:'center'})
-          .text(Number(item.unitPrice||0).toFixed(2), colX[6]+2, midY, { width: COL[6]-4, align:'right'});
+          .text(`${Number(item.qty||0).toFixed(2)} ${item.unit||'Mtr'}`, colX[5]+2, midY, { width: COL[5]-4, align:'center' })
+          .text(Number(item.unitPrice||0).toFixed(2), colX[6]+2, midY, { width: COL[6]-4, align:'right' });
         doc.fillColor(S500).font('Helvetica').fontSize(7.5)
-          .text(item.unit || 'Mtr', colX[7]+2, midY, { width: COL[7]-4, align:'center'});
+          .text(item.unit || 'Mtr', colX[7]+2, midY, { width: COL[7]-4, align:'center' });
         doc.fillColor(S900).font('Helvetica-Bold').fontSize(8.5)
-          .text(Number(item.totalAmount||0).toFixed(2), colX[8]+2, midY, { width: COL[8]-4, align:'right'});
-
+          .text(Number(item.totalAmount||0).toFixed(2), colX[8]+2, midY, { width: COL[8]-4, align:'right' });
         Y += rowH;
       });
 
-      // ── 6. CGST / SGST ROWS ───────────────────────────────────────────────────
+      // ── CGST / SGST ROWS ─────────────────────────────────────────────────────
       hsnRows.forEach(row => {
         const halfRate = row.rate / 2;
         ['CGST', 'SGST'].forEach(type => {
@@ -612,14 +613,14 @@ const downloadInvoicePdf = async (req, res) => {
           const trH = 16;
           doc.rect(PAD, Y, CW, trH).fill(PRPL).stroke(S200);
           doc.fillColor(PRPM).fontSize(8).font('Helvetica-Bold')
-            .text(`${type} @ ${halfRate}%`, colX[2] + 4, Y + 4, { width: COL[2] + COL[3] + COL[4] + COL[5] + COL[6] + COL[7] - 4 });
+            .text(`${type} @ ${halfRate}%`, colX[2] + 4, Y + 4, { width: COL[2]+COL[3]+COL[4]+COL[5]+COL[6]+COL[7]-4 });
           doc.fillColor(PRP).font('Helvetica-Bold').fontSize(8.5)
             .text(amt.toFixed(2), colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
           Y += trH;
         });
       });
 
-      // ── 7. GRAND TOTAL ROW ────────────────────────────────────────────────────
+      // ── GRAND TOTAL ───────────────────────────────────────────────────────────
       const totH = 22;
       doc.rect(PAD, Y, CW, totH).fill(PRP);
       doc.fillColor(WHT).fontSize(10).font('Helvetica-Bold')
@@ -627,7 +628,7 @@ const downloadInvoicePdf = async (req, res) => {
         .text(`Rs. ${Number(invoice.grandTotal||0).toFixed(2)}`, colX[8] + 2, Y + 6, { width: COL[8]-4, align: 'right' });
       Y += totH;
 
-      // ── 8. AMOUNT IN WORDS ────────────────────────────────────────────────────
+      // ── AMOUNT IN WORDS ───────────────────────────────────────────────────────
       const wordsH = 28;
       doc.rect(PAD, Y, CW, wordsH).fill(S50).stroke(S200);
       doc.fillColor(S700).fontSize(7.5).font('Helvetica-Bold')
@@ -643,17 +644,17 @@ const downloadInvoicePdf = async (req, res) => {
       }
       Y += wordsH + 6;
 
-      // ── 9. GST TAX SUMMARY TABLE ─────────────────────────────────────────────
-      const TC = [58, 90, 40, 76, 40, 76]; // HSN | Taxable | CGST% | CGST Amt | SGST% | SGST Amt
-      TC.push(CW - TC.reduce((a,b) => a+b, 0)); // Total Tax
+      // ── GST TAX SUMMARY TABLE ─────────────────────────────────────────────────
+      const TC = [58, 90, 40, 76, 40, 76];
+      TC.push(CW - TC.reduce((a,b) => a+b, 0));
       const TX = TC.reduce((acc, w, i) => { acc.push((acc[i-1]||PAD) + (i>0?TC[i-1]:0)); return acc; }, []);
 
       const tHdrH2 = 20;
       doc.rect(PAD, Y, CW, tHdrH2).fill(PRP);
       doc.fillColor(WHT).fontSize(7.5).font('Helvetica-Bold');
-      ['HSN/SAC', 'Taxable Value', 'CGST\nRate', 'CGST Amount', 'SGST\nRate', 'SGST Amount', 'Total Tax'].forEach((h, i) => {
-        const align = i === 0 ? 'left' : (i % 2 === 0 || i === 2 || i === 4 ? 'center' : 'right');
-        doc.text(h, TX[i] + 2, Y + 4, { width: TC[i] - 4, align, lineBreak: false });
+      ['HSN/SAC','Taxable Value','CGST Rate','CGST Amount','SGST Rate','SGST Amount','Total Tax'].forEach((h, i) => {
+        const align = i === 0 ? 'left' : (i === 2 || i === 4 ? 'center' : 'right');
+        doc.text(h, TX[i] + 2, Y + 6, { width: TC[i] - 4, align });
       });
       Y += tHdrH2;
 
@@ -673,7 +674,7 @@ const downloadInvoicePdf = async (req, res) => {
         Y += rH;
       });
 
-      // Total row for tax table
+      // Tax totals row
       const tTotH = 17;
       doc.rect(PAD, Y, CW, tTotH).fill(PRPL).stroke(S200);
       doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
@@ -689,8 +690,7 @@ const downloadInvoicePdf = async (req, res) => {
         .text(numToWords(totalTax), PAD+105, Y+2, { width: CW-109 });
       Y += 16;
 
-      // ── 10. FOOTER ────────────────────────────────────────────────────────────
-      // Place footer at fixed bottom (within page border)
+      // ── FOOTER ────────────────────────────────────────────────────────────────
       const footerY = PH - PAD - 70;
       doc.moveTo(PAD, footerY).lineTo(PAD+CW, footerY).strokeColor(S200).lineWidth(0.6).stroke();
 
@@ -698,46 +698,38 @@ const downloadInvoicePdf = async (req, res) => {
       const rightFX = PAD + leftFW + 8;
       const rightFW = CW - leftFW - 8;
 
-      // Bank details
       doc.fillColor(S900).fontSize(8).font('Helvetica-Bold')
         .text("Company's Bank Details:", PAD+4, footerY+5);
       doc.fillColor(S700).fontSize(8).font('Helvetica')
         .text(`Bank Name: ${bankName}`, PAD+4, footerY+16)
         .text(`A/c No.: ${bankAcNo}`, PAD+4, footerY+26)
         .text(`Branch & IFS Code: ${bankIfsc}`, PAD+4, footerY+36);
-
-      // Terms
       doc.fillColor(S500).fontSize(6.5).font('Helvetica')
         .text('Terms & Conditions:', PAD+4, footerY+50)
         .text(companyTerms, PAD+4, footerY+58, { width: leftFW });
 
-      // Signatory
       doc.fillColor(S900).fontSize(8.5).font('Helvetica-Bold')
         .text(`for ${companyName.toUpperCase()}`, rightFX, footerY+5, { width: rightFW, align:'right' });
-      // Signature box line
       doc.moveTo(rightFX + rightFW - 100, footerY + 48).lineTo(rightFX + rightFW, footerY + 48)
         .strokeColor(S500).lineWidth(0.5).stroke();
       doc.fillColor(S500).fontSize(8).font('Helvetica')
         .text('Authorised Signatory', rightFX, footerY+50, { width: rightFW, align:'right' });
 
-      // Bottom note
       const bottomNoteY = PH - PAD - 14;
       doc.moveTo(PAD, bottomNoteY).lineTo(PAD+CW, bottomNoteY).strokeColor(S200).lineWidth(0.4).stroke();
       doc.fillColor(S500).fontSize(7).font('Helvetica')
         .text('This is a Computer Generated Document', PAD, bottomNoteY+3, { width: CW, align:'center' });
     };
 
-    // ── RENDER 3 COPIES ────────────────────────────────────────────────────────
-    const copies = [
-      'ORIGINAL FOR BUYER',
-      'DUPLICATE FOR TRANSPORTER',
-      'TRIPLICATE FOR SELLER'
-    ];
+    // ── RENDER PAGES ──────────────────────────────────────────────────────────
+    // Page 1: Colourful original
+    renderPage('ORIGINAL FOR BUYER', false);
 
-    copies.forEach((label, i) => {
-      if (i > 0) doc.addPage();
-      renderPage(label);
-    });
+    // Page 2 (only if duplicate requested): Black & White duplicate
+    if (includeDuplicate) {
+      doc.addPage();
+      renderPage('DUPLICATE COPY', true);
+    }
 
     doc.end();
 

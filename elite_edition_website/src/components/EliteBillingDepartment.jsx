@@ -85,6 +85,27 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
   const [customerSearch, setCustomerSearch] = useState('');
   const [itemSearch, setItemSearch] = useState('');
   const [viewInvoiceModal, setViewInvoiceModal] = useState(null);
+  const [pdfDuplicateModal, setPdfDuplicateModal] = useState(null); // { inv } when open
+  const [pdfDuplicateChecked, setPdfDuplicateChecked] = useState(false);
+  const [pdfDownloading, setPdfDownloading] = useState(false);
+
+  const openPdfDialog = (inv) => {
+    setPdfDuplicateChecked(false);
+    setPdfDuplicateModal(inv);
+  };
+
+  const handleConfirmDownloadPdf = async () => {
+    if (!pdfDuplicateModal) return;
+    setPdfDownloading(true);
+    try {
+      await api.downloadInvoicePdf(pdfDuplicateModal._id, pdfDuplicateModal.invoiceNo, pdfDuplicateChecked);
+    } catch(e) {
+      alert('Failed to download PDF: ' + e.message);
+    } finally {
+      setPdfDownloading(false);
+      setPdfDuplicateModal(null);
+    }
+  };
 
   // Filtered Customers & Items
   const filteredCustomers = useMemo(() => {
@@ -936,7 +957,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                           <button onClick={() => setViewInvoiceModal(inv)} className="btn-icon" title="View Tax Invoice Details">
                             <Eye size={14} color="#38bdf8" />
                           </button>
-                          <button onClick={() => api.downloadInvoicePdf(inv._id, inv.invoiceNo)} className="btn-icon" title="Download GST PDF">
+                          <button onClick={() => openPdfDialog(inv)} className="btn-icon" title="Download GST PDF">
                             <Download size={14} color="#a78bfa" />
                           </button>
                           {inv.balanceDue > 0 && (
@@ -1747,7 +1768,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
             {/* Modal Actions */}
             <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               <button className="btn-secondary" onClick={() => setViewInvoiceModal(null)}>Close</button>
-              <button className="btn-primary" style={{ background: 'linear-gradient(135deg,#10b981,#059669)', display: 'inline-flex', alignItems: 'center', gap: '4px' }} onClick={() => api.downloadInvoicePdf(viewInvoiceModal._id, viewInvoiceModal.invoiceNo)}>
+              <button className="btn-primary" style={{ background: 'linear-gradient(135deg,#10b981,#059669)', display: 'inline-flex', alignItems: 'center', gap: '4px' }} onClick={() => openPdfDialog(viewInvoiceModal)}>
                 <Download size={15} /> Download PDF
               </button>
               {viewInvoiceModal.balanceDue > 0 && (
@@ -1905,6 +1926,92 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
             <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
               <button className="btn-secondary" onClick={() => setShowItemModal(false)}>Cancel</button>
               <button className="btn-primary" onClick={handleSaveItem}>Save Product</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PDF DUPLICATE COPY DIALOG ─────────────────────────────────── */}
+      {pdfDuplicateModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{
+            background: 'var(--bg-card, #1a2035)',
+            border: '1px solid rgba(124,58,237,0.35)',
+            borderRadius: '16px',
+            padding: '2rem',
+            width: '380px',
+            boxShadow: '0 20px 60px rgba(76,29,149,0.4)',
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.2rem' }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#7c3aed,#4c1d95)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Download size={18} color="#fff" />
+              </div>
+              <div>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary, #f7fafc)' }}>Download Invoice PDF</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)' }}>
+                  Invoice: {pdfDuplicateModal.invoiceNo}
+                </div>
+              </div>
+            </div>
+
+            {/* Checkbox option */}
+            <label style={{
+              display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
+              background: pdfDuplicateChecked ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.04)',
+              border: `1.5px solid ${pdfDuplicateChecked ? '#7c3aed' : 'rgba(255,255,255,0.1)'}`,
+              borderRadius: '10px', padding: '0.85rem 1rem',
+              cursor: 'pointer', transition: 'all 0.2s',
+            }}>
+              <input
+                type="checkbox"
+                checked={pdfDuplicateChecked}
+                onChange={e => setPdfDuplicateChecked(e.target.checked)}
+                style={{ width: 18, height: 18, marginTop: 2, accentColor: '#7c3aed', cursor: 'pointer' }}
+              />
+              <div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary, #f7fafc)', marginBottom: '0.2rem' }}>
+                  Include Duplicate Copy
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)', lineHeight: 1.4 }}>
+                  Adds a 2nd page — <b style={{ color: '#a78bfa' }}>black &amp; white</b> duplicate copy of this invoice for your records.
+                </div>
+              </div>
+            </label>
+
+            {/* Info note */}
+            <div style={{ fontSize: '0.73rem', color: 'var(--text-muted, #94a3b8)', margin: '0.8rem 0 1.4rem', paddingLeft: '0.3rem' }}>
+              {pdfDuplicateChecked
+                ? '📄 You will get a 2-page PDF: Page 1 (Original — Colourful) + Page 2 (Duplicate — Black & White)'
+                : '📄 You will get a 1-page PDF: Original colourful copy only'}
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '0.7rem', justifyContent: 'flex-end' }}>
+              <button
+                className="btn-secondary"
+                onClick={() => setPdfDuplicateModal(null)}
+                disabled={pdfDownloading}
+                style={{ minWidth: 80 }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handleConfirmDownloadPdf}
+                disabled={pdfDownloading}
+                style={{ background: 'linear-gradient(135deg,#10b981,#059669)', display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 130 }}
+              >
+                {pdfDownloading ? (
+                  <>⏳ Generating...</>
+                ) : (
+                  <><Download size={15} /> Download PDF</>
+                )}
+              </button>
             </div>
           </div>
         </div>
