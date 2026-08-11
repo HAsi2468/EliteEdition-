@@ -1766,7 +1766,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
     <div style={{ display:'flex', flexDirection:'column', gap:'1.2rem' }}>
       {department === 'stitching' && (activeSubTab === 'list' || activeSubTab === 'jobcards') ? (
         <GarmentJobCardDashboard />
-      ) : department === 'stitching' && (activeSubTab === 'challan' || activeSubTab === 'fabric_challan') ? (
+      ) : department === 'stitching' && (activeSubTab === 'challan' || activeSubTab === 'fabric_challan' || activeSubTab === 'stitching_challan' || activeSubTab === 'fabric') ? (
         <StitchingChallanPanel />
       ) : activeSubTab === 'catalogue' ? (
         <DesignCatalogue department={department} />
