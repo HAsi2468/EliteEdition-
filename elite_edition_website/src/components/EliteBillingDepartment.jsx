@@ -161,8 +161,10 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       stateCode: '24'
     },
     items: [
-      { itemName: 'Digital Printing Service (Fabric)', hsnCode: '5407', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 18, totalAmount: 4500 }
+      { itemName: 'Digital Printing Service (Fabric)', hsnCode: '5407', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 18, butterPaper: false, jobNo: '', lotNo: '', partyChallan: '', imageUrl: '', totalAmount: 4500 }
     ],
+    isButterPaperUsed: false,
+    enableRoundOff: true,
     discountType: 'flat',
     discountValue: 0,
     taxType: 'CGST_SGST', // 'CGST_SGST' or 'IGST'
@@ -258,12 +260,17 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
           return {
             itemName: it.designNo ? `Design ${it.designNo}` : (it.particulars || 'Garment Goods'),
             description: `Challan ${ch.challanNo} | ${it.particulars || 'Stitching'}`,
+            jobNo: ch.jobNo || it.jobNo || '',
+            lotNo: ch.lotNo || it.lotNo || '',
+            partyChallan: ch.challanNo ? String(ch.challanNo) : '',
+            imageUrl: it.imageUrl || ch.imageUrl || ch.designImage || '',
             hsnCode: '6204',
             qty: pcs,
             unit: 'Pcs',
             unitPrice: rate,
             discountPct: 0,
             taxRate: 18,
+            butterPaper: false,
             totalAmount: parseFloat((pcs * rate).toFixed(2))
           };
         });
@@ -279,13 +286,18 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
 
         preparedItems = [{
           itemName,
-          description: `Fabric: ${ch.fabricName || 'Fabric'} | Delivery Challan EDP-${ch.challanNo}${ch.jobNo ? ` | Job #${ch.jobNo}` : ''}${ch.designNo ? ` | Design: ${ch.designNo}` : ''}`,
+          description: `Fabric: ${ch.fabricName || 'Fabric'}`,
+          jobNo: ch.jobNo || '',
+          lotNo: ch.lotNo || '',
+          partyChallan: ch.challanNo ? String(ch.challanNo) : '',
+          imageUrl: ch.imageUrl || ch.designImage || '',
           hsnCode: '5407',
           qty: mtr,
           unit: 'Meters',
           unitPrice: 25,
           discountPct: 0,
           taxRate: 18,
+          butterPaper: false,
           totalAmount: mtr * 25
         }];
       }
@@ -300,6 +312,8 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
         dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
         customer: selectedCust,
         items: preparedItems,
+        isButterPaperUsed: false,
+        enableRoundOff: true,
         discountType: 'flat',
         discountValue: 0,
         taxType: selectedCust.stateCode && selectedCust.stateCode !== '24' ? 'IGST' : 'CGST_SGST',
@@ -365,14 +379,16 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
     let subtotal = 0;
     const updatedItems = invoiceForm.items.map(it => {
       const qty = parseFloat(it.qty) || 0;
-      const price = parseFloat(it.unitPrice) || 0;
+      const basePrice = parseFloat(it.unitPrice) || 0;
+      const effectivePrice = basePrice + ((it.butterPaper || invoiceForm.isButterPaperUsed) ? 3 : 0);
       const discPct = parseFloat(it.discountPct) || 0;
-      const baseTotal = qty * price;
+      const baseTotal = qty * effectivePrice;
       const discAmt = (baseTotal * discPct) / 100;
       const itemTotal = baseTotal - discAmt;
       subtotal += itemTotal;
       return {
         ...it,
+        effectivePrice,
         discountAmt: discAmt,
         totalAmount: itemTotal
       };
@@ -405,7 +421,18 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       sgstAmount = totalTax / 2;
     }
 
-    const grandTotal = Math.round(netSubtotal + totalTax);
+    const rawGrandTotal = netSubtotal + totalTax;
+    let grandTotal = rawGrandTotal;
+    let roundOff = 0;
+
+    if (invoiceForm.enableRoundOff !== false) {
+      grandTotal = Math.round(rawGrandTotal);
+      roundOff = parseFloat((grandTotal - rawGrandTotal).toFixed(2));
+    } else {
+      grandTotal = parseFloat(rawGrandTotal.toFixed(2));
+      roundOff = 0;
+    }
+
     const paid = parseFloat(invoiceForm.paidAmount) || 0;
     const balanceDue = Math.max(0, grandTotal - paid);
 
@@ -418,13 +445,15 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       sgstAmount: parseFloat(sgstAmount.toFixed(2)),
       igstAmount: parseFloat(igstAmount.toFixed(2)),
       totalTax: parseFloat(totalTax.toFixed(2)),
+      roundOff,
+      rawGrandTotal: parseFloat(rawGrandTotal.toFixed(2)),
       grandTotal,
       balanceDue: parseFloat(balanceDue.toFixed(2))
     };
-  }, [invoiceForm.items, invoiceForm.discountType, invoiceForm.discountValue, invoiceForm.taxType, invoiceForm.paidAmount]);
+  }, [invoiceForm.items, invoiceForm.isButterPaperUsed, invoiceForm.enableRoundOff, invoiceForm.discountType, invoiceForm.discountValue, invoiceForm.taxType, invoiceForm.paidAmount]);
 
-  // Handle Dynamic Line Item Change
-  const handleItemChange = (index, field, value) => {
+  // Handle Dynamic Line Item Change with HSN Auto-Sync
+  const handleItemChange = async (index, field, value) => {
     const newItems = [...invoiceForm.items];
     newItems[index][field] = value;
 
@@ -436,6 +465,19 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
         newItems[index].unitPrice = matched.unitPrice || 0;
         newItems[index].unit = matched.unit || 'Meters';
         newItems[index].taxRate = matched.taxRate || 18;
+      }
+    }
+
+    // HSN Code Change Auto-Sync to Saved Product
+    if (field === 'hsnCode' && newItems[index].itemName) {
+      const matched = itemsList.find(i => i.itemName.toLowerCase() === newItems[index].itemName.toLowerCase());
+      if (matched && matched._id) {
+        try {
+          await api.updateBillingItem(matched._id, { ...matched, hsnCode: value });
+          setItemsList(prev => prev.map(i => i._id === matched._id ? { ...i, hsnCode: value } : i));
+        } catch (e) {
+          console.warn('HSN sync error:', e);
+        }
       }
     }
 
@@ -978,42 +1020,89 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
 
           {/* Dynamic Products / Line Items Table */}
           <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1rem', overflowX: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>📦 Invoice Line Items</div>
-              <button type="button" onClick={handleAddItemRow} className="btn-secondary" style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem' }}>
-                <Plus size={13} /> Add Item Row
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: '#fbbf24', cursor: 'pointer', background: 'rgba(251,191,36,0.12)', padding: '0.3rem 0.65rem', borderRadius: '5px', border: '1px solid rgba(251,191,36,0.3)' }}>
+                  <input
+                    type="checkbox"
+                    checked={invoiceForm.isButterPaperUsed}
+                    onChange={e => setInvoiceForm(f => ({ ...f, isButterPaperUsed: e.target.checked }))}
+                  />
+                  🧈 Butter Paper Used (+ ₹3/m Rate)
+                </label>
+                <button type="button" onClick={handleAddItemRow} className="btn-secondary" style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem' }}>
+                  <Plus size={13} /> Add Item Row
+                </button>
+              </div>
             </div>
 
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '800px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '920px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-light)', fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  <th style={{ padding: '0.5rem' }}>Item Description</th>
+                  <th style={{ padding: '0.5rem' }}>Item Description & Details</th>
                   <th style={{ padding: '0.5rem', width: '90px' }}>HSN</th>
                   <th style={{ padding: '0.5rem', width: '80px' }}>Qty</th>
                   <th style={{ padding: '0.5rem', width: '90px' }}>Unit</th>
-                  <th style={{ padding: '0.5rem', width: '110px' }}>Price (₹)</th>
-                  <th style={{ padding: '0.5rem', width: '80px' }}>Disc %</th>
-                  <th style={{ padding: '0.5rem', width: '80px' }}>GST %</th>
-                  <th style={{ padding: '0.5rem', width: '110px', textAlign: 'right' }}>Total (₹)</th>
+                  <th style={{ padding: '0.5rem', width: '100px' }}>Price (₹)</th>
+                  <th style={{ padding: '0.5rem', width: '75px' }}>Disc %</th>
+                  <th style={{ padding: '0.5rem', width: '75px' }}>GST %</th>
+                  <th style={{ padding: '0.5rem', width: '105px', textAlign: 'right' }}>Total (₹)</th>
                   <th style={{ padding: '0.5rem', width: '40px' }}></th>
                 </tr>
               </thead>
               <tbody>
                 {invoiceForm.items.map((it, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <td style={{ padding: '0.4rem' }}>
-                      <input
-                        type="text"
-                        list={`items-list-${idx}`}
-                        value={it.itemName}
-                        onChange={e => handleItemChange(idx, 'itemName', e.target.value)}
-                        placeholder="Type item or select..."
-                        style={inputStyle}
-                      />
-                      <datalist id={`items-list-${idx}`}>
-                        {itemsList.map(item => <option key={item._id} value={item.itemName} />)}
-                      </datalist>
+                  <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)', verticalAlign: 'top' }}>
+                    <td style={{ padding: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                        {it.imageUrl && (
+                          <img src={it.imageUrl} alt="Design" style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--border-light)' }} />
+                        )}
+                        <input
+                          type="text"
+                          list={`items-list-${idx}`}
+                          value={it.itemName}
+                          onChange={e => handleItemChange(idx, 'itemName', e.target.value)}
+                          placeholder="Type item or select..."
+                          style={inputStyle}
+                        />
+                        <datalist id={`items-list-${idx}`}>
+                          {itemsList.map(item => <option key={item._id} value={item.itemName} />)}
+                        </datalist>
+                      </div>
+
+                      {/* Sub-inputs: Job No, Lot No, Party Challan, Image URL */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr 1.5fr', gap: '0.3rem' }}>
+                        <input
+                          type="text"
+                          value={it.jobNo || ''}
+                          onChange={e => handleItemChange(idx, 'jobNo', e.target.value)}
+                          placeholder="Job Card #"
+                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                        />
+                        <input
+                          type="text"
+                          value={it.lotNo || ''}
+                          onChange={e => handleItemChange(idx, 'lotNo', e.target.value)}
+                          placeholder="Lot #"
+                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                        />
+                        <input
+                          type="text"
+                          value={it.partyChallan || ''}
+                          onChange={e => handleItemChange(idx, 'partyChallan', e.target.value)}
+                          placeholder="Party Challan #"
+                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                        />
+                        <input
+                          type="text"
+                          value={it.imageUrl || ''}
+                          onChange={e => handleItemChange(idx, 'imageUrl', e.target.value)}
+                          placeholder="Design Image Link..."
+                          style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
+                        />
+                      </div>
                     </td>
                     <td style={{ padding: '0.4rem' }}>
                       <input
@@ -1050,6 +1139,11 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                         onChange={e => handleItemChange(idx, 'unitPrice', e.target.value)}
                         style={inputStyle}
                       />
+                      {(it.butterPaper || invoiceForm.isButterPaperUsed) && (
+                        <span style={{ fontSize: '0.65rem', color: '#fbbf24', fontWeight: 700, display: 'block', textAlign: 'center', marginTop: 2 }}>
+                          +₹3 Butter Paper
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '0.4rem' }}>
                       <input
@@ -1073,7 +1167,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                       </select>
                     </td>
                     <td style={{ padding: '0.4rem', textAlign: 'right', fontWeight: 800, color: 'var(--text-primary)' }}>
-                      ₹ {((parseFloat(it.qty) || 0) * (parseFloat(it.unitPrice) || 0)).toFixed(2)}
+                      ₹ {(it.totalAmount || 0).toFixed(2)}
                     </td>
                     <td style={{ padding: '0.4rem', textAlign: 'center' }}>
                       <button type="button" onClick={() => handleRemoveItemRow(idx)} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer' }}>
@@ -1139,6 +1233,19 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                   </div>
                 </>
               )}
+
+              {/* Round Off Checkbox & Display (Default Checked) */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#a78bfa', marginTop: '0.2rem', paddingTop: '0.2rem', borderTop: '1px dashed var(--border-light)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: 600 }}>
+                  <input
+                    type="checkbox"
+                    checked={invoiceForm.enableRoundOff !== false}
+                    onChange={e => setInvoiceForm(f => ({ ...f, enableRoundOff: e.target.checked }))}
+                  />
+                  Round Off Total
+                </label>
+                <span style={{ fontWeight: 700 }}>{calculatedInvoice.roundOff > 0 ? '+' : ''} ₹ {calculatedInvoice.roundOff.toFixed(2)}</span>
+              </div>
 
               <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: '#a78bfa' }}>
                 <span>Grand Total:</span>
