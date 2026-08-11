@@ -161,7 +161,19 @@ const printConfigSchema = new mongoose.Schema(
     },
     companyTerms: {
       type: String,
-      default: 'Payment due within 15 days from invoice date. Subject to Surat jurisdiction.',
+      default: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
+    },
+    paymentDueDays: {
+      type: Number,
+      default: 30,
+    },
+    startingInvoiceNo: {
+      type: Number,
+      default: 1001,
+    },
+    invoicePrefix: {
+      type: String,
+      default: 'EDP-INV-',
     },
   },
   {

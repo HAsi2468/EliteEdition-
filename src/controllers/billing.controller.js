@@ -140,11 +140,13 @@ const getInvoiceById = async (req, res) => {
 // ── 4. GET NEXT INVOICE NUMBER ──────────────────────────────────────────────
 const getNextInvoiceNo = async (req, res) => {
   try {
-    const START_SEQ = 1001;
-    const lastInvoice = await BillingInvoice.findOne({}, 'invoiceSeq').sort({ invoiceSeq: -1 });
+    const PrintConfig = require('../db/models/printConfig.model');
+    const config = await PrintConfig.findOne({ isConfig: true }).lean() || {};
+    const START_SEQ = Number(config.startingInvoiceNo) || 1001;
+    const prefix = config.invoicePrefix || 'EDP-INV-';
 
-    const nextSeq = lastInvoice && lastInvoice.invoiceSeq ? lastInvoice.invoiceSeq + 1 : START_SEQ;
-    const prefix = 'EDP-INV-';
+    const lastInvoice = await BillingInvoice.findOne({}, 'invoiceSeq').sort({ invoiceSeq: -1 });
+    const nextSeq = lastInvoice && lastInvoice.invoiceSeq ? Math.max(lastInvoice.invoiceSeq + 1, START_SEQ) : START_SEQ;
     const invoiceNo = `${prefix}${nextSeq}`;
 
     res.json({ success: true, nextSeq, prefix, invoiceNo });

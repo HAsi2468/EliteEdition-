@@ -147,7 +147,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
     invoiceNo: '',
     invoiceSeq: 1001,
     invoiceDate: new Date().toISOString().split('T')[0],
-    dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+    dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
     customer: {
       customerId: '',
       name: '',
@@ -170,7 +170,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
     taxType: 'CGST_SGST', // 'CGST_SGST' or 'IGST'
     paidAmount: 0,
     notes: 'Thank you for doing business with Elite Digital Prints!',
-    terms: 'Payment due within 15 days from invoice date. Subject to Surat jurisdiction.'
+    terms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.'
   });
 
   // ── Fetch Initial Data ─────────────────────────────────────────────────────
@@ -303,13 +303,16 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       }
 
       const nextRes = await api.getNextInvoiceNo();
+      const cfg = await api.getPrintConfig().catch(() => ({}));
+      const dueDays = cfg?.paymentDueDays || 30;
+      const termsStr = cfg?.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
       const challanTag = String(ch.challanNo || '').startsWith('PCH') ? ch.challanNo : `EDP-${ch.challanNo}`;
 
       setInvoiceForm({
         invoiceNo: nextRes.invoiceNo || 'EDP-INV-1001',
         invoiceSeq: nextRes.nextSeq || 1001,
         invoiceDate: new Date().toISOString().split('T')[0],
-        dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+        dueDate: new Date(Date.now() + dueDays * 86400000).toISOString().split('T')[0],
         customer: selectedCust,
         items: preparedItems,
         isButterPaperUsed: false,
@@ -319,7 +322,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
         taxType: selectedCust.stateCode && selectedCust.stateCode !== '24' ? 'IGST' : 'CGST_SGST',
         paidAmount: 0,
         notes: `Auto-generated from Delivery Challan #${challanTag}`,
-        terms: 'Payment due within 15 days from invoice date. Subject to Surat jurisdiction.'
+        terms: termsStr
       });
 
       setEditingInvoiceId(null);
@@ -349,11 +352,15 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       setEditingInvoiceId(null);
       try {
         const nextRes = await api.getNextInvoiceNo();
+        const cfg = await api.getPrintConfig().catch(() => ({}));
+        const dueDays = cfg?.paymentDueDays || 30;
+        const termsStr = cfg?.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
+
         setInvoiceForm({
           invoiceNo: nextRes.invoiceNo || 'EDP-INV-1001',
           invoiceSeq: nextRes.nextSeq || 1001,
           invoiceDate: new Date().toISOString().split('T')[0],
-          dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+          dueDate: new Date(Date.now() + dueDays * 86400000).toISOString().split('T')[0],
           customer: customers[0] ? { ...customers[0] } : {
             customerId: '', name: 'Walk-in Client', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24'
           },
@@ -365,7 +372,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
           taxType: 'CGST_SGST',
           paidAmount: 0,
           notes: 'Thank you for doing business with Elite Digital Prints!',
-          terms: 'Payment due within 15 days from invoice date. Subject to Surat jurisdiction.'
+          terms: termsStr
         });
         setActiveTab('create');
       } catch (err) {

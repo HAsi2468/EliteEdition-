@@ -48,7 +48,10 @@ export default function PrintSettings() {
     companyBankName: '',
     companyAccountNo: '',
     companyIfscCode: '',
-    companyTerms: 'Payment due within 15 days from invoice date. Subject to Surat jurisdiction.'
+    companyTerms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
+    paymentDueDays: 30,
+    startingInvoiceNo: 1001,
+    invoicePrefix: 'EDP-INV-'
   });
 
   useEffect(() => {
@@ -73,7 +76,10 @@ export default function PrintSettings() {
           companyBankName: data.companyBankName || '',
           companyAccountNo: data.companyAccountNo || '',
           companyIfscCode: data.companyIfscCode || '',
-          companyTerms: data.companyTerms || 'Payment due within 15 days from invoice date. Subject to Surat jurisdiction.'
+          companyTerms: data.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
+          paymentDueDays: data.paymentDueDays !== undefined ? data.paymentDueDays : 30,
+          startingInvoiceNo: data.startingInvoiceNo !== undefined ? data.startingInvoiceNo : 1001,
+          invoicePrefix: data.invoicePrefix || 'EDP-INV-'
         });
       }
     } catch (err) {
@@ -376,6 +382,43 @@ export default function PrintSettings() {
               value={companyProfile.companyIfscCode}
               onChange={e => setCompanyProfile(p => ({ ...p, companyIfscCode: e.target.value }))}
               placeholder="e.g. HDFC0001234"
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', borderTop: '1px dashed var(--border-light)', paddingTop: '1rem' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Default Payment Due Days</label>
+            <input
+              type="number"
+              min="1"
+              style={styles.input}
+              value={companyProfile.paymentDueDays}
+              onChange={e => setCompanyProfile(p => ({ ...p, paymentDueDays: e.target.value }))}
+              placeholder="e.g. 30"
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Invoice Prefix</label>
+            <input
+              type="text"
+              style={styles.input}
+              value={companyProfile.invoicePrefix}
+              onChange={e => setCompanyProfile(p => ({ ...p, invoicePrefix: e.target.value }))}
+              placeholder="e.g. EDP-INV-"
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Starting Invoice Sequence No.</label>
+            <input
+              type="number"
+              min="1001"
+              style={styles.input}
+              value={companyProfile.startingInvoiceNo}
+              onChange={e => setCompanyProfile(p => ({ ...p, startingInvoiceNo: e.target.value }))}
+              placeholder="e.g. 1001"
             />
           </div>
         </div>

@@ -99,6 +99,9 @@ const updatePrintConfig = async (req, res) => {
         if (companyData.companyAccountNo !== undefined) config.companyAccountNo = companyData.companyAccountNo;
         if (companyData.companyIfscCode !== undefined) config.companyIfscCode = companyData.companyIfscCode;
         if (companyData.companyTerms !== undefined) config.companyTerms = companyData.companyTerms;
+        if (companyData.paymentDueDays !== undefined) config.paymentDueDays = Number(companyData.paymentDueDays) || 30;
+        if (companyData.startingInvoiceNo !== undefined) config.startingInvoiceNo = Number(companyData.startingInvoiceNo) || 1001;
+        if (companyData.invoicePrefix !== undefined) config.invoicePrefix = companyData.invoicePrefix || 'EDP-INV-';
 
         await config.save();
         return res.status(httpStatus.OK).send(config);
@@ -116,6 +119,7 @@ const updatePrintConfig = async (req, res) => {
       'sublimationPanna', 'sublimationQualities', 'butterPanna', 'inkColors', 'inkCanSizes',
       'deliveryOptions', 'lotPartyMap', 'companyName', 'companyGstin', 'companyAddress',
       'companyPhone', 'companyEmail', 'companyBankName', 'companyAccountNo', 'companyIfscCode', 'companyTerms',
+      'paymentDueDays', 'startingInvoiceNo', 'invoicePrefix',
       'stitchingCategories', 'stitchingLabels', 'finishingOptions', 'stitchingParties', 'stitchingBillTo', 'stitchingShipTo', 'stitchingDeliveryBy'
     ];
     if (!validFields.includes(field)) {
@@ -141,6 +145,12 @@ const updatePrintConfig = async (req, res) => {
       }
     } else if (field === 'startingJobNo') {
       config.startingJobNo = Number(value) || 1;
+    } else if (field === 'startingInvoiceNo') {
+      config.startingInvoiceNo = Number(value) || 1001;
+    } else if (field === 'paymentDueDays') {
+      config.paymentDueDays = Number(value) || 30;
+    } else if (field === 'invoicePrefix') {
+      config.invoicePrefix = value;
     } else if (field.startsWith('company')) {
       config[field] = value;
     } else {
