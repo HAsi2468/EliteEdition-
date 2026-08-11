@@ -255,7 +255,7 @@ export default function App() {
     } else if (EE_PERMISSIONS.includes(activeTab)) {
       setActiveDepartment('elite_edition');
     }
-  }, [activeTab]);
+  }, [activeTab, activeDepartment]);
 
   useEffect(() => {
     const handleNavTab = (e) => {
@@ -837,9 +837,9 @@ export default function App() {
           <div className="mobile-drawer-content" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={styles.logoBadge}>{activeDepartment === 'digital_print' ? 'EDP' : 'EE'}</div>
+                <div style={styles.logoBadge}>{activeDepartment === 'digital_print' ? 'EDP' : activeDepartment === 'stitching' ? 'ES' : 'EE'}</div>
                 <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                  {activeDepartment === 'digital_print' ? 'Elite Digital Print' : 'Elite Edition'}
+                  {activeDepartment === 'digital_print' ? 'Elite Digital Print' : activeDepartment === 'stitching' ? 'Elite Stitching' : 'Elite Edition'}
                 </span>
               </div>
               <button onClick={() => setMobileMenuOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: '0.25rem' }}>
@@ -1321,7 +1321,7 @@ export default function App() {
           ) : activeTab === 'reports' ? (
             <ReportsCenter />
           ) : activeTab.startsWith('jobcards') ? (
-            <JobCardPanel activeSubTab={activeTab === 'jobcards' ? 'jobcards' : activeTab.replace('jobcards_', '')} />
+            <JobCardPanel activeSubTab={activeTab === 'jobcards' ? 'jobcards' : activeTab.replace('jobcards_', '')} department={activeDepartment} />
           ) : activeTab === 'unicommerce' ? (
             <UnicommerceHub />
           ) : activeTab === 'myntra' ? (
