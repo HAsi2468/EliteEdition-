@@ -180,8 +180,7 @@ const downloadInvoicePdf = async (req, res) => {
       const challanStr = invoice.ourChallanNo || invoice.challanNo || '';
       doc.fillColor(S700).fontSize(8).font('Helvetica')
         .text(`Invoice No: ${invoice.invoiceNo}${challanStr ? '   Challan: ' + challanStr : ''}`, PAD + 130, Y + 5, { width: 200 })
-        .text(`Date: ${formatDate(invoice.invoiceDate)}   Due: ${formatDate(invoice.dueDate)}`,
-              PAD + CW - 175, Y + 5, { width: 170, align: 'right' });
+        .text(`Date: ${formatDate(invoice.invoiceDate)}`, PAD + CW - 175, Y + 5, { width: 170, align: 'right' });
       Y += titleH;
 
       // ── BUYER / SELLER INFO ───────────────────────────────────────────────────
@@ -227,6 +226,12 @@ const downloadInvoicePdf = async (req, res) => {
       });
       Y += infoH;
 
+      // ── DYNAMIC 1-PAGE TABLE HEIGHT CALCULATION ─────────────────────────────
+      const fixedTopH = PAD + 4 + 52 + 22 + 72 + 22; // 190
+      const bottomSummaryH = (hsnRows.length * 48) + 22 + 28 + 18 + (hsnRows.length * 16) + 17 + 16 + 78 + PAD;
+      const availableItemsH = PH - fixedTopH - bottomSummaryH;
+      const minRowHPerItem = Math.floor(availableItemsH / Math.max(items.length, 1));
+
       // ── ITEMS TABLE HEADER ───────────────────────────────────────────────────
       const tblHdrH = 22;
       doc.rect(PAD, Y, CW, tblHdrH).fill(PRP);
@@ -254,7 +259,6 @@ const downloadInvoicePdf = async (req, res) => {
         if (item.partyChallan) p1.push(`Vendor Challan: ${item.partyChallan}`);
         if (p1.length) metaLines.push({ text: p1.join('  |  '), font: 'Helvetica', size: 7, color: S700 });
         const p2 = [];
-        if (item.ourChallanNo) p2.push(`Challan: ${item.ourChallanNo}`);
         if (item.description)  p2.push(item.description);
         if (p2.length) metaLines.push({ text: p2.join('  |  '), font: 'Helvetica', size: 7, color: S700 });
         if (item.fabric) metaLines.push({ text: `Fabric: ${item.fabric}`, font: 'Helvetica', size: 7, color: S500 });
@@ -265,7 +269,7 @@ const downloadInvoicePdf = async (req, res) => {
           doc.font(m.font).fontSize(m.size);
           descH += doc.heightOfString(m.text, { width: COL[2] - 6 }) + 1;
         });
-        const rowH = Math.max(80, descH + 12);
+        const rowH = Math.max(minRowHPerItem, descH + 12);
 
         doc.rect(PAD, Y, CW, rowH).fill(rowBg).stroke(S200);
         drawColSeps(Y, rowH);
