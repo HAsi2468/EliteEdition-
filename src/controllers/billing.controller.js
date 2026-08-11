@@ -422,11 +422,11 @@ const downloadInvoicePdf = async (req, res) => {
     doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold');
     doc.text('#', ML + 4, tableY + 6, { width: 16 });
     doc.text('IMAGE', ML + 22, tableY + 6, { width: 36, align: 'center' });
-    doc.text('ITEM DESCRIPTION & DETAILS', ML + 62, tableY + 6, { width: 198 });
-    doc.text('HSN/SAC', ML + 265, tableY + 6, { width: 50, align: 'center' });
-    doc.text('QTY / MTRS', ML + 320, tableY + 6, { width: 60, align: 'center' });
-    doc.text('RATE (Rs.)', ML + 385, tableY + 6, { width: 60, align: 'right' });
-    doc.text('AMOUNT (Rs.)', ML + 450, tableY + 6, { width: contentWidth - 455, align: 'right' });
+    doc.text('ITEM DESCRIPTION & DETAILS', ML + 60, tableY + 6, { width: 235 });
+    doc.text('HSN/SAC', ML + 295, tableY + 6, { width: 50, align: 'center' });
+    doc.text('QTY / MTRS', ML + 345, tableY + 6, { width: 60, align: 'center' });
+    doc.text('RATE (Rs.)', ML + 405, tableY + 6, { width: 60, align: 'right' });
+    doc.text('AMOUNT (Rs.)', ML + 470, tableY + 6, { width: contentWidth - 475, align: 'right' });
 
     tableY += 22;
 
@@ -436,18 +436,28 @@ const downloadInvoicePdf = async (req, res) => {
       const item = items[idx];
       const rowBg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
 
-      // Build clean multi-line metadata structure
-      const metaLines = [];
+      // Build clean multi-line metadata structure (Each object has text, font, size, color)
+      const metaLineObjs = [];
       const formattedJobs = cleanJobDisplay(item.jobNo);
-      if (formattedJobs) metaLines.push(formattedJobs);
+      if (formattedJobs) {
+        metaLineObjs.push({ text: formattedJobs, font: 'Helvetica-Bold', size: 9, color: '#6b21a8' });
+      }
 
-      const secondaryBadges = [];
-      if (item.lotNo) secondaryBadges.push(`Lot #: ${item.lotNo}`);
-      if (item.partyChallan) secondaryBadges.push(`Party Challan #: ${item.partyChallan}`);
-      if (item.ourChallanNo) secondaryBadges.push(`Our Challan #: ${item.ourChallanNo}`);
+      // Line for Lot No & Party Challan
+      const line1Parts = [];
+      if (item.lotNo) line1Parts.push(`Lot #: ${item.lotNo}`);
+      if (item.partyChallan) line1Parts.push(`Party Challan #: ${item.partyChallan}`);
+      if (line1Parts.length > 0) {
+        metaLineObjs.push({ text: line1Parts.join('   |   '), font: 'Helvetica', size: 8.8, color: '#334155' });
+      }
 
-      if (secondaryBadges.length > 0) metaLines.push(secondaryBadges.join('   •   '));
-      if (item.description) metaLines.push(item.description);
+      // Line for Our Challan & Description
+      const line2Parts = [];
+      if (item.ourChallanNo) line2Parts.push(`Our Challan #: ${item.ourChallanNo}`);
+      if (item.description) line2Parts.push(item.description);
+      if (line2Parts.length > 0) {
+        metaLineObjs.push({ text: line2Parts.join('   |   '), font: 'Helvetica', size: 8.8, color: '#334155' });
+      }
 
       // Multi-Job Image Lookup
       let resolvedImgPath = resolveImagePath(item.imageUrl);
@@ -475,21 +485,28 @@ const downloadInvoicePdf = async (req, res) => {
         } catch (e) {}
       }
 
-      // Calculate dynamic row height
-      const totalTextLines = 1 + metaLines.length; // Item title + metadata lines
-      const rowHeight = Math.max(42, 14 + (totalTextLines * 13));
+      // Pre-calculate exact total metadata height to prevent any overlaps
+      doc.font('Helvetica-Bold').fontSize(10);
+      let calculatedMetaHeight = doc.heightOfString(item.itemName || '—', { width: 230 });
+
+      metaLineObjs.forEach(mObj => {
+        doc.font(mObj.font).fontSize(mObj.size);
+        calculatedMetaHeight += Math.max(doc.heightOfString(mObj.text, { width: 230 }), mObj.size + 3);
+      });
+
+      const rowHeight = Math.max(46, calculatedMetaHeight + 14);
 
       doc.rect(ML, tableY, contentWidth, rowHeight).fill(rowBg).stroke('#e2e8f0');
 
       // Row Index #
-      doc.fillColor('#334155').fontSize(9).font('Helvetica-Bold');
+      doc.fillColor('#334155').fontSize(9.5).font('Helvetica-Bold');
       doc.text(String(idx + 1), ML + 4, tableY + 8, { width: 16 });
 
       // Thumbnail Image
       if (resolvedImgPath && fs.existsSync(resolvedImgPath)) {
         try {
-          const imgBoxSize = Math.min(32, rowHeight - 8);
-          doc.image(resolvedImgPath, ML + 24, tableY + 4, {
+          const imgBoxSize = Math.min(34, rowHeight - 8);
+          doc.image(resolvedImgPath, ML + 22, tableY + 4, {
             fit: [imgBoxSize, imgBoxSize],
             align: 'center',
             valign: 'center'
@@ -503,30 +520,28 @@ const downloadInvoicePdf = async (req, res) => {
           .text('—', ML + 22, tableY + (rowHeight / 2 - 4), { width: 36, align: 'center' });
       }
 
-      // Item Title (Bold 9pt)
+      // Item Title (Bold 10pt)
       let textY = tableY + 6;
-      doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(9)
-        .text(item.itemName || '—', ML + 62, textY, { width: 198, lineBreak: false, ellipsis: true });
+      doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(10);
+      const titleH = doc.heightOfString(item.itemName || '—', { width: 230 });
+      doc.text(item.itemName || '—', ML + 60, textY, { width: 230 });
+      textY += Math.max(titleH, 13);
 
-      textY += 13;
-
-      // Meta Lines (8.2pt, structured)
-      metaLines.forEach((mLine, mIdx) => {
-        const isJobLine = mIdx === 0 && formattedJobs;
-        doc.font(isJobLine ? 'Helvetica-Bold' : 'Helvetica')
-          .fontSize(8.2)
-          .fillColor(isJobLine ? '#6b21a8' : '#475569')
-          .text(mLine, ML + 62, textY, { width: 198, lineBreak: false, ellipsis: true });
-        textY += 12;
+      // Meta Lines (8.8pt - 9pt, dynamically measured heights)
+      metaLineObjs.forEach((mObj) => {
+        doc.font(mObj.font).fontSize(mObj.size).fillColor(mObj.color);
+        const h = doc.heightOfString(mObj.text, { width: 230 });
+        doc.text(mObj.text, ML + 60, textY, { width: 230 });
+        textY += Math.max(h, mObj.size + 3);
       });
 
       // HSN, Qty, Rate, Amount (Centered / Vertically aligned)
       const alignY = tableY + 6;
-      doc.fillColor('#1e293b').fontSize(9).font('Helvetica');
-      doc.text(item.hsnCode || '998821', ML + 265, alignY, { width: 50, align: 'center' });
-      doc.font('Helvetica-Bold').text(`${item.qty} ${item.unit || ''}`, ML + 320, alignY, { width: 60, align: 'center' });
-      doc.font('Helvetica').text(Number(item.unitPrice || 0).toFixed(2), ML + 385, alignY, { width: 60, align: 'right' });
-      doc.font('Helvetica-Bold').fillColor('#0f172a').text(Number(item.totalAmount || 0).toFixed(2), ML + 450, alignY, { width: contentWidth - 455, align: 'right' });
+      doc.fillColor('#1e293b').fontSize(9.5).font('Helvetica');
+      doc.text(item.hsnCode || '998821', ML + 295, alignY, { width: 50, align: 'center' });
+      doc.font('Helvetica-Bold').text(`${item.qty} ${item.unit || ''}`, ML + 345, alignY, { width: 60, align: 'center' });
+      doc.font('Helvetica').text(Number(item.unitPrice || 0).toFixed(2), ML + 405, alignY, { width: 60, align: 'right' });
+      doc.font('Helvetica-Bold').fillColor('#0f172a').text(Number(item.totalAmount || 0).toFixed(2), ML + 470, alignY, { width: contentWidth - 475, align: 'right' });
 
       tableY += rowHeight;
     }
@@ -539,52 +554,52 @@ const downloadInvoicePdf = async (req, res) => {
     doc.rect(summaryBoxX, tableY, 230, summaryBoxHeight).fill('#f8fafc').stroke('#cbd5e1');
 
     let sumY = tableY + 8;
-    doc.fillColor('#475569').fontSize(8).font('Helvetica');
+    doc.fillColor('#475569').fontSize(9).font('Helvetica');
 
     doc.text('Subtotal:', summaryBoxX + 10, sumY);
     doc.text(`Rs. ${Number(invoice.subtotal || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 210, align: 'right' });
-    sumY += 13;
+    sumY += 15;
 
     if (invoice.discountTotal > 0) {
       doc.text('Discount:', summaryBoxX + 10, sumY);
       doc.text(`- Rs. ${Number(invoice.discountTotal || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 210, align: 'right' });
-      sumY += 13;
+      sumY += 15;
     }
 
     if (invoice.taxType === 'IGST') {
       doc.text('IGST Amount:', summaryBoxX + 10, sumY);
       doc.text(`Rs. ${Number(invoice.igstAmount || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 210, align: 'right' });
-      sumY += 13;
+      sumY += 15;
     } else {
-      doc.text('CGST Amount:', summaryBoxX + 10, sumY);
+      doc.text('CGST Amount (9%):', summaryBoxX + 10, sumY);
       doc.text(`Rs. ${Number(invoice.cgstAmount || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 210, align: 'right' });
-      sumY += 13;
+      sumY += 15;
 
-      doc.text('SGST Amount:', summaryBoxX + 10, sumY);
+      doc.text('SGST Amount (9%):', summaryBoxX + 10, sumY);
       doc.text(`Rs. ${Number(invoice.sgstAmount || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 210, align: 'right' });
-      sumY += 13;
+      sumY += 15;
     }
 
     // Round Off Display (Always display Round Off details)
     const roundOffVal = Number(invoice.roundOff || 0);
     const sign = roundOffVal > 0 ? '+' : '';
-    doc.fillColor('#6b21a8').fontSize(8).font('Helvetica-Bold')
+    doc.fillColor('#6b21a8').fontSize(9).font('Helvetica-Bold')
       .text('Round Off:', summaryBoxX + 10, sumY);
     doc.text(`${sign} Rs. ${roundOffVal.toFixed(2)}`, summaryBoxX + 10, sumY, { width: 210, align: 'right' });
-    sumY += 13;
+    sumY += 16;
 
-    doc.moveTo(summaryBoxX, sumY).lineTo(PW - MR, sumY).strokeColor('#cbd5e1').lineWidth(1).stroke();
-    sumY += 4;
+    doc.moveTo(summaryBoxX, sumY).lineTo(PW - MR, sumY).strokeColor('#cbd5e1').lineWidth(1.5).stroke();
+    sumY += 5;
 
-    doc.fillColor('#6b21a8').fontSize(9.5).font('Helvetica-Bold');
+    doc.fillColor('#4c1d95').fontSize(11).font('Helvetica-Bold');
     doc.text('Grand Total:', summaryBoxX + 10, sumY);
     doc.text(`Rs. ${Number(invoice.grandTotal || 0).toFixed(2)}`, summaryBoxX + 10, sumY, { width: 210, align: 'right' });
 
     // Amount in Words
-    doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold')
+    doc.fillColor('#0f172a').fontSize(9.5).font('Helvetica-Bold')
       .text('Amount in Words:', ML, tableY + 5);
-    doc.fillColor('#475569').fontSize(8).font('Helvetica')
-      .text(numToWords(invoice.grandTotal), ML, tableY + 18, { width: contentWidth - 240 });
+    doc.fillColor('#334155').fontSize(9).font('Helvetica')
+      .text(numToWords(invoice.grandTotal), ML, tableY + 20, { width: contentWidth - 240 });
 
     // ── FIXED BOTTOM FOOTER ────────
     const footerY = PH - 110;
