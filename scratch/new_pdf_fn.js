@@ -127,12 +127,12 @@ const downloadInvoicePdf = async (req, res) => {
       // Colour palette — overridden to grayscale if bw=true
       const c = (color, bwFallback) => bw ? (bwFallback || '#000000') : color;
 
-      const PRP  = c('#4c1d95', '#1a1a1a');  // deep purple   → near-black
-      const PRPM = c('#6b21a8', '#333333');  // mid purple    → dark gray
+      const PRP  = c('#4c1d95', '#000000');  // deep purple   → black in B&W
+      const PRPM = c('#6b21a8', '#000000');  // mid purple    → black in B&W
       const PRPL = c('#ede9fe', '#f0f0f0');  // light purple  → light gray
-      const S900 = c('#0f172a', '#000000');
-      const S700 = c('#334155', '#222222');
-      const S500 = c('#64748b', '#555555');
+      const S900 = c('#000000', '#000000');  // pure black
+      const S700 = c('#000000', '#000000');  // pure black (was gray)
+      const S500 = c('#000000', '#000000');  // pure black (was gray)
       const S200 = c('#e2e8f0', '#cccccc');
       const S50  = c('#f8fafc', '#f9f9f9');
       const WHT  = '#ffffff';
@@ -161,7 +161,7 @@ const downloadInvoicePdf = async (req, res) => {
         .text(companyName.toUpperCase(), PAD + 90, Y + 6, { width: CW - 96, align: 'right' });
       doc.fillColor(S500).fontSize(7).font('Helvetica')
         .text(companyAddress, PAD + 90, Y + 20, { width: CW - 96, align: 'right' })
-        .text(`GSTIN/UIN: ${companyGstin}   Phone: ${companyPhone}   State: ${companyState}, Code: ${companyStateCode}`,
+        .text(`GST: ${companyGstin}   Phone: ${companyPhone}   State: ${companyState}, Code: ${companyStateCode}`,
               PAD + 90, Y + 30, { width: CW - 96, align: 'right' });
 
       // Copy label badge
@@ -177,10 +177,9 @@ const downloadInvoicePdf = async (req, res) => {
       doc.rect(PAD, Y, CW, titleH).fill(PRPL);
       doc.fillColor(PRP).fontSize(13).font('Helvetica-Bold').text('TAX INVOICE', PAD + 8, Y + 5);
 
-      const challanStr = invoice.ourChallanNo || invoice.challanNo || '';
-      doc.fillColor(S700).fontSize(8).font('Helvetica')
-        .text(`Invoice No: ${invoice.invoiceNo}${challanStr ? '   Challan: ' + challanStr : ''}`, PAD + 130, Y + 5, { width: 200 })
-        .text(`Date: ${formatDate(invoice.invoiceDate)}`, PAD + CW - 175, Y + 5, { width: 170, align: 'right' });
+      doc.fillColor(S900).fontSize(10).font('Helvetica-Bold')
+        .text(`Invoice No: ${invoice.invoiceNo}`, PAD + 140, Y + 5, { width: 220 })
+        .text(`Date: ${formatDate(invoice.invoiceDate)}`, PAD + CW - 180, Y + 5, { width: 175, align: 'right' });
       Y += titleH;
 
       // ── BUYER / SELLER INFO ───────────────────────────────────────────────────
@@ -198,7 +197,7 @@ const downloadInvoicePdf = async (req, res) => {
       doc.fillColor(S700).fontSize(7.5).font('Helvetica')
         .text(cust.billingAddress || '--', PAD + 5, Y + 26, { width: halfCW - 10 });
       doc.fillColor(S500).fontSize(7).font('Helvetica')
-        .text(`GSTIN/UIN: ${cust.gstin || 'N/A'}`, PAD + 5, Y + 46)
+        .text(`GST: ${cust.gstin || 'N/A'}`, PAD + 5, Y + 46)
         .text(`State: ${cust.state || 'Gujarat'}, Code: ${cust.stateCode || '24'}`, PAD + 5, Y + 56)
         .text(`Contact: ${cust.phone || '--'}`, PAD + 5, Y + 64);
 
@@ -211,7 +210,7 @@ const downloadInvoicePdf = async (req, res) => {
       const metaW = (CW - halfCW) / 2 - 5;
       const pairs = [
         ['Order No.', invoice.orderNo || '--', 'e-Way Bill', invoice.ewayBillNo || '--'],
-        ['Dispatch Doc', invoice.dispatchDocNo || '--', 'Destination', cust.state || 'Gujarat'],
+        ['Dispatch Doc', invoice.dispatchDocNo || '--', 'Challan No.', invoice.ourChallanNo || invoice.challanNo || '--'],
         ['Terms of Delivery', 'By Road', 'Place of Supply', `${cust.state || 'Gujarat'} (${cust.stateCode || '24'})`],
       ];
       let metaY = Y + 15;
@@ -236,7 +235,7 @@ const downloadInvoicePdf = async (req, res) => {
       const tblHdrH = 22;
       doc.rect(PAD, Y, CW, tblHdrH).fill(PRP);
       doc.fillColor(WHT).fontSize(7.5).font('Helvetica-Bold');
-      const hdrs   = ['Sr.', 'Image', 'Description of Goods', 'HSN/SAC', 'GST%', 'Qty', 'Rate', 'Per', 'Amount'];
+      const hdrs   = ['Sr.', 'Image', 'Description of Goods', 'HSN', 'GST%', 'Qty', 'Rate', 'Per', 'Amount'];
       const aligns = ['left','center','left','center','center','center','right','center','right'];
       hdrs.forEach((h, i) => doc.text(h, colX[i] + 2, Y + 7, { width: COL[i] - 4, align: aligns[i] }));
       Y += tblHdrH;
@@ -332,6 +331,18 @@ const downloadInvoicePdf = async (req, res) => {
         });
       });
 
+      // ── ROUND OFF ROW (UPPER OF TOTAL) ────────────────────────────────────────
+      const roundOff = Number(invoice.roundOff || 0);
+      if (Math.abs(roundOff) > 0) {
+        const roH = 16;
+        doc.rect(PAD, Y, CW, roH).fill(PRPL).stroke(S200);
+        doc.fillColor(S900).fontSize(8).font('Helvetica-Bold')
+          .text('Round Off', colX[2] + 4, Y + 4, { width: 100 });
+        doc.fillColor(S900).font('Helvetica-Bold').fontSize(8.5)
+          .text(`${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}`, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+        Y += roH;
+      }
+
       // ── GRAND TOTAL ───────────────────────────────────────────────────────────
       const totH = 22;
       doc.rect(PAD, Y, CW, totH).fill(PRP);
@@ -349,11 +360,6 @@ const downloadInvoicePdf = async (req, res) => {
         .text(numToWords(invoice.grandTotal), PAD + 5, Y + 14, { width: CW - 80 });
       doc.fillColor(S500).fontSize(7).font('Helvetica')
         .text('E. & O.E.', PAD + CW - 55, Y + 14, { width: 50, align: 'right' });
-      const roundOff = Number(invoice.roundOff || 0);
-      if (Math.abs(roundOff) > 0) {
-        doc.fillColor(S500).fontSize(7.5).font('Helvetica')
-          .text(`Round Off: ${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}`, PAD + CW - 120, Y + 4, { width: 115, align: 'right' });
-      }
       Y += wordsH;
 
       // ── 9. GST TAX SUMMARY TABLE ─────────────────────────────────────────────
@@ -364,7 +370,7 @@ const downloadInvoicePdf = async (req, res) => {
       const tHdrH2 = 18;
       doc.rect(PAD, Y, CW, tHdrH2).fill(PRP);
       doc.fillColor(WHT).fontSize(7.5).font('Helvetica-Bold');
-      ['HSN/SAC','Taxable Value','CGST %','CGST Amount','SGST %','SGST Amount','Total Tax'].forEach((h, i) => {
+      ['HSN','Taxable Value','CGST %','CGST Amount','SGST %','SGST Amount','Total Tax'].forEach((h, i) => {
         const align = i === 0 ? 'left' : (i === 2 || i === 4 ? 'center' : 'right');
         doc.text(h, TX[i] + 2, Y + 5, { width: TC[i] - 4, align });
       });
