@@ -36,6 +36,10 @@ const getStitchingConfigDocument = async () => {
       config.parties = ['Wholesale Party', 'Direct Client', 'Retailer'];
       changed = true;
     }
+    if (!config.vendors || config.vendors.length === 0) {
+      config.vendors = ['Stitching Contractor A', 'Fabric Supplier B', 'Embroidery Job Worker'];
+      changed = true;
+    }
     if (!config.deliveryOptions || config.deliveryOptions.length === 0) {
       config.deliveryOptions = ['Party Delivery', 'Self Pickup', 'Courier / Cargo'];
       changed = true;
@@ -67,7 +71,7 @@ const updateStitchingConfig = async (req, res) => {
     }
 
     const validFields = [
-      'categories', 'labels', 'finishingOptions', 'parties', 'billToOptions',
+      'categories', 'labels', 'finishingOptions', 'parties', 'vendors', 'billToOptions',
       'shipToOptions', 'deliveryOptions', 'startingJobNo', 'startingChallanNo', 'notes'
     ];
 

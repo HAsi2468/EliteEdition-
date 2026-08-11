@@ -25,6 +25,7 @@ export default function StitchingSettings() {
   const [newLabel, setNewLabel] = useState('');
   const [newFinishingOption, setNewFinishingOption] = useState('');
   const [newParty, setNewParty] = useState('');
+  const [newVendor, setNewVendor] = useState('');
   const [newBillTo, setNewBillTo] = useState('');
   const [newShipTo, setNewShipTo] = useState('');
   const [newDeliveryBy, setNewDeliveryBy] = useState('');
@@ -227,18 +228,26 @@ export default function StitchingSettings() {
         )}
       </div>
 
-      {/* Section 3: Stitching Party, Billing & Delivery Dropdowns */}
+      {/* Section 3: Stitching Party, Vendor, Billing & Delivery Dropdowns */}
       <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
-        {renderSectionHeader('🏢 Party, Delivery & Challan Dropdowns', 'party', '#fbbf24')}
+        {renderSectionHeader('🏢 Parties (Clients) & 🏭 Vendors (Job Workers)', 'party', '#fbbf24')}
         {expandedSections.party && (
           <div style={{ padding: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
             {renderSection(
-              'Parties & Client Names',
+              'Parties (Clients / Customers)',
               'parties',
               newParty,
               setNewParty,
               config?.parties,
               <Tag size={16} color="#fbbf24" />
+            )}
+            {renderSection(
+              'Vendors (Suppliers & Job Workers)',
+              'vendors',
+              newVendor,
+              setNewVendor,
+              config?.vendors,
+              <Tag size={16} color="#38bdf8" />
             )}
             {renderSection(
               'Delivery By Options',
@@ -262,24 +271,35 @@ export default function StitchingSettings() {
               newShipTo,
               setNewShipTo,
               config?.shipToOptions,
-              <Package size={16} color="#38bdf8" />
+              <Package size={16} color="#34d399" />
             )}
           </div>
         )}
       </div>
 
-      {/* Vendors Quick Access */}
-      <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)' }}>
+      {/* Directory Quick Access */}
+      <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)' }}>
         <div>
-          <h4 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: 700 }}>Vendor & Contractor Directory</h4>
-          <p style={{ margin: '2px 0 0', color: 'var(--text-muted)', fontSize: '0.78rem' }}>Manage vendor contacts, stitching job contractors, and party billing accounts.</p>
+          <h4 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: 700 }}>Party & Vendor Directory Management</h4>
+          <p style={{ margin: '2px 0 0', color: 'var(--text-muted)', fontSize: '0.78rem' }}>Manage saved customer profiles (Parties) and external suppliers/contractors (Vendors).</p>
         </div>
-        <button className="btn-secondary" onClick={() => setIsVendorManagerOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Settings size={15} /> Manage Vendors
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button className="btn-secondary" onClick={() => setIsVendorManagerOpen('parties')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Settings size={15} /> Customer / Party Directory
+          </button>
+          <button className="btn-primary" onClick={() => setIsVendorManagerOpen('vendors')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'linear-gradient(135deg, #0284c7, #2563eb)' }}>
+            <Settings size={15} /> Vendor / Supplier Directory
+          </button>
+        </div>
       </div>
 
-      {isVendorManagerOpen && <CatalogManagerModal initialTab="vendors" context="stitching" onClose={() => setIsVendorManagerOpen(false)} />}
+      {isVendorManagerOpen && (
+        <CatalogManagerModal 
+          initialTab={isVendorManagerOpen === 'parties' ? 'parties' : 'vendors'} 
+          context="stitching" 
+          onClose={() => setIsVendorManagerOpen(false)} 
+        />
+      )}
     </div>
   );
 }

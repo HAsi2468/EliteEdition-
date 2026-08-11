@@ -23,6 +23,10 @@ const stitchingConfigSchema = new mongoose.Schema(
       type: [String],
       default: ['Wholesale Party', 'Direct Client', 'Retailer'],
     },
+    vendors: {
+      type: [String],
+      default: ['Stitching Contractor A', 'Fabric Supplier B', 'Embroidery Job Worker'],
+    },
     billToOptions: {
       type: [String],
       default: [],
