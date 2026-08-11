@@ -1266,6 +1266,43 @@ export const api = {
     return request(`/fabric-challan/lot-info/${lotNo}`);
   },
 
+  // ── Stitching Challan (PCH-1) ──────────────────────────────────────────────
+  async getStitchingChallans(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/stitching-challan${qs}`);
+  },
+  async createStitchingChallan(data) {
+    return request('/stitching-challan', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async updateStitchingChallan(id, data) {
+    return request(`/stitching-challan/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  },
+  async deleteStitchingChallan(id) {
+    return request(`/stitching-challan/${id}`, { method: 'DELETE' });
+  },
+  async getNextStitchingChallanNo() {
+    return request('/stitching-challan/next-no');
+  },
+  async downloadStitchingChallanPdf(id, challanNo) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const response = await fetch(`${baseUrl}/stitching-challan/${id}/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate Stitching Challan PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Stitching_Challan_${challanNo || 'PCH'}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
   // ── Stock Adjustment (SA) ──────────────────────────────────────────────
   async getStockAdjustments() {
     return request('/fabric/stock-adjustment');

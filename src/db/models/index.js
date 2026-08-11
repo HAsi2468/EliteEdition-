@@ -38,6 +38,7 @@ const db = {
   StockOut: require('./stockOut.model'),
   JobCard: require('./jobCard.model'),
   GarmentJobCard: require('./garmentJobCard.model'),
+  StitchingChallan: require('./stitchingChallan.model'),
   JobPrintLog: require('./jobPrintLog.model'),
   Design: require('./design.model'),
   MyntraConfig: require('./myntraConfig.model'),
