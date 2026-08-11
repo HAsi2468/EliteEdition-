@@ -28,6 +28,7 @@ const AVAILABLE_SCREENS = [
   { id: 'reports', label: 'Reports Center', category: 'General' },
   { id: 'unicommerce', label: 'Uniware Integrations', category: 'General' },
   { id: 'myntra', label: 'Myntra Integrations', category: 'General' },
+  { id: 'admin', label: 'Admin User & Infrastructure Settings', category: 'General' },
 
   // Elite Edition (E-Commerce)
   { id: 'elite_online', label: 'Elite Online: Dashboard', category: 'Elite Edition' },
@@ -41,7 +42,7 @@ const AVAILABLE_SCREENS = [
   { id: 'jobcards_list', label: 'Elite Prints: Job Card', category: 'Elite Digital Print' },
   { id: 'jobcards_catalogue', label: 'Elite Prints: Design Catalog', category: 'Elite Digital Print' },
   { id: 'jobcards_tracking', label: 'Elite Prints: Job Card Tracking', category: 'Elite Digital Print' },
-  { id: 'jobcards_printing_log', label: 'Elite Prints: Printing Dipartment', category: 'Elite Digital Print' },
+  { id: 'jobcards_printing_log', label: 'Elite Prints: Printing Department', category: 'Elite Digital Print' },
   { id: 'jobcards_master', label: 'Elite Prints: Design Master (100 Pic)', category: 'Elite Digital Print' },
   { id: 'jobcards_fabric', label: 'Elite Prints: Fabric Management', category: 'Elite Digital Print' },
   { id: 'jobcards_raw_materials', label: 'Elite Prints: Raw Materials', category: 'Elite Digital Print' },
@@ -388,7 +389,16 @@ export default function AdminPanel() {
             <div style={styles.panelHeader}>
               <Sliders size={16} color="var(--primary)" />
               <h3 style={styles.panelTitle}>Active Accounts</h3>
-              {loading && <RotateCw size={14} className="spin-loader" style={{ marginLeft: 'auto', color: 'var(--text-muted)' }} />}
+              {loading && <RotateCw size={14} className="spin-loader" style={{ marginLeft: '0.5rem', color: 'var(--text-muted)' }} />}
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="btn-primary"
+                style={{ marginLeft: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+              >
+                <UserPlus size={13} />
+                <span>Add New User</span>
+              </button>
             </div>
 
             <div className="table-container" style={styles.tableWrap}>

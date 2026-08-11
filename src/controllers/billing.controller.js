@@ -420,7 +420,7 @@ const downloadInvoicePdf = async (req, res) => {
     doc.rect(ML, tableY, contentWidth, 22).fill('#4c1d95');
 
     doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold');
-    doc.text('#', ML + 4, tableY + 6, { width: 16 });
+    doc.text('Sr.', ML + 4, tableY + 6, { width: 16 });
     doc.text('IMAGE', ML + 22, tableY + 6, { width: 36, align: 'center' });
     doc.text('ITEM DESCRIPTION & DETAILS', ML + 60, tableY + 6, { width: 235 });
     doc.text('HSN/SAC', ML + 295, tableY + 6, { width: 50, align: 'center' });
@@ -445,15 +445,15 @@ const downloadInvoicePdf = async (req, res) => {
 
       // Line for Lot No & Party Challan
       const line1Parts = [];
-      if (item.lotNo) line1Parts.push(`Lot #: ${item.lotNo}`);
-      if (item.partyChallan) line1Parts.push(`Party Challan #: ${item.partyChallan}`);
+      if (item.lotNo) line1Parts.push(`Lot: ${item.lotNo}`);
+      if (item.partyChallan) line1Parts.push(`Party Challan: ${item.partyChallan}`);
       if (line1Parts.length > 0) {
         metaLineObjs.push({ text: line1Parts.join('   |   '), font: 'Helvetica', size: 8.8, color: '#334155' });
       }
 
       // Line for Our Challan & Description
       const line2Parts = [];
-      if (item.ourChallanNo) line2Parts.push(`Our Challan #: ${item.ourChallanNo}`);
+      if (item.ourChallanNo) line2Parts.push(`Our Challan: ${item.ourChallanNo}`);
       if (item.description) line2Parts.push(item.description);
       if (line2Parts.length > 0) {
         metaLineObjs.push({ text: line2Parts.join('   |   '), font: 'Helvetica', size: 8.8, color: '#334155' });

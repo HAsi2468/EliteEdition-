@@ -1147,21 +1147,21 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                           type="text"
                           value={it.jobNo || ''}
                           onChange={e => handleItemChange(idx, 'jobNo', e.target.value)}
-                          placeholder="Job Card #"
+                          placeholder="Job Card"
                           style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
                         />
                         <input
                           type="text"
                           value={it.lotNo || ''}
                           onChange={e => handleItemChange(idx, 'lotNo', e.target.value)}
-                          placeholder="Lot #"
+                          placeholder="Lot No"
                           style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
                         />
                         <input
                           type="text"
                           value={it.partyChallan || ''}
                           onChange={e => handleItemChange(idx, 'partyChallan', e.target.value)}
-                          placeholder="Party Challan #"
+                          placeholder="Party Challan"
                           style={{ ...inputStyle, fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}
                         />
                         <input
@@ -1651,9 +1651,9 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                   {(viewInvoiceModal.items || []).map((it, idx) => {
                     const jobDisplay = formatJobDisplay(it.jobNo);
                     const secondaryBadges = [];
-                    if (it.lotNo) secondaryBadges.push(`Lot #: ${it.lotNo}`);
-                    if (it.partyChallan) secondaryBadges.push(`Party Challan #: ${it.partyChallan}`);
-                    if (it.ourChallanNo) secondaryBadges.push(`Our Challan #: ${it.ourChallanNo}`);
+                    if (it.lotNo) secondaryBadges.push(`Lot: ${it.lotNo}`);
+                    if (it.partyChallan) secondaryBadges.push(`Party Challan: ${it.partyChallan}`);
+                    if (it.ourChallanNo) secondaryBadges.push(`Our Challan: ${it.ourChallanNo}`);
 
                     return (
                       <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', verticalAlign: 'top' }}>
