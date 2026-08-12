@@ -26,23 +26,21 @@ const errorHandler = (err, req, res, next) => {
 		statusCode = httpStatus.INTERNAL_SERVER_ERROR;
 	}
 	if (!message) {
-		message = httpStatus[statusCode] || 'Error';
-	}
-	if (config.env === 'production' && !err?.isOperational) {
-		statusCode = httpStatus.INTERNAL_SERVER_ERROR;
-		message = httpStatus[httpStatus.INTERNAL_SERVER_ERROR];
+		message = httpStatus[statusCode] || 'An unexpected error occurred';
 	}
 
 	res.locals.errorMessage = err.message || message;
 
 	const response = {
+		success: false,
 		code: statusCode,
+		error: message,
 		message,
 		...(config.env === 'development' && { stack: err.stack }),
 	};
 
-	if (config.env === 'development') {
-		logger.error(err);
+	if (config.env === 'development' || statusCode >= 500) {
+		logger.error('API Error (%d): %s', statusCode, err.stack || message);
 	}
 
 	res.status(statusCode).send(response);

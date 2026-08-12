@@ -21,10 +21,14 @@ export const setBaseUrl = (url) => {
   localStorage.setItem('elite_api_base_url', cleaned);
 };
 
-// Generic request wrapper
+// Generic request wrapper with Timeout & Safe Error Parser
 const request = async (path, options = {}) => {
   const baseUrl = getBaseUrl();
   const token = localStorage.getItem('elite_auth_token');
+
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    throw new Error('Network offline. Please check your internet connection.');
+  }
   
   const headers = {
     ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
@@ -32,16 +36,42 @@ const request = async (path, options = {}) => {
     ...options.headers,
   };
   
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...options,
-    headers,
-  });
+  const timeoutMs = options.timeout || 30000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, {
+      ...options,
+      headers,
+      signal: options.signal || controller.signal,
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s.`);
+    }
+    throw new Error(err.message || 'Server connection failed. Please check network.');
+  } finally {
+    clearTimeout(timeoutId);
+  }
   
   if (!response.ok) {
-    let errMsg = 'API Request Failed';
+    let errMsg = `Server returned status ${response.status}`;
     try {
-      const data = await response.json();
-      errMsg = data.message || data.error || errMsg;
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await response.json();
+        errMsg = data.message || data.error || data.err || errMsg;
+        if (typeof errMsg === 'object') {
+          errMsg = JSON.stringify(errMsg);
+        }
+      } else {
+        const text = await response.text();
+        if (text && text.length < 150) {
+          errMsg = text.replace(/<[^>]*>/g, '').trim() || errMsg;
+        }
+      }
     } catch (e) {}
     throw new Error(errMsg);
   }
