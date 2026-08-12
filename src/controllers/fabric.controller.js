@@ -2123,7 +2123,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
         const displayPaperTypes = Object.keys(paperTypeMap).length > 0
           ? Object.keys(paperTypeMap)
-          : ['A++', 'A+', 'A'];
+          : ['Sublimation Paper', 'Butter Paper', 'Tissue Paper'];
 
         const colTotals = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
         let grandTotalPaperRolls = 0;
