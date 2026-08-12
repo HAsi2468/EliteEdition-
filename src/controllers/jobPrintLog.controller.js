@@ -91,7 +91,7 @@ const createPrintLog = async (req, res) => {
       machineName: machineName.trim(),
       pass: pass || targetJob.pass || '4 Pass',
       meters: Number(meters),
-      date: date ? new Date(date) : new Date(),
+      date: date ? (parseFlexibleDate(date) || new Date()) : new Date(),
       operatorName: operatorName || req.user?.name || '',
       shift: shift || 'General',
       notes: notes || ''
@@ -114,10 +114,28 @@ const createPrintLog = async (req, res) => {
   }
 };
 
+function parseFlexibleDate(dateInput, isEnd = false) {
+  if (!dateInput) return null;
+  if (dateInput instanceof Date) return dateInput;
+  const str = String(dateInput).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const [y, m, d] = str.split('T')[0].split('-');
+    if (isEnd) return new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), 23, 59, 59, 999));
+    return new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), 0, 0, 0, 0));
+  }
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(str)) {
+    const [d, m, y] = str.split('/');
+    if (isEnd) return new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), 23, 59, 59, 999));
+    return new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), 0, 0, 0, 0));
+  }
+  const parsed = new Date(str);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
 // 2. Get all Print Logs with pagination & filters
 const getPrintLogs = async (req, res) => {
   try {
-    const { jobNo, machineName, operatorName, dateStart, dateEnd, page = 1, limit = 50 } = req.query;
+    const { jobNo, machineName, operatorName, dateStart, dateEnd, page = 1, limit = 500 } = req.query;
 
     const filter = {};
     if (jobNo) {
@@ -129,6 +147,7 @@ const getPrintLogs = async (req, res) => {
     if (operatorName) {
       filter.operatorName = { $regex: operatorName.trim(), $options: 'i' };
     }
+
     if (dateStart || dateEnd) {
       const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
       const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
@@ -143,16 +162,15 @@ const getPrintLogs = async (req, res) => {
       if (dsStr && deStr) {
         dateConditions.push({ date: { $gte: dsLocal, $lte: deLocal } });
         dateConditions.push({ date: { $gte: dsUtc, $lte: deUtc } });
-        dateConditions.push({ created_date_time: { $gte: dsLocal, $lte: deLocal } });
-        dateConditions.push({ created_date_time: { $gte: dsUtc, $lte: deUtc } });
+        dateConditions.push({ date: { $gte: dsStr, $lte: deStr } });
       } else if (dsStr) {
         dateConditions.push({ date: { $gte: dsLocal } });
         dateConditions.push({ date: { $gte: dsUtc } });
-        dateConditions.push({ created_date_time: { $gte: dsLocal } });
+        dateConditions.push({ date: { $gte: dsStr } });
       } else if (deStr) {
         dateConditions.push({ date: { $lte: deLocal } });
         dateConditions.push({ date: { $lte: deUtc } });
-        dateConditions.push({ created_date_time: { $lte: deLocal } });
+        dateConditions.push({ date: { $lte: deStr } });
       }
 
       if (dateConditions.length > 0) {
