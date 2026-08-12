@@ -401,8 +401,9 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
                           <FileText size={13} /> PDF
                         </button>
                         <button
+                          onClick={() => onNavigateToBilling && onNavigateToBilling(c)}
                           className="btn-secondary"
-                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem' }}
+                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem', background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2))', color: '#a78bfa', borderColor: 'rgba(124,58,237,0.4)' }}
                           title="Generate Bill"
                         >
                           <Receipt size={13} /> Bill

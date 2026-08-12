@@ -953,9 +953,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             {department === 'stitching' ? (
               <StitchingChallanPanel
                 onNavigateToBilling={(ch) => {
-                  populateFormFromChallan(ch);
+                  loadInvoiceFromChallan(ch);
                   setActiveTab('create');
-                  triggerPushNotification('Challan Imported 🚚', `Stitching Delivery Challan #${ch.challanNo || ch.jobNo} imported into Invoice Generator.`, 'success');
                 }}
               />
             ) : (
@@ -963,9 +962,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 department="digital_print"
                 onlyChallan={true}
                 onNavigateToBilling={(ch) => {
-                  populateFormFromChallan(ch);
+                  loadInvoiceFromChallan(ch);
                   setActiveTab('create');
-                  triggerPushNotification('Challan Imported 🚚', `Digital Print Delivery Challan #${ch.challanNo || ch.jobNo} imported into Invoice Generator.`, 'success');
                 }}
               />
             )}
