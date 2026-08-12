@@ -1454,6 +1454,7 @@ export const api = {
   },
 
   async downloadInvoicePdf(id, invoiceNo, duplicate = false) {
+    const t0 = performance.now();
     const baseUrl = getBaseUrl();
     const token = localStorage.getItem('elite_auth_token');
     const url = `${baseUrl}/billing/invoices/${id}/pdf${duplicate ? '?duplicate=true' : ''}`;
@@ -1470,6 +1471,7 @@ export const api = {
     link.click();
     link.parentNode.removeChild(link);
     window.URL.revokeObjectURL(objUrl);
+    console.log(`[PDF Download] Generated & downloaded in ${(performance.now() - t0).toFixed(0)}ms`);
   },
 
   // Billing Customers

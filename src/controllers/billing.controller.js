@@ -474,6 +474,7 @@ const recordPayment = async (req, res) => {
 
 // ── 9. DOWNLOAD INVOICE PDF ──────────────────────────────────────────────────
 const downloadInvoicePdf = async (req, res) => {
+  const startTime = Date.now();
   try {
     const invoice = await BillingInvoice.findById(req.params.id).lean();
     if (!invoice) return res.status(404).send('Invoice not found');
@@ -1099,6 +1100,7 @@ const downloadInvoicePdf = async (req, res) => {
       renderPage('DUPLICATE COPY', true);
     }
 
+    console.log(`[PDF Performance] Invoice ${invoice.invoiceNo} PDF generated in ${Date.now() - startTime}ms (${items.length} items)`);
     doc.end();
 
   } catch (error) {
