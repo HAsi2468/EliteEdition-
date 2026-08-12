@@ -9,7 +9,7 @@ import {
   RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
   Layers, Database, Settings, Trash2, FileDown, Search, X,
   AlertTriangle, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Edit, FileText,
-  Check, Plus, ArrowRightLeft, Download, Eye, Receipt
+  Check, Plus, ArrowRightLeft, Download, Eye, Receipt, Clock
 } from 'lucide-react';
 
 export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard', onlyChallan = false }) {
