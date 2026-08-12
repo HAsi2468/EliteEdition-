@@ -1406,7 +1406,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 </>
               )}
 
-              {/* Round Off Checkbox & Manual Override */}
+              {/* Round Off Checkbox & Editable Value */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#a78bfa', marginTop: '0.2rem', paddingTop: '0.2rem', borderTop: '1px dashed var(--border-light)' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: 600 }}>
                   <input
@@ -1416,20 +1416,16 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                   />
                   Round Off Total
                 </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                    Auto: {calculatedInvoice.roundOff > 0 ? '+' : ''}₹{calculatedInvoice.roundOff.toFixed(2)}
-                  </span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Override"
-                    value={invoiceForm.manualRoundOff !== undefined ? invoiceForm.manualRoundOff : ''}
-                    onChange={e => setInvoiceForm(f => ({ ...f, manualRoundOff: e.target.value === '' ? undefined : parseFloat(e.target.value), enableRoundOff: true }))}
-                    style={{ width: '80px', padding: '0.2rem 0.4rem', fontSize: '0.78rem', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '4px', color: '#a78bfa', textAlign: 'right' }}
-                    title="Manually override round off amount"
-                  />
-                </div>
+                <input
+                  type="number"
+                  step="0.01"
+                  disabled={invoiceForm.enableRoundOff === false}
+                  value={invoiceForm.manualRoundOff !== undefined ? invoiceForm.manualRoundOff : calculatedInvoice.roundOff}
+                  onChange={e => setInvoiceForm(f => ({ ...f, manualRoundOff: e.target.value === '' ? undefined : parseFloat(e.target.value), enableRoundOff: true }))}
+                  onBlur={e => { if (e.target.value === '') setInvoiceForm(f => ({ ...f, manualRoundOff: undefined })); }}
+                  style={{ width: '90px', padding: '0.25rem 0.5rem', fontSize: '0.85rem', fontWeight: 700, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '5px', color: '#a78bfa', textAlign: 'right' }}
+                  title="Auto-calculated. Edit to set manually."
+                />
               </div>
 
               <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: '#a78bfa' }}>
