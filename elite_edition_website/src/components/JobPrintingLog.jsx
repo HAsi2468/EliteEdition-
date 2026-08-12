@@ -8,6 +8,7 @@ import {
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
+import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import JobCardTooltip from './JobCardTooltip';
 
 // Automatic Shift Calculator:
@@ -848,15 +849,15 @@ export default function JobPrintingLog() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.jobNo) {
-      alert('Please select or enter a Job Card Number.');
+      triggerEliteAlert('Validation Error', 'Please select or enter a Job Card Number.', 'warning');
       return;
     }
     if (!form.machineName) {
-      alert('Please select a Printing Machine.');
+      triggerEliteAlert('Validation Error', 'Please select a Printing Machine.', 'warning');
       return;
     }
     if (!form.meters || parseFloat(form.meters) <= 0) {
-      alert('Please enter a valid meter quantity.');
+      triggerEliteAlert('Validation Error', 'Please enter a valid meter quantity.', 'warning');
       return;
     }
 
@@ -949,7 +950,13 @@ export default function JobPrintingLog() {
 
   // Delete Log Entry
   const handleDeleteLog = async (logId, jobNo) => {
-    if (!window.confirm(`Are you sure you want to delete this print log for Job #${jobNo}?`)) return;
+    const confirmed = await triggerEliteConfirm({
+      title: 'Delete Print Log',
+      message: `Are you sure you want to delete this print log entry for Job #${jobNo}?`,
+      confirmText: 'Delete Entry',
+      type: 'danger'
+    });
+    if (!confirmed) return;
     try {
       await api.deleteJobPrintLog(logId);
       triggerPushNotification('🗑️ Print Log Deleted', `Removed entry for Job #${jobNo}`, 'info');
@@ -960,7 +967,7 @@ export default function JobPrintingLog() {
         loadJobCardHistory(jobNo);
       }
     } catch (err) {
-      alert(err.message || 'Failed to delete log entry.');
+      triggerEliteAlert('Delete Failed', err.message || 'Failed to delete log entry.', 'error');
     }
   };
 

@@ -3,6 +3,7 @@ import { Plus, Search, Filter, Download, Eye, Edit, Trash2, Printer, X, Save, Re
 import { api } from '../services/api';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
+import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 
 const MAX_ITEMS = 30;
 
@@ -126,7 +127,7 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
 
   const addItemRow = () => {
     if (formState.items.length >= MAX_ITEMS) {
-      alert(`Maximum limit of ${MAX_ITEMS} items reached per Challan.`);
+      triggerEliteAlert('Item Limit Reached', `Maximum limit of ${MAX_ITEMS} items reached per Challan.`, 'warning');
       return;
     }
     setFormState(prev => ({ ...prev, items: [...prev.items, DEFAULT_ITEM()] }));
@@ -184,12 +185,18 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
   };
 
   const handleDelete = async (id, no) => {
-    if (!window.confirm(`Delete Stitching Challan #${no}?`)) return;
+    const confirmed = await triggerEliteConfirm({
+      title: 'Delete Stitching Challan',
+      message: `Are you sure you want to delete Stitching Challan #${no}? This action cannot be undone.`,
+      confirmText: 'Delete Challan',
+      type: 'danger'
+    });
+    if (!confirmed) return;
     try {
       await api.deleteStitchingChallan(id);
       fetchChallans();
     } catch (err) {
-      alert(err.message || 'Failed to delete.');
+      triggerEliteAlert('Delete Failed', err.message || 'Failed to delete.', 'error');
     }
   };
 
@@ -197,7 +204,7 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
     try {
       await api.downloadStitchingChallanPdf(c._id, c.challanNo);
     } catch (e) {
-      alert('Error downloading PDF: ' + e.message);
+      triggerEliteAlert('PDF Error', 'Error downloading PDF: ' + e.message, 'error');
     }
   };
 

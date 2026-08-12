@@ -5,6 +5,7 @@ import GarmentJobCardForm from './GarmentJobCardForm';
 import GarmentJobCardPrintView from './GarmentJobCardPrintView';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
+import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 
 export default function GarmentJobCardDashboard() {
   const [cards, setCards] = useState([]);
@@ -86,18 +87,27 @@ export default function GarmentJobCardDashboard() {
   }, [fetchCards, fetchAnalytics]);
 
   const handleDelete = async (id, jobNo) => {
-    if (!window.confirm(`Delete Garment Job Card "${jobNo}"?`)) return;
+    const confirmed = await triggerEliteConfirm({
+      title: 'Delete Garment Job Card',
+      message: `Are you sure you want to delete Garment Job Card "${jobNo}"?`,
+      confirmText: 'Delete Job Card',
+      type: 'danger'
+    });
+    if (!confirmed) return;
     try {
       await api.deleteGarmentJobCard(id);
       fetchCards();
       fetchAnalytics();
     } catch (err) {
-      alert(err.message || 'Failed to delete job card.');
+      triggerEliteAlert('Delete Failed', err.message || 'Failed to delete job card.', 'error');
     }
   };
 
   const handleExportCSV = () => {
-    if (!cards.length) { alert('No data to export.'); return; }
+    if (!cards.length) {
+      triggerEliteAlert('Export Notice', 'No job card data available to export.', 'warning');
+      return;
+    }
     
     const headers = [
       'Job Number', 'Date', 'Design Number', 'Label', 'Finishing', 'Status',

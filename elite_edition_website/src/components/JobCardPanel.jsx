@@ -18,6 +18,7 @@ import JobPrintingLog from './JobPrintingLog';
 import GarmentJobCardDashboard from './GarmentJobCardDashboard';
 import StitchingChallanPanel from './StitchingChallanPanel';
 import StitchingSettings from './StitchingSettings';
+import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
 import { triggerPushNotification } from './NotificationToast';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
@@ -1670,7 +1671,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
       const currentUser = api.getCurrentUser();
       const senderId = currentUser ? (currentUser._id || currentUser.id) : '';
       if (!senderId) {
-        alert('You must be signed in to share job cards.');
+        triggerEliteAlert('Authentication Required', 'You must be signed in to share job cards.', 'warning');
         return;
       }
 
@@ -1688,14 +1689,14 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
       content += `🔗 *Download PDF:* ${downloadLink}`;
 
       await api.sendRoomMessage(selectedRoomId, { senderId, content });
-      alert('Job Card shared successfully to the chat room!');
+      triggerEliteAlert('Job Card Shared 🚀', 'Job Card shared successfully to the chat room!', 'success');
       setShowShareModal(false);
       setShareCard(null);
       setSelectedRoomId('');
       setShareSearch('');
     } catch (err) {
       console.error('Failed to share job card', err);
-      alert('Failed to share job card.');
+      triggerEliteAlert('Sharing Failed', 'Failed to share job card.', 'error');
     } finally {
       setSharingJobCard(false);
     }
@@ -1749,14 +1750,20 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
   }, [fetchCards, activeSubTab]);
 
   const handleDelete = async (id, jobNo) => {
-    if (!window.confirm(`Delete Job Card "${jobNo}"?`)) return;
+    const confirmed = await triggerEliteConfirm({
+      title: 'Delete Job Card',
+      message: `Are you sure you want to delete Job Card "${jobNo}"? This action cannot be undone.`,
+      confirmText: 'Delete Job Card',
+      type: 'danger'
+    });
+    if (!confirmed) return;
     try {
       await api.deleteJobCard(id);
       triggerPushNotification('🗑️ Job Card Deleted', `Job Card #${jobNo} removed.`, 'warning');
       triggerGlobalDataRefresh('jobcards');
       fetchCards();
     } catch (err) {
-      alert(err.message || 'Failed to delete.');
+      triggerEliteAlert('Delete Failed', err.message || 'Failed to delete.', 'error');
     }
   };
 

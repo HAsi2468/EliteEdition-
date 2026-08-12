@@ -9,6 +9,7 @@ import imageCompression from 'browser-image-compression';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
+import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 
 // Copy convertDriveUrl helper
 function convertDriveUrl(link) {
@@ -594,7 +595,13 @@ export default function DesignCatalogue({ department }) {
   };
 
   const handleDelete = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to delete design "${name}"?`)) return;
+    const confirmed = await triggerEliteConfirm({
+      title: 'Delete Design',
+      message: `Are you sure you want to delete design "${name}"? This action cannot be undone.`,
+      confirmText: 'Delete Design',
+      type: 'danger'
+    });
+    if (!confirmed) return;
     try {
       await api.deleteDesign(id);
       triggerPushNotification('🗑️ Design Deleted', `Design "${name}" removed.`, 'warning');
@@ -602,13 +609,19 @@ export default function DesignCatalogue({ department }) {
       fetchDesigns();
       fetchCategories();
     } catch (err) {
-      alert(err.message || 'Failed to delete design.');
+      triggerEliteAlert('Delete Failed', err.message || 'Failed to delete design.', 'error');
     }
   };
 
   // Bulk auto-detect colours for ALL designs
   const handleBulkAutoDetectColors = async () => {
-    if (!window.confirm('This will analyze every design image and set the colour field to the most dominant colour detected.\n\nDesigns without images will be skipped.\n\nContinue?')) return;
+    const confirmed = await triggerEliteConfirm({
+      title: 'Bulk Detect Colors',
+      message: 'This will analyze every design image and set the colour field to the most dominant colour detected.\n\nDesigns without images will be skipped. Continue?',
+      confirmText: 'Start Analysis',
+      type: 'primary'
+    });
+    if (!confirmed) return;
 
     setBulkDetecting(true);
     setBulkProgress({ current: 0, total: 0, updated: 0, skipped: 0, failed: 0, log: [] });
@@ -667,7 +680,7 @@ export default function DesignCatalogue({ department }) {
       // Refresh the grid
       fetchDesigns();
     } catch (err) {
-      alert('Bulk operation failed: ' + err.message);
+      triggerEliteAlert('Bulk Error', 'Bulk operation failed: ' + err.message, 'error');
     } finally {
       // Keep modal open so user can see results — they close it manually
     }

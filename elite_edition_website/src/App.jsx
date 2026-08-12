@@ -18,6 +18,7 @@ import JobCardPanel from './components/JobCardPanel';
 import StitchingSettings from './components/StitchingSettings';
 import AdminPanel from './components/AdminPanel';
 import Workspace from './components/Workspace';
+import EliteModalDialog from './components/EliteModalDialog';
 import { 
   LogOut, 
   LayoutDashboard, 
@@ -1459,6 +1460,8 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* Global Elite Glassmorphic Modal Dialog */}
+      <EliteModalDialog />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import CatalogManagerModal from './CatalogManagerModal';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
+import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import {
   RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
   Layers, Database, Settings, Trash2, FileDown, Search, X,
@@ -658,15 +659,19 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling }
     const negLots = lotRecords.filter(l => l.currentStock < 0);
     const negCount = negLots.length;
     if (negCount === 0) {
-      alert('No negative deficit lots found. Inventory stock balances are clean!');
+      triggerEliteAlert('Inventory Clean', 'No negative deficit lots found. Inventory stock balances are clean!', 'success');
       return;
     }
 
     const totalDeficit = negLots.reduce((sum, l) => sum + Math.abs(l.currentStock), 0);
 
-    if (!window.confirm(`⚡ AUTO REBALANCE CONFIRMATION:\n\nFound ${negCount} negative stock lots with a total deficit of ${totalDeficit.toFixed(2)} mtr.\n\nDo you want to automatically transfer stock from matching positive lots (filtering by Fabric Quality, Panna, and Vendor/Party) to eliminate these negative deficits?\n\nAll executed transfers will be recorded in History.`)) {
-      return;
-    }
+    const confirmed = await triggerEliteConfirm({
+      title: 'Auto Rebalance Lots',
+      message: `Found ${negCount} negative stock lots with a total deficit of ${totalDeficit.toFixed(2)} mtr.\n\nDo you want to automatically transfer stock from matching positive lots to eliminate these deficits?`,
+      confirmText: 'Run Auto Rebalance',
+      type: 'warning'
+    });
+    if (!confirmed) return;
 
     setAutoTransferLoading(true);
     try {
@@ -676,10 +681,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling }
         triggerGlobalDataRefresh('fabric');
         fetchData();
       } else {
-        alert(res.error || 'Failed to auto-rebalance lot stock.');
+        triggerEliteAlert('Rebalance Error', res.error || 'Failed to auto-rebalance lot stock.', 'error');
       }
     } catch (err) {
-      alert('Error running auto lot transfer: ' + err.message);
+      triggerEliteAlert('Rebalance Error', 'Error running auto lot transfer: ' + err.message, 'error');
     } finally {
       setAutoTransferLoading(false);
     }
