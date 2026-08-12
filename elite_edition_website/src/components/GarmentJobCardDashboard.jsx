@@ -3,6 +3,8 @@ import { Plus, Search, Filter, Download, Eye, Edit, Trash2, Scissors, Calculator
 import { api } from '../services/api';
 import GarmentJobCardForm from './GarmentJobCardForm';
 import GarmentJobCardPrintView from './GarmentJobCardPrintView';
+import { formatDateDDMMYYYY } from '../utils/dateUtils';
+import { matchSearchQuery } from '../utils/searchUtils';
 
 export default function GarmentJobCardDashboard() {
   const [cards, setCards] = useState([]);
@@ -371,10 +373,12 @@ export default function GarmentJobCardDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {cards.map((c) => (
+                  {cards
+                    .filter(c => matchSearchQuery(c, search, ['job_number', 'design_number', 'label', 'vendor_name', 'finishing', 'status']))
+                    .map((c) => (
                     <tr key={c._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td style={{ ...tTdStyle, fontWeight: 800, color: 'var(--primary)' }}>{c.job_number}</td>
-                      <td style={tTdStyle}>{c.date || '—'}</td>
+                      <td style={tTdStyle}>{formatDateDDMMYYYY(c.date)}</td>
                       <td style={{ ...tTdStyle, fontWeight: 700 }}>{c.design_number || '—'}</td>
                       <td style={tTdStyle}>{c.label || '—'}</td>
                       <td style={tTdStyle}>

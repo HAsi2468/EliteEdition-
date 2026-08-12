@@ -21,6 +21,7 @@ import StitchingSettings from './StitchingSettings';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
 import { triggerPushNotification } from './NotificationToast';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
+import { matchSearchQuery } from '../utils/searchUtils';
 import JobCardTooltip from './JobCardTooltip';
 
 // ─── EXP.TIME calculation (mirrors Apps Script exactly) ─────────────────────
@@ -1700,14 +1701,15 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
     }
   };
 
-  const fetchCards = useCallback(async () => {
+  const fetchCards = useCallback(async (isSilent = false) => {
     if (activeSubTab !== 'list') return;
     // Cancel any in-flight request to prevent race conditions
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setLoading(true); setError('');
+    if (!isSilent) setLoading(true);
+    setError('');
     try {
       const res = await api.getJobCards({
         search: debouncedSearch,
@@ -1726,18 +1728,18 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         setPages(res.pages || 1);
       }
     } catch (err) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && !isSilent) {
         setError(err.message || 'Failed to load job cards.');
       }
     } finally {
-      if (!controller.signal.aborted) setLoading(false);
+      if (!controller.signal.aborted && !isSilent) setLoading(false);
     }
   }, [debouncedSearch, statusFilter, page, activeSubTab, sortBy, sortOrder, dateStart, dateEnd, department]);
 
   useEffect(() => {
-    fetchCards();
-    const interval = setInterval(fetchCards, 10000);
-    const handleDataRefresh = () => fetchCards();
+    fetchCards(false);
+    const interval = setInterval(() => fetchCards(true), 10000);
+    const handleDataRefresh = () => fetchCards(true);
     window.addEventListener('elite-data-refresh', handleDataRefresh);
 
     return () => {
@@ -1983,7 +1985,9 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                   </tr>
                 </thead>
                 <tbody>
-                  {cards.map(c => (
+                  {cards
+                    .filter(c => matchSearchQuery(c, debouncedSearch, ['jobNo', 'party', 'designNo', 'designName', 'machineName', 'billNo', 'partyChallan', 'ourChallanNo', 'lotNo', 'fabric']))
+                    .map(c => (
                     <tr 
                       key={c._id} 
                       style={{ borderBottom: '1px solid var(--border-light)', transition: 'background-color 0.15s' }}

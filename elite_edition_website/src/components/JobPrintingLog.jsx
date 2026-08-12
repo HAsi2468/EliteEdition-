@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
+import { matchSearchQuery } from '../utils/searchUtils';
 import JobCardTooltip from './JobCardTooltip';
 
 // Automatic Shift Calculator:
@@ -493,7 +494,7 @@ export default function JobPrintingLog() {
             <div class="subtitle">Complete Printing Log & Raw Material Usage Summary</div>
           </div>
           <div class="meta">
-            <div><strong>Generated:</strong> ${new Date().toLocaleDateString('en-IN')} ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
+            <div><strong>Generated:</strong> ${formatDateDDMMYYYY(new Date())} ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
             <div><strong>Filters:</strong> ${reportMachine || 'All Machines'} | ${reportShift || 'All Shifts'} | ${reportPass || 'All Passes'}</div>
           </div>
         </div>
@@ -648,7 +649,7 @@ export default function JobPrintingLog() {
 
         <div class="footer">
           <div>Elite Edition ERP — Digital Printing Operator Production Report</div>
-          <div>Printed On: ${new Date().toLocaleDateString('en-IN')}</div>
+          <div>Printed On: ${formatDateDDMMYYYY(new Date())}</div>
         </div>
 
         <script>
@@ -1477,7 +1478,9 @@ export default function JobPrintingLog() {
                   </td>
                 </tr>
               ) : (
-                logs.map(log => (
+                logs
+                  .filter(log => matchSearchQuery(log, searchJob, ['jobNo', 'machineName', 'pass', 'operatorName', 'notes', 'shift']))
+                  .map(log => (
                   <tr key={log._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <td style={tdStyle}>{formatDateTimeDDMMYYYY(log.date || log.created_date_time)}</td>
                     <td style={{ ...tdStyle, fontWeight: 800, color: 'var(--text-primary)' }}>

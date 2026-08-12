@@ -106,13 +106,32 @@ const getAllJobCards = async (req, res) => {
     }
 
     if (search) {
+      const trimmed = search.trim();
+      const digitsOnly = trimmed.replace(/\D/g, '');
+      const searchRegex = { $regex: trimmed, $options: 'i' };
+      
       const searchOr = [
-        { jobNo:       { $regex: search, $options: 'i' } },
-        { party:       { $regex: search, $options: 'i' } },
-        { designNo:    { $regex: search, $options: 'i' } },
-        { machineName: { $regex: search, $options: 'i' } },
-        { billNo:      { $regex: search, $options: 'i' } },
+        { jobNo:       searchRegex },
+        { party:       searchRegex },
+        { designNo:    searchRegex },
+        { machineName: searchRegex },
+        { billNo:      searchRegex },
+        { partyChallan: searchRegex },
+        { ourChallanNo: searchRegex },
+        { lotNo:       searchRegex },
+        { fabric:      searchRegex },
       ];
+
+      if (digitsOnly) {
+        const digitRegex = { $regex: digitsOnly, $options: 'i' };
+        searchOr.push(
+          { jobNo: digitRegex },
+          { billNo: digitRegex },
+          { partyChallan: digitRegex },
+          { ourChallanNo: digitRegex }
+        );
+      }
+
       if (deptOr) {
         filter.$and = [{ $or: deptOr }, { $or: searchOr }];
       } else {

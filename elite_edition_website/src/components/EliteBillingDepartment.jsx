@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
+import { matchSearchQuery } from '../utils/searchUtils';
 import {
   FileText,
   Plus,
@@ -914,7 +915,13 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                     </td>
                   </tr>
                 ) : (
-                  invoices.map(inv => (
+                  invoices
+                    .filter(inv => matchSearchQuery(inv, searchQuery || search, [
+                      'invoiceNo', 'ourChallanNo', 'challanNo', 'orderNo', 'dispatchDocNo',
+                      'customer.name', 'customer.businessName', 'customer.phone', 'customer.gstin',
+                      'items.itemName', 'items.jobNo', 'items.lotNo', 'items.partyChallan', 'items.ourChallanNo', 'items.hsnCode'
+                    ]))
+                    .map(inv => (
                     <tr key={inv._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: '#a78bfa' }}>
                         <button

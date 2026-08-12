@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Filter, Download, Eye, Edit, Trash2, Printer, X, Save, RefreshCw, FileText, CheckCircle, Receipt } from 'lucide-react';
 import { api } from '../services/api';
+import { matchSearchQuery } from '../utils/searchUtils';
+import { formatDateDDMMYYYY } from '../utils/dateUtils';
 
 const MAX_ITEMS = 30;
 
@@ -308,13 +310,15 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
                 </tr>
               </thead>
               <tbody>
-                {challans.map(c => (
+                {challans
+                  .filter(c => matchSearchQuery(c, search, ['challanNo', 'partyName', 'billTo', 'shipTo', 'deliveryBy', 'vendorChallanNo', 'items.designNo', 'items.particulars']))
+                  .map(c => (
                   <tr key={c._id} style={{ borderBottom: '1px solid var(--border-light)', transition: 'background 0.15s' }}>
                     <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--primary)' }}>
                       {c.challanNo}
                     </td>
                     <td style={{ padding: '0.75rem 1rem', color: 'var(--text-primary)' }}>
-                      {c.date ? new Date(c.date).toLocaleDateString('en-IN') : '—'}
+                      {formatDateDDMMYYYY(c.date)}
                     </td>
                     <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                       {c.partyName || '—'}
@@ -645,7 +649,7 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
 
               <div style={{ borderTop: '2px solid #1e40af', borderBottom: '1px solid #cbd5e1', padding: '0.5rem 0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', background: '#f8fafc' }}>
                 <div><strong>CHALLAN NO:</strong> {printChallan.challanNo}</div>
-                <div style={{ textAlign: 'right' }}><strong>DATE:</strong> {printChallan.date ? new Date(printChallan.date).toLocaleDateString('en-IN') : '—'}</div>
+                <div style={{ textAlign: 'right' }}><strong>DATE:</strong> {formatDateDDMMYYYY(printChallan.date)}</div>
                 <div><strong>PARTY NAME:</strong> {printChallan.partyName || '—'}</div>
                 <div style={{ textAlign: 'right' }}><strong>TRANSPORT:</strong> {printChallan.deliveryBy || '—'}</div>
               </div>

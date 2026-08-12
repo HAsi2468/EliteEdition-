@@ -3,6 +3,7 @@ import { api } from '../services/api';
 import CatalogManagerModal from './CatalogManagerModal';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
+import { matchSearchQuery } from '../utils/searchUtils';
 import {
   RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
   Layers, Database, Settings, Trash2, FileDown, Search, X,
@@ -392,8 +393,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling }
     jobNo: '', challanNo: '', partyName: '', fabricQuality: '', panna: '', lotNo: '', qty: '', date: new Date().toISOString().split('T')[0], notes: ''
   });
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError('');
     try {
       const cfg = await api.getPrintConfig();
@@ -452,9 +453,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling }
       } catch (e) { console.warn('Failed to fetch lot transfers', e); }
 
     } catch (err) {
-      setError(err.message || 'Failed to load fabric inventory data.');
+      if (!isSilent) setError(err.message || 'Failed to load fabric inventory data.');
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
@@ -481,15 +482,15 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling }
   };
 
   // fetch requirement from job cards
-  const fetchRequirement = async () => {
-    setReqLoading(true);
+  const fetchRequirement = async (isSilent = false) => {
+    if (!isSilent) setReqLoading(true);
     try {
       const res = await api.getFabricRequirement();
       if (res && res.success) setRequirement(res.data || []);
     } catch (e) {
       console.warn('Failed to fetch requirement', e);
     } finally {
-      setReqLoading(false);
+      if (!isSilent) setReqLoading(false);
     }
   };
 
@@ -503,20 +504,20 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling }
   };
 
   useEffect(() => {
-    fetchData();
-    fetchRequirement();
+    fetchData(false);
+    fetchRequirement(false);
     fetchChallans();
     fetchStockAdjustments();
     const intervalId = setInterval(() => {
-      fetchData();
-      fetchRequirement();
+      fetchData(true);
+      fetchRequirement(true);
       fetchChallans();
       fetchStockAdjustments();
     }, 5000); // 5s real-time auto-sync
 
     const handleDataRefresh = () => {
-      fetchData();
-      fetchRequirement();
+      fetchData(true);
+      fetchRequirement(true);
       fetchChallans();
       fetchStockAdjustments();
     };
@@ -1355,12 +1356,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling }
     if (t.type !== 'INWARD') return false;
     if (inwardDateStart && t.date < inwardDateStart) return false;
     if (inwardDateEnd && t.date > inwardDateEnd + 'T23:59:59') return false;
-    if (!inwardSearch) return true;
-    const s = inwardSearch.toLowerCase();
-    return (t.fabricQuality || '').toLowerCase().includes(s)
-      || (t.vendorName || '').toLowerCase().includes(s)
-      || (t.challanNo || '').toLowerCase().includes(s)
-      || String(t.lotNo || '').includes(s);
+    return matchSearchQuery(t, inwardSearch, ['fabricQuality', 'vendorName', 'challanNo', 'lotNo', 'notes']);
   }).sort((a, b) => {
     let valA = a[inwardSortBy];
     let valB = b[inwardSortBy];
@@ -1377,12 +1373,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling }
     if (t.type !== 'OUTWARD') return false;
     if (outwardDateStart && t.date < outwardDateStart) return false;
     if (outwardDateEnd && t.date > outwardDateEnd + 'T23:59:59') return false;
-    if (!outwardSearch) return true;
-    const s = outwardSearch.toLowerCase();
-    return (t.fabricQuality || '').toLowerCase().includes(s)
-      || (t.partyName || '').toLowerCase().includes(s)
-      || (t.jobNo || '').toLowerCase().includes(s)
-      || String(t.lotNo || '').includes(s);
+    return matchSearchQuery(t, outwardSearch, ['fabricQuality', 'partyName', 'jobNo', 'challanNo', 'lotNo', 'notes']);
   }).sort((a, b) => {
     let valA = a[outwardSortBy];
     let valB = b[outwardSortBy];

@@ -7,6 +7,8 @@ import {
 import { COLOR_NAMES, getColorHex, detectDominantColors } from '../utils/colors';
 import imageCompression from 'browser-image-compression';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
+import { formatDateDDMMYYYY } from '../utils/dateUtils';
+import { matchSearchQuery } from '../utils/searchUtils';
 
 // Copy convertDriveUrl helper
 function convertDriveUrl(link) {
@@ -400,15 +402,15 @@ export default function DesignCatalogue({ department }) {
       }
     };
 
-    const loadAll = () => {
-      fetchDesigns();
+    const loadAll = (isSilent = false) => {
+      fetchDesigns(isSilent);
       fetchCategories();
       fetchConfig();
     };
 
-    loadAll();
-    const interval = setInterval(loadAll, 10000);
-    const handleDataRefresh = () => loadAll();
+    loadAll(false);
+    const interval = setInterval(() => loadAll(true), 10000);
+    const handleDataRefresh = () => loadAll(true);
     window.addEventListener('elite-data-refresh', handleDataRefresh);
 
     return () => {
@@ -417,8 +419,8 @@ export default function DesignCatalogue({ department }) {
     };
   }, [search, categoryFilter, colorFilter, statusFilter, page, sortBy, sortOrder]);
 
-  const fetchDesigns = async () => {
-    setLoading(true);
+  const fetchDesigns = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError('');
     try {
       const res = await api.getDesigns({
@@ -438,9 +440,9 @@ export default function DesignCatalogue({ department }) {
         setPages(res.pages || 1);
       }
     } catch (err) {
-      setError(err.message || 'Failed to fetch designs.');
+      if (!isSilent) setError(err.message || 'Failed to fetch designs');
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
@@ -455,7 +457,7 @@ export default function DesignCatalogue({ department }) {
 
   const openNew = async () => {
     setFormDesign(null);
-    setFormVal({ ...BLANK_DESIGN, category: department === 'stitching' ? 'Stitching' : '' });
+    setFormVal({ ...BLANK_DESIGN });
     setFormError('');
     setDetectedColors(null);
     setShowForm(true);
@@ -563,7 +565,7 @@ export default function DesignCatalogue({ department }) {
       const sanitizedVal = {
         ...formVal,
         department: department || (formDesign?.department) || 'digital_print',
-        category: formVal.category || (department === 'stitching' ? 'Stitching' : ''),
+        category: formVal.category || '',
         top100: formVal.top100 === '' || formVal.top100 === null || formVal.top100 === undefined ? 0 : Number(formVal.top100),
         sleeve100: formVal.sleeve100 === '' || formVal.sleeve100 === null || formVal.sleeve100 === undefined ? 0 : Number(formVal.sleeve100),
         bottom100: formVal.bottom100 === '' || formVal.bottom100 === null || formVal.bottom100 === undefined ? 0 : Number(formVal.bottom100),
@@ -836,7 +838,9 @@ export default function DesignCatalogue({ department }) {
       ) : (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.2rem' }}>
-            {designs.map(d => {
+            {designs
+              .filter(d => matchSearchQuery(d, search, ['designNo', 'designName', 'category', 'colors', 'fabric', 'partyName', 'notes']))
+              .map(d => {
               const mainImg = convertDriveUrl(d.imageUrl);
               const subImg = convertDriveUrl(d.imageUrl2);
 
