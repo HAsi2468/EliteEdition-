@@ -767,10 +767,17 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     }
   };
 
-  // Keep ref in sync with state so fetchChallans always reads current values
+  // Keep ref in sync with state so fetchChallans always reads current values.
+  // Debounce search input: wait 400ms after user stops typing before firing API.
+  // Date changes fire immediately (no delay). Cleanup cancels stale requests.
   useEffect(() => {
     challanFiltersRef.current = { search: challanSearch, dateStart: challanDateStart, dateEnd: challanDateEnd };
-    fetchChallans();
+    // No debounce for date filter changes, only for text search
+    const delay = challanSearch !== challanFiltersRef.current.search ? 400 : 0;
+    const debounceTimer = setTimeout(() => {
+      fetchChallans();
+    }, challanSearch ? 400 : 0); // Instant clear when search is emptied, 400ms delay while typing
+    return () => clearTimeout(debounceTimer); // Cancel previous timer on next keystroke
   }, [challanDateStart, challanDateEnd, challanSearch]);
 
   const getVendorShortForm = (name) => {
