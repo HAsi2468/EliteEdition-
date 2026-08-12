@@ -130,12 +130,33 @@ const getPrintLogs = async (req, res) => {
       filter.operatorName = { $regex: operatorName.trim(), $options: 'i' };
     }
     if (dateStart || dateEnd) {
-      filter.date = {};
-      if (dateStart) filter.date.$gte = new Date(dateStart);
-      if (dateEnd) {
-        const end = new Date(dateEnd);
-        end.setHours(23, 59, 59, 999);
-        filter.date.$lte = end;
+      const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
+      const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
+
+      const dsLocal = dsStr ? new Date(`${dsStr}T00:00:00.000`) : null;
+      const deLocal = deStr ? new Date(`${deStr}T23:59:59.999`) : null;
+
+      const dsUtc = dsStr ? new Date(`${dsStr}T00:00:00.000Z`) : null;
+      const deUtc = deStr ? new Date(`${deStr}T23:59:59.999Z`) : null;
+
+      const dateConditions = [];
+      if (dsStr && deStr) {
+        dateConditions.push({ date: { $gte: dsLocal, $lte: deLocal } });
+        dateConditions.push({ date: { $gte: dsUtc, $lte: deUtc } });
+        dateConditions.push({ created_date_time: { $gte: dsLocal, $lte: deLocal } });
+        dateConditions.push({ created_date_time: { $gte: dsUtc, $lte: deUtc } });
+      } else if (dsStr) {
+        dateConditions.push({ date: { $gte: dsLocal } });
+        dateConditions.push({ date: { $gte: dsUtc } });
+        dateConditions.push({ created_date_time: { $gte: dsLocal } });
+      } else if (deStr) {
+        dateConditions.push({ date: { $lte: deLocal } });
+        dateConditions.push({ date: { $lte: deUtc } });
+        dateConditions.push({ created_date_time: { $lte: deLocal } });
+      }
+
+      if (dateConditions.length > 0) {
+        filter.$or = dateConditions;
       }
     }
 

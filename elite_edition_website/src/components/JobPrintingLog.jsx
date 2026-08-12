@@ -1108,7 +1108,11 @@ export default function JobPrintingLog() {
               {/* Button 2: Download Report */}
               <button
                 type="button"
-                onClick={() => setShowReportModal(true)}
+                onClick={() => {
+                  setReportStartDate(dateStart);
+                  setReportEndDate(dateEnd);
+                  setShowReportModal(true);
+                }}
                 className="btn-primary"
                 style={{
                   padding: '0.4rem 0.85rem',
@@ -1811,7 +1815,11 @@ export default function JobPrintingLog() {
                   <input
                     type="date"
                     value={reportStartDate}
-                    onChange={e => setReportStartDate(e.target.value)}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setReportStartDate(val);
+                      setDateStart(val);
+                    }}
                     style={{ ...inputStyle, fontSize: '0.85rem', padding: '0.55rem 0.75rem', fontWeight: 700 }}
                   />
                 </div>
@@ -1821,7 +1829,11 @@ export default function JobPrintingLog() {
                   <input
                     type="date"
                     value={reportEndDate}
-                    onChange={e => setReportEndDate(e.target.value)}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setReportEndDate(val);
+                      setDateEnd(val);
+                    }}
                     style={{ ...inputStyle, fontSize: '0.85rem', padding: '0.55rem 0.75rem', fontWeight: 700 }}
                   />
                 </div>
