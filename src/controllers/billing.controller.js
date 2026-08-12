@@ -1031,7 +1031,8 @@ const downloadInvoicePdf = async (req, res) => {
 
       const drawFooter = (startY) => {
         const minFooterY = PH - PAD - 72;
-        const footerY = Math.max(startY + 8, minFooterY);
+        const validStartY = (typeof startY === 'number' && !isNaN(startY)) ? startY : minFooterY - 8;
+        const footerY = Math.max(validStartY + 8, minFooterY);
         doc.moveTo(PAD, footerY).lineTo(PAD+CW, footerY).strokeColor(S200).lineWidth(0.6).stroke();
 
         const leftFW = 300;
@@ -1079,14 +1080,14 @@ const downloadInvoicePdf = async (req, res) => {
 
         Y = drawItemsTable(Y, items.slice(5), 5, true);
         Y = drawSummary(Y);
-        drawFooter();
+        drawFooter(Y);
 
       } else {
         // 1 page
         let Y = drawHeader('');
         Y = drawItemsTable(Y, items, 0, true);
         Y = drawSummary(Y);
-        drawFooter();
+        drawFooter(Y);
       }
     };
 
