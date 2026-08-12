@@ -756,13 +756,24 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     setEditingChallan(null);
     resetChallanForm();
     document.body.style.overflow = '';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    const scrollContainers = document.querySelectorAll('.main-content, .app-container, .content-area, .dashboard-container');
-    scrollContainers.forEach(c => {
-      if (c && typeof c.scrollTo === 'function') {
-        c.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    });
+
+    const executeScrollTop = () => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      const selectors = '.main-content, .app-container, .content-area, .dashboard-container, .table-responsive, section, main, .panel-body';
+      document.querySelectorAll(selectors).forEach(c => {
+        if (c) {
+          c.scrollTop = 0;
+          if (typeof c.scrollTo === 'function') c.scrollTo(0, 0);
+        }
+      });
+    };
+
+    executeScrollTop();
+    requestAnimationFrame(executeScrollTop);
+    setTimeout(executeScrollTop, 50);
+    setTimeout(executeScrollTop, 150);
   };
 
   // ── Challan helpers ────────────────────────────────────────────────────
@@ -3176,14 +3187,67 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
       {/* ── Challan Tab ── */}
       {activeTab === 'challan' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <h2>Fabric Challans</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          
+          {/* Header Banner & Metrics Summary Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem' }}>
+            <div className="glass-panel" style={{ padding: '0.9rem 1.1rem', borderLeft: '4px solid #38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Challans</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{challans.length} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>records</span></div>
+              </div>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(56,189,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FileText size={18} color="#38bdf8" />
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '0.9rem 1.1rem', borderLeft: '4px solid #34d399', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Invoiced & Billed</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#34d399', marginTop: 2 }}>
+                  {challans.filter(c => c.status === 'INVOICED').length} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>billed</span>
+                </div>
+              </div>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(52,211,153,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CheckCircle size={18} color="#34d399" />
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '0.9rem 1.1rem', borderLeft: '4px solid #fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Pending Invoice</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#fbbf24', marginTop: 2 }}>
+                  {challans.filter(c => c.status !== 'INVOICED').length} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>pending</span>
+                </div>
+              </div>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(251,191,36,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Clock size={18} color="#fbbf24" />
+              </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '0.9rem 1.1rem', borderLeft: '4px solid #a78bfa', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Dispatched Mtr</span>
+                <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#a78bfa', marginTop: 2 }}>
+                  {challans.reduce((sum, c) => sum + (parseFloat(c.totalMtr) || 0), 0).toFixed(2)} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>mtr</span>
+                </div>
+              </div>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(167,139,250,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Receipt size={18} color="#a78bfa" />
+              </div>
+            </div>
+          </div>
+
+          {/* Action Toolbar & Filters */}
+          <div className="glass-panel" style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              📜 Fabric Dispatch Challans Register
+            </h2>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
               {selectedChallanIds.length > 0 && (
                 <button
                   className="btn-primary"
-                  style={{ background: 'linear-gradient(135deg,#7c3aed,#6366f1)', fontSize: '0.78rem', padding: '0.35rem 0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  style={{ background: 'linear-gradient(135deg,#7c3aed,#6366f1)', fontSize: '0.78rem', padding: '0.45rem 0.9rem', display: 'inline-flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)' }}
                   onClick={() => {
                     if (selectedChallanIds.length > 10) {
                       alert('Maximum 10 Challans can be merged into a single Invoice. Please deselect some and try again.');
@@ -3204,115 +3268,128 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               )}
               {/* Search */}
               <div style={{ position: 'relative' }}>
-                <Search size={14} style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input type="text" placeholder="Search challan no, party, job, fabric..." value={challanSearch} onChange={e => setChallanSearch(e.target.value)} style={{ ...inputStyle, width: '230px', paddingLeft: '1.8rem' }} />
+                <Search size={14} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input type="text" placeholder="Search challan no, party, job, fabric..." value={challanSearch} onChange={e => setChallanSearch(e.target.value)} style={{ ...inputStyle, width: '230px', paddingLeft: '2rem' }} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
-                <input type="date" value={challanDateStart} onChange={e => setChallanDateStart(e.target.value)} style={{ ...inputStyle, width: '130px', padding: '0.3rem' }} />
+                <input type="date" value={challanDateStart} onChange={e => setChallanDateStart(e.target.value)} style={{ ...inputStyle, width: '130px', padding: '0.35rem 0.5rem' }} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>To:</span>
-                <input type="date" value={challanDateEnd} onChange={e => setChallanDateEnd(e.target.value)} style={{ ...inputStyle, width: '130px', padding: '0.3rem' }} />
+                <input type="date" value={challanDateEnd} onChange={e => setChallanDateEnd(e.target.value)} style={{ ...inputStyle, width: '130px', padding: '0.35rem 0.5rem' }} />
               </div>
-              <button className="btn-primary" onClick={() => { resetChallanForm(); setEditingChallan(null); setIsChallanOpen(true); }}>
+              <button className="btn-primary" onClick={() => { resetChallanForm(); setEditingChallan(null); setIsChallanOpen(true); }} style={{ padding: '0.45rem 1rem', fontSize: '0.85rem', fontWeight: 800 }}>
                 <PlusCircle size={16} /> New Challan
               </button>
             </div>
           </div>
 
-          <div className="table-responsive" style={{ overflowX: 'auto', width: '100%' }}>
-            <table className="data-table" style={{ width: '100%', fontSize: '0.78rem', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-light)' }}>
-                  <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center', width: '35px' }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedChallanIds.length > 0 && selectedChallanIds.length === challans.length}
-                      onChange={e => {
-                        if (e.target.checked) setSelectedChallanIds(challans.map(c => c._id));
-                        else setSelectedChallanIds([]);
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    />
-                  </th>
-                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '80px' }}>Ch. No</th>
-                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '75px' }}>Status</th>
-                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '85px' }}>Date</th>
-                  <th style={{ padding: '0.45rem 0.4rem' }}>Bill To</th>
-                  <th style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap', width: '65px' }}>Lot No</th>
-                  <th style={{ padding: '0.45rem 0.4rem' }}>Fabric</th>
-                  <th style={{ padding: '0.45rem 0.4rem', width: '95px' }}>Job No</th>
-                  <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center', whiteSpace: 'nowrap', width: '55px' }}>Panna</th>
-                  <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center', whiteSpace: 'nowrap', width: '40px' }}>TP</th>
-                  <th style={{ padding: '0.45rem 0.4rem', textAlign: 'right', whiteSpace: 'nowrap', width: '90px' }}>Total Mtr</th>
-                  <th style={{ padding: '0.45rem 0.4rem', textAlign: 'center', whiteSpace: 'nowrap', width: '180px' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {challans.length === 0 && (
-                  <tr><td colSpan={12} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No challans found. Click "New Challan" to create one.</td></tr>
-                )}
-                {challans.map(ch => (
-                  <tr key={ch._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <td style={{ padding: '0.45rem 0.4rem', textAlign: 'center' }}>
+          {/* Table Container */}
+          <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', border: '1px solid var(--border-light)' }}>
+            <div className="table-responsive" style={{ overflowX: 'auto', width: '100%' }}>
+              <table className="data-table" style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'linear-gradient(135deg, rgba(30,41,59,0.9), rgba(15,23,42,0.9))', borderBottom: '1px solid var(--border-light)' }}>
+                    <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', width: '38px' }}>
                       <input
                         type="checkbox"
-                        checked={selectedChallanIds.includes(ch._id)}
+                        checked={selectedChallanIds.length > 0 && selectedChallanIds.length === challans.length}
                         onChange={e => {
-                          if (e.target.checked) setSelectedChallanIds(prev => [...prev, ch._id]);
-                          else setSelectedChallanIds(prev => prev.filter(id => id !== ch._id));
+                          if (e.target.checked) setSelectedChallanIds(challans.map(c => c._id));
+                          else setSelectedChallanIds([]);
                         }}
                         style={{ cursor: 'pointer' }}
                       />
-                    </td>
-                    <td style={{ padding: '0.45rem 0.4rem', fontWeight: 800, color: 'var(--primary)', whiteSpace: 'nowrap' }}>EDP-{ch.challanNo}</td>
-                    <td style={{ padding: '0.45rem 0.4rem' }}>
-                      {ch.status === 'INVOICED' ? (
-                        <span style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(52,211,153,0.3)' }}>
-                          INVOICED
-                        </span>
-                      ) : (
-                        <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(251,191,36,0.3)' }}>
-                          PENDING
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap' }}>{formatDateDDMMYYYY(ch.date)}</td>
-                    <td style={{ padding: '0.45rem 0.4rem', fontWeight: 700, color: '#a78bfa' }}>{ch.billTo || ch.partyName || '—'}</td>
-                    <td style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap' }}>{ch.lotNo != null ? `#${ch.lotNo}` : '—'}</td>
-                    <td style={{ padding: '0.45rem 0.4rem' }}>{ch.fabricName || '—'}</td>
-                    <td style={{ padding: '0.45rem 0.4rem', color: 'var(--primary)', fontWeight: 700, width: '95px', wordBreak: 'break-word', whiteSpace: 'normal' }}>{ch.jobNo ? `#${String(ch.jobNo).trim()}` : '—'}</td>
-                    <td style={{ padding: '0.45rem 0.4rem', whiteSpace: 'nowrap' }}>{ch.panna || '—'}</td>
-                    <td style={{ padding: '0.45rem 0.4rem', textAlign: 'center', fontWeight: 700 }}>{ch.totalTp}</td>
-                    <td style={{ padding: '0.45rem 0.4rem', textAlign: 'right', fontWeight: 800, color: 'var(--success)', whiteSpace: 'nowrap' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
-                    <td style={{ padding: '0.35rem 0.4rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center', alignItems: 'center' }}>
-                        <button className="btn-icon" title="View Challan" style={{ color: '#38bdf8', padding: '0.25rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 4, cursor: 'pointer' }} onClick={() => setViewChallanModal(ch)}>
-                          <Eye size={13} />
-                        </button>
-                        <button className="btn-icon" title="Download PDF" style={{ color: '#34d399', padding: '0.25rem', background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 4, cursor: 'pointer' }} onClick={() => handleDownloadChallanPdf(ch._id, ch.challanNo)}>
-                          <FileDown size={13} />
-                        </button>
-                        <button className="btn-secondary" title="Create Tax Bill" style={{ padding: '0.2rem 0.45rem', fontSize: '0.68rem', fontWeight: 800, background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2))', color: '#a78bfa', border: '1px solid rgba(124,58,237,0.4)', borderRadius: 4, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '2px' }} onClick={() => handleCreateBillFromChallan(ch)}>
-                          <Receipt size={12} /> Bill
-                        </button>
-                        {ch.status !== 'INVOICED' && (
-                          <>
-                            <button className="btn-icon" title="Edit Challan" style={{ color: 'var(--primary)', padding: '0.25rem', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 4, cursor: 'pointer' }} onClick={() => startEditChallan(ch)}>
-                              <Edit size={13} />
-                            </button>
-                            <button className="btn-icon" title="Delete Challan" style={{ color: '#f87171', padding: '0.25rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 4, cursor: 'pointer' }} onClick={() => setChallanDeleteTarget({ id: ch._id, label: `Challan EDP-${ch.challanNo}` })}>
-                              <Trash2 size={13} />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
+                    </th>
+                    <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '90px' }}>Ch. No</th>
+                    <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '85px' }}>Status</th>
+                    <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '90px' }}>Date</th>
+                    <th style={{ padding: '0.65rem 0.5rem' }}>Bill To / Party</th>
+                    <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '75px' }}>Lot No</th>
+                    <th style={{ padding: '0.65rem 0.5rem' }}>Fabric</th>
+                    <th style={{ padding: '0.65rem 0.5rem', width: '100px' }}>Job No</th>
+                    <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '60px' }}>Panna</th>
+                    <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '45px' }}>TP</th>
+                    <th style={{ padding: '0.65rem 0.5rem', textAlign: 'right', whiteSpace: 'nowrap', width: '100px' }}>Total Mtr</th>
+                    <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '190px' }}>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {challans.length === 0 && (
+                    <tr><td colSpan={12} style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>No challans found. Click "New Challan" to create one.</td></tr>
+                  )}
+                  {challans.map(ch => (
+                    <tr key={ch._id} style={{ borderBottom: '1px solid var(--border-light)', transition: 'background-color 0.15s' }}>
+                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedChallanIds.includes(ch._id)}
+                          onChange={e => {
+                            if (e.target.checked) setSelectedChallanIds(prev => [...prev, ch._id]);
+                            else setSelectedChallanIds(prev => prev.filter(id => id !== ch._id));
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </td>
+                      <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
+                        <span style={{ padding: '0.2rem 0.5rem', borderRadius: 4, fontWeight: 900, color: '#38bdf8', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)', fontSize: '0.78rem' }}>
+                          EDP-{ch.challanNo}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.6rem 0.5rem' }}>
+                        {ch.status === 'INVOICED' ? (
+                          <span style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(52,211,153,0.3)' }}>
+                            INVOICED
+                          </span>
+                        ) : (
+                          <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(251,191,36,0.3)' }}>
+                            PENDING
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>{formatDateDDMMYYYY(ch.date)}</td>
+                      <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: '#a78bfa' }}>{ch.billTo || ch.partyName || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
+                        {ch.lotNo != null && String(ch.lotNo).trim() !== '' ? (
+                          <span style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', padding: '2px 6px', borderRadius: 4, fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(16,185,129,0.25)' }}>
+                            #{ch.lotNo}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td style={{ padding: '0.6rem 0.5rem', color: 'var(--text-primary)' }}>{ch.fabricName || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.5rem', color: '#38bdf8', fontWeight: 700, width: '100px', wordBreak: 'break-word', whiteSpace: 'normal' }}>{ch.jobNo ? `#${String(ch.jobNo).trim()}` : '—'}</td>
+                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>{ch.panna || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--text-primary)' }}>{ch.totalTp}</td>
+                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontWeight: 900, color: '#10b981', whiteSpace: 'nowrap', fontSize: '0.88rem' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
+                      <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center', alignItems: 'center' }}>
+                          <button className="btn-icon" title="View Challan" style={{ color: '#38bdf8', padding: '0.3rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => setViewChallanModal(ch)}>
+                            <Eye size={14} />
+                          </button>
+                          <button className="btn-icon" title="Download PDF" style={{ color: '#34d399', padding: '0.3rem', background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => handleDownloadChallanPdf(ch._id, ch.challanNo)}>
+                            <FileDown size={14} />
+                          </button>
+                          <button className="btn-secondary" title="Create Tax Bill" style={{ padding: '0.25rem 0.55rem', fontSize: '0.7rem', fontWeight: 800, background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2))', color: '#a78bfa', border: '1px solid rgba(124,58,237,0.4)', borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }} onClick={() => handleCreateBillFromChallan(ch)}>
+                            <Receipt size={13} /> Bill
+                          </button>
+                          {ch.status !== 'INVOICED' && (
+                            <>
+                              <button className="btn-icon" title="Edit Challan" style={{ color: 'var(--primary)', padding: '0.3rem', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => startEditChallan(ch)}>
+                                <Edit size={14} />
+                              </button>
+                              <button className="btn-icon" title="Delete Challan" style={{ color: '#f87171', padding: '0.3rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => setChallanDeleteTarget({ id: ch._id, label: `Challan EDP-${ch.challanNo}` })}>
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
