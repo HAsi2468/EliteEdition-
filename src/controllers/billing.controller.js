@@ -1,6 +1,8 @@
 const BillingInvoice = require('../db/models/billingInvoice.model');
 const BillingCustomer = require('../db/models/billingCustomer.model');
 const BillingItem = require('../db/models/billingItem.model');
+const FabricChallan = require('../db/models/fabricChallan.model');
+const StitchingChallan = require('../db/models/stitchingChallan.model');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
@@ -193,6 +195,19 @@ const createInvoice = async (req, res) => {
     }
 
     const invoice = await BillingInvoice.create(invoiceData);
+
+    // Lock linked Challans to INVOICED if status is FINAL (or default save)
+    if (invoice.linkedChallanIds && invoice.linkedChallanIds.length > 0) {
+      await FabricChallan.updateMany(
+        { _id: { $in: invoice.linkedChallanIds } },
+        { $set: { status: 'INVOICED', invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
+      );
+      await StitchingChallan.updateMany(
+        { _id: { $in: invoice.linkedChallanIds } },
+        { $set: { status: 'INVOICED', invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
+      );
+    }
+
     res.status(201).json({ success: true, data: invoice });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -221,7 +236,182 @@ const updateInvoice = async (req, res) => {
     if (!invoice) {
       return res.status(404).json({ success: false, error: 'Invoice not found' });
     }
+
+    // Lock linked Challans to INVOICED
+    if (invoice.linkedChallanIds && invoice.linkedChallanIds.length > 0) {
+      await FabricChallan.updateMany(
+        { _id: { $in: invoice.linkedChallanIds } },
+        { $set: { status: 'INVOICED', invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
+      );
+      await StitchingChallan.updateMany(
+        { _id: { $in: invoice.linkedChallanIds } },
+        { $set: { status: 'INVOICED', invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
+      );
+    }
+
     res.json({ success: true, data: invoice });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ── 6B. MERGE CHALLANS TO INVOICE ───────────────────────────────────────────
+const mergeChallans = async (req, res) => {
+  try {
+    const { challanIds } = req.body;
+    if (!Array.isArray(challanIds) || challanIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'Please select at least one Challan to merge.' });
+    }
+
+    // 1. Fetch Fabric Challans & Stitching Challans
+    const fabricChallans = await FabricChallan.find({ _id: { $in: challanIds } }).lean();
+    const stitchingChallans = await StitchingChallan.find({ _id: { $in: challanIds } }).lean();
+
+    const allChallans = [...fabricChallans, ...stitchingChallans];
+    if (allChallans.length === 0) {
+      return res.status(404).json({ success: false, error: 'No matching Challans found.' });
+    }
+
+    // 2. SAME-CUSTOMER VALIDATION CHECK
+    const normalizeName = (s) => (s || '').trim().toLowerCase();
+    const customerNames = new Set(
+      allChallans.map(ch => normalizeName(ch.billTo || ch.partyName)).filter(Boolean)
+    );
+
+    if (customerNames.size > 1) {
+      const partyList = [...new Set(allChallans.map(ch => ch.billTo || ch.partyName).filter(Boolean))].join(', ');
+      return res.status(400).json({
+        success: false,
+        error: `Cannot merge Challans from different customers. Selected Challans belong to multiple customers: ${partyList}`
+      });
+    }
+
+    // 3. AGGREGATE CUSTOMER DETAILS
+    const rawParty = allChallans[0].billTo || allChallans[0].partyName || '';
+    let customerObj = {
+      name: rawParty,
+      businessName: rawParty,
+      phone: '',
+      email: '',
+      gstin: '',
+      billingAddress: '',
+      shippingAddress: '',
+      state: 'Gujarat',
+      stateCode: '24'
+    };
+
+    if (rawParty) {
+      const matchedCust = await BillingCustomer.findOne({
+        $or: [
+          { name: { $regex: `^${rawParty.trim()}$`, $options: 'i' } },
+          { businessName: { $regex: `^${rawParty.trim()}$`, $options: 'i' } }
+        ]
+      }).lean();
+      if (matchedCust) {
+        customerObj = {
+          customerId: matchedCust._id,
+          name: matchedCust.name || rawParty,
+          businessName: matchedCust.businessName || matchedCust.name || rawParty,
+          phone: matchedCust.phone || '',
+          email: matchedCust.email || '',
+          gstin: matchedCust.gstin || '',
+          billingAddress: matchedCust.billingAddress || '',
+          shippingAddress: matchedCust.shippingAddress || matchedCust.billingAddress || '',
+          state: matchedCust.state || 'Gujarat',
+          stateCode: matchedCust.stateCode || '24'
+        };
+      }
+    }
+
+    // 4. AGGREGATE LINE ITEMS (GROUPED BY CHALLAN NO)
+    const items = [];
+    const linkedChallanIds = [];
+    const linkedChallanNos = [];
+    const catalogItems = await BillingItem.find().lean();
+
+    allChallans.forEach(ch => {
+      const chNoStr = ch.challanNo
+        ? (String(ch.challanNo).startsWith('PCH') || String(ch.challanNo).startsWith('EDP')
+            ? String(ch.challanNo)
+            : `EDP-${ch.challanNo}`)
+        : `EDP-${ch._id}`;
+
+      linkedChallanIds.push(String(ch._id));
+      linkedChallanNos.push(chNoStr);
+
+      if (Array.isArray(ch.items) && ch.items.length > 0) {
+        // Stitching Challan or Multi-item Challan
+        ch.items.forEach(it => {
+          const pcs = parseFloat(it.pcs) || 1;
+          const rate = parseFloat(it.rate) || 0;
+          const itemName = it.designNo ? `Design ${it.designNo}` : (it.particulars || 'Garment Work');
+          const matched = catalogItems.find(cat => cat.itemName.trim().toLowerCase() === itemName.trim().toLowerCase());
+          const unitPrice = matched?.unitPrice != null ? matched.unitPrice : rate;
+          const taxRate = matched?.taxRate != null ? matched.taxRate : 5;
+
+          items.push({
+            itemName,
+            description: `Challan ${chNoStr} | ${it.particulars || 'Stitching Work'}`,
+            jobNo: ch.jobNo || it.jobNo || '',
+            lotNo: ch.lotNo || it.lotNo || '',
+            partyChallan: ch.vendorChallanNo ? String(ch.vendorChallanNo) : (ch.partyChallan ? String(ch.partyChallan) : ''),
+            ourChallanNo: chNoStr,
+            challanId: String(ch._id),
+            isLocked: true, // MTR / PCS LOCKED
+            imageUrl: it.imageUrl || ch.imageUrl || '',
+            hsnCode: it.hsnCode || matched?.hsnCode || '6204',
+            qty: pcs,
+            unit: matched?.unit || 'Pcs',
+            unitPrice,
+            taxRate,
+            totalAmount: parseFloat((pcs * unitPrice).toFixed(2))
+          });
+        });
+      } else {
+        // Digital Print Fabric Delivery Challan
+        const mtr = parseFloat(ch.totalMtr || ch.pcs || 1);
+        const pannaStr = String(ch.panna || '').trim();
+        let itemName = 'DIGITAL PRINT JOB WORK 58"';
+        if (pannaStr.includes('36')) itemName = 'DIGITAL PRINT JOB WORK 36"';
+        else if (pannaStr.includes('44')) itemName = 'DIGITAL PRINT JOB WORK 44"';
+        else if (pannaStr.includes('58')) itemName = 'DIGITAL PRINT JOB WORK 58"';
+        else if (pannaStr) itemName = `DIGITAL PRINT JOB WORK ${pannaStr.replace(/['"]/g, '')}"`;
+
+        const matched = catalogItems.find(cat => cat.itemName.trim().toLowerCase() === itemName.trim().toLowerCase());
+        const hsnCode = matched?.hsnCode || '998821';
+        const unitPrice = matched?.unitPrice != null ? matched.unitPrice : 25;
+        const taxRate = matched?.taxRate != null ? matched.taxRate : 5;
+        const unit = matched?.unit || 'Meters';
+
+        items.push({
+          itemName,
+          description: `Challan ${chNoStr} | Fabric: ${ch.fabricName || 'Fabric'}`,
+          jobNo: ch.jobNo || '',
+          lotNo: ch.lotNo || '',
+          partyChallan: ch.vendorChallanNo ? String(ch.vendorChallanNo) : (ch.partyChallan ? String(ch.partyChallan) : ''),
+          ourChallanNo: chNoStr,
+          challanId: String(ch._id),
+          isLocked: true, // MTR LOCKED
+          imageUrl: ch.designImage || ch.imageUrl || '',
+          hsnCode,
+          qty: mtr,
+          unit,
+          unitPrice,
+          taxRate,
+          totalAmount: parseFloat((mtr * unitPrice).toFixed(2))
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        customer: customerObj,
+        items,
+        linkedChallanIds,
+        linkedChallanNos
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -879,6 +1069,7 @@ module.exports = {
   getNextInvoiceNo,
   createInvoice,
   updateInvoice,
+  mergeChallans,
   deleteInvoice,
   recordPayment,
   downloadInvoicePdf,

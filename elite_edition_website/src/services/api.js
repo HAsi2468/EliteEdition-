@@ -1428,6 +1428,13 @@ export const api = {
     });
   },
 
+  async mergeChallansToInvoice(challanIds) {
+    return request('/billing/merge-challans', {
+      method: 'POST',
+      body: JSON.stringify({ challanIds }),
+    });
+  },
+
   async updateBillingInvoice(id, data) {
     return request(`/billing/invoices/${id}`, {
       method: 'PUT',

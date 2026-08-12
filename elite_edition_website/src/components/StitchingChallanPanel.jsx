@@ -21,6 +21,23 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
   const [search, setSearch] = useState('');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
+  const [selectedChallanIds, setSelectedChallanIds] = useState([]);
+
+  const handleMergeSelected = () => {
+    if (selectedChallanIds.length === 0) return;
+    const selected = challans.filter(c => selectedChallanIds.includes(c._id));
+
+    const partyNames = new Set(selected.map(c => (c.billTo || c.partyName || '').trim().toLowerCase()).filter(Boolean));
+    if (partyNames.size > 1) {
+      const partyList = [...new Set(selected.map(c => c.billTo || c.partyName).filter(Boolean))].join(', ');
+      triggerEliteAlert('Customer Mismatch', `Cannot merge Challans from different customers. Selected Challans belong to multiple customers: ${partyList}`, 'error');
+      return;
+    }
+
+    if (onNavigateToBilling) {
+      onNavigateToBilling(selected);
+    }
+  };
 
   const [showModal, setShowModal] = useState(false);
   const [editingChallan, setEditingChallan] = useState(null);
@@ -307,12 +324,24 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)' }}>
+                  <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', width: '40px' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedChallanIds.length > 0 && selectedChallanIds.length === challans.length}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedChallanIds(challans.map(c => c._id));
+                        else setSelectedChallanIds([]);
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </th>
                   <th style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 700 }}>Challan No</th>
+                  <th style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 700 }}>Status</th>
                   <th style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 700 }}>Date</th>
                   <th style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 700 }}>Party Name</th>
                   <th style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 700, textAlign: 'center' }}>Total Pcs</th>
                   <th style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 700, textAlign: 'right' }}>Total Amount</th>
-                  <th style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 700 }}>Delivery By / Transport</th>
+                  <th style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 700 }}>Delivery By</th>
                   <th style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 700, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -321,8 +350,30 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
                   .filter(c => matchSearchQuery(c, search, ['challanNo', 'partyName', 'billTo', 'shipTo', 'deliveryBy', 'vendorChallanNo', 'items.designNo', 'items.particulars']))
                   .map(c => (
                   <tr key={c._id} style={{ borderBottom: '1px solid var(--border-light)', transition: 'background 0.15s' }}>
+                    <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedChallanIds.includes(c._id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedChallanIds(prev => [...prev, c._id]);
+                          else setSelectedChallanIds(prev => prev.filter(id => id !== c._id));
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </td>
                     <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: 'var(--primary)' }}>
                       {c.challanNo}
+                    </td>
+                    <td style={{ padding: '0.75rem 1rem' }}>
+                      {c.status === 'INVOICED' ? (
+                        <span style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(52,211,153,0.3)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          ✓ INVOICED
+                        </span>
+                      ) : (
+                        <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(251,191,36,0.3)' }}>
+                          PENDING
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '0.75rem 1rem', color: 'var(--text-primary)' }}>
                       {formatDateDDMMYYYY(c.date)}
@@ -336,30 +387,23 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
                     <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, color: '#60a5fa' }}>
                       {c.totalAmount ? `₹${c.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
                     </td>
-                    <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
+                    <td style={{ padding: '0.75rem 1rem', color: 'var(--text-primary)' }}>
                       {c.deliveryBy || '—'}
                     </td>
                     <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
-                        <button
-                          onClick={() => setPrintChallan(c)}
-                          className="btn-secondary"
-                          style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem', gap: '0.3rem' }}
-                          title="Print View"
-                        >
-                          <Printer size={13} /> Print
-                        </button>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
                         <button
                           onClick={() => handleDownloadPdf(c)}
-                          style={{ background: 'rgba(37,99,235,0.12)', border: '1px solid rgba(37,99,235,0.3)', color: '#60a5fa', padding: '0.35rem 0.6rem', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          className="btn-secondary"
+                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem' }}
                           title="Download PDF"
                         >
-                          <Download size={13} /> PDF
+                          <FileText size={13} /> PDF
                         </button>
                         <button
-                          onClick={() => onNavigateToBilling && onNavigateToBilling(c)}
-                          style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2))', border: '1px solid rgba(124,58,237,0.4)', color: '#a78bfa', padding: '0.35rem 0.6rem', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                          title="Create Tax Invoice / Bill"
+                          className="btn-secondary"
+                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem' }}
+                          title="Generate Bill"
                         >
                           <Receipt size={13} /> Bill
                         </button>

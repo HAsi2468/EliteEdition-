@@ -7,6 +7,8 @@ const invoiceItemSchema = new mongoose.Schema({
   lotNo: { type: String, default: '' },
   partyChallan: { type: String, default: '' },
   ourChallanNo: { type: String, default: '' },
+  challanId: { type: String, default: '' },
+  isLocked: { type: Boolean, default: false },
   imageUrl: { type: String, default: '' },
   hsnCode: { type: String, default: '998821' },
   qty: { type: Number, required: true, default: 1 },
@@ -26,6 +28,9 @@ const billingInvoiceSchema = new mongoose.Schema(
     invoicePrefix: { type: String, default: 'EDP-INV-' },
     invoiceSeq: { type: Number, required: true },
     ourChallanNo: { type: String, default: '' },
+    linkedChallanIds: [{ type: String }],
+    linkedChallanNos: [{ type: String }],
+    invoiceStatus: { type: String, enum: ['DRAFT', 'FINAL', 'CANCELLED'], default: 'FINAL' },
     invoiceDate: { type: Date, default: Date.now },
     dueDate: { type: Date },
 

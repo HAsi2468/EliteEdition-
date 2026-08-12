@@ -26,7 +26,9 @@ const stitchingChallanSchema = new mongoose.Schema(
     totalAmount: { type: Number, default: 0 },
     notes: { type: String, default: '', trim: true },
     createdBy: { type: String, default: '', trim: true },
-    status: { type: String, default: 'Active', enum: ['Active', 'Cancelled'] }
+    status: { type: String, default: 'Active', enum: ['Active', 'INVOICED', 'Cancelled'] },
+    invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'BillingInvoice', default: null },
+    invoiceNo: { type: String, default: '' }
   },
   {
     timestamps: {

@@ -11,6 +11,7 @@ router.get('/invoices', billingController.getInvoices);
 router.get('/invoices/next-no', billingController.getNextInvoiceNo);
 router.get('/invoices/:id', billingController.getInvoiceById);
 router.post('/invoices', billingController.createInvoice);
+router.post('/merge-challans', billingController.mergeChallans);
 router.put('/invoices/:id', billingController.updateInvoice);
 router.delete('/invoices/:id', billingController.deleteInvoice);
 router.post('/invoices/:id/payment', billingController.recordPayment);

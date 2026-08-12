@@ -28,7 +28,8 @@ import {
   Package,
   X,
   Truck,
-  Receipt
+  Receipt,
+  Lock
 } from 'lucide-react';
 
 // Helper for Indian Currency formatting
@@ -268,158 +269,69 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     loadData();
   }, [search, statusFilter]);
 
-  // Auto-populate Invoice from Challan with Saved Customer Auto-Selection
-  const loadInvoiceFromChallan = async (ch) => {
-    if (!ch) return;
+  // Auto-populate Invoice from Challan with Saved Customer Auto-Selection & Multi-Challan Merging
+  const loadInvoiceFromChallan = async (chInput) => {
+    if (!chInput) return;
     try {
-      const partyStr = (ch.billTo || ch.partyName || 'Client').trim();
+      const challanList = Array.isArray(chInput) ? chInput : [chInput];
+      if (challanList.length === 0) return;
 
-      // Look up saved customer matching billTo / partyName
-      let selectedCust = {
-        customerId: '',
-        name: partyStr,
-        businessName: partyStr,
-        phone: ch.phone || '',
-        email: '',
-        gstin: ch.gstin || '',
-        billingAddress: ch.address || '',
-        shippingAddress: ch.address || '',
-        state: 'Gujarat',
-        stateCode: '24'
-      };
-
-      try {
-        const custRes = await api.getBillingCustomers();
-        const custs = (custRes && custRes.data && Array.isArray(custRes.data)) ? custRes.data : Array.isArray(custRes) ? custRes : customers;
-        if (custs && custs.length > 0) {
-          const matched = custs.find(c =>
-            (c.businessName && c.businessName.trim().toLowerCase() === partyStr.toLowerCase()) ||
-            (c.name && c.name.trim().toLowerCase() === partyStr.toLowerCase()) ||
-            (c.businessName && partyStr.toLowerCase().includes(c.businessName.toLowerCase())) ||
-            (c.name && partyStr.toLowerCase().includes(c.name.toLowerCase()))
-          );
-          if (matched) {
-            selectedCust = {
-              customerId: matched._id,
-              name: matched.name || partyStr,
-              businessName: matched.businessName || matched.name || partyStr,
-              phone: matched.phone || '',
-              email: matched.email || '',
-              gstin: matched.gstin || '',
-              billingAddress: matched.billingAddress || '',
-              shippingAddress: matched.shippingAddress || matched.billingAddress || '',
-              state: matched.state || 'Gujarat',
-              stateCode: matched.stateCode || '24'
-            };
-          }
-        }
-      } catch (e) {
-        console.warn('Customer lookup error:', e);
+      // 1. SAME-CUSTOMER VALIDATION CHECK
+      const partyNames = new Set(challanList.map(c => (c.billTo || c.partyName || '').trim().toLowerCase()).filter(Boolean));
+      if (partyNames.size > 1) {
+        const partyList = [...new Set(challanList.map(c => c.billTo || c.partyName).filter(Boolean))].join(', ');
+        triggerEliteAlert('Customer Mismatch', `Cannot merge Challans from different customers. Selected Challans belong to multiple customers: ${partyList}`, 'error');
+        return;
       }
 
-      // Fetch catalog items to ensure exact HSN Code, Unit Price & Default GST % match from saved products
-      let catalogItems = itemsList;
-      try {
-        const itemRes = await api.getBillingItems();
-        if (itemRes && itemRes.data && Array.isArray(itemRes.data)) {
-          catalogItems = itemRes.data;
-          setItemsList(itemRes.data);
-        }
-      } catch (e) {
-        console.warn('Billing items catalog lookup error:', e);
+      // 2. Call backend merge endpoint for complete aggregation & customer resolution
+      const challanIds = challanList.map(c => c._id);
+      const mergeRes = await api.mergeChallansToInvoice(challanIds);
+
+      if (!mergeRes || !mergeRes.success || !mergeRes.data) {
+        throw new Error(mergeRes?.error || 'Failed to merge selected Challans.');
       }
 
-      // Build Items from Challan Data
-      let preparedItems = [];
+      const { customer: custData, items: mergedItems, linkedChallanIds, linkedChallanNos } = mergeRes.data;
 
-      if (Array.isArray(ch.items) && ch.items.length > 0) {
-        // Stitching Challan or multi-item Challan
-        preparedItems = ch.items.map(it => {
-          const pcs = parseFloat(it.pcs) || 1;
-          const rate = parseFloat(it.rate) || 0;
-          const name = it.designNo ? `Design ${it.designNo}` : (it.particulars || 'Garment Goods');
-          const matched = catalogItems.find(cat => cat.itemName.trim().toLowerCase() === name.trim().toLowerCase());
-          return {
-            itemName: name,
-            description: `Challan ${ch.challanNo} | ${it.particulars || 'Stitching'}`,
-            jobNo: ch.jobNo || it.jobNo || '',
-            lotNo: ch.lotNo || it.lotNo || '',
-            partyChallan: ch.vendorChallanNo ? String(ch.vendorChallanNo) : (ch.partyChallan ? String(ch.partyChallan) : ''),
-            ourChallanNo: String(ch.challanNo ? (String(ch.challanNo).startsWith('PCH') ? ch.challanNo : `EDP-${ch.challanNo}`) : ''),
-            imageUrl: it.imageUrl || ch.imageUrl || ch.designImage || '',
-            hsnCode: matched?.hsnCode || '998821',
-            qty: pcs,
-            unit: matched?.unit || 'Pcs',
-            unitPrice: matched?.unitPrice != null ? matched.unitPrice : rate,
-            discountPct: 0,
-            taxRate: matched?.taxRate != null ? matched.taxRate : 5,
-            butterPaper: false,
-            totalAmount: parseFloat((pcs * (matched?.unitPrice != null ? matched.unitPrice : rate)).toFixed(2))
-          };
-        });
-      } else {
-        // Digital Print Fabric Challan
-        const mtr = parseFloat(ch.totalMtr || ch.pcs || 1);
-        const pannaStr = String(ch.panna || '').trim();
-        let itemName = 'DIGITAL PRINT JOB WORK 58"';
-        if (pannaStr.includes('36')) itemName = 'DIGITAL PRINT JOB WORK 36"';
-        else if (pannaStr.includes('44')) itemName = 'DIGITAL PRINT JOB WORK 44"';
-        else if (pannaStr.includes('58')) itemName = 'DIGITAL PRINT JOB WORK 58"';
-        else if (pannaStr) itemName = `DIGITAL PRINT JOB WORK ${pannaStr.replace(/['"]/g, '')}"`;
-
-        const matched = catalogItems.find(cat => cat.itemName.trim().toLowerCase() === itemName.trim().toLowerCase());
-        const hsnCode = matched?.hsnCode || '998821';
-        const unitPrice = matched?.unitPrice != null ? matched.unitPrice : 25;
-        const taxRate = matched?.taxRate != null ? matched.taxRate : 5;
-        const unit = matched?.unit || 'Meters';
-
-        preparedItems = [{
-          itemName,
-          description: `Fabric: ${ch.fabricName || 'Fabric'}`,
-          jobNo: ch.jobNo || '',
-          lotNo: ch.lotNo || '',
-          partyChallan: ch.vendorChallanNo ? String(ch.vendorChallanNo) : (ch.partyChallan ? String(ch.partyChallan) : ''),
-          ourChallanNo: String(ch.challanNo ? (String(ch.challanNo).startsWith('PCH') ? ch.challanNo : `EDP-${ch.challanNo}`) : ''),
-          imageUrl: ch.imageUrl || ch.designImage || '',
-          hsnCode: hsnCode,
-          qty: mtr,
-          unit: unit,
-          unitPrice: unitPrice,
-          discountPct: 0,
-          taxRate: taxRate,
-          butterPaper: false,
-          totalAmount: parseFloat((mtr * unitPrice).toFixed(2))
-        }];
-      }
+      // Add isLocked flag to ensure MTR fields are read-only
+      const lockedItems = (mergedItems || []).map(it => ({
+        ...it,
+        isLocked: true
+      }));
 
       const nextRes = await api.getNextInvoiceNo();
       const cfg = await api.getPrintConfig().catch(() => ({}));
       const dueDays = cfg?.paymentDueDays || 30;
       const termsStr = cfg?.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
-      const challanTag = String(ch.challanNo || '').startsWith('PCH') ? ch.challanNo : `EDP-${ch.challanNo}`;
+      const challanTagStr = (linkedChallanNos || []).join(', ');
 
       setInvoiceForm({
         invoiceNo: nextRes.invoiceNo || 'EDP-INV-1001',
         invoiceSeq: nextRes.nextSeq || 1001,
-        ourChallanNo: challanTag,
+        ourChallanNo: challanTagStr,
+        linkedChallanIds: linkedChallanIds || [],
+        linkedChallanNos: linkedChallanNos || [],
         invoiceDate: new Date().toISOString().split('T')[0],
         dueDate: new Date(Date.now() + dueDays * 86400000).toISOString().split('T')[0],
-        customer: selectedCust,
-        items: preparedItems,
+        customer: custData,
+        items: lockedItems,
         isButterPaperUsed: false,
         enableRoundOff: true,
         discountType: 'flat',
         discountValue: 0,
-        taxType: selectedCust.stateCode && selectedCust.stateCode !== '24' ? 'IGST' : 'CGST_SGST',
+        taxType: custData.stateCode && custData.stateCode !== '24' ? 'IGST' : 'CGST_SGST',
         paidAmount: 0,
-        notes: `Auto-generated from Delivery Challan #${challanTag}`,
+        notes: `Auto-generated from Delivery Challan(s): #${challanTagStr}`,
         terms: termsStr
       });
 
       setEditingInvoiceId(null);
       setActiveTab('create');
+      triggerPushNotification('Challans Merged 🚚', `${challanList.length} Delivery Challan(s) successfully imported into Invoice Generator.`, 'success');
     } catch (e) {
       console.error('Error loading invoice from challan:', e);
+      triggerEliteAlert('Import Error', e.message || 'Failed to import Challan(s)', 'error');
     }
   };
 
@@ -1295,12 +1207,23 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                       />
                     </td>
                     <td style={{ padding: '0.4rem' }}>
-                      <input
-                        type="number"
-                        value={it.qty}
-                        onChange={e => handleItemChange(idx, 'qty', e.target.value)}
-                        style={inputStyle}
-                      />
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          value={it.qty}
+                          readOnly={it.isLocked}
+                          onChange={e => handleItemChange(idx, 'qty', e.target.value)}
+                          style={{
+                            ...inputStyle,
+                            backgroundColor: it.isLocked ? 'rgba(255,255,255,0.06)' : undefined,
+                            cursor: it.isLocked ? 'not-allowed' : 'text',
+                            borderColor: it.isLocked ? 'rgba(251,191,36,0.35)' : undefined
+                          }}
+                        />
+                        {it.isLocked && (
+                          <Lock size={12} style={{ position: 'absolute', right: 6, color: '#fbbf24', pointerEvents: 'none' }} title="Metres / Qty locked from Delivery Challan" />
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '0.4rem' }}>
                       <select

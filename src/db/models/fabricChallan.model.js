@@ -119,6 +119,20 @@ const fabricChallanSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'FabricTransaction',
     }],
+    status: {
+      type: String,
+      default: 'PENDING',
+      enum: ['PENDING', 'INVOICED', 'CANCELLED']
+    },
+    invoiceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'BillingInvoice',
+      default: null
+    },
+    invoiceNo: {
+      type: String,
+      default: ''
+    },
   },
   {
     timestamps: true,
