@@ -298,7 +298,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         throw new Error(mergeRes?.error || 'Failed to merge selected Challans.');
       }
 
-      const { customer: custData, items: mergedItems, linkedChallanIds, linkedChallanNos } = mergeRes.data;
+      const { customer: custData, items: mergedItems, linkedChallanIds, linkedChallanNos, deliveryBy: mergeDeliveryBy } = mergeRes.data;
 
       // Add isLocked flag to ensure MTR fields are read-only
       const lockedItems = (mergedItems || []).map(it => ({
@@ -316,6 +316,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         invoiceNo: nextRes.invoiceNo || 'EDP-INV-1001',
         invoiceSeq: nextRes.nextSeq || 1001,
         ourChallanNo: challanTagStr,
+        deliveryBy: mergeDeliveryBy || '',
         linkedChallanIds: linkedChallanIds || [],
         linkedChallanNos: linkedChallanNos || [],
         invoiceDate: new Date().toISOString().split('T')[0],

@@ -403,13 +403,16 @@ const mergeChallans = async (req, res) => {
       }
     });
 
+    const deliveryByList = [...new Set(allChallans.map(ch => ch.deliveryBy).filter(Boolean))].join(', ');
+
     res.json({
       success: true,
       data: {
         customer: customerObj,
         items,
         linkedChallanIds,
-        linkedChallanNos
+        linkedChallanNos,
+        deliveryBy: deliveryByList
       }
     });
   } catch (error) {
@@ -482,7 +485,7 @@ const downloadInvoicePdf = async (req, res) => {
     const config = await PrintConfig.findOne({ isConfig: true }).lean() || {};
 
     const companyName    = config.companyName    || 'ELITE DIGITAL PRINTS';
-    const companyGstin   = config.companyGstin   || '24AAAFE1234F1Z5';
+    const companyGstin   = config.companyGstin   || '24AANFE0044M1ZG';
     const companyAddress = config.companyAddress  || 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, Surat - 395006';
     const companyPhone   = config.companyPhone   || '+91 98790 00000';
     const companyState   = config.companyState   || 'Gujarat';
@@ -599,6 +602,19 @@ const downloadInvoicePdf = async (req, res) => {
     const totalIgst    = hsnRows.reduce((s, r) => s + r.igst,    0);
     const totalTax     = isIgst ? totalIgst : (totalCgst + totalSgst);
 
+    let delByVal = invoice.deliveryBy || '';
+    if (!delByVal && Array.isArray(invoice.linkedChallanIds) && invoice.linkedChallanIds.length > 0) {
+      try {
+        const FabricChallan = require('../db/models/fabricChallan.model');
+        const StitchingChallan = require('../db/models/stitchingChallan.model');
+        const fChs = await FabricChallan.find({ _id: { $in: invoice.linkedChallanIds } }, 'deliveryBy').lean();
+        const sChs = await StitchingChallan.find({ _id: { $in: invoice.linkedChallanIds } }, 'deliveryBy').lean();
+        const allDel = [...fChs, ...sChs].map(c => c.deliveryBy).filter(Boolean);
+        if (allDel.length > 0) delByVal = [...new Set(allDel)].join(', ');
+      } catch(e) {}
+    }
+    if (!delByVal) delByVal = 'By Road';
+
     const renderPage = (copyLabel, bw = false) => {
       const c = (color, bwFallback) => bw ? (bwFallback || '#000000') : color;
       const PRP  = c('#4c1d95', '#000000');
@@ -647,17 +663,41 @@ const downloadInvoicePdf = async (req, res) => {
         const infoH  = 72;
         const halfCW = Math.floor(CW / 2);
 
+        const rawChallanStr = invoice.ourChallanNo || (invoice.linkedChallanNos && invoice.linkedChallanNos.join(', ')) || invoice.challanNo || '--';
+        let challanLine1 = rawChallanStr;
+        let challanLine2 = '';
+
+        if (rawChallanStr.includes(',')) {
+          const cList = rawChallanStr.split(',').map(s => s.trim()).filter(Boolean);
+          if (cList.length > 5) {
+            challanLine1 = cList.slice(0, 5).join(', ');
+            challanLine2 = cList.slice(5).join(', ');
+          } else if (rawChallanStr.length > 28) {
+            const half = Math.ceil(cList.length / 2);
+            challanLine1 = cList.slice(0, half).join(', ');
+            challanLine2 = cList.slice(half).join(', ');
+          }
+        }
+
         doc.rect(PAD, Y, halfCW, infoH).fill(WHT).stroke(S200);
         doc.rect(PAD, Y, halfCW, 14).fill(PRP);
         doc.fillColor(WHT).fontSize(8.5).font('Helvetica-Bold')
-          .text('BUYER (BILLED TO)', PAD + 5, Y + 3, { width: halfCW - 10 });
-        doc.fillColor(S900).fontSize(10).font('Helvetica-Bold')
-          .text(cust.businessName || cust.name || '--', PAD + 5, Y + 16, { width: halfCW - 10 });
-        doc.fillColor(S700).fontSize(8.5).font('Helvetica')
-          .text(cust.billingAddress || '--', PAD + 5, Y + 28, { width: halfCW - 10 });
+          .text('BILL TO', PAD + 5, Y + 3, { width: halfCW - 10 });
+
+        let custY = Y + 16;
+        doc.fillColor(S900).fontSize(9.5).font('Helvetica-Bold')
+          .text(cust.businessName || cust.name || '--', PAD + 5, custY, { width: halfCW - 10 });
+        custY += 13;
+
+        if (cust.billingAddress && cust.billingAddress.trim() && cust.billingAddress.trim() !== '--') {
+          doc.fillColor(S700).fontSize(8.5).font('Helvetica')
+            .text(cust.billingAddress.trim(), PAD + 5, custY, { width: halfCW - 10 });
+          custY += 12;
+        }
+
         doc.fillColor(S500).fontSize(8).font('Helvetica')
-          .text(`GST: ${cust.gstin || 'N/A'}`, PAD + 5, Y + 46)
-          .text(`State: ${cust.state || 'Gujarat'}, Code: ${cust.stateCode || '24'}`, PAD + 5, Y + 56);
+          .text(`GST: ${cust.gstin || 'N/A'}`, PAD + 5, custY)
+          .text(`State: ${cust.state || 'Gujarat'}, Code: ${cust.stateCode || '24'}`, PAD + 5, custY + 10);
 
         const rx = PAD + halfCW;
         doc.rect(rx, Y, CW - halfCW, infoH).fill(WHT).stroke(S200);
@@ -666,8 +706,8 @@ const downloadInvoicePdf = async (req, res) => {
           .text('SELLER / DISPATCH DETAILS', rx + 5, Y + 3, { width: CW - halfCW - 10 });
         const metaW = (CW - halfCW) / 2 - 5;
         const pairs = [
-          ['Tax Invoice No.', invoice.invoiceNo || '--', 'Challan No.', invoice.ourChallanNo || invoice.challanNo || '--'],
-          ['Terms of Delivery', 'By Road', 'Place of Supply', `${cust.state || 'Gujarat'} (${cust.stateCode || '24'})`],
+          ['Challan No.', challanLine1, 'Tax Invoice No.', invoice.invoiceNo || '--'],
+          [challanLine2 ? 'Challan No.' : '', challanLine2, 'Terms of Delivery', delByVal],
         ];
         if (useTwoPages && pageLabel) {
           pairs.push(['Page', pageLabel, 'Copy', copyLabel]);
@@ -959,9 +999,9 @@ const downloadInvoicePdf = async (req, res) => {
       };
 
       if (useTwoPages) {
-        // Page 1
+        // Page 1: Items 0..4 (first 5 items)
         let Y = drawHeader('1 of 2');
-        Y = drawItemsTable(Y, items, 0, false);
+        Y = drawItemsTable(Y, items.slice(0, 5), 0, false);
         doc.rect(PAD, PH - PAD - 20, CW, 20).fill(PRPL);
         doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
           .text(`Continued on Page 2  ›  GST Summary & Payment Details  (Invoice: ${invoice.invoiceNo})`, PAD, PH - PAD - 13, { width: CW, align: 'center' });
@@ -974,6 +1014,7 @@ const downloadInvoicePdf = async (req, res) => {
           .text(`‹  ${invoice.invoiceNo}  —  Tax Summary & Payment Details  (${items.length} Line Items)`, PAD, Y + 5, { width: CW, align: 'center' });
         Y += 18;
 
+        Y = drawItemsTable(Y, items.slice(5), 5, true);
         Y = drawSummary(Y);
         drawFooter();
 

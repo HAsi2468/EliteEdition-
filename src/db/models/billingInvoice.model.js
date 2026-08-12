@@ -28,6 +28,7 @@ const billingInvoiceSchema = new mongoose.Schema(
     invoicePrefix: { type: String, default: 'EDP-INV-' },
     invoiceSeq: { type: Number, required: true },
     ourChallanNo: { type: String, default: '' },
+    deliveryBy: { type: String, default: '' },
     linkedChallanIds: [{ type: String }],
     linkedChallanNos: [{ type: String }],
     invoiceStatus: { type: String, enum: ['DRAFT', 'FINAL', 'CANCELLED'], default: 'FINAL' },
