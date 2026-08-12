@@ -807,7 +807,14 @@ const downloadInvoicePdf = async (req, res) => {
           });
         };
 
-        const minRowHPerItem = 34;
+        let targetRowHPerItem = 34;
+        if (!isLastPage && itemsToRender.length > 0) {
+          const pageBottomLimit = PH - PAD - 22;
+          const availableSpace = pageBottomLimit - startY - tblHdrH;
+          if (availableSpace > 0) {
+            targetRowHPerItem = Math.floor(availableSpace / itemsToRender.length);
+          }
+        }
 
         itemsToRender.forEach((item, localIdx) => {
           const idx = startIdx + localIdx;
@@ -831,30 +838,33 @@ const downloadInvoicePdf = async (req, res) => {
             doc.font(m.font).fontSize(m.size);
             descH += doc.heightOfString(m.text, { width: COL[2] - 6 }) + 2;
           });
-          const rowH = Math.max(minRowHPerItem, descH + 10);
+          const rowH = Math.max(targetRowHPerItem, descH + 10);
 
           doc.rect(PAD, Y, CW, rowH).fill(rowBg).stroke(S200);
           drawColSeps(Y, rowH);
 
+          const contentPadY = Math.max(6, Math.floor((rowH - Math.max(34, descH)) / 2));
+
           doc.fillColor(S700).fontSize(10).font('Helvetica-Bold')
-            .text(String(idx + 1), colX[0] + 3, Y + 6, { width: COL[0] - 3 });
+            .text(String(idx + 1), colX[0] + 3, Y + contentPadY, { width: COL[0] - 3 });
 
           const imgPath = itemImages[idx];
           const imgMaxW = COL[1] - 6;
           const imgMaxH = Math.min(rowH - 10, 100);
           if (imgPath && fs.existsSync(imgPath)) {
             try {
-              doc.image(imgPath, colX[1] + 3, Y + 5, { fit: [imgMaxW, imgMaxH] });
+              const imgY = Y + Math.max(4, Math.floor((rowH - imgMaxH) / 2));
+              doc.image(imgPath, colX[1] + 3, imgY, { fit: [imgMaxW, imgMaxH] });
             } catch(e) {
               doc.fillColor(S200).fontSize(7).font('Helvetica')
-                .text('N/A', colX[1], Y + 12, { width: COL[1], align: 'center' });
+                .text('N/A', colX[1], Y + contentPadY + 6, { width: COL[1], align: 'center' });
             }
           } else {
             doc.fillColor(S200).fontSize(7).font('Helvetica')
-              .text('N/A', colX[1], Y + 12, { width: COL[1], align: 'center' });
+              .text('N/A', colX[1], Y + contentPadY + 6, { width: COL[1], align: 'center' });
           }
 
-          let textY = Y + 5;
+          let textY = Y + contentPadY;
           doc.fillColor(S900).font('Helvetica').fontSize(11);
           doc.text(item.itemName || '--', colX[2] + 3, textY, { width: COL[2] - 6 });
           textY += doc.heightOfString(item.itemName || '--', { width: COL[2] - 6 }) + 2;
@@ -864,7 +874,7 @@ const downloadInvoicePdf = async (req, res) => {
             textY += doc.heightOfString(m.text, { width: COL[2] - 6 }) + 2;
           });
 
-          const numY    = Y + 6;
+          const numY    = Y + contentPadY;
           const taxRate = item.taxRate || 5;
           let u = (item.unit || 'MTR').trim();
           if (/meter|mtr/i.test(u)) u = 'MTR';
