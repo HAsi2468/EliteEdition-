@@ -1468,18 +1468,14 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         if (dsStr && deStr) {
           rawConditions.push({ date: { $gte: dsLocal, $lte: deLocal } });
           rawConditions.push({ date: { $gte: dsUtc, $lte: deUtc } });
-          rawConditions.push({ createdAt: { $gte: dsLocal, $lte: deLocal } });
-          rawConditions.push({ createdAt: { $gte: dsUtc, $lte: deUtc } });
           rawConditions.push({ date: { $gte: dsStr, $lte: deStr } });
         } else if (dsStr) {
           rawConditions.push({ date: { $gte: dsLocal } });
           rawConditions.push({ date: { $gte: dsUtc } });
-          rawConditions.push({ createdAt: { $gte: dsLocal } });
           rawConditions.push({ date: { $gte: dsStr } });
         } else if (deStr) {
           rawConditions.push({ date: { $lte: deLocal } });
           rawConditions.push({ date: { $lte: deUtc } });
-          rawConditions.push({ createdAt: { $lte: deLocal } });
           rawConditions.push({ date: { $lte: deStr } });
         }
         if (rawConditions.length > 0) {
