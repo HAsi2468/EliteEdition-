@@ -69,9 +69,9 @@ function formatJobDisplay(jobStr) {
   return str.replace(/JOB NO\.-?\s*/gi, '').replace(/Job\s*#?\s*/gi, '').trim();
 }
 
-export default function EliteBillingDepartment({ initialChallanData = null }) {
+export default function EliteBillingDepartment({ initialChallanData = null, department = 'digital_print' }) {
   const [activeTab, setActiveTab] = useState('invoices'); // 'dashboard', 'invoices', 'create', 'customers', 'items', 'challans'
-  const [challanDept, setChallanDept] = useState('digital_print'); // 'digital_print' or 'stitching'
+  const [challanDept, setChallanDept] = useState(() => (department === 'stitching' ? 'stitching' : 'digital_print'));
   const [stats, setStats] = useState({
     totalInvoices: 0,
     totalInvoiced: 0,

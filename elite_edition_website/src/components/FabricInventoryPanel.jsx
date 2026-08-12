@@ -1407,7 +1407,6 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     { id: 'lotTransfer', label: 'Lot Transfer', icon: ArrowRightLeft },
     { id: 'inward', label: 'Inward Register', icon: ArrowDownToLine },
     ...(isAdmin ? [{ id: 'outward', label: 'Outward Register', icon: ArrowUpFromLine }] : []),
-    { id: 'challan', label: 'Challan', icon: FileText },
     { id: 'stockAdjustment', label: 'Stock Adjustment (SA)', icon: RefreshCw },
     { id: 'requirement', label: 'Fabric Requirement', icon: AlertTriangle },
   ];
