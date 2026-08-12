@@ -962,36 +962,23 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       {/* ── TAB: DELIVERY CHALLANS HUB ─────────────────────────────────────── */}
       {activeTab === 'challans' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div className="glass-panel" style={{ padding: '1.25rem' }}>
-            <div style={{ marginBottom: '1.25rem' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Truck size={22} color="var(--primary)" /> {department === 'stitching' ? 'Stitching Delivery Challans' : 'Challan'}
-              </h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
-                {department === 'stitching'
-                  ? 'Manage Stitching Delivery Challans. Click "Convert to Invoice" on any Challan to issue a Tax Invoice.'
-                  : 'Create and manage Digital Printing Delivery Challans with complete View, Edit, Delete, PDF Print, and Tax Invoice actions.'}
-              </p>
-            </div>
-
-            {department === 'stitching' ? (
-              <StitchingChallanPanel
-                onNavigateToBilling={(ch) => {
-                  loadInvoiceFromChallan(ch);
-                  setActiveTab('create');
-                }}
-              />
-            ) : (
-              <FabricInventoryPanel
-                department="digital_print"
-                onlyChallan={true}
-                onNavigateToBilling={(ch) => {
-                  loadInvoiceFromChallan(ch);
-                  setActiveTab('create');
-                }}
-              />
-            )}
-          </div>
+          {department === 'stitching' ? (
+            <StitchingChallanPanel
+              onNavigateToBilling={(ch) => {
+                loadInvoiceFromChallan(ch);
+                setActiveTab('create');
+              }}
+            />
+          ) : (
+            <FabricInventoryPanel
+              department="digital_print"
+              onlyChallan={true}
+              onNavigateToBilling={(ch) => {
+                loadInvoiceFromChallan(ch);
+                setActiveTab('create');
+              }}
+            />
+          )}
         </div>
       )}
 
