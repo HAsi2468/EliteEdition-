@@ -553,29 +553,50 @@ const downloadInvoicePdf = async (req, res) => {
     const COL = [18, 100, 132, 54, 34, 60, 60, 30, 71.28];
     const colX = COL.reduce((acc, w, i) => { acc.push((acc[i-1]||PAD) + (i>0?COL[i-1]:0)); return acc; }, []);
 
-    // ── PRE-LOAD IMAGES ──────────────────────────────────────────────────────────
-    const itemImages = [];
+    // ── OPTIMIZED HIGH-SPEED PRE-LOAD IMAGES ──────────────────────────────────
     const items = invoice.items || [];
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
+
+    const allJobNumsSet = new Set();
+    items.forEach(it => {
+      if (it.jobNo) {
+        const matches = String(it.jobNo).match(/\d+/g) || [];
+        matches.forEach(n => allJobNumsSet.add(n));
+      }
+    });
+    const jobNumArray = Array.from(allJobNumsSet);
+
+    const jobCardMap = {};
+    if (jobNumArray.length > 0) {
+      try {
+        const queryOr = [];
+        jobNumArray.forEach(n => {
+          queryOr.push({ jobNo: n }, { jobNo: `JOB NO.- ${n}` }, { jobNo: `JOB NO.-${n}` });
+        });
+        const foundJobCards = await JobCard.find({ $or: queryOr }).select('jobNo imageUrl1 imageUrl2 proofing.artworkUrl').lean();
+        foundJobCards.forEach(jc => {
+          const nums = String(jc.jobNo).match(/\d+/g) || [];
+          nums.forEach(n => { if (!jobCardMap[n]) jobCardMap[n] = jc; });
+        });
+      } catch(e) {}
+    }
+
+    const itemImages = items.map(item => {
       let imgPath = resolveImagePath(item.imageUrl);
       if (!imgPath && item.jobNo) {
-        try {
-          const nums = String(item.jobNo).match(/\d+/g) || [];
-          for (const num of nums) {
-            const jd = await JobCard.findOne({ $or: [
-              { jobNo: num }, { jobNo: `JOB NO.- ${num}` },
-              { jobNo: `JOB NO.-${num}` }, { jobNo: { $regex: num, $options: 'i' } }
-            ]}).lean();
-            if (jd) {
-              const url = jd.imageUrl1 || jd.imageUrl2 || jd.proofing?.artworkUrl;
-              if (url) { imgPath = resolveImagePath(url); if (imgPath) break; }
+        const nums = String(item.jobNo).match(/\d+/g) || [];
+        for (const num of nums) {
+          const jd = jobCardMap[num];
+          if (jd) {
+            const url = jd.imageUrl1 || jd.imageUrl2 || jd.proofing?.artworkUrl;
+            if (url) {
+              imgPath = resolveImagePath(url);
+              if (imgPath) break;
             }
           }
-        } catch(e) {}
+        }
       }
-      itemImages.push(imgPath);
-    }
+      return imgPath;
+    });
 
     const taxType = invoice.taxType || (invoice.customer && invoice.customer.stateCode && String(invoice.customer.stateCode).trim() !== '24' ? 'IGST' : 'CGST_SGST');
     const isIgst = taxType === 'IGST';
