@@ -484,9 +484,10 @@ const getFabricRequirement = async (req, res) => {
   try {
     const JobCard = require('../db/models/jobCard.model');
 
-    // Fetch all Pending and In Progress job cards that have fabric info
+    // Fetch all Pending and In Progress job cards that have fabric info and are not yet fully printed
     const jobs = await JobCard.find({
       status: { $in: ['Pending', 'In Progress'] },
+      printStatus: { $ne: 'Printing Done' },
       fabric: { $ne: '' }
     }).lean();
 
@@ -497,8 +498,19 @@ const getFabricRequirement = async (req, res) => {
       const panna = normalizePanna(job.panna);
       if (!fabric) continue;
 
-      // totalMtr is the main fabric needed in meters
-      const mtrNeeded = parseFloat(job.totalMtr) || 0;
+      // Target fabric needed in meters
+      const targetStr = job.totalMtr || job.consumption || '0';
+      const targetMatch = String(targetStr).match(/[\d.]+/);
+      const targetMtr = targetMatch ? parseFloat(targetMatch[0]) : 0;
+
+      // Already printed meters
+      const printedStr = job.printMtr || '0';
+      const printedMatch = String(printedStr).match(/[\d.]+/);
+      const printedMtr = printedMatch ? parseFloat(printedMatch[0]) : 0;
+
+      // Net remaining meters required for this active job
+      const mtrNeeded = Math.max(0, targetMtr - printedMtr);
+      if (mtrNeeded <= 0) continue; // Skip jobs where printing is already complete
 
       const key = `${fabric}|||${panna}`;
       if (!requirementMap[key]) {
@@ -514,7 +526,9 @@ const getFabricRequirement = async (req, res) => {
         jobNo: job.jobNo,
         party: job.party,
         pcs: job.pcs,
-        totalMtr: mtrNeeded,
+        totalMtr: targetMtr,
+        printedMtr,
+        remainingMtr: mtrNeeded,
         date: job.date
       });
     }

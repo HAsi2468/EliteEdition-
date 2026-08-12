@@ -884,6 +884,11 @@ export default function JobPrintingLog() {
         notes: ''
       }));
 
+      if (form.date) {
+        setDateStart(form.date);
+        setDateEnd(form.date);
+      }
+
       await fetchLogs();
       await fetchJobCards();
       triggerGlobalDataRefresh('jobcards');

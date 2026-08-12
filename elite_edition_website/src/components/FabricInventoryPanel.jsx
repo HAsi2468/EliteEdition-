@@ -2709,7 +2709,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                 <th style={{ textAlign: 'left', padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Job No</th>
                                 <th style={{ textAlign: 'left', padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Party</th>
                                 <th style={{ textAlign: 'left', padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Date</th>
-                                <th style={{ textAlign: 'right', padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Meters</th>
+                                <th style={{ textAlign: 'right', padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Net Required</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -2718,7 +2718,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                   <td style={{ padding: '0.45rem 0.5rem', fontWeight: 600, color: 'var(--primary)' }}>{job.jobNo}</td>
                                   <td style={{ padding: '0.45rem 0.5rem' }}>{job.party || '—'}</td>
                                   <td style={{ padding: '0.45rem 0.5rem', color: 'var(--text-muted)' }}>{job.date || '—'}</td>
-                                  <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right', fontWeight: 600 }}>{job.totalMtr > 0 ? `${Number(job.totalMtr).toFixed(2)} mtr` : '—'}</td>
+                                  <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right', fontWeight: 600 }}>
+                                    {job.remainingMtr > 0 ? `${Number(job.remainingMtr).toFixed(2)} mtr` : (job.totalMtr > 0 ? `${Number(job.totalMtr).toFixed(2)} mtr` : '—')}
+                                    {job.printedMtr > 0 && (
+                                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                                        ({Number(job.printedMtr).toFixed(1)}m printed of {Number(job.totalMtr).toFixed(1)}m)
+                                      </div>
+                                    )}
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
