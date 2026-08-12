@@ -358,28 +358,73 @@ const createChallan = async (req, res) => {
 // ── GET /fabric-challan ────────────────────────────────────────────────────
 const getChallans = async (req, res) => {
   try {
-    const { dateStart, dateEnd, search, page = 1, limit = 200 } = req.query;
+    const { dateStart, dateEnd, search, page = 1, limit = 500 } = req.query;
     const filter = {};
+    const andConditions = [];
 
     if (dateStart || dateEnd) {
-      filter.date = {};
-      if (dateStart) filter.date.$gte = new Date(dateStart);
-      if (dateEnd) {
-        const end = new Date(dateEnd);
-        end.setHours(23, 59, 59, 999);
-        filter.date.$lte = end;
+      const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
+      const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
+
+      const dsLocal = dsStr ? new Date(`${dsStr}T00:00:00.000`) : null;
+      const deLocal = deStr ? new Date(`${deStr}T23:59:59.999`) : null;
+
+      const dsUtc = dsStr ? new Date(`${dsStr}T00:00:00.000Z`) : null;
+      const deUtc = deStr ? new Date(`${deStr}T23:59:59.999Z`) : null;
+
+      const dateConditions = [];
+      if (dsStr && deStr) {
+        dateConditions.push({ date: { $gte: dsLocal, $lte: deLocal } });
+        dateConditions.push({ date: { $gte: dsUtc, $lte: deUtc } });
+        dateConditions.push({ date: { $gte: dsStr, $lte: deStr } });
+      } else if (dsStr) {
+        dateConditions.push({ date: { $gte: dsLocal } });
+        dateConditions.push({ date: { $gte: dsUtc } });
+        dateConditions.push({ date: { $gte: dsStr } });
+      } else if (deStr) {
+        dateConditions.push({ date: { $lte: deLocal } });
+        dateConditions.push({ date: { $lte: deUtc } });
+        dateConditions.push({ date: { $lte: deStr } });
+      }
+
+      if (dateConditions.length > 0) {
+        andConditions.push({ $or: dateConditions });
       }
     }
 
     if (search) {
-      const re = new RegExp(search, 'i');
-      filter.$or = [
+      const rawSearch = String(search).trim();
+      const safeSearch = rawSearch.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+      const re = new RegExp(safeSearch, 'i');
+
+      const numMatch = rawSearch.match(/\d+/);
+      const numVal = numMatch ? parseInt(numMatch[0], 10) : null;
+
+      const searchConditions = [
         { partyName: re },
         { fabricName: re },
         { jobNo: re },
         { designNo: re },
         { colour: re },
+        { lotNo: re },
+        { vendorChallanNo: re },
+        { billTo: re },
+        { shipTo: re },
+        { deliveryBy: re },
+        { notes: re },
+        { 'tpDetails.lotNo': re },
       ];
+
+      if (numVal !== null && !isNaN(numVal)) {
+        searchConditions.push({ challanNo: numVal });
+        searchConditions.push({ lotNo: numVal });
+      }
+
+      andConditions.push({ $or: searchConditions });
+    }
+
+    if (andConditions.length > 0) {
+      filter.$and = andConditions;
     }
 
     const challans = await FabricChallan.find(filter)
