@@ -676,7 +676,7 @@ const updateProductionStage = async (req, res) => {
     await db.OrderActivityLog.create({
       jobCardId: card._id,
       jobNo: card.jobNo,
-      actor: currentUser._id,
+      actor: (currentUser && currentUser._id && db.mongoose.Types.ObjectId.isValid(currentUser._id)) ? currentUser._id : null,
       actorName: currentUser.name || currentUser.username || 'System Operator',
       action: 'Stage Transition',
       previousStage: prevStage,

@@ -398,7 +398,8 @@ export default function App() {
     const ALL_SYSTEM_TABS = [
       'dashboard', 'workspace', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
-      'jobcards_stitching_challan', 'jobcards_stitching_settings'
+      'jobcards_stitching_challan', 'jobcards_stitching_settings',
+      'jobcards_printing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan'
     ];
 
     if (currentUser.role === 'admin') {
