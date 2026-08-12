@@ -3,7 +3,7 @@ import { api, getBaseUrl } from '../services/api';
 import {
   PlusCircle, Search, RefreshCw, Edit2, Trash2, FileText,
   Printer, ChevronLeft, ChevronRight, Clock, CheckCircle,
-  AlertCircle, Cpu, X, Save, Eye, Image, LayoutGrid, List, Send, Download
+  AlertCircle, Cpu, X, Save, Eye, Image, LayoutGrid, List, Send, Download, Receipt
 } from 'lucide-react';
 import DesignCatalogue from './DesignCatalogue';
 import DesignMaster from './DesignMaster';
@@ -1767,6 +1767,40 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
     }
   };
 
+  const handleSendToBilling = (c) => {
+    const challanData = {
+      challanNo: c.billNo || c.ourChallanNo || c.jobNo,
+      jobNo: c.jobNo,
+      party: c.party,
+      customerName: c.party,
+      designNo: c.designNo || c.designName,
+      fabric: c.fabric,
+      lotNo: c.lotNo,
+      partyChallan: c.partyChallan,
+      vendorChallanNo: c.partyChallan,
+      ourChallanNo: c.ourChallanNo || c.jobNo,
+      date: c.date,
+      items: [
+        {
+          designNo: c.designNo || c.designName,
+          particulars: `Digital Printing Service - ${c.fabric || 'Fabric'} (Design: ${c.designNo || c.designName || ''})`,
+          pcs: parseFloat(c.totalMtr) || parseFloat(c.totalQty) || 1,
+          rate: parseFloat(c.rate) || 0,
+          amount: (parseFloat(c.totalMtr) || 1) * (parseFloat(c.rate) || 0),
+          hsnCode: '998821',
+          unit: 'Meters',
+          jobNo: c.jobNo,
+          lotNo: c.lotNo,
+          partyChallan: c.partyChallan,
+          ourChallanNo: c.ourChallanNo || c.jobNo,
+          imageUrl: c.designImage || c.imageUrl || ''
+        }
+      ]
+    };
+    setBillingChallanData(challanData);
+    setOverrideSubTab('billing');
+  };
+
   const openNew  = () => {
     setFormCard(null);
     setShowForm(true);
@@ -2021,6 +2055,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem' }}><StatusBadge status={c.status} /></td>
                       <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                          <button onClick={() => handleSendToBilling(c)} className="btn-icon" title="Create Invoice / Send to Billing" style={{ padding: '0.3rem', color: '#a78bfa' }}><Receipt size={13} /></button>
                           <button onClick={() => triggerJobCardPrint(c)} className="btn-icon" title="Print / Save PDF" style={{ padding: '0.3rem', color: '#10b981' }}><Printer size={13} /></button>
                           <button onClick={() => setPreviewCard(c)} className="btn-icon" title="Preview" style={{ padding: '0.3rem' }}><Eye size={13} /></button>
                           <button onClick={() => openEdit(c)} className="btn-icon" title="Edit" style={{ padding: '0.3rem' }}><Edit2 size={13} /></button>
@@ -2122,6 +2157,10 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
 
                   {/* Actions */}
                   <div style={{ display:'flex', gap:'0.5rem', borderTop:'1px solid var(--border-light)', paddingTop:'0.7rem' }}>
+                    <button onClick={()=>handleSendToBilling(c)} className="btn-secondary"
+                      style={{ flex:1, padding:'0.4rem', fontSize:'0.78rem', justifyContent:'center', color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.1)' }}>
+                      <Receipt size={13}/> Invoice
+                    </button>
                     <button onClick={()=>triggerJobCardPrint(c)} className="btn-secondary"
                       style={{ flex:1, padding:'0.4rem', fontSize:'0.78rem', justifyContent:'center', color: '#10b981', borderColor: 'rgba(16,185,129,0.3)' }}>
                       <Printer size={13}/> Print / PDF
