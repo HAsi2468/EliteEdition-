@@ -3391,136 +3391,150 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         </div>
       )}
 
-      {/* ── Challan Form Modal ── */}
+      {/* ── Challan Form Modal (Wide Ergonomic 2-Column Layout) ── */}
       {isChallanOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="glass-panel" style={{ width: '640px', padding: '2rem', maxHeight: '92vh', overflowY: 'auto' }}>
-            <h2 style={{ marginBottom: '1.5rem' }}>{editingChallan ? `Edit Challan EDP-${editingChallan.challanNo}` : 'New Fabric Challan'}</h2>
-            <form onSubmit={handleChallanSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
-              {/* Row 1: Date + Party */}
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Date</label>
-                  <input type="date" required value={challanForm.date} onChange={e => setChallanForm({ ...challanForm, date: e.target.value })} style={inputStyle} />
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '1020px', maxWidth: '98vw', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0, borderRadius: '14px', border: '1.5px solid var(--border-light)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
+            
+            {/* Modal Header Bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', background: 'rgba(15, 23, 42, 0.85)', borderBottom: '1px solid var(--border-light)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)' }}>
+                  <FileText size={20} />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Party Name</label>
-                  <input type="text" list="challan-parties" value={challanForm.partyName} onChange={e => setChallanForm({ ...challanForm, partyName: e.target.value })} style={inputStyle} placeholder="Select or type..." />
-                  <datalist id="challan-parties">
-                    {partiesList.map((p, i) => <option key={i} value={typeof p === 'string' ? p : p.name} />)}
+                <div>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#f8fafc' }}>
+                    {editingChallan ? `Edit Fabric Challan EDP-${editingChallan.challanNo}` : 'New Fabric Challan Dispatch'}
+                  </h2>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Enter challan metadata & TP meter values</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setIsChallanOpen(false); setEditingChallan(null); resetChallanForm(); }}
+                style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Form Body - 2 Columns */}
+            <form onSubmit={handleChallanSubmit} style={{ display: 'flex', flex: 1, overflow: 'hidden', margin: 0 }}>
+              
+              {/* LEFT COLUMN: Metadata, Job & Lot Details (Scrollable if needed) */}
+              <div style={{ flex: '1 1 480px', minWidth: '420px', padding: '1.25rem 1.5rem', overflowY: 'auto', borderRight: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '0.9rem', background: 'rgba(15, 23, 42, 0.4)' }}>
+                
+                {/* Section Header: Basic & Party */}
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>Date</label>
+                    <input type="date" required value={challanForm.date} onChange={e => setChallanForm({ ...challanForm, date: e.target.value })} style={inputStyle} />
+                  </div>
+                  <div style={{ flex: 1.5 }}>
+                    <label style={labelStyle}>Party Name</label>
+                    <input type="text" list="challan-parties" value={challanForm.partyName} onChange={e => setChallanForm({ ...challanForm, partyName: e.target.value })} style={inputStyle} placeholder="Select or type party..." />
+                    <datalist id="challan-parties">
+                      {partiesList.map((p, i) => <option key={i} value={typeof p === 'string' ? p : p.name} />)}
+                    </datalist>
+                  </div>
+                </div>
+
+                {/* Job Selection & Interactive Pills */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+                    <label style={labelStyle}>Job No(s) <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(select multiple or type)</span></label>
+                    {challanForm.partyName && (
+                      <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 600 }}>
+                        Party: {challanForm.partyName}
+                      </span>
+                    )}
+                  </div>
+                  <input type="text" list="challan-jobs" value={challanForm.jobNo} onChange={e => handleChallanJobChange(e.target.value)} style={inputStyle} placeholder="e.g. JOB-2252, JOB-2253..." />
+                  <datalist id="challan-jobs">
+                    {inProgressJobCards.map(j => <option key={j._id} value={j.jobNo}>{j.jobNo} — {j.party} ({j.designNo || ''})</option>)}
                   </datalist>
-                </div>
-              </div>
 
-              {/* Divider: Job Details */}
-              <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Job Details</span>
-              </div>
-
-              {/* Row 2: Job No + Party Job Pills */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
-                  <label style={labelStyle}>Job No(s) <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(select multiple or type comma-separated)</span></label>
-                  {challanForm.partyName && (
-                    <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 600 }}>
-                      Party: {challanForm.partyName}
-                    </span>
-                  )}
+                  {/* Interactive Job Pills */}
+                  <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem', maxHeight: '75px', overflowY: 'auto' }}>
+                    {inProgressJobCards
+                      .filter(j => !challanForm.partyName || (j.party && j.party.toLowerCase().trim() === challanForm.partyName.toLowerCase().trim()))
+                      .slice(0, 20)
+                      .map(j => {
+                        const isSelected = String(challanForm.jobNo || '').toUpperCase().includes(String(j.jobNo).toUpperCase());
+                        return (
+                          <button
+                            key={j._id}
+                            type="button"
+                            onClick={() => toggleChallanJobPill(j.jobNo)}
+                            style={{
+                              padding: '0.15rem 0.45rem',
+                              fontSize: '0.7rem',
+                              borderRadius: '10px',
+                              border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-light)',
+                              background: isSelected ? 'rgba(56,189,248,0.25)' : 'rgba(255,255,255,0.05)',
+                              color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            {isSelected ? '✓ ' : '+ '} {j.jobNo} {j.designNo ? `(${j.designNo})` : ''}
+                          </button>
+                        );
+                      })}
+                  </div>
                 </div>
 
-                <input type="text" list="challan-jobs" value={challanForm.jobNo} onChange={e => handleChallanJobChange(e.target.value)} style={inputStyle} placeholder="e.g. JOB-2252, JOB-2253 (or select below)..." />
-                <datalist id="challan-jobs">
-                  {inProgressJobCards.map(j => <option key={j._id} value={j.jobNo}>{j.jobNo} — {j.party} ({j.designNo || ''})</option>)}
-                </datalist>
+                {/* Design, Colour, Panna */}
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>Design No</label>
+                    <input type="text" value={challanForm.designNo} onChange={e => setChallanForm({ ...challanForm, designNo: e.target.value })} style={inputStyle} placeholder="Design #" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>Colour</label>
+                    <input type="text" value={challanForm.colour} onChange={e => setChallanForm({ ...challanForm, colour: e.target.value })} style={inputStyle} placeholder="Colour" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>Panna</label>
+                    <input type="text" list="challan-widths" value={challanForm.panna} onChange={e => setChallanForm({ ...challanForm, panna: e.target.value })} style={inputStyle} placeholder="Width" />
+                    <datalist id="challan-widths">
+                      {widthsList.map((w, i) => <option key={i} value={w} />)}
+                    </datalist>
+                  </div>
+                </div>
 
-                {/* Interactive Job Pills */}
-                <div style={{ marginTop: '0.4rem', display: 'flex', flexWrap: 'wrap', gap: '0.35rem', maxHeight: '100px', overflowY: 'auto' }}>
-                  {inProgressJobCards
-                    .filter(j => !challanForm.partyName || (j.party && j.party.toLowerCase().trim() === challanForm.partyName.toLowerCase().trim()))
-                    .slice(0, 20)
-                    .map(j => {
-                      const isSelected = String(challanForm.jobNo || '').toUpperCase().includes(String(j.jobNo).toUpperCase());
-                      return (
-                        <button
-                          key={j._id}
-                          type="button"
-                          onClick={() => toggleChallanJobPill(j.jobNo)}
-                          style={{
-                            padding: '0.2rem 0.55rem',
-                            fontSize: '0.72rem',
-                            borderRadius: '12px',
-                            border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-light)',
-                            background: isSelected ? 'rgba(56,189,248,0.25)' : 'rgba(255,255,255,0.05)',
-                            color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          {isSelected ? '✓ ' : '+ '} {j.jobNo} {j.designNo ? `(${j.designNo})` : ''}
-                        </button>
-                      );
-                    })}
+                {/* Bill To & Ship To */}
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>Bill To</label>
+                    <select
+                      value={challanForm.billTo}
+                      onChange={e => setChallanForm({ ...challanForm, billTo: e.target.value })}
+                      style={inputStyle}
+                    >
+                      <option value="">-- Select Bill To --</option>
+                      {billToOptions.map((opt, i) => (
+                        <option key={i} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>Ship To</label>
+                    <select
+                      value={challanForm.shipTo}
+                      onChange={e => setChallanForm({ ...challanForm, shipTo: e.target.value })}
+                      style={inputStyle}
+                    >
+                      <option value="">-- Select Ship To --</option>
+                      {shipToOptions.map((opt, i) => (
+                        <option key={i} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
 
-              {/* Row 3: Design + Colour + Panna */}
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Design No <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-filled)</span></label>
-                  <input type="text" value={challanForm.designNo} onChange={e => setChallanForm({ ...challanForm, designNo: e.target.value })} style={inputStyle} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Colour <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-filled)</span></label>
-                  <input type="text" value={challanForm.colour} onChange={e => setChallanForm({ ...challanForm, colour: e.target.value })} style={inputStyle} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Panna</label>
-                  <input type="text" list="challan-widths" value={challanForm.panna} onChange={e => setChallanForm({ ...challanForm, panna: e.target.value })} style={inputStyle} placeholder="Auto-filled" />
-                  <datalist id="challan-widths">
-                    {widthsList.map((w, i) => <option key={i} value={w} />)}
-                  </datalist>
-                </div>
-              </div>
-
-              {/* Row 3.5: Bill To & Ship To (Dropdowns from Setting tab) */}
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Bill To</label>
-                  <select
-                    value={challanForm.billTo}
-                    onChange={e => setChallanForm({ ...challanForm, billTo: e.target.value })}
-                    style={inputStyle}
-                  >
-                    <option value="">-- Select Bill To --</option>
-                    {billToOptions.map((opt, i) => (
-                      <option key={i} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Ship To</label>
-                  <select
-                    value={challanForm.shipTo}
-                    onChange={e => setChallanForm({ ...challanForm, shipTo: e.target.value })}
-                    style={inputStyle}
-                  >
-                    <option value="">-- Select Ship To --</option>
-                    {shipToOptions.map((opt, i) => (
-                      <option key={i} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Divider: Lot Details */}
-              <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lot Details</span>
-              </div>
-
-              {/* Row 4: Lot No + Vendor Challan No + Delivery By + PCS */}
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1.2 }}>
+                {/* Lot No & Available Lot Chips */}
+                <div>
                   <label style={labelStyle}>Lot No {challanLotLoading && <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Loading…</span>}</label>
                   <input
                     type="text"
@@ -3528,7 +3542,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     value={challanForm.lotNo}
                     onChange={e => handleChallanLotChange(e.target.value)}
                     style={inputStyle}
-                    placeholder="Select or type e.g. 337, 338..."
+                    placeholder="Select or type e.g. 252, 280, 291..."
                   />
                   <datalist id="challan-lot-options">
                     {availableLots.map((l, i) => (
@@ -3537,8 +3551,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       </option>
                     ))}
                   </datalist>
+
+                  {/* Available Lot Buttons Chips */}
                   {availableLots.length > 0 && (
-                    <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.3rem', maxHeight: '75px', overflowY: 'auto' }}>
+                    <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.25rem', maxHeight: '75px', overflowY: 'auto' }}>
                       {availableLots.slice(0, 15).map((lot, idx) => {
                         const selectedList = String(challanForm.lotNo || '').split(/[,\s&]+/).map(s => s.trim()).filter(Boolean);
                         const isSelected = selectedList.includes(String(lot.lotNo));
@@ -3573,242 +3589,153 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     </div>
                   )}
                 </div>
-                <div style={{ flex: 1.2 }}>
-                  <label style={labelStyle}>Vendor Challan No <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-filled)</span></label>
-                  <input type="text" value={challanForm.vendorChallanNo} onChange={e => setChallanForm({ ...challanForm, vendorChallanNo: e.target.value })} style={inputStyle} placeholder="Auto-filled from lot…" />
-                </div>
-                <div style={{ flex: 1.2 }}>
-                  <label style={labelStyle}>Delivery By <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(driver/person)</span></label>
-                  <input
-                    type="text"
-                    list="delivery-by-options"
-                    value={challanForm.deliveryBy}
-                    onChange={e => setChallanForm({ ...challanForm, deliveryBy: e.target.value })}
-                    style={inputStyle}
-                    placeholder="Select or type..."
-                  />
-                  <datalist id="delivery-by-options">
-                    {deliveryByOptions.map((opt, i) => (
-                      <option key={i} value={opt} />
-                    ))}
-                  </datalist>
-                </div>
-                <div style={{ flex: 0.8 }}>
-                  <label style={labelStyle}>PCS</label>
-                  <input type="number" min="0" value={challanForm.pcs} onChange={e => setChallanForm({ ...challanForm, pcs: e.target.value })} style={inputStyle} placeholder="Expected pcs" />
-                </div>
-              </div>
 
-              {/* Row 5: Fabric Name + Shortage */}
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 2 }}>
-                  <label style={labelStyle}>Fabric Name <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>(auto-filled)</span></label>
-                  <input
-                    type="text"
-                    list="challan-fabrics"
-                    value={challanForm.fabricName}
-                    onChange={e => {
-                      const normFab = normalizeFabricName(e.target.value);
-                      const autoP = getDefaultPannaForFabric(normFab, challanForm.panna);
-                      setChallanForm({ ...challanForm, fabricName: normFab, panna: autoP });
-                    }}
-                    style={inputStyle}
-                    placeholder="Auto-filled from lot…"
-                  />
-                  <datalist id="challan-fabrics">
-                    {fabricsList.map((f, i) => <option key={i} value={f} />)}
-                  </datalist>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Shortage %</label>
-                  <input type="number" step="0.01" min="0" max="100" value={challanForm.shortagePct} onChange={e => setChallanForm({ ...challanForm, shortagePct: e.target.value })} style={inputStyle} placeholder="e.g. 3.5" />
-                  <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: 'var(--success)', fontWeight: '600' }}>
-                    Row Meters: {(challanTotalMtr * (1 + (parseFloat(challanForm.shortagePct) || 0) / 100)).toFixed(2)} mtr
+                {/* Vendor Challan, Delivery By, PCS */}
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div style={{ flex: 1.2 }}>
+                    <label style={labelStyle}>Vendor Challan</label>
+                    <input type="text" value={challanForm.vendorChallanNo} onChange={e => setChallanForm({ ...challanForm, vendorChallanNo: e.target.value })} style={inputStyle} placeholder="Vendor Challan #" />
+                  </div>
+                  <div style={{ flex: 1.2 }}>
+                    <label style={labelStyle}>Delivery By</label>
+                    <input
+                      type="text"
+                      list="delivery-by-options"
+                      value={challanForm.deliveryBy}
+                      onChange={e => setChallanForm({ ...challanForm, deliveryBy: e.target.value })}
+                      style={inputStyle}
+                      placeholder="Driver/person..."
+                    />
+                    <datalist id="delivery-by-options">
+                      {deliveryByOptions.map((opt, i) => (
+                        <option key={i} value={opt} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div style={{ flex: 0.8 }}>
+                    <label style={labelStyle}>PCS</label>
+                    <input type="number" min="0" value={challanForm.pcs} onChange={e => setChallanForm({ ...challanForm, pcs: e.target.value })} style={inputStyle} placeholder="Pcs" />
                   </div>
                 </div>
-              </div>
 
-              {/* Smart Lot Selection & Stock Tracker */}
-              {challanForm.jobNo && (
-                <div style={{
-                  background: 'rgba(30, 41, 59, 0.7)',
-                  border: '1px solid var(--border-light)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '1rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.75rem',
-                  marginTop: '0.25rem'
-                }}>
-                  {/* Job Requirement Info */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      Job Requirement: <strong>{jobMtrNeeded > 0 ? `${Number(jobMtrNeeded).toFixed(2)} mtr` : 'Not specified'}</strong>
-                    </span>
-                    {jobMtrNeeded > 0 && (
-                      <span style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        padding: '0.15rem 0.5rem',
-                        borderRadius: '4px',
-                        background: selectedLotsTotalStock >= jobMtrNeeded ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                        color: selectedLotsTotalStock >= jobMtrNeeded ? '#10b981' : '#f87171'
-                      }}>
-                        {selectedLotsTotalStock >= jobMtrNeeded ? '✓ Stock Sufficient' : '⚠️ Need More Stock'}
-                      </span>
-                    )}
+                {/* Fabric Name & Shortage */}
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div style={{ flex: 2 }}>
+                    <label style={labelStyle}>Fabric Quality</label>
+                    <input
+                      type="text"
+                      list="challan-fabrics"
+                      value={challanForm.fabricName}
+                      onChange={e => {
+                        const normFab = normalizeFabricName(e.target.value);
+                        const autoP = getDefaultPannaForFabric(normFab, challanForm.panna);
+                        setChallanForm({ ...challanForm, fabricName: normFab, panna: autoP });
+                      }}
+                      style={inputStyle}
+                      placeholder="Fabric quality..."
+                    />
+                    <datalist id="challan-fabrics">
+                      {fabricsList.map((f, i) => <option key={i} value={f} />)}
+                    </datalist>
                   </div>
-
-                  {/* Stock Progress Bar */}
-                  {jobMtrNeeded > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <div style={{ height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%',
-                          width: `${Math.min(100, (selectedLotsTotalStock / jobMtrNeeded) * 100)}%`,
-                          background: selectedLotsTotalStock >= jobMtrNeeded ? 'var(--success)' : 'var(--primary)',
-                          transition: 'width 0.3s ease'
-                        }} />
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                        <span>Selected Lot Stock: {selectedLotsTotalStock.toFixed(2)} mtr</span>
-                        <span>{((selectedLotsTotalStock / jobMtrNeeded) * 100).toFixed(0)}% of required</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Available Lot Buttons Grid */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.6rem' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                      Available Inward Lots for "{challanForm.fabricName}":
-                    </div>
-                    {availableLots.length === 0 ? (
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                        No inward stock found with this fabric.
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                        {availableLots.map((lot, idx) => {
-                          const isSelected = selectedLotsList.includes(String(lot.lotNo));
-                          return (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => {
-                                let newLots;
-                                if (isSelected) {
-                                  // Remove the lot
-                                  newLots = selectedLotsList.filter(l => l !== String(lot.lotNo)).join(', ');
-                                } else {
-                                  // Add the lot
-                                  newLots = [...selectedLotsList, String(lot.lotNo)].join(', ');
-                                }
-                                handleChallanLotChange(newLots);
-                              }}
-                              className={isSelected ? "btn-primary" : "btn-secondary"}
-                              style={{
-                                padding: '0.3rem 0.6rem',
-                                fontSize: '0.74rem',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.35rem',
-                                borderRadius: '4px',
-                                border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-light)',
-                                background: isSelected ? 'rgba(14, 165, 233, 0.15)' : 'rgba(255, 255, 255, 0.03)',
-                                color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
-                                transition: 'all 0.2s'
-                              }}
-                              title={isSelected ? "Click to deselect lot" : "Click to select lot"}
-                            >
-                              {isSelected ? <Check size={12} /> : <Plus size={12} />}
-                              <span>Lot #{lot.lotNo}</span>
-                              <span style={{ opacity: 0.6, fontSize: '0.68rem' }}>({lot.panna} Panna)</span>
-                              <span style={{ color: isSelected ? 'inherit' : 'var(--success)', fontWeight: 700 }}>
-                                {lot.currentStock}m
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    * Click the lot buttons above to toggle selections and verify stock sufficiency.
+                  <div style={{ flex: 1 }}>
+                    <label style={labelStyle}>Shortage %</label>
+                    <input type="number" step="0.01" min="0" max="100" value={challanForm.shortagePct} onChange={e => setChallanForm({ ...challanForm, shortagePct: e.target.value })} style={inputStyle} placeholder="Shortage %" />
                   </div>
                 </div>
-              )}
 
-              {/* Divider: TP Details */}
-              <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {/* Optional Notes */}
                 <div>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TP Details</span>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--primary)', marginLeft: '0.5rem', fontWeight: 600 }}>(Lot No Auto-managed by Program)</span>
+                  <label style={labelStyle}>Notes</label>
+                  <input type="text" value={challanForm.notes} onChange={e => setChallanForm({ ...challanForm, notes: e.target.value })} style={inputStyle} placeholder="Optional challan notes…" />
                 </div>
-                <button type="button" className="btn-secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.78rem' }} onClick={addTpRow} disabled={challanForm.tpDetails.length >= 30}>
-                  <PlusCircle size={13} /> Add TP Row
-                </button>
               </div>
 
-              {/* TP Rows */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '60px 110px 1fr 32px', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, paddingLeft: '0.25rem' }}>
-                  <span>TP No.</span><span>Lot No (Auto)</span><span>TP Meter (mtr)</span><span></span>
+              {/* RIGHT COLUMN: Dedicated TP Meters Entry & Immediate Action Bar (NO SCROLL NEEDED TO TYPE VALUE!) */}
+              <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', background: 'rgba(15, 23, 42, 0.85)' }}>
+                
+                {/* Right Top Header: TP Section Title & Summary Banner */}
+                <div style={{ padding: '1rem 1.25rem', background: 'rgba(30, 41, 59, 0.6)', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TP METERS VALUES</span>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 600 }}>Lot No assigned automatically line-by-line</div>
+                  </div>
+                  <button type="button" className="btn-secondary" style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', fontWeight: 700 }} onClick={addTpRow} disabled={challanForm.tpDetails.length >= 30}>
+                    <PlusCircle size={14} /> Add TP Row
+                  </button>
                 </div>
-                {(() => {
-                  const currentLots = String(challanForm.lotNo || '')
-                    .split(',')
-                    .map(s => s.trim())
-                    .filter(s => s.length > 0);
-                  return challanForm.tpDetails.map((row, idx) => {
-                    const assignedLot = row.lotNo || currentLots[0] || '';
-                    return (
-                      <div key={idx} style={{ display: 'grid', gridTemplateColumns: '60px 110px 1fr 32px', gap: '0.5rem', alignItems: 'center' }}>
-                        <div style={{ ...inputStyle, textAlign: 'center', fontWeight: 700, color: 'var(--primary)', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          TP {row.tpNo}
+
+                {/* TP Meters Entry Scrollable Area */}
+                <div style={{ flex: 1, padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  
+                  {/* Table Column Headers */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '65px 120px 1fr 36px', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', paddingLeft: '0.25rem', marginBottom: '0.2rem' }}>
+                    <span>TP No</span>
+                    <span>Assigned Lot</span>
+                    <span>TP Meters (mtr)</span>
+                    <span></span>
+                  </div>
+
+                  {(() => {
+                    const currentLots = String(challanForm.lotNo || '')
+                      .split(',')
+                      .map(s => s.trim())
+                      .filter(s => s.length > 0);
+                    return challanForm.tpDetails.map((row, idx) => {
+                      const assignedLot = row.lotNo || currentLots[0] || '';
+                      return (
+                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '65px 120px 1fr 36px', gap: '0.5rem', alignItems: 'center' }}>
+                          <div style={{ ...inputStyle, textAlign: 'center', fontWeight: 800, color: 'var(--primary)', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.25)', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            TP {row.tpNo}
+                          </div>
+                          <div style={{ ...inputStyle, background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#10b981', fontWeight: 700, fontSize: '0.78rem', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Lot No is automatically zeroed out and assigned by program">
+                            {assignedLot ? `#${assignedLot}` : 'Auto Lot'}
+                          </div>
+                          <input
+                            type="number"
+                            step="0.001"
+                            min="0"
+                            autoFocus={idx === 0}
+                            value={row.tpMeter}
+                            onChange={e => updateTpRow(idx, 'tpMeter', e.target.value)}
+                            style={{ ...inputStyle, fontSize: '0.95rem', fontWeight: 800, color: '#f8fafc', border: '1.5px solid var(--primary)' }}
+                            placeholder="Enter TP meters…"
+                          />
+                          <button type="button" onClick={() => removeTpRow(idx)} style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '6px', cursor: 'pointer', color: '#f87171', height: '36px', width: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Remove Row">
+                            <X size={16} />
+                          </button>
                         </div>
-                        <div style={{ ...inputStyle, background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.3)', color: 'var(--primary)', fontWeight: 600, fontSize: '0.78rem', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Lot No is automatically assigned by the program based on fabric stock">
-                          {assignedLot ? `#${assignedLot}` : 'Auto Lot'}
-                        </div>
-                        <input
-                          type="number"
-                          step="0.001"
-                          min="0"
-                          value={row.tpMeter}
-                          onChange={e => updateTpRow(idx, 'tpMeter', e.target.value)}
-                          style={inputStyle}
-                          placeholder="Enter TP meters…"
-                        />
-                        <button type="button" onClick={() => removeTpRow(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: '0.2rem', display: 'flex', alignItems: 'center' }}>
-                          <X size={15} />
-                        </button>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
-
-              {/* Totals summary */}
-              <div style={{ display: 'flex', gap: '1rem', padding: '0.75rem 1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                <div style={{ flex: 1 }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total TP Machines</span>
-                  <div style={{ fontWeight: 800, fontSize: '1.4rem', color: 'var(--primary)' }}>{challanTotalTp}</div>
+                      );
+                    });
+                  })()}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Meters</span>
-                  <div style={{ fontWeight: 800, fontSize: '1.4rem', color: 'var(--success)' }}>{challanTotalMtr.toFixed(2)} mtr</div>
+
+                {/* Right Bottom Footer: Live Total & STICKY SAVE / CANCEL BUTTONS (ALWAYS VISIBLE!) */}
+                <div style={{ padding: '1rem 1.25rem', background: 'rgba(15, 23, 42, 0.95)', borderTop: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  
+                  {/* Total Summary Row */}
+                  <div style={{ display: 'flex', gap: '1rem', padding: '0.6rem 1rem', background: 'rgba(30, 41, 59, 0.7)', borderRadius: '8px', border: '1px solid var(--border-light)', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Total TPs</span>
+                      <div style={{ fontWeight: 900, fontSize: '1.3rem', color: 'var(--primary)' }}>{challanTotalTp} Rows</div>
+                    </div>
+                    <div style={{ flex: 1.5, textAlign: 'right' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Total Meters</span>
+                      <div style={{ fontWeight: 900, fontSize: '1.4rem', color: '#10b981' }}>{challanTotalMtr.toFixed(2)} mtr</div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons Bar */}
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button type="button" className="btn-secondary" style={{ flex: 1, padding: '0.65rem 1rem', fontSize: '0.9rem', fontWeight: 700 }} onClick={() => { setIsChallanOpen(false); setEditingChallan(null); resetChallanForm(); }}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn-primary" style={{ flex: 1.8, padding: '0.65rem 1rem', fontSize: '0.95rem', fontWeight: 900, background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)', border: 'none', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)' }}>
+                      {editingChallan ? '💾 Save Changes' : '🚀 Save Challan'}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Notes */}
-              <div>
-                <label style={labelStyle}>Notes</label>
-                <input type="text" value={challanForm.notes} onChange={e => setChallanForm({ ...challanForm, notes: e.target.value })} style={inputStyle} placeholder="Optional notes…" />
-              </div>
-
-              {/* Buttons */}
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => { setIsChallanOpen(false); setEditingChallan(null); resetChallanForm(); }}>Cancel</button>
-                <button type="submit" className="btn-primary" style={{ flex: 1 }}>{editingChallan ? 'Save Changes' : 'Save Challan'}</button>
               </div>
             </form>
           </div>
