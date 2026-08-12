@@ -739,6 +739,32 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     }
   };
 
+  // ── Modal scroll lock & smooth reset helper ──
+  useEffect(() => {
+    if (isChallanOpen || isInwardOpen || isOutwardOpen || isSaOpen || isTransferOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isChallanOpen, isInwardOpen, isOutwardOpen, isSaOpen, isTransferOpen]);
+
+  const closeChallanModal = () => {
+    setIsChallanOpen(false);
+    setEditingChallan(null);
+    resetChallanForm();
+    document.body.style.overflow = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const scrollContainers = document.querySelectorAll('.main-content, .app-container, .content-area, .dashboard-container');
+    scrollContainers.forEach(c => {
+      if (c && typeof c.scrollTo === 'function') {
+        c.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+  };
+
   // ── Challan helpers ────────────────────────────────────────────────────
   const resetChallanForm = () => {
     setChallanForm({
@@ -1024,9 +1050,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       } else {
         await api.createFabricChallan(payload);
       }
-      setIsChallanOpen(false);
-      setEditingChallan(null);
-      resetChallanForm();
+      closeChallanModal();
       triggerGlobalDataRefresh('fabric');
       fetchData();
       fetchChallans();
@@ -3411,7 +3435,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               </div>
               <button
                 type="button"
-                onClick={() => { setIsChallanOpen(false); setEditingChallan(null); resetChallanForm(); }}
+                onClick={closeChallanModal}
                 style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
                 <X size={18} />
@@ -3727,7 +3751,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
                   {/* Action Buttons Bar */}
                   <div style={{ display: 'flex', gap: '1rem' }}>
-                    <button type="button" className="btn-secondary" style={{ flex: 1, padding: '0.65rem 1rem', fontSize: '0.9rem', fontWeight: 700 }} onClick={() => { setIsChallanOpen(false); setEditingChallan(null); resetChallanForm(); }}>
+                    <button type="button" className="btn-secondary" style={{ flex: 1, padding: '0.65rem 1rem', fontSize: '0.9rem', fontWeight: 700 }} onClick={closeChallanModal}>
                       Cancel
                     </button>
                     <button type="submit" className="btn-primary" style={{ flex: 1.8, padding: '0.65rem 1rem', fontSize: '0.95rem', fontWeight: 900, background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)', border: 'none', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)' }}>
