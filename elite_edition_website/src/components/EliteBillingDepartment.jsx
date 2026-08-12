@@ -276,6 +276,12 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       const challanList = Array.isArray(chInput) ? chInput : [chInput];
       if (challanList.length === 0) return;
 
+      // MAX 4 CHALLANS LIMIT
+      if (challanList.length > 4) {
+        triggerEliteAlert('Too Many Challans', 'Maximum 4 Challans can be merged into a single Invoice. Please deselect some and try again.', 'error');
+        return;
+      }
+
       // 1. SAME-CUSTOMER VALIDATION CHECK
       const partyNames = new Set(challanList.map(c => (c.billTo || c.partyName || '').trim().toLowerCase()).filter(Boolean));
       if (partyNames.size > 1) {
@@ -1130,6 +1136,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                   <th style={{ padding: '0.5rem', width: '80px' }}>Qty</th>
                   <th style={{ padding: '0.5rem', width: '90px' }}>Unit</th>
                   <th style={{ padding: '0.5rem', width: '100px' }}>Price (₹)</th>
+                  <th style={{ padding: '0.5rem', width: '65px', textAlign: 'center' }}>🧈 Butter</th>
                   <th style={{ padding: '0.5rem', width: '75px' }}>Disc %</th>
                   <th style={{ padding: '0.5rem', width: '75px' }}>GST %</th>
                   <th style={{ padding: '0.5rem', width: '105px', textAlign: 'right' }}>Total (₹)</th>
@@ -1242,11 +1249,39 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                         onChange={e => handleItemChange(idx, 'unitPrice', e.target.value)}
                         style={inputStyle}
                       />
-                      {(it.butterPaper || invoiceForm.isButterPaperUsed) && (
-                        <span style={{ fontSize: '0.65rem', color: '#fbbf24', fontWeight: 700, display: 'block', textAlign: 'center', marginTop: 2 }}>
-                          +₹3 Butter Paper
+                    </td>
+                    {/* Per-item Butter Paper Toggle */}
+                    <td style={{ padding: '0.4rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                      <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', cursor: 'pointer' }} title="Toggle Butter Paper (+₹3/m)">
+                        <input
+                          type="checkbox"
+                          checked={!!it.butterPaper}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            setInvoiceForm(f => ({
+                              ...f,
+                              items: f.items.map((item, i) => {
+                                if (i !== idx) return item;
+                                const currentPrice = parseFloat(item.unitPrice || 0);
+                                const basePrice = checked ? currentPrice + 3 : currentPrice - 3;
+                                const finalPrice = Math.max(0, parseFloat(basePrice.toFixed(2)));
+                                const taxable = finalPrice * (item.qty || 0) * (1 - (item.discountPct || 0) / 100);
+                                const tax = taxable * ((item.taxRate || 0) / 100);
+                                return {
+                                  ...item,
+                                  butterPaper: checked,
+                                  unitPrice: finalPrice,
+                                  totalAmount: parseFloat((taxable + tax).toFixed(2))
+                                };
+                              })
+                            }));
+                          }}
+                          style={{ cursor: 'pointer', width: 14, height: 14 }}
+                        />
+                        <span style={{ fontSize: '0.6rem', color: it.butterPaper ? '#fbbf24' : 'var(--text-muted)', fontWeight: 700 }}>
+                          {it.butterPaper ? '+₹3' : 'None'}
                         </span>
-                      )}
+                      </label>
                     </td>
                     <td style={{ padding: '0.4rem' }}>
                       <input

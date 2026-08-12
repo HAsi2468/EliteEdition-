@@ -25,6 +25,12 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
 
   const handleMergeSelected = () => {
     if (selectedChallanIds.length === 0) return;
+
+    if (selectedChallanIds.length > 4) {
+      triggerEliteAlert('Too Many Challans', 'Maximum 4 Challans can be merged into a single Invoice. Please deselect some Challans and try again.', 'error');
+      return;
+    }
+
     const selected = challans.filter(c => selectedChallanIds.includes(c._id));
 
     const partyNames = new Set(selected.map(c => (c.billTo || c.partyName || '').trim().toLowerCase()).filter(Boolean));

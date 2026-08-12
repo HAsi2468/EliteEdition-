@@ -3137,6 +3137,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   className="btn-primary"
                   style={{ background: 'linear-gradient(135deg,#7c3aed,#6366f1)', fontSize: '0.78rem', padding: '0.35rem 0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                   onClick={() => {
+                    if (selectedChallanIds.length > 4) {
+                      alert('Maximum 4 Challans can be merged into a single Invoice. Please deselect some Challans and try again.');
+                      return;
+                    }
                     const selected = challans.filter(c => selectedChallanIds.includes(c._id));
                     const partyNames = new Set(selected.map(c => (c.billTo || c.partyName || '').trim().toLowerCase()).filter(Boolean));
                     if (partyNames.size > 1) {
@@ -3147,7 +3151,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     if (onNavigateToBilling) onNavigateToBilling(selected);
                   }}
                 >
-                  <Receipt size={14} /> Merge & Create Invoice ({selectedChallanIds.length})
+                  <Receipt size={14} /> Merge & Create Invoice ({selectedChallanIds.length}/4)
                 </button>
               )}
               {/* Search */}
