@@ -478,12 +478,13 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
 
     const netSubtotal = Math.max(0, subtotal - discountTotal);
 
-    // Calculate Tax based on items average tax rate or 18%
-    const avgTaxRate = updatedItems.length > 0
-      ? (updatedItems.reduce((sum, i) => sum + (parseFloat(i.taxRate) || 18), 0) / updatedItems.length)
-      : 18;
+    // Calculate Tax based on items individual tax rates or 5% default
+    const totalTax = updatedItems.reduce((sum, i) => {
+      const taxable = (parseFloat(i.qty) || 0) * (parseFloat(i.unitPrice) || 0);
+      const rate = parseFloat(i.taxRate !== undefined && i.taxRate !== null ? i.taxRate : 5);
+      return sum + (taxable * rate / 100);
+    }, 0);
 
-    const totalTax = (netSubtotal * avgTaxRate) / 100;
     let cgstAmount = 0;
     let sgstAmount = 0;
     let igstAmount = 0;
@@ -1038,14 +1039,20 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
               />
             </div>
             <div>
-              <label style={labelStyle}>GST Tax Type</label>
+              <label style={{ ...labelStyle, color: '#a78bfa', fontWeight: 800 }}>⚡ GST Tax Type (Dynamic)</label>
               <select
                 value={invoiceForm.taxType}
                 onChange={e => setInvoiceForm(f => ({ ...f, taxType: e.target.value }))}
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  fontWeight: '700',
+                  color: '#a78bfa',
+                  background: 'rgba(124, 58, 237, 0.15)',
+                  border: '1px solid rgba(167, 139, 250, 0.5)'
+                }}
               >
-                <option value="CGST_SGST">Intra-State (CGST 9% + SGST 9%)</option>
-                <option value="IGST">Inter-State (IGST 18%)</option>
+                <option value="CGST_SGST">Intra-State (CGST + SGST)</option>
+                <option value="IGST">Inter-State (IGST)</option>
               </select>
             </div>
           </div>
@@ -1315,17 +1322,23 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
 
               {invoiceForm.taxType === 'IGST' ? (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>IGST Tax (18%):</span>
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    IGST Tax ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal) * 100).toFixed(1) : 5}%):
+                  </span>
                   <span>₹ {calculatedInvoice.igstAmount.toFixed(2)}</span>
                 </div>
               ) : (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>CGST Tax (9%):</span>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      CGST Tax ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal / 2) * 100).toFixed(1) : 2.5}%):
+                    </span>
                     <span>₹ {calculatedInvoice.cgstAmount.toFixed(2)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>SGST Tax (9%):</span>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      SGST Tax ({calculatedInvoice.netSubtotal > 0 ? ((calculatedInvoice.totalTax / calculatedInvoice.netSubtotal / 2) * 100).toFixed(1) : 2.5}%):
+                    </span>
                     <span>₹ {calculatedInvoice.sgstAmount.toFixed(2)}</span>
                   </div>
                 </>

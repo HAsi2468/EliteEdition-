@@ -385,22 +385,30 @@ const downloadInvoicePdf = async (req, res) => {
     }
 
     // ── TAX COMPUTATION ──────────────────────────────────────────────────────────
+    const taxType = invoice.taxType || (invoice.customer && invoice.customer.stateCode && String(invoice.customer.stateCode).trim() !== '24' ? 'IGST' : 'CGST_SGST');
+    const isIgst = taxType === 'IGST';
+
     const hsnMap = {};
     items.forEach(it => {
       const hsn  = it.hsnCode || '998821';
-      const rate = it.taxRate || 18;
+      const rate = Number(it.taxRate !== undefined && it.taxRate !== null ? it.taxRate : 5);
       const key  = `${hsn}_${rate}`;
-      if (!hsnMap[key]) hsnMap[key] = { hsn, rate, taxable: 0, cgst: 0, sgst: 0 };
+      if (!hsnMap[key]) hsnMap[key] = { hsn, rate, taxable: 0, cgst: 0, sgst: 0, igst: 0 };
       const taxable = Number(it.totalAmount || 0);
       hsnMap[key].taxable += taxable;
-      hsnMap[key].cgst   += taxable * (rate / 2 / 100);
-      hsnMap[key].sgst   += taxable * (rate / 2 / 100);
+      if (isIgst) {
+        hsnMap[key].igst += taxable * (rate / 100);
+      } else {
+        hsnMap[key].cgst += taxable * (rate / 2 / 100);
+        hsnMap[key].sgst += taxable * (rate / 2 / 100);
+      }
     });
     const hsnRows      = Object.values(hsnMap);
     const totalTaxable = hsnRows.reduce((s, r) => s + r.taxable, 0);
     const totalCgst    = hsnRows.reduce((s, r) => s + r.cgst,    0);
     const totalSgst    = hsnRows.reduce((s, r) => s + r.sgst,    0);
-    const totalTax     = totalCgst + totalSgst;
+    const totalIgst    = hsnRows.reduce((s, r) => s + r.igst,    0);
+    const totalTax     = isIgst ? totalIgst : (totalCgst + totalSgst);
 
     // ── PAGE RENDERER ────────────────────────────────────────────────────────────
     // bw = true → renders entire page in black & white (duplicate copy)
@@ -592,27 +600,39 @@ const downloadInvoicePdf = async (req, res) => {
         Y += rowH;
       });
 
-      // ── CGST / SGST ROWS ─────────────────────────────────────────────────────
-      hsnRows.forEach(row => {
-        const halfRate = row.rate / 2;
-        ['CGST', 'SGST'].forEach(type => {
-          const amt = type === 'CGST' ? row.cgst : row.sgst;
+      // ── TAX ROWS (IGST vs CGST/SGST) ─────────────────────────────────────────
+      if (isIgst) {
+        hsnRows.forEach(row => {
           const trH = 16;
           doc.rect(PAD, Y, CW, trH).fill(PRPL).stroke(S200);
           doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
-            .text(`${type} @ ${halfRate}%`, colX[6] - 20, Y + 4, { width: COL[6] + COL[7] + 16, align: 'right' });
+            .text(`IGST @ ${row.rate}%`, colX[6] - 20, Y + 4, { width: COL[6] + COL[7] + 16, align: 'right' });
           doc.fillColor(PRP).font('Helvetica-Bold').fontSize(9)
-            .text(amt.toFixed(2), colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+            .text(row.igst.toFixed(2), colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
           Y += trH;
         });
-      });
+      } else {
+        hsnRows.forEach(row => {
+          const halfRate = row.rate / 2;
+          ['CGST', 'SGST'].forEach(type => {
+            const amt = type === 'CGST' ? row.cgst : row.sgst;
+            const trH = 16;
+            doc.rect(PAD, Y, CW, trH).fill(PRPL).stroke(S200);
+            doc.fillColor(PRPM).fontSize(8.5).font('Helvetica-Bold')
+              .text(`${type} @ ${halfRate}%`, colX[6] - 20, Y + 4, { width: COL[6] + COL[7] + 16, align: 'right' });
+            doc.fillColor(PRP).font('Helvetica-Bold').fontSize(9)
+              .text(amt.toFixed(2), colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+            Y += trH;
+          });
+        });
+      }
 
       // ── ROUND OFF ROW ────────────────────────────────────────────────────────
       let computedRoundOff = 0;
       if (invoice.roundOff !== undefined && invoice.roundOff !== null && Number(invoice.roundOff) !== 0) {
         computedRoundOff = Number(invoice.roundOff);
       } else if (invoice.grandTotal) {
-        const rawSum = totalTaxable + totalCgst + totalSgst;
+        const rawSum = totalTaxable + totalTax;
         computedRoundOff = Number((Number(invoice.grandTotal) - rawSum).toFixed(2));
       }
 
@@ -645,45 +665,83 @@ const downloadInvoicePdf = async (req, res) => {
       Y += wordsH;
 
       // ── 9. GST TAX SUMMARY TABLE ─────────────────────────────────────────────
-      const TC = [58, 86, 44, 74, 44, 74];
-      TC.push(CW - TC.reduce((a,b) => a+b, 0));
-      const TX = TC.reduce((acc, w, i) => { acc.push((acc[i-1]||PAD) + (i>0?TC[i-1]:0)); return acc; }, []);
+      if (isIgst) {
+        const TC = [90, 120, 90, 130];
+        TC.push(CW - TC.reduce((a,b) => a+b, 0));
+        const TX = TC.reduce((acc, w, i) => { acc.push((acc[i-1]||PAD) + (i>0?TC[i-1]:0)); return acc; }, []);
 
-      const tHdrH2 = 18;
-      doc.rect(PAD, Y, CW, tHdrH2).fill(PRP);
-      doc.fillColor(WHT).fontSize(7.5).font('Helvetica-Bold');
-      ['HSN','Taxable Value','CGST %','CGST Amount','SGST %','SGST Amount','Total Tax'].forEach((h, i) => {
-        const align = i === 0 ? 'left' : (i === 2 || i === 4 ? 'center' : 'right');
-        doc.text(h, TX[i] + 2, Y + 5, { width: TC[i] - 4, align });
-      });
-      Y += tHdrH2;
+        const tHdrH2 = 18;
+        doc.rect(PAD, Y, CW, tHdrH2).fill(PRP);
+        doc.fillColor(WHT).fontSize(7.5).font('Helvetica-Bold');
+        ['HSN','Taxable Value','IGST %','IGST Amount','Total Tax'].forEach((h, i) => {
+          const align = i === 0 ? 'left' : (i === 2 ? 'center' : 'right');
+          doc.text(h, TX[i] + 2, Y + 5, { width: TC[i] - 4, align });
+        });
+        Y += tHdrH2;
 
-      hsnRows.forEach((row, i) => {
-        const rH = 16;
-        doc.rect(PAD, Y, CW, rH).fill(i % 2 === 0 ? WHT : S50).stroke(S200);
-        const halfRate = row.rate / 2;
-        doc.fillColor(S700).fontSize(8).font('Helvetica')
-          .text(row.hsn, TX[0]+2, Y+4, { width: TC[0]-4 })
-          .text(row.taxable.toFixed(2), TX[1]+2, Y+4, { width: TC[1]-4, align:'right' })
-          .text(`${halfRate}%`, TX[2]+2, Y+4, { width: TC[2]-4, align:'center' })
-          .text(row.cgst.toFixed(2), TX[3]+2, Y+4, { width: TC[3]-4, align:'right' })
-          .text(`${halfRate}%`, TX[4]+2, Y+4, { width: TC[4]-4, align:'center' })
-          .text(row.sgst.toFixed(2), TX[5]+2, Y+4, { width: TC[5]-4, align:'right' });
-        doc.fillColor(S900).font('Helvetica-Bold')
-          .text((row.cgst+row.sgst).toFixed(2), TX[6]+2, Y+4, { width: TC[6]-4, align:'right' });
-        Y += rH;
-      });
+        hsnRows.forEach((row, i) => {
+          const rH = 16;
+          doc.rect(PAD, Y, CW, rH).fill(i % 2 === 0 ? WHT : S50).stroke(S200);
+          doc.fillColor(S700).fontSize(8).font('Helvetica')
+            .text(row.hsn, TX[0]+2, Y+4, { width: TC[0]-4 })
+            .text(row.taxable.toFixed(2), TX[1]+2, Y+4, { width: TC[1]-4, align:'right' })
+            .text(`${row.rate}%`, TX[2]+2, Y+4, { width: TC[2]-4, align:'center' })
+            .text(row.igst.toFixed(2), TX[3]+2, Y+4, { width: TC[3]-4, align:'right' });
+          doc.fillColor(S900).font('Helvetica-Bold')
+            .text(row.igst.toFixed(2), TX[4]+2, Y+4, { width: TC[4]-4, align:'right' });
+          Y += rH;
+        });
 
-      // Tax totals row
-      const tTotH = 17;
-      doc.rect(PAD, Y, CW, tTotH).fill(PRPL).stroke(S200);
-      doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
-        .text('Total', TX[0]+2, Y+4, { width: TC[0]-4 })
-        .text(totalTaxable.toFixed(2), TX[1]+2, Y+4, { width: TC[1]-4, align:'right' })
-        .text(totalCgst.toFixed(2), TX[3]+2, Y+4, { width: TC[3]-4, align:'right' })
-        .text(totalSgst.toFixed(2), TX[5]+2, Y+4, { width: TC[5]-4, align:'right' })
-        .text(totalTax.toFixed(2), TX[6]+2, Y+4, { width: TC[6]-4, align:'right' });
-      Y += tTotH + 3;
+        // Tax totals row
+        const tTotH = 17;
+        doc.rect(PAD, Y, CW, tTotH).fill(PRPL).stroke(S200);
+        doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
+          .text('Total', TX[0]+2, Y+4, { width: TC[0]-4 })
+          .text(totalTaxable.toFixed(2), TX[1]+2, Y+4, { width: TC[1]-4, align:'right' })
+          .text(totalIgst.toFixed(2), TX[3]+2, Y+4, { width: TC[3]-4, align:'right' })
+          .text(totalIgst.toFixed(2), TX[4]+2, Y+4, { width: TC[4]-4, align:'right' });
+        Y += tTotH + 3;
+      } else {
+        const TC = [58, 86, 44, 74, 44, 74];
+        TC.push(CW - TC.reduce((a,b) => a+b, 0));
+        const TX = TC.reduce((acc, w, i) => { acc.push((acc[i-1]||PAD) + (i>0?TC[i-1]:0)); return acc; }, []);
+
+        const tHdrH2 = 18;
+        doc.rect(PAD, Y, CW, tHdrH2).fill(PRP);
+        doc.fillColor(WHT).fontSize(7.5).font('Helvetica-Bold');
+        ['HSN','Taxable Value','CGST %','CGST Amount','SGST %','SGST Amount','Total Tax'].forEach((h, i) => {
+          const align = i === 0 ? 'left' : (i === 2 || i === 4 ? 'center' : 'right');
+          doc.text(h, TX[i] + 2, Y + 5, { width: TC[i] - 4, align });
+        });
+        Y += tHdrH2;
+
+        hsnRows.forEach((row, i) => {
+          const rH = 16;
+          doc.rect(PAD, Y, CW, rH).fill(i % 2 === 0 ? WHT : S50).stroke(S200);
+          const halfRate = row.rate / 2;
+          doc.fillColor(S700).fontSize(8).font('Helvetica')
+            .text(row.hsn, TX[0]+2, Y+4, { width: TC[0]-4 })
+            .text(row.taxable.toFixed(2), TX[1]+2, Y+4, { width: TC[1]-4, align:'right' })
+            .text(`${halfRate}%`, TX[2]+2, Y+4, { width: TC[2]-4, align:'center' })
+            .text(row.cgst.toFixed(2), TX[3]+2, Y+4, { width: TC[3]-4, align:'right' })
+            .text(`${halfRate}%`, TX[4]+2, Y+4, { width: TC[4]-4, align:'center' })
+            .text(row.sgst.toFixed(2), TX[5]+2, Y+4, { width: TC[5]-4, align:'right' });
+          doc.fillColor(S900).font('Helvetica-Bold')
+            .text((row.cgst+row.sgst).toFixed(2), TX[6]+2, Y+4, { width: TC[6]-4, align:'right' });
+          Y += rH;
+        });
+
+        // Tax totals row
+        const tTotH = 17;
+        doc.rect(PAD, Y, CW, tTotH).fill(PRPL).stroke(S200);
+        doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
+          .text('Total', TX[0]+2, Y+4, { width: TC[0]-4 })
+          .text(totalTaxable.toFixed(2), TX[1]+2, Y+4, { width: TC[1]-4, align:'right' })
+          .text(totalCgst.toFixed(2), TX[3]+2, Y+4, { width: TC[3]-4, align:'right' })
+          .text(totalSgst.toFixed(2), TX[5]+2, Y+4, { width: TC[5]-4, align:'right' })
+          .text(totalTax.toFixed(2), TX[6]+2, Y+4, { width: TC[6]-4, align:'right' });
+        Y += tTotH + 3;
+      }
 
       doc.fillColor(S500).fontSize(7.5).font('Helvetica')
         .text('Tax Amount (in words):', PAD+2, Y+2)
