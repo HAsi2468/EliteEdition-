@@ -1039,10 +1039,10 @@ export default function App() {
                       <BarChart3 size={18} /><span>Prints Dashboard</span>
                     </button>
                   )}
-                  {/* 2. Printing Dipartment */}
+                  {/* 2. Printing Department */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_printing_log')) && (
                     <button onClick={() => { setActiveTab('jobcards_printing_log'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_printing_log' ? styles.navItemActive : {}) }}>
-                      <Printer size={18} /><span>Printing Dipartment</span>
+                      <Printer size={18} /><span>Printing Department</span>
                     </button>
                   )}
                   {/* 2. Fabric Management */}
@@ -1244,10 +1244,10 @@ export default function App() {
                     <BarChart3 size={18} /><span>Prints Dashboard & Reports</span>
                   </button>
                 )}
-                {/* 2. Printing Dipartment */}
+                {/* 2. Printing Department */}
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_printing_log')) && (
                   <button onClick={() => handleNavClick('jobcards_printing_log')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_printing_log' ? styles.navItemActive : {}) }}>
-                    <Printer size={18} /><span>Printing Dipartment</span>
+                    <Printer size={18} /><span>Printing Department</span>
                   </button>
                 )}
                 {/* 2. Fabric Management */}

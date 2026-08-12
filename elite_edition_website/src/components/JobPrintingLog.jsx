@@ -1054,7 +1054,7 @@ export default function JobPrintingLog() {
             <Printer size={22} color="#fff" />
           </div>
           <div>
-            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>Printing Dipartment</h2>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>Printing Department</h2>
             <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 1 }}>
               Log multiple machine runs per Job Card, monitor shifts, and track completion progress.
             </p>
