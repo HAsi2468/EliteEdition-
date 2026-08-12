@@ -4,6 +4,7 @@ import { triggerPushNotification } from './NotificationToast';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import StitchingChallanPanel from './StitchingChallanPanel';
+import FabricInventoryPanel from './FabricInventoryPanel';
 import { triggerEliteAlert } from './EliteModalDialog';
 import {
   FileText,
@@ -69,7 +70,8 @@ function formatJobDisplay(jobStr) {
 }
 
 export default function EliteBillingDepartment({ initialChallanData = null }) {
-  const [activeTab, setActiveTab] = useState('invoices'); // 'dashboard', 'invoices', 'create', 'customers', 'items'
+  const [activeTab, setActiveTab] = useState('invoices'); // 'dashboard', 'invoices', 'create', 'customers', 'items', 'challans'
+  const [challanDept, setChallanDept] = useState('digital_print'); // 'digital_print' or 'stitching'
   const [stats, setStats] = useState({
     totalInvoices: 0,
     totalInvoiced: 0,
@@ -999,24 +1001,70 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       {activeTab === 'challans' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div className="glass-panel" style={{ padding: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
               <div>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Truck size={22} color="var(--primary)" /> Delivery Challans & Dispatch Hub
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
-                  Manage Delivery Challans across Digital Printing, Stitching, and Fabric Dispatch. One-click convert any Challan into a GST Tax Invoice.
+                  Manage Delivery Challans across Digital Printing, Fabric Dispatch, and Stitching. Click "Convert to Invoice" on any Challan to issue a Tax Invoice.
                 </p>
+              </div>
+
+              {/* Department Sub-Switcher */}
+              <div style={{ display: 'flex', gap: '0.4rem', background: 'rgba(0,0,0,0.3)', padding: '0.3rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                <button
+                  onClick={() => setChallanDept('digital_print')}
+                  style={{
+                    padding: '0.45rem 1rem',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: challanDept === 'digital_print' ? 'var(--primary)' : 'transparent',
+                    color: challanDept === 'digital_print' ? '#fff' : 'var(--text-muted)'
+                  }}
+                >
+                  🖨️ Elite Digital Print Challans
+                </button>
+                <button
+                  onClick={() => setChallanDept('stitching')}
+                  style={{
+                    padding: '0.45rem 1rem',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: challanDept === 'stitching' ? 'var(--primary)' : 'transparent',
+                    color: challanDept === 'stitching' ? '#fff' : 'var(--text-muted)'
+                  }}
+                >
+                  ✂️ Elite Stitching Challans
+                </button>
               </div>
             </div>
 
-            <StitchingChallanPanel
-              onNavigateToBilling={(ch) => {
-                populateFormFromChallan(ch);
-                setActiveTab('create');
-                triggerPushNotification('Challan Imported 🚚', `Delivery Challan #${ch.challanNo || ch.jobNo} imported into Invoice Generator.`, 'success');
-              }}
-            />
+            {challanDept === 'digital_print' ? (
+              <FabricInventoryPanel
+                department="digital_print"
+                initialTab="challan"
+                onNavigateToBilling={(ch) => {
+                  populateFormFromChallan(ch);
+                  setActiveTab('create');
+                  triggerPushNotification('Challan Imported 🚚', `Digital Print Delivery Challan #${ch.challanNo || ch.jobNo} imported into Invoice Generator.`, 'success');
+                }}
+              />
+            ) : (
+              <StitchingChallanPanel
+                onNavigateToBilling={(ch) => {
+                  populateFormFromChallan(ch);
+                  setActiveTab('create');
+                  triggerPushNotification('Challan Imported 🚚', `Stitching Delivery Challan #${ch.challanNo || ch.jobNo} imported into Invoice Generator.`, 'success');
+                }}
+              />
+            )}
           </div>
         </div>
       )}

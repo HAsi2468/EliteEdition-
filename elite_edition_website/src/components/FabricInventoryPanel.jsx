@@ -12,8 +12,8 @@ import {
   Check, Plus, ArrowRightLeft, Download, Eye, Receipt
 } from 'lucide-react';
 
-export default function FabricInventoryPanel({ department, onNavigateToBilling }) {
-  const [activeTab, setActiveTab] = useState('dashboard');
+export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard' }) {
+  const [activeTab, setActiveTab] = useState(initialTab);
   const currentUser = api.getCurrentUser();
 
   const normalizeFabricName = (val) => {
