@@ -637,10 +637,10 @@ const downloadInvoicePdf = async (req, res) => {
       }
 
       doc.fillColor(S900).fontSize(12).font('Helvetica-Bold')
-        .text(companyName.toUpperCase(), PAD + 120, Y + 6, { width: CW - 126, align: 'right' });
+        .text(`${companyName.toUpperCase()} (${companyGstin})`, PAD + 120, Y + 6, { width: CW - 126, align: 'right' });
       doc.fillColor(S500).fontSize(8).font('Helvetica')
         .text('G.F., PLOT NO-B/37, SIDDHESHWAR SOC., PUNAGAM MAIN ROAD, SURAT - 395010', PAD + 120, Y + 22, { width: CW - 126, align: 'right' })
-        .text(`GST: 24AANFE0044M   PHONE: +91 99098 66667   STATE: GUJARAT, CODE: 24`,
+        .text(`PHONE: +91 99098 66667   STATE: GUJARAT, CODE: 24`,
               PAD + 120, Y + 34, { width: CW - 126, align: 'right' });
 
       Y += hdrH;
@@ -679,9 +679,9 @@ const downloadInvoicePdf = async (req, res) => {
       doc.fillColor(WHT).fontSize(8.5).font('Helvetica-Bold')
         .text('SELLER / DISPATCH DETAILS', rx + 5, Y + 3, { width: CW - halfCW - 10 });
       const metaW = (CW - halfCW) / 2 - 5;
+      // Show only: Tax Invoice No., Challan No., Terms, Place of Supply
       const pairs = [
-        ['Order No.', invoice.orderNo || '--', 'Tax Invoice No.', invoice.invoiceNo || '--'],
-        ['Dispatch Doc', invoice.dispatchDocNo || '--', 'Challan No.', invoice.ourChallanNo || invoice.challanNo || '--'],
+        ['Tax Invoice No.', invoice.invoiceNo || '--', 'Challan No.', invoice.ourChallanNo || invoice.challanNo || '--'],
         ['Terms of Delivery', 'By Road', 'Place of Supply', `${cust.state || 'Gujarat'} (${cust.stateCode || '24'})`],
       ];
       let metaY = Y + 16;
@@ -780,12 +780,12 @@ const downloadInvoicePdf = async (req, res) => {
         doc.fillColor(S700).font('Helvetica').fontSize(9.5)
           .text(item.hsnCode || '998821', colX[3] + 2, numY, { width: COL[3] - 4, align: 'center' })
           .text(`${taxRate}%`,            colX[4] + 2, numY, { width: COL[4] - 4, align: 'center' });
-        doc.fillColor(S900).font('Helvetica-Bold').fontSize(10)
+        doc.fillColor(S900).font('Helvetica').fontSize(10)
           .text(`${Number(item.qty||0).toFixed(2)} ${u}`, colX[5]+2, numY, { width: COL[5]-4, align:'center' })
           .text(Number(item.unitPrice||0).toFixed(2), colX[6]+2, numY, { width: COL[6]-4, align:'right' });
-        doc.fillColor(S500).font('Helvetica-Bold').fontSize(8.5)
+        doc.fillColor(S500).font('Helvetica').fontSize(8.5)
           .text(u, colX[7]+2, numY, { width: COL[7]-4, align:'center' });
-        doc.fillColor(S900).font('Helvetica-Bold').fontSize(10.5)
+        doc.fillColor(S900).font('Helvetica').fontSize(10.5)
           .text(Number(item.totalAmount||0).toFixed(2), colX[8]+2, numY, { width: COL[8]-4, align:'right' });
         Y += rowH;
       });
