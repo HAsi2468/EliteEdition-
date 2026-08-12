@@ -405,7 +405,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     const updatedItems = invoiceForm.items.map(it => {
       const qty = parseFloat(it.qty) || 0;
       const basePrice = parseFloat(it.unitPrice) || 0;
-      const effectivePrice = basePrice + ((it.butterPaper || invoiceForm.isButterPaperUsed) ? 3 : 0);
+      const effectivePrice = basePrice + (it.butterPaper ? 3 : 0);
       const discPct = parseFloat(it.discountPct) || 0;
       const baseTotal = qty * effectivePrice;
       const discAmt = (baseTotal * discPct) / 100;
@@ -431,7 +431,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
     // Calculate Tax based on items individual tax rates or 5% default
     const totalTax = updatedItems.reduce((sum, i) => {
-      const taxable = (parseFloat(i.qty) || 0) * (parseFloat(i.unitPrice) || 0);
+      const taxable = i.totalAmount || 0;
       const rate = parseFloat(i.taxRate !== undefined && i.taxRate !== null ? i.taxRate : 5);
       return sum + (taxable * rate / 100);
     }, 0);
@@ -1141,19 +1141,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                       setInvoiceForm(f => ({
                         ...f,
                         isButterPaperUsed: checked,
-                        items: f.items.map(item => {
-                          if (item.butterPaper === checked) return item; // already in correct state
-                          const currentPrice = parseFloat(item.unitPrice || 0);
-                          const basePrice = checked ? currentPrice + 3 : currentPrice - 3;
-                          const finalPrice = Math.max(0, parseFloat(basePrice.toFixed(2)));
-                          const taxable = finalPrice * (item.qty || 0) * (1 - (item.discountPct || 0) / 100);
-                          return {
-                            ...item,
-                            butterPaper: checked,
-                            unitPrice: finalPrice,
-                            totalAmount: parseFloat(taxable.toFixed(2))
-                          };
-                        })
+                        items: f.items.map(item => ({ ...item, butterPaper: checked }))
                       }));
                     }}
                   />
@@ -1286,6 +1274,11 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                         onChange={e => handleItemChange(idx, 'unitPrice', e.target.value)}
                         style={inputStyle}
                       />
+                      {it.butterPaper && (
+                        <span style={{ fontSize: '0.62rem', color: '#fbbf24', fontWeight: 700, display: 'block', textAlign: 'center', marginTop: '2px' }}>
+                          Eff: ₹{(parseFloat(it.unitPrice || 0) + 3).toFixed(2)}
+                        </span>
+                      )}
                     </td>
                     {/* Per-item Butter Paper Toggle */}
                     <td style={{ padding: '0.4rem', textAlign: 'center', verticalAlign: 'middle' }}>
@@ -1297,19 +1290,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                             const checked = e.target.checked;
                             setInvoiceForm(f => ({
                               ...f,
-                              items: f.items.map((item, i) => {
-                                if (i !== idx) return item;
-                                const currentPrice = parseFloat(item.unitPrice || 0);
-                                const basePrice = checked ? currentPrice + 3 : currentPrice - 3;
-                                const finalPrice = Math.max(0, parseFloat(basePrice.toFixed(2)));
-                                const taxable = finalPrice * (item.qty || 0) * (1 - (item.discountPct || 0) / 100);
-                                return {
-                                  ...item,
-                                  butterPaper: checked,
-                                  unitPrice: finalPrice,
-                                  totalAmount: parseFloat(taxable.toFixed(2))
-                                };
-                              })
+                              items: f.items.map((item, i) => i === idx ? { ...item, butterPaper: checked } : item)
                             }));
                           }}
                           style={{ cursor: 'pointer', width: 14, height: 14 }}
