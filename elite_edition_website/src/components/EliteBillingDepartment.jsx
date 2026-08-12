@@ -820,7 +820,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.2rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.8rem', overflowX: 'auto' }}>
           {[
             { id: 'invoices', label: '🧾 Invoices Directory', count: stats.totalInvoices },
-            { id: 'challans', label: '🚚 Delivery Challans Hub' },
+            { id: 'challans', label: '🚚 Challan' },
             { id: 'dashboard', label: '📊 Financial Summary' },
             { id: 'create', label: activeTab === 'create' ? (editingInvoiceId ? '✍️ Edit Invoice' : '✍️ New Invoice Generator') : '✍️ Create Invoice' },
             { id: 'customers', label: `👥 Customers (${customers.length})` },
@@ -1029,7 +1029,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           <div className="glass-panel" style={{ padding: '1.25rem' }}>
             <div style={{ marginBottom: '1.25rem' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Truck size={22} color="var(--primary)" /> {department === 'stitching' ? 'Stitching Delivery Challans' : 'Digital Print Delivery Challans'}
+                <Truck size={22} color="var(--primary)" /> {department === 'stitching' ? 'Stitching Delivery Challans' : 'Challan'}
               </h3>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
                 {department === 'stitching'
