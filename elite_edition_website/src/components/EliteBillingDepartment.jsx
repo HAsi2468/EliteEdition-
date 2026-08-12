@@ -133,7 +133,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     setPdfDownloading(true);
     try {
       await api.downloadInvoicePdf(pdfDuplicateModal._id, pdfDuplicateModal.invoiceNo, pdfDuplicateChecked);
-    } catch(e) {
+    } catch (e) {
       alert('Failed to download PDF: ' + e.message);
     } finally {
       setPdfDownloading(false);
@@ -145,7 +145,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   const filteredCustomers = useMemo(() => {
     if (!customerSearch) return customers;
     const q = customerSearch.toLowerCase();
-    return customers.filter(c => 
+    return customers.filter(c =>
       (c.name || '').toLowerCase().includes(q) ||
       (c.businessName || '').toLowerCase().includes(q) ||
       (c.phone || '').toLowerCase().includes(q) ||
@@ -156,7 +156,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   const filteredItems = useMemo(() => {
     if (!itemSearch) return itemsList;
     const q = itemSearch.toLowerCase();
-    return itemsList.filter(i => 
+    return itemsList.filter(i =>
       (i.itemName || '').toLowerCase().includes(q) ||
       (i.hsnCode || '').toLowerCase().includes(q) ||
       (i.category || '').toLowerCase().includes(q)
@@ -567,8 +567,10 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   const handleSaveInvoice = async () => {
     setLoading(true);
     try {
+      // Strip UI-only fields and build clean payload
+      const { manualRoundOff, ...formRest } = invoiceForm;
       const payload = {
-        ...invoiceForm,
+        ...formRest,
         items: calculatedInvoice.items,
         subtotal: calculatedInvoice.subtotal,
         discountTotal: calculatedInvoice.discountTotal,
@@ -576,9 +578,17 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         sgstAmount: calculatedInvoice.sgstAmount,
         igstAmount: calculatedInvoice.igstAmount,
         totalTax: calculatedInvoice.totalTax,
+        roundOff: calculatedInvoice.roundOff,
         grandTotal: calculatedInvoice.grandTotal,
         balanceDue: calculatedInvoice.balanceDue
       };
+
+      // Guard against NaN values that would fail DB save
+      if (!payload.grandTotal || isNaN(payload.grandTotal)) {
+        alert('Grand Total is invalid. Please check item prices and quantities.');
+        setLoading(false);
+        return;
+      }
 
       if (editingInvoiceId) {
         await api.updateBillingInvoice(editingInvoiceId, payload);
@@ -712,7 +722,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      
+
       {/* ── TOP BANNER ──────────────────────────────────────────────────────── */}
       <div className="glass-panel" style={{ padding: '1.25rem 1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
@@ -809,7 +819,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       {/* ── TAB 1: INVOICES DIRECTORY ───────────────────────────────────────── */}
       {activeTab === 'invoices' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          
+
           {/* Search & Status Filters */}
           <div className="glass-panel" style={{ padding: '0.85rem 1.25rem', display: 'flex', gap: '0.8rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <div style={{ position: 'relative', flex: '1 1 240px' }}>
@@ -880,67 +890,67 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                       'items.itemName', 'items.jobNo', 'items.lotNo', 'items.partyChallan', 'items.ourChallanNo', 'items.hsnCode'
                     ]))
                     .map(inv => (
-                    <tr key={inv._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: '#a78bfa' }}>
-                        <button
-                          onClick={() => setViewInvoiceModal(inv)}
-                          style={{ background: 'none', border: 'none', color: '#a78bfa', fontWeight: 800, cursor: 'pointer', padding: 0, textDecoration: 'underline', outline: 'none' }}
-                        >
-                          {inv.invoiceNo}
-                        </button>
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>
-                        <div style={{ fontWeight: 700 }}>{inv.customer?.businessName || inv.customer?.name || '—'}</div>
-                        {inv.customer?.gstin && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>GSTIN: {inv.customer.gstin}</div>}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>
-                        {formatDateDDMMYYYY(inv.invoiceDate)}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                        {fmtINR(inv.grandTotal)}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#34d399', fontWeight: 700 }}>
-                        {fmtINR(inv.paidAmount)}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: inv.balanceDue > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700 }}>
-                        {fmtINR(inv.balanceDue)}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
-                        <span style={{
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: 6,
-                          fontSize: '0.68rem',
-                          fontWeight: 800,
-                          background: inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.15)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
-                          color: inv.paymentStatus === 'PAID' ? '#34d399' : inv.paymentStatus === 'PARTIALLY_PAID' ? '#fbbf24' : '#f87171',
-                          border: `1px solid ${inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.3)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}`
-                        }}>
-                          {inv.paymentStatus}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
-                          <button onClick={() => setViewInvoiceModal(inv)} className="btn-icon" title="View Tax Invoice Details">
-                            <Eye size={14} color="#38bdf8" />
+                      <tr key={inv._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: '#a78bfa' }}>
+                          <button
+                            onClick={() => setViewInvoiceModal(inv)}
+                            style={{ background: 'none', border: 'none', color: '#a78bfa', fontWeight: 800, cursor: 'pointer', padding: 0, textDecoration: 'underline', outline: 'none' }}
+                          >
+                            {inv.invoiceNo}
                           </button>
-                          <button onClick={() => openPdfDialog(inv)} className="btn-icon" title="Download GST PDF">
-                            <Download size={14} color="#a78bfa" />
-                          </button>
-                          {inv.balanceDue > 0 && (
-                            <button onClick={() => { setPaymentModalInvoice(inv); setPayAmount(inv.balanceDue); }} className="btn-icon" title="Record Payment">
-                              <CreditCard size={14} color="#34d399" />
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>
+                          <div style={{ fontWeight: 700 }}>{inv.customer?.businessName || inv.customer?.name || '—'}</div>
+                          {inv.customer?.gstin && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>GSTIN: {inv.customer.gstin}</div>}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>
+                          {formatDateDDMMYYYY(inv.invoiceDate)}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                          {fmtINR(inv.grandTotal)}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#34d399', fontWeight: 700 }}>
+                          {fmtINR(inv.paidAmount)}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: inv.balanceDue > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700 }}>
+                          {fmtINR(inv.balanceDue)}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <span style={{
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: 6,
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            background: inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.15)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+                            color: inv.paymentStatus === 'PAID' ? '#34d399' : inv.paymentStatus === 'PARTIALLY_PAID' ? '#fbbf24' : '#f87171',
+                            border: `1px solid ${inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.3)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}`
+                          }}>
+                            {inv.paymentStatus}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                            <button onClick={() => setViewInvoiceModal(inv)} className="btn-icon" title="View Tax Invoice Details">
+                              <Eye size={14} color="#38bdf8" />
                             </button>
-                          )}
-                          <button onClick={() => handleOpenCreateTab(inv)} className="btn-icon" title="Edit Invoice">
-                            <Edit2 size={14} />
-                          </button>
-                          <button onClick={() => handleDeleteInvoice(inv._id, inv.invoiceNo)} className="btn-icon" title="Delete Invoice">
-                            <Trash2 size={14} color="#f87171" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            <button onClick={() => openPdfDialog(inv)} className="btn-icon" title="Download GST PDF">
+                              <Download size={14} color="#a78bfa" />
+                            </button>
+                            {inv.balanceDue > 0 && (
+                              <button onClick={() => { setPaymentModalInvoice(inv); setPayAmount(inv.balanceDue); }} className="btn-icon" title="Record Payment">
+                                <CreditCard size={14} color="#34d399" />
+                              </button>
+                            )}
+                            <button onClick={() => handleOpenCreateTab(inv)} className="btn-icon" title="Edit Invoice">
+                              <Edit2 size={14} />
+                            </button>
+                            <button onClick={() => handleDeleteInvoice(inv._id, inv.invoiceNo)} className="btn-icon" title="Delete Invoice">
+                              <Trash2 size={14} color="#f87171" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
                 )}
               </tbody>
             </table>
@@ -987,7 +997,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       {/* ── TAB 2: INVOICE GENERATOR / EDITOR (myBillBook style) ────────────── */}
       {activeTab === 'create' && (
         <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.8rem' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
               {editingInvoiceId ? `Edit Invoice — ${invoiceForm.invoiceNo}` : 'New GST Tax Invoice Generator'}
@@ -1137,12 +1147,11 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                           const basePrice = checked ? currentPrice + 3 : currentPrice - 3;
                           const finalPrice = Math.max(0, parseFloat(basePrice.toFixed(2)));
                           const taxable = finalPrice * (item.qty || 0) * (1 - (item.discountPct || 0) / 100);
-                          const tax = taxable * ((item.taxRate || 0) / 100);
                           return {
                             ...item,
                             butterPaper: checked,
                             unitPrice: finalPrice,
-                            totalAmount: parseFloat((taxable + tax).toFixed(2))
+                            totalAmount: parseFloat(taxable.toFixed(2))
                           };
                         })
                       }));
@@ -1172,7 +1181,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 </tr>
               </thead>
               <tbody>
-                {invoiceForm.items.map((it, idx) => (
+                {calculatedInvoice.items.map((it, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)', verticalAlign: 'top' }}>
                     <td style={{ padding: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                       <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
@@ -1294,12 +1303,11 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                                 const basePrice = checked ? currentPrice + 3 : currentPrice - 3;
                                 const finalPrice = Math.max(0, parseFloat(basePrice.toFixed(2)));
                                 const taxable = finalPrice * (item.qty || 0) * (1 - (item.discountPct || 0) / 100);
-                                const tax = taxable * ((item.taxRate || 0) / 100);
                                 return {
                                   ...item,
                                   butterPaper: checked,
                                   unitPrice: finalPrice,
-                                  totalAmount: parseFloat((taxable + tax).toFixed(2))
+                                  totalAmount: parseFloat(taxable.toFixed(2))
                                 };
                               })
                             }));
@@ -1681,7 +1689,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       {viewInvoiceModal && (
         <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: '750px', maxHeight: '92vh', overflowY: 'auto', padding: '1.5rem', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 12 }}>
-            
+
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.85rem', marginBottom: '1rem' }}>
               <div>
