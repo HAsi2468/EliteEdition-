@@ -916,7 +916,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                   </tr>
                 ) : (
                   invoices
-                    .filter(inv => matchSearchQuery(inv, searchQuery || search, [
+                    .filter(inv => matchSearchQuery(inv, search, [
                       'invoiceNo', 'ourChallanNo', 'challanNo', 'orderNo', 'dispatchDocNo',
                       'customer.name', 'customer.businessName', 'customer.phone', 'customer.gstin',
                       'items.itemName', 'items.jobNo', 'items.lotNo', 'items.partyChallan', 'items.ourChallanNo', 'items.hsnCode'
