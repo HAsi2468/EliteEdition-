@@ -1027,36 +1027,15 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       {activeTab === 'challans' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div className="glass-panel" style={{ padding: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Truck size={22} color="var(--primary)" /> {department === 'stitching' ? 'Stitching Delivery Challans' : 'Digital Print Delivery Challans'}
-                </h3>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
-                  {department === 'stitching'
-                    ? 'Manage Stitching Delivery Challans. Click "Convert to Invoice" on any Challan to issue a Tax Invoice.'
-                    : 'Manage Digital Printing Delivery Challans. Click "Convert to Invoice" on any Challan to issue a Tax Invoice.'}
-                </p>
-              </div>
-
-              {/* Action Buttons & Search for Digital Print */}
-              {department !== 'stitching' && (
-                <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <div style={{ position: 'relative', width: '260px' }}>
-                    <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                    <input
-                      type="text"
-                      value={challanSearch}
-                      onChange={e => setChallanSearch(e.target.value)}
-                      placeholder="Search Challan No, Job No, Party, Fabric..."
-                      style={{ paddingLeft: 32, width: '100%', fontSize: '0.85rem' }}
-                    />
-                  </div>
-                  <button onClick={fetchDigitalChallans} className="btn-icon" title="Refresh Challans">
-                    <RefreshCw size={14} className={loadingChallans ? 'spin-loader' : ''} />
-                  </button>
-                </div>
-              )}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Truck size={22} color="var(--primary)" /> {department === 'stitching' ? 'Stitching Delivery Challans' : 'Digital Print Delivery Challans'}
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
+                {department === 'stitching'
+                  ? 'Manage Stitching Delivery Challans. Click "Convert to Invoice" on any Challan to issue a Tax Invoice.'
+                  : 'Create and manage Digital Printing Delivery Challans with complete View, Edit, Delete, PDF Print, and Tax Invoice actions.'}
+              </p>
             </div>
 
             {department === 'stitching' ? (
@@ -1068,76 +1047,15 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 }}
               />
             ) : (
-              /* Digital Print Delivery Challans Table */
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Challan No</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Date</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Party Name</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Job Card #</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Fabric Quality</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Design No</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Mtr</th>
-                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {digitalChallans
-                      .filter(c => matchSearchQuery(c, challanSearch, ['challanNo', 'partyName', 'jobNo', 'fabricName', 'designNo', 'lotNo', 'vendorChallanNo']))
-                      .length === 0 ? (
-                      <tr>
-                        <td colSpan={8} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
-                          {loadingChallans ? 'Loading Digital Print Challans...' : 'No Digital Printing Delivery Challans found.'}
-                        </td>
-                      </tr>
-                    ) : (
-                      digitalChallans
-                        .filter(c => matchSearchQuery(c, challanSearch, ['challanNo', 'partyName', 'jobNo', 'fabricName', 'designNo', 'lotNo', 'vendorChallanNo']))
-                        .map(ch => (
-                          <tr key={ch._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--primary)' }}>
-                              {ch.challanNo ? (String(ch.challanNo).startsWith('EDP') ? ch.challanNo : `EDP-${ch.challanNo}`) : '—'}
-                            </td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>{formatDateDDMMYYYY(ch.date)}</td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>{ch.partyName || '—'}</td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#60a5fa' }}>{ch.jobNo || '—'}</td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>{ch.fabricName || '—'}</td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>{ch.designNo || '—'}</td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 700, color: '#34d399' }}>{ch.pcs || ch.totalMtr || 0} mtr</td>
-                            <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
-                              <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                                <button
-                                  onClick={() => {
-                                    populateFormFromChallan(ch);
-                                    setActiveTab('create');
-                                    triggerPushNotification('Challan Imported 🚚', `Delivery Challan #${ch.challanNo || ch.jobNo} imported into Invoice Generator.`, 'success');
-                                  }}
-                                  className="btn-primary"
-                                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem', gap: '0.3rem', background: 'linear-gradient(135deg,#7c3aed,#6366f1)' }}
-                                  title="Convert to Tax Invoice"
-                                >
-                                  <Receipt size={13} /> Convert to Invoice
-                                </button>
-                                {ch._id && (
-                                  <button
-                                    onClick={() => api.downloadFabricChallanPdf(ch._id, ch.challanNo)}
-                                    className="btn-secondary"
-                                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem', color: '#10b981', borderColor: 'rgba(16,185,129,0.3)' }}
-                                    title="Print Delivery Challan PDF"
-                                  >
-                                    <Printer size={13} /> PDF
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <FabricInventoryPanel
+                department="digital_print"
+                onlyChallan={true}
+                onNavigateToBilling={(ch) => {
+                  populateFormFromChallan(ch);
+                  setActiveTab('create');
+                  triggerPushNotification('Challan Imported 🚚', `Digital Print Delivery Challan #${ch.challanNo || ch.jobNo} imported into Invoice Generator.`, 'success');
+                }}
+              />
             )}
           </div>
         </div>

@@ -12,8 +12,8 @@ import {
   Check, Plus, ArrowRightLeft, Download, Eye, Receipt
 } from 'lucide-react';
 
-export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard' }) {
-  const [activeTab, setActiveTab] = useState(initialTab);
+export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard', onlyChallan = false }) {
+  const [activeTab, setActiveTab] = useState(onlyChallan ? 'challan' : initialTab);
   const currentUser = api.getCurrentUser();
 
   const normalizeFabricName = (val) => {
@@ -1505,46 +1505,48 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         </div>
       )}
       {/* Header & Navigation */}
-      <div className="glass-panel" style={{ display: 'flex', gap: '1rem', padding: '0.75rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', overflowX: 'auto' }}>
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}
-              style={{ padding: '0.5rem 1.1rem', fontSize: '0.85rem', flexShrink: 0 }}
-            >
-              <tab.icon size={16} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      {!onlyChallan && (
+        <div className="glass-panel" style={{ display: 'flex', gap: '1rem', padding: '0.75rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', overflowX: 'auto' }}>
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}
+                style={{ padding: '0.5rem 1.1rem', fontSize: '0.85rem', flexShrink: 0 }}
+              >
+                <tab.icon size={16} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={handleExportCsv} className="btn-secondary" title="Download Fabric Stock CSV" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0 }}>
-            <FileDown size={16} /> Export CSV
-          </button>
-          <button onClick={() => fileInputRef.current && fileInputRef.current.click()} className="btn-secondary" title="Upload Fabric Stock CSV" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0 }}>
-            <ArrowDownToLine size={16} /> Import CSV
-          </button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleImportCsv}
-            accept=".csv"
-            style={{ display: 'none' }}
-          />
-          <button onClick={() => setIsPdfFilterOpen(true)} className="btn-secondary" title="Download Ledger PDF" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0 }}>
-            <FileDown size={16} /> PDF Report
-          </button>
-          <button onClick={() => setIsCombinedModalOpen(true)} className="btn-primary" title="Multiple Reports (Combined 1-Page PDF)" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0, background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', color: '#ffffff', border: 'none', boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)' }}>
-            <FileText size={16} /> Multiple Reports
-          </button>
-          <button onClick={fetchData} className="btn-icon" title="Refresh Data" style={{ padding: '0.5rem', flexShrink: 0 }}>
-            <RefreshCw size={18} className={loading ? 'spin-loader' : ''} />
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button onClick={handleExportCsv} className="btn-secondary" title="Download Fabric Stock CSV" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0 }}>
+              <FileDown size={16} /> Export CSV
+            </button>
+            <button onClick={() => fileInputRef.current && fileInputRef.current.click()} className="btn-secondary" title="Upload Fabric Stock CSV" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0 }}>
+              <ArrowDownToLine size={16} /> Import CSV
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImportCsv}
+              accept=".csv"
+              style={{ display: 'none' }}
+            />
+            <button onClick={() => setIsPdfFilterOpen(true)} className="btn-secondary" title="Download Ledger PDF" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0 }}>
+              <FileDown size={16} /> PDF Report
+            </button>
+            <button onClick={() => setIsCombinedModalOpen(true)} className="btn-primary" title="Multiple Reports (Combined 1-Page PDF)" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0, background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', color: '#ffffff', border: 'none', boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)' }}>
+              <FileText size={16} /> Multiple Reports
+            </button>
+            <button onClick={fetchData} className="btn-icon" title="Refresh Data" style={{ padding: '0.5rem', flexShrink: 0 }}>
+              <RefreshCw size={18} className={loading ? 'spin-loader' : ''} />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {error && <div style={{ color: 'red', padding: '1rem', background: '#ffebeb', borderRadius: '8px' }}>{error}</div>}
 
