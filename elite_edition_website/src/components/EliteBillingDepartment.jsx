@@ -276,6 +276,12 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       const challanList = Array.isArray(chInput) ? chInput : [chInput];
       if (challanList.length === 0) return;
 
+      // MAX 10 CHALLANS LIMIT
+      if (challanList.length > 10) {
+        triggerEliteAlert('Too Many Challans', 'Maximum 10 Challans can be merged into a single Invoice. Please deselect some and try again.', 'error');
+        return;
+      }
+
       // 1. SAME-CUSTOMER VALIDATION CHECK
       const partyNames = new Set(challanList.map(c => (c.billTo || c.partyName || '').trim().toLowerCase()).filter(Boolean));
       if (partyNames.size > 1) {
