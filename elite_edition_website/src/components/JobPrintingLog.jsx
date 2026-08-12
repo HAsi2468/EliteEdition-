@@ -141,9 +141,9 @@ export default function JobPrintingLog() {
 
   // Section 2: PAPER CONSUMPTION (PANNA WISE ROLL CONSUMPTION)
   const [pannaOptionsList, setPannaOptionsList] = useState([]);
-  const [paperTypesList, setPaperTypesList] = useState(['Sublimation Paper', 'Butter Paper', 'Tissue Paper']);
+  const [paperTypesList, setPaperTypesList] = useState(['A++', 'A+', 'A']);
   const [paperEntries, setPaperEntries] = useState([
-    { id: 1, paperType: 'Sublimation Paper', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+    { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
   ]);
 
   // Raw Material Summary State for Displaying on Screen & Reports
@@ -217,7 +217,7 @@ export default function JobPrintingLog() {
             pannaMap[pKey] = (pannaMap[pKey] || 0) + q;
             paperList.push({
               id: paperList.length + 1,
-              paperType: t.materialName || 'Sublimation Paper',
+              paperType: t.materialName || 'A++',
               paperPanna: t.panna ? (t.panna.toLowerCase().includes('panna') || t.panna.includes('"') ? t.panna : `${t.panna} Panna`) : '44" Panna',
               paperCustomPanna: '',
               paperRollsQty: q ? q.toString() : ''
@@ -246,7 +246,7 @@ export default function JobPrintingLog() {
           while (paperList.length < 2) {
             paperList.push({
               id: paperList.length + 1,
-              paperType: 'Sublimation Paper',
+              paperType: 'A++',
               paperPanna: '44" Panna',
               paperCustomPanna: '',
               paperRollsQty: ''
@@ -255,8 +255,8 @@ export default function JobPrintingLog() {
           setPaperEntries(paperList);
         } else {
           setPaperEntries([
-            { id: 1, paperType: 'Sublimation Paper', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' },
-            { id: 2, paperType: 'Sublimation Paper', paperPanna: '58" Panna', paperCustomPanna: '', paperRollsQty: '' }
+            { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' },
+            { id: 2, paperType: 'A+', paperPanna: '58" Panna', paperCustomPanna: '', paperRollsQty: '' }
           ]);
         }
       }
@@ -370,7 +370,7 @@ export default function JobPrintingLog() {
         if (entry.paperRollsQty && Number(entry.paperRollsQty) > 0) {
           const selPanna = entry.paperPanna === 'Custom' ? (entry.paperCustomPanna || '44" Panna') : entry.paperPanna;
           payload.push({
-            materialName: entry.paperType || 'Sublimation Paper',
+            materialName: entry.paperType || 'A++',
             panna: selPanna,
             qty: Number(entry.paperRollsQty),
             unit: 'Rolls',
@@ -413,7 +413,7 @@ export default function JobPrintingLog() {
       setPrintdotInkC(''); setPrintdotInkM(''); setPrintdotInkY(''); setPrintdotInkK('');
       setRawStartTime(''); setRawStopTime(''); setRawNotes('');
       setPaperEntries([
-        { id: 1, paperType: paperTypesList[0] || 'Sublimation Paper', paperPanna: pannaOptionsList[0] || '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+        { id: 1, paperType: paperTypesList[0] || 'A++', paperPanna: pannaOptionsList[0] || '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
       ]);
       setShowRawMaterialModal(false);
     } catch (err) {
@@ -2252,7 +2252,7 @@ export default function JobPrintingLog() {
                             disabled={isOlderThan36Hours(rawDate)}
                             style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #059669', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
                           >
-                            {(paperTypesList.length > 0 ? paperTypesList : ['Sublimation Paper', 'Butter Paper', 'Tissue Paper']).map((p, pIdx) => (
+                            {(paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']).map((p, pIdx) => (
                               <option key={pIdx} value={p}>{p}</option>
                             ))}
                           </select>

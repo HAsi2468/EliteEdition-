@@ -11,18 +11,20 @@ const getConfig = async () => {
       categories: ['Cotton', 'Polyester', 'Silk'],
       passes: ['1 Pass', '2 Pass'],
       parties: ['Wholesale'],
-      widths: ['44 inch', '58 inch'],
-      rawMaterials: ['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'],
+      paperTypes: ['A++', 'A+', 'A'],
+      rawMaterials: ['A++', 'A+', 'A', 'Grando Ink', 'Printdot Ink'],
       sublimationPanna: ['44', '60', '64'],
       sublimationQualities: ['70 GSM', '80 GSM', '90 GSM'],
       butterPanna: ['44', '60'],
       inkColors: ['C', 'M', 'Y', 'K', 'C.S.'],
       inkCanSizes: ['1 Ltr', '5 Ltr', '10 Ltr']
     });
-  } else {
-    let changed = false;
+    if (!config.paperTypes || config.paperTypes.length === 0 || config.paperTypes.includes('Sublimation Paper')) {
+      config.paperTypes = ['A++', 'A+', 'A'];
+      changed = true;
+    }
     if (!config.rawMaterials || config.rawMaterials.length === 0) {
-      config.rawMaterials = ['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'];
+      config.rawMaterials = ['A++', 'A+', 'A', 'Grando Ink', 'Printdot Ink'];
       changed = true;
     }
     if (!config.sublimationPanna || config.sublimationPanna.length === 0) {

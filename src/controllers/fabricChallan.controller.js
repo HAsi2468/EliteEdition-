@@ -79,11 +79,12 @@ function parseLotNo(lotStr) {
 }
 
 // ── Helper: Automated Lot Allocation Program Logic ─────────────────────────
-// Automatically allocates lot numbers across TP details based on available inward stock
-// (or distributes fallback lots across TP rows if no inward stock is recorded yet).
-async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails) {
+// Automatically allocates lot numbers across TP details sequentially:
+// First lot is consumed until stock becomes EXACTLY ZERO (accounting for shortage),
+// then the second lot, then the third lot.
+async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails, defaultShortagePct = 0) {
   const details = Array.isArray(tpDetails) ? tpDetails : [];
-  if (!fabricName || details.length === 0) {
+  if (details.length === 0) {
     return {
       sanitizedDetails: details,
       finalLotNoStr: rawLotNoStr || '',
@@ -91,19 +92,24 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails)
     };
   }
 
-  // 1. Fetch available INWARD lot stocks for this fabric
+  // Parse specified lot numbers in exact order: e.g. "252, 280, 291" -> ["252", "280", "291"]
+  const specifiedLots = (rawLotNoStr || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  // Fetch available INWARD lot stocks for this fabric
   let availableLots = [];
   try {
-    const cleanFabric = fabricName.trim();
-    const re = new RegExp(`^${cleanFabric.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
-    
-    const matchFilter = {
-      fabricQuality: re,
-      lotNo: { $ne: null }
-    };
-    if (panna && String(panna).trim()) {
-      const cleanP = String(panna).trim().replace(/['"]/g, '');
-      matchFilter.panna = new RegExp(`^${cleanP}["']?$`, 'i');
+    const matchFilter = { lotNo: { $ne: null } };
+    if (specifiedLots.length > 0) {
+      const lotNums = specifiedLots.map(s => parseInt(s, 10)).filter(n => !isNaN(n));
+      if (lotNums.length > 0) {
+        matchFilter.lotNo = { $in: lotNums };
+      }
+    } else if (fabricName && fabricName.trim()) {
+      const cleanFabric = fabricName.trim();
+      matchFilter.fabricQuality = new RegExp(`^${cleanFabric.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
     }
     
     const pipeline = [
@@ -123,7 +129,7 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails)
         }
       },
       { $match: { currentStock: { $gt: 0 } } },
-      { $sort: { lotNo: 1 } } // FIFO: oldest lot first
+      { $sort: { lotNo: 1 } }
     ];
 
     availableLots = await FabricTransaction.aggregate(pipeline);
@@ -131,32 +137,59 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails)
     console.warn('Failed to query inward lot stock:', e.message);
   }
 
-  // Parse existing/header lot numbers string (e.g. "330,328,317" -> ["330", "328", "317"])
-  const fallbackLots = (rawLotNoStr || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
+  const lotStockMap = [];
+
+  if (specifiedLots.length > 0) {
+    for (const fLot of specifiedLots) {
+      const lotNum = parseInt(fLot, 10);
+      let remRaw = Infinity;
+      let lotShortage = parseFloat(defaultShortagePct) || 0;
+
+      if (!isNaN(lotNum)) {
+        const match = availableLots.find(l => String(l.lotNo) === fLot);
+        remRaw = match ? Math.max(0, match.currentStock) : 0;
+
+        // Fetch inward transaction for exact shortage %
+        const inwardTx = await FabricTransaction.findOne({ type: 'INWARD', lotNo: lotNum }).lean();
+        if (inwardTx && inwardTx.shortagePct != null) {
+          lotShortage = parseFloat(inwardTx.shortagePct) || 0;
+        }
+      }
+
+      // Compute fresh meters available from raw stock
+      const remFresh = remRaw === Infinity ? Infinity : (remRaw / (1 + lotShortage / 100));
+      lotStockMap.push({
+        lotNo: fLot,
+        remRaw,
+        remFresh,
+        shortagePct: lotShortage
+      });
+    }
+  } else {
+    // Fall back to available FIFO lots from database
+    for (const aLot of availableLots) {
+      const lotNum = parseInt(aLot.lotNo, 10);
+      let lotShortage = parseFloat(defaultShortagePct) || 0;
+      if (!isNaN(lotNum)) {
+        const inwardTx = await FabricTransaction.findOne({ type: 'INWARD', lotNo: lotNum }).lean();
+        if (inwardTx && inwardTx.shortagePct != null) {
+          lotShortage = parseFloat(inwardTx.shortagePct) || 0;
+        }
+      }
+      const remRaw = Math.max(0, aLot.currentStock);
+      const remFresh = remRaw / (1 + lotShortage / 100);
+      lotStockMap.push({
+        lotNo: String(aLot.lotNo),
+        remRaw,
+        remFresh,
+        shortagePct: lotShortage
+      });
+    }
+  }
 
   const sanitizedDetails = [];
   const usedLotsSet = new Set();
   const lotGroups = {};
-
-  // Build prioritized lotStockMap:
-  // If user specified lots (e.g. ["330", "328", "317"]), use ONLY those specified lots!
-  const lotStockMap = [];
-
-  if (fallbackLots.length > 0) {
-    for (const fLot of fallbackLots) {
-      const match = availableLots.find(l => String(l.lotNo) === fLot);
-      const rem = match ? match.currentStock : Infinity;
-      lotStockMap.push({ lotNo: fLot, remaining: rem });
-    }
-  } else {
-    // If no specific lots provided, fall back to available FIFO lots from database
-    for (const aLot of availableLots) {
-      lotStockMap.push({ lotNo: String(aLot.lotNo), remaining: aLot.currentStock });
-    }
-  }
 
   if (lotStockMap.length > 0) {
     let lotIdx = 0;
@@ -173,13 +206,17 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails)
 
       while (needed > 0 && lotIdx < lotStockMap.length) {
         const curLot = lotStockMap[lotIdx];
-        if (curLot.remaining <= 0) {
+
+        // Advance to next lot if current lot is zeroed out
+        if (curLot.remFresh <= 0.001) {
           lotIdx++;
           continue;
         }
 
-        const take = curLot.remaining === Infinity ? needed : Math.min(needed, curLot.remaining);
-        if (curLot.remaining !== Infinity) curLot.remaining -= take;
+        const take = curLot.remFresh === Infinity ? needed : Math.min(needed, curLot.remFresh);
+        if (curLot.remFresh !== Infinity) {
+          curLot.remFresh -= take;
+        }
         needed -= take;
 
         const lotStr = curLot.lotNo;
@@ -188,14 +225,15 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails)
 
         lotGroups[lotStr] = (lotGroups[lotStr] || 0) + take;
 
-        if (curLot.remaining <= 0) {
+        // If lot is exhausted, move to next lot for subsequent rows/meters
+        if (curLot.remFresh <= 0.001) {
           lotIdx++;
         }
       }
 
       if (needed > 0) {
-        // Remaining meters beyond available stock -> assign to last used lot or fallback lot
-        const lastLot = assignedLots.length > 0 ? assignedLots[assignedLots.length - 1] : (fallbackLots[0] || '1');
+        // Exceeded available stock -> assign remaining to the last specified lot
+        const lastLot = lotStockMap.length > 0 ? lotStockMap[lotStockMap.length - 1].lotNo : (specifiedLots[0] || '1');
         if (!assignedLots.includes(lastLot)) assignedLots.push(lastLot);
         usedLotsSet.add(lastLot);
         lotGroups[lastLot] = (lotGroups[lastLot] || 0) + needed;
@@ -207,30 +245,16 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails)
       });
     }
   } else {
-    // No inward stock records in DB yet -> distribute fallback lots across TP rows programmatically
-    const defaultLot = fallbackLots[0] || '1';
-    let fIdx = 0;
-    const itemsPerLot = fallbackLots.length > 1 ? Math.ceil(details.length / fallbackLots.length) : details.length;
-
-    details.forEach((tp, idx) => {
+    const defaultLot = specifiedLots[0] || '1';
+    details.forEach((tp) => {
       const m = parseFloat(tp.tpMeter) || 0;
       if (m <= 0) {
         sanitizedDetails.push({ ...tp, lotNo: '' });
         return;
       }
-
-      if (fallbackLots.length > 1 && idx > 0 && idx % itemsPerLot === 0) {
-        if (fIdx < fallbackLots.length - 1) fIdx++;
-      }
-
-      const assignedLot = fallbackLots[fIdx] || defaultLot;
-      usedLotsSet.add(assignedLot);
-      lotGroups[assignedLot] = (lotGroups[assignedLot] || 0) + m;
-
-      sanitizedDetails.push({
-        ...tp,
-        lotNo: assignedLot
-      });
+      usedLotsSet.add(defaultLot);
+      lotGroups[defaultLot] = (lotGroups[defaultLot] || 0) + m;
+      sanitizedDetails.push({ ...tp, lotNo: defaultLot });
     });
   }
 
@@ -323,20 +347,42 @@ const createChallan = async (req, res) => {
       try {
         const createdTxIds = [];
         for (const [lot, groupMtr] of Object.entries(lotGroups)) {
-          const rawMtr = computeRawMeters(groupMtr, challan.shortagePct);
+          const lotNum = parseLotNo(lot);
+          let lotShortage = challan.shortagePct != null ? challan.shortagePct : 0;
+          let rawMtr = computeRawMeters(groupMtr, lotShortage);
+
+          if (lotNum) {
+            const inwardTxs = await FabricTransaction.find({ type: 'INWARD', lotNo: lotNum }).lean();
+            const outwardTxs = await FabricTransaction.find({ type: 'OUTWARD', lotNo: lotNum }).lean();
+            
+            const totalIn = inwardTxs.reduce((s, t) => s + (t.qty || 0), 0);
+            const totalOut = outwardTxs.reduce((s, t) => s + (t.qty || 0), 0);
+            const availRaw = Math.max(0, totalIn - totalOut);
+
+            if (inwardTxs.length > 0 && inwardTxs[0].shortagePct != null) {
+              lotShortage = parseFloat(inwardTxs[0].shortagePct) || 0;
+              rawMtr = computeRawMeters(groupMtr, lotShortage);
+            }
+
+            // EXACT ZEROING GUARANTEE
+            if (availRaw > 0 && Math.abs(rawMtr - availRaw) <= 2.0) {
+              rawMtr = parseFloat(availRaw.toFixed(3));
+            }
+          }
+
           const outwardTx = new FabricTransaction({
             type: 'OUTWARD',
             fabricQuality: fabricName,
             panna: panna || '',
-            lotNo: parseLotNo(lot),
+            lotNo: lotNum,
             qty: rawMtr,
-            shortagePct: challan.shortagePct != null ? challan.shortagePct : ((fabricName && (fabricName.includes('CREPE') || fabricName.includes('CRAPE') || fabricName.includes('FRENCH'))) ? 2 : null),
+            shortagePct: lotShortage,
             date: challan.date,
             jobNo: jobNo || '',
             partyName: partyName || '',
             billTo: billTo || partyName || '',
             challanNo: 'EDP-' + challan.challanNo,
-            notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Fresh=${groupMtr}m + ${challan.shortagePct || 0}% shortage = ${rawMtr}m raw`,
+            notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Fresh=${groupMtr}m + ${lotShortage}% shortage = ${rawMtr}m raw`,
           });
           await outwardTx.save();
           createdTxIds.push(outwardTx._id);
@@ -506,20 +552,42 @@ const updateChallan = async (req, res) => {
       if (challan.fabricName && challan.totalMtr > 0 && Object.keys(lotGroups).length > 0) {
         const createdTxIds = [];
         for (const [lot, groupMtr] of Object.entries(lotGroups)) {
-          const rawMtr = computeRawMeters(groupMtr, challan.shortagePct);
+          const lotNum = parseLotNo(lot);
+          let lotShortage = challan.shortagePct != null ? challan.shortagePct : 0;
+          let rawMtr = computeRawMeters(groupMtr, lotShortage);
+
+          if (lotNum) {
+            const inwardTxs = await FabricTransaction.find({ type: 'INWARD', lotNo: lotNum }).lean();
+            const outwardTxs = await FabricTransaction.find({ type: 'OUTWARD', lotNo: lotNum }).lean();
+            
+            const totalIn = inwardTxs.reduce((s, t) => s + (t.qty || 0), 0);
+            const totalOut = outwardTxs.reduce((s, t) => s + (t.qty || 0), 0);
+            const availRaw = Math.max(0, totalIn - totalOut);
+
+            if (inwardTxs.length > 0 && inwardTxs[0].shortagePct != null) {
+              lotShortage = parseFloat(inwardTxs[0].shortagePct) || 0;
+              rawMtr = computeRawMeters(groupMtr, lotShortage);
+            }
+
+            // EXACT ZEROING GUARANTEE
+            if (availRaw > 0 && Math.abs(rawMtr - availRaw) <= 2.0) {
+              rawMtr = parseFloat(availRaw.toFixed(3));
+            }
+          }
+
           const outwardTx = new FabricTransaction({
             type: 'OUTWARD',
             fabricQuality: challan.fabricName,
             panna: challan.panna || '',
-            lotNo: parseLotNo(lot),
+            lotNo: lotNum,
             qty: rawMtr,
-            shortagePct: challan.shortagePct != null ? challan.shortagePct : ((challan.fabricName && (challan.fabricName.includes('CREPE') || challan.fabricName.includes('CRAPE') || challan.fabricName.includes('FRENCH'))) ? 2 : null),
+            shortagePct: lotShortage,
             date: challan.date,
             jobNo: challan.jobNo || '',
             partyName: challan.partyName || '',
             billTo: challan.billTo || challan.partyName || '',
             challanNo: 'EDP-' + challan.challanNo,
-            notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Fresh=${groupMtr}m + ${challan.shortagePct || 0}% shortage = ${rawMtr}m raw`,
+            notes: `Auto: EDP-${challan.challanNo} | Lot #${lot || 'N/A'} | Fresh=${groupMtr}m + ${lotShortage}% shortage = ${rawMtr}m raw`,
           });
           await outwardTx.save();
           createdTxIds.push(outwardTx._id);
@@ -1199,5 +1267,6 @@ module.exports = {
   getLotInfo,
   downloadChallanPdf,
   downloadChallanSummaryPdf,
+  allocateLotsForChallan,
 };
 
