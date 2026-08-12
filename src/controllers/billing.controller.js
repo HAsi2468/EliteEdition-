@@ -484,7 +484,8 @@ const downloadInvoicePdf = async (req, res) => {
     const JobCard = require('../db/models/jobCard.model');
     const config = await PrintConfig.findOne({ isConfig: true }).lean() || {};
 
-    const companyName    = config.companyName    || 'ELITE DIGITAL PRINTS';
+    const rawCompName = config.companyName || 'ELITE DIGITAL PRINTS';
+    const companyDisplayName = rawCompName.replace(/\s*\([^)]*\)/g, '').trim();
     const companyGstin   = config.companyGstin   || '24AANFE0044M1ZG';
     const companyAddress = config.companyAddress  || 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, Surat - 395006';
     const companyPhone   = config.companyPhone   || '+91 98790 00000';
@@ -549,8 +550,7 @@ const downloadInvoicePdf = async (req, res) => {
     };
 
     // ── COLUMN WIDTHS ────────────────────────────────────────────────────────────
-    // Sr | IMG | Description | HSN | GST% | Qty | Rate | Per | Amount
-    const COL = [18, 100, 132, 54, 34, 60, 60, 30, 71.28]; // sum=559.28 ✓
+    const COL = [18, 100, 132, 54, 34, 60, 60, 30, 71.28];
     const colX = COL.reduce((acc, w, i) => { acc.push((acc[i-1]||PAD) + (i>0?COL[i-1]:0)); return acc; }, []);
 
     // ── PRE-LOAD IMAGES ──────────────────────────────────────────────────────────
@@ -644,7 +644,7 @@ const downloadInvoicePdf = async (req, res) => {
         }
 
         doc.fillColor(S900).fontSize(12).font('Helvetica-Bold')
-          .text(`${companyName.toUpperCase()} (${companyGstin})`, PAD + 120, Y + 6, { width: CW - 126, align: 'right' });
+          .text(`${companyDisplayName.toUpperCase()} (${companyGstin})`, PAD + 120, Y + 6, { width: CW - 126, align: 'right' });
         doc.fillColor(S500).fontSize(8).font('Helvetica')
           .text(companyAddress.toUpperCase(), PAD + 120, Y + 22, { width: CW - 126, align: 'right' })
           .text(`PHONE: ${companyPhone}   STATE: ${companyState}, CODE: ${companyStateCode}`,
@@ -660,7 +660,6 @@ const downloadInvoicePdf = async (req, res) => {
         Y += titleH;
 
         const cust   = invoice.customer || {};
-        const infoH  = 72;
         const halfCW = Math.floor(CW / 2);
 
         const rawChallanStr = invoice.ourChallanNo || (invoice.linkedChallanNos && invoice.linkedChallanNos.join(', ')) || invoice.challanNo || '--';
@@ -669,41 +668,33 @@ const downloadInvoicePdf = async (req, res) => {
 
         if (rawChallanStr.includes(',')) {
           const cList = rawChallanStr.split(',').map(s => s.trim()).filter(Boolean);
-          if (cList.length > 5) {
-            challanLine1 = cList.slice(0, 5).join(', ');
-            challanLine2 = cList.slice(5).join(', ');
-          } else if (rawChallanStr.length > 28) {
+          if (cList.length > 4) {
+            challanLine1 = cList.slice(0, 4).join(', ');
+            challanLine2 = cList.slice(4).join(', ');
+          } else if (rawChallanStr.length > 25) {
             const half = Math.ceil(cList.length / 2);
             challanLine1 = cList.slice(0, half).join(', ');
             challanLine2 = cList.slice(half).join(', ');
           }
         }
 
-        doc.rect(PAD, Y, halfCW, infoH).fill(WHT).stroke(S200);
-        doc.rect(PAD, Y, halfCW, 14).fill(PRP);
-        doc.fillColor(WHT).fontSize(8.5).font('Helvetica-Bold')
-          .text('BILL TO', PAD + 5, Y + 3, { width: halfCW - 10 });
+        // Calculate dynamic height for BILL TO box
+        const custNameStr   = cust.businessName || cust.name || '--';
+        const custGstStr    = cust.gstin && cust.gstin !== 'N/A' ? ` (GST: ${cust.gstin})` : '';
+        const fullCustTitle = `${custNameStr}${custGstStr}`;
 
         let custY = Y + 16;
-        doc.fillColor(S900).fontSize(9.5).font('Helvetica-Bold')
-          .text(cust.businessName || cust.name || '--', PAD + 5, custY, { width: halfCW - 10 });
-        custY += 13;
+        doc.font('Helvetica-Bold').fontSize(9.5);
+        custY += doc.heightOfString(fullCustTitle, { width: halfCW - 10 }) + 3;
 
         if (cust.billingAddress && cust.billingAddress.trim() && cust.billingAddress.trim() !== '--') {
-          doc.fillColor(S700).fontSize(8.5).font('Helvetica')
-            .text(cust.billingAddress.trim(), PAD + 5, custY, { width: halfCW - 10 });
-          custY += 12;
+          doc.font('Helvetica').fontSize(8);
+          custY += doc.heightOfString(cust.billingAddress.trim(), { width: halfCW - 10 }) + 3;
         }
+        custY += 14; // For State and Code line
 
-        doc.fillColor(S500).fontSize(8).font('Helvetica')
-          .text(`GST: ${cust.gstin || 'N/A'}`, PAD + 5, custY)
-          .text(`State: ${cust.state || 'Gujarat'}, Code: ${cust.stateCode || '24'}`, PAD + 5, custY + 10);
-
+        // Calculate dynamic height for SELLER / DISPATCH box
         const rx = PAD + halfCW;
-        doc.rect(rx, Y, CW - halfCW, infoH).fill(WHT).stroke(S200);
-        doc.rect(rx, Y, CW - halfCW, 14).fill(PRP);
-        doc.fillColor(WHT).fontSize(8.5).font('Helvetica-Bold')
-          .text('SELLER / DISPATCH DETAILS', rx + 5, Y + 3, { width: CW - halfCW - 10 });
         const metaW = (CW - halfCW) / 2 - 5;
         const pairs = [
           ['Challan No.', challanLine1, 'Tax Invoice No.', invoice.invoiceNo || '--'],
@@ -712,16 +703,66 @@ const downloadInvoicePdf = async (req, res) => {
         if (useTwoPages && pageLabel) {
           pairs.push(['Page', pageLabel, 'Copy', copyLabel]);
         }
+
+        let testMetaY = Y + 16;
+        pairs.forEach(([k1, v1, k2, v2]) => {
+          doc.font('Helvetica-Bold').fontSize(8);
+          const h1 = v1 ? doc.heightOfString(v1, { width: metaW }) : 10;
+          const h2 = v2 ? doc.heightOfString(v2, { width: metaW }) : 10;
+          testMetaY += Math.max(h1, h2, 10) + 6;
+        });
+
+        const infoH = Math.max(74, custY - Y, testMetaY - Y + 4);
+
+        // Render Boxes
+        doc.rect(PAD, Y, halfCW, infoH).fill(WHT).stroke(S200);
+        doc.rect(PAD, Y, halfCW, 14).fill(PRP);
+        doc.fillColor(WHT).fontSize(8.5).font('Helvetica-Bold')
+          .text('BILL TO', PAD + 5, Y + 3, { width: halfCW - 10 });
+
+        let drawCustY = Y + 16;
+        doc.fillColor(S900).fontSize(9.5).font('Helvetica-Bold')
+          .text(fullCustTitle, PAD + 5, drawCustY, { width: halfCW - 10 });
+        drawCustY += doc.heightOfString(fullCustTitle, { width: halfCW - 10 }) + 3;
+
+        if (cust.billingAddress && cust.billingAddress.trim() && cust.billingAddress.trim() !== '--') {
+          const addrStr = cust.billingAddress.trim();
+          doc.fillColor(S700).fontSize(8).font('Helvetica')
+            .text(addrStr, PAD + 5, drawCustY, { width: halfCW - 10 });
+          doc.font('Helvetica').fontSize(8);
+          drawCustY += doc.heightOfString(addrStr, { width: halfCW - 10 }) + 3;
+        }
+
+        doc.fillColor(S500).fontSize(8).font('Helvetica')
+          .text(`State: ${cust.state || 'Gujarat'}, Code: ${cust.stateCode || '24'}`, PAD + 5, drawCustY);
+
+        doc.rect(rx, Y, CW - halfCW, infoH).fill(WHT).stroke(S200);
+        doc.rect(rx, Y, CW - halfCW, 14).fill(PRP);
+        doc.fillColor(WHT).fontSize(8.5).font('Helvetica-Bold')
+          .text('SELLER / DISPATCH DETAILS', rx + 5, Y + 3, { width: CW - halfCW - 10 });
+
         let metaY = Y + 16;
         pairs.forEach(([k1, v1, k2, v2]) => {
-          doc.fillColor(S500).fontSize(7.5).font('Helvetica')
-            .text(k1 + ':', rx + 4, metaY, { width: metaW })
-            .text(k2 + ':', rx + metaW + 10, metaY, { width: metaW });
-          doc.fillColor(S900).fontSize(8.5).font('Helvetica-Bold')
-            .text(v1, rx + 4, metaY + 9, { width: metaW })
-            .text(v2, rx + metaW + 10, metaY + 9, { width: metaW });
-          metaY += 18;
+          doc.font('Helvetica-Bold').fontSize(8);
+          const h1 = v1 ? doc.heightOfString(v1, { width: metaW }) : 10;
+          const h2 = v2 ? doc.heightOfString(v2, { width: metaW }) : 10;
+          const rowH = Math.max(h1, h2, 10) + 6;
+
+          if (k1) {
+            doc.fillColor(S500).fontSize(7).font('Helvetica')
+              .text(k1 + ':', rx + 4, metaY, { width: metaW });
+            doc.fillColor(S900).fontSize(8).font('Helvetica-Bold')
+              .text(v1 || '--', rx + 4, metaY + 8, { width: metaW });
+          }
+          if (k2) {
+            doc.fillColor(S500).fontSize(7).font('Helvetica')
+              .text(k2 + ':', rx + metaW + 10, metaY, { width: metaW });
+            doc.fillColor(S900).fontSize(8).font('Helvetica-Bold')
+              .text(v2 || '--', rx + metaW + 10, metaY + 8, { width: metaW });
+          }
+          metaY += rowH;
         });
+
         Y += infoH;
         return Y;
       };
@@ -743,8 +784,7 @@ const downloadInvoicePdf = async (req, res) => {
           });
         };
 
-        const availH = (useTwoPages && !isLastPage) ? (PH - PAD - 30 - Y) : 400;
-        const minRowHPerItem = Math.max(36, Math.floor(availH / Math.max(itemsToRender.length, 1)));
+        const minRowHPerItem = 34;
 
         itemsToRender.forEach((item, localIdx) => {
           const idx = startIdx + localIdx;
@@ -768,7 +808,7 @@ const downloadInvoicePdf = async (req, res) => {
             doc.font(m.font).fontSize(m.size);
             descH += doc.heightOfString(m.text, { width: COL[2] - 6 }) + 2;
           });
-          const rowH = Math.max(minRowHPerItem, descH + 12);
+          const rowH = Math.max(minRowHPerItem, descH + 10);
 
           doc.rect(PAD, Y, CW, rowH).fill(rowBg).stroke(S200);
           drawColSeps(Y, rowH);
@@ -967,8 +1007,9 @@ const downloadInvoicePdf = async (req, res) => {
         return Y;
       };
 
-      const drawFooter = () => {
-        const footerY = PH - PAD - 70;
+      const drawFooter = (startY) => {
+        const minFooterY = PH - PAD - 72;
+        const footerY = Math.max(startY + 8, minFooterY);
         doc.moveTo(PAD, footerY).lineTo(PAD+CW, footerY).strokeColor(S200).lineWidth(0.6).stroke();
 
         const leftFW = 300;
@@ -986,7 +1027,7 @@ const downloadInvoicePdf = async (req, res) => {
           .text(companyTerms, PAD+4, footerY+58, { width: leftFW });
 
         doc.fillColor(S900).fontSize(8.5).font('Helvetica-Bold')
-          .text(`for ${companyName.toUpperCase()}`, rightFX, footerY+5, { width: rightFW, align:'right' });
+          .text(`for ${companyDisplayName.toUpperCase()}`, rightFX, footerY+5, { width: rightFW, align:'right' });
         doc.moveTo(rightFX + rightFW - 100, footerY + 48).lineTo(rightFX + rightFW, footerY + 48)
           .strokeColor(S500).lineWidth(0.5).stroke();
         doc.fillColor(S500).fontSize(8).font('Helvetica')
