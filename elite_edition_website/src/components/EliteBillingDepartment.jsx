@@ -452,8 +452,15 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     let roundOff = 0;
 
     if (invoiceForm.enableRoundOff !== false) {
-      grandTotal = Math.round(rawGrandTotal);
-      roundOff = parseFloat((grandTotal - rawGrandTotal).toFixed(2));
+      if (invoiceForm.manualRoundOff !== undefined && invoiceForm.manualRoundOff !== '') {
+        // Manual override: use user-specified round off value
+        roundOff = parseFloat(invoiceForm.manualRoundOff);
+        grandTotal = parseFloat((rawGrandTotal + roundOff).toFixed(2));
+      } else {
+        // Auto round off
+        grandTotal = Math.round(rawGrandTotal);
+        roundOff = parseFloat((grandTotal - rawGrandTotal).toFixed(2));
+      }
     } else {
       grandTotal = parseFloat(rawGrandTotal.toFixed(2));
       roundOff = 0;
@@ -1117,8 +1124,29 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 700, color: '#fbbf24', cursor: 'pointer', background: 'rgba(251,191,36,0.12)', padding: '0.3rem 0.65rem', borderRadius: '5px', border: '1px solid rgba(251,191,36,0.3)' }}>
                   <input
                     type="checkbox"
-                    checked={invoiceForm.isButterPaperUsed}
-                    onChange={e => setInvoiceForm(f => ({ ...f, isButterPaperUsed: e.target.checked }))}
+                    checked={invoiceForm.items.length > 0 && invoiceForm.items.every(it => it.butterPaper)}
+                    ref={el => { if (el) el.indeterminate = invoiceForm.items.some(it => it.butterPaper) && !invoiceForm.items.every(it => it.butterPaper); }}
+                    onChange={e => {
+                      const checked = e.target.checked;
+                      setInvoiceForm(f => ({
+                        ...f,
+                        isButterPaperUsed: checked,
+                        items: f.items.map(item => {
+                          if (item.butterPaper === checked) return item; // already in correct state
+                          const currentPrice = parseFloat(item.unitPrice || 0);
+                          const basePrice = checked ? currentPrice + 3 : currentPrice - 3;
+                          const finalPrice = Math.max(0, parseFloat(basePrice.toFixed(2)));
+                          const taxable = finalPrice * (item.qty || 0) * (1 - (item.discountPct || 0) / 100);
+                          const tax = taxable * ((item.taxRate || 0) / 100);
+                          return {
+                            ...item,
+                            butterPaper: checked,
+                            unitPrice: finalPrice,
+                            totalAmount: parseFloat((taxable + tax).toFixed(2))
+                          };
+                        })
+                      }));
+                    }}
                   />
                   🧈 Butter Paper Used (+ ₹3/m Rate)
                 </label>
@@ -1378,17 +1406,30 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 </>
               )}
 
-              {/* Round Off Checkbox & Display (Default Checked) */}
+              {/* Round Off Checkbox & Manual Override */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', color: '#a78bfa', marginTop: '0.2rem', paddingTop: '0.2rem', borderTop: '1px dashed var(--border-light)' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: 600 }}>
                   <input
                     type="checkbox"
                     checked={invoiceForm.enableRoundOff !== false}
-                    onChange={e => setInvoiceForm(f => ({ ...f, enableRoundOff: e.target.checked }))}
+                    onChange={e => setInvoiceForm(f => ({ ...f, enableRoundOff: e.target.checked, manualRoundOff: undefined }))}
                   />
                   Round Off Total
                 </label>
-                <span style={{ fontWeight: 700 }}>{calculatedInvoice.roundOff > 0 ? '+' : ''} ₹ {calculatedInvoice.roundOff.toFixed(2)}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                    Auto: {calculatedInvoice.roundOff > 0 ? '+' : ''}₹{calculatedInvoice.roundOff.toFixed(2)}
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Override"
+                    value={invoiceForm.manualRoundOff !== undefined ? invoiceForm.manualRoundOff : ''}
+                    onChange={e => setInvoiceForm(f => ({ ...f, manualRoundOff: e.target.value === '' ? undefined : parseFloat(e.target.value), enableRoundOff: true }))}
+                    style={{ width: '80px', padding: '0.2rem 0.4rem', fontSize: '0.78rem', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.35)', borderRadius: '4px', color: '#a78bfa', textAlign: 'right' }}
+                    title="Manually override round off amount"
+                  />
+                </div>
               </div>
 
               <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.5rem', display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: '#a78bfa' }}>
