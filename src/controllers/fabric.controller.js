@@ -1460,11 +1460,35 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       const printLogs = await JobPrintLog.find(logDateFilter).sort({ date: -1, created_date_time: -1 }).lean();
 
       // 1B. Fetch Raw Material Outward Usage logs for selected date range (strictly by date range)
-      const rawMaterialDateFilter = { type: 'OUTWARD' };
+      let rawMaterialDateFilter = { type: 'OUTWARD' };
       if (dsStr || deStr) {
-        rawMaterialDateFilter.date = {};
-        if (dsStr) rawMaterialDateFilter.date.$gte = new Date(`${dsStr}T00:00:00.000Z`);
-        if (deStr) rawMaterialDateFilter.date.$lte = new Date(`${deStr}T23:59:59.999Z`);
+        const dsLocal = dsStr ? new Date(`${dsStr}T00:00:00.000`) : null;
+        const deLocal = deStr ? new Date(`${deStr}T23:59:59.999`) : null;
+
+        const dsUtc = dsStr ? new Date(`${dsStr}T00:00:00.000Z`) : null;
+        const deUtc = deStr ? new Date(`${deStr}T23:59:59.999Z`) : null;
+
+        const rawConditions = [];
+        if (dsStr && deStr) {
+          rawConditions.push({ date: { $gte: dsLocal, $lte: deLocal } });
+          rawConditions.push({ date: { $gte: dsUtc, $lte: deUtc } });
+          rawConditions.push({ createdAt: { $gte: dsLocal, $lte: deLocal } });
+          rawConditions.push({ createdAt: { $gte: dsUtc, $lte: deUtc } });
+          rawConditions.push({ date: { $gte: dsStr, $lte: deStr } });
+        } else if (dsStr) {
+          rawConditions.push({ date: { $gte: dsLocal } });
+          rawConditions.push({ date: { $gte: dsUtc } });
+          rawConditions.push({ createdAt: { $gte: dsLocal } });
+          rawConditions.push({ date: { $gte: dsStr } });
+        } else if (deStr) {
+          rawConditions.push({ date: { $lte: deLocal } });
+          rawConditions.push({ date: { $lte: deUtc } });
+          rawConditions.push({ createdAt: { $lte: deLocal } });
+          rawConditions.push({ date: { $lte: deStr } });
+        }
+        if (rawConditions.length > 0) {
+          rawMaterialDateFilter = { type: 'OUTWARD', $or: rawConditions };
+        }
       }
       rawMaterialLogs = await RawMaterialTransaction.find(rawMaterialDateFilter).sort({ date: -1, createdAt: -1 }).lean();
 
@@ -1555,14 +1579,14 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     const totalLotNetStock = lotwiseData.reduce((s, l) => s + Math.max(0, l.currentStock || 0), 0);
 
     // ── MTD & WTD (Month-Till-Date & Week-Till-Date) Calculations ──
-    const now = new Date();
-    const dayOfWeek = now.getDay();
+    const refDate = deStr ? new Date(`${deStr}T23:59:59.999`) : new Date();
+    const dayOfWeek = refDate.getDay();
     const distToMonday = (dayOfWeek + 6) % 7;
-    const wtdStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distToMonday, 0, 0, 0, 0);
-    const wtdEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const wtdStart = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate() - distToMonday, 0, 0, 0, 0);
+    const wtdEnd = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate(), 23, 59, 59, 999);
 
-    const mtdStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    const mtdEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const mtdStart = new Date(refDate.getFullYear(), refDate.getMonth(), 1, 0, 0, 0, 0);
+    const mtdEnd = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate(), 23, 59, 59, 999);
     const mtdDateFilter = { date: { $gte: mtdStart, $lte: mtdEnd } };
 
     const mtdInwardData = await FabricTransaction.find({ type: 'INWARD', ...mtdDateFilter, ...lotTransferExclude }).lean();
