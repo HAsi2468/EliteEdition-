@@ -685,20 +685,6 @@ const downloadInvoicePdf = async (req, res) => {
         const halfCW = Math.floor(CW / 2);
 
         const rawChallanStr = invoice.ourChallanNo || (invoice.linkedChallanNos && invoice.linkedChallanNos.join(', ')) || invoice.challanNo || '--';
-        let challanLine1 = rawChallanStr;
-        let challanLine2 = '';
-
-        if (rawChallanStr.includes(',')) {
-          const cList = rawChallanStr.split(',').map(s => s.trim()).filter(Boolean);
-          if (cList.length > 4) {
-            challanLine1 = cList.slice(0, 4).join(', ');
-            challanLine2 = cList.slice(4).join(', ');
-          } else if (rawChallanStr.length > 25) {
-            const half = Math.ceil(cList.length / 2);
-            challanLine1 = cList.slice(0, half).join(', ');
-            challanLine2 = cList.slice(half).join(', ');
-          }
-        }
 
         // Calculate dynamic height for BILL TO box
         const custNameStr   = cust.businessName || cust.name || '--';
@@ -719,8 +705,8 @@ const downloadInvoicePdf = async (req, res) => {
         const rx = PAD + halfCW;
         const metaW = (CW - halfCW) / 2 - 5;
         const pairs = [
-          ['Challan No.', challanLine1, 'Tax Invoice No.', invoice.invoiceNo || '--'],
-          ['', challanLine2, 'Terms of Delivery', delByVal],
+          ['Challan No.', rawChallanStr, 'Tax Invoice No.', invoice.invoiceNo || '--'],
+          ['', '', 'Terms of Delivery', delByVal],
         ];
         if (useTwoPages && pageLabel) {
           pairs.push(['Page', pageLabel, '', '']);
@@ -729,13 +715,15 @@ const downloadInvoicePdf = async (req, res) => {
         let testMetaY = Y + 16;
         pairs.forEach(([k1, v1, k2, v2]) => {
           doc.font('Helvetica-Bold').fontSize(8);
-          const h1 = v1 ? doc.heightOfString(v1, { width: metaW }) : (k1 ? 10 : 0);
-          const h2 = v2 ? doc.heightOfString(v2, { width: metaW }) : (k2 ? 10 : 0);
-          const rowH = Math.max(h1, h2, (k1 || k2 || v1 || v2) ? 10 : 0) + 4;
+          const vh1 = v1 ? doc.heightOfString(v1, { width: metaW }) : 0;
+          const vh2 = v2 ? doc.heightOfString(v2, { width: metaW }) : 0;
+          const leftH = (k1 ? 8 : 0) + vh1;
+          const rightH = (k2 ? 8 : 0) + vh2;
+          const rowH = Math.max(leftH, rightH, (k1 || k2 || v1 || v2) ? 12 : 0) + 4;
           testMetaY += rowH;
         });
 
-        const infoH = Math.max(74, custY - Y, testMetaY - Y + 4);
+        const infoH = Math.max(76, custY - Y, testMetaY - Y + 4);
 
         // Render Boxes
         doc.rect(PAD, Y, halfCW, infoH).fill(WHT).stroke(S200);
@@ -767,9 +755,11 @@ const downloadInvoicePdf = async (req, res) => {
         let metaY = Y + 16;
         pairs.forEach(([k1, v1, k2, v2]) => {
           doc.font('Helvetica-Bold').fontSize(8);
-          const h1 = v1 ? doc.heightOfString(v1, { width: metaW }) : (k1 ? 10 : 0);
-          const h2 = v2 ? doc.heightOfString(v2, { width: metaW }) : (k2 ? 10 : 0);
-          const rowH = Math.max(h1, h2, (k1 || k2 || v1 || v2) ? 10 : 0) + 4;
+          const vh1 = v1 ? doc.heightOfString(v1, { width: metaW }) : 0;
+          const vh2 = v2 ? doc.heightOfString(v2, { width: metaW }) : 0;
+          const leftH = (k1 ? 8 : 0) + vh1;
+          const rightH = (k2 ? 8 : 0) + vh2;
+          const rowH = Math.max(leftH, rightH, (k1 || k2 || v1 || v2) ? 12 : 0) + 4;
 
           if (k1 || v1) {
             if (k1) {
@@ -800,7 +790,7 @@ const downloadInvoicePdf = async (req, res) => {
         return Y;
       };
 
-      const drawItemsTable = (startY, itemsToRender, startIdx, isLastPage) => {
+      const drawItemsTable = (startY, itemsToRender, startIdx, isLastPage, minBottomY) => {
         let Y = startY;
 
         const tblHdrH = 22;
@@ -890,6 +880,14 @@ const downloadInvoicePdf = async (req, res) => {
             .text(Number(item.totalAmount||0).toFixed(2), colX[8]+2, numY, { width: COL[8]-4, align:'right' });
           Y += rowH;
         });
+
+        // Fill remaining table height so table reaches minBottomY
+        if (minBottomY && Y < minBottomY) {
+          const fillH = minBottomY - Y;
+          doc.rect(PAD, Y, CW, fillH).fill(WHT).stroke(S200);
+          drawColSeps(Y, fillH);
+          Y = minBottomY;
+        }
 
         return Y;
       };
@@ -1073,6 +1071,12 @@ const downloadInvoicePdf = async (req, res) => {
           .text('This is a Computer Generated Document', PAD, bottomNoteY+3, { width: CW, align:'center' });
       };
 
+      // Calculate exact summary height to position minBottomY
+      const sumH = isIgst
+        ? (16 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16)
+        : (32 * hsnRows.length + 16 + 22 + 28 + 18 + 16 * hsnRows.length + 17 + 3 + 16);
+      const minBottomY = PH - PAD - 76 - sumH;
+
       if (useTwoPages) {
         // Page 1: Items 0..4 (first 5 items)
         let Y = drawHeader('1 of 2');
@@ -1089,14 +1093,14 @@ const downloadInvoicePdf = async (req, res) => {
           .text(`‹  ${invoice.invoiceNo}  —  Tax Summary & Payment Details  (${items.length} Line Items)`, PAD, Y + 5, { width: CW, align: 'center' });
         Y += 18;
 
-        Y = drawItemsTable(Y, items.slice(5), 5, true);
+        Y = drawItemsTable(Y, items.slice(5), 5, true, minBottomY);
         Y = drawSummary(Y);
         drawFooter(Y);
 
       } else {
         // 1 page
         let Y = drawHeader('');
-        Y = drawItemsTable(Y, items, 0, true);
+        Y = drawItemsTable(Y, items, 0, true, minBottomY);
         Y = drawSummary(Y);
         drawFooter(Y);
       }
