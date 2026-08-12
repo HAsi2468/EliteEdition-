@@ -172,7 +172,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
   const [showItemModal, setShowItemModal] = useState(false);
   const [editingItemId, setEditingItemId] = useState(null);
   const [itemForm, setItemForm] = useState({
-    itemName: '', hsnCode: '998821', unitPrice: '', unit: 'Meters', taxRate: 18, category: 'Printing Services'
+    itemName: '', hsnCode: '998821', unitPrice: '', unit: 'Meters', taxRate: 5, category: 'Printing Services'
   });
 
   // ── INVOICE EDITOR STATE (myBillBook style) ──────────────────────────────
@@ -196,7 +196,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       stateCode: '24'
     },
     items: [
-      { itemName: 'Digital Printing Service (Fabric)', hsnCode: '998821', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 18, butterPaper: false, jobNo: '', lotNo: '', partyChallan: '', ourChallanNo: '', imageUrl: '', totalAmount: 4500 }
+      { itemName: 'Digital Printing Service (Fabric)', hsnCode: '998821', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 5, butterPaper: false, jobNo: '', lotNo: '', partyChallan: '', ourChallanNo: '', imageUrl: '', totalAmount: 4500 }
     ],
     isButterPaperUsed: false,
     enableRoundOff: true,
@@ -432,7 +432,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
             customerId: '', name: 'Walk-in Client', businessName: '', phone: '', email: '', gstin: '', billingAddress: '', state: 'Gujarat', stateCode: '24'
           },
           items: [
-            { itemName: 'Digital Printing Service (Fabric)', hsnCode: '998821', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 18, totalAmount: 4500 }
+            { itemName: 'Digital Printing Service (Fabric)', hsnCode: '998821', qty: 100, unit: 'Meters', unitPrice: 45, discountPct: 0, taxRate: 5, totalAmount: 4500 }
           ],
           discountType: 'flat',
           discountValue: 0,
@@ -570,7 +570,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       ...prev,
       items: [
         ...prev.items,
-        { itemName: '', hsnCode: '998821', qty: 1, unit: 'Meters', unitPrice: 0, discountPct: 0, taxRate: 18, totalAmount: 0 }
+        { itemName: '', hsnCode: '998821', qty: 1, unit: 'Meters', unitPrice: 0, discountPct: 0, taxRate: 5, totalAmount: 0 }
       ]
     }));
   };
@@ -733,7 +733,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       }
       setShowItemModal(false);
       setEditingItemId(null);
-      setItemForm({ itemName: '', hsnCode: '998821', unitPrice: '', unit: 'Meters', taxRate: 18, category: 'Printing Services' });
+      setItemForm({ itemName: '', hsnCode: '998821', unitPrice: '', unit: 'Meters', taxRate: 5, category: 'Printing Services' });
     } catch (err) {
       alert(err.message || 'Failed to save product');
     }
@@ -746,7 +746,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
       hsnCode: item.hsnCode || '998821',
       unitPrice: item.unitPrice != null ? item.unitPrice : '',
       unit: item.unit || 'Meters',
-      taxRate: item.taxRate != null ? item.taxRate : 18,
+      taxRate: item.taxRate != null ? item.taxRate : 5,
       category: item.category || 'Printing Services'
     });
     setShowItemModal(true);
@@ -1586,7 +1586,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                       <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{item.category || 'Printing Services'}</td>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#a78bfa' }}>{item.hsnCode || '998821'}</td>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: '#34d399' }}>₹ {item.unitPrice} / {item.unit || 'Meters'}</td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>{item.taxRate || 18}%</td>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>{item.taxRate != null ? item.taxRate : 5}%</td>
                       <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
                           <button onClick={() => handleEditItem(item)} className="btn-icon" title="Edit Product">
