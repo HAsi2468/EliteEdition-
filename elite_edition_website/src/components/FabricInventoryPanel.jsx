@@ -55,6 +55,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   // Challan state
   const [challans, setChallans] = useState([]);
   const [challanSearch, setChallanSearch] = useState('');
+  // Ref to always hold latest challan filter values — prevents stale closure in setInterval
+  const challanFiltersRef = useRef({ search: '', dateStart: '', dateEnd: '' });
   const [challanDateStart, setChallanDateStart] = useState('');
   const [challanDateEnd, setChallanDateEnd] = useState('');
   const [isChallanOpen, setIsChallanOpen] = useState(false);
@@ -513,14 +515,16 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     const intervalId = setInterval(() => {
       fetchData(true);
       fetchRequirement(true);
-      fetchChallans();
+      // NOTE: fetchChallans is intentionally excluded here.
+      // It has its own useEffect that fires on challanSearch/date changes.
+      // Including it here with a stale closure would reset search results every 5s.
       fetchStockAdjustments();
     }, 5000); // 5s real-time auto-sync
 
     const handleDataRefresh = () => {
       fetchData(true);
       fetchRequirement(true);
-      fetchChallans();
+      fetchChallans(); // Uses ref — always reads current search/date values
       fetchStockAdjustments();
     };
     window.addEventListener('elite-data-refresh', handleDataRefresh);
@@ -750,10 +754,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   const fetchChallans = async () => {
     try {
+      // Always read from ref so stale closures (e.g. setInterval) get current filter values
+      const { search, dateStart, dateEnd } = challanFiltersRef.current;
       const res = await api.getFabricChallans({
-        dateStart: challanDateStart,
-        dateEnd: challanDateEnd,
-        search: challanSearch,
+        dateStart,
+        dateEnd,
+        search,
       });
       if (res.success) setChallans(res.data || []);
     } catch (e) {
@@ -761,7 +767,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     }
   };
 
-  useEffect(() => { fetchChallans(); }, [challanDateStart, challanDateEnd, challanSearch]);
+  // Keep ref in sync with state so fetchChallans always reads current values
+  useEffect(() => {
+    challanFiltersRef.current = { search: challanSearch, dateStart: challanDateStart, dateEnd: challanDateEnd };
+    fetchChallans();
+  }, [challanDateStart, challanDateEnd, challanSearch]);
 
   const getVendorShortForm = (name) => {
     if (!name) return '';
@@ -3144,10 +3154,6 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   className="btn-primary"
                   style={{ background: 'linear-gradient(135deg,#7c3aed,#6366f1)', fontSize: '0.78rem', padding: '0.35rem 0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                   onClick={() => {
-                    if (selectedChallanIds.length > 4) {
-                      alert('Maximum 4 Challans can be merged into a single Invoice. Please deselect some Challans and try again.');
-                      return;
-                    }
                     const selected = challans.filter(c => selectedChallanIds.includes(c._id));
                     const partyNames = new Set(selected.map(c => (c.billTo || c.partyName || '').trim().toLowerCase()).filter(Boolean));
                     if (partyNames.size > 1) {
@@ -3158,13 +3164,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     if (onNavigateToBilling) onNavigateToBilling(selected);
                   }}
                 >
-                  <Receipt size={14} /> Merge & Create Invoice ({selectedChallanIds.length}/4)
+                  <Receipt size={14} /> Merge & Create Invoice ({selectedChallanIds.length})
                 </button>
               )}
               {/* Search */}
               <div style={{ position: 'relative' }}>
                 <Search size={14} style={{ position: 'absolute', left: '0.5rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input type="text" placeholder="Search party, fabric, job..." value={challanSearch} onChange={e => setChallanSearch(e.target.value)} style={{ ...inputStyle, width: '200px', paddingLeft: '1.8rem' }} />
+                <input type="text" placeholder="Search challan no, party, job, fabric..." value={challanSearch} onChange={e => setChallanSearch(e.target.value)} style={{ ...inputStyle, width: '230px', paddingLeft: '1.8rem' }} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
