@@ -3,6 +3,8 @@ import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
+import StitchingChallanPanel from './StitchingChallanPanel';
+import { triggerEliteAlert } from './EliteModalDialog';
 import {
   FileText,
   Plus,
@@ -23,7 +25,9 @@ import {
   Edit2,
   ChevronRight,
   Package,
-  X
+  X,
+  Truck,
+  Receipt
 } from 'lucide-react';
 
 // Helper for Indian Currency formatting
@@ -788,6 +792,7 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.2rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.8rem', overflowX: 'auto' }}>
           {[
             { id: 'invoices', label: '🧾 Invoices Directory', count: stats.totalInvoices },
+            { id: 'challans', label: '🚚 Delivery Challans Hub' },
             { id: 'dashboard', label: '📊 Financial Summary' },
             { id: 'create', label: activeTab === 'create' ? (editingInvoiceId ? '✍️ Edit Invoice' : '✍️ New Invoice Generator') : '✍️ Create Invoice' },
             { id: 'customers', label: `👥 Customers (${customers.length})` },
@@ -986,6 +991,32 @@ export default function EliteBillingDepartment({ initialChallanData = null }) {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: DELIVERY CHALLANS HUB ─────────────────────────────────────── */}
+      {activeTab === 'challans' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="glass-panel" style={{ padding: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Truck size={22} color="var(--primary)" /> Delivery Challans & Dispatch Hub
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
+                  Manage Delivery Challans across Digital Printing, Stitching, and Fabric Dispatch. One-click convert any Challan into a GST Tax Invoice.
+                </p>
+              </div>
+            </div>
+
+            <StitchingChallanPanel
+              onNavigateToBilling={(ch) => {
+                populateFormFromChallan(ch);
+                setActiveTab('create');
+                triggerPushNotification('Challan Imported 🚚', `Delivery Challan #${ch.challanNo || ch.jobNo} imported into Invoice Generator.`, 'success');
+              }}
+            />
           </div>
         </div>
       )}
