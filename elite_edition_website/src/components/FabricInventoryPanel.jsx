@@ -741,7 +741,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   // ── Modal scroll lock & smooth reset helper ──
   useEffect(() => {
-    if (isChallanOpen || isInwardOpen || isOutwardOpen || isSaOpen || isTransferOpen) {
+    if (isChallanOpen || isInwardOpen || isOutwardOpen || isSaFormOpen || isTransferFormOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -749,7 +749,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isChallanOpen, isInwardOpen, isOutwardOpen, isSaOpen, isTransferOpen]);
+  }, [isChallanOpen, isInwardOpen, isOutwardOpen, isSaFormOpen, isTransferFormOpen]);
 
   const closeChallanModal = () => {
     setIsChallanOpen(false);
