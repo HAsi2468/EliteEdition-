@@ -720,18 +720,19 @@ const downloadInvoicePdf = async (req, res) => {
         const metaW = (CW - halfCW) / 2 - 5;
         const pairs = [
           ['Challan No.', challanLine1, 'Tax Invoice No.', invoice.invoiceNo || '--'],
-          [challanLine2 ? 'Challan No.' : '', challanLine2, 'Terms of Delivery', delByVal],
+          ['', challanLine2, 'Terms of Delivery', delByVal],
         ];
         if (useTwoPages && pageLabel) {
-          pairs.push(['Page', pageLabel, 'Copy', copyLabel]);
+          pairs.push(['Page', pageLabel, '', '']);
         }
 
         let testMetaY = Y + 16;
         pairs.forEach(([k1, v1, k2, v2]) => {
           doc.font('Helvetica-Bold').fontSize(8);
-          const h1 = v1 ? doc.heightOfString(v1, { width: metaW }) : 10;
-          const h2 = v2 ? doc.heightOfString(v2, { width: metaW }) : 10;
-          testMetaY += Math.max(h1, h2, 10) + 6;
+          const h1 = v1 ? doc.heightOfString(v1, { width: metaW }) : (k1 ? 10 : 0);
+          const h2 = v2 ? doc.heightOfString(v2, { width: metaW }) : (k2 ? 10 : 0);
+          const rowH = Math.max(h1, h2, (k1 || k2 || v1 || v2) ? 10 : 0) + 4;
+          testMetaY += rowH;
         });
 
         const infoH = Math.max(74, custY - Y, testMetaY - Y + 4);
@@ -766,21 +767,31 @@ const downloadInvoicePdf = async (req, res) => {
         let metaY = Y + 16;
         pairs.forEach(([k1, v1, k2, v2]) => {
           doc.font('Helvetica-Bold').fontSize(8);
-          const h1 = v1 ? doc.heightOfString(v1, { width: metaW }) : 10;
-          const h2 = v2 ? doc.heightOfString(v2, { width: metaW }) : 10;
-          const rowH = Math.max(h1, h2, 10) + 6;
+          const h1 = v1 ? doc.heightOfString(v1, { width: metaW }) : (k1 ? 10 : 0);
+          const h2 = v2 ? doc.heightOfString(v2, { width: metaW }) : (k2 ? 10 : 0);
+          const rowH = Math.max(h1, h2, (k1 || k2 || v1 || v2) ? 10 : 0) + 4;
 
-          if (k1) {
-            doc.fillColor(S500).fontSize(7).font('Helvetica')
-              .text(k1 + ':', rx + 4, metaY, { width: metaW });
-            doc.fillColor(S900).fontSize(8).font('Helvetica-Bold')
-              .text(v1 || '--', rx + 4, metaY + 8, { width: metaW });
+          if (k1 || v1) {
+            if (k1) {
+              doc.fillColor(S500).fontSize(7).font('Helvetica')
+                .text(k1 + ':', rx + 4, metaY, { width: metaW });
+            }
+            if (v1) {
+              const valY = k1 ? metaY + 8 : metaY;
+              doc.fillColor(S900).fontSize(8).font('Helvetica-Bold')
+                .text(v1, rx + 4, valY, { width: metaW });
+            }
           }
-          if (k2) {
-            doc.fillColor(S500).fontSize(7).font('Helvetica')
-              .text(k2 + ':', rx + metaW + 10, metaY, { width: metaW });
-            doc.fillColor(S900).fontSize(8).font('Helvetica-Bold')
-              .text(v2 || '--', rx + metaW + 10, metaY + 8, { width: metaW });
+          if (k2 || v2) {
+            if (k2) {
+              doc.fillColor(S500).fontSize(7).font('Helvetica')
+                .text(k2 + ':', rx + metaW + 10, metaY, { width: metaW });
+            }
+            if (v2) {
+              const valY = k2 ? metaY + 8 : metaY;
+              doc.fillColor(S900).fontSize(8).font('Helvetica-Bold')
+                .text(v2, rx + metaW + 10, valY, { width: metaW });
+            }
           }
           metaY += rowH;
         });
