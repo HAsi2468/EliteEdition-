@@ -1481,7 +1481,33 @@ export const api = {
     return request(`/billing/items/${id}`, { method: 'DELETE' });
   },
 
-  async deleteBillingItem(id) {
-    return request(`/billing/items/${id}`, { method: 'DELETE' });
+  // Data Backup
+  async downloadDataBackup({ startDate, endDate, department, format = 'json' }) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const params = new URLSearchParams({
+      ...(startDate ? { startDate } : {}),
+      ...(endDate ? { endDate } : {}),
+      ...(department ? { department } : {}),
+      format
+    });
+    const res = await fetch(`${baseUrl}/backup/download?${params.toString()}`, {
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      }
+    });
+    if (!res.ok) {
+      throw new Error('Failed to generate data backup');
+    }
+    const blob = await res.blob();
+    const filename = `Elite_Edition_Backup_${department || 'All'}_${startDate || 'Start'}_to_${endDate || 'End'}.${format === 'csv' ? 'csv' : 'json'}`;
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
   },
 };

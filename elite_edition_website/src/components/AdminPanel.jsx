@@ -18,7 +18,12 @@ import {
   Coins,
   CreditCard,
   DollarSign,
-  FileText
+  FileText,
+  Database,
+  Calendar,
+  Layers,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 
 const AVAILABLE_SCREENS = [
@@ -64,7 +69,7 @@ export default function AdminPanel() {
   const [success, setSuccess] = useState('');
 
   // Sub Tab Navigation
-  const [activeSubTab, setActiveSubTab] = useState('users'); // 'users' or 'billing'
+  const [activeSubTab, setActiveSubTab] = useState('users'); // 'users', 'billing', 'backup'
   const [bills, setBills] = useState([]);
   const [billsLoading, setBillsLoading] = useState(false);
   const [billFormData, setBillFormData] = useState({
@@ -74,6 +79,15 @@ export default function AdminPanel() {
     notes: ''
   });
   const [editingBill, setEditingBill] = useState(null); // null means "Add Mode"
+
+  // Data Backup Form State
+  const [backupForm, setBackupForm] = useState({
+    startDate: '',
+    endDate: '',
+    department: 'all',
+    format: 'json'
+  });
+  const [backupLoading, setBackupLoading] = useState(false);
 
   // Form State
   const [editingUser, setEditingUser] = useState(null); // null means "Add Mode"
@@ -183,6 +197,27 @@ export default function AdminPanel() {
     }
   };
 
+  const handleDownloadBackup = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setBackupLoading(true);
+    try {
+      await api.downloadDataBackup({
+        startDate: backupForm.startDate,
+        endDate: backupForm.endDate,
+        department: backupForm.department,
+        format: backupForm.format
+      });
+      setSuccess('Full data backup archive generated and downloaded successfully!');
+      triggerPushNotification('Data Backup Complete', 'Backup file downloaded to your system.');
+    } catch (err) {
+      setError(err.message || 'Failed to generate data backup.');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -215,7 +250,6 @@ export default function AdminPanel() {
     setFormData(prev => ({
       ...prev,
       role: roleValue,
-      // If admin, auto-select all screen permissions, otherwise empty them
       permissions: roleValue === 'admin' ? AVAILABLE_SCREENS.map(s => s.id) : []
     }));
   };
@@ -241,7 +275,7 @@ export default function AdminPanel() {
     setFormData({
       name: user.name || '',
       email: user.email || '',
-      password: '', // Don't prefill password
+      password: '',
       role: user.role || (user.permissions?.length === AVAILABLE_SCREENS.length ? 'admin' : 'user'),
       permissions: user.permissions || []
     });
@@ -280,7 +314,6 @@ export default function AdminPanel() {
     setSubmitLoading(true);
     try {
       if (editingUser) {
-        // Update user payload
         const updatePayload = {
           name: formData.name.trim(),
           email: formData.email.trim(),
@@ -299,12 +332,11 @@ export default function AdminPanel() {
           } else {
             localStorage.setItem('elite_user', JSON.stringify({ ...loggedUser, ...updatePayload }));
           }
-          await api.refreshCurrentUser();
         }
-        setSuccess(`User "${formData.name}" updated successfully.`);
-        triggerPushNotification('🛡️ Admin Update', `User "${formData.name}" permissions updated!`, 'info');
+
+        setSuccess(`User "${formData.name}" credentials updated successfully.`);
+        triggerPushNotification('👤 User Updated', `User "${formData.name}" credentials updated successfully!`, 'info');
       } else {
-        // Create user payload
         await api.createUser({
           name: formData.name.trim(),
           email: formData.email.trim(),
@@ -356,12 +388,14 @@ export default function AdminPanel() {
           <ShieldAlert size={22} color="var(--primary)" />
           <div>
             <h2 style={styles.pageTitle}>
-              {activeSubTab === 'users' ? 'Admin User Management' : 'Infrastructure Billing Management'}
+              {activeSubTab === 'users' ? 'Admin User Management' : activeSubTab === 'billing' ? 'Infrastructure Billing Management' : 'System Data Backup & Export'}
             </h2>
             <p style={styles.pageSubtitle}>
               {activeSubTab === 'users'
                 ? 'Create system users, set passwords, and manage screen-by-screen functionality credentials.'
-                : 'Track monthly cloud bills for AWS and MongoDB to monitor hosting costs.'}
+                : activeSubTab === 'billing'
+                ? 'Track monthly cloud bills for AWS and MongoDB to monitor hosting costs.'
+                : 'Export comprehensive system data filtered by department and custom date ranges.'}
             </p>
           </div>
         </div>
@@ -382,6 +416,13 @@ export default function AdminPanel() {
           style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem' }}
         >
           <CreditCard size={16} /> Infrastructure Billing
+        </button>
+        <button
+          onClick={() => { setActiveSubTab('backup'); setError(''); setSuccess(''); }}
+          className={activeSubTab === 'backup' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+        >
+          <Database size={16} /> Data Backup
         </button>
       </div>
 
@@ -687,7 +728,7 @@ export default function AdminPanel() {
             </form>
           </div>
         </div>
-      ) : (
+      ) : activeSubTab === 'billing' ? (
         <div style={styles.contentLayout}>
           {/* Left Side: Bills List */}
           <div className="glass-panel" style={styles.tablePanel}>
@@ -867,6 +908,100 @@ export default function AdminPanel() {
               </div>
             </form>
           </div>
+        </div>
+      ) : (
+        <div className="glass-panel" style={{ padding: '1.75rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+            <Database size={24} color="var(--primary)" />
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>System Data Backup & Export</h3>
+              <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.83rem', color: 'var(--text-muted)' }}>
+                Export comprehensive system data filtered by department and custom start/end date ranges.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleDownloadBackup} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginTop: '1rem' }}>
+            {/* Start Date */}
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Start Date (Optional)</label>
+              <div style={styles.inputWrapper}>
+                <Calendar size={14} style={styles.inputIcon} />
+                <input
+                  type="date"
+                  value={backupForm.startDate}
+                  onChange={(e) => setBackupForm(prev => ({ ...prev, startDate: e.target.value }))}
+                  style={styles.formInput}
+                />
+              </div>
+            </div>
+
+            {/* End Date */}
+            <div style={styles.formGroup}>
+              <label style={styles.label}>End Date (Optional)</label>
+              <div style={styles.inputWrapper}>
+                <Calendar size={14} style={styles.inputIcon} />
+                <input
+                  type="date"
+                  value={backupForm.endDate}
+                  onChange={(e) => setBackupForm(prev => ({ ...prev, endDate: e.target.value }))}
+                  style={styles.formInput}
+                />
+              </div>
+            </div>
+
+            {/* Department Select */}
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Select Department *</label>
+              <div style={styles.inputWrapper}>
+                <Layers size={14} style={styles.inputIcon} />
+                <select
+                  value={backupForm.department}
+                  onChange={(e) => setBackupForm(prev => ({ ...prev, department: e.target.value }))}
+                  style={styles.formInput}
+                >
+                  <option value="all">⚡ All Departments (Full System Backup)</option>
+                  <option value="billing">🧾 Billing & Invoicing</option>
+                  <option value="design">🎨 Design Room</option>
+                  <option value="digital_printing">🖨️ Digital Printing (Job Cards & Logs)</option>
+                  <option value="fabric">🧵 Fabric Inventory & Stock</option>
+                  <option value="stitching">🪡 Stitching Department</option>
+                  <option value="garment">👔 Garment Job Cards</option>
+                  <option value="sales">🛒 E-Commerce Sales & Catalog</option>
+                  <option value="customers">👥 Customers & Vendors Master</option>
+                </select>
+              </div>
+            </div>
+
+            {/* File Format */}
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Export File Format *</label>
+              <div style={styles.inputWrapper}>
+                <FileSpreadsheet size={14} style={styles.inputIcon} />
+                <select
+                  value={backupForm.format}
+                  onChange={(e) => setBackupForm(prev => ({ ...prev, format: e.target.value }))}
+                  style={styles.formInput}
+                >
+                  <option value="json">JSON Data Archive (.json)</option>
+                  <option value="csv">CSV Spreadsheet (.csv)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Download Button */}
+            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={backupLoading}
+                style={{ padding: '0.7rem 1.8rem', fontSize: '0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                {backupLoading ? <RotateCw size={16} className="spin-loader" /> : <Download size={16} />}
+                <span>{backupLoading ? 'Generating Backup File...' : 'Download Data Backup'}</span>
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>
