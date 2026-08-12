@@ -193,9 +193,31 @@ function SidePanelColorPicker() {
 }
 
 export default function App() {
+  const getSavedNavState = () => {
+    let savedTab = '';
+    let savedDept = '';
+    try {
+      if (typeof window !== 'undefined' && window.location.hash) {
+        savedTab = window.location.hash.replace('#', '').trim();
+      }
+      if (!savedTab && typeof localStorage !== 'undefined') {
+        savedTab = localStorage.getItem('elite_active_tab') || '';
+      }
+      if (typeof localStorage !== 'undefined') {
+        savedDept = localStorage.getItem('elite_active_dept') || '';
+      }
+    } catch (e) {}
+
+    return {
+      tab: savedTab || 'jobcards',
+      dept: savedDept || 'digital_print'
+    };
+  };
+
+  const initialNav = getSavedNavState();
   const [isAuthenticated, setIsAuthenticated] = useState(api.isAuthenticated());
   const [currentUser, setCurrentUser] = useState(() => api.getCurrentUser());
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(initialNav.tab);
   const [items, setItems] = useState([]);
   const [catalogItems, setCatalogItems] = useState([]);
   const [sales, setSales] = useState([]);
@@ -206,10 +228,37 @@ export default function App() {
   // Notification Toasts state
   const [toasts, setToasts] = useState([]);
 
-  // Department state (digital_print vs elite_edition)
-  const [activeDepartment, setActiveDepartment] = useState('digital_print');
+  // Department state (digital_print vs elite_edition vs stitching)
+  const [activeDepartment, setActiveDepartment] = useState(initialNav.dept);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  // Preserve activeTab and activeDepartment across hard refreshes and browser history
+  useEffect(() => {
+    if (activeTab) {
+      localStorage.setItem('elite_active_tab', activeTab);
+      if (window.location.hash !== `#${activeTab}`) {
+        window.history.replaceState(null, '', `#${activeTab}`);
+      }
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeDepartment) {
+      localStorage.setItem('elite_active_dept', activeDepartment);
+    }
+  }, [activeDepartment]);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '').trim();
+      if (hash && hash !== activeTab) {
+        setActiveTab(hash);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [activeTab]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
