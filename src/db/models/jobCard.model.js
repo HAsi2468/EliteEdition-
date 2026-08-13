@@ -76,6 +76,7 @@ const jobCardSchema = new mongoose.Schema(
       clientFeedback: { type: String, default: '' },
       approvedAt: { type: Date }
     },
+    createdBy:        { type: String, default: 'Admin', trim: true },
     orderChatRoomId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatRoom' }
   },
   {

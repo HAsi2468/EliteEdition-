@@ -94,7 +94,10 @@ const billingInvoiceSchema = new mongoose.Schema(
 
     // Notes & Terms
     notes: { type: String, default: 'Thank you for doing business with Elite Digital Prints!' },
-    terms: { type: String, default: 'Payment due within 15 days from invoice date. Subject to Surat jurisdiction.' }
+    terms: { type: String, default: 'Payment due within 15 days from invoice date. Subject to Surat jurisdiction.' },
+
+    // Audit Trail
+    createdBy: { type: String, default: 'Admin', trim: true }
   },
   {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }

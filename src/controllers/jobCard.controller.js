@@ -247,6 +247,9 @@ const syncDesignImage = async (body, existingCard = null) => {
 const createJobCard = async (req, res) => {
   try {
     const body = req.body;
+    if (!body.createdBy) {
+      body.createdBy = req.user?.name || req.user?.username || 'Admin';
+    }
     if (body.date) body.date = normalizeDateStr(body.date);
     if (body.printDate) body.printDate = normalizeDateStr(body.printDate);
     if (body.fusingDate) body.fusingDate = normalizeDateStr(body.fusingDate);

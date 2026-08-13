@@ -80,18 +80,25 @@ export const getScreenGroupInfo = (screenId, allUsers = []) => {
 
 export const dispatchScreenGroupEvent = (screenId, title, message, actionTab = null) => {
   const group = SCREEN_GROUPS[screenId] || { name: 'Operations Group' };
+  const currentUser = api.getCurrentUser();
+  const creatorName = currentUser?.username || currentUser?.name || currentUser?.email || 'Admin';
+  const roleBadge = currentUser?.role === 'admin' ? '👑 Admin' : '👤 Staff';
+
   const formattedTitle = `👥 [${group.name}] ${title}`;
+  const fullMessage = `${message} — Created by: ${creatorName} (${roleBadge})`;
   
   // 1. Trigger push toast and audio alert
-  triggerPushNotification(formattedTitle, message, 'info', actionTab);
+  triggerPushNotification(formattedTitle, fullMessage, 'info', actionTab);
 
   // 2. Dispatch real-time screen group event for any listening UI components
   window.dispatchEvent(new CustomEvent('screen-group-broadcast', {
     detail: {
       screenId,
       groupName: group.name,
+      creatorName,
+      userRole: currentUser?.role || 'staff',
       title,
-      message,
+      message: fullMessage,
       actionTab,
       timestamp: new Date().toISOString()
     }

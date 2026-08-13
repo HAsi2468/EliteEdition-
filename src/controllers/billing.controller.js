@@ -179,6 +179,10 @@ const createInvoice = async (req, res) => {
       };
     }
 
+    if (!invoiceData.createdBy) {
+      invoiceData.createdBy = req.user?.name || req.user?.username || 'Admin';
+    }
+
     // Auto-calculate balance due
     const grandTotal = parseFloat(invoiceData.grandTotal) || 0;
     const paidAmount = parseFloat(invoiceData.paidAmount) || 0;
