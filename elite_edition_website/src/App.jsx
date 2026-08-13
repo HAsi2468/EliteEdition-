@@ -280,8 +280,7 @@ export default function App() {
   const EDP_PERMISSIONS = ['jobcards', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials'];
   const STITCHING_PERMISSIONS = [
     'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
-    'jobcards_list', 'jobcards_catalogue', 'jobcards_fabric',
-    'jobcards_stitching_challan', 'jobcards_stitching_settings'
+    'jobcards_stitching_challan', 'jobcards_stitching_settings', 'stitching'
   ];
 
   const hasEliteEditionAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => EE_PERMISSIONS.includes(p)));

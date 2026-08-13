@@ -4,37 +4,49 @@ import { api } from './api';
 export const SCREEN_GROUPS = {
   jobcards: {
     id: 'jobcards',
-    name: 'Job Cards Team',
+    name: '[EDP] Job Cards',
+    deptShort: 'EDP',
+    screenName: 'Job Cards',
     permissionKeys: ['jobcards', 'jobcards_list', 'stitching_jobcards'],
     description: 'Digital Printing & Production Job Cards Group'
   },
   jobcards_fabric: {
     id: 'jobcards_fabric',
-    name: 'Fabric Inventory Team',
+    name: '[EDP] Fabric Inventory',
+    deptShort: 'EDP',
+    screenName: 'Fabric Inventory',
     permissionKeys: ['jobcards_fabric', 'jobcards_stitching_challan', 'stitching_fabric'],
     description: 'Fabric Inward, Outward & Dispatch Challans Group'
   },
   jobcards_billing: {
     id: 'jobcards_billing',
-    name: 'Billing & Invoicing Team',
+    name: '[EDP] Billing & Invoicing',
+    deptShort: 'EDP',
+    screenName: 'Billing & Invoicing',
     permissionKeys: ['jobcards_billing', 'invoices'],
     description: 'GST Invoicing, Accounts & Receivables Group'
   },
   jobcards_catalogue: {
     id: 'jobcards_catalogue',
-    name: 'Design Room Team',
+    name: '[EDP] Design Room',
+    deptShort: 'EDP',
+    screenName: 'Design Room',
     permissionKeys: ['jobcards_catalogue', 'stitching_design'],
     description: 'Design Library, Master Assets & Patterns Group'
   },
   stitching_department: {
     id: 'stitching_department',
-    name: 'Stitching Department Team',
+    name: '[ST] Stitching Department',
+    deptShort: 'ST',
+    screenName: 'Stitching Department',
     permissionKeys: ['stitching_jobcards', 'stitching_fabric', 'stitching_design'],
     description: 'Stitching Production & Fabric Challans Group'
   },
   inventory: {
     id: 'inventory',
-    name: 'E-Commerce Inventory Team',
+    name: '[EE] E-Commerce Inventory',
+    deptShort: 'EE',
+    screenName: 'E-Commerce Inventory',
     permissionKeys: ['inventory', 'catalog', 'sales'],
     description: 'Elite Edition Online Inventory & Dispatch Group'
   }
