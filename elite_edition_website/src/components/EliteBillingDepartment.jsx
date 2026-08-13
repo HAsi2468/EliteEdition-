@@ -1361,7 +1361,6 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           {[
             { id: 'challans', label: '🚚 Challan' },
             { id: 'invoices', label: '🧾 Invoices Directory', count: stats.totalInvoices },
-            { id: 'dashboard', label: '📊 Financial Summary' },
             ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? '✍️ Edit Invoice' : '✍️ New Invoice Generator' }] : []),
             { id: 'customers', label: `👥 Customers (${customers.length})` },
             { id: 'items', label: `📦 Item (${itemsList.length})` }
