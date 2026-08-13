@@ -1473,12 +1473,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   const tabs = [
     { id: 'dashboard', label: 'Stock Overview', icon: Database },
-    { id: 'lotwise', label: 'Lot-Wise Management', icon: Layers },
-    { id: 'lotTransfer', label: 'Lot Transfer', icon: ArrowRightLeft },
     { id: 'inward', label: 'Inward Register', icon: ArrowDownToLine },
-    ...(isAdmin ? [{ id: 'outward', label: 'Outward Register', icon: ArrowUpFromLine }] : []),
-    { id: 'stockAdjustment', label: 'Stock Adjustment (SA)', icon: RefreshCw },
-    { id: 'requirement', label: 'Fabric Requirement', icon: AlertTriangle },
+    { id: 'lotwise', label: 'Lot Wise Details', icon: Layers },
+    { id: 'lotTransfer', label: 'Lot Transfer', icon: ArrowRightLeft },
+    { id: 'stockAdjustment', label: 'Stock Adjustment', icon: RefreshCw },
+    { id: 'requirement', label: 'Fabric Requirements', icon: AlertTriangle },
   ];
 
   // Group all transactions by Lot No for Lot-Wise Management View
@@ -1747,7 +1746,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               <div>
                 <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
                   <Layers size={22} color="var(--primary)" />
-                  Lot-Wise Fabric Management
+                  Lot Wise Details
                 </h2>
                 <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                   Track inward receipts, outward dispatches, and net available stock for every fabric lot.
