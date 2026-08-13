@@ -32,7 +32,9 @@ import {
   X,
   Truck,
   Receipt,
-  Lock
+  Lock,
+  BookOpen,
+  FileSpreadsheet
 } from 'lucide-react';
 
 // Helper for Indian Currency formatting
@@ -245,7 +247,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [datePreset, setDatePreset] = useState('last_365_days');
+  const [datePreset, setDatePreset] = useState('this_month');
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
@@ -253,6 +255,259 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   // Multi-select for bulk Invoice PDF download
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
   const [bulkDownloading, setBulkDownloading] = useState(false);
+
+  // ── Ledger System States ──────────────────────────────────────────────────
+  const [showLedgerModal, setShowLedgerModal] = useState(false);
+  const [ledgerMode, setLedgerMode] = useState('party'); // 'party' or 'master'
+  const [selectedPartyId, setSelectedPartyId] = useState('ALL');
+  const [ledgerPreset, setLedgerPreset] = useState('this_month');
+  const [ledgerDateStart, setLedgerDateStart] = useState('');
+  const [ledgerDateEnd, setLedgerDateEnd] = useState('');
+  const [ledgerFormat, setLedgerFormat] = useState('pdf'); // 'pdf', 'excel', 'csv', 'print'
+
+  // Helper for Ledger dates
+  const getLedgerDateRange = () => {
+    const now = new Date();
+    let startD = null;
+    let endD = null;
+
+    if (ledgerPreset === 'this_month') {
+      startD = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+      endD = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    } else if (ledgerPreset === 'last_quarter') {
+      const m = now.getMonth();
+      const qStartMonth = Math.floor(m / 3) * 3 - 3;
+      startD = new Date(now.getFullYear(), qStartMonth, 1, 0, 0, 0);
+      endD = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59);
+    } else if (ledgerPreset === 'fy_ytd') {
+      const yr = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+      startD = new Date(yr, 3, 1, 0, 0, 0);
+      endD = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    } else if (ledgerPreset === 'custom') {
+      if (ledgerDateStart) startD = new Date(`${ledgerDateStart}T00:00:00`);
+      if (ledgerDateEnd) endD = new Date(`${ledgerDateEnd}T23:59:59`);
+    }
+    return { startD, endD };
+  };
+
+  // Compute Party Ledger Data
+  const computePartyLedger = (partyId, startD, endD) => {
+    const sortedInvoices = [...invoices].sort((a, b) => new Date(a.invoiceDate || a.createdAt) - new Date(b.invoiceDate || b.createdAt));
+    
+    let openingBalance = 0;
+    const periodTx = [];
+
+    sortedInvoices.forEach(inv => {
+      if (partyId && partyId !== 'ALL' && inv.customer?._id !== partyId && inv.customerId !== partyId) return;
+
+      const invDate = new Date(inv.invoiceDate || inv.createdAt);
+      const grandTotal = Number(inv.grandTotal || 0);
+      const paidAmount = Number(inv.paidAmount || 0);
+
+      if (startD && invDate < startD) {
+        openingBalance += (grandTotal - paidAmount);
+        return;
+      }
+
+      if (endD && invDate > endD) return;
+
+      if (grandTotal > 0) {
+        periodTx.push({
+          date: formatDateDDMMYYYY(inv.invoiceDate || inv.createdAt),
+          voucherNo: inv.invoiceNo,
+          particulars: `Sales Invoice #${inv.invoiceNo}`,
+          department: inv.department || 'Elite Digital Prints',
+          debit: grandTotal,
+          credit: 0
+        });
+      }
+
+      if (paidAmount > 0) {
+        periodTx.push({
+          date: formatDateDDMMYYYY(inv.paymentDate || inv.invoiceDate || inv.createdAt),
+          voucherNo: `REC-${inv.invoiceNo}`,
+          particulars: `Payment Received — Invoice #${inv.invoiceNo}`,
+          department: inv.department || 'Elite Digital Prints',
+          debit: 0,
+          credit: paidAmount
+        });
+      }
+    });
+
+    let runningBal = openingBalance;
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    const rows = periodTx.map(tx => {
+      runningBal += (tx.debit - tx.credit);
+      totalDebit += tx.debit;
+      totalCredit += tx.credit;
+      return { ...tx, runningBalance: runningBal, balType: runningBal >= 0 ? 'Dr' : 'Cr' };
+    });
+
+    return {
+      openingBalance,
+      totalDebit,
+      totalCredit,
+      closingBalance: runningBal,
+      transactions: rows
+    };
+  };
+
+  const handleGenerateLedgerExport = () => {
+    const { startD, endD } = getLedgerDateRange();
+
+    if (ledgerMode === 'party') {
+      const selectedParty = customers.find(c => c._id === selectedPartyId) || { name: 'All Customers', businessName: 'Global Account Ledger' };
+      const partyName = selectedParty.businessName || selectedParty.name;
+      const ledger = computePartyLedger(selectedPartyId, startD, endD);
+
+      if (ledgerFormat === 'csv' || ledgerFormat === 'excel') {
+        let csvContent = `ELITE DIGITAL PRINTS — PARTY LEDGER STATEMENT\n`;
+        csvContent += `Party Name: "${partyName}"\n`;
+        csvContent += `Period: ${startD ? formatDateDDMMYYYY(startD) : 'Start'} to ${endD ? formatDateDDMMYYYY(endD) : 'Present'}\n`;
+        csvContent += `Opening Balance: ₹ ${ledger.openingBalance.toFixed(2)}\n\n`;
+        csvContent += `Date,Voucher No,Particulars,Department,Debit (₹),Credit (₹),Running Balance (₹),Dr/Cr\n`;
+
+        ledger.transactions.forEach(t => {
+          csvContent += `"${t.date}","${t.voucherNo}","${t.particulars}","${t.department}",${t.debit.toFixed(2)},${t.credit.toFixed(2)},${Math.abs(t.runningBalance).toFixed(2)},"${t.balType}"\n`;
+        });
+
+        csvContent += `\nTOTALS,,,"",${ledger.totalDebit.toFixed(2)},${ledger.totalCredit.toFixed(2)},${Math.abs(ledger.closingBalance).toFixed(2)},"${ledger.closingBalance >= 0 ? 'Dr' : 'Cr'}"\n`;
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Ledger_${partyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        triggerPushNotification('📒 Ledger Exported', `Party statement for ${partyName} exported successfully.`, 'success');
+      } else {
+        const printWin = window.open('', '_blank');
+        printWin.document.write(`
+          <html>
+            <head>
+              <title>Party Ledger — ${partyName}</title>
+              <style>
+                body { font-family: 'Segoe UI', Arial, sans-serif; padding: 25px; color: #1e293b; }
+                .header { border-bottom: 2px solid #7c3aed; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; }
+                .title { font-size: 20px; font-weight: 800; color: #5b21b6; }
+                .subtitle { font-size: 13px; color: #64748b; margin-top: 4px; }
+                .meta-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+                th { background: #f1f5f9; text-align: left; padding: 8px; border-bottom: 2px solid #cbd5e1; font-weight: 700; }
+                td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
+                .num { text-align: right; }
+                .totals-row { font-weight: 800; background: #f8fafc; border-top: 2px solid #334155; }
+                .footer { margin-top: 40px; display: flex; justify-content: space-between; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <div>
+                  <div class="title">ELITE DIGITAL PRINTS</div>
+                  <div class="subtitle">Official Party Account Statement & Ledger Report</div>
+                </div>
+                <div style="text-align: right; font-size: 12px;">
+                  <div><strong>Date:</strong> ${new Date().toLocaleDateString('en-IN')}</div>
+                  <div><strong>Format:</strong> Account Ledger Statement</div>
+                </div>
+              </div>
+
+              <div class="meta-box">
+                <div>
+                  <div><strong>Party Name:</strong> ${partyName}</div>
+                  <div><strong>GSTIN:</strong> ${selectedParty.gstin || 'N/A'}</div>
+                  <div><strong>Phone:</strong> ${selectedParty.phone || 'N/A'}</div>
+                </div>
+                <div style="text-align: right;">
+                  <div><strong>Opening Balance:</strong> ${fmtINR(ledger.openingBalance)}</div>
+                  <div><strong>Total Billed:</strong> ${fmtINR(ledger.totalDebit)}</div>
+                  <div><strong>Total Paid:</strong> ${fmtINR(ledger.totalCredit)}</div>
+                  <div><strong>Closing Balance:</strong> <span style="color: ${ledger.closingBalance > 0 ? '#dc2626' : '#16a34a'}; font-weight: 800;">${fmtINR(ledger.closingBalance)} (${ledger.closingBalance >= 0 ? 'Dr' : 'Cr'})</span></div>
+                </div>
+              </div>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Voucher No</th>
+                    <th>Particulars</th>
+                    <th>Dept</th>
+                    <th class="num">Debit (₹)</th>
+                    <th class="num">Credit (₹)</th>
+                    <th class="num">Running Balance (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${ledger.transactions.length === 0 ? '<tr><td colspan="7" style="text-align:center; padding: 20px;">No transactions recorded for selected period.</td></tr>' : ledger.transactions.map(t => `
+                    <tr>
+                      <td>${t.date}</td>
+                      <td><strong>${t.voucherNo}</strong></td>
+                      <td>${t.particulars}</td>
+                      <td>${t.department}</td>
+                      <td class="num">${t.debit > 0 ? fmtINR(t.debit) : '—'}</td>
+                      <td class="num">${t.credit > 0 ? fmtINR(t.credit) : '—'}</td>
+                      <td class="num"><strong>${fmtINR(Math.abs(t.runningBalance))} ${t.balType}</strong></td>
+                    </tr>
+                  `).join('')}
+                  <tr class="totals-row">
+                    <td colspan="4">TOTALS</td>
+                    <td class="num">${fmtINR(ledger.totalDebit)}</td>
+                    <td class="num">${fmtINR(ledger.totalCredit)}</td>
+                    <td class="num">${fmtINR(Math.abs(ledger.closingBalance))} ${ledger.closingBalance >= 0 ? 'Dr' : 'Cr'}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="footer">
+                <div>Prepared By: Accounts Department</div>
+                <div>Authorized Signatory: Elite Digital Prints</div>
+              </div>
+
+              <script>
+                window.onload = function() { window.print(); };
+              </script>
+            </body>
+          </html>
+        `);
+        printWin.document.close();
+      }
+    } else {
+      // Mode B: Master Ledger Export
+      let csvContent = `ELITE DIGITAL PRINTS — ALL-PARTIES MASTER LEDGER SUMMARY\n`;
+      csvContent += `Report Date: ${new Date().toLocaleDateString('en-IN')}\n\n`;
+      csvContent += `Party Code,Party Name,GSTIN,Phone,Opening Balance (₹),Total Billed (₹),Total Paid (₹),Closing Balance (₹),Status\n`;
+
+      let grandBilled = 0;
+      let grandPaid = 0;
+      let grandBal = 0;
+
+      customers.forEach(cust => {
+        const partyLedger = computePartyLedger(cust._id, startD, endD);
+        grandBilled += partyLedger.totalDebit;
+        grandPaid += partyLedger.totalCredit;
+        grandBal += partyLedger.closingBalance;
+
+        csvContent += `"CUST-${cust._id.slice(-4).toUpperCase()}","${cust.businessName || cust.name}","${cust.gstin || 'N/A'}","${cust.phone || 'N/A'}",${partyLedger.openingBalance.toFixed(2)},${partyLedger.totalDebit.toFixed(2)},${partyLedger.totalCredit.toFixed(2)},${partyLedger.closingBalance.toFixed(2)},"${partyLedger.closingBalance > 0 ? 'Overdue' : 'Active'}"\n`;
+      });
+
+      csvContent += `\nGRAND TOTALS,,,,,${grandBilled.toFixed(2)},${grandPaid.toFixed(2)},${grandBal.toFixed(2)},\n`;
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Master_Ledger_Summary_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      triggerPushNotification('🌐 Master Ledger Exported', `All-Parties Master Ledger exported successfully.`, 'success');
+    }
+  };
 
   const handleToggleSelectAllInvoices = (visibleInvoices) => {
     const visibleIds = visibleInvoices.map(i => i._id);
@@ -1009,6 +1264,13 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           </div>
 
           <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              className="btn-primary"
+              onClick={() => setShowLedgerModal(true)}
+              style={{ padding: '0.55rem 1.25rem', background: 'linear-gradient(135deg,#10b981,#059669)', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)', fontWeight: 800 }}
+            >
+              <BookOpen size={16} /> Ledger Reports
+            </button>
             <button
               className="btn-primary"
               onClick={() => handleOpenCreateTab()}
@@ -2509,6 +2771,240 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DOWNLOAD ACCOUNTS & PARTY LEDGER MODAL ─────────────────────────────── */}
+      {showLedgerModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1050, background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '16px', width: '100%', maxWidth: '720px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', color: '#f8fafc', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+            
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '0.8rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <BookOpen size={22} color="#10b981" />
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#ffffff' }}>Ledger Export & Accounts Statement</h3>
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Download Party Account Statements & Global Master Ledgers</span>
+                </div>
+              </div>
+              <button onClick={() => setShowLedgerModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.2rem' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Mode Selector Tabs */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', background: '#1e293b', padding: '0.3rem', borderRadius: '8px' }}>
+              <button
+                onClick={() => setLedgerMode('party')}
+                style={{
+                  padding: '0.65rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  background: ledgerMode === 'party' ? 'linear-gradient(135deg,#10b981,#059669)' : 'transparent',
+                  color: ledgerMode === 'party' ? '#ffffff' : '#94a3b8',
+                  transition: 'all 0.2s'
+                }}
+              >
+                👤 Mode A: Party-Wise Detailed Ledger
+              </button>
+              <button
+                onClick={() => setLedgerMode('master')}
+                style={{
+                  padding: '0.65rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  background: ledgerMode === 'master' ? 'linear-gradient(135deg,#7c3aed,#6366f1)' : 'transparent',
+                  color: ledgerMode === 'master' ? '#ffffff' : '#94a3b8',
+                  transition: 'all 0.2s'
+                }}
+              >
+                🌐 Mode B: All-Parties Master Ledger
+              </button>
+            </div>
+
+            {/* Mode A: Select Party */}
+            {ledgerMode === 'party' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1' }}>Select Customer / Party Account</label>
+                <select
+                  value={selectedPartyId}
+                  onChange={e => setSelectedPartyId(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem 0.8rem', background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                >
+                  <option value="ALL">All Parties (Combined)</option>
+                  {customers.map(c => (
+                    <option key={c._id} value={c._id}>
+                      {c.businessName || c.name} {c.phone ? `(${c.phone})` : ''} {c.gstin ? `— GSTIN: ${c.gstin}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Date Range Presets */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1' }}>Date Range Filter</label>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'this_month', label: 'This Month' },
+                  { id: 'last_quarter', label: 'Last Quarter' },
+                  { id: 'fy_ytd', label: 'Financial Year (YTD)' },
+                  { id: 'all_time', label: 'All Time' },
+                  { id: 'custom', label: 'Custom Date' }
+                ].map(preset => (
+                  <button
+                    key={preset.id}
+                    onClick={() => setLedgerPreset(preset.id)}
+                    style={{
+                      padding: '0.4rem 0.85rem',
+                      borderRadius: '6px',
+                      border: '1px solid',
+                      borderColor: ledgerPreset === preset.id ? '#10b981' : '#334155',
+                      background: ledgerPreset === preset.id ? 'rgba(16,185,129,0.18)' : '#1e293b',
+                      color: ledgerPreset === preset.id ? '#34d399' : '#94a3b8',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              {ledgerPreset === 'custom' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginTop: '0.3rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>From Date</label>
+                    <input type="date" value={ledgerDateStart} onChange={e => setLedgerDateStart(e.target.value)} style={{ width: '100%', padding: '0.45rem', background: '#1e293b', border: '1px solid #334155', borderRadius: '6px', color: '#ffffff', fontSize: '0.8rem' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>To Date</label>
+                    <input type="date" value={ledgerDateEnd} onChange={e => setLedgerDateEnd(e.target.value)} style={{ width: '100%', padding: '0.45rem', background: '#1e293b', border: '1px solid #334155', borderRadius: '6px', color: '#ffffff', fontSize: '0.8rem' }} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Export Format Selector */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1' }}>Select Export Format</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                {[
+                  { id: 'excel', label: '📊 Excel (.xlsx)', icon: FileSpreadsheet },
+                  { id: 'pdf', label: '📄 PDF Document', icon: FileText },
+                  { id: 'csv', label: '📁 CSV File', icon: Download },
+                  { id: 'print', label: '🖨️ Quick Print', icon: Printer }
+                ].map(fmt => {
+                  const Icon = fmt.icon;
+                  const isSel = ledgerFormat === fmt.id;
+                  return (
+                    <button
+                      key={fmt.id}
+                      onClick={() => setLedgerFormat(fmt.id)}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        padding: '0.75rem 0.5rem',
+                        borderRadius: '8px',
+                        border: '1px solid',
+                        borderColor: isSel ? '#38bdf8' : '#334155',
+                        background: isSel ? 'rgba(56,189,248,0.18)' : '#1e293b',
+                        color: isSel ? '#38bdf8' : '#cbd5e1',
+                        fontWeight: 700,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      <Icon size={18} />
+                      <span>{fmt.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Live Calculated Summary Box */}
+            {(() => {
+              const { startD, endD } = getLedgerDateRange();
+              if (ledgerMode === 'party') {
+                const ledger = computePartyLedger(selectedPartyId, startD, endD);
+                return (
+                  <div style={{ background: '#1e293b', borderRadius: '10px', padding: '1rem', border: '1px solid #334155', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Opening Balance</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#f8fafc', marginTop: 2 }}>{fmtINR(ledger.openingBalance)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Total Debit (Billed)</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#38bdf8', marginTop: 2 }}>{fmtINR(ledger.totalDebit)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Total Credit (Paid)</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#34d399', marginTop: 2 }}>{fmtINR(ledger.totalCredit)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Closing Balance</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: ledger.closingBalance > 0 ? '#fbbf24' : '#34d399', marginTop: 2 }}>{fmtINR(ledger.closingBalance)} ({ledger.closingBalance >= 0 ? 'Dr' : 'Cr'})</div>
+                    </div>
+                  </div>
+                );
+              } else {
+                let grandBilled = 0;
+                let grandPaid = 0;
+                let grandBal = 0;
+                customers.forEach(cust => {
+                  const pL = computePartyLedger(cust._id, startD, endD);
+                  grandBilled += pL.totalDebit;
+                  grandPaid += pL.totalCredit;
+                  grandBal += pL.closingBalance;
+                });
+                return (
+                  <div style={{ background: '#1e293b', borderRadius: '10px', padding: '1rem', border: '1px solid #334155', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Parties Count</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#f8fafc', marginTop: 2 }}>{customers.length} Accounts</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Period Billed</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#38bdf8', marginTop: 2 }}>{fmtINR(grandBilled)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Period Collected</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#34d399', marginTop: 2 }}>{fmtINR(grandPaid)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Total Outstanding</div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fbbf24', marginTop: 2 }}>{fmtINR(grandBal)}</div>
+                    </div>
+                  </div>
+                );
+              }
+            })()}
+
+            {/* Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.5rem' }}>
+              <button className="btn-secondary" onClick={() => setShowLedgerModal(false)} style={{ padding: '0.55rem 1.1rem' }}>Cancel</button>
+              <button
+                className="btn-primary"
+                onClick={handleGenerateLedgerExport}
+                style={{ padding: '0.55rem 1.4rem', background: 'linear-gradient(135deg,#10b981,#059669)', border: 'none', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Download size={16} /> Generate & Download Ledger
+              </button>
+            </div>
+
           </div>
         </div>
       )}
