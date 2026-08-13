@@ -290,18 +290,56 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     return { startD, endD };
   };
 
-  // Compute Party Ledger Data
+  // Compute Party Ledger Data with robust matching & date parsing
   const computePartyLedger = (partyId, startD, endD) => {
-    const sortedInvoices = [...invoices].sort((a, b) => new Date(a.invoiceDate || a.createdAt) - new Date(b.invoiceDate || b.createdAt));
+    const parseInvDate = (dateVal) => {
+      if (!dateVal) return new Date();
+      if (dateVal instanceof Date) return dateVal;
+      const str = String(dateVal);
+      if (str.includes('/')) {
+        const parts = str.split('/');
+        if (parts.length === 3) {
+          return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+        }
+      }
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? new Date() : d;
+    };
+
+    const targetParty = customers.find(c => String(c._id) === String(partyId) || String(c.id) === String(partyId));
+
+    const isMatch = (inv) => {
+      if (!partyId || partyId === 'ALL') return true;
+      if (inv.customerId && String(inv.customerId) === String(partyId)) return true;
+      if (inv.customer?._id && String(inv.customer._id) === String(partyId)) return true;
+      if (inv.customer?.id && String(inv.customer.id) === String(partyId)) return true;
+
+      if (targetParty) {
+        const pName = (targetParty.businessName || targetParty.name || '').toLowerCase().trim();
+        const pGst = (targetParty.gstin || '').toLowerCase().trim();
+        const pPhone = (targetParty.phone || '').toLowerCase().trim();
+
+        const invCustName = (inv.customer?.businessName || inv.customer?.name || inv.customerName || (typeof inv.customer === 'string' ? inv.customer : '')).toLowerCase().trim();
+        const invGst = (inv.customer?.gstin || inv.customerGst || '').toLowerCase().trim();
+        const invPhone = (inv.customer?.phone || inv.customerPhone || '').toLowerCase().trim();
+
+        if (pName && invCustName && (invCustName.includes(pName) || pName.includes(invCustName))) return true;
+        if (pGst && invGst && invGst === pGst) return true;
+        if (pPhone && invPhone && invPhone === pPhone) return true;
+      }
+      return false;
+    };
+
+    const sortedInvoices = [...invoices]
+      .filter(isMatch)
+      .sort((a, b) => parseInvDate(a.invoiceDate || a.createdAt) - parseInvDate(b.invoiceDate || b.createdAt));
     
     let openingBalance = 0;
     const periodTx = [];
 
     sortedInvoices.forEach(inv => {
-      if (partyId && partyId !== 'ALL' && inv.customer?._id !== partyId && inv.customerId !== partyId) return;
-
-      const invDate = new Date(inv.invoiceDate || inv.createdAt);
-      const grandTotal = Number(inv.grandTotal || 0);
+      const invDate = parseInvDate(inv.invoiceDate || inv.createdAt);
+      const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
       const paidAmount = Number(inv.paidAmount || 0);
 
       if (startD && invDate < startD) {
@@ -314,8 +352,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       if (grandTotal > 0) {
         periodTx.push({
           date: formatDateDDMMYYYY(inv.invoiceDate || inv.createdAt),
-          voucherNo: inv.invoiceNo,
-          particulars: `Sales Invoice #${inv.invoiceNo}`,
+          voucherNo: inv.invoiceNo || 'INV',
+          particulars: `Sales Invoice #${inv.invoiceNo || ''}`,
           department: inv.department || 'Elite Digital Prints',
           debit: grandTotal,
           credit: 0
@@ -325,8 +363,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       if (paidAmount > 0) {
         periodTx.push({
           date: formatDateDDMMYYYY(inv.paymentDate || inv.invoiceDate || inv.createdAt),
-          voucherNo: `REC-${inv.invoiceNo}`,
-          particulars: `Payment Received — Invoice #${inv.invoiceNo}`,
+          voucherNo: `REC-${inv.invoiceNo || ''}`,
+          particulars: `Payment Received — Invoice #${inv.invoiceNo || ''}`,
           department: inv.department || 'Elite Digital Prints',
           debit: 0,
           credit: paidAmount
