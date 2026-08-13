@@ -344,6 +344,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [requirement, setRequirement] = useState([]);
   const [reqLoading, setReqLoading] = useState(false);
   const [expandedFabric, setExpandedFabric] = useState(null);
+  const [stockSortOrder, setStockSortOrder] = useState('highToLow');
 
   // Search / filter state
   const [inwardSearch, setInwardSearch] = useState('');
@@ -378,7 +379,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [isCombinedModalOpen, setIsCombinedModalOpen] = useState(false);
   const [combinedDateStart, setCombinedDateStart] = useState(() => new Date().toISOString().split('T')[0]);
   const [combinedDateEnd, setCombinedDateEnd] = useState(() => new Date().toISOString().split('T')[0]);
-  const [selectedCombinedReports, setSelectedCombinedReports] = useState(['challan', 'inward', 'outward', 'lotwise', 'stock', 'machine']);
+  const [selectedCombinedReports, setSelectedCombinedReports] = useState(['challan', 'inward', 'lotwise', 'stock', 'machine']);
   const [combinedLoading, setCombinedLoading] = useState(false);
 
   // Delete confirmation
@@ -1591,26 +1592,15 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button onClick={handleExportCsv} className="btn-secondary" title="Download Fabric Stock CSV" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0 }}>
-              <FileDown size={16} /> Export CSV
+            <button
+              onClick={() => setIsCombinedModalOpen(true)}
+              className="btn-primary"
+              title="Download Department PDF Reports"
+              style={{ gap: '0.45rem', padding: '0.5rem 1.25rem', fontSize: '0.85rem', flexShrink: 0, background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', color: '#ffffff', border: 'none', boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)', fontWeight: 800 }}
+            >
+              <FileDown size={16} /> Download PDF Report
             </button>
-            <button onClick={() => fileInputRef.current && fileInputRef.current.click()} className="btn-secondary" title="Upload Fabric Stock CSV" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0 }}>
-              <ArrowDownToLine size={16} /> Import CSV
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleImportCsv}
-              accept=".csv"
-              style={{ display: 'none' }}
-            />
-            <button onClick={() => setIsPdfFilterOpen(true)} className="btn-secondary" title="Download Ledger PDF" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0 }}>
-              <FileDown size={16} /> PDF Report
-            </button>
-            <button onClick={() => setIsCombinedModalOpen(true)} className="btn-primary" title="Multiple Reports (Combined 1-Page PDF)" style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', flexShrink: 0, background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', color: '#ffffff', border: 'none', boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)' }}>
-              <FileText size={16} /> Multiple Reports
-            </button>
-            <button onClick={fetchData} className="btn-icon" title="Refresh Data" style={{ padding: '0.5rem', flexShrink: 0 }}>
+            <button onClick={fetchData} className="btn-icon" title="Refresh Data" style={{ padding: '0.55rem', flexShrink: 0 }}>
               <RefreshCw size={18} className={loading ? 'spin-loader' : ''} />
             </button>
           </div>
@@ -1625,7 +1615,39 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <div>
-            <h2 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Layers size={20} /> Current Fabric Stock</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Layers size={20} color="var(--primary)" /> Current Fabric Stock
+              </h2>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Sort Stock:</span>
+                <button
+                  type="button"
+                  className={stockSortOrder === 'highToLow' ? 'btn-primary' : 'btn-secondary'}
+                  onClick={() => setStockSortOrder('highToLow')}
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '8px' }}
+                >
+                   High to Low (Mtr)
+                </button>
+                <button
+                  type="button"
+                  className={stockSortOrder === 'lowToHigh' ? 'btn-primary' : 'btn-secondary'}
+                  onClick={() => setStockSortOrder('lowToHigh')}
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '8px' }}
+                >
+                   Low to High (Mtr)
+                </button>
+                <button
+                  type="button"
+                  className={stockSortOrder === 'nameAsc' ? 'btn-primary' : 'btn-secondary'}
+                  onClick={() => setStockSortOrder('nameAsc')}
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '8px' }}
+                >
+                   Name (A-Z)
+                </button>
+              </div>
+            </div>
 
             {/* Summary Bar */}
             {stock.length > 0 && (
@@ -1641,7 +1663,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
             {/* Fabric Quality Cards with Panna breakdown */}
             {stock.length === 0 && !loading && <p>No stock data found.</p>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {stock.map((item, idx) => {
+              {[...stock].sort((a, b) => {
+                const stockA = Number(a.currentStock || 0);
+                const stockB = Number(b.currentStock || 0);
+                if (stockSortOrder === 'highToLow') return stockB - stockA;
+                if (stockSortOrder === 'lowToHigh') return stockA - stockB;
+                return String(a.fabricQuality || '').localeCompare(String(b.fabricQuality || ''));
+              }).map((item, idx) => {
                 const isLow = item.currentStock <= 50;
                 const isEmpty = item.currentStock <= 0;
                 const isExpanded = expandedFabric === item.fabricQuality;
@@ -4167,20 +4195,20 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         />
       )}
 
-      {/* COMBINED MULTI-REPORT MODAL */}
+      {/* COMBINED / INDIVIDUAL DEPARTMENT PDF REPORT MODAL */}
       {isCombinedModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
-          <div className="glass-panel" style={{ background: 'var(--panel-bg, #1e1b4b)', width: '100%', maxWidth: '520px', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-light, #4c1d95)', color: 'var(--text-primary, #ffffff)', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
+          <div className="glass-panel" style={{ background: 'var(--panel-bg, #1e1b4b)', width: '100%', maxWidth: '560px', borderRadius: '14px', padding: '1.5rem', border: '1px solid var(--border-light, #4c1d95)', color: 'var(--text-primary, #ffffff)', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <FileText size={22} color="#a78bfa" />
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>Multiple Reports (Elite Digital Prints)</h3>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>Download PDF Reports (Elite Digital Prints)</h3>
               </div>
               <button onClick={() => setIsCombinedModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.2rem' }}><X size={20} /></button>
             </div>
 
-            <p style={{ fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '1.2rem', lineHeight: '1.4' }}>
-              Select report period and choose which reports to combine into a single PDF report exclusively for <strong>Elite Digital Prints</strong>.
+            <p style={{ fontSize: '0.82rem', color: '#cbd5e1', marginBottom: '1rem', lineHeight: '1.4' }}>
+              Select the date period and choose individual department reports or combine them into a single report PDF.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -4196,17 +4224,48 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', marginBottom: '0.5rem' }}>Select Reports to Include (Fits in 1 Page):</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', margin: 0 }}>Select Department Reports:</label>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCombinedReports(['stock', 'inward', 'lotwise', 'lotTransfer', 'stockAdjustment', 'requirement', 'challan'])}
+                      style={{ fontSize: '0.7rem', padding: '2px 8px', background: 'rgba(124, 58, 237, 0.2)', border: '1px solid rgba(124, 58, 237, 0.4)', color: '#c084fc', borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const tabToReport = {
+                          dashboard: 'stock',
+                          inward: 'inward',
+                          lotwise: 'lotwise',
+                          lotTransfer: 'lotTransfer',
+                          stockAdjustment: 'stockAdjustment',
+                          requirement: 'requirement'
+                        };
+                        const targetRep = tabToReport[activeTab] || 'stock';
+                        setSelectedCombinedReports([targetRep]);
+                      }}
+                      style={{ fontSize: '0.7rem', padding: '2px 8px', background: 'rgba(56, 189, 248, 0.2)', border: '1px solid rgba(56, 189, 248, 0.4)', color: '#38bdf8', borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}
+                    >
+                      Active Tab Only
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '240px', overflowY: 'auto' }}>
                   {[
-                    { id: 'challan', label: 'Fabric Challans Dispatch Outwards', desc: 'Dispatched meters, party name, billing name & TP rolls' },
-                    { id: 'inward', label: 'Fabric Inwards Summary', desc: 'Supplier receipts, vendor details & inward meters' },
-                    { id: 'outward', label: 'Fabric Consumption Summary', desc: 'Fabric consumed, job dispatches & shortage %' },
-                    { id: 'machine', label: 'Printing Department', desc: 'Machine & pass-wise meterage, total printed meters & jobcard count' },
-                    { id: 'lotwise', label: 'Lot-Wise Fabric Stock Balance Summary', desc: 'Lot-level stock balance & net remaining meters' },
-                    { id: 'stock', label: 'Fabric Current Stock Summary', desc: 'Available fabric quality stock levels & status' }
+                    { id: 'stock', label: 'Stock Overview', desc: 'Fabric quality stock levels, inward/outward totals & net available stock' },
+                    { id: 'inward', label: 'Inward Register', desc: 'Supplier inward receipts, lot numbers, vendor names & inward meters' },
+                    { id: 'lotwise', label: 'Lot Wise Details', desc: 'Lot-wise fabric stock balance, net remaining meters & vendor details' },
+                    { id: 'lotTransfer', label: 'Lot Transfer Logs', desc: 'Lot-to-lot transfer transactions & fabric quality movements' },
+                    { id: 'stockAdjustment', label: 'Stock Adjustment (SA)', desc: 'Physical audit adjustments, stock (+/-) entries & SA vouchers' },
+                    { id: 'requirement', label: 'Fabric Requirements', desc: 'Required vs available fabric meters & shortage alerts' },
+                    { id: 'challan', label: 'Delivery Challans Register', desc: 'Dispatched challans, party names, billing & TP rolls' }
                   ].map(rep => (
-                    <label key={rep.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    <label key={rep.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'pointer', fontSize: '0.83rem' }}>
                       <input
                         type="checkbox"
                         checked={selectedCombinedReports.includes(rep.id)}
@@ -4225,7 +4284,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       />
                       <div>
                         <strong style={{ color: '#f8fafc' }}>{rep.label}</strong>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{rep.desc}</div>
+                        <div style={{ fontSize: '0.73rem', color: '#94a3b8' }}>{rep.desc}</div>
                       </div>
                     </label>
                   ))}
@@ -4239,7 +4298,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 onClick={async () => {
                   setCombinedLoading(true);
                   try {
-                    await api.downloadFabricCombinedReportPdf(combinedDateStart, combinedDateEnd, selectedCombinedReports, `Elite_Digital_Prints_Combined_Report_${combinedDateStart}_to_${combinedDateEnd}.pdf`);
+                    await api.downloadFabricCombinedReportPdf(combinedDateStart, combinedDateEnd, selectedCombinedReports, `Elite_Digital_Prints_Report_${combinedDateStart}_to_${combinedDateEnd}.pdf`);
                     setIsCombinedModalOpen(false);
                   } catch (err) {
                     alert(err.message);
@@ -4249,9 +4308,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 }}
                 disabled={combinedLoading}
                 className="btn-primary"
-                style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', border: 'none', gap: '0.4rem' }}
+                style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', border: 'none', gap: '0.4rem', fontWeight: 700 }}
               >
-                <Download size={16} /> {combinedLoading ? 'Generating 1-Page PDF...' : 'Download Combined PDF'}
+                <Download size={16} /> {combinedLoading ? 'Generating Report PDF...' : 'Download Report PDF'}
               </button>
             </div>
           </div>

@@ -73,7 +73,7 @@ function formatJobDisplay(jobStr) {
 }
 
 export default function EliteBillingDepartment({ initialChallanData = null, department = 'digital_print' }) {
-  const [activeTab, setActiveTab] = useState('invoices'); // 'dashboard', 'invoices', 'create', 'customers', 'items', 'challans'
+  const [activeTab, setActiveTab] = useState('challans'); // 'challans', 'invoices', 'dashboard', 'create', 'customers', 'items'
   const [challanDept, setChallanDept] = useState(() => (department === 'stitching' ? 'stitching' : 'digital_print'));
   const [stats, setStats] = useState({
     totalInvoices: 0,
@@ -755,18 +755,20 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-            <button className="btn-primary" onClick={() => handleOpenCreateTab()} style={{ padding: '0.55rem 1.25rem', background: 'linear-gradient(135deg,#7c3aed,#6366f1)' }}>
-              <PlusCircle size={15} /> Create Invoice
+          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              className="btn-primary"
+              onClick={() => handleOpenCreateTab()}
+              style={{ padding: '0.55rem 1.25rem', background: 'linear-gradient(135deg,#7c3aed,#6366f1)', boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)', fontWeight: 800 }}
+            >
+              <PlusCircle size={16} /> Create Invoice
             </button>
-            <button className="btn-primary" onClick={handleOpenCreateChallan} style={{ padding: '0.55rem 1.25rem', background: 'linear-gradient(135deg,#0284c7,#2563eb)' }}>
-              <Truck size={15} /> Create Challan
-            </button>
-            <button className="btn-secondary" onClick={() => setShowCustomerModal(true)} style={{ padding: '0.55rem 1rem' }}>
-              <Users size={15} /> Add Customer
-            </button>
-            <button className="btn-secondary" onClick={() => setShowItemModal(true)} style={{ padding: '0.55rem 1rem' }}>
-              <Package size={15} /> Add Product
+            <button
+              className="btn-primary"
+              onClick={handleOpenCreateChallan}
+              style={{ padding: '0.55rem 1.25rem', background: 'linear-gradient(135deg,#0284c7,#2563eb)', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)', fontWeight: 800 }}
+            >
+              <Truck size={16} /> Create Challan
             </button>
           </div>
         </div>
@@ -774,31 +776,25 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         {/* Sub-Tabs Bar */}
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.2rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.8rem', overflowX: 'auto' }}>
           {[
-            { id: 'invoices', label: '🧾 Invoices Directory', count: stats.totalInvoices },
             { id: 'challans', label: '🚚 Challan' },
+            { id: 'invoices', label: '🧾 Invoices Directory', count: stats.totalInvoices },
             { id: 'dashboard', label: '📊 Financial Summary' },
-            { id: 'create', label: activeTab === 'create' ? (editingInvoiceId ? '✍️ Edit Invoice' : '✍️ New Invoice Generator') : '✍️ Create Invoice' },
+            ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? '✍️ Edit Invoice' : '✍️ New Invoice Generator' }] : []),
             { id: 'customers', label: `👥 Customers (${customers.length})` },
-            { id: 'items', label: `📦 Billing Products (${itemsList.length})` }
+            { id: 'items', label: `📦 Item (${itemsList.length})` }
           ].map(t => (
             <button
               key={t.id}
-              onClick={() => {
-                if (t.id === 'create' && activeTab !== 'create') {
-                  handleOpenCreateTab();
-                } else {
-                  setActiveTab(t.id);
-                }
-              }}
+              onClick={() => setActiveTab(t.id)}
               style={{
-                padding: '0.5rem 1rem',
+                padding: '0.5rem 1.1rem',
                 borderRadius: 'var(--radius-sm)',
                 fontWeight: 700,
                 fontSize: '0.82rem',
                 cursor: 'pointer',
                 border: '1px solid',
                 borderColor: activeTab === t.id ? '#7c3aed' : 'var(--border-light)',
-                background: activeTab === t.id ? 'rgba(124,58,237,0.15)' : 'transparent',
+                background: activeTab === t.id ? 'rgba(124,58,237,0.18)' : 'transparent',
                 color: activeTab === t.id ? '#a78bfa' : 'var(--text-muted)',
                 transition: 'all 0.15s'
               }}
