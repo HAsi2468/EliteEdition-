@@ -424,64 +424,91 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         triggerPushNotification('📒 Ledger Exported', `Party statement for ${partyName} exported successfully.`, 'success');
       } else {
         const printWin = window.open('', '_blank');
+        if (!printWin) {
+          triggerEliteAlert('⚠️ Popup Blocked', 'Please allow popups for this site to view/download the PDF Ledger Statement.', 'warning');
+          return;
+        }
         printWin.document.write(`
+          <!DOCTYPE html>
           <html>
             <head>
               <title>Party Ledger — ${partyName}</title>
               <style>
-                body { font-family: 'Segoe UI', Arial, sans-serif; padding: 25px; color: #1e293b; }
-                .header { border-bottom: 2px solid #7c3aed; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; }
-                .title { font-size: 20px; font-weight: 800; color: #5b21b6; }
-                .subtitle { font-size: 13px; color: #64748b; margin-top: 4px; }
-                .meta-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
-                th { background: #f1f5f9; text-align: left; padding: 8px; border-bottom: 2px solid #cbd5e1; font-weight: 700; }
-                td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
+                @page { size: A4 portrait; margin: 12mm; }
+                body { font-family: 'Segoe UI', Arial, Helvetica, sans-serif; padding: 20px; color: #0f172a; font-size: 11px; line-height: 1.4; }
+                .no-print { display: flex; justify-content: space-between; align-items: center; background: #1e1b4b; color: #fff; padding: 10px 16px; border-radius: 8px; margin-bottom: 20px; }
+                .no-print button { background: #10b981; color: #fff; border: none; padding: 8px 18px; font-weight: 800; border-radius: 6px; cursor: pointer; font-size: 13px; }
+                .header { border-bottom: 2.5px solid #7c3aed; padding-bottom: 12px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: flex-start; }
+                .title { font-size: 22px; font-weight: 800; color: #4c1d95; letter-spacing: -0.5px; }
+                .subtitle { font-size: 11px; color: #64748b; margin-top: 3px; font-weight: 600; }
+                .meta-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 11px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+                th { background: #1e1b4b; color: #ffffff; text-align: left; padding: 8px 10px; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; }
+                td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
+                tr:nth-child(even) { background: #f8fafc; }
                 .num { text-align: right; }
-                .totals-row { font-weight: 800; background: #f8fafc; border-top: 2px solid #334155; }
-                .footer { margin-top: 40px; display: flex; justify-content: space-between; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+                .totals-row { font-weight: 800; background: #f1f5f9; border-top: 2px solid #1e1b4b; border-bottom: 2px solid #1e1b4b; font-size: 11px; }
+                .footer { margin-top: 35px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+                @media print {
+                  .no-print { display: none !important; }
+                  body { padding: 0; }
+                }
               </style>
             </head>
             <body>
+              <div class="no-print">
+                <span style="font-weight: 700; font-size: 13px;">📄 ${partyName} — Ledger Statement PDF</span>
+                <button onclick="window.print()">📥 Print / Save as PDF</button>
+              </div>
+
               <div class="header">
                 <div>
                   <div class="title">ELITE DIGITAL PRINTS</div>
-                  <div class="subtitle">Official Party Account Statement & Ledger Report</div>
+                  <div class="subtitle">Cloud Accounting & GST Invoicing — Official Party Account Ledger Statement</div>
                 </div>
-                <div style="text-align: right; font-size: 12px;">
+                <div style="text-align: right; font-size: 11px; color: #475569;">
+                  <div style="background: #7c3aed; color: #fff; padding: 3px 8px; border-radius: 4px; font-weight: 800; display: inline-block; margin-bottom: 4px;">LEDGER STATEMENT</div>
                   <div><strong>Date:</strong> ${new Date().toLocaleDateString('en-IN')}</div>
-                  <div><strong>Format:</strong> Account Ledger Statement</div>
                 </div>
               </div>
 
               <div class="meta-box">
                 <div>
-                  <div><strong>Party Name:</strong> ${partyName}</div>
-                  <div><strong>GSTIN:</strong> ${selectedParty.gstin || 'N/A'}</div>
-                  <div><strong>Phone:</strong> ${selectedParty.phone || 'N/A'}</div>
+                  <div style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 700;">Account / Customer Details</div>
+                  <div style="font-size: 14px; font-weight: 800; color: #0f172a; margin-top: 2px;">${partyName}</div>
+                  <div style="color: #475569; margin-top: 3px;">
+                    ${selectedParty.gstin ? `GSTIN: <b>${selectedParty.gstin}</b> | ` : ''}
+                    ${selectedParty.phone ? `Phone: <b>${selectedParty.phone}</b>` : ''}
+                  </div>
                 </div>
-                <div style="text-align: right;">
-                  <div><strong>Opening Balance:</strong> ${fmtINR(ledger.openingBalance)}</div>
-                  <div><strong>Total Billed:</strong> ${fmtINR(ledger.totalDebit)}</div>
-                  <div><strong>Total Paid:</strong> ${fmtINR(ledger.totalCredit)}</div>
-                  <div><strong>Closing Balance:</strong> <span style="color: ${ledger.closingBalance > 0 ? '#dc2626' : '#16a34a'}; font-weight: 800;">${fmtINR(ledger.closingBalance)} (${ledger.closingBalance >= 0 ? 'Dr' : 'Cr'})</span></div>
+                <div style="text-align: right; border-left: 1px solid #e2e8f0; padding-left: 15px;">
+                  <div style="font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: 700;">Statement Summary</div>
+                  <div style="margin-top: 4px;">Opening Balance: <b>${fmtINR(ledger.openingBalance)}</b></div>
+                  <div>Total Billed: <b>${fmtINR(ledger.totalDebit)}</b> | Total Paid: <b>${fmtINR(ledger.totalCredit)}</b></div>
+                  <div style="margin-top: 3px;">Closing Balance: <span style="color: ${ledger.closingBalance > 0 ? '#dc2626' : '#16a34a'}; font-weight: 800; font-size: 13px;">${fmtINR(Math.abs(ledger.closingBalance))} (${ledger.closingBalance >= 0 ? 'Dr' : 'Cr'})</span></div>
                 </div>
               </div>
 
               <table>
                 <thead>
                   <tr>
-                    <th>Date</th>
-                    <th>Voucher No</th>
-                    <th>Particulars</th>
-                    <th>Dept</th>
-                    <th class="num">Debit (₹)</th>
-                    <th class="num">Credit (₹)</th>
-                    <th class="num">Running Balance (₹)</th>
+                    <th style="width: 12%;">Date</th>
+                    <th style="width: 16%;">Voucher No</th>
+                    <th>Particulars / Description</th>
+                    <th style="width: 16%;">Department</th>
+                    <th class="num" style="width: 14%;">Debit (₹)</th>
+                    <th class="num" style="width: 14%;">Credit (₹)</th>
+                    <th class="num" style="width: 16%;">Running Balance</th>
                   </tr>
                 </thead>
                 <tbody>
-                  ${ledger.transactions.length === 0 ? '<tr><td colspan="7" style="text-align:center; padding: 20px;">No transactions recorded for selected period.</td></tr>' : ledger.transactions.map(t => `
+                  <tr style="background: #f1f5f9; font-weight: 700;">
+                    <td colspan="4"><i>Opening Balance B/F</i></td>
+                    <td class="num">—</td>
+                    <td class="num">—</td>
+                    <td class="num"><b>${fmtINR(Math.abs(ledger.openingBalance))} ${ledger.openingBalance >= 0 ? 'Dr' : 'Cr'}</b></td>
+                  </tr>
+                  ${ledger.transactions.length === 0 ? '<tr><td colspan="7" style="text-align:center; padding: 20px; color: #64748b;">No transactions recorded for selected period.</td></tr>' : ledger.transactions.map(t => `
                     <tr>
                       <td>${t.date}</td>
                       <td><strong>${t.voucherNo}</strong></td>
@@ -493,7 +520,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                     </tr>
                   `).join('')}
                   <tr class="totals-row">
-                    <td colspan="4">TOTALS</td>
+                    <td colspan="4">TOTAL PERIOD TRANSACTIONS</td>
                     <td class="num">${fmtINR(ledger.totalDebit)}</td>
                     <td class="num">${fmtINR(ledger.totalCredit)}</td>
                     <td class="num">${fmtINR(Math.abs(ledger.closingBalance))} ${ledger.closingBalance >= 0 ? 'Dr' : 'Cr'}</td>
@@ -502,17 +529,20 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               </table>
 
               <div class="footer">
-                <div>Prepared By: Accounts Department</div>
-                <div>Authorized Signatory: Elite Digital Prints</div>
+                <div>Prepared By: Accounts & Billing Department — Elite Digital Prints</div>
+                <div>Authorized Signatory: _______________________</div>
               </div>
 
               <script>
-                window.onload = function() { window.print(); };
+                window.onload = function() {
+                  setTimeout(function() { window.print(); }, 300);
+                };
               </script>
             </body>
           </html>
         `);
         printWin.document.close();
+        triggerPushNotification('📄 Ledger PDF Ready', `Party statement PDF generated for ${partyName}.`, 'success');
       }
     } else {
       // Mode B: Master Ledger Export
