@@ -18,6 +18,8 @@ import JobPrintingLog from './JobPrintingLog';
 import GarmentJobCardDashboard from './GarmentJobCardDashboard';
 import StitchingChallanPanel from './StitchingChallanPanel';
 import StitchingSettings from './StitchingSettings';
+import ScreenGroupRoster from './ScreenGroupRoster';
+import { dispatchScreenGroupEvent } from '../services/screenGroupService';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
 import { triggerPushNotification } from './NotificationToast';
@@ -1160,6 +1162,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
       } else {
         await api.createJobCard(payload);
         triggerPushNotification('✨ Job Card Created', `Job Card #${form.jobNo} created successfully!`, 'success');
+        dispatchScreenGroupEvent('jobcards', 'New Job Card Created 🚀', `Job Card #${form.jobNo} for ${form.party || 'Customer'} was created and dispatched to Job Cards Group.`, 'jobcards_list');
       }
       onSave();
     } catch (err) {
@@ -1851,9 +1854,12 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                   <FileText size={22} color="#fff"/>
                 </div>
                 <div>
-                  <h2 style={{ fontSize:'1.2rem', fontWeight:800, color:'var(--text-primary)' }}>
-                    {department === 'stitching' ? 'Elite Stitching' : 'Elite Digital Prints'}
-                  </h2>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                    <h2 style={{ fontSize:'1.2rem', fontWeight:800, color:'var(--text-primary)', margin: 0 }}>
+                      {department === 'stitching' ? 'Elite Stitching' : 'Elite Digital Prints'}
+                    </h2>
+                    <ScreenGroupRoster screenId="jobcards" />
+                  </div>
                   <p style={{ fontSize:'0.78rem', color:'var(--text-muted)', marginTop:1 }}>
                     {department === 'stitching' ? 'Stitching Job Card Management' : 'Job Card Management'} — {total} total cards
                   </p>

@@ -5,6 +5,8 @@ import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import StitchingChallanPanel from './StitchingChallanPanel';
 import FabricInventoryPanel from './FabricInventoryPanel';
+import ScreenGroupRoster from './ScreenGroupRoster';
+import { dispatchScreenGroupEvent } from '../services/screenGroupService';
 import { triggerEliteAlert } from './EliteModalDialog';
 import {
   FileText,
@@ -594,7 +596,9 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       if (editingInvoiceId) {
         await api.updateBillingInvoice(editingInvoiceId, payload);
       } else {
-        await api.createBillingInvoice(payload);
+        const createRes = await api.createBillingInvoice(payload);
+        const invNoStr = createRes?.data?.invoiceNo || payload.invoiceNo || 'INV';
+        dispatchScreenGroupEvent('jobcards_billing', 'New Tax Invoice Generated 🧾', `Invoice #${invNoStr} for ${payload.customerName || 'Customer'} (₹${Number(payload.grandTotal || 0).toLocaleString('en-IN')}) generated & dispatched to Billing Group.`, 'invoices');
       }
 
       alert(`Invoice ${editingInvoiceId ? 'updated' : 'created'} successfully!`);
@@ -707,7 +711,6 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       alert(err.message || 'Failed to save product');
     }
   };
-
   const handleEditItem = (item) => {
     setEditingItemId(item._id);
     setItemForm({
@@ -721,6 +724,13 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     setShowItemModal(true);
   };
 
+  const handleOpenCreateChallan = () => {
+    setActiveTab('challans');
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('open-new-challan'));
+    }, 50);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
@@ -732,16 +742,22 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               <FileText size={22} color="#fff" />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>Billing & Invoicing Department</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Billing & Invoicing Department</h2>
+                <ScreenGroupRoster screenId="jobcards_billing" />
+              </div>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 1 }}>
                 Elite Digital Prints — Cloud Accounting & GST Invoicing System
               </p>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.6rem' }}>
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
             <button className="btn-primary" onClick={() => handleOpenCreateTab()} style={{ padding: '0.55rem 1.25rem', background: 'linear-gradient(135deg,#7c3aed,#6366f1)' }}>
               <PlusCircle size={15} /> Create Invoice
+            </button>
+            <button className="btn-primary" onClick={handleOpenCreateChallan} style={{ padding: '0.55rem 1.25rem', background: 'linear-gradient(135deg,#0284c7,#2563eb)' }}>
+              <Truck size={15} /> Create Challan
             </button>
             <button className="btn-secondary" onClick={() => setShowCustomerModal(true)} style={{ padding: '0.55rem 1rem' }}>
               <Users size={15} /> Add Customer
