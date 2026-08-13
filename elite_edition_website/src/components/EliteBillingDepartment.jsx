@@ -1174,32 +1174,34 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           </div>
         </div>
 
-        {/* KPI CARDS GRID */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-          <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #3b82f6' }}>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Invoiced</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{fmtINR(periodStats.totalInvoiced)}</div>
-            <div style={{ fontSize: '0.72rem', color: '#3b82f6', marginTop: 4 }}>{periodStats.totalInvoices} Invoices Generated</div>
-          </div>
+        {/* KPI CARDS GRID (Displayed on Invoices Directory & Financial Summary) */}
+        {activeTab !== 'challans' && activeTab !== 'customers' && activeTab !== 'items' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+            <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #3b82f6' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Invoiced</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{fmtINR(periodStats.totalInvoiced)}</div>
+              <div style={{ fontSize: '0.72rem', color: '#3b82f6', marginTop: 4 }}>{periodStats.totalInvoices} Invoices Generated</div>
+            </div>
 
-          <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #10b981' }}>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Received (Paid)</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#34d399', marginTop: 4 }}>{fmtINR(periodStats.totalPaid)}</div>
-            <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: 4 }}>{periodStats.paidCount} Fully Paid Invoices</div>
-          </div>
+            <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #10b981' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Received (Paid)</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#34d399', marginTop: 4 }}>{fmtINR(periodStats.totalPaid)}</div>
+              <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: 4 }}>{periodStats.paidCount} Fully Paid Invoices</div>
+            </div>
 
-          <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #f59e0b' }}>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Pending Receivables</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>{fmtINR(periodStats.totalBalanceDue)}</div>
-            <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: 4 }}>{periodStats.unpaidCount} Pending / Partial</div>
-          </div>
+            <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #f59e0b' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Pending Receivables</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>{fmtINR(periodStats.totalBalanceDue)}</div>
+              <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: 4 }}>{periodStats.unpaidCount} Pending / Partial</div>
+            </div>
 
-          <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #ef4444' }}>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Overdue Invoices</div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f87171', marginTop: 4 }}>{periodStats.overdueCount}</div>
-            <div style={{ fontSize: '0.72rem', color: '#ef4444', marginTop: 4 }}>Payment Date Passed</div>
+            <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #ef4444' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Overdue Invoices</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f87171', marginTop: 4 }}>{periodStats.overdueCount}</div>
+              <div style={{ fontSize: '0.72rem', color: '#ef4444', marginTop: 4 }}>Payment Date Passed</div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ── TAB 1: INVOICES DIRECTORY ───────────────────────────────────────── */}
