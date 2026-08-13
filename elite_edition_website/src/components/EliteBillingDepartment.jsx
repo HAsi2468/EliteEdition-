@@ -284,16 +284,19 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         return;
       }
 
-      // 1. SAME-CUSTOMER VALIDATION CHECK
-      const partyNames = new Set(challanList.map(c => (c.billTo || c.partyName || '').trim().toLowerCase()).filter(Boolean));
-      if (partyNames.size > 1) {
-        const partyList = [...new Set(challanList.map(c => c.billTo || c.partyName).filter(Boolean))].join(', ');
+      // 1. FLEXIBLE SAME-CUSTOMER VALIDATION CHECK
+      const normalizeKey = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const customerKeys = new Set(challanList.map(c => typeof c === 'string' ? '' : normalizeKey(c.billTo || c.partyName)).filter(Boolean));
+      const partyNameKeys = new Set(challanList.map(c => typeof c === 'string' ? '' : normalizeKey(c.partyName || c.billTo)).filter(Boolean));
+
+      if (customerKeys.size > 1 && partyNameKeys.size > 1) {
+        const partyList = [...new Set(challanList.map(c => typeof c === 'string' ? c : (c.billTo || c.partyName)).filter(Boolean))].join(', ');
         triggerEliteAlert('Customer Mismatch', `Cannot merge Challans from different customers. Selected Challans belong to multiple customers: ${partyList}`, 'error');
         return;
       }
 
       // 2. Call backend merge endpoint for complete aggregation & customer resolution
-      const challanIds = challanList.map(c => c._id);
+      const challanIds = challanList.map(c => (typeof c === 'string' ? c : (c._id || c.id))).filter(Boolean);
       const mergeRes = await api.mergeChallansToInvoice(challanIds);
 
       if (!mergeRes || !mergeRes.success || !mergeRes.data) {

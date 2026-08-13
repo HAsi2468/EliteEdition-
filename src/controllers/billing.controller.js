@@ -272,13 +272,16 @@ const mergeChallans = async (req, res) => {
       return res.status(404).json({ success: false, error: 'No matching Challans found.' });
     }
 
-    // 2. SAME-CUSTOMER VALIDATION CHECK
-    const normalizeName = (s) => (s || '').trim().toLowerCase();
-    const customerNames = new Set(
-      allChallans.map(ch => normalizeName(ch.billTo || ch.partyName)).filter(Boolean)
+    // 2. FLEXIBLE SAME-CUSTOMER VALIDATION CHECK
+    const normalizeKey = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const customerKeys = new Set(
+      allChallans.map(ch => normalizeKey(ch.billTo || ch.partyName)).filter(Boolean)
+    );
+    const partyNameKeys = new Set(
+      allChallans.map(ch => normalizeKey(ch.partyName || ch.billTo)).filter(Boolean)
     );
 
-    if (customerNames.size > 1) {
+    if (customerKeys.size > 1 && partyNameKeys.size > 1) {
       const partyList = [...new Set(allChallans.map(ch => ch.billTo || ch.partyName).filter(Boolean))].join(', ');
       return res.status(400).json({
         success: false,

@@ -3271,8 +3271,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       return;
                     }
                     const selected = challans.filter(c => selectedChallanIds.includes(c._id));
-                    const partyNames = new Set(selected.map(c => (c.billTo || c.partyName || '').trim().toLowerCase()).filter(Boolean));
-                    if (partyNames.size > 1) {
+                    const normalizeKey = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const customerKeys = new Set(selected.map(c => normalizeKey(c.billTo || c.partyName)).filter(Boolean));
+                    const partyNameKeys = new Set(selected.map(c => normalizeKey(c.partyName || c.billTo)).filter(Boolean));
+
+                    if (customerKeys.size > 1 && partyNameKeys.size > 1) {
                       const partyList = [...new Set(selected.map(c => c.billTo || c.partyName).filter(Boolean))].join(', ');
                       alert(`Cannot merge Challans from different customers. Selected Challans belong to multiple customers: ${partyList}`);
                       return;
