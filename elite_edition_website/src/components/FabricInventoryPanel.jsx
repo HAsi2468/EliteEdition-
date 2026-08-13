@@ -57,8 +57,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   // Challan state
   const [challans, setChallans] = useState([]);
   const [challanSearch, setChallanSearch] = useState('');
+  const [challanStatusFilter, setChallanStatusFilter] = useState('All');
   // Ref to always hold latest challan filter values — prevents stale closure in setInterval
-  const challanFiltersRef = useRef({ search: '', dateStart: '', dateEnd: '' });
+  const challanFiltersRef = useRef({ search: '', dateStart: '', dateEnd: '', status: 'All' });
   const [challanDateStart, setChallanDateStart] = useState('');
   const [challanDateEnd, setChallanDateEnd] = useState('');
   const [isChallanOpen, setIsChallanOpen] = useState(false);
@@ -805,11 +806,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const fetchChallans = async () => {
     try {
       // Always read from ref so stale closures (e.g. setInterval) get current filter values
-      const { search, dateStart, dateEnd } = challanFiltersRef.current;
+      const { search, dateStart, dateEnd, status } = challanFiltersRef.current;
       const res = await api.getFabricChallans({
         dateStart,
         dateEnd,
         search,
+        status
       });
       if (res.success) setChallans(res.data || []);
     } catch (e) {
@@ -821,14 +823,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   // Debounce search input: wait 400ms after user stops typing before firing API.
   // Date changes fire immediately (no delay). Cleanup cancels stale requests.
   useEffect(() => {
-    challanFiltersRef.current = { search: challanSearch, dateStart: challanDateStart, dateEnd: challanDateEnd };
-    // No debounce for date filter changes, only for text search
+    challanFiltersRef.current = { search: challanSearch, dateStart: challanDateStart, dateEnd: challanDateEnd, status: challanStatusFilter };
+    // No debounce for date/status filter changes, only for text search
     const delay = challanSearch !== challanFiltersRef.current.search ? 400 : 0;
     const debounceTimer = setTimeout(() => {
       fetchChallans();
     }, challanSearch ? 400 : 0); // Instant clear when search is emptied, 400ms delay while typing
     return () => clearTimeout(debounceTimer); // Cancel previous timer on next keystroke
-  }, [challanDateStart, challanDateEnd, challanSearch]);
+  }, [challanDateStart, challanDateEnd, challanSearch, challanStatusFilter]);
 
   const getVendorShortForm = (name) => {
     if (!name) return '';
@@ -3291,6 +3293,18 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               <div style={{ position: 'relative' }}>
                 <Search size={14} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input type="text" placeholder="Search challan no, party, job, fabric..." value={challanSearch} onChange={e => setChallanSearch(e.target.value)} style={{ ...inputStyle, width: '230px', paddingLeft: '2rem' }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Status:</span>
+                <select
+                  value={challanStatusFilter}
+                  onChange={e => setChallanStatusFilter(e.target.value)}
+                  style={{ ...inputStyle, width: '120px', padding: '0.35rem 0.5rem', cursor: 'pointer', fontWeight: 700, color: 'var(--text-primary)', background: 'var(--bg-input, rgba(15, 23, 42, 0.6))' }}
+                >
+                  <option value="All">All Status</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="INVOICED">Invoiced</option>
+                </select>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>

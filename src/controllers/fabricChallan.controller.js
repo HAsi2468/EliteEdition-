@@ -404,9 +404,19 @@ const createChallan = async (req, res) => {
 // ── GET /fabric-challan ────────────────────────────────────────────────────
 const getChallans = async (req, res) => {
   try {
-    const { dateStart, dateEnd, search, page = 1, limit = 500 } = req.query;
+    const { dateStart, dateEnd, search, status, page = 1, limit = 500 } = req.query;
     const filter = {};
     const andConditions = [];
+
+    if (status && status !== 'All') {
+      if (status.toUpperCase() === 'PENDING') {
+        andConditions.push({ status: { $ne: 'INVOICED' } });
+      } else if (status.toUpperCase() === 'INVOICED') {
+        andConditions.push({ status: 'INVOICED' });
+      } else {
+        andConditions.push({ status });
+      }
+    }
 
     if (dateStart || dateEnd) {
       const dsStr = dateStart ? String(dateStart).split('T')[0] : '';

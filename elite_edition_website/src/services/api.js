@@ -1238,6 +1238,7 @@ export const api = {
     if (params.dateStart) q.append('dateStart', params.dateStart);
     if (params.dateEnd) q.append('dateEnd', params.dateEnd);
     if (params.search) q.append('search', params.search);
+    if (params.status && params.status !== 'All') q.append('status', params.status);
     const qs = q.toString() ? `?${q.toString()}` : '';
     return request(`/fabric-challan${qs}`);
   },
