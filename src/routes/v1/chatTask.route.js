@@ -27,6 +27,33 @@ const upload = multer({ storage: storage });
 
 const router = express.Router();
 
+const DEFAULT_AUTO_GROUPS = [
+  { name: '[EDP] Billing & Invoicing', description: 'GST Invoicing, Accounts & Receivables Group', type: 'group' },
+  { name: '[EDP] Fabric Inventory', description: 'Fabric Inward, Outward & Dispatch Challans Group', type: 'group' },
+  { name: '[EDP] Job Cards', description: 'Digital Printing & Production Job Cards Group', type: 'group' },
+  { name: '[EDP] Design Room', description: 'Design Library, Master Assets & Patterns Group', type: 'group' },
+  { name: '[ST] Stitching Department', description: 'Stitching Production & Fabric Challans Group', type: 'group' },
+  { name: '[EE] E-Commerce Inventory', description: 'Elite Edition Online Inventory & Dispatch Group', type: 'group' }
+];
+
+async function ensureAutoScreenGroupsExist() {
+  try {
+    for (const grp of DEFAULT_AUTO_GROUPS) {
+      const existing = await ChatRoom.findOne({ name: grp.name });
+      if (!existing) {
+        await ChatRoom.create({
+          name: grp.name,
+          type: 'group',
+          description: grp.description,
+          members: []
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error ensuring auto screen groups exist:', err);
+  }
+}
+
 // Generate Pre-signed URL for S3
 router.post('/presign', async (req, res) => {
   try {
