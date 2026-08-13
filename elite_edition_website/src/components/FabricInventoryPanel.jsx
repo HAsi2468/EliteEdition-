@@ -1610,7 +1610,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       {error && <div style={{ color: 'red', padding: '1rem', background: '#ffebeb', borderRadius: '8px' }}>{error}</div>}
 
       {/* Main Content Area */}
-      <div className="glass-panel" style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
+      <div className={onlyChallan ? '' : 'glass-panel'} style={{ flex: 1, overflowY: 'auto', padding: onlyChallan ? 0 : '1.5rem' }}>
 
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
