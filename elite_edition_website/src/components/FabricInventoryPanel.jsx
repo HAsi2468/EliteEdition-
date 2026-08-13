@@ -66,7 +66,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [challanLotLoading, setChallanLotLoading] = useState(false);
   const [challanDeleteTarget, setChallanDeleteTarget] = useState(null);
   const [viewChallanModal, setViewChallanModal] = useState(null);
-  const [selectedChallanIds, setSelectedChallanIds] = useState([]);
+  const [selectedChallanMap, setSelectedChallanMap] = useState({});
+  const selectedChallanIds = Object.keys(selectedChallanMap);
   const [availableLots, setAvailableLots] = useState([]);
   const [billToOptions, setBillToOptions] = useState([]);
   const [shipToOptions, setShipToOptions] = useState([]);
@@ -3270,7 +3271,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       alert('Maximum 10 Challans can be merged into a single Invoice. Please deselect some and try again.');
                       return;
                     }
-                    const selected = challans.filter(c => selectedChallanIds.includes(c._id));
+                    const selected = Object.values(selectedChallanMap);
                     const normalizeKey = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                     const customerKeys = new Set(selected.map(c => normalizeKey(c.billTo || c.partyName)).filter(Boolean));
                     const partyNameKeys = new Set(selected.map(c => normalizeKey(c.partyName || c.billTo)).filter(Boolean));
@@ -3314,10 +3315,17 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', width: '38px' }}>
                       <input
                         type="checkbox"
-                        checked={selectedChallanIds.length > 0 && selectedChallanIds.length === challans.length}
+                        checked={challans.length > 0 && challans.every(c => !!selectedChallanMap[c._id])}
                         onChange={e => {
-                          if (e.target.checked) setSelectedChallanIds(challans.map(c => c._id));
-                          else setSelectedChallanIds([]);
+                          if (e.target.checked) {
+                            setSelectedChallanMap(prev => {
+                              const copy = { ...prev };
+                              challans.forEach(c => { copy[c._id] = c; });
+                              return copy;
+                            });
+                          } else {
+                            setSelectedChallanMap({});
+                          }
                         }}
                         style={{ cursor: 'pointer' }}
                       />
@@ -3344,10 +3352,17 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
                         <input
                           type="checkbox"
-                          checked={selectedChallanIds.includes(ch._id)}
+                          checked={!!selectedChallanMap[ch._id]}
                           onChange={e => {
-                            if (e.target.checked) setSelectedChallanIds(prev => [...prev, ch._id]);
-                            else setSelectedChallanIds(prev => prev.filter(id => id !== ch._id));
+                            if (e.target.checked) {
+                              setSelectedChallanMap(prev => ({ ...prev, [ch._id]: ch }));
+                            } else {
+                              setSelectedChallanMap(prev => {
+                                const copy = { ...prev };
+                                delete copy[ch._id];
+                                return copy;
+                              });
+                            }
                           }}
                           style={{ cursor: 'pointer' }}
                         />
