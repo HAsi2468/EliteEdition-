@@ -2017,6 +2017,31 @@ const Workspace = ({ currentUser }) => {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   };
 
+  const formatMessageTimestamp = (dateInput) => {
+    if (!dateInput) return '';
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return '';
+
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday = date.toDateString() === yesterday.toDateString();
+
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    if (isToday) {
+      return `Today at ${timeStr}`;
+    }
+    if (isYesterday) {
+      return `Yesterday at ${timeStr}`;
+    }
+
+    const dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return `${dateStr}, ${timeStr}`;
+  };
+
   const filteredTasks = boardTasks.filter(t => {
     if (taskFilter === 'my-tasks') {
       if (!t.assignees?.some(a => a._id === currentUser._id)) return false;
@@ -2264,14 +2289,42 @@ const Workspace = ({ currentUser }) => {
             <div className={`glass-panel workspace-sidebar-panel ${isMobile && mobileActiveView === 'chat' ? 'ws-hide-mobile' : ''}`} style={wsStyles.sidebar}>
               <div style={{ marginBottom: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px' }}>
-                  <h3 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Channels</h3>
-                  <button onClick={() => setShowCreateRoomModal(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><Plus size={16} /></button>
+                  <h3 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Channels & Groups</h3>
+                  <button onClick={() => setShowCreateRoomModal(true)} title="Create New Channel / Group" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}><Plus size={18} /></button>
                 </div>
+
+                <button
+                  onClick={() => setShowCreateRoomModal(true)}
+                  style={{
+                    width: '100%',
+                    padding: '0.55rem 0.85rem',
+                    borderRadius: '8px',
+                    background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(124, 58, 237, 0.15))',
+                    border: '1px dashed var(--primary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justify: 'center',
+                    gap: '6px',
+                    margin: '0.2rem 0 0.8rem 0',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <Plus size={15} color="var(--primary)" />
+                  <span>➕ Create Custom Channel / Group</span>
+                </button>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {groupRooms.map(room => (
                     <div key={room._id} style={wsStyles.roomItem(activeRoom?._id === room._id)} onClick={() => { setActiveRoom(room); setMobileActiveView('chat'); }}>
-                      <Hash size={18} /><span>{room.name}</span>
+                      <Hash size={18} />
+                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{room.name}</span>
+                        {room.description && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{room.description}</span>}
+                      </div>
                       {unreadCounts[room._id] > 0 && (
                         <div style={{
                           marginLeft: 'auto',
@@ -2542,25 +2595,61 @@ const Workspace = ({ currentUser }) => {
                           return <div style={{ margin: 'auto', color: 'var(--text-secondary)' }}>No matching messages found.</div>;
                         }
 
-                        return filteredMessages.map(msg => {
+                        let lastMsgDateStr = '';
+
+                        return filteredMessages.map((msg, idx) => {
                           const isMine = msg.senderId?._id === currentUser._id;
                           const isTask = msg.type === 'task-card';
                           
+                          // Format Date Header Divider
+                          const msgDate = new Date(msg.createdAt);
+                          const dateKey = !isNaN(msgDate.getTime()) ? msgDate.toDateString() : '';
+                          const showDateHeader = dateKey && dateKey !== lastMsgDateStr;
+                          if (showDateHeader) {
+                            lastMsgDateStr = dateKey;
+                          }
+
+                          // Readable Date Divider Text
+                          let dateHeaderLabel = '';
+                          if (showDateHeader) {
+                            const now = new Date();
+                            const yesterday = new Date(now);
+                            yesterday.setDate(yesterday.getDate() - 1);
+                            if (msgDate.toDateString() === now.toDateString()) {
+                              dateHeaderLabel = 'Today';
+                            } else if (msgDate.toDateString() === yesterday.toDateString()) {
+                              dateHeaderLabel = 'Yesterday';
+                            } else {
+                              dateHeaderLabel = msgDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                            }
+                          }
+
                           return (
-                            <div key={msg._id} id={`msg-${msg._id}`} style={{ display: 'flex', flexDirection: 'column', transition: 'background-color 0.5s ease', borderRadius: '8px' }}>
-                              <div style={wsStyles.messageSender(isMine && !isTask)}>
-                                <span>{msg.senderId?.name || msg.senderId?.username || 'System'}</span>
-                                <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                  {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                  {renderReadReceipt(msg)}
-                                </span>
-                              </div>
-                              
-                              <div 
-                                style={wsStyles.messageBubble(isMine, isTask)}
-                                onMouseEnter={() => !isTask && setHoveredMessageId(msg._id)}
-                                onMouseLeave={() => !isTask && setHoveredMessageId(null)}
-                              >
+                            <React.Fragment key={msg._id || idx}>
+                              {showDateHeader && (
+                                <div style={{ display: 'flex', alignItems: 'center', margin: '1.25rem 0 0.65rem 0', gap: '1rem' }}>
+                                  <div style={{ flex: 1, height: '1px', background: 'var(--border-light, rgba(255,255,255,0.1))' }} />
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#a78bfa', background: 'rgba(167, 139, 250, 0.12)', padding: '0.25rem 0.85rem', borderRadius: '12px', letterSpacing: '0.04em' }}>
+                                    📅 {dateHeaderLabel}
+                                  </span>
+                                  <div style={{ flex: 1, height: '1px', background: 'var(--border-light, rgba(255,255,255,0.1))' }} />
+                                </div>
+                              )}
+
+                              <div id={`msg-${msg._id}`} style={{ display: 'flex', flexDirection: 'column', transition: 'background-color 0.5s ease', borderRadius: '8px' }}>
+                                <div style={wsStyles.messageSender(isMine && !isTask)}>
+                                  <span>{msg.senderId?.name || msg.senderId?.username || 'System'}</span>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', opacity: 0.88 }}>
+                                    <span>📅 {formatMessageTimestamp(msg.createdAt)}</span>
+                                    {renderReadReceipt(msg)}
+                                  </span>
+                                </div>
+                                
+                                <div 
+                                  style={wsStyles.messageBubble(isMine, isTask)}
+                                  onMouseEnter={() => !isTask && setHoveredMessageId(msg._id)}
+                                  onMouseLeave={() => !isTask && setHoveredMessageId(null)}
+                                >
                                 {/* TASK CARD RENDERING in CHAT */}
                                 {isTask && msg.taskId ? (
                                    <div>
@@ -2849,6 +2938,7 @@ const Workspace = ({ currentUser }) => {
                                 )}
                               </div>
                             </div>
+                          </React.Fragment>
                           );
                         });
                       })()
@@ -3959,31 +4049,53 @@ const Workspace = ({ currentUser }) => {
         <div style={wsStyles.modalOverlay}>
           <div style={wsStyles.modalContent}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0 }}>Create Channel</h3>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Plus size={20} color="var(--primary)" /> Create Custom Channel / Group
+              </h3>
               <button onClick={() => setShowCreateRoomModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={20} /></button>
             </div>
             
             <form onSubmit={handleCreateRoomSubmit}>
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Channel Name</label>
-                <input required autoFocus type="text" value={newRoomName} onChange={e => setNewRoomName(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none' }} placeholder="e.g. general-discussions" />
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Channel / Group Name</label>
+                <input required autoFocus type="text" value={newRoomName} onChange={e => setNewRoomName(e.target.value)} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-main)', color: 'var(--text-primary)', outline: 'none', fontSize: '0.9rem' }} placeholder="e.g. urgent-orders, printing-issues, sales-leads" />
               </div>
 
               <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Select Members to Invite</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Select Members to Invite</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (newRoomMembers.length === otherUsers.length) {
+                        setNewRoomMembers([]);
+                      } else {
+                        setNewRoomMembers(otherUsers.map(u => u._id));
+                      }
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 'bold', textDecoration: 'underline' }}
+                  >
+                    {newRoomMembers.length === otherUsers.length ? 'Deselect All' : 'Select All Members'}
+                  </button>
+                </div>
+
                 <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: 'var(--bg-main)' }}>
-                  {otherUsers.map(u => (
-                    <label key={u._id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                      <input type="checkbox" checked={newRoomMembers.includes(u._id)} onChange={() => handleRoomMemberToggle(u._id)} />
-                      <span>{u.name || u.username} ({u.email})</span>
-                    </label>
-                  ))}
+                  {otherUsers.length === 0 ? (
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', textAlign: 'center', padding: '8px' }}>No other team members found.</span>
+                  ) : (
+                    otherUsers.map(u => (
+                      <label key={u._id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.88rem', color: 'var(--text-primary)', padding: '4px', borderRadius: '4px' }}>
+                        <input type="checkbox" checked={newRoomMembers.includes(u._id)} onChange={() => handleRoomMemberToggle(u._id)} />
+                        <span>{u.name || u.username} ({u.email || u.role || 'Staff'})</span>
+                      </label>
+                    ))
+                  )}
                 </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <button type="button" onClick={() => setShowCreateRoomModal(false)} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--border-light)', backgroundColor: 'transparent', color: 'var(--text-primary)', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: '#0b0f19', cursor: 'pointer', fontWeight: 'bold' }}>Create Room</button>
+                <button type="submit" style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--primary)', color: '#0b0f19', cursor: 'pointer', fontWeight: 'bold' }}>Create Channel</button>
               </div>
             </form>
           </div>
