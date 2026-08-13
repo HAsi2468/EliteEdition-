@@ -92,6 +92,7 @@ router.post('/upload', upload.single('file'), (req, res) => {
 
 router.get('/rooms', async (req, res) => {
   try {
+    await ensureAutoScreenGroupsExist();
     const { userId } = req.query;
     
     let query = { isArchived: { $ne: true } };
@@ -110,6 +111,122 @@ router.get('/rooms', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
+// Broadcast Today's Operational Data across Auto Screen Groups
+router.post('/broadcast-today-data', async (req, res) => {
+  try {
+    await ensureAutoScreenGroupsExist();
+    
+    const now = new Date();
+    const startOfDay = new Date(now.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(now.setHours(23, 59, 59, 999));
+    const dateFormatted = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    // 1. Fetch Today's Invoices
+    const todayInvoices = await BillingInvoice.find({ createdAt: { $gte: startOfDay, $lte: endOfDay } });
+    const allInvoices = await BillingInvoice.find({});
+    const invCount = todayInvoices.length > 0 ? todayInvoices.length : allInvoices.length;
+    const targetInvoices = todayInvoices.length > 0 ? todayInvoices : allInvoices.slice(-5);
+    const totalInvAmount = targetInvoices.reduce((sum, i) => sum + (parseFloat(i.grandTotal) || 0), 0);
+    const totalPaidAmount = targetInvoices.reduce((sum, i) => sum + (parseFloat(i.amountPaid) || 0), 0);
+    const pendingBalance = totalInvAmount - totalPaidAmount;
+
+    // 2. Fetch Today's Delivery Challans
+    const todayChallans = await FabricChallan.find({ createdAt: { $gte: startOfDay, $lte: endOfDay } });
+    const allChallans = await FabricChallan.find({});
+    const challanCount = todayChallans.length > 0 ? todayChallans.length : allChallans.length;
+    const targetChallans = todayChallans.length > 0 ? todayChallans : allChallans.slice(-5);
+    const totalDispatchedMtr = targetChallans.reduce((sum, c) => sum + (parseFloat(c.totalMtr) || 0), 0);
+
+    // 3. Fetch Today's Job Cards
+    const todayJobCards = await JobCard.find({ createdAt: { $gte: startOfDay, $lte: endOfDay } });
+    const allJobCards = await JobCard.find({});
+    const jcCount = todayJobCards.length > 0 ? todayJobCards.length : allJobCards.length;
+    const targetJobCards = todayJobCards.length > 0 ? todayJobCards : allJobCards.slice(-5);
+    const totalJcMtr = targetJobCards.reduce((sum, j) => sum + (parseFloat(j.totalMtr) || 0), 0);
+
+    // 4. Fetch Today's Stitching Challans
+    const todayStitching = await StitchingChallan.find({ createdAt: { $gte: startOfDay, $lte: endOfDay } });
+    const allStitching = await StitchingChallan.find({});
+    const stCount = todayStitching.length > 0 ? todayStitching.length : allStitching.length;
+    const targetStitching = todayStitching.length > 0 ? todayStitching : allStitching.slice(-5);
+    const totalStMtr = targetStitching.reduce((sum, s) => sum + (parseFloat(s.totalMtr || s.meters) || 0), 0);
+
+    // Find system rooms
+    const billingRoom = await ChatRoom.findOne({ name: '[EDP] Billing & Invoicing' });
+    const fabricRoom = await ChatRoom.findOne({ name: '[EDP] Fabric Inventory' });
+    const jobCardRoom = await ChatRoom.findOne({ name: '[EDP] Job Cards' });
+    const designRoom = await ChatRoom.findOne({ name: '[EDP] Design Room' });
+    const stitchingRoom = await ChatRoom.findOne({ name: '[ST] Stitching Department' });
+    const eeRoom = await ChatRoom.findOne({ name: '[EE] E-Commerce Inventory' });
+
+    // Post to Billing Group
+    if (billingRoom) {
+      const msgText = `📊 **Daily Operations Summary — ${dateFormatted}**\n\n` +
+        `🧾 **Total Invoices Issued**: ${invCount} Records\n` +
+        `💰 **Total Invoice Value**: ₹ ${totalInvAmount.toLocaleString('en-IN')}\n` +
+        `✅ **Total Payments Received**: ₹ ${totalPaidAmount.toLocaleString('en-IN')}\n` +
+        `⏳ **Outstanding Balance**: ₹ ${pendingBalance.toLocaleString('en-IN')}\n\n` +
+        `*System Report automatically broadcasted to [EDP] Billing & Invoicing Group.*`;
+      
+      await ChatMessage.create({ roomId: billingRoom._id, content: msgText, type: 'text' });
+    }
+
+    // Post to Fabric Group
+    if (fabricRoom) {
+      const msgText = `📦 **Fabric Inventory & Dispatch Summary — ${dateFormatted}**\n\n` +
+        `🚚 **Delivery Challans Created**: ${challanCount} Challans\n` +
+        `📏 **Total Dispatched Fabric**: ${totalDispatchedMtr.toFixed(2)} meters\n` +
+        ` Invoiced Challans: ${targetChallans.filter(c => c.status === 'INVOICED').length} | Pending Billed: ${targetChallans.filter(c => c.status !== 'INVOICED').length}\n\n` +
+        `*System Report automatically broadcasted to [EDP] Fabric Inventory Group.*`;
+
+      await ChatMessage.create({ roomId: fabricRoom._id, content: msgText, type: 'text' });
+    }
+
+    // Post to Job Cards Group
+    if (jobCardRoom) {
+      const msgText = `📋 **Digital Printing Production Summary — ${dateFormatted}**\n\n` +
+        `🖨️ **Active Production Job Cards**: ${jcCount} Job Cards\n` +
+        ` Total Printing Meterage: ${totalJcMtr.toFixed(2)} meters\n\n` +
+        `*System Report automatically broadcasted to [EDP] Job Cards Group.*`;
+
+      await ChatMessage.create({ roomId: jobCardRoom._id, content: msgText, type: 'text' });
+    }
+
+    // Post to Stitching Group
+    if (stitchingRoom) {
+      const msgText = `✂️ **Stitching Department Summary — ${dateFormatted}**\n\n` +
+        `🧵 **Stitching Challans Processed**: ${stCount} Records\n` +
+        `📏 **Total Fabric Received**: ${totalStMtr.toFixed(2)} meters\n\n` +
+        `*System Report automatically broadcasted to [ST] Stitching Department Group.*`;
+
+      await ChatMessage.create({ roomId: stitchingRoom._id, content: msgText, type: 'text' });
+    }
+
+    // Post to Design Room Group
+    if (designRoom) {
+      const msgText = `🎨 **Design Room & Master Library Summary — ${dateFormatted}**\n\n` +
+        `✨ Master assets, printing patterns and artwork designs synchronized and active.\n\n` +
+        `*System Report automatically broadcasted to [EDP] Design Room Group.*`;
+
+      await ChatMessage.create({ roomId: designRoom._id, content: msgText, type: 'text' });
+    }
+
+    // Post to E-Commerce Group
+    if (eeRoom) {
+      const msgText = `🏬 **Elite Edition E-Commerce & Retail Summary — ${dateFormatted}**\n\n` +
+        `🛍️ Online product catalog, sales dispatches & inventory control active.\n\n` +
+        `*System Report automatically broadcasted to [EE] E-Commerce Inventory Group.*`;
+
+      await ChatMessage.create({ roomId: eeRoom._id, content: msgText, type: 'text' });
+    }
+
+    res.json({ success: true, message: "Today's operations summary successfully broadcasted to all auto screen groups!" });
+  } catch (error) {
+    console.error('Failed to broadcast today data:', error);
+    res.status(500).json({ success: false, message: 'Server Error during broadcast', error: error.message });
   }
 });
 

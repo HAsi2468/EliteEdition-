@@ -873,6 +873,12 @@ export const api = {
     });
   },
 
+  async broadcastTodayData() {
+    return request('/workspace/broadcast-today-data', {
+      method: 'POST'
+    });
+  },
+
   async getRoomMessages(roomId, before = '') {
     const query = before ? `?before=${before}` : '';
     return request(`/workspace/rooms/${roomId}/messages${query}`);
