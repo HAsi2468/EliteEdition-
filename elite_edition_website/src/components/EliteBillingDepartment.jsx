@@ -28,6 +28,7 @@ import {
   Edit2,
   ChevronRight,
   Package,
+  Calendar,
   X,
   Truck,
   Receipt,
@@ -72,6 +73,159 @@ function formatJobDisplay(jobStr) {
   return str.replace(/JOB NO\.-?\s*/gi, '').replace(/Job\s*#?\s*/gi, '').trim();
 }
 
+const PRESET_OPTIONS = [
+  { id: 'today', name: 'Today' },
+  { id: 'yesterday', name: 'Yesterday' },
+  { id: 'this_week', name: 'This Week' },
+  { id: 'last_week', name: 'Last Week' },
+  { id: 'last_7_days', name: 'Last 7 Days' },
+  { id: 'this_month', name: 'This Month' },
+  { id: 'previous_month', name: 'Previous Month' },
+  { id: 'last_30_days', name: 'Last 30 Days' },
+  { id: 'this_quarter', name: 'This Quarter' },
+  { id: 'previous_quarter', name: 'Previous Quarter' },
+  { id: 'current_fiscal_year', name: 'Current Fiscal Year' },
+  { id: 'previous_fiscal_year', name: 'Previous Fiscal Year' },
+  { id: 'last_365_days', name: 'Last 365 Days' },
+  { id: 'all', name: 'All Time' },
+  { id: 'custom', name: 'Custom' }
+];
+
+function getDatePresetRange(preset, customStart = '', customEnd = '') {
+  const now = new Date();
+  let start = null;
+  let end = null;
+  let labelText = '';
+
+  const formatDate = (d) => {
+    if (!d) return '';
+    const day = String(d.getDate()).padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
+
+  switch (preset) {
+    case 'today': {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'yesterday': {
+      const y = new Date(now);
+      y.setDate(now.getDate() - 1);
+      start = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 0, 0, 0);
+      end = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'this_week': {
+      const dayOfWeek = now.getDay();
+      const distToMonday = (dayOfWeek + 6) % 7;
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distToMonday, 0, 0, 0);
+      const sun = new Date(start);
+      sun.setDate(start.getDate() + 6);
+      end = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'last_week': {
+      const dayOfWeek = now.getDay();
+      const distToMonday = (dayOfWeek + 6) % 7;
+      const prevMon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distToMonday - 7, 0, 0, 0);
+      start = prevMon;
+      const prevSun = new Date(prevMon);
+      prevSun.setDate(prevMon.getDate() + 6);
+      end = new Date(prevSun.getFullYear(), prevSun.getMonth(), prevSun.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'last_7_days': {
+      const d7 = new Date(now);
+      d7.setDate(now.getDate() - 6);
+      start = new Date(d7.getFullYear(), d7.getMonth(), d7.getDate(), 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'this_month': {
+      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'previous_month': {
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'last_30_days': {
+      const d30 = new Date(now);
+      d30.setDate(now.getDate() - 29);
+      start = new Date(d30.getFullYear(), d30.getMonth(), d30.getDate(), 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'this_quarter': {
+      const m = now.getMonth();
+      const qStartMonth = Math.floor(m / 3) * 3;
+      start = new Date(now.getFullYear(), qStartMonth, 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'previous_quarter': {
+      const m = now.getMonth();
+      const qStartMonth = Math.floor(m / 3) * 3 - 3;
+      start = new Date(now.getFullYear(), qStartMonth, 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'current_fiscal_year': {
+      const yr = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+      start = new Date(yr, 3, 1, 0, 0, 0);
+      end = new Date(yr + 1, 2, 31, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'previous_fiscal_year': {
+      const yr = (now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1) - 1;
+      start = new Date(yr, 3, 1, 0, 0, 0);
+      end = new Date(yr + 1, 2, 31, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'last_365_days': {
+      const d365 = new Date(now);
+      d365.setDate(now.getDate() - 364);
+      start = new Date(d365.getFullYear(), d365.getMonth(), d365.getDate(), 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'custom': {
+      if (customStart) start = new Date(`${customStart}T00:00:00`);
+      if (customEnd) end = new Date(`${customEnd}T23:59:59`);
+      labelText = start && end ? `${formatDate(start)} - ${formatDate(end)}` : 'Custom Range';
+      break;
+    }
+    case 'all':
+    default: {
+      start = null;
+      end = null;
+      labelText = 'All Time Records';
+      break;
+    }
+  }
+
+  return { start, end, labelText };
+}
+
 export default function EliteBillingDepartment({ initialChallanData = null, department = 'digital_print' }) {
   const [activeTab, setActiveTab] = useState('challans'); // 'challans', 'invoices', 'dashboard', 'create', 'customers', 'items'
   const [challanDept, setChallanDept] = useState(() => (department === 'stitching' ? 'stitching' : 'digital_print'));
@@ -91,6 +245,105 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [datePreset, setDatePreset] = useState('last_365_days');
+  const [customDateStart, setCustomDateStart] = useState('');
+  const [customDateEnd, setCustomDateEnd] = useState('');
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+
+  // Multi-select for bulk Invoice PDF download
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
+  const [bulkDownloading, setBulkDownloading] = useState(false);
+
+  const handleToggleSelectAllInvoices = (visibleInvoices) => {
+    const visibleIds = visibleInvoices.map(i => i._id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedInvoiceIds.includes(id));
+    if (allSelected) {
+      setSelectedInvoiceIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      setSelectedInvoiceIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const handleToggleSelectInvoice = (id) => {
+    setSelectedInvoiceIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkDownloadInvoices = async () => {
+    if (selectedInvoiceIds.length === 0) return;
+    setBulkDownloading(true);
+    try {
+      const selectedInvs = invoices.filter(inv => selectedInvoiceIds.includes(inv._id));
+      for (const inv of selectedInvs) {
+        await api.downloadInvoicePdf(inv._id, inv.invoiceNo || 'Invoice');
+        await new Promise(res => setTimeout(res, 400));
+      }
+      triggerPushNotification('📥 Bulk Invoice PDFs Downloaded', `${selectedInvs.length} Invoices downloaded successfully.`, 'success');
+    } catch (e) {
+      alert('Error during bulk invoice download: ' + e.message);
+    } finally {
+      setBulkDownloading(false);
+    }
+  };
+
+  const activeRange = useMemo(() => {
+    return getDatePresetRange(datePreset, customDateStart, customDateEnd);
+  }, [datePreset, customDateStart, customDateEnd]);
+
+  const periodInvoices = useMemo(() => {
+    if (!activeRange.start && !activeRange.end) return invoices;
+    return invoices.filter(inv => {
+      const dateVal = inv.invoiceDate || inv.date || inv.createdAt;
+      if (!dateVal) return true;
+      const d = new Date(dateVal);
+      if (activeRange.start && d < activeRange.start) return false;
+      if (activeRange.end && d > activeRange.end) return false;
+      return true;
+    });
+  }, [invoices, activeRange]);
+
+  const periodStats = useMemo(() => {
+    const totalInvoices = periodInvoices.length;
+    let totalInvoiced = 0;
+    let totalPaid = 0;
+    let totalBalanceDue = 0;
+    let paidCount = 0;
+    let unpaidCount = 0;
+    let overdueCount = 0;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    periodInvoices.forEach(inv => {
+      const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
+      const paid = Number(inv.paidAmount || 0);
+      const balance = Math.max(0, grandTotal - paid);
+
+      totalInvoiced += grandTotal;
+      totalPaid += paid;
+      totalBalanceDue += balance;
+
+      if (inv.paymentStatus === 'PAID' || balance <= 0) {
+        paidCount++;
+      } else {
+        unpaidCount++;
+        if (inv.dueDate && inv.dueDate < todayStr) {
+          overdueCount++;
+        }
+      }
+    });
+
+    return {
+      totalInvoices,
+      totalInvoiced,
+      totalPaid,
+      totalBalanceDue,
+      paidCount,
+      unpaidCount,
+      overdueCount
+    };
+  }, [periodInvoices]);
+
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [customerSearch, setCustomerSearch] = useState('');
   const [itemSearch, setItemSearch] = useState('');
@@ -805,30 +1058,147 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         </div>
       </div>
 
-      {/* ── KPI CARDS ───────────────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-        <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #3b82f6' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Invoiced</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{fmtINR(stats.totalInvoiced)}</div>
-          <div style={{ fontSize: '0.72rem', color: '#3b82f6', marginTop: 4 }}>{stats.totalInvoices} Invoices Generated</div>
+      {/* ── DATE FILTER & KPI CARDS BAR ─────────────────────────────────────── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', padding: '0.2rem 0.1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+            <Calendar size={17} color="#a78bfa" />
+            <span>Reporting Period:</span>
+            <span style={{ fontSize: '0.78rem', color: '#a78bfa', fontWeight: 600 }}>({activeRange.labelText})</span>
+          </div>
+
+          {/* Date Range Preset Selector Component */}
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+              type="button"
+              onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.65rem',
+                padding: '0.5rem 1.1rem',
+                borderRadius: '8px',
+                border: '1.5px solid #a78bfa',
+                background: 'var(--panel-bg, #1e1b4b)',
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(124, 58, 237, 0.25)',
+                transition: 'all 0.2s'
+              }}
+            >
+              <Calendar size={16} color="#a78bfa" />
+              <span>{PRESET_OPTIONS.find(p => p.id === datePreset)?.name || 'Last 365 Days'}</span>
+              <Calendar size={16} color="#a78bfa" />
+            </button>
+
+            {isDateDropdownOpen && (
+              <>
+                <div
+                  style={{ position: 'fixed', inset: 0, zIndex: 998 }}
+                  onClick={() => setIsDateDropdownOpen(false)}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 6px)',
+                    right: 0,
+                    width: '380px',
+                    maxHeight: '400px',
+                    overflowY: 'auto',
+                    background: '#ffffff',
+                    color: '#1e293b',
+                    borderRadius: '10px',
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.35)',
+                    border: '1px solid #cbd5e1',
+                    zIndex: 999,
+                    padding: '0.35rem 0'
+                  }}
+                >
+                  {PRESET_OPTIONS.map(opt => {
+                    const rangeInfo = getDatePresetRange(opt.id, customDateStart, customDateEnd);
+                    const isSelected = datePreset === opt.id;
+                    return (
+                      <div
+                        key={opt.id}
+                        onClick={() => {
+                          setDatePreset(opt.id);
+                          if (opt.id !== 'custom') setIsDateDropdownOpen(false);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justify: 'space-between',
+                          padding: '0.65rem 1rem',
+                          cursor: 'pointer',
+                          background: isSelected ? '#f1f5f9' : 'transparent',
+                          borderBottom: '1px solid #f1f5f9',
+                          fontSize: '0.84rem',
+                          transition: 'background 0.15s'
+                        }}
+                      >
+                        <span style={{ fontWeight: isSelected ? 700 : 500, color: isSelected ? '#4338ca' : '#334155' }}>
+                          {opt.name}
+                        </span>
+                        <span style={{ fontWeight: 700, fontSize: '0.78rem', color: isSelected ? '#1e1b4b' : '#64748b' }}>
+                          {rangeInfo.labelText}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {datePreset === 'custom' && (
+                    <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>From</label>
+                          <input type="date" value={customDateStart} onChange={e => setCustomDateStart(e.target.value)} style={{ width: '100%', padding: '0.3rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>To</label>
+                          <input type="date" value={customDateEnd} onChange={e => setCustomDateEnd(e.target.value)} style={{ width: '100%', padding: '0.3rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setIsDateDropdownOpen(false)}
+                        style={{ padding: '0.4rem', background: '#4338ca', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Apply Custom Range
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #10b981' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Received (Paid)</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#34d399', marginTop: 4 }}>{fmtINR(stats.totalPaid)}</div>
-          <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: 4 }}>{stats.paidCount} Fully Paid Invoices</div>
-        </div>
+        {/* KPI CARDS GRID */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+          <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #3b82f6' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Invoiced</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{fmtINR(periodStats.totalInvoiced)}</div>
+            <div style={{ fontSize: '0.72rem', color: '#3b82f6', marginTop: 4 }}>{periodStats.totalInvoices} Invoices Generated</div>
+          </div>
 
-        <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #f59e0b' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Pending Receivables</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>{fmtINR(stats.totalBalanceDue)}</div>
-          <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: 4 }}>{stats.unpaidCount} Pending / Partial</div>
-        </div>
+          <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #10b981' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Received (Paid)</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#34d399', marginTop: 4 }}>{fmtINR(periodStats.totalPaid)}</div>
+            <div style={{ fontSize: '0.72rem', color: '#10b981', marginTop: 4 }}>{periodStats.paidCount} Fully Paid Invoices</div>
+          </div>
 
-        <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #ef4444' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Overdue Invoices</div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f87171', marginTop: 4 }}>{stats.overdueCount}</div>
-          <div style={{ fontSize: '0.72rem', color: '#ef4444', marginTop: 4 }}>Payment Date Passed</div>
+          <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #f59e0b' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Pending Receivables</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>{fmtINR(periodStats.totalBalanceDue)}</div>
+            <div style={{ fontSize: '0.72rem', color: '#f59e0b', marginTop: 4 }}>{periodStats.unpaidCount} Pending / Partial</div>
+          </div>
+
+          <div className="glass-panel" style={{ padding: '1.1rem', borderLeft: '4px solid #ef4444' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Overdue Invoices</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#f87171', marginTop: 4 }}>{periodStats.overdueCount}</div>
+            <div style={{ fontSize: '0.72rem', color: '#ef4444', marginTop: 4 }}>Payment Date Passed</div>
+          </div>
         </div>
       </div>
 
@@ -876,37 +1246,83 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             </button>
           </div>
 
+          {/* Bulk Invoices Selection Action Bar */}
+          {selectedInvoiceIds.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 1.1rem', background: 'rgba(124, 58, 237, 0.18)', border: '1px solid #7c3aed', borderRadius: '10px', boxShadow: '0 4px 14px rgba(124, 58, 237, 0.25)' }}>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#c084fc', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckCircle size={16} color="#a78bfa" />
+                <span>{selectedInvoiceIds.length} Invoice{selectedInvoiceIds.length > 1 ? 's' : ''} Selected for Bulk PDF Download</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                <button
+                  onClick={handleBulkDownloadInvoices}
+                  disabled={bulkDownloading}
+                  className="btn-primary"
+                  style={{ padding: '0.45rem 1.1rem', fontSize: '0.82rem', background: 'linear-gradient(135deg, #7c3aed, #6366f1)', border: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <Download size={15} className={bulkDownloading ? 'spin-loader' : ''} />
+                  {bulkDownloading ? 'Downloading Invoices...' : `Download ${selectedInvoiceIds.length} PDF${selectedInvoiceIds.length > 1 ? 's' : ''}`}
+                </button>
+                <button
+                  onClick={() => setSelectedInvoiceIds([])}
+                  className="btn-secondary"
+                  style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Invoices Table */}
           <div className="glass-panel" style={{ overflowX: 'auto', padding: 0 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Invoice No</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Customer Name</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Date</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Grand Total</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Paid Amount</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Balance Due</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
-                  <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                      No invoices found. Click "Create Invoice" to issue your first invoice!
-                    </td>
-                  </tr>
-                ) : (
-                  invoices
-                    .filter(inv => matchSearchQuery(inv, search, [
-                      'invoiceNo', 'ourChallanNo', 'challanNo', 'orderNo', 'dispatchDocNo',
-                      'customer.name', 'customer.businessName', 'customer.phone', 'customer.gstin',
-                      'items.itemName', 'items.jobNo', 'items.lotNo', 'items.partyChallan', 'items.ourChallanNo', 'items.hsnCode'
-                    ]))
-                    .map(inv => (
-                      <tr key={inv._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+            {(() => {
+              const displayedInvoices = periodInvoices.filter(inv => matchSearchQuery(inv, search, [
+                'invoiceNo', 'ourChallanNo', 'challanNo', 'orderNo', 'dispatchDocNo',
+                'customer.name', 'customer.businessName', 'customer.phone', 'customer.gstin',
+                'items.itemName', 'items.jobNo', 'items.lotNo', 'items.partyChallan', 'items.ourChallanNo', 'items.hsnCode'
+              ]));
+              return (
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
+                      <th style={{ padding: '0.75rem 0.5rem', width: '42px', textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={displayedInvoices.length > 0 && displayedInvoices.every(i => selectedInvoiceIds.includes(i._id))}
+                          onChange={() => handleToggleSelectAllInvoices(displayedInvoices)}
+                          style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#7c3aed' }}
+                          title="Select All Invoices"
+                        />
+                      </th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Invoice No</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Customer Name</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Date</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Grand Total</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Paid Amount</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Balance Due</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayedInvoices.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                          No invoices found for the selected date range ({activeRange.labelText}).
+                        </td>
+                      </tr>
+                    ) : (
+                      displayedInvoices.map(inv => (
+                        <tr key={inv._id} style={{ borderBottom: '1px solid var(--border-light)', background: selectedInvoiceIds.includes(inv._id) ? 'rgba(124, 58, 237, 0.08)' : 'transparent' }}>
+                          <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedInvoiceIds.includes(inv._id)}
+                              onChange={() => handleToggleSelectInvoice(inv._id)}
+                              style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#7c3aed' }}
+                            />
+                          </td>
                         <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: '#a78bfa' }}>
                           <button
                             onClick={() => setViewInvoiceModal(inv)}
@@ -970,7 +1386,9 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 )}
               </tbody>
             </table>
-          </div>
+          );
+        })()}
+      </div>
         </div>
       )}
 

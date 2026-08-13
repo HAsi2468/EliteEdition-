@@ -1632,6 +1632,36 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
   const [shareSearch, setShareSearch] = useState('');
   const [sharingJobCard, setSharingJobCard] = useState(false);
 
+  // Multi-select for Job Cards Bulk Download / Print
+  const [selectedJobCardIds, setSelectedJobCardIds] = useState([]);
+
+  const handleToggleSelectAllJobCards = (visibleCards) => {
+    const visibleIds = visibleCards.map(c => c._id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedJobCardIds.includes(id));
+    if (allSelected) {
+      setSelectedJobCardIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      setSelectedJobCardIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const handleToggleSelectJobCard = (id) => {
+    setSelectedJobCardIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkPrintSelectedJobCards = () => {
+    if (selectedJobCardIds.length === 0) return;
+    const selectedList = cards.filter(c => selectedJobCardIds.includes(c._id));
+    selectedList.forEach((card, index) => {
+      setTimeout(() => {
+        triggerJobCardPrint(card);
+      }, index * 600);
+    });
+    triggerPushNotification('🖨️ Bulk Job Cards Print', `Triggered printing for ${selectedList.length} Job Cards.`, 'success');
+  };
+
   // ── Debounced search: fires API only after user stops typing for 400ms ──────
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const abortRef = useRef(null);
@@ -1988,59 +2018,104 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         </div>
       ) : (
         <>
+          {/* Bulk Job Cards Selection Action Bar */}
+          {selectedJobCardIds.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 1.1rem', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', borderRadius: '10px', marginBottom: '1rem', boxShadow: '0 4px 14px rgba(16, 185, 129, 0.2)' }}>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Printer size={16} color="#34d399" />
+                <span>{selectedJobCardIds.length} Job Card{selectedJobCardIds.length > 1 ? 's' : ''} Selected</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                <button
+                  onClick={handleBulkPrintSelectedJobCards}
+                  className="btn-primary"
+                  style={{ padding: '0.45rem 1.1rem', fontSize: '0.82rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <Printer size={15} />
+                  Print / Save PDF ({selectedJobCardIds.length})
+                </button>
+                <button
+                  onClick={() => setSelectedJobCardIds([])}
+                  className="btn-secondary"
+                  style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          )}
+
           {viewMode === 'list' ? (
             <div className="glass-panel" style={{ overflowX: 'auto', padding: 0 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
-                    <th 
-                      onClick={() => {
-                        if (sortBy === 'jobNo') {
-                          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setSortBy('jobNo');
-                          setSortOrder('desc');
-                        }
-                        setPage(1);
-                      }}
-                      style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Job No {sortBy === 'jobNo' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Party</th>
-                    <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Design</th>
-                    <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Fabric</th>
-                    <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Colors</th>
-                    <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Panna</th>
-                    <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Mtr</th>
-                    <th 
-                      onClick={() => {
-                        if (sortBy === 'date') {
-                          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-                        } else {
-                          setSortBy('date');
-                          setSortOrder('desc');
-                        }
-                        setPage(1);
-                      }}
-                      style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      Date {sortBy === 'date' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
-                    </th>
-                    <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
-                    <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cards
-                    .filter(c => matchSearchQuery(c, debouncedSearch, ['jobNo', 'party', 'designNo', 'designName', 'machineName', 'billNo', 'partyChallan', 'ourChallanNo', 'lotNo', 'fabric']))
-                    .map(c => (
-                    <tr 
-                      key={c._id} 
-                      style={{ borderBottom: '1px solid var(--border-light)', transition: 'background-color 0.15s' }}
-                      onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.015)'}
-                      onMouseLeave={e => e.currentTarget.style.backgroundColor = ''}
-                    >
+              {(() => {
+                const displayedCards = cards.filter(c => matchSearchQuery(c, debouncedSearch, ['jobNo', 'party', 'designNo', 'designName', 'machineName', 'billNo', 'partyChallan', 'ourChallanNo', 'lotNo', 'fabric']));
+                return (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '900px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.02)' }}>
+                        <th style={{ padding: '0.75rem 0.5rem', width: '42px', textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={displayedCards.length > 0 && displayedCards.every(c => selectedJobCardIds.includes(c._id))}
+                            onChange={() => handleToggleSelectAllJobCards(displayedCards)}
+                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#10b981' }}
+                            title="Select All Job Cards"
+                          />
+                        </th>
+                        <th 
+                          onClick={() => {
+                            if (sortBy === 'jobNo') {
+                              setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setSortBy('jobNo');
+                              setSortOrder('desc');
+                            }
+                            setPage(1);
+                          }}
+                          style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          Job No {sortBy === 'jobNo' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </th>
+                        <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Party</th>
+                        <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Design</th>
+                        <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Fabric</th>
+                        <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Colors</th>
+                        <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Panna</th>
+                        <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Mtr</th>
+                        <th 
+                          onClick={() => {
+                            if (sortBy === 'date') {
+                              setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setSortBy('date');
+                              setSortOrder('desc');
+                            }
+                            setPage(1);
+                          }}
+                          style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          Date {sortBy === 'date' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
+                        </th>
+                        <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
+                        <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayedCards.map(c => (
+                        <tr 
+                          key={c._id} 
+                          style={{ borderBottom: '1px solid var(--border-light)', background: selectedJobCardIds.includes(c._id) ? 'rgba(16, 185, 129, 0.08)' : 'transparent', transition: 'background-color 0.15s' }}
+                          onMouseEnter={e => e.currentTarget.style.backgroundColor = selectedJobCardIds.includes(c._id) ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255,255,255,0.015)'}
+                          onMouseLeave={e => e.currentTarget.style.backgroundColor = selectedJobCardIds.includes(c._id) ? 'rgba(16, 185, 129, 0.08)' : ''}
+                        >
+                          <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedJobCardIds.includes(c._id)}
+                              onChange={() => handleToggleSelectJobCard(c._id)}
+                              style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#10b981' }}
+                            />
+                          </td>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                         <JobCardTooltip card={c}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -2111,7 +2186,9 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                   ))}
                 </tbody>
               </table>
-            </div>
+            );
+          })()}
+        </div>
           ) : (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(340px, 1fr))', gap:'1rem' }}>
               {cards.map(c => (
