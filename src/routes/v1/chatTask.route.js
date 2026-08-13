@@ -189,6 +189,8 @@ router.post('/broadcast-today-data', async (req, res) => {
     const stitchingRoom = await ChatRoom.findOne({ name: '[ST] Stitching Department' });
     const eeRoom = await ChatRoom.findOne({ name: '[EE] E-Commerce Inventory' });
 
+    const adminUser = await User.findOne({ role: 'admin' }) || await User.findOne({}) || { _id: new (require('mongoose').Types.ObjectId)() };
+
     // Post to Billing Group
     if (billingRoom) {
       const msgText = `📊 **Daily Operations Summary — ${dateFormatted}**\n\n` +
@@ -198,7 +200,7 @@ router.post('/broadcast-today-data', async (req, res) => {
         `⏳ **Outstanding Balance**: ₹ ${pendingBalance.toLocaleString('en-IN')}\n\n` +
         `*System Report automatically broadcasted to [EDP] Billing & Invoicing Group.*`;
       
-      await ChatMessage.create({ roomId: billingRoom._id, content: msgText, type: 'text' });
+      await ChatMessage.create({ roomId: billingRoom._id, senderId: adminUser._id, content: msgText, type: 'text' });
     }
 
     // Post to Fabric Group
@@ -209,7 +211,7 @@ router.post('/broadcast-today-data', async (req, res) => {
         ` Invoiced Challans: ${targetChallans.filter(c => c.status === 'INVOICED').length} | Pending Billed: ${targetChallans.filter(c => c.status !== 'INVOICED').length}\n\n` +
         `*System Report automatically broadcasted to [EDP] Fabric Inventory Group.*`;
 
-      await ChatMessage.create({ roomId: fabricRoom._id, content: msgText, type: 'text' });
+      await ChatMessage.create({ roomId: fabricRoom._id, senderId: adminUser._id, content: msgText, type: 'text' });
     }
 
     // Post to Job Cards Group
@@ -219,7 +221,7 @@ router.post('/broadcast-today-data', async (req, res) => {
         ` Total Printing Meterage: ${totalJcMtr.toFixed(2)} meters\n\n` +
         `*System Report automatically broadcasted to [EDP] Job Cards Group.*`;
 
-      await ChatMessage.create({ roomId: jobCardRoom._id, content: msgText, type: 'text' });
+      await ChatMessage.create({ roomId: jobCardRoom._id, senderId: adminUser._id, content: msgText, type: 'text' });
     }
 
     // Post to Stitching Group
@@ -229,7 +231,7 @@ router.post('/broadcast-today-data', async (req, res) => {
         `📏 **Total Fabric Received**: ${totalStMtr.toFixed(2)} meters\n\n` +
         `*System Report automatically broadcasted to [ST] Stitching Department Group.*`;
 
-      await ChatMessage.create({ roomId: stitchingRoom._id, content: msgText, type: 'text' });
+      await ChatMessage.create({ roomId: stitchingRoom._id, senderId: adminUser._id, content: msgText, type: 'text' });
     }
 
     // Post to Design Room Group
@@ -238,7 +240,7 @@ router.post('/broadcast-today-data', async (req, res) => {
         `✨ Master assets, printing patterns and artwork designs synchronized and active.\n\n` +
         `*System Report automatically broadcasted to [EDP] Design Room Group.*`;
 
-      await ChatMessage.create({ roomId: designRoom._id, content: msgText, type: 'text' });
+      await ChatMessage.create({ roomId: designRoom._id, senderId: adminUser._id, content: msgText, type: 'text' });
     }
 
     // Post to E-Commerce Group
@@ -247,7 +249,7 @@ router.post('/broadcast-today-data', async (req, res) => {
         `🛍️ Online product catalog, sales dispatches & inventory control active.\n\n` +
         `*System Report automatically broadcasted to [EE] E-Commerce Inventory Group.*`;
 
-      await ChatMessage.create({ roomId: eeRoom._id, content: msgText, type: 'text' });
+      await ChatMessage.create({ roomId: eeRoom._id, senderId: adminUser._id, content: msgText, type: 'text' });
     }
 
     res.json({ success: true, message: "Today's operations summary successfully broadcasted to all auto screen groups!" });
