@@ -9,6 +9,8 @@ router.route('/')
   .get(garmentJobCardController.getAll)
   .post(garmentJobCardController.create);
 
+router.put('/:id/advance-stage', garmentJobCardController.advanceStage);
+
 router.route('/:id')
   .get(garmentJobCardController.getOne)
   .put(garmentJobCardController.update)

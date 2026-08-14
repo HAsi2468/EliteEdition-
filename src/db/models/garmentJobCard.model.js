@@ -20,6 +20,19 @@ const vendorDetailSchema = new mongoose.Schema({
   amount: { type: Number, default: 0 }
 }, { _id: true });
 
+const stageHistorySchema = new mongoose.Schema({
+  stage_number: { type: Number, required: true },
+  stage_name: { type: String, required: true, trim: true },
+  from_stage_name: { type: String, default: '', trim: true },
+  pcs_completed: { type: Number, default: 0 },
+  defect_pcs: { type: Number, default: 0 },
+  operator_name: { type: String, default: '', trim: true },
+  rack_number: { type: String, default: '', trim: true },
+  remarks: { type: String, default: '', trim: true },
+  transitioned_at: { type: Date, default: Date.now },
+  transitioned_by: { type: String, default: 'System', trim: true }
+}, { _id: true });
+
 const garmentJobCardSchema = new mongoose.Schema(
   {
     job_number: { type: String, required: true, unique: true, trim: true, index: true },
@@ -30,6 +43,11 @@ const garmentJobCardSchema = new mongoose.Schema(
     notes: { type: String, default: '', trim: true },
     department: { type: String, default: 'stitching', trim: true, index: true },
     status: { type: String, default: 'Pending', enum: ['Pending', 'In Production', 'Completed'], trim: true },
+
+    // ── 8-Stage Garment Production Pipeline Fields ─────────────────────────
+    current_stage: { type: Number, default: 1, min: 1, max: 8, index: true },
+    current_stage_name: { type: String, default: 'Fabric Order', trim: true },
+    stage_history: [stageHistorySchema],
 
     size_ratios: {
       xs_34: { type: Number, default: 0 },

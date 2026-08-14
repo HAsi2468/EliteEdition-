@@ -54,12 +54,24 @@ const recalculateCard = (body) => {
   return body;
 };
 
+const STAGES = [
+  { stage_number: 1, key: '1_fabric_order', name: 'Fabric Order', icon: '🧵' },
+  { stage_number: 2, key: '2_fabric_checking', name: 'Fabric Checking', icon: '🔍' },
+  { stage_number: 3, key: '3_cutting', name: 'Cutting', icon: '✂️' },
+  { stage_number: 4, key: '4_stitching', name: 'Stitching', icon: '🪡' },
+  { stage_number: 5, key: '5_garment_checking', name: 'Garment Checking', icon: '🔎' },
+  { stage_number: 6, key: '6_press_and_pack', name: 'Press & Pack', icon: '📦' },
+  { stage_number: 7, key: '7_in_rack', name: 'In Rack', icon: '🗄️' },
+  { stage_number: 8, key: '8_delivery', name: 'Delivery', icon: '🚚' }
+];
+
 const getAll = async (req, res) => {
   try {
-    const { dateStart, dateEnd, design_number, label, vendor_name, search, status, page = 1, limit = 50 } = req.query;
+    const { dateStart, dateEnd, design_number, label, vendor_name, search, status, stage, page = 1, limit = 50 } = req.query;
     const filter = { department: 'stitching' };
 
     if (status && status !== 'All') filter.status = status;
+    if (stage && stage !== 'All') filter.current_stage = Number(stage);
     if (design_number) filter.design_number = { $regex: design_number, $options: 'i' };
     if (label) filter.label = { $regex: label, $options: 'i' };
     if (vendor_name) {
@@ -107,6 +119,10 @@ const getOne = async (req, res) => {
 const create = async (req, res) => {
   try {
     const payload = recalculateCard({ ...req.body });
+    if (!payload.current_stage) {
+      payload.current_stage = 1;
+      payload.current_stage_name = 'Fabric Order';
+    }
     const card = await db.GarmentJobCard.create(payload);
     res.status(201).json({ success: true, data: card });
   } catch (err) {
@@ -127,6 +143,83 @@ const update = async (req, res) => {
   } catch (err) {
     logger.error('garmentJobCard.update error: %o', err);
     res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const advanceStage = async (req, res) => {
+  try {
+    const card = await db.GarmentJobCard.findById(req.params.id);
+    if (!card) return res.status(404).json({ success: false, error: 'Garment job card not found' });
+
+    const currentStageNo = card.current_stage || 1;
+    const nextStageNo = Math.min(currentStageNo + 1, 8);
+    const fromStage = STAGES.find(s => s.stage_number === currentStageNo) || STAGES[0];
+    const targetStage = STAGES.find(s => s.stage_number === nextStageNo) || STAGES[nextStageNo - 1];
+
+    const {
+      pcs_completed = card.total_pieces || 0,
+      defect_pcs = 0,
+      operator_name = '',
+      rack_number = '',
+      remarks = '',
+      user_name = 'Operator'
+    } = req.body;
+
+    const transitionLog = {
+      stage_number: targetStage.stage_number,
+      stage_name: targetStage.name,
+      from_stage_name: fromStage.name,
+      pcs_completed: Number(pcs_completed) || 0,
+      defect_pcs: Number(defect_pcs) || 0,
+      operator_name: operator_name.trim(),
+      rack_number: rack_number.trim(),
+      remarks: remarks.trim(),
+      transitioned_at: new Date(),
+      transitioned_by: user_name
+    };
+
+    card.current_stage = targetStage.stage_number;
+    card.current_stage_name = targetStage.name;
+    if (targetStage.stage_number > 1 && card.status === 'Pending') {
+      card.status = 'In Production';
+    }
+    if (targetStage.stage_number === 8) {
+      card.status = 'Completed';
+    }
+
+    if (!Array.isArray(card.stage_history)) card.stage_history = [];
+    card.stage_history.push(transitionLog);
+
+    await card.save();
+
+    // Broadcast event to [ST] Stitching Department chat group
+    try {
+      const stitchingRoom = await db.ChatRoom.findOne({ name: '[ST] Stitching Department' });
+      if (stitchingRoom) {
+        const msgText = `✂️ **Stitching Job Card Stage Update**\n\n` +
+          `📋 **Job Card**: #${card.job_number} (Design: ${card.design_number || 'N/A'})\n` +
+          `🔄 **Stage Shifted**: ${fromStage.icon} ${fromStage.name} ➡️ **${targetStage.icon} ${targetStage.name}**\n` +
+          `👕 **Passed Pcs**: ${pcs_completed} pcs | ⚠️ **Defects**: ${defect_pcs} pcs\n` +
+          (operator_name ? `👤 **Operator**: ${operator_name}\n` : '') +
+          (rack_number ? `🗄️ **Rack Location**: ${rack_number}\n` : '') +
+          `👤 **Updated By**: ${user_name}`;
+
+        const adminUser = await db.user.findOne({ role: 'admin' }) || { _id: new (require('mongoose').Types.ObjectId)() };
+        await db.ChatMessage.create({
+          roomId: stitchingRoom._id,
+          senderId: adminUser._id,
+          content: msgText,
+          type: 'text'
+        });
+      }
+    } catch (msgErr) {
+      logger.warn('Failed to post stage transition message: %o', msgErr);
+    }
+
+    res.json({ success: true, data: card, message: `Advanced to Stage ${targetStage.stage_number}: ${targetStage.name}` });
+  } catch (err) {
+    logger.error('garmentJobCard.advanceStage error: %o', err);
+    res.status(500).json({ success: false, error: err.message || 'Failed to advance stage' });
   }
 };
 
@@ -231,6 +324,7 @@ module.exports = {
   getOne,
   create,
   update,
+  advanceStage,
   remove,
   getNextJobNumber,
   getAnalyticsSummary

@@ -1,11 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Filter, Download, Eye, Edit, Trash2, Scissors, Calculator, TrendingUp, DollarSign, Layers } from 'lucide-react';
+import { Plus, Search, Filter, Download, Eye, Edit, Trash2, Scissors, Calculator, TrendingUp, DollarSign, Layers, ArrowRight, CheckCircle2, History, Package, Truck, Check, AlertCircle } from 'lucide-react';
 import { api } from '../services/api';
 import GarmentJobCardForm from './GarmentJobCardForm';
 import GarmentJobCardPrintView from './GarmentJobCardPrintView';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
+
+const PIPELINE_STAGES = [
+  { stage_number: 1, key: '1_fabric_order', name: 'Fabric Order', icon: '🧵', color: '#60a5fa', desc: 'Fabric Procurement & Requisition' },
+  { stage_number: 2, key: '2_fabric_checking', name: 'Fabric Checking', icon: '🔍', color: '#818cf8', desc: 'Defect Inspection & Shading' },
+  { stage_number: 3, key: '3_cutting', name: 'Cutting', icon: '✂️', color: '#c084fc', desc: 'Laying & Pattern Cutting' },
+  { stage_number: 4, key: '4_stitching', name: 'Stitching', icon: '🪡', color: '#f472b6', desc: 'Tailor Assembly & Seam Stitching' },
+  { stage_number: 5, key: '5_garment_checking', name: 'Garment Checking', icon: '🔎', color: '#fb7185', desc: 'Quality Audit & Thread Trimming' },
+  { stage_number: 6, key: '6_press_and_pack', name: 'Press & Pack', icon: '📦', color: '#fbbf24', desc: 'Steam Pressing & Poly Bagging' },
+  { stage_number: 7, key: '7_in_rack', name: 'In Rack', icon: '🗄️', color: '#34d399', desc: 'Finished Goods Rack Storage' },
+  { stage_number: 8, key: '8_delivery', name: 'Delivery', icon: '🚚', color: '#10b981', desc: 'Final Dispatch & Delivery' }
+];
 
 export default function GarmentJobCardDashboard() {
   const [cards, setCards] = useState([]);
@@ -22,6 +33,7 @@ export default function GarmentJobCardDashboard() {
   const [designFilter, setDesignFilter] = useState('');
   const [vendorFilter, setVendorFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [stageFilter, setStageFilter] = useState('All');
 
   // Analytics State
   const [analytics, setAnalytics] = useState({
@@ -33,6 +45,19 @@ export default function GarmentJobCardDashboard() {
   const [showForm, setShowForm] = useState(false);
   const [editingCard, setEditingCard] = useState(null);
   const [printCard, setPrintCard] = useState(null);
+  
+  // Pipeline Stage Transition & History States
+  const [transitionCard, setTransitionCard] = useState(null);
+  const [historyCard, setHistoryCard] = useState(null);
+  const [advancing, setAdvancing] = useState(false);
+
+  // Transition Modal Form State
+  const [transPcs, setTransPcs] = useState(0);
+  const [transDefects, setTransDefects] = useState(0);
+  const [transOperator, setTransOperator] = useState('');
+  const [transRack, setTransRack] = useState('');
+  const [transRemarks, setTransRemarks] = useState('');
+  const [transUserName, setTransUserName] = useState('');
 
   // Active Sub View
   const [activeTab, setActiveTab] = useState('list'); // 'list' or 'analytics'
@@ -48,6 +73,7 @@ export default function GarmentJobCardDashboard() {
         design_number: designFilter,
         vendor_name: vendorFilter,
         status: statusFilter,
+        stage: stageFilter !== 'All' ? stageFilter : undefined,
         page,
         limit: 25
       });
@@ -61,7 +87,7 @@ export default function GarmentJobCardDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [search, dateStart, dateEnd, designFilter, vendorFilter, statusFilter, page]);
+  }, [search, dateStart, dateEnd, designFilter, vendorFilter, statusFilter, stageFilter, page]);
 
   const fetchAnalytics = useCallback(async () => {
     try {
@@ -85,6 +111,43 @@ export default function GarmentJobCardDashboard() {
     fetchCards();
     fetchAnalytics();
   }, [fetchCards, fetchAnalytics]);
+
+  const openTransitionModal = (card) => {
+    const currentStageNo = card.current_stage || 1;
+    setTransitionCard(card);
+    setTransPcs(card.total_pieces || 0);
+    setTransDefects(0);
+    setTransOperator('');
+    setTransRack('');
+    setTransRemarks('');
+    setTransUserName(localStorage.getItem('userName') || 'Operator');
+  };
+
+  const handleAdvanceStageSubmit = async (e) => {
+    e.preventDefault();
+    if (!transitionCard) return;
+    setAdvancing(true);
+    try {
+      const res = await api.advanceGarmentJobCardStage(transitionCard._id, {
+        pcs_completed: transPcs,
+        defect_pcs: transDefects,
+        operator_name: transOperator,
+        rack_number: transRack,
+        remarks: transRemarks,
+        user_name: transUserName
+      });
+      if (res && res.success) {
+        triggerEliteAlert('Stage Advanced!', res.message || 'Job Card successfully moved to next stage.', 'success');
+        setTransitionCard(null);
+        fetchCards();
+        fetchAnalytics();
+      }
+    } catch (err) {
+      triggerEliteAlert('Advance Failed', err.message || 'Failed to advance stage.', 'error');
+    } finally {
+      setAdvancing(false);
+    }
+  };
 
   const handleDelete = async (id, jobNo) => {
     const confirmed = await triggerEliteConfirm({
@@ -110,7 +173,7 @@ export default function GarmentJobCardDashboard() {
     }
     
     const headers = [
-      'Job Number', 'Date', 'Design Number', 'Label', 'Finishing', 'Status',
+      'Job Number', 'Date', 'Design Number', 'Label', 'Current Stage No', 'Current Stage Name', 'Status',
       'Total Pieces', 'Total Fabric Cost (INR)', 'Total Processing Cost (INR)',
       'Overhead Cost (INR)', 'Grand Total Cost (INR)', 'Final Unit Cost (INR/Pc)'
     ];
@@ -120,7 +183,8 @@ export default function GarmentJobCardDashboard() {
       `"${c.date || ''}"`,
       `"${c.design_number || ''}"`,
       `"${c.label || ''}"`,
-      `"${c.finishing || ''}"`,
+      c.current_stage || 1,
+      `"${c.current_stage_name || 'Fabric Order'}"`,
       `"${c.status || ''}"`,
       c.total_pieces || 0,
       (c.total_fabric_cost || 0).toFixed(2),
@@ -149,10 +213,10 @@ export default function GarmentJobCardDashboard() {
         <div>
           <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
             <Scissors size={26} color="var(--primary)" />
-            Elite Stitching — Garment Manufacturing ERP & Analytics
+            Elite Stitching — 8-Stage Garment Production ERP
           </h1>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
-            Garment Job Cards, Size Ratios, Material Consumption & Real-time Unit Cost Calculations
+            Multi-stage Lot Handover Tracking (Fabric Order ➔ Fabric Check ➔ Cutting ➔ Stitching ➔ Garment Check ➔ Press & Pack ➔ Rack ➔ Delivery)
           </p>
         </div>
 
@@ -205,7 +269,7 @@ export default function GarmentJobCardDashboard() {
             <Layers size={18} color="#60a5fa" />
           </div>
           <span style={kpiValStyle}>{summary.totalJobs || 0}</span>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Job Cards Recorded</span>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Active Production Lots</span>
         </div>
 
         <div style={kpiCardStyle}>
@@ -245,7 +309,63 @@ export default function GarmentJobCardDashboard() {
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* 8-Stage Production Filter Pills */}
+      <div style={{
+        background: 'var(--bg-card, #1f2937)',
+        padding: '0.85rem 1rem',
+        borderRadius: '10px',
+        border: '1px solid var(--border-light)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.5rem'
+      }}>
+        <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          📌 Filter Production Stage (8 Steps):
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <button
+            onClick={() => setStageFilter('All')}
+            style={{
+              padding: '0.35rem 0.75rem',
+              borderRadius: '20px',
+              border: stageFilter === 'All' ? '1px solid var(--primary)' : '1px solid var(--border-light)',
+              background: stageFilter === 'All' ? 'var(--primary)' : 'var(--bg-main, #111827)',
+              color: stageFilter === 'All' ? '#fff' : 'var(--text-muted)',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            All Stages
+          </button>
+          {PIPELINE_STAGES.map(st => (
+            <button
+              key={st.stage_number}
+              onClick={() => setStageFilter(String(st.stage_number))}
+              style={{
+                padding: '0.35rem 0.75rem',
+                borderRadius: '20px',
+                border: stageFilter === String(st.stage_number) ? `1px solid ${st.color}` : '1px solid var(--border-light)',
+                background: stageFilter === String(st.stage_number) ? `${st.color}25` : 'var(--bg-main, #111827)',
+                color: stageFilter === String(st.stage_number) ? st.color : 'var(--text-muted)',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <span>{st.icon}</span>
+              <span>{st.stage_number}. {st.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Filter Bar */}
       <div style={{
         background: 'var(--bg-card, #1f2937)',
         padding: '1rem',
@@ -309,9 +429,9 @@ export default function GarmentJobCardDashboard() {
           <option value="Completed">Completed</option>
         </select>
 
-        {(search || dateStart || dateEnd || designFilter || vendorFilter || statusFilter !== 'All') && (
+        {(search || dateStart || dateEnd || designFilter || vendorFilter || statusFilter !== 'All' || stageFilter !== 'All') && (
           <button
-            onClick={() => { setSearch(''); setDateStart(''); setDateEnd(''); setDesignFilter(''); setVendorFilter(''); setStatusFilter('All'); }}
+            onClick={() => { setSearch(''); setDateStart(''); setDateEnd(''); setDesignFilter(''); setVendorFilter(''); setStatusFilter('All'); setStageFilter('All'); }}
             style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
           >
             Reset Filters
@@ -319,7 +439,7 @@ export default function GarmentJobCardDashboard() {
         )}
       </div>
 
-      {/* Tab Switcher: Job Cards List vs Design Analytics Matrix */}
+      {/* Tab Switcher */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border-light)', gap: '1rem' }}>
         <button
           onClick={() => setActiveTab('list')}
@@ -369,72 +489,158 @@ export default function GarmentJobCardDashboard() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255,255,255,0.03)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                    <th style={tThStyle}>Job No</th>
-                    <th style={tThStyle}>Date</th>
-                    <th style={tThStyle}>Design No</th>
-                    <th style={tThStyle}>Label</th>
+                    <th style={tThStyle}>Job Card #</th>
+                    <th style={tThStyle}>Design & Label</th>
+                    <th style={tThStyle}>Current Production Stage (8 Steps)</th>
                     <th style={tThStyle}>Status</th>
-                    <th style={tThStyle}>Total Pcs</th>
-                    <th style={tThStyle}>Fabric Cost</th>
-                    <th style={tThStyle}>Processing</th>
+                    <th style={tThStyle}>Volume</th>
                     <th style={tThStyle}>Grand Total</th>
                     <th style={tThStyle}>Cost / Pc</th>
-                    <th style={{ ...tThStyle, textAlign: 'right' }}>Actions</th>
+                    <th style={{ ...tThStyle, textAlign: 'right' }}>Stage Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {cards
-                    .filter(c => matchSearchQuery(c, search, ['job_number', 'design_number', 'label', 'vendor_name', 'finishing', 'status']))
-                    .map((c) => (
-                    <tr key={c._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                      <td style={{ ...tTdStyle, fontWeight: 800, color: 'var(--primary)' }}>{c.job_number}</td>
-                      <td style={tTdStyle}>{formatDateDDMMYYYY(c.date)}</td>
-                      <td style={{ ...tTdStyle, fontWeight: 700 }}>{c.design_number || '—'}</td>
-                      <td style={tTdStyle}>{c.label || '—'}</td>
-                      <td style={tTdStyle}>
-                        <span style={{
-                          padding: '0.2rem 0.5rem',
-                          borderRadius: '12px',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          background: c.status === 'Completed' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
-                          color: c.status === 'Completed' ? '#34d399' : '#fbbf24'
-                        }}>
-                          {c.status}
-                        </span>
-                      </td>
-                      <td style={{ ...tTdStyle, fontWeight: 700 }}>{c.total_pieces || 0} Pcs</td>
-                      <td style={tTdStyle}>₹{(c.total_fabric_cost || 0).toFixed(2)}</td>
-                      <td style={tTdStyle}>₹{(c.total_stitching_cost || 0).toFixed(2)}</td>
-                      <td style={{ ...tTdStyle, fontWeight: 800, color: '#60a5fa' }}>₹{(c.grand_total_cost || 0).toFixed(2)}</td>
-                      <td style={{ ...tTdStyle, fontWeight: 900, color: '#fbbf24' }}>₹{(c.final_cost_per_pc || 0).toFixed(2)}</td>
-                      <td style={{ ...tTdStyle, textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
-                          <button
-                            title="Print Paper Job Card"
-                            onClick={() => setPrintCard(c)}
-                            style={actionBtnStyle}
-                          >
-                            <Eye size={15} color="#34d399" />
-                          </button>
-                          <button
-                            title="Edit Job Card"
-                            onClick={() => { setEditingCard(c); setShowForm(true); }}
-                            style={actionBtnStyle}
-                          >
-                            <Edit size={15} color="#60a5fa" />
-                          </button>
-                          <button
-                            title="Delete"
-                            onClick={() => handleDelete(c._id, c.job_number)}
-                            style={actionBtnStyle}
-                          >
-                            <Trash2 size={15} color="#f87171" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                    .filter(c => matchSearchQuery(c, search, ['job_number', 'design_number', 'label', 'vendor_name', 'finishing', 'status', 'current_stage_name']))
+                    .map((c) => {
+                      const curStageNo = c.current_stage || 1;
+                      const curStageObj = PIPELINE_STAGES.find(s => s.stage_number === curStageNo) || PIPELINE_STAGES[0];
+                      const nextStageObj = PIPELINE_STAGES.find(s => s.stage_number === curStageNo + 1);
+
+                      return (
+                        <tr key={c._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                          <td style={{ ...tTdStyle }}>
+                            <div style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '0.9rem' }}>{c.job_number}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{formatDateDDMMYYYY(c.date)}</div>
+                          </td>
+
+                          <td style={tTdStyle}>
+                            <div style={{ fontWeight: 700 }}>{c.design_number || '—'}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{c.label || 'No Label'}</div>
+                          </td>
+
+                          {/* 8-Stage Visual Stepper Column */}
+                          <td style={{ ...tTdStyle, minWidth: '280px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{
+                                  padding: '0.2rem 0.5rem',
+                                  borderRadius: '12px',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 800,
+                                  background: `${curStageObj.color}25`,
+                                  color: curStageObj.color,
+                                  border: `1px solid ${curStageObj.color}50`
+                                }}>
+                                  {curStageObj.icon} Stage {curStageNo}/8: {curStageObj.name}
+                                </span>
+                                {c.stage_history && c.stage_history.length > 0 && (
+                                  <button
+                                    title="View Stage Audit Trail History"
+                                    onClick={() => setHistoryCard(c)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.7rem', fontWeight: 600 }}
+                                  >
+                                    <History size={12} /> Log ({c.stage_history.length})
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Visual Stepper Dots */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.1rem' }}>
+                                {PIPELINE_STAGES.map((s) => {
+                                  const isCompleted = s.stage_number < curStageNo;
+                                  const isCurrent = s.stage_number === curStageNo;
+                                  return (
+                                    <div
+                                      key={s.stage_number}
+                                      title={`Stage ${s.stage_number}: ${s.name}`}
+                                      style={{
+                                        flex: 1,
+                                        height: '6px',
+                                        borderRadius: '3px',
+                                        background: isCompleted ? '#10b981' : isCurrent ? s.color : 'rgba(255,255,255,0.1)',
+                                        boxShadow: isCurrent ? `0 0 8px ${s.color}` : 'none'
+                                      }}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </td>
+
+                          <td style={tTdStyle}>
+                            <span style={{
+                              padding: '0.2rem 0.5rem',
+                              borderRadius: '12px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              background: c.status === 'Completed' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+                              color: c.status === 'Completed' ? '#34d399' : '#fbbf24'
+                            }}>
+                              {c.status}
+                            </span>
+                          </td>
+
+                          <td style={{ ...tTdStyle, fontWeight: 700 }}>{c.total_pieces || 0} Pcs</td>
+                          <td style={{ ...tTdStyle, fontWeight: 800, color: '#60a5fa' }}>₹{(c.grand_total_cost || 0).toFixed(2)}</td>
+                          <td style={{ ...tTdStyle, fontWeight: 900, color: '#fbbf24' }}>₹{(c.final_cost_per_pc || 0).toFixed(2)}</td>
+
+                          {/* Stage Advance Action Button */}
+                          <td style={{ ...tTdStyle, textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                              {curStageNo < 8 ? (
+                                <button
+                                  onClick={() => openTransitionModal(c)}
+                                  style={{
+                                    background: `linear-gradient(135deg, ${nextStageObj ? nextStageObj.color : '#3b82f6'}, #1d4ed8)`,
+                                    border: 'none',
+                                    color: '#fff',
+                                    padding: '0.35rem 0.75rem',
+                                    borderRadius: '6px',
+                                    fontWeight: 700,
+                                    fontSize: '0.75rem',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem',
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+                                  }}
+                                >
+                                  <span>Send to Stage {curStageNo + 1} ({nextStageObj ? nextStageObj.name : ''})</span>
+                                  <ArrowRight size={13} />
+                                </button>
+                              ) : (
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                                  <CheckCircle2 size={14} /> Delivered
+                                </span>
+                              )}
+
+                              <button
+                                title="Print Paper Job Card"
+                                onClick={() => setPrintCard(c)}
+                                style={actionBtnStyle}
+                              >
+                                <Eye size={14} color="#34d399" />
+                              </button>
+                              <button
+                                title="Edit Job Card"
+                                onClick={() => { setEditingCard(c); setShowForm(true); }}
+                                style={actionBtnStyle}
+                              >
+                                <Edit size={14} color="#60a5fa" />
+                              </button>
+                              <button
+                                title="Delete"
+                                onClick={() => handleDelete(c._id, c.job_number)}
+                                style={actionBtnStyle}
+                              >
+                                <Trash2 size={14} color="#f87171" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
@@ -502,6 +708,291 @@ export default function GarmentJobCardDashboard() {
         </div>
       )}
 
+      {/* Stage Transition Modal */}
+      {transitionCard && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1100,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: 'var(--bg-card, #1f2937)',
+            border: '1px solid var(--border-light)',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '520px',
+            boxShadow: 'var(--shadow-xl)',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(16,185,129,0.2))',
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid var(--border-light)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  🔄 Advance Production Stage
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Garment Job Card: #{transitionCard.job_number} (Design: {transitionCard.design_number || 'N/A'})
+                </span>
+              </div>
+              <button
+                onClick={() => setTransitionCard(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body / Form */}
+            <form onSubmit={handleAdvanceStageSubmit} style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* From -> To Stage Banner */}
+              {(() => {
+                const curNo = transitionCard.current_stage || 1;
+                const fromObj = PIPELINE_STAGES.find(s => s.stage_number === curNo) || PIPELINE_STAGES[0];
+                const targetObj = PIPELINE_STAGES.find(s => s.stage_number === curNo + 1) || PIPELINE_STAGES[curNo - 1];
+
+                return (
+                  <div style={{
+                    background: 'var(--bg-main, #111827)',
+                    padding: '0.85rem',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-light)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.5rem'
+                  }}>
+                    <div style={{ textAlign: 'center', flex: 1 }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Current Stage</span>
+                      <div style={{ fontWeight: 800, color: fromObj.color, fontSize: '0.9rem', marginTop: '0.1rem' }}>
+                        {fromObj.icon} {fromObj.stage_number}. {fromObj.name}
+                      </div>
+                    </div>
+
+                    <ArrowRight size={20} color="var(--primary)" />
+
+                    <div style={{ textAlign: 'center', flex: 1 }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Target Stage</span>
+                      <div style={{ fontWeight: 800, color: targetObj.color, fontSize: '0.9rem', marginTop: '0.1rem' }}>
+                        {targetObj.icon} {targetObj.stage_number}. {targetObj.name}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                <div>
+                  <label style={modalLabelStyle}>Passed / Completed Pcs *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={transPcs}
+                    onChange={e => setTransPcs(e.target.value)}
+                    style={modalInputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={modalLabelStyle}>Defect / Rejected Pcs</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={transDefects}
+                    onChange={e => setTransDefects(e.target.value)}
+                    style={modalInputStyle}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                <div>
+                  <label style={modalLabelStyle}>Operator / Tailor Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Ramesh Tailor / Operator"
+                    value={transOperator}
+                    onChange={e => setTransOperator(e.target.value)}
+                    style={modalInputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={modalLabelStyle}>Rack Location (If Stage 7)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Rack-B-04"
+                    value={transRack}
+                    onChange={e => setTransRack(e.target.value)}
+                    style={modalInputStyle}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={modalLabelStyle}>Your Name / User *</label>
+                <input
+                  type="text"
+                  required
+                  value={transUserName}
+                  onChange={e => setTransUserName(e.target.value)}
+                  style={modalInputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={modalLabelStyle}>Handover Remarks / Notes</label>
+                <textarea
+                  rows={2}
+                  placeholder="Additional observations, inspection notes..."
+                  value={transRemarks}
+                  onChange={e => setTransRemarks(e.target.value)}
+                  style={{ ...modalInputStyle, resize: 'none' }}
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setTransitionCard(null)}
+                  style={{ background: 'none', border: '1px solid var(--border-light)', color: 'var(--text-primary)', padding: '0.55rem 1rem', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={advancing}
+                  style={{ background: 'var(--primary)', border: 'none', color: '#fff', padding: '0.55rem 1.25rem', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  {advancing ? 'Saving...' : 'Confirm Stage Move ➡️'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Stage History Timeline Drawer */}
+      {historyCard && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1100,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: 'var(--bg-card, #1f2937)',
+            border: '1px solid var(--border-light)',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '600px',
+            maxHeight: '85vh',
+            boxShadow: 'var(--shadow-xl)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              background: 'var(--bg-main, #111827)',
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid var(--border-light)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <History size={20} color="var(--primary)" /> Stage Handover Audit Log
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Job Card #{historyCard.job_number} (Design: {historyCard.design_number || 'N/A'})
+                </span>
+              </div>
+              <button
+                onClick={() => setHistoryCard(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {(!historyCard.stage_history || historyCard.stage_history.length === 0) ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  No stage transitions logged yet. Job card is at Stage 1: Fabric Order.
+                </div>
+              ) : (
+                historyCard.stage_history.map((h, i) => (
+                  <div key={i} style={{
+                    background: 'var(--bg-main, #111827)',
+                    border: '1px solid var(--border-light)',
+                    borderRadius: '8px',
+                    padding: '0.85rem 1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.35rem'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 800, color: '#34d399', fontSize: '0.88rem' }}>
+                        Step {h.stage_number}: {h.stage_name}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        {new Date(h.transitioned_at).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                      Moved from <b>{h.from_stage_name || 'Previous Stage'}</b> by <b>{h.transitioned_by || 'User'}</b>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '1rem', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                      <span>👕 Passed: <b>{h.pcs_completed} pcs</b></span>
+                      {h.defect_pcs > 0 && <span style={{ color: '#f87171' }}>⚠️ Defects: <b>{h.defect_pcs} pcs</b></span>}
+                      {h.operator_name && <span>👤 Operator: <b>{h.operator_name}</b></span>}
+                      {h.rack_number && <span>🗄️ Rack: <b>{h.rack_number}</b></span>}
+                    </div>
+
+                    {h.remarks && (
+                      <div style={{ fontSize: '0.75rem', fontStyle: 'italic', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                        "{h.remarks}"
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div style={{ padding: '0.85rem 1.25rem', borderTop: '1px solid var(--border-light)', background: 'var(--bg-main, #111827)', textAlign: 'right' }}>
+              <button
+                onClick={() => setHistoryCard(null)}
+                style={{ background: 'var(--primary)', border: 'none', color: '#fff', padding: '0.45rem 1rem', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Close Log
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Form Modal */}
       {showForm && (
         <GarmentJobCardForm
@@ -558,38 +1049,4 @@ const filterInputStyle = {
   padding: '0.4rem 0.6rem',
   fontSize: '0.8rem',
   outline: 'none'
-};
-
-const tThStyle = {
-  padding: '0.65rem 0.85rem',
-  fontWeight: 700,
-  fontSize: '0.75rem',
-  textTransform: 'uppercase',
-  borderBottom: '1px solid var(--border-light)'
-};
-
-const tTdStyle = {
-  padding: '0.65rem 0.85rem',
-  verticalAlign: 'middle'
-};
-
-const actionBtnStyle = {
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid var(--border-light)',
-  borderRadius: '6px',
-  padding: '0.35rem 0.5rem',
-  cursor: 'pointer',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center'
-};
-
-const pageBtnStyle = {
-  background: 'var(--bg-main, #111827)',
-  border: '1px solid var(--border-light)',
-  color: 'var(--text-primary)',
-  padding: '0.3rem 0.75rem',
-  borderRadius: '6px',
-  fontSize: '0.8rem',
-  cursor: 'pointer'
 };

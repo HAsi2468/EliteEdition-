@@ -671,6 +671,9 @@ export const api = {
   async updateGarmentJobCard(id, payload) {
     return request(`/garment-jobcards/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
   },
+  async advanceGarmentJobCardStage(id, payload = {}) {
+    return request(`/garment-jobcards/${id}/advance-stage`, { method: 'PUT', body: JSON.stringify(payload) });
+  },
   async deleteGarmentJobCard(id) {
     return request(`/garment-jobcards/${id}`, { method: 'DELETE' });
   },
