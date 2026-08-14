@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { Search, Edit2, Check, X, RefreshCw, Layers, Save, Trash2, ArrowUpDown } from 'lucide-react';
+import PKDOrdersImportModal from './PKDOrdersImportModal';
 
 export default function DesignMaster() {
   const [designs, setDesigns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [showPKDModal, setShowPKDModal] = useState(false);
   
   // Inline editing row tracking
   const [editingId, setEditingId] = useState(null);
@@ -96,8 +98,35 @@ export default function DesignMaster() {
               </p>
             </div>
           </div>
+          <div>
+            <button
+              onClick={() => setShowPKDModal(true)}
+              style={{
+                padding: '0.55rem 1.1rem',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid rgba(56,189,248,0.4)',
+                background: 'linear-gradient(135deg, rgba(56,189,248,0.15), rgba(16,185,129,0.15))',
+                color: '#38bdf8',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+              }}
+            >
+              📥 Import PKD Orders
+            </button>
+          </div>
         </div>
       </div>
+
+      {showPKDModal && (
+        <PKDOrdersImportModal
+          onClose={() => setShowPKDModal(false)}
+          onImportSuccess={fetchDesigns}
+        />
+      )}
 
       {/* Filter panel */}
       <div className="glass-panel" style={{ padding: '1rem 1.25rem' }}>

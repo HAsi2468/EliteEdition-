@@ -138,4 +138,86 @@ const getCategories = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getOne, create, update, remove, getCategories, getNextDesignNumber };
+// Bulk Import PKD Orders with duplicate prevention
+const importPKDOrders = async (req, res) => {
+  try {
+    const { items = [] } = req.body;
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'No items provided for import' });
+    }
+
+    // Fetch existing designs to perform fast in-memory duplicate check
+    const existingDesigns = await db.Design.find({}, { designName: 1, imageUrl: 1 }).lean();
+    const existingNameSet = new Set(existingDesigns.map(d => (d.designName || '').toLowerCase().trim()));
+    const existingUrlSet = new Set(existingDesigns.map(d => (d.imageUrl || '').trim()).filter(Boolean));
+
+    const toCreate = [];
+    const skippedDetails = [];
+
+    items.forEach((item, index) => {
+      let rawOrderNo = String(item.orderNo || item.designName || '').trim();
+      let rawPhoto = String(item.photo || item.imageUrl || '').trim();
+
+      if (!rawOrderNo) {
+        skippedDetails.push({ row: index + 1, orderNo: 'N/A', reason: 'Missing Order No' });
+        return;
+      }
+
+      // System Naming Normalization: e.g. "1001" -> "PKD-1001", "pkd 1002" -> "PKD-1002"
+      let normalizedName = rawOrderNo.toUpperCase();
+      if (!normalizedName.startsWith('PKD-')) {
+        const numOnly = normalizedName.replace(/[^0-9]/g, '');
+        if (numOnly && !normalizedName.startsWith('ED')) {
+          normalizedName = `PKD-${numOnly || normalizedName}`;
+        } else if (!normalizedName.includes('-')) {
+          normalizedName = `PKD-${normalizedName}`;
+        }
+      }
+
+      const lowerName = normalizedName.toLowerCase();
+
+      // Check Name Duplicate
+      if (existingNameSet.has(lowerName)) {
+        skippedDetails.push({ row: index + 1, orderNo: rawOrderNo, normalizedName, reason: `Design Name "${normalizedName}" already exists` });
+        return;
+      }
+
+      // Check Image Duplicate (if photo provided)
+      if (rawPhoto && existingUrlSet.has(rawPhoto)) {
+        skippedDetails.push({ row: index + 1, orderNo: rawOrderNo, normalizedName, reason: `Image URL already exists in system` });
+        return;
+      }
+
+      // Add to set to prevent internal duplicates within the same batch upload
+      existingNameSet.add(lowerName);
+      if (rawPhoto) existingUrlSet.add(rawPhoto);
+
+      toCreate.push({
+        designName: normalizedName,
+        imageUrl: rawPhoto,
+        department: 'stitching',
+        category: 'Stitching',
+        status: 'Active',
+        notes: `Imported via PKD Orders Sheet (${new Date().toLocaleDateString('en-IN')})`
+      });
+    });
+
+    let createdDocs = [];
+    if (toCreate.length > 0) {
+      createdDocs = await db.Design.insertMany(toCreate);
+    }
+
+    res.json({
+      success: true,
+      createdCount: createdDocs.length,
+      skippedCount: skippedDetails.length,
+      skippedDetails,
+      message: `Successfully imported ${createdDocs.length} PKD Orders (${skippedDetails.length} duplicates skipped).`
+    });
+  } catch (err) {
+    logger.error('design.importPKDOrders error: %o', err);
+    res.status(500).json({ error: err.message || 'Failed to import PKD orders' });
+  }
+};
+
+module.exports = { getAll, getOne, create, update, remove, getCategories, getNextDesignNumber, importPKDOrders };

@@ -7,6 +7,8 @@ import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 
+import PKDOrdersImportModal from './PKDOrdersImportModal';
+
 const PIPELINE_STAGES = [
   { stage_number: 1, key: '1_fabric_order', name: 'Fabric Order', icon: '🧵', color: '#60a5fa', desc: 'Fabric Procurement & Requisition' },
   { stage_number: 2, key: '2_fabric_checking', name: 'Fabric Checking', icon: '🔍', color: '#818cf8', desc: 'Defect Inspection & Shading' },
@@ -43,6 +45,7 @@ export default function GarmentJobCardDashboard() {
 
   // Modal States
   const [showForm, setShowForm] = useState(false);
+  const [showPKDImportModal, setShowPKDImportModal] = useState(false);
   const [editingCard, setEditingCard] = useState(null);
   const [printCard, setPrintCard] = useState(null);
   
@@ -240,6 +243,24 @@ export default function GarmentJobCardDashboard() {
             <Download size={16} /> Export CSV
           </button>
           <button
+            onClick={() => setShowPKDImportModal(true)}
+            style={{
+              background: 'linear-gradient(135deg, rgba(56,189,248,0.15), rgba(16,185,129,0.15))',
+              border: '1px solid rgba(56,189,248,0.4)',
+              color: '#38bdf8',
+              padding: '0.55rem 1rem',
+              borderRadius: '8px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              fontSize: '0.85rem'
+            }}
+          >
+            📥 Import PKD Orders
+          </button>
+          <button
             onClick={() => { setEditingCard(null); setShowForm(true); }}
             style={{
               background: 'var(--primary, #10b981)',
@@ -260,6 +281,16 @@ export default function GarmentJobCardDashboard() {
           </button>
         </div>
       </div>
+
+      {showPKDImportModal && (
+        <PKDOrdersImportModal
+          onClose={() => setShowPKDImportModal(false)}
+          onImportSuccess={() => {
+            fetchCards();
+            fetchAnalytics();
+          }}
+        />
+      )}
 
       {/* KPI Analytical Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>

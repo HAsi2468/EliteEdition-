@@ -11,6 +11,8 @@ import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 
+import PKDOrdersImportModal from './PKDOrdersImportModal';
+
 // Copy convertDriveUrl helper
 function convertDriveUrl(link) {
   if (!link || !link.trim()) return '';
@@ -357,6 +359,7 @@ export default function DesignCatalogue({ department }) {
 
   // Modal form states
   const [showForm, setShowForm] = useState(false);
+  const [showPKDImportModal, setShowPKDImportModal] = useState(false);
   const [formDesign, setFormDesign] = useState(null); // null means New
   const [formVal, setFormVal] = useState({ ...BLANK_DESIGN });
   const [saving, setSaving] = useState(false);
@@ -732,12 +735,40 @@ export default function DesignCatalogue({ department }) {
                 <><span style={{ fontSize: '1rem' }}>🎨</span> Auto-set All Colours</>
               )}
             </button>
+            <button
+              onClick={() => setShowPKDImportModal(true)}
+              style={{
+                padding: '0.55rem 1.1rem',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid rgba(56,189,248,0.4)',
+                background: 'linear-gradient(135deg, rgba(56,189,248,0.15), rgba(16,185,129,0.15))',
+                color: '#38bdf8',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+              }}
+            >
+              📥 Import PKD Orders
+            </button>
             <button className="btn-primary" onClick={openNew} style={{ padding: '0.55rem 1.25rem' }}>
               <PlusCircle size={15} /> New Design
             </button>
           </div>
         </div>
       </div>
+
+      {showPKDImportModal && (
+        <PKDOrdersImportModal
+          onClose={() => setShowPKDImportModal(false)}
+          onImportSuccess={() => {
+            fetchDesigns();
+            fetchCategories();
+          }}
+        />
+      )}
 
       {/* Filter panel */}
       <div className="glass-panel" style={{ padding: '1rem 1.25rem' }}>

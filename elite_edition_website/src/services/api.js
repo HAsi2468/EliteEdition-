@@ -747,6 +747,9 @@ export const api = {
     const qs = query.toString() ? `?${query.toString()}` : '';
     return request(`/designs/next-number${qs}`);
   },
+  async importPKDOrders(items) {
+    return request('/designs/import-pkd-orders', { method: 'POST', body: JSON.stringify({ items }) });
+  },
 
   // ─── Analytics ──────────────────────────────────────────────────────────────
   async getVariantAnalytics(params = {}) {
