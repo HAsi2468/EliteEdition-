@@ -13,7 +13,8 @@ const getAll = async (req, res) => {
     if (department === 'stitching') {
       deptOr = [
         { department: 'stitching' },
-        { category: { $regex: 'stitching', $options: 'i' } }
+        { category: { $regex: 'stitching', $options: 'i' } },
+        { designName: { $regex: '^PKD-', $options: 'i' } }
       ];
     } else if (department === 'digital_print') {
       filter.department = { $ne: 'stitching' };

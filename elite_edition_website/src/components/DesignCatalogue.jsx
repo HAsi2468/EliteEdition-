@@ -16,39 +16,46 @@ import PKDOrdersImportModal from './PKDOrdersImportModal';
 // Copy convertDriveUrl helper
 function convertDriveUrl(link) {
   if (!link || !link.trim()) return '';
-  if (link.startsWith('data:')) return link;
-  
-  // If it's a local relative path
-  if (link.startsWith('/')) {
+  const trimmed = link.trim();
+  if (trimmed.startsWith('data:')) return trimmed;
+
+  // Handle local uploaded files e.g. "uploads/chat-123.jpg" or "/uploads/chat-123.jpg"
+  if (trimmed.includes('uploads/')) {
+    const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
     const baseUrl = getBaseUrl();
     if (baseUrl && baseUrl.startsWith('http')) {
       try {
         const url = new URL(baseUrl);
-        return `${url.origin}${link}`;
+        return `${url.origin}${cleanPath}`;
       } catch (e) {}
     }
-    return link;
+    return cleanPath;
   }
-  
-  // If it's a Google Drive link
-  if (link.includes('drive.google.com') || link.includes('googleusercontent') || link.includes('lh3.google')) {
-    if (link.includes('uc?export') || link.includes('lh3.google') || link.includes('googleusercontent')) return link;
-    const fileMatch = link.match(/\/d\/([-\w]{20,})/);
-    if (fileMatch) return `https://drive.google.com/uc?export=view&id=${fileMatch[1]}`;
-    const openMatch = link.match(/[?&]id=([-\w]{20,})/);
-    if (openMatch) return `https://drive.google.com/uc?export=view&id=${openMatch[1]}`;
-    if (link.includes('/folders/')) return '';
-    const idMatch = link.match(/([-\w]{25,})/);
-    return idMatch ? `https://drive.google.com/uc?export=view&id=${idMatch[1]}` : link;
+
+  // Handle Google Drive Links - extract File ID & use high-res CORS-free thumbnail endpoint
+  if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
+    let fileId = '';
+    const dMatch = trimmed.match(/\/d\/([-\w]{20,})/);
+    if (dMatch) fileId = dMatch[1];
+    if (!fileId) {
+      const idMatch = trimmed.match(/[?&]id=([-\w]{20,})/);
+      if (idMatch) fileId = idMatch[1];
+    }
+    if (!fileId) {
+      const genericMatch = trimmed.match(/([-\w]{25,})/);
+      if (genericMatch) fileId = genericMatch[1];
+    }
+
+    if (fileId) {
+      return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+    }
   }
-  
-  // If it's any other external link (e.g. starts with http)
-  if (link.startsWith('http')) {
-    return link;
+
+  if (trimmed.startsWith('http')) {
+    return trimmed;
   }
-  
-  // Fallback
-  return link;
+
+  return trimmed;
 }
 
 // Image compression helper
@@ -949,24 +956,30 @@ export default function DesignCatalogue({ department }) {
                         style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
                         onClick={() => setZoomImg(mainImg)}
                         onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.nextSibling.style.display = 'flex';
+                          if (d.imageUrl && !e.target.dataset.retried) {
+                            e.target.dataset.retried = 'true';
+                            if (d.imageUrl.startsWith('data:')) {
+                              e.target.src = d.imageUrl;
+                            } else if (d.imageUrl.includes('drive.google.com')) {
+                              const fileMatch = d.imageUrl.match(/([-\w]{25,})/);
+                              if (fileMatch) e.target.src = `https://drive.google.com/uc?export=view&id=${fileMatch[1]}`;
+                            }
+                          } else {
+                            e.target.style.display = 'none';
+                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                          }
                         }}
                       />
-                    ) : null}
-
-                    {(!mainImg) && (
+                    ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'var(--text-muted)', gap: '0.4rem' }}>
                         <Image size={24} style={{ opacity: 0.3 }} />
                         <span style={{ fontSize: '0.7rem' }}>No Design Image</span>
                       </div>
                     )}
-                    {mainImg && (
-                      <div style={{ display: 'none', position: 'absolute', inset: 0, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#000', color: 'var(--text-muted)', gap: '0.4rem' }}>
-                        <Image size={24} style={{ opacity: 0.3 }} />
-                        <span style={{ fontSize: '0.7rem', padding: '0.5rem', textAlign: 'center' }}>🔒 CORS blocked preview</span>
-                      </div>
-                    )}
+                    <div style={{ display: 'none', position: 'absolute', inset: 0, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#000', color: 'var(--text-muted)', gap: '0.4rem' }}>
+                      <Image size={24} style={{ opacity: 0.3 }} />
+                      <span style={{ fontSize: '0.7rem', padding: '0.5rem', textAlign: 'center' }}>⚠️ Unable to load image link</span>
+                    </div>
 
                     {/* Small Sub image thumbnail inside card if available */}
                     {subImg && (
