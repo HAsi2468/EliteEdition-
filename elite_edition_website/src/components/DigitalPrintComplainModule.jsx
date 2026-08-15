@@ -536,11 +536,13 @@ export default function DigitalPrintComplainModule() {
       triggerEliteAlert('Export Notice', 'No complaint records to export.', 'warning');
       return;
     }
-    const headers = ['Complaint No', 'Date', 'Party Name', 'Job Card No', 'Design No', 'Category', 'Priority', 'Status', 'Defective Meters', 'Description', 'Action Taken'];
+    const headers = ['Complaint No', 'Date', 'Party Name', 'Assigned By', 'Responsible Person', 'Job Card No', 'Design No', 'Category', 'Priority', 'Status', 'Defective Meters', 'Description', 'Action Taken'];
     const rows = complaints.map(c => [
       `"${c.complaintNo || ''}"`,
       `"${c.date || ''}"`,
       `"${c.partyName || ''}"`,
+      `"${c.assignedTo || ''}"`,
+      `"${c.responsiblePerson || ''}"`,
       `"${c.jobCardNo || ''}"`,
       `"${c.designNo || ''}"`,
       `"${c.category || ''}"`,
@@ -921,7 +923,7 @@ export default function DigitalPrintComplainModule() {
                         <strong style={{ color: 'var(--text-primary)' }}>{item.partyName || 'N/A'}</strong>
                       </div>
                       <div>
-                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.66rem' }}>Assigned By / To:</span>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.66rem' }}>Assigned By:</span>
                         <strong style={{ color: '#60a5fa' }}>{item.assignedTo || 'Unassigned'}</strong>
                       </div>
                       <div>
@@ -1104,28 +1106,40 @@ export default function DigitalPrintComplainModule() {
                     </select>
                   </div>
 
-                  {/* Assigned By / Assigned To */}
+                  {/* Assigned By (Dropdown with all ERP Users) */}
                   <div>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase' }}>Assigned By / To</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Admin / Manager"
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase' }}>Assigned By *</label>
+                    <select
                       value={formVal.assignedTo}
                       onChange={e => setFormVal({ ...formVal, assignedTo: e.target.value })}
                       style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
-                    />
+                    >
+                      <option value="">-- Select Assigned By (ERP User) --</option>
+                      {staffList.map((sName, idx) => (
+                        <option key={idx} value={sName}>{sName}</option>
+                      ))}
+                      {formVal.assignedTo && !staffList.includes(formVal.assignedTo) && (
+                        <option value={formVal.assignedTo}>{formVal.assignedTo}</option>
+                      )}
+                    </select>
                   </div>
 
-                  {/* Responsible Person (To Solve) */}
+                  {/* Responsible Person (Dropdown with all ERP Users) */}
                   <div>
                     <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#f43f5e', textTransform: 'uppercase' }}>Responsible Person (To Solve) *</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Printer Operator / Designer"
+                    <select
                       value={formVal.responsiblePerson}
                       onChange={e => setFormVal({ ...formVal, responsiblePerson: e.target.value })}
                       style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem', border: '1.5px solid rgba(244,63,94,0.4)', background: 'rgba(244,63,94,0.05)' }}
-                    />
+                    >
+                      <option value="">-- Select Responsible Person (ERP User) --</option>
+                      {staffList.map((sName, idx) => (
+                        <option key={idx} value={sName}>{sName}</option>
+                      ))}
+                      {formVal.responsiblePerson && !staffList.includes(formVal.responsiblePerson) && (
+                        <option value={formVal.responsiblePerson}>{formVal.responsiblePerson}</option>
+                      )}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -1324,7 +1338,7 @@ export default function DigitalPrintComplainModule() {
                 <div><strong>Category:</strong> {showViewModal.category}</div>
                 <div><strong>Sub-Category:</strong> {showViewModal.subCategory || 'N/A'}</div>
                 <div><strong>Severity / Priority:</strong> {showViewModal.priority}</div>
-                <div><strong>Assigned By / To:</strong> {showViewModal.assignedTo || 'Unassigned'}</div>
+                <div><strong>Assigned By:</strong> {showViewModal.assignedTo || 'Unassigned'}</div>
                 <div style={{ color: '#f43f5e', fontWeight: 700 }}><strong>Responsible Person:</strong> {showViewModal.responsiblePerson || 'Unassigned'}</div>
                 <div><strong>Job Card No:</strong> {showViewModal.jobCardNo || 'N/A'}</div>
                 <div><strong>Challan No:</strong> {showViewModal.challanNo || 'N/A'}</div>
