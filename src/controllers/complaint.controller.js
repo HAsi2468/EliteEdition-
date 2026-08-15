@@ -75,7 +75,7 @@ const getAll = async (req, res) => {
   }
 };
 
-// Get Next Complaint Ticket Number (e.g. COMP-1001)
+// Get Next Complaint Ticket Number (e.g. EDP-COMP-1001)
 const getNextNumber = async (req, res) => {
   try {
     const complaints = await db.Complaint.find({}, { complaintNo: 1 }).lean();
@@ -83,14 +83,14 @@ const getNextNumber = async (req, res) => {
 
     complaints.forEach(c => {
       if (!c.complaintNo) return;
-      const match = String(c.complaintNo).match(/^COMP-(\d+)/i);
+      const match = String(c.complaintNo).match(/(?:EDP-)?COMP-(\d+)/i);
       if (match) {
         const num = parseInt(match[1], 10);
         if (!isNaN(num) && num > maxNo) maxNo = num;
       }
     });
 
-    res.json({ nextComplaintNo: `COMP-${maxNo + 1}` });
+    res.json({ nextComplaintNo: `EDP-COMP-${maxNo + 1}` });
   } catch (err) {
     logger.error('complaint.getNextNumber error: %o', err);
     res.status(500).json({ error: 'Failed to generate next complaint number' });
@@ -121,13 +121,13 @@ const create = async (req, res) => {
       let maxNo = 1000;
       complaints.forEach(c => {
         if (!c.complaintNo) return;
-        const match = String(c.complaintNo).match(/^COMP-(\d+)/i);
+        const match = String(c.complaintNo).match(/(?:EDP-)?COMP-(\d+)/i);
         if (match) {
           const num = parseInt(match[1], 10);
           if (!isNaN(num) && num > maxNo) maxNo = num;
         }
       });
-      payload.complaintNo = `COMP-${maxNo + 1}`;
+      payload.complaintNo = `EDP-COMP-${maxNo + 1}`;
     }
 
     const newComplaint = await db.Complaint.create(payload);
