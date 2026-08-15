@@ -194,25 +194,12 @@ const update = async (req, res) => {
       payload.responsiblePersons = payload.responsiblePerson.split(',').map(s => s.trim()).filter(Boolean);
     }
 
-    if (payload.status === 'Resolved' && !payload.resolvedDate) {
+    if (payload.status === 'Close' && !payload.resolvedDate) {
       payload.resolvedDate = new Date();
     }
 
-    const existing = await db.Complaint.findById(id);
-    if (!existing) return res.status(404).json({ error: 'Complaint not found' });
-
-    if (payload.status && payload.status !== existing.status) {
-      const updaterName = payload.updatedBy || payload.userName || 'System';
-      if (!existing.comments) existing.comments = [];
-      existing.comments.push({
-        text: `🔄 Status updated to '${payload.status}'`,
-        userName: updaterName,
-        createdAt: new Date()
-      });
-      payload.comments = existing.comments;
-    }
-
     const updated = await db.Complaint.findByIdAndUpdate(id, payload, { new: true, runValidators: true });
+    if (!updated) return res.status(404).json({ error: 'Complaint not found' });
     res.json(updated);
   } catch (err) {
     logger.error('complaint.update error: %o', err);

@@ -42,7 +42,7 @@ const SUB_CATEGORIES = {
 };
 
 const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
-const STATUSES = ['Open', 'In Progress', 'Hold', 'Pending', 'Feedback', 'Resolved', 'Close', 'Rejected'];
+const STATUSES = ['Open', 'In Progress', 'Hold', 'Pending', 'Feedback', 'Close'];
 
 const PRESET_OPTIONS = [
   { id: 'today', name: 'Today' },
