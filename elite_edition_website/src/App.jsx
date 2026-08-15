@@ -951,12 +951,6 @@ export default function App() {
                       <AlertTriangle size={18} color="#f43f5e" /><span>Complain Module</span>
                     </button>
                   )}
-                  {/* 10. Department Expenses */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_expense') || currentUser.permissions?.includes('jobcards_expenses') || currentUser.permissions?.includes('expense_dashboard') || currentUser.permissions?.includes('expense_create')) && (
-                    <button onClick={() => { setActiveTab('jobcards_expense'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_expense' ? styles.navItemActive : {}) }}>
-                      <Wallet size={18} color="#10b981" /><span>Department Expenses</span>
-                    </button>
-                  )}
                 </>
               ) : (
                 <>
@@ -1166,12 +1160,6 @@ export default function App() {
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_complain') || currentUser.permissions?.includes('jobcards_complaints') || currentUser.permissions?.includes('complaint_dashboard') || currentUser.permissions?.includes('complaint_create')) && (
                   <button onClick={() => handleNavClick('jobcards_complain')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_complain' ? styles.navItemActive : {}) }}>
                     <AlertTriangle size={18} color="#f43f5e" /><span>Complain Module</span>
-                  </button>
-                )}
-                {/* 10. Department Expenses */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_expense') || currentUser.permissions?.includes('jobcards_expenses') || currentUser.permissions?.includes('expense_dashboard') || currentUser.permissions?.includes('expense_create')) && (
-                  <button onClick={() => handleNavClick('jobcards_expense')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_expense' ? styles.navItemActive : {}) }}>
-                    <Wallet size={18} color="#10b981" /><span>Department Expenses</span>
                   </button>
                 )}
               </>

@@ -5,6 +5,7 @@ import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import StitchingChallanPanel from './StitchingChallanPanel';
 import FabricInventoryPanel from './FabricInventoryPanel';
+import DigitalPrintExpenseModule from './DigitalPrintExpenseModule';
 import ScreenGroupRoster from './ScreenGroupRoster';
 import { dispatchScreenGroupEvent } from '../services/screenGroupService';
 import { triggerEliteAlert } from './EliteModalDialog';
@@ -1366,7 +1367,8 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             { id: 'invoices', label: '🧾 Invoices Directory', count: stats.totalInvoices },
             ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? '✍️ Edit Invoice' : '✍️ New Invoice Generator' }] : []),
             { id: 'customers', label: `👥 Customers (${customers.length})` },
-            { id: 'items', label: `📦 Item (${itemsList.length})` }
+            { id: 'items', label: `📦 Item (${itemsList.length})` },
+            { id: 'expense', label: '💰 Expenses & Ledger' }
           ].map(t => (
             <button
               key={t.id}
@@ -2423,6 +2425,11 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             </table>
           </div>
         </div>
+      )}
+
+      {/* ── TAB 6: EXPENSE & LEDGER MODULE ───────────────────────────────────── */}
+      {activeTab === 'expense' && (
+        <DigitalPrintExpenseModule />
       )}
 
       {/* ── TAX INVOICE PREVIEW / VIEW MODAL ────────────────────────────────── */}
