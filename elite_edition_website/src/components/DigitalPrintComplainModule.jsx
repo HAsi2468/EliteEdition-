@@ -128,12 +128,26 @@ export default function DigitalPrintComplainModule() {
 
   const fetchParties = async () => {
     try {
-      const [pRes, cfg] = await Promise.all([
-        api.getParties({ limit: 1000 }),
-        api.getPrintConfig()
+      const [pRes, cfg, uRes] = await Promise.all([
+        api.getParties({ limit: 1000 }).catch(() => ({ data: [] })),
+        api.getPrintConfig().catch(() => ({})),
+        api.getUsers({ limit: 500 }).catch(() => ({ results: [], data: [] }))
       ]);
-      if (pRes && pRes.data) setParties(pRes.data);
-      if (cfg && cfg.operators) setStaffList(cfg.operators);
+
+      // 1. Party Names from Print Settings Parties (Clients) + Party Master
+      const printConfigParties = (cfg && Array.isArray(cfg.parties)) ? cfg.parties : [];
+      const partyMasterNames = (pRes && Array.isArray(pRes.data)) ? pRes.data.map(p => typeof p === 'string' ? p : (p.name || p.partyName)).filter(Boolean) : [];
+      const mergedParties = Array.from(new Set([...printConfigParties, ...partyMasterNames]));
+      setParties(mergedParties);
+
+      // 2. Staff / Users who have access to Elite Digital Prints (Current & Future)
+      const userList = (uRes && (uRes.results || uRes.data)) ? (uRes.results || uRes.data) : [];
+      const userNames = Array.isArray(userList) ? userList.map(u => u.name || u.fullName || u.username).filter(Boolean) : [];
+      const operators = (cfg && Array.isArray(cfg.operators)) ? cfg.operators : [];
+      const autoUsers = (cfg && Array.isArray(cfg.autoScreenUsers)) ? cfg.autoScreenUsers : [];
+
+      const mergedStaff = Array.from(new Set([...userNames, ...autoUsers, ...operators]));
+      setStaffList(mergedStaff);
     } catch (e) {
       console.warn('Failed to fetch metadata list:', e);
     }
@@ -663,7 +677,7 @@ export default function DigitalPrintComplainModule() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.65rem' }}>
                   {/* Customer Name Dropdown */}
                   <div>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Customer Name (Dropdown) *</label>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Customer Name (Print Settings Parties) *</label>
                     <select
                       value={formVal.partyName}
                       onChange={e => setFormVal({ ...formVal, partyName: e.target.value })}
@@ -671,28 +685,25 @@ export default function DigitalPrintComplainModule() {
                       style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
                     >
                       <option value="">-- Select Customer / Party --</option>
-                      {parties.map(p => (
-                        <option key={p._id || p.name} value={p.name || p.partyName}>{p.name || p.partyName}</option>
+                      {parties.map((pName, idx) => (
+                        <option key={idx} value={pName}>{pName}</option>
                       ))}
                     </select>
                   </div>
 
                   {/* Responsible Person Dropdown */}
                   <div>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Responsible Person (Dropdown)</label>
-                    <input
-                      type="text"
-                      list="staff-list"
-                      placeholder="Select or type Responsible Staff..."
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Responsible Person (Department User)</label>
+                    <select
                       value={formVal.assignedTo}
                       onChange={e => setFormVal({ ...formVal, assignedTo: e.target.value })}
                       style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
-                    />
-                    <datalist id="staff-list">
-                      {staffList.map((s, idx) => (
-                        <option key={idx} value={s} />
+                    >
+                      <option value="">-- Select Responsible Person --</option>
+                      {staffList.map((sName, idx) => (
+                        <option key={idx} value={sName}>{sName}</option>
                       ))}
-                    </datalist>
+                    </select>
                   </div>
                 </div>
               </div>
