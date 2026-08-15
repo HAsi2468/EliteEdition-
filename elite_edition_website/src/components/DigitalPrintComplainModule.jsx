@@ -235,6 +235,7 @@ export default function DigitalPrintComplainModule() {
     partyName: '',
     assignedTo: '',
     responsiblePerson: '',
+    responsiblePersons: [],
     jobCardNo: '',
     challanNo: '',
     invoiceNo: '',
@@ -431,6 +432,7 @@ export default function DigitalPrintComplainModule() {
       partyName: '',
       assignedTo: currentUserName,
       responsiblePerson: '',
+      responsiblePersons: [],
       jobCardNo: '',
       challanNo: '',
       invoiceNo: '',
@@ -465,12 +467,17 @@ export default function DigitalPrintComplainModule() {
     const cat = item.category || 'Printing Defect';
     const subOpts = SUB_CATEGORIES[cat] || ['Other'];
 
+    const respList = Array.isArray(item.responsiblePersons) && item.responsiblePersons.length > 0
+      ? item.responsiblePersons
+      : (item.responsiblePerson ? item.responsiblePerson.split(',').map(s => s.trim()).filter(Boolean) : []);
+
     setFormVal({
       complaintNo: item.complaintNo || '',
       date: item.date || new Date().toISOString().split('T')[0],
       partyName: item.partyName || '',
       assignedTo: item.assignedTo || '',
-      responsiblePerson: item.responsiblePerson || '',
+      responsiblePerson: item.responsiblePerson || respList.join(', '),
+      responsiblePersons: respList,
       jobCardNo: item.jobCardNo || '',
       challanNo: item.challanNo || '',
       invoiceNo: item.invoiceNo || '',
@@ -973,8 +980,12 @@ export default function DigitalPrintComplainModule() {
                         <strong style={{ color: '#60a5fa' }}>{item.assignedTo || 'Unassigned'}</strong>
                       </div>
                       <div>
-                        <span style={{ color: '#f43f5e', display: 'block', fontSize: '0.66rem', fontWeight: 800 }}>Responsible To:</span>
-                        <strong style={{ color: '#f43f5e' }}>{item.responsiblePerson || 'Unassigned'}</strong>
+                        <span style={{ color: '#f43f5e', display: 'block', fontSize: '0.66rem', fontWeight: 800 }}>Responsible Person:</span>
+                        <strong style={{ color: '#f43f5e' }}>
+                          {Array.isArray(item.responsiblePersons) && item.responsiblePersons.length > 0
+                            ? item.responsiblePersons.join(', ')
+                            : (item.responsiblePerson || 'Unassigned')}
+                        </strong>
                       </div>
                     </div>
 
@@ -1170,22 +1181,50 @@ export default function DigitalPrintComplainModule() {
                     </select>
                   </div>
 
-                  {/* Responsible To (Dropdown with all ERP Users) */}
-                  <div>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#f43f5e', textTransform: 'uppercase' }}>Responsible To *</label>
-                    <select
-                      value={formVal.responsiblePerson}
-                      onChange={e => setFormVal({ ...formVal, responsiblePerson: e.target.value })}
-                      style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem', border: '1.5px solid rgba(244,63,94,0.4)', background: 'rgba(244,63,94,0.05)' }}
-                    >
-                      <option value="">-- Select Responsible To (ERP User) --</option>
-                      {staffList.map((sName, idx) => (
-                        <option key={idx} value={sName}>{sName}</option>
-                      ))}
-                      {formVal.responsiblePerson && !staffList.includes(formVal.responsiblePerson) && (
-                        <option value={formVal.responsiblePerson}>{formVal.responsiblePerson}</option>
-                      )}
-                    </select>
+                  {/* Responsible Person (Multi-Select Pills for ERP Users) */}
+                  <div style={{ marginTop: '0.75rem', gridColumn: '1 / -1' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#f43f5e', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                      <span>👥 Responsible Person (Select One or Multiple ERP Users) *</span>
+                      <span style={{ fontSize: '0.68rem', color: '#f43f5e', fontWeight: 900, background: 'rgba(244,63,94,0.15)', padding: '2px 8px', borderRadius: '10px', border: '1px solid rgba(244,63,94,0.3)' }}>
+                        {formVal.responsiblePersons.length} Selected
+                      </span>
+                    </label>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', background: 'rgba(255,255,255,0.03)', padding: '0.6rem', borderRadius: '8px', border: '1px solid rgba(244,63,94,0.3)', maxHeight: '130px', overflowY: 'auto' }}>
+                      {staffList.map((sName, idx) => {
+                        const isSelected = formVal.responsiblePersons.includes(sName);
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              let nextList = [...formVal.responsiblePersons];
+                              if (isSelected) {
+                                nextList = nextList.filter(n => n !== sName);
+                              } else {
+                                nextList.push(sName);
+                              }
+                              setFormVal(prev => ({
+                                ...prev,
+                                responsiblePersons: nextList,
+                                responsiblePerson: nextList.join(', ')
+                              }));
+                            }}
+                            style={{
+                              padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, borderRadius: '20px',
+                              border: isSelected ? '1px solid #f43f5e' : '1px solid var(--border-light)',
+                              background: isSelected ? 'linear-gradient(135deg, #f43f5e, #e11d48)' : 'rgba(255,255,255,0.05)',
+                              color: isSelected ? '#ffffff' : 'var(--text-muted)',
+                              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem',
+                              boxShadow: isSelected ? '0 3px 10px rgba(244,63,94,0.3)' : 'none',
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            {isSelected ? '✓ ' : '+ '} {sName}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1446,7 +1485,12 @@ export default function DigitalPrintComplainModule() {
                 <div><strong>Sub-Category:</strong> {showViewModal.subCategory || 'N/A'}</div>
                 <div><strong>Severity / Priority:</strong> {showViewModal.priority}</div>
                 <div><strong>Assigned By:</strong> {showViewModal.assignedTo || 'Unassigned'}</div>
-                <div style={{ color: '#f43f5e', fontWeight: 700 }}><strong>Responsible To:</strong> {showViewModal.responsiblePerson || 'Unassigned'}</div>
+                <div style={{ color: '#f43f5e', fontWeight: 700 }}>
+                  <strong>Responsible Person:</strong> {' '}
+                  {Array.isArray(showViewModal.responsiblePersons) && showViewModal.responsiblePersons.length > 0
+                    ? showViewModal.responsiblePersons.join(', ')
+                    : (showViewModal.responsiblePerson || 'Unassigned')}
+                </div>
                 <div><strong>Job Card No:</strong> {showViewModal.jobCardNo || 'N/A'}</div>
                 <div><strong>Challan No:</strong> {showViewModal.challanNo || 'N/A'}</div>
                 <div><strong>Invoice No:</strong> {showViewModal.invoiceNo || 'N/A'}</div>

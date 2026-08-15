@@ -129,6 +129,12 @@ const create = async (req, res) => {
       return res.status(400).json({ error: 'Party Name is required' });
     }
 
+    if (Array.isArray(payload.responsiblePersons)) {
+      payload.responsiblePerson = payload.responsiblePersons.join(', ');
+    } else if (typeof payload.responsiblePerson === 'string' && payload.responsiblePerson.trim()) {
+      payload.responsiblePersons = payload.responsiblePerson.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
     if (!payload.complaintNo) {
       const complaints = await db.Complaint.find({}, { complaintNo: 1 }).lean();
       let maxNo = 1000;
@@ -174,6 +180,12 @@ const update = async (req, res) => {
   try {
     const { id } = req.params;
     const payload = req.body;
+
+    if (Array.isArray(payload.responsiblePersons)) {
+      payload.responsiblePerson = payload.responsiblePersons.join(', ');
+    } else if (typeof payload.responsiblePerson === 'string' && payload.responsiblePerson.trim()) {
+      payload.responsiblePersons = payload.responsiblePerson.split(',').map(s => s.trim()).filter(Boolean);
+    }
 
     if (payload.status === 'Resolved' && !payload.resolvedDate) {
       payload.resolvedDate = new Date();
