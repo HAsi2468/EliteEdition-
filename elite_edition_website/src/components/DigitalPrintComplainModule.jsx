@@ -48,6 +48,8 @@ export default function DigitalPrintComplainModule() {
   const [complaints, setComplaints] = useState([]);
   const [parties, setParties] = useState([]);
   const [staffList, setStaffList] = useState([]);
+  const [dynamicCategories, setDynamicCategories] = useState(CATEGORIES);
+  const [dynamicSubCategories, setDynamicSubCategories] = useState(SUB_CATEGORIES);
   const [analytics, setAnalytics] = useState({
     total: 0, open: 0, hold: 0, close: 0, feedback: 0, urgent: 0, totalDefectiveMeters: 0, totalExpectedAmount: 0
   });
@@ -501,7 +503,7 @@ export default function DigitalPrintComplainModule() {
             style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem', minWidth: 150 }}
           >
             <option value="All">All Categories</option>
-            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            {(Array.isArray(dynamicCategories) ? dynamicCategories : CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
       </div>
