@@ -54,6 +54,8 @@ const AVAILABLE_SCREENS = [
   { id: 'jobcards_billing', label: 'Elite Prints: Billing & Invoicing', category: 'Elite Digital Print' },
   { id: 'complaint_dashboard', label: 'Elite Prints: Complaint Dashboard (View Only)', category: 'Elite Digital Print' },
   { id: 'complaint_create', label: 'Elite Prints: Log New Complaint (Create Access)', category: 'Elite Digital Print' },
+  { id: 'expense_dashboard', label: 'Elite Prints: Department Expenses (View Only)', category: 'Elite Digital Print' },
+  { id: 'expense_create', label: 'Elite Prints: Log Department Expense (IN/OUT)', category: 'Elite Digital Print' },
   { id: 'jobcards_settings', label: 'Elite Prints: Settings', category: 'Elite Digital Print' },
 
   // Elite Stitching

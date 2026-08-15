@@ -804,6 +804,32 @@ export const api = {
     return request(`/complaints/${id}/comments`, { method: 'POST', body: JSON.stringify(payload) });
   },
 
+  // ─── Department Expense Module ──────────────────────────────────────────────
+  async getExpenses(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/expenses${qs}`);
+  },
+  async getExpenseAnalytics(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/expenses/analytics${qs}`);
+  },
+  async getNextExpenseVoucherNo() {
+    return request('/expenses/next-number');
+  },
+  async createExpense(payload) {
+    return request('/expenses', { method: 'POST', body: JSON.stringify(payload) });
+  },
+  async updateExpense(id, payload) {
+    return request(`/expenses/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+  },
+  async deleteExpense(id) {
+    return request(`/expenses/${id}`, { method: 'DELETE' });
+  },
+
   // ─── Analytics ──────────────────────────────────────────────────────────────
   async getVariantAnalytics(params = {}) {
     const query = new URLSearchParams();

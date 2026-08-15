@@ -19,6 +19,7 @@ import GarmentJobCardDashboard from './GarmentJobCardDashboard';
 import StitchingChallanPanel from './StitchingChallanPanel';
 import StitchingSettings from './StitchingSettings';
 import DigitalPrintComplainModule from './DigitalPrintComplainModule';
+import DigitalPrintExpenseModule from './DigitalPrintExpenseModule';
 import ScreenGroupRoster from './ScreenGroupRoster';
 import { dispatchScreenGroupEvent } from '../services/screenGroupService';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
@@ -1872,6 +1873,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         <RawMaterialsPanel />
       ) : effectiveSubTab === 'complain' || effectiveSubTab === 'complaint' || effectiveSubTab === 'complaints' ? (
         <DigitalPrintComplainModule />
+      ) : effectiveSubTab === 'expense' || effectiveSubTab === 'expenses' ? (
+        <DigitalPrintExpenseModule />
       ) : effectiveSubTab === 'tracking' ? (
         <JobCardTracking onPreview={setPreviewCard} />
       ) : effectiveSubTab === 'settings' || effectiveSubTab === 'stitching_settings' ? (

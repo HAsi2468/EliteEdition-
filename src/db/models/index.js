@@ -51,6 +51,7 @@ const db = {
   BillingItem: require('./billingItem.model'),
   FabricChallan: require('./fabricChallan.model'),
   Complaint: require('./complaint.model'),
+  Expense: require('./expense.model'),
   ChatRoom: require('./chat.model').ChatRoom,
   ChatMessage: require('./chat.model').ChatMessage,
   Task: require('./task.model').Task,
