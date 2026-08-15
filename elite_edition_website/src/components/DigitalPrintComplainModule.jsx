@@ -790,11 +790,6 @@ export default function DigitalPrintComplainModule() {
               <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>Avg Open to Close Time</div>
             </div>
 
-            {/* Defective Fabric Mtr */}
-            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #a78bfa' }}>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Defective Fabric</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#a78bfa', marginTop: 2 }}>{analytics.totalDefectiveMeters || 0} <span style={{ fontSize: '0.8rem' }}>Mtr</span></div>
-            </div>
           </div>
 
           {/* Filter Toolbar */}
