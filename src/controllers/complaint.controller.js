@@ -283,98 +283,183 @@ const getAnalytics = async (req, res) => {
   }
 };
 
-// Lookup order details across JobCards, FabricChallans, and Invoices
+// Lookup order details across JobCards, FabricChallans, and Invoices with intelligent cross-linking
 const lookupOrderDetails = async (req, res) => {
   try {
     const { query = '', jobCardNo = '', challanNo = '', invoiceNo = '' } = req.query;
-    const searchTerm = (query || jobCardNo || challanNo || invoiceNo || '').trim();
+    const rawSearch = (query || jobCardNo || challanNo || invoiceNo || '').trim();
 
-    if (!searchTerm) {
+    if (!rawSearch) {
       return res.json({ success: false, message: 'No search term provided' });
     }
 
-    const cleanTerm = searchTerm.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+    // Extract numeric parts e.g. "JOB-2267" -> 2267, "EDP/26-27/267" -> 267
+    const numMatch = rawSearch.match(/(\d+)/g);
+    const numQueries = numMatch ? numMatch.map(n => parseInt(n, 10)).filter(n => !isNaN(n)) : [];
+
+    const cleanTerm = rawSearch.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
     const regex = new RegExp(cleanTerm, 'i');
 
-    let result = {
-      partyName: '',
-      jobCardNo: '',
-      challanNo: '',
-      invoiceNo: '',
-      designNo: '',
-      totalMeters: 0,
-      foundIn: ''
-    };
+    let jcDoc = null;
+    let chDoc = null;
+    let invDoc = null;
+    let gjcDoc = null;
 
-    // 1. Search in JobCards
+    // 1. Search JobCards
     if (db.JobCard) {
-      const jc = await db.JobCard.findOne({
-        $or: [{ jobCardNo: regex }, { challanNo: regex }, { invoiceNo: regex }, { jobNo: regex }]
+      jcDoc = await db.JobCard.findOne({
+        $or: [
+          { jobNo: regex },
+          { jobCardNo: regex },
+          { billNo: regex },
+          { invoiceNo: regex },
+          { challanNo: regex },
+          { designNo: regex }
+        ]
+      }).lean();
+    }
+
+    // 2. Search BillingInvoices (Tax Invoices)
+    if (db.BillingInvoice) {
+      invDoc = await db.BillingInvoice.findOne({
+        $or: [
+          { invoiceNo: regex },
+          { ourChallanNo: regex },
+          { linkedChallanNos: regex },
+          { 'items.jobNo': regex },
+          { 'items.ourChallanNo': regex },
+          { 'items.partyChallan': regex }
+        ]
       }).lean();
 
-      if (jc) {
-        result.partyName = jc.partyName || jc.clientName || jc.party || '';
-        result.jobCardNo = jc.jobCardNo || jc.jobNo || '';
-        result.challanNo = jc.challanNo || '';
-        result.invoiceNo = jc.invoiceNo || '';
-        result.designNo = jc.designNo || jc.designName || '';
-        result.totalMeters = jc.totalMeters || jc.meters || jc.qty || 0;
-        result.foundIn = 'Job Card';
+      // If not found directly but jcDoc exists, query BillingInvoice using jcDoc fields
+      if (!invDoc && jcDoc) {
+        const jNo = jcDoc.jobNo || jcDoc.jobCardNo;
+        const bNo = jcDoc.billNo;
+        invDoc = await db.BillingInvoice.findOne({
+          $or: [
+            ...(bNo ? [{ invoiceNo: new RegExp(bNo.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i') }] : []),
+            ...(jNo ? [{ 'items.jobNo': new RegExp(jNo.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i') }] : [])
+          ]
+        }).lean();
       }
     }
 
-    // 2. Search in FabricChallans
-    if (!result.partyName && db.FabricChallan) {
-      const ch = await db.FabricChallan.findOne({
-        $or: [{ challanNo: regex }, { jobCardNo: regex }, { invoiceNo: regex }]
+    // 3. Search FabricChallans
+    if (db.FabricChallan) {
+      const challanNumberFilter = [];
+      if (numQueries.length > 0) {
+        challanNumberFilter.push({ challanNo: { $in: numQueries } });
+      }
+      chDoc = await db.FabricChallan.findOne({
+        $or: [
+          { jobNo: regex },
+          { vendorChallanNo: regex },
+          { invoiceNo: regex },
+          { designNo: regex },
+          ...challanNumberFilter
+        ]
       }).lean();
 
-      if (ch) {
-        result.partyName = result.partyName || ch.partyName || ch.vendorName || '';
-        result.jobCardNo = result.jobCardNo || ch.jobCardNo || '';
-        result.challanNo = result.challanNo || ch.challanNo || '';
-        result.invoiceNo = result.invoiceNo || ch.invoiceNo || '';
-        result.designNo = result.designNo || ch.designNo || '';
-        result.totalMeters = result.totalMeters || ch.totalMeters || ch.totalQty || 0;
-        result.foundIn = result.foundIn || 'Fabric Challan';
+      // If not found directly but jcDoc or invDoc exist, find FabricChallan by their jobNo / invoiceNo
+      if (!chDoc) {
+        const targetJobNo = jcDoc?.jobNo || invDoc?.items?.find(i => i.jobNo)?.jobNo;
+        const targetInvNo = invDoc?.invoiceNo || jcDoc?.billNo;
+        if (targetJobNo || targetInvNo) {
+          chDoc = await db.FabricChallan.findOne({
+            $or: [
+              ...(targetJobNo ? [{ jobNo: new RegExp(targetJobNo.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i') }] : []),
+              ...(targetInvNo ? [{ invoiceNo: new RegExp(targetInvNo.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i') }] : [])
+            ]
+          }).lean();
+        }
       }
     }
 
-    // 3. Search in BillingInvoices
-    if ((!result.partyName || !result.invoiceNo) && db.BillingInvoice) {
-      const inv = await db.BillingInvoice.findOne({
-        $or: [{ invoiceNo: regex }, { eWayBillNo: regex }, { jobCardNo: regex }]
-      }).lean();
-
-      if (inv) {
-        result.partyName = result.partyName || inv.partyName || '';
-        result.invoiceNo = result.invoiceNo || inv.invoiceNo || '';
-        result.jobCardNo = result.jobCardNo || inv.jobCardNo || '';
-        result.challanNo = result.challanNo || inv.challanNo || '';
-        result.designNo = result.designNo || inv.designNo || '';
-        result.foundIn = result.foundIn || 'Invoice';
-      }
-    }
-
-    // 4. Search in GarmentJobCard
-    if (!result.partyName && db.GarmentJobCard) {
-      const gjc = await db.GarmentJobCard.findOne({
+    // 4. Search GarmentJobCard
+    if (!jcDoc && db.GarmentJobCard) {
+      gjcDoc = await db.GarmentJobCard.findOne({
         $or: [{ jobCardNo: regex }, { challanNo: regex }]
       }).lean();
-
-      if (gjc) {
-        result.partyName = result.partyName || gjc.partyName || gjc.brandName || '';
-        result.jobCardNo = result.jobCardNo || gjc.jobCardNo || '';
-        result.challanNo = result.challanNo || gjc.challanNo || '';
-        result.foundIn = result.foundIn || 'Garment Job Card';
-      }
     }
 
-    if (!result.partyName && !result.jobCardNo && !result.challanNo && !result.invoiceNo) {
+    // Check if any matching order record was found
+    if (!jcDoc && !invDoc && !chDoc && !gjcDoc) {
       return res.json({ success: false, message: 'No matching order found' });
     }
 
-    res.json({ success: true, data: result });
+    // Merge details seamlessly across all linked documents
+    const partyName =
+      jcDoc?.party ||
+      jcDoc?.billTo ||
+      invDoc?.customer?.name ||
+      invDoc?.customer?.businessName ||
+      chDoc?.partyName ||
+      chDoc?.billTo ||
+      gjcDoc?.partyName ||
+      '';
+
+    const jobCardNo =
+      jcDoc?.jobNo ||
+      jcDoc?.jobCardNo ||
+      invDoc?.items?.find(i => i.jobNo)?.jobNo ||
+      chDoc?.jobNo ||
+      gjcDoc?.jobCardNo ||
+      '';
+
+    let rawChallanNo =
+      chDoc?.challanNo ||
+      chDoc?.vendorChallanNo ||
+      invDoc?.ourChallanNo ||
+      invDoc?.linkedChallanNos?.[0] ||
+      invDoc?.items?.find(i => i.ourChallanNo)?.ourChallanNo ||
+      jcDoc?.challanNo ||
+      gjcDoc?.challanNo ||
+      '';
+
+    if (rawChallanNo && typeof rawChallanNo === 'number') {
+      rawChallanNo = `EDP-CH-${rawChallanNo}`;
+    }
+
+    const invoiceNo =
+      invDoc?.invoiceNo ||
+      jcDoc?.billNo ||
+      chDoc?.invoiceNo ||
+      '';
+
+    const designNo =
+      jcDoc?.designNo ||
+      jcDoc?.designName ||
+      chDoc?.designNo ||
+      invDoc?.items?.find(i => i.itemName)?.itemName ||
+      '';
+
+    const totalMeters = parseFloat(
+      jcDoc?.totalMtr ||
+      jcDoc?.printMtr ||
+      chDoc?.totalMtr ||
+      invDoc?.items?.reduce((sum, item) => sum + (item.qty || 0), 0) ||
+      0
+    ) || 0;
+
+    let foundInSources = [];
+    if (jcDoc) foundInSources.push('Job Card');
+    if (chDoc) foundInSources.push('Delivery Challan');
+    if (invDoc) foundInSources.push('Invoice');
+    if (gjcDoc) foundInSources.push('Garment Job Card');
+
+    res.json({
+      success: true,
+      data: {
+        partyName,
+        jobCardNo,
+        challanNo: rawChallanNo,
+        invoiceNo,
+        designNo,
+        totalMeters,
+        foundIn: foundInSources.join(' + ') || 'Database'
+      }
+    });
   } catch (err) {
     logger.error('complaint.lookupOrderDetails error: %o', err);
     res.status(500).json({ error: 'Failed to lookup order details' });
