@@ -103,6 +103,7 @@ export default function JobPrintingLog() {
   // Dedicated Raw Material Usage Form Modal State
   const [showRawMaterialModal, setShowRawMaterialModal] = useState(false);
   const [rawMaterialSubmitting, setRawMaterialSubmitting] = useState(false);
+  const [rawEntryType, setRawEntryType] = useState('OUTWARD');
 
   const [rawDate, setRawDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [rawShift, setRawShift] = useState(() => getAutoShift());
