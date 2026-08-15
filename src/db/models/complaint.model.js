@@ -8,22 +8,10 @@ const complaintSchema = new mongoose.Schema(
     jobCardNo: { type: String, default: '', trim: true },
     invoiceNo: { type: String, default: '', trim: true },
     designNo: { type: String, default: '', trim: true },
-    category: {
-      type: String,
-      default: 'Printing Defect',
-      enum: [
-        'Color Matching / Shade Difference',
-        'Printing Defect',
-        'Fabric Damage',
-        'Quantity Shortage',
-        'Delivery Delay',
-        'Billing Issue',
-        'Other'
-      ]
-    },
+    category: { type: String, default: 'Printing Defect', trim: true },
     subCategory: { type: String, default: '', trim: true },
     priority: { type: String, default: 'Medium', enum: ['Low', 'Medium', 'High', 'Urgent'] },
-    status: { type: String, default: 'Open', enum: ['Open', 'Hold', 'Close', 'Feedback', 'Pending', 'In Progress', 'Resolved', 'Rejected'] },
+    status: { type: String, default: 'Open', trim: true },
     defectiveMeters: { type: Number, default: 0 },
     expectedAmount: { type: Number, default: 0 },
     description: { type: String, default: '', trim: true },
