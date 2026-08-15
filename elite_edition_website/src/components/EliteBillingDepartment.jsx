@@ -1627,6 +1627,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                         />
                       </th>
                       <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Invoice No</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Challan No</th>
                       <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Customer Name</th>
                       <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Date</th>
                       <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Grand Total</th>
@@ -1639,7 +1640,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                   <tbody>
                     {displayedInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={9} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <td colSpan={10} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                           No invoices found for the selected date range ({activeRange.labelText}).
                         </td>
                       </tr>
@@ -1661,6 +1662,9 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                           >
                             {inv.invoiceNo}
                           </button>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#60a5fa', fontWeight: 700 }}>
+                          {inv.ourChallanNo || (Array.isArray(inv.linkedChallanNos) && inv.linkedChallanNos.length > 0 ? inv.linkedChallanNos.join(', ') : '') || (inv.items && inv.items.map(i => i.ourChallanNo || i.partyChallan).filter(Boolean).join(', ')) || '—'}
                         </td>
                         <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>
                           <div style={{ fontWeight: 700 }}>{inv.customer?.businessName || inv.customer?.name || '—'}</div>

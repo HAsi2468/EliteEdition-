@@ -52,6 +52,8 @@ const AVAILABLE_SCREENS = [
   { id: 'jobcards_fabric', label: 'Elite Prints: Fabric Management', category: 'Elite Digital Print' },
   { id: 'jobcards_raw_materials', label: 'Elite Prints: Raw Materials', category: 'Elite Digital Print' },
   { id: 'jobcards_billing', label: 'Elite Prints: Billing & Invoicing', category: 'Elite Digital Print' },
+  { id: 'complaint_dashboard', label: 'Elite Prints: Complain Dashboard', category: 'Elite Digital Print' },
+  { id: 'complaint_create', label: 'Elite Prints: Log New Complaint', category: 'Elite Digital Print' },
   { id: 'jobcards_settings', label: 'Elite Prints: Settings', category: 'Elite Digital Print' },
 
   // Elite Stitching

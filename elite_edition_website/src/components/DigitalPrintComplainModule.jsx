@@ -235,6 +235,7 @@ export default function DigitalPrintComplainModule() {
     partyName: '',
     assignedTo: '',
     jobCardNo: '',
+    challanNo: '',
     invoiceNo: '',
     designNo: '',
     category: 'Printing Defect',
@@ -259,7 +260,11 @@ export default function DigitalPrintComplainModule() {
   const fetchComplaints = async () => {
     setLoading(true);
     try {
-      const res = await api.getComplaints({
+      const currentUser = api.getCurrentUser();
+      const isAdmin = !currentUser || currentUser.role === 'admin';
+      const currentUserName = currentUser ? (currentUser.name || currentUser.fullName || currentUser.username || '') : '';
+
+      const params = {
         search,
         status: statusFilter,
         priority: priorityFilter,
@@ -267,9 +272,19 @@ export default function DigitalPrintComplainModule() {
         dateStart,
         dateEnd,
         limit: 500
-      });
+      };
+
+      if (!isAdmin && currentUserName) {
+        params.assignedTo = currentUserName;
+      }
+
+      const res = await api.getComplaints(params);
       if (res && res.data) {
-        setComplaints(res.data);
+        let list = res.data;
+        if (!isAdmin && currentUserName) {
+          list = list.filter(item => (item.assignedTo || '').toLowerCase().trim() === currentUserName.toLowerCase().trim());
+        }
+        setComplaints(list);
       }
     } catch (err) {
       console.error('Failed to fetch complaints:', err);
@@ -280,7 +295,16 @@ export default function DigitalPrintComplainModule() {
 
   const fetchAnalytics = async () => {
     try {
-      const data = await api.getComplaintAnalytics({ dateStart, dateEnd });
+      const currentUser = api.getCurrentUser();
+      const isAdmin = !currentUser || currentUser.role === 'admin';
+      const currentUserName = currentUser ? (currentUser.name || currentUser.fullName || currentUser.username || '') : '';
+
+      const params = { dateStart, dateEnd };
+      if (!isAdmin && currentUserName) {
+        params.assignedTo = currentUserName;
+      }
+
+      const data = await api.getComplaintAnalytics(params);
       if (data) setAnalytics(data);
     } catch (e) {
       console.error('Failed to fetch complaint analytics:', e);
@@ -301,17 +325,21 @@ export default function DigitalPrintComplainModule() {
       const mergedParties = Array.from(new Set([...printConfigParties, ...partyMasterNames]));
       setParties(mergedParties);
 
-      // 2. Staff / Users who have access to Elite Digital Prints (Current & Future)
+      // 2. Responsible Persons strictly from System Users & Admins
       let userList = [];
       if (Array.isArray(uRes)) userList = uRes;
+      else if (uRes && Array.isArray(uRes.users?.rows)) userList = uRes.users.rows;
       else if (uRes && Array.isArray(uRes.results)) userList = uRes.results;
       else if (uRes && Array.isArray(uRes.data)) userList = uRes.data;
 
-      const userNames = userList.map(u => typeof u === 'string' ? u : (u.name || u.fullName || u.username)).filter(Boolean);
-      const operators = (cfg && Array.isArray(cfg.operators)) ? cfg.operators : [];
-      const autoUsers = (cfg && Array.isArray(cfg.autoScreenUsers)) ? cfg.autoScreenUsers : [];
+      const registeredUsers = userList
+        .map(u => typeof u === 'string' ? u : (u.name || u.fullName || u.username))
+        .filter(Boolean);
 
-      const mergedStaff = Array.from(new Set([...userNames, ...operators, ...autoUsers])).filter(Boolean);
+      const currentUser = api.getCurrentUser();
+      const currentUserName = currentUser ? (currentUser.name || currentUser.fullName || currentUser.username || '') : '';
+
+      const mergedStaff = Array.from(new Set([...registeredUsers, currentUserName])).filter(Boolean);
       setStaffList(mergedStaff);
 
       // 3. Dynamic Categories & Sub-Categories from Print Settings
@@ -342,6 +370,9 @@ export default function DigitalPrintComplainModule() {
   };
 
   const handleOpenNew = () => {
+    const currentUser = api.getCurrentUser();
+    const currentUserName = currentUser ? (currentUser.name || currentUser.fullName || currentUser.username || '') : '';
+
     setEditingItem(null);
     const catList = Array.isArray(dynamicCategories) && dynamicCategories.length > 0 ? dynamicCategories : CATEGORIES;
     const defaultCat = catList[0] || 'Printing Defect';
@@ -351,8 +382,9 @@ export default function DigitalPrintComplainModule() {
       complaintNo: 'Loading...',
       date: new Date().toISOString().split('T')[0],
       partyName: '',
-      assignedTo: '',
+      assignedTo: currentUserName,
       jobCardNo: '',
+      challanNo: '',
       invoiceNo: '',
       designNo: '',
       category: defaultCat,
@@ -391,6 +423,7 @@ export default function DigitalPrintComplainModule() {
       partyName: item.partyName || '',
       assignedTo: item.assignedTo || '',
       jobCardNo: item.jobCardNo || '',
+      challanNo: item.challanNo || '',
       invoiceNo: item.invoiceNo || '',
       designNo: item.designNo || '',
       category: cat,
@@ -544,6 +577,15 @@ export default function DigitalPrintComplainModule() {
     }
   };
 
+  const currentUser = api.getCurrentUser();
+  const perms = currentUser?.permissions || [];
+  const isAdmin = !currentUser || currentUser.role === 'admin';
+
+  // Permission 1: Dashboard View
+  const canViewDashboard = isAdmin || perms.includes('complaint_dashboard') || perms.includes('jobcards_complain') || perms.includes('jobcards');
+  // Permission 2: Create Complaint
+  const canCreateComplaint = isAdmin || perms.includes('complaint_create') || perms.includes('jobcards_complain') || perms.includes('jobcards');
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1rem' }}>
       
@@ -569,401 +611,431 @@ export default function DigitalPrintComplainModule() {
           </div>
 
           <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-            <button
-              onClick={handleExportCSV}
-              style={{
-                padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 700, borderRadius: '8px',
-                border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.12)', color: '#60a5fa',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem'
-              }}
-            >
-              <Download size={15} /> Export CSV
-            </button>
-            <button
-              onClick={handleOpenNew}
-              style={{
-                padding: '0.55rem 1.2rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
-                border: 'none', background: 'linear-gradient(135deg, #f43f5e, #e11d48)', color: '#fff',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', boxShadow: '0 4px 12px rgba(244,63,94,0.3)'
-              }}
-            >
-              <PlusCircle size={16} /> + Log New Complaint
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* KPI Analytical Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.85rem' }}>
-        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #60a5fa' }}>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Total Complaints</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{analytics.total || 0}</div>
-        </div>
-
-        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #eab308' }}>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Open</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#eab308', marginTop: 2 }}>{analytics.open || 0}</div>
-        </div>
-
-        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #f97316' }}>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Hold</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#f97316', marginTop: 2 }}>{analytics.hold || 0}</div>
-        </div>
-
-        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #4ade80' }}>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Close</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#4ade80', marginTop: 2 }}>{analytics.close || 0}</div>
-        </div>
-
-        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #c084fc' }}>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Feedback</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#c084fc', marginTop: 2 }}>{analytics.feedback || 0}</div>
-        </div>
-
-        {/* Complaint Rate (%) */}
-        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #f43f5e' }}>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Complaint Rate (%)</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#f43f5e', marginTop: 2 }}>
-            {analytics.complaintRate || '0.00'}%
-          </div>
-          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>Tickets / Dispatched</div>
-        </div>
-
-        {/* Resolution SLA / TAT */}
-        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #38bdf8' }}>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Resolution SLA/TAT</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#38bdf8', marginTop: 2 }}>
-            {analytics.avgTatFormatted || 'N/A'}
-          </div>
-          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>Avg Open to Close Time</div>
-        </div>
-
-        {/* Defective Fabric Mtr */}
-        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #a78bfa' }}>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Defective Fabric</div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#a78bfa', marginTop: 2 }}>{analytics.totalDefectiveMeters || 0} <span style={{ fontSize: '0.8rem' }}>Mtr</span></div>
-        </div>
-      </div>
-
-      {/* Filter Toolbar */}
-      <div className="glass-panel" style={{ padding: '1rem 1.25rem', overflow: 'visible', position: 'relative', zIndex: 100 }}>
-        <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: '1 1 200px' }}>
-            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search Ticket, Party, Job Card, Invoice No..."
-              style={{ paddingLeft: 32, width: '100%', fontSize: '0.82rem' }}
-            />
-          </div>
-
-          {/* Invoice-style Date Range Preset Selector Component */}
-          <div style={{ position: 'relative', display: 'inline-block', zIndex: 200 }}>
-            <button
-              type="button"
-              onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.65rem',
-                padding: '0.45rem 1.1rem',
-                borderRadius: '8px',
-                border: '1.5px solid #a78bfa',
-                background: 'linear-gradient(135deg, #1e1b4b, #312e81)',
-                color: '#ffffff',
-                fontWeight: 700,
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(124, 58, 237, 0.35)',
-                transition: 'all 0.2s'
-              }}
-            >
-              <Calendar size={15} color="#a78bfa" />
-              <span>{PRESET_OPTIONS.find(p => p.id === datePreset)?.name || 'This Month'}</span>
-              <Calendar size={15} color="#a78bfa" />
-            </button>
-
-            {isDateDropdownOpen && (
-              <>
-                <div
-                  style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
-                  onClick={() => setIsDateDropdownOpen(false)}
-                />
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 6px)',
-                    left: 0,
-                    width: '350px',
-                    maxHeight: '380px',
-                    overflowY: 'auto',
-                    background: '#0f172a',
-                    color: '#f8fafc',
-                    borderRadius: '12px',
-                    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(167, 139, 250, 0.3)',
-                    border: '1px solid rgba(167, 139, 250, 0.35)',
-                    zIndex: 9999,
-                    padding: '0.35rem 0'
-                  }}
-                >
-                  {PRESET_OPTIONS.map(opt => {
-                    const rangeInfo = getDatePresetRange(opt.id, customDateStart, customDateEnd);
-                    const isSelected = datePreset === opt.id;
-                    return (
-                      <div
-                        key={opt.id}
-                        onClick={() => {
-                          setDatePreset(opt.id);
-                          if (opt.id !== 'custom') setIsDateDropdownOpen(false);
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '0.6rem 0.95rem',
-                          cursor: 'pointer',
-                          background: isSelected ? 'rgba(124, 58, 237, 0.3)' : 'transparent',
-                          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-                          fontSize: '0.82rem',
-                          transition: 'background 0.15s'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isSelected) e.currentTarget.style.background = 'transparent';
-                        }}
-                      >
-                        <span style={{ fontWeight: isSelected ? 800 : 500, color: isSelected ? '#a78bfa' : '#e2e8f0' }}>
-                          {opt.name}
-                        </span>
-                        <span style={{ fontWeight: 700, fontSize: '0.74rem', color: isSelected ? '#38bdf8' : '#94a3b8' }}>
-                          {rangeInfo.labelText}
-                        </span>
-                      </div>
-                    );
-                  })}
-
-                  {datePreset === 'custom' && (
-                    <div style={{ padding: '0.75rem 1rem', background: '#1e293b', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                        <div>
-                          <label style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>From</label>
-                          <input type="date" value={customDateStart} onChange={e => setCustomDateStart(e.target.value)} style={{ width: '100%', padding: '0.35rem', fontSize: '0.8rem', background: '#0f172a', color: '#fff', border: '1px solid #334155', borderRadius: '6px' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>To</label>
-                          <input type="date" value={customDateEnd} onChange={e => setCustomDateEnd(e.target.value)} style={{ width: '100%', padding: '0.35rem', fontSize: '0.8rem', background: '#0f172a', color: '#fff', border: '1px solid #334155', borderRadius: '6px' }} />
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsDateDropdownOpen(false)}
-                        style={{ padding: '0.45rem', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}
-                      >
-                        Apply Custom Range
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </>
+            {canViewDashboard && (
+              <button
+                onClick={handleExportCSV}
+                style={{
+                  padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 700, borderRadius: '8px',
+                  border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.12)', color: '#60a5fa',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem'
+                }}
+              >
+                <Download size={15} /> Export CSV
+              </button>
+            )}
+            {canCreateComplaint && (
+              <button
+                onClick={handleOpenNew}
+                style={{
+                  padding: '0.55rem 1.2rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
+                  border: 'none', background: 'linear-gradient(135deg, #f43f5e, #e11d48)', color: '#fff',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', boxShadow: '0 4px 12px rgba(244,63,94,0.3)'
+                }}
+              >
+                <PlusCircle size={16} /> + Log New Complaint
+              </button>
             )}
           </div>
+        </div>
+      </div>      {/* Dashboard View (Scoped by Permission) */}
+      {canViewDashboard ? (
+        <>
+          {/* KPI Analytical Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.85rem' }}>
+            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #60a5fa' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Total Complaints</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{analytics.total || 0}</div>
+            </div>
 
-          {/* Status Filter Buttons */}
-          <div style={{ display: 'flex', gap: '0.3rem', background: 'var(--bg-main, #111827)', padding: '3px', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-            {['All', ...STATUSES].map(st => (
-              <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
-                style={{
-                  padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', border: 'none',
-                  background: statusFilter === st ? 'var(--primary)' : 'transparent',
-                  color: statusFilter === st ? '#fff' : 'var(--text-muted)', cursor: 'pointer'
-                }}
-              >
-                {st}
-              </button>
-            ))}
+            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #eab308' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Open</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#eab308', marginTop: 2 }}>{analytics.open || 0}</div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #f97316' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Hold</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#f97316', marginTop: 2 }}>{analytics.hold || 0}</div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #4ade80' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Close</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#4ade80', marginTop: 2 }}>{analytics.close || 0}</div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #c084fc' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Feedback</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#c084fc', marginTop: 2 }}>{analytics.feedback || 0}</div>
+            </div>
+
+            {/* Complaint Rate (%) */}
+            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #f43f5e' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Complaint Rate (%)</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#f43f5e', marginTop: 2 }}>
+                {analytics.complaintRate || '0.00'}%
+              </div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>Tickets / Dispatched</div>
+            </div>
+
+            {/* Resolution SLA / TAT */}
+            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #38bdf8' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Resolution SLA/TAT</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#38bdf8', marginTop: 2 }}>
+                {analytics.avgTatFormatted || 'N/A'}
+              </div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>Avg Open to Close Time</div>
+            </div>
+
+            {/* Defective Fabric Mtr */}
+            <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #a78bfa' }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Defective Fabric</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#a78bfa', marginTop: 2 }}>{analytics.totalDefectiveMeters || 0} <span style={{ fontSize: '0.8rem' }}>Mtr</span></div>
+            </div>
           </div>
 
-          {/* Priority Select */}
-          <select
-            value={priorityFilter}
-            onChange={e => setPriorityFilter(e.target.value)}
-            style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem', minWidth: 120 }}
-          >
-            <option value="All">All Priorities</option>
-            {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+          {/* Filter Toolbar */}
+          <div className="glass-panel" style={{ padding: '1rem 1.25rem', overflow: 'visible', position: 'relative', zIndex: 100 }}>
+            <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: '1 1 200px' }}>
+                <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search Ticket, Party, Job Card, Invoice No..."
+                  style={{ paddingLeft: 32, width: '100%', fontSize: '0.82rem' }}
+                />
+              </div>
 
-          {/* Category Select */}
-          <select
-            value={categoryFilter}
-            onChange={e => setCategoryFilter(e.target.value)}
-            style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem', minWidth: 150 }}
-          >
-            <option value="All">All Categories</option>
-            {(Array.isArray(dynamicCategories) ? dynamicCategories : CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-      </div>
+              {/* Invoice-style Date Range Preset Selector Component */}
+              <div style={{ position: 'relative', display: 'inline-block', zIndex: 200 }}>
+                <button
+                  type="button"
+                  onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.65rem',
+                    padding: '0.45rem 1.1rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid #a78bfa',
+                    background: 'linear-gradient(135deg, #1e1b4b, #312e81)',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(124, 58, 237, 0.35)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Calendar size={15} color="#a78bfa" />
+                  <span>{PRESET_OPTIONS.find(p => p.id === datePreset)?.name || 'This Month'}</span>
+                  <Calendar size={15} color="#a78bfa" />
+                </button>
 
-      {/* Complaints Grid / Table */}
-      {loading ? (
-        <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
-          <RefreshCw size={30} className="spin-loader" color="var(--primary)" />
-          <p style={{ marginTop: '0.75rem', color: 'var(--text-muted)' }}>Loading complaint tickets...</p>
-        </div>
-      ) : complaints.length === 0 ? (
-        <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
-          <CheckCircle size={48} color="#4ade80" style={{ opacity: 0.5 }} />
-          <h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>No Complaints Logged</h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4 }}>There are no quality complaints matching your selected filters.</p>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
-          {complaints.map(item => {
-            const statusMeta = getStatusBadge(item.status);
-            const priorityColor = getPriorityColor(item.priority);
+                {isDateDropdownOpen && (
+                  <>
+                    <div
+                      style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+                      onClick={() => setIsDateDropdownOpen(false)}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 6px)',
+                        left: 0,
+                        width: '350px',
+                        maxHeight: '380px',
+                        overflowY: 'auto',
+                        background: '#0f172a',
+                        color: '#f8fafc',
+                        borderRadius: '12px',
+                        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(167, 139, 250, 0.3)',
+                        border: '1px solid rgba(167, 139, 250, 0.35)',
+                        zIndex: 9999,
+                        padding: '0.35rem 0'
+                      }}
+                    >
+                      {PRESET_OPTIONS.map(opt => {
+                        const rangeInfo = getDatePresetRange(opt.id, customDateStart, customDateEnd);
+                        const isSelected = datePreset === opt.id;
+                        return (
+                          <div
+                            key={opt.id}
+                            onClick={() => {
+                              setDatePreset(opt.id);
+                              if (opt.id !== 'custom') setIsDateDropdownOpen(false);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.6rem 0.95rem',
+                              cursor: 'pointer',
+                              background: isSelected ? 'rgba(124, 58, 237, 0.3)' : 'transparent',
+                              borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                              fontSize: '0.82rem',
+                              transition: 'background 0.15s'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected) e.currentTarget.style.background = 'transparent';
+                            }}
+                          >
+                            <span style={{ fontWeight: isSelected ? 800 : 500, color: isSelected ? '#a78bfa' : '#e2e8f0' }}>
+                              {opt.name}
+                            </span>
+                            <span style={{ fontWeight: 700, fontSize: '0.74rem', color: isSelected ? '#38bdf8' : '#94a3b8' }}>
+                              {rangeInfo.labelText}
+                            </span>
+                          </div>
+                        );
+                      })}
 
-            return (
-              <div
-                key={item._id}
-                className="glass-panel"
-                style={{
-                  padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem',
-                  borderTop: `4px solid ${priorityColor}`, position: 'relative'
-                }}
+                      {datePreset === 'custom' && (
+                        <div style={{ padding: '0.75rem 1rem', background: '#1e293b', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                            <div>
+                              <label style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>From</label>
+                              <input type="date" value={customDateStart} onChange={e => setCustomDateStart(e.target.value)} style={{ width: '100%', padding: '0.35rem', fontSize: '0.8rem', background: '#0f172a', color: '#fff', border: '1px solid #334155', borderRadius: '6px' }} />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>To</label>
+                              <input type="date" value={customDateEnd} onChange={e => setCustomDateEnd(e.target.value)} style={{ width: '100%', padding: '0.35rem', fontSize: '0.8rem', background: '#0f172a', color: '#fff', border: '1px solid #334155', borderRadius: '6px' }} />
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsDateDropdownOpen(false)}
+                            style={{ padding: '0.45rem', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}
+                          >
+                            Apply Custom Range
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Status Filter Buttons */}
+              <div style={{ display: 'flex', gap: '0.3rem', background: 'var(--bg-main, #111827)', padding: '3px', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+                {['All', ...STATUSES].map(st => (
+                  <button
+                    key={st}
+                    onClick={() => setStatusFilter(st)}
+                    style={{
+                      padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, borderRadius: '4px', border: 'none',
+                      background: statusFilter === st ? 'var(--primary)' : 'transparent',
+                      color: statusFilter === st ? '#fff' : 'var(--text-muted)', cursor: 'pointer'
+                    }}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+
+              {/* Priority Select */}
+              <select
+                value={priorityFilter}
+                onChange={e => setPriorityFilter(e.target.value)}
+                style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem', minWidth: 120 }}
               >
-                {/* Header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--primary)' }}>{item.complaintNo}</span>
+                <option value="All">All Priorities</option>
+                {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+
+              {/* Category Select */}
+              <select
+                value={categoryFilter}
+                onChange={e => setCategoryFilter(e.target.value)}
+                style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem', minWidth: 150 }}
+              >
+                <option value="All">All Categories</option>
+                {(Array.isArray(dynamicCategories) ? dynamicCategories : CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Complaints Grid / Table */}
+          {loading ? (
+            <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
+              <RefreshCw size={30} className="spin-loader" color="var(--primary)" />
+              <p style={{ marginTop: '0.75rem', color: 'var(--text-muted)' }}>Loading complaint tickets...</p>
+            </div>
+          ) : complaints.length === 0 ? (
+            <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
+              <CheckCircle size={48} color="#4ade80" style={{ opacity: 0.5 }} />
+              <h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>No Complaints Logged</h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4 }}>There are no quality complaints matching your selected filters.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+              {complaints.map(item => {
+                const statusMeta = getStatusBadge(item.status);
+                const priorityColor = getPriorityColor(item.priority);
+
+                return (
+                  <div
+                    key={item._id}
+                    className="glass-panel"
+                    style={{
+                      padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem',
+                      borderTop: `4px solid ${priorityColor}`, position: 'relative'
+                    }}
+                  >
+                    {/* Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--primary)' }}>{item.complaintNo}</span>
+                          <span style={{
+                            fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
+                            background: `${priorityColor}20`, color: priorityColor, border: `1px solid ${priorityColor}40`
+                          }}>
+                            {item.priority}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                          {item.date ? new Date(item.date).toLocaleDateString('en-IN') : ''}
+                        </div>
+                      </div>
+
                       <span style={{
-                        fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
-                        background: `${priorityColor}20`, color: priorityColor, border: `1px solid ${priorityColor}40`
+                        display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                        fontSize: '0.7rem', fontWeight: 800, padding: '0.25rem 0.6rem', borderRadius: '20px',
+                        background: statusMeta.bg, color: statusMeta.color, border: `1px solid ${statusMeta.border}`
                       }}>
-                        {item.priority}
+                        {statusMeta.icon} {item.status}
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>
-                      {item.partyName}
+
+                    {/* Customer & Responsible Person */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.78rem' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.68rem' }}>Customer:</span>
+                        <strong style={{ color: 'var(--text-primary)' }}>{item.partyName || 'N/A'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.68rem' }}>Assigned To:</span>
+                        <strong style={{ color: 'var(--text-primary)' }}>{item.assignedTo || 'Unassigned'}</strong>
+                      </div>
+                    </div>
+
+                    {/* Linkage Info */}
+                    <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.73rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+                      {item.jobCardNo && <span>Job Card: <strong style={{ color: 'var(--text-primary)' }}>{item.jobCardNo}</strong></span>}
+                      {item.challanNo && <span>Challan: <strong style={{ color: '#60a5fa' }}>{item.challanNo}</strong></span>}
+                      {item.invoiceNo && <span>Invoice: <strong style={{ color: 'var(--text-primary)' }}>{item.invoiceNo}</strong></span>}
+                      {item.defectiveMeters > 0 && (
+                        <span style={{ background: 'rgba(239,68,68,0.12)', padding: '2px 6px', borderRadius: '4px', color: '#f87171', fontWeight: 700 }}>
+                          ⚠️ {item.defectiveMeters} Mtr
+                        </span>
+                      )}
+                      {item.expectedAmount > 0 && (
+                        <span style={{ background: 'rgba(34,197,94,0.12)', padding: '2px 6px', borderRadius: '4px', color: '#4ade80', fontWeight: 700 }}>
+                          💰 ₹{item.expectedAmount}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Category & Sub-Category & Description */}
+                    <div style={{ fontSize: '0.78rem', background: 'var(--bg-main, #111827)', padding: '0.65rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', marginBottom: 2 }}>
+                        {item.category} {item.subCategory ? `› ${item.subCategory}` : ''}
+                      </div>
+                      <div style={{ color: 'var(--text-primary)', lineClamp: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {item.description || 'No description provided.'}
+                      </div>
+                    </div>
+
+                    {/* Photos Thumbnails */}
+                    {item.photoUrls && item.photoUrls.length > 0 && (
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Proof ({item.photoUrls.length}):</span>
+                        {item.photoUrls.slice(0, 3).map((url, idx) => (
+                          <img
+                            key={idx}
+                            src={url}
+                            alt="Defect proof"
+                            onClick={() => setZoomImg(url)}
+                            style={{ width: 30, height: 30, borderRadius: 4, objectFit: 'cover', cursor: 'zoom-in', border: '1px solid var(--border-light)' }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Resolution Summary if Action Taken */}
+                    {item.actionTaken && (
+                      <div style={{ fontSize: '0.73rem', color: '#4ade80', background: 'rgba(34,197,94,0.08)', padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(34,197,94,0.2)' }}>
+                        <strong>Action Taken:</strong> {item.actionTaken}
+                      </div>
+                    )}
+
+                    {/* Actions Footer */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)', marginTop: 'auto' }}>
+                      <button
+                        onClick={() => setShowViewModal(item)}
+                        style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                      >
+                        <Eye size={14} /> View & Resolve
+                      </button>
+
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <button
+                          onClick={() => handleOpenEdit(item)}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
+                          title="Edit Complaint"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item._id, item.complaintNo)}
+                          style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px' }}
+                          title="Delete Ticket"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Status Badge */}
-                  <span style={{
-                    fontSize: '0.7rem', fontWeight: 800, padding: '3px 8px', borderRadius: '6px',
-                    background: statusMeta.bg, color: statusMeta.color, border: `1px solid ${statusMeta.border}`,
-                    display: 'flex', alignItems: 'center', gap: '0.3rem'
-                  }}>
-                    {statusMeta.icon} {item.status}
-                  </span>
-                </div>
-
-                {/* Details Pills */}
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', fontSize: '0.73rem' }}>
-                  {item.jobCardNo && (
-                    <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.2)' }}>
-                      JC: {item.jobCardNo}
-                    </span>
-                  )}
-                  {item.invoiceNo && (
-                    <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.2)' }}>
-                      Inv: {item.invoiceNo}
-                    </span>
-                  )}
-                  {item.designNo && (
-                    <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.2)' }}>
-                      Design: {item.designNo}
-                    </span>
-                  )}
-                  {item.assignedTo && (
-                    <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', color: '#facc15', border: '1px solid rgba(250,204,21,0.2)' }}>
-                      👤 {item.assignedTo}
-                    </span>
-                  )}
-                  <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-muted)' }}>
-                    📅 {item.date}
-                  </span>
-                  {item.defectiveMeters > 0 && (
-                    <span style={{ background: 'rgba(244,63,94,0.12)', padding: '2px 6px', borderRadius: '4px', color: '#f43f5e', fontWeight: 700 }}>
-                      ⚠️ {item.defectiveMeters} Mtr
-                    </span>
-                  )}
-                  {item.expectedAmount > 0 && (
-                    <span style={{ background: 'rgba(34,197,94,0.12)', padding: '2px 6px', borderRadius: '4px', color: '#4ade80', fontWeight: 700 }}>
-                      💰 ₹{item.expectedAmount}
-                    </span>
-                  )}
-                </div>
-
-                {/* Category & Sub-Category & Description */}
-                <div style={{ fontSize: '0.78rem', background: 'var(--bg-main, #111827)', padding: '0.65rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-                  <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', marginBottom: 2 }}>
-                    {item.category} {item.subCategory ? `› ${item.subCategory}` : ''}
-                  </div>
-                  <div style={{ color: 'var(--text-primary)', lineClamp: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {item.description || 'No description provided.'}
-                  </div>
-                </div>
-
-                {/* Photos Thumbnails */}
-                {item.photoUrls && item.photoUrls.length > 0 && (
-                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Proof ({item.photoUrls.length}):</span>
-                    {item.photoUrls.slice(0, 3).map((url, idx) => (
-                      <img
-                        key={idx}
-                        src={url}
-                        alt="Defect proof"
-                        onClick={() => setZoomImg(url)}
-                        style={{ width: 30, height: 30, borderRadius: 4, objectFit: 'cover', cursor: 'zoom-in', border: '1px solid var(--border-light)' }}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {/* Resolution Summary if Action Taken */}
-                {item.actionTaken && (
-                  <div style={{ fontSize: '0.73rem', color: '#4ade80', background: 'rgba(34,197,94,0.08)', padding: '0.5rem', borderRadius: '6px', border: '1px solid rgba(34,197,94,0.2)' }}>
-                    <strong>Action Taken:</strong> {item.actionTaken}
-                  </div>
-                )}
-
-                {/* Actions Footer */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)', marginTop: 'auto' }}>
-                  <button
-                    onClick={() => setShowViewModal(item)}
-                    style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                  >
-                    <Eye size={14} /> View & Resolve
-                  </button>
-
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <button
-                      onClick={() => handleOpenEdit(item)}
-                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
-                      title="Edit Complaint"
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item._id, item.complaintNo)}
-                      style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px' }}
-                      title="Delete Ticket"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : canCreateComplaint ? (
+        /* Fallback View for Users with ONLY Create Complaint Permission */
+        <div className="glass-panel" style={{ padding: '3rem 2rem', textAlign: 'center', maxWidth: 600, margin: '2rem auto' }}>
+          <AlertTriangle size={56} color="#f43f5e" style={{ margin: '0 auto 1rem auto' }} />
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 0.5rem 0' }}>
+            Log Quality Complaint Ticket
+          </h2>
+          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+            You have access to log new quality complaints and defect reports for Elite Digital Prints. Click below to submit a new ticket.
+          </p>
+          <button
+            onClick={handleOpenNew}
+            style={{
+              padding: '0.75rem 2rem', fontSize: '0.95rem', fontWeight: 800, borderRadius: '10px',
+              border: 'none', background: 'linear-gradient(135deg, #f43f5e, #e11d48)', color: '#fff',
+              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.6rem', boxShadow: '0 6px 18px rgba(244,63,94,0.4)'
+            }}
+          >
+            <PlusCircle size={20} /> + Log New Complaint
+          </button>
+        </div>
+      ) : (
+        /* No Permission Fallback */
+        <div className="glass-panel" style={{ padding: '3rem 2rem', textAlign: 'center', maxWidth: 600, margin: '2rem auto' }}>
+          <ShieldAlert size={56} color="#ef4444" style={{ margin: '0 auto 1rem auto' }} />
+          <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 0.5rem 0' }}>
+            Access Restricted
+          </h2>
+          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+            You do not have permission to view or create complaints. Please contact your system administrator.
+          </p>
         </div>
       )}
 
@@ -1023,15 +1095,15 @@ export default function DigitalPrintComplainModule() {
                     </select>
                   </div>
 
-                  {/* Responsible Person Dropdown */}
+                  {/* Assigned To Dropdown */}
                   <div>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Responsible Person (Department User)</label>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Assigned To *</label>
                     <select
                       value={formVal.assignedTo}
                       onChange={e => setFormVal({ ...formVal, assignedTo: e.target.value })}
                       style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
                     >
-                      <option value="">-- Select Responsible Person --</option>
+                      <option value="">-- Select Assigned User / Admin --</option>
                       {staffList.map((sName, idx) => (
                         <option key={idx} value={sName}>{sName}</option>
                       ))}
@@ -1045,10 +1117,14 @@ export default function DigitalPrintComplainModule() {
                 <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', marginBottom: '0.65rem' }}>
                   🔗 Order Linkage
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.75rem' }}>
                   <div>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Job Card No.</label>
                     <input type="text" placeholder="e.g. JC-1001" value={formVal.jobCardNo} onChange={e => setFormVal({ ...formVal, jobCardNo: e.target.value })} style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Challan No.</label>
+                    <input type="text" placeholder="e.g. EDP-CH-1001" value={formVal.challanNo} onChange={e => setFormVal({ ...formVal, challanNo: e.target.value })} style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }} />
                   </div>
                   <div>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Invoice No.</label>
@@ -1160,7 +1236,7 @@ export default function DigitalPrintComplainModule() {
                       </select>
                     </div>
                     <div>
-                      <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Assigned Responsible Staff</label>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Assigned To</label>
                       <input type="text" placeholder="e.g. Quality Inspector" value={formVal.assignedTo} onChange={e => setFormVal({ ...formVal, assignedTo: e.target.value })} style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem' }} />
                     </div>
                   </div>
@@ -1230,8 +1306,9 @@ export default function DigitalPrintComplainModule() {
                 <div><strong>Category:</strong> {showViewModal.category}</div>
                 <div><strong>Sub-Category:</strong> {showViewModal.subCategory || 'N/A'}</div>
                 <div><strong>Severity / Priority:</strong> {showViewModal.priority}</div>
-                <div><strong>Responsible Person:</strong> {showViewModal.assignedTo || 'Unassigned'}</div>
+                <div><strong>Assigned To:</strong> {showViewModal.assignedTo || 'Unassigned'}</div>
                 <div><strong>Job Card No:</strong> {showViewModal.jobCardNo || 'N/A'}</div>
+                <div><strong>Challan No:</strong> {showViewModal.challanNo || 'N/A'}</div>
                 <div><strong>Invoice No:</strong> {showViewModal.invoiceNo || 'N/A'}</div>
                 <div><strong>Defective Quantity:</strong> {showViewModal.defectiveMeters} Mtr</div>
                 <div><strong>Expected Claim (₹):</strong> {showViewModal.expectedAmount ? `₹${showViewModal.expectedAmount}` : 'N/A'}</div>

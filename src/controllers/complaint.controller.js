@@ -9,6 +9,7 @@ const getAll = async (req, res) => {
       status = 'All',
       priority = 'All',
       category = 'All',
+      assignedTo = '',
       dateStart = '',
       dateEnd = '',
       page = 1,
@@ -17,6 +18,9 @@ const getAll = async (req, res) => {
 
     const filter = {};
 
+    if (assignedTo && assignedTo !== 'All') {
+      filter.assignedTo = new RegExp(`^${assignedTo.trim()}$`, 'i');
+    }
     if (status && status !== 'All') {
       filter.status = status;
     }
@@ -190,9 +194,13 @@ const remove = async (req, res) => {
 // Analytics Endpoint
 const getAnalytics = async (req, res) => {
   try {
-    const { dateStart = '', dateEnd = '' } = req.query;
+    const { dateStart = '', dateEnd = '', assignedTo = '' } = req.query;
     const filter = {};
     const jcFilter = {};
+
+    if (assignedTo && assignedTo !== 'All') {
+      filter.assignedTo = new RegExp(`^${assignedTo.trim()}$`, 'i');
+    }
 
     if (dateStart || dateEnd) {
       filter.date = {};
