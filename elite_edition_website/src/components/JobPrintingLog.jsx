@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import {
   Printer, PlusCircle, Search, RefreshCw, Trash2, Edit2, Edit, CheckCircle2,
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
-  X, Download, Eye, Layers3, Activity, Tag, Sparkles, FileText
+  X, Download, Eye, Layers3, Activity, Tag, Sparkles, FileText, ArrowUpFromLine, ArrowDownToLine
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
@@ -131,6 +131,9 @@ export default function JobPrintingLog() {
     { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
   ]);
 
+  // Raw Material Log Mode: OUTWARD (Usage) vs INWARD (Stock Received)
+  const [rawEntryType, setRawEntryType] = useState('OUTWARD');
+
   // Raw Material Summary State for Displaying on Screen & Reports
   const [rawMaterialSummary, setRawMaterialSummary] = useState({
     grandoInk: { C: 0, M: 0, Y: 0, K: 0 },
@@ -138,13 +141,13 @@ export default function JobPrintingLog() {
     paperPanna: {}
   });
 
-  const fetchRawMaterialSummary = async () => {
+  const fetchRawMaterialSummary = async (targetType = rawEntryType) => {
     try {
       const res = await api.getRawMaterialTransactions();
       if (res && res.data && Array.isArray(res.data)) {
-        const outwardLogs = res.data.filter(t => t.type === 'OUTWARD');
+        const typeLogs = res.data.filter(t => t.type === (targetType || 'OUTWARD'));
         
-        const filtered = outwardLogs.filter(t => {
+        const filtered = typeLogs.filter(t => {
           if (!t.date) return true;
           const dStr = new Date(t.date).toISOString().split('T')[0];
           if (dateStart && dStr < dateStart) return false;
@@ -162,7 +165,7 @@ export default function JobPrintingLog() {
         let foundShift = '';
         let foundOperator = '';
 
-        outwardLogs.forEach(t => {
+        typeLogs.forEach(t => {
           if (t.notes) {
             const tm = t.notes.match(/Time:\s*([^\s|]+(?:\s*[AP]M)?)\s*(?:to|-)\s*([^\s|]+(?:\s*[AP]M)?)/i) ||
                        t.notes.match(/(\d{1,2}:\d{2}(?:\s*[AP]M)?)\s*(?:to|-)\s*(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i);
@@ -370,16 +373,16 @@ export default function JobPrintingLog() {
         return;
       }
 
-      // 🧹 CLEAN PREVIOUS OUTWARD LOGS FOR THIS DATE SO EDITING REPLACES INSTEAD OF ACCUMULATING/MULTIPLYING
+      // 🧹 CLEAN PREVIOUS LOGS FOR THIS DATE & ENTRY TYPE SO EDITING REPLACES ACCURATELY
       try {
         const existingRes = await api.getRawMaterialTransactions();
         if (existingRes && existingRes.data && Array.isArray(existingRes.data)) {
-          const oldOutwards = existingRes.data.filter(t => {
-            if (t.type !== 'OUTWARD' || !t.date) return false;
+          const oldLogs = existingRes.data.filter(t => {
+            if (t.type !== rawEntryType || !t.date) return false;
             const tDate = new Date(t.date).toISOString().split('T')[0];
             return tDate === rawDate;
           });
-          for (const oldLog of oldOutwards) {
+          for (const oldLog of oldLogs) {
             if (oldLog._id) {
               await api.deleteRawMaterialTransaction(oldLog._id);
             }
@@ -389,9 +392,14 @@ export default function JobPrintingLog() {
         console.warn('Could not clean previous raw material entries:', cleanErr);
       }
 
-      await api.createRawMaterialOutward(payload);
-      triggerPushNotification('📦 Raw Material Logged', `Recorded ${payload.length} material consumption entries successfully!`, 'success');
-      await fetchRawMaterialSummary();
+      if (rawEntryType === 'INWARD') {
+        await api.createRawMaterialInward(payload);
+        triggerPushNotification('📦 Raw Material Stock IN Logged', `Added ${payload.length} stock inward entries successfully!`, 'success');
+      } else {
+        await api.createRawMaterialOutward(payload);
+        triggerPushNotification('📦 Raw Material Usage Logged', `Recorded ${payload.length} material consumption entries successfully!`, 'success');
+      }
+      await fetchRawMaterialSummary(rawEntryType);
 
       // Clear fields
       setGrandoInkC(''); setGrandoInkM(''); setGrandoInkY(''); setGrandoInkK('');
@@ -402,7 +410,7 @@ export default function JobPrintingLog() {
       ]);
       setShowRawMaterialModal(false);
     } catch (err) {
-      alert(err.message || 'Failed to save raw material usage.');
+      alert(err.message || 'Failed to save raw material entry.');
     } finally {
       setRawMaterialSubmitting(false);
     }
@@ -1548,12 +1556,57 @@ export default function JobPrintingLog() {
 
       </div>
 
-      {/* ── 3B. RAW MATERIAL CONSUMPTION SUMMARY CARD (READ-ONLY DISPLAY TABLE ON SCREEN) ── */}
-      <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: '4px solid #10b981', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#34d399', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Sparkles size={16} /> Raw Material Consumption Summary
+      {/* ── 3B. RAW MATERIAL SUMMARY CARD (OUTWARD CONSUMPTION / INWARD STOCK IN) ── */}
+      <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: rawEntryType === 'INWARD' ? '4px solid #10b981' : '4px solid #f59e0b', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: rawEntryType === 'INWARD' ? '#34d399' : '#f59e0b', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Sparkles size={16} /> Raw Material {rawEntryType === 'INWARD' ? 'Inward (Stock Received)' : 'Consumption (Outward)'} Summary
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.35rem', background: 'rgba(255,255,255,0.04)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setRawEntryType('OUTWARD');
+                  fetchRawMaterialSummary('OUTWARD');
+                }}
+                style={{
+                  padding: '0.3rem 0.65rem',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  borderRadius: '5px',
+                  border: 'none',
+                  background: rawEntryType === 'OUTWARD' ? '#f59e0b' : 'transparent',
+                  color: rawEntryType === 'OUTWARD' ? '#ffffff' : 'var(--text-muted)',
+                  cursor: 'pointer'
+                }}
+              >
+                📤 Outward (Usage)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setRawEntryType('INWARD');
+                  fetchRawMaterialSummary('INWARD');
+                }}
+                style={{
+                  padding: '0.3rem 0.65rem',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  borderRadius: '5px',
+                  border: 'none',
+                  background: rawEntryType === 'INWARD' ? '#10b981' : 'transparent',
+                  color: rawEntryType === 'INWARD' ? '#ffffff' : 'var(--text-muted)',
+                  cursor: 'pointer'
+                }}
+              >
+                📥 Inward (Stock IN)
+              </button>
+            </div>
           </div>
+
           {!isOlderThan36Hours(dateEnd || dateStart) && (
             <button
               type="button"
@@ -1566,15 +1619,15 @@ export default function JobPrintingLog() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: rawEntryType === 'INWARD' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '6px',
-                boxShadow: '0 3px 10px rgba(16, 185, 129, 0.3)',
+                boxShadow: rawEntryType === 'INWARD' ? '0 3px 10px rgba(16, 185, 129, 0.3)' : '0 3px 10px rgba(245, 158, 11, 0.3)',
                 cursor: 'pointer'
               }}
             >
-              <Edit size={14} /> Edit Data
+              <Edit size={14} /> Log / Edit Raw Material
             </button>
           )}
         </div>
@@ -1950,7 +2003,7 @@ export default function JobPrintingLog() {
                   width: 40,
                   height: 40,
                   borderRadius: 10,
-                  background: 'linear-gradient(135deg, #059669, #047857)',
+                  background: rawEntryType === 'INWARD' ? 'linear-gradient(135deg, #059669, #047857)' : 'linear-gradient(135deg, #d97706, #b45309)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
@@ -1959,14 +2012,82 @@ export default function JobPrintingLog() {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                    GENERATE REPORT / RAW MATERIAL USAGE
+                    {rawEntryType === 'INWARD' ? 'GENERATE REPORT / RAW MATERIAL INWARD (STOCK RECEIVED)' : 'GENERATE REPORT / RAW MATERIAL USAGE (OUTWARD)'}
                   </h3>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2, margin: 0 }}>
-                    Log Ink Consumption (Liters) & Sublimation/Butter Paper Roll Consumption (Panna Wise)
+                    {rawEntryType === 'INWARD'
+                      ? 'Log Ink Received (Liters) & Sublimation/Butter Paper Rolls Received (Stock IN)'
+                      : 'Log Ink Consumption (Liters) & Sublimation/Butter Paper Roll Consumption (Panna Wise)'}
                   </p>
                 </div>
               </div>
               <button onClick={() => setShowRawMaterialModal(false)} className="btn-icon"><X size={18} /></button>
+            </div>
+
+            {/* Entry Mode Switcher: OUTWARD vs INWARD */}
+            <div style={{
+              display: 'flex',
+              gap: '0.6rem',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid var(--border-light)',
+              borderRadius: '10px',
+              padding: '0.5rem',
+              alignItems: 'center'
+            }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', paddingLeft: '0.4rem', whiteSpace: 'nowrap' }}>
+                LOG TYPE:
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setRawEntryType('OUTWARD');
+                  fetchRawMaterialSummary('OUTWARD');
+                }}
+                style={{
+                  flex: 1,
+                  padding: '0.5rem 0.85rem',
+                  borderRadius: '7px',
+                  border: rawEntryType === 'OUTWARD' ? '2px solid #f59e0b' : '1px solid var(--border-light)',
+                  background: rawEntryType === 'OUTWARD' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'transparent',
+                  color: rawEntryType === 'OUTWARD' ? '#ffffff' : 'var(--text-muted)',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <ArrowUpFromLine size={15} /> 📤 OUTWARD (USAGE / CONSUMPTION)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setRawEntryType('INWARD');
+                  fetchRawMaterialSummary('INWARD');
+                }}
+                style={{
+                  flex: 1,
+                  padding: '0.5rem 0.85rem',
+                  borderRadius: '7px',
+                  border: rawEntryType === 'INWARD' ? '2px solid #10b981' : '1px solid var(--border-light)',
+                  background: rawEntryType === 'INWARD' ? 'linear-gradient(135deg, #10b981, #059669)' : 'transparent',
+                  color: rawEntryType === 'INWARD' ? '#ffffff' : 'var(--text-muted)',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <ArrowDownToLine size={15} /> 📥 INWARD (STOCK RECEIVED / IN)
+              </button>
             </div>
 
             <form onSubmit={handleSaveRawMaterialUsage} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
@@ -2038,7 +2159,7 @@ export default function JobPrintingLog() {
                 </div>
               </div>
 
-              {/* ── DIV 1: INK CONSUMPTION (BACKGROUND COLOUR: WHITE) ── */}
+              {/* ── DIV 1: INK CONSUMPTION / INWARD (BACKGROUND COLOUR: WHITE) ── */}
               <div style={{
                 background: '#ffffff',
                 color: '#0f172a',
@@ -2050,8 +2171,8 @@ export default function JobPrintingLog() {
                 gap: '1rem',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
               }}>
-                <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#0284c7', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem' }}>
-                  💧 INK CONSUMPTION
+                <div style={{ fontSize: '0.9rem', fontWeight: 900, color: rawEntryType === 'INWARD' ? '#059669' : '#0284c7', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem' }}>
+                  💧 {rawEntryType === 'INWARD' ? 'INK INWARD (STOCK RECEIVED)' : 'INK CONSUMPTION'}
                 </div>
 
                 {/* Sub-Section 1: GRANDO MACHINE INK */}
@@ -2176,7 +2297,7 @@ export default function JobPrintingLog() {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#059669', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    📜 PAPER CONSUMPTION
+                    📜 {rawEntryType === 'INWARD' ? 'PAPER INWARD (STOCK RECEIVED)' : 'PAPER CONSUMPTION'}
                   </div>
                   {!isOlderThan36Hours(rawDate) && (
                     <button
@@ -2358,7 +2479,7 @@ export default function JobPrintingLog() {
                       cursor: 'pointer'
                     }}
                   >
-                    <Sparkles size={16} /> {rawMaterialSubmitting ? 'Saving Usage...' : 'Save Raw Material Usage'}
+                    <Sparkles size={16} /> {rawMaterialSubmitting ? 'Saving...' : rawEntryType === 'INWARD' ? 'Save Raw Material Stock IN' : 'Save Raw Material Usage (OUT)'}
                   </button>
                 )}
               </div>
