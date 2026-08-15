@@ -143,6 +143,35 @@ const printConfigSchema = new mongoose.Schema(
       type: [String],
       default: ['Party Delivery', 'Self Pickup', 'Courier / Cargo'],
     },
+    expenseInCategories: {
+      type: [String],
+      default: [
+        'Petty Cash Top-up',
+        'Client Payment / Advance',
+        'Scrap / Waste Sale',
+        'Refund / Cashback',
+        'Other Receipt'
+      ],
+    },
+    expenseOutCategories: {
+      type: [String],
+      default: [
+        'Machine Maintenance & Service',
+        'Ink & Consumables',
+        'Spare Parts & Repairs',
+        'Paper & Transfer Film',
+        'Tea & Refreshments',
+        'Carriage & Freight',
+        'Salary / Daily Wages',
+        'Electricity & Utility',
+        'Stationery & Office',
+        'Other Expense'
+      ],
+    },
+    expensePaymentModes: {
+      type: [String],
+      default: ['Cash', 'UPI / GPay / PhonePe', 'Bank Transfer (NEFT/RTGS)', 'Cheque', 'Credit / Debit Card', 'Other'],
+    },
     lotPartyMap: {
       type: Map,
       of: String,

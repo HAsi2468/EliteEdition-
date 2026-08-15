@@ -37,8 +37,11 @@ export default function PrintSettings() {
   const [newPaperType, setNewPaperType] = useState('');
   const [newRawMaterial, setNewRawMaterial] = useState('');
   const [newInkColors, setNewInkColors] = useState('');
-  const [isVendorManagerOpen, setIsVendorManagerOpen] = useState(false);
   const [newInkCanSizes, setNewInkCanSizes] = useState('');
+  const [newExpenseInCategory, setNewExpenseInCategory] = useState('');
+  const [newExpenseOutCategory, setNewExpenseOutCategory] = useState('');
+  const [newExpensePaymentMode, setNewExpensePaymentMode] = useState('');
+  const [isVendorManagerOpen, setIsVendorManagerOpen] = useState(false);
   const [startingJobNo, setStartingJobNo] = useState('1');
   const [companyProfile, setCompanyProfile] = useState({
     companyName: 'ELITE DIGITAL PRINTS',
@@ -576,7 +579,19 @@ export default function PrintSettings() {
             {renderSection('Ink Can Sizes', 'inkCanSizes', newInkCanSizes, setNewInkCanSizes, config?.inkCanSizes)}
           </div>
         )}
-            </div>
+      </div>
+
+      {/* Department: Expense Settings */}
+      <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+        {renderDepartmentHeader('💰 Department Expense Settings', 'expense', '#10b981')}
+        {expandedDepts.expense && (
+          <div style={{ padding: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
+            {renderSection('Income Categories (Cash IN)', 'expenseInCategories', newExpenseInCategory, setNewExpenseInCategory, config?.expenseInCategories)}
+            {renderSection('Expense Categories (Cash OUT)', 'expenseOutCategories', newExpenseOutCategory, setNewExpenseOutCategory, config?.expenseOutCategories)}
+            {renderSection('Expense Payment Modes', 'expensePaymentModes', newExpensePaymentMode, setNewExpensePaymentMode, config?.expensePaymentModes)}
+          </div>
+        )}
+      </div>
 
       {/* Vendors Section */}
       <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)' }}>

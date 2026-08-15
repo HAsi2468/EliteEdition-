@@ -67,6 +67,18 @@ const getConfig = async () => {
       config.stitchingDeliveryBy = ['Party Delivery', 'Self Pickup', 'Courier / Cargo'];
       changed = true;
     }
+    if (!config.expenseInCategories || config.expenseInCategories.length === 0) {
+      config.expenseInCategories = ['Petty Cash Top-up', 'Client Payment / Advance', 'Scrap / Waste Sale', 'Refund / Cashback', 'Other Receipt'];
+      changed = true;
+    }
+    if (!config.expenseOutCategories || config.expenseOutCategories.length === 0) {
+      config.expenseOutCategories = ['Machine Maintenance & Service', 'Ink & Consumables', 'Spare Parts & Repairs', 'Paper & Transfer Film', 'Tea & Refreshments', 'Carriage & Freight', 'Salary / Daily Wages', 'Electricity & Utility', 'Stationery & Office', 'Other Expense'];
+      changed = true;
+    }
+    if (!config.expensePaymentModes || config.expensePaymentModes.length === 0) {
+      config.expensePaymentModes = ['Cash', 'UPI / GPay / PhonePe', 'Bank Transfer (NEFT/RTGS)', 'Cheque', 'Credit / Debit Card', 'Other'];
+      changed = true;
+    }
     if (changed) {
       await config.save();
     }
@@ -156,7 +168,8 @@ const updatePrintConfig = async (req, res) => {
       'deliveryOptions', 'lotPartyMap', 'companyName', 'companyGstin', 'companyAddress',
       'companyPhone', 'companyEmail', 'companyBankName', 'companyAccountNo', 'companyIfscCode', 'companyTerms',
       'paymentDueDays', 'startingInvoiceNo', 'invoicePrefix',
-      'stitchingCategories', 'stitchingLabels', 'finishingOptions', 'stitchingParties', 'stitchingBillTo', 'stitchingShipTo', 'stitchingDeliveryBy'
+      'stitchingCategories', 'stitchingLabels', 'finishingOptions', 'stitchingParties', 'stitchingBillTo', 'stitchingShipTo', 'stitchingDeliveryBy',
+      'expenseInCategories', 'expenseOutCategories', 'expensePaymentModes'
     ];
     if (!validFields.includes(field)) {
       return res.status(httpStatus.BAD_REQUEST).send('Invalid field');
