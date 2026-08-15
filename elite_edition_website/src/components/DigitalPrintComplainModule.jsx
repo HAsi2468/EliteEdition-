@@ -8,8 +8,8 @@ import imageCompression from 'browser-image-compression';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 
 const CATEGORIES = [
-  'Color Matching / Shade Difference',
   'Printing Defect',
+  'Color Matching / Shade Difference',
   'Fabric Damage',
   'Quantity Shortage',
   'Delivery Delay',
@@ -17,14 +17,39 @@ const CATEGORIES = [
   'Other'
 ];
 
+const SUB_CATEGORIES = {
+  'Printing Defect': [
+    'Line Defect', 'Ink Spot', 'Ghost Printing', 'Streaks', 'Smudge', 'Misalignment', 'White Specks', 'Paper Wrinkle', 'Other Printing Defect'
+  ],
+  'Color Matching / Shade Difference': [
+    'Lighter Shade', 'Darker Shade', 'Tone Variation', 'Color Bleeding', 'Sample Mismatch', 'Shade Variation Across Width', 'Other Shade Issue'
+  ],
+  'Fabric Damage': [
+    'Hole / Tear', 'Stains / Spots', 'Shrinkage', 'Weaving Flaw', 'Panna Variation', 'Other Fabric Defect'
+  ],
+  'Quantity Shortage': [
+    'Meter Shortage', 'Piece Count Shortage', 'Partial Delivery', 'Missing Roll', 'Other Shortage'
+  ],
+  'Delivery Delay': [
+    'Late Dispatch', 'Transit Delay', 'Missing Parcel', 'Wrong Address Delivery'
+  ],
+  'Billing Issue': [
+    'Rate Mismatch', 'Discount Missing', 'GST Calculation Error', 'Duplicate Bill'
+  ],
+  'Other': [
+    'General Customer Issue', 'Packaging Defect', 'Miscellaneous'
+  ]
+};
+
 const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
 const STATUSES = ['Open', 'Hold', 'Close', 'Feedback'];
 
 export default function DigitalPrintComplainModule() {
   const [complaints, setComplaints] = useState([]);
   const [parties, setParties] = useState([]);
+  const [staffList, setStaffList] = useState([]);
   const [analytics, setAnalytics] = useState({
-    total: 0, open: 0, hold: 0, close: 0, feedback: 0, urgent: 0, totalDefectiveMeters: 0
+    total: 0, open: 0, hold: 0, close: 0, feedback: 0, urgent: 0, totalDefectiveMeters: 0, totalExpectedAmount: 0
   });
   const [loading, setLoading] = useState(false);
 
@@ -47,16 +72,19 @@ export default function DigitalPrintComplainModule() {
     complaintNo: '',
     date: new Date().toISOString().split('T')[0],
     partyName: '',
+    assignedTo: '',
     jobCardNo: '',
+    invoiceNo: '',
     designNo: '',
     category: 'Printing Defect',
+    subCategory: 'Line Defect',
     priority: 'Medium',
     status: 'Open',
     defectiveMeters: 0,
+    expectedAmount: 0,
     description: '',
     photoUrls: [],
-    actionTaken: '',
-    assignedTo: ''
+    actionTaken: ''
   });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -100,10 +128,14 @@ export default function DigitalPrintComplainModule() {
 
   const fetchParties = async () => {
     try {
-      const res = await api.getParties({ limit: 1000 });
-      if (res && res.data) setParties(res.data);
+      const [pRes, cfg] = await Promise.all([
+        api.getParties({ limit: 1000 }),
+        api.getPrintConfig()
+      ]);
+      if (pRes && pRes.data) setParties(pRes.data);
+      if (cfg && cfg.operators) setStaffList(cfg.operators);
     } catch (e) {
-      console.warn('Failed to fetch parties list:', e);
+      console.warn('Failed to fetch metadata list:', e);
     }
   };
 
@@ -113,16 +145,19 @@ export default function DigitalPrintComplainModule() {
       complaintNo: '',
       date: new Date().toISOString().split('T')[0],
       partyName: '',
+      assignedTo: '',
       jobCardNo: '',
+      invoiceNo: '',
       designNo: '',
       category: 'Printing Defect',
+      subCategory: 'Line Defect',
       priority: 'Medium',
       status: 'Open',
       defectiveMeters: 0,
+      expectedAmount: 0,
       description: '',
       photoUrls: [],
-      actionTaken: '',
-      assignedTo: ''
+      actionTaken: ''
     });
 
     try {
@@ -138,20 +173,26 @@ export default function DigitalPrintComplainModule() {
 
   const handleOpenEdit = (item) => {
     setEditingItem(item);
+    const cat = item.category || 'Printing Defect';
+    const subOpts = SUB_CATEGORIES[cat] || ['Other'];
+
     setFormVal({
       complaintNo: item.complaintNo || '',
       date: item.date || new Date().toISOString().split('T')[0],
       partyName: item.partyName || '',
+      assignedTo: item.assignedTo || '',
       jobCardNo: item.jobCardNo || '',
+      invoiceNo: item.invoiceNo || '',
       designNo: item.designNo || '',
-      category: item.category || 'Printing Defect',
+      category: cat,
+      subCategory: item.subCategory || subOpts[0] || '',
       priority: item.priority || 'Medium',
       status: item.status || 'Open',
       defectiveMeters: item.defectiveMeters || 0,
+      expectedAmount: item.expectedAmount || 0,
       description: item.description || '',
       photoUrls: item.photoUrls || [],
-      actionTaken: item.actionTaken || '',
-      assignedTo: item.assignedTo || ''
+      actionTaken: item.actionTaken || ''
     });
     setShowModal(true);
   };
@@ -485,9 +526,19 @@ export default function DigitalPrintComplainModule() {
                       JC: {item.jobCardNo}
                     </span>
                   )}
+                  {item.invoiceNo && (
+                    <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.2)' }}>
+                      Inv: {item.invoiceNo}
+                    </span>
+                  )}
                   {item.designNo && (
                     <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.2)' }}>
                       Design: {item.designNo}
+                    </span>
+                  )}
+                  {item.assignedTo && (
+                    <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', color: '#facc15', border: '1px solid rgba(250,204,21,0.2)' }}>
+                      👤 {item.assignedTo}
                     </span>
                   )}
                   <span style={{ background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-muted)' }}>
@@ -498,12 +549,17 @@ export default function DigitalPrintComplainModule() {
                       ⚠️ {item.defectiveMeters} Mtr
                     </span>
                   )}
+                  {item.expectedAmount > 0 && (
+                    <span style={{ background: 'rgba(34,197,94,0.12)', padding: '2px 6px', borderRadius: '4px', color: '#4ade80', fontWeight: 700 }}>
+                      💰 ₹{item.expectedAmount}
+                    </span>
+                  )}
                 </div>
 
-                {/* Category & Description */}
+                {/* Category & Sub-Category & Description */}
                 <div style={{ fontSize: '0.78rem', background: 'var(--bg-main, #111827)', padding: '0.65rem', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
                   <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--primary)', marginBottom: 2 }}>
-                    Category: {item.category}
+                    {item.category} {item.subCategory ? `› ${item.subCategory}` : ''}
                   </div>
                   <div style={{ color: 'var(--text-primary)', lineClamp: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                     {item.description || 'No description provided.'}
@@ -586,62 +642,156 @@ export default function DigitalPrintComplainModule() {
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
             </div>
 
-            <form onSubmit={handleSubmit} style={{ padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Complaint No</label>
-                  <input type="text" value={formVal.complaintNo} readOnly style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem', fontWeight: 800, background: 'var(--bg-main)' }} />
+            <form onSubmit={handleSubmit} style={{ padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+              
+              {/* SECTION 1: BASIC DETAILS */}
+              <div style={{ background: 'var(--bg-main, #111827)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '0.65rem' }}>
+                  📌 Basic Details
                 </div>
-                <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Date *</label>
-                  <input type="date" value={formVal.date} onChange={e => setFormVal({ ...formVal, date: e.target.value })} required style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Ticket ID (Auto)</label>
+                    <input type="text" value={formVal.complaintNo} readOnly style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem', fontWeight: 800, background: 'rgba(255,255,255,0.04)' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Date *</label>
+                    <input type="date" value={formVal.date} onChange={e => setFormVal({ ...formVal, date: e.target.value })} required style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.65rem' }}>
+                  {/* Customer Name Dropdown */}
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Customer Name (Dropdown) *</label>
+                    <select
+                      value={formVal.partyName}
+                      onChange={e => setFormVal({ ...formVal, partyName: e.target.value })}
+                      required
+                      style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
+                    >
+                      <option value="">-- Select Customer / Party --</option>
+                      {parties.map(p => (
+                        <option key={p._id || p.name} value={p.name || p.partyName}>{p.name || p.partyName}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Responsible Person Dropdown */}
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Responsible Person (Dropdown)</label>
+                    <input
+                      type="text"
+                      list="staff-list"
+                      placeholder="Select or type Responsible Staff..."
+                      value={formVal.assignedTo}
+                      onChange={e => setFormVal({ ...formVal, assignedTo: e.target.value })}
+                      style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
+                    />
+                    <datalist id="staff-list">
+                      {staffList.map((s, idx) => (
+                        <option key={idx} value={s} />
+                      ))}
+                    </datalist>
+                  </div>
                 </div>
               </div>
 
-              {/* Party Name */}
-              <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Party / Client Name *</label>
-                <input
-                  type="text"
-                  list="parties-list"
-                  placeholder="Select or type Party Name..."
-                  value={formVal.partyName}
-                  onChange={e => setFormVal({ ...formVal, partyName: e.target.value })}
-                  required
-                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem' }}
-                />
-                <datalist id="parties-list">
-                  {parties.map(p => <option key={p._id || p.name} value={p.name || p.partyName} />)}
-                </datalist>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Job Card No (Optional)</label>
-                  <input type="text" placeholder="e.g. JC-1001" value={formVal.jobCardNo} onChange={e => setFormVal({ ...formVal, jobCardNo: e.target.value })} style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem' }} />
+              {/* SECTION 2: ORDER LINKAGE */}
+              <div style={{ background: 'var(--bg-main, #111827)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', marginBottom: '0.65rem' }}>
+                  🔗 Order Linkage
                 </div>
-                <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Design No (Optional)</label>
-                  <input type="text" placeholder="e.g. ED-101" value={formVal.designNo} onChange={e => setFormVal({ ...formVal, designNo: e.target.value })} style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Job Card No.</label>
+                    <input type="text" placeholder="e.g. JC-1001" value={formVal.jobCardNo} onChange={e => setFormVal({ ...formVal, jobCardNo: e.target.value })} style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Invoice No.</label>
+                    <input type="text" placeholder="e.g. EDP-INV-1001" value={formVal.invoiceNo} onChange={e => setFormVal({ ...formVal, invoiceNo: e.target.value })} style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Design No. (Optional)</label>
+                    <input type="text" placeholder="e.g. ED-101" value={formVal.designNo} onChange={e => setFormVal({ ...formVal, designNo: e.target.value })} style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }} />
+                  </div>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.85rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Defect Category</label>
-                  <select value={formVal.category} onChange={e => setFormVal({ ...formVal, category: e.target.value })} style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem' }}>
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+              {/* SECTION 3: COMPLAINT CATEGORY & SUB-CATEGORY */}
+              <div style={{ background: 'var(--bg-main, #111827)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', marginBottom: '0.65rem' }}>
+                  🏷️ Complaint Category & Sub-Category
                 </div>
-                <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Priority</label>
-                  <select value={formVal.priority} onChange={e => setFormVal({ ...formVal, priority: e.target.value })} style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem' }}>
-                    {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Complaint Category *</label>
+                    <select
+                      value={formVal.category}
+                      onChange={e => {
+                        const newCat = e.target.value;
+                        const subOpts = SUB_CATEGORIES[newCat] || ['Other'];
+                        setFormVal({ ...formVal, category: newCat, subCategory: subOpts[0] || '' });
+                      }}
+                      style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
+                    >
+                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Sub-Category *</label>
+                    <select
+                      value={formVal.subCategory}
+                      onChange={e => setFormVal({ ...formVal, subCategory: e.target.value })}
+                      style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
+                    >
+                      {(SUB_CATEGORIES[formVal.category] || ['Other']).map(sub => (
+                        <option key={sub} value={sub}>{sub}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Defective Meters</label>
-                  <input type="number" min="0" value={formVal.defectiveMeters} onChange={e => setFormVal({ ...formVal, defectiveMeters: parseFloat(e.target.value) || 0 })} style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem' }} />
+              </div>
+
+              {/* SECTION 4: SEVERITY / PRIORITY & CLAIMED VALUE */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: '0.85rem' }}>
+                {/* Severity */}
+                <div style={{ background: 'var(--bg-main, #111827)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>Severity / Priority</label>
+                  <div style={{ display: 'flex', gap: '0.35rem' }}>
+                    {['Low', 'Medium', 'High', 'Urgent'].map(p => {
+                      const active = formVal.priority === p;
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setFormVal({ ...formVal, priority: p })}
+                          style={{
+                            flex: 1, padding: '0.35rem 0', fontSize: '0.72rem', fontWeight: 800, borderRadius: '4px',
+                            border: active ? '1px solid var(--primary)' : '1px solid var(--border-light)',
+                            background: active ? 'var(--primary)' : 'transparent',
+                            color: active ? '#fff' : 'var(--text-muted)', cursor: 'pointer'
+                          }}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Claimed Value */}
+                <div style={{ background: 'var(--bg-main, #111827)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Defective Mtr / Qty</label>
+                      <input type="number" min="0" step="0.01" value={formVal.defectiveMeters} onChange={e => setFormVal({ ...formVal, defectiveMeters: parseFloat(e.target.value) || 0 })} style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Expected Claim (₹)</label>
+                      <input type="number" min="0" step="1" placeholder="₹ Amount" value={formVal.expectedAmount} onChange={e => setFormVal({ ...formVal, expectedAmount: parseFloat(e.target.value) || 0 })} style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem', fontWeight: 700, color: '#4ade80' }} />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -651,26 +801,9 @@ export default function DigitalPrintComplainModule() {
                 <textarea rows={3} placeholder="Describe the defect, shade difference, or customer issue..." value={formVal.description} onChange={e => setFormVal({ ...formVal, description: e.target.value })} style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem' }} />
               </div>
 
-              {/* Photos Upload */}
-              <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Attach Defect Photos / Proof</label>
-                <label style={{ border: '2px dashed var(--border-light)', borderRadius: 8, padding: '1rem', textAlign: 'center', cursor: 'pointer', display: 'block', background: 'rgba(255,255,255,0.01)' }}>
-                  <input type="file" multiple accept="image/*" onChange={handlePhotoUpload} style={{ display: 'none' }} />
-                  <span style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 700 }}>
-                    {uploading ? 'Compressing & Uploading Photos...' : '📷 Click to Upload Defect Photos'}
-                  </span>
-                </label>
-
-                {formVal.photoUrls && formVal.photoUrls.length > 0 && (
-                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                    {formVal.photoUrls.map((url, idx) => (
-                      <div key={idx} style={{ position: 'relative' }}>
-                        <img src={url} alt="Proof" style={{ width: 50, height: 50, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--border-light)' }} />
-                        <button type="button" onClick={() => handleRemovePhoto(idx)} style={{ position: 'absolute', top: -5, right: -5, background: '#f87171', color: '#fff', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer' }}>✕</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              {/* Attachments Section - Disabled per request */}
+              <div style={{ opacity: 0.5, pointerEvents: 'none', background: 'rgba(255,255,255,0.02)', padding: '0.65rem', borderRadius: '6px', border: '1px dashed var(--border-light)' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>📷 Attachments / Defect Proof (Currently Disabled)</span>
               </div>
 
               {/* Status & Resolution for Edit Mode */}
@@ -752,10 +885,13 @@ export default function DigitalPrintComplainModule() {
               {/* Info Details */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', fontSize: '0.82rem' }}>
                 <div><strong>Category:</strong> {showViewModal.category}</div>
-                <div><strong>Priority:</strong> {showViewModal.priority}</div>
+                <div><strong>Sub-Category:</strong> {showViewModal.subCategory || 'N/A'}</div>
+                <div><strong>Severity / Priority:</strong> {showViewModal.priority}</div>
+                <div><strong>Responsible Person:</strong> {showViewModal.assignedTo || 'Unassigned'}</div>
                 <div><strong>Job Card No:</strong> {showViewModal.jobCardNo || 'N/A'}</div>
-                <div><strong>Design No:</strong> {showViewModal.designNo || 'N/A'}</div>
+                <div><strong>Invoice No:</strong> {showViewModal.invoiceNo || 'N/A'}</div>
                 <div><strong>Defective Quantity:</strong> {showViewModal.defectiveMeters} Mtr</div>
+                <div><strong>Expected Claim (₹):</strong> {showViewModal.expectedAmount ? `₹${showViewModal.expectedAmount}` : 'N/A'}</div>
                 <div><strong>Date Logged:</strong> {showViewModal.date}</div>
               </div>
 

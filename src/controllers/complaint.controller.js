@@ -39,10 +39,13 @@ const getAll = async (req, res) => {
         { complaintNo: regex },
         { partyName: regex },
         { jobCardNo: regex },
+        { invoiceNo: regex },
         { designNo: regex },
         { description: regex },
         { actionTaken: regex },
-        { category: regex }
+        { category: regex },
+        { subCategory: regex },
+        { assignedTo: regex }
       ];
     }
 
@@ -195,11 +198,12 @@ const getAnalytics = async (req, res) => {
       db.Complaint.countDocuments({ status: 'Feedback' }),
       db.Complaint.countDocuments({ priority: 'Urgent', status: { $nin: ['Close', 'Resolved'] } }),
       db.Complaint.aggregate([
-        { $group: { _id: null, totalDefectiveMeters: { $sum: '$defectiveMeters' } } }
+        { $group: { _id: null, totalDefectiveMeters: { $sum: '$defectiveMeters' }, totalExpectedAmount: { $sum: '$expectedAmount' } } }
       ])
     ]);
 
     const totalDefectiveMeters = metrics.length > 0 ? metrics[0].totalDefectiveMeters : 0;
+    const totalExpectedAmount = metrics.length > 0 ? (metrics[0].totalExpectedAmount || 0) : 0;
 
     res.json({
       total,
@@ -208,7 +212,8 @@ const getAnalytics = async (req, res) => {
       close,
       feedback,
       urgent,
-      totalDefectiveMeters
+      totalDefectiveMeters,
+      totalExpectedAmount
     });
   } catch (err) {
     logger.error('complaint.getAnalytics error: %o', err);

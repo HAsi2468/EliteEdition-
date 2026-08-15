@@ -6,6 +6,7 @@ const complaintSchema = new mongoose.Schema(
     date: { type: String, default: () => new Date().toISOString().split('T')[0] },
     partyName: { type: String, required: true, trim: true },
     jobCardNo: { type: String, default: '', trim: true },
+    invoiceNo: { type: String, default: '', trim: true },
     designNo: { type: String, default: '', trim: true },
     category: {
       type: String,
@@ -20,9 +21,11 @@ const complaintSchema = new mongoose.Schema(
         'Other'
       ]
     },
+    subCategory: { type: String, default: '', trim: true },
     priority: { type: String, default: 'Medium', enum: ['Low', 'Medium', 'High', 'Urgent'] },
     status: { type: String, default: 'Open', enum: ['Open', 'Hold', 'Close', 'Feedback', 'Pending', 'In Progress', 'Resolved', 'Rejected'] },
     defectiveMeters: { type: Number, default: 0 },
+    expectedAmount: { type: Number, default: 0 },
     description: { type: String, default: '', trim: true },
     photoUrls: [{ type: String, trim: true }],
     actionTaken: { type: String, default: '', trim: true },
