@@ -187,13 +187,13 @@ const remove = async (req, res) => {
 // Analytics Endpoint
 const getAnalytics = async (req, res) => {
   try {
-    const [total, pending, inProgress, resolved, rejected, urgent, metrics] = await Promise.all([
+    const [total, open, hold, close, feedback, urgent, metrics] = await Promise.all([
       db.Complaint.countDocuments({}),
-      db.Complaint.countDocuments({ status: 'Pending' }),
-      db.Complaint.countDocuments({ status: 'In Progress' }),
-      db.Complaint.countDocuments({ status: 'Resolved' }),
-      db.Complaint.countDocuments({ status: 'Rejected' }),
-      db.Complaint.countDocuments({ priority: 'Urgent', status: { $ne: 'Resolved' } }),
+      db.Complaint.countDocuments({ status: { $in: ['Open', 'Pending'] } }),
+      db.Complaint.countDocuments({ status: { $in: ['Hold', 'In Progress'] } }),
+      db.Complaint.countDocuments({ status: { $in: ['Close', 'Resolved'] } }),
+      db.Complaint.countDocuments({ status: 'Feedback' }),
+      db.Complaint.countDocuments({ priority: 'Urgent', status: { $nin: ['Close', 'Resolved'] } }),
       db.Complaint.aggregate([
         { $group: { _id: null, totalDefectiveMeters: { $sum: '$defectiveMeters' } } }
       ])
@@ -203,10 +203,10 @@ const getAnalytics = async (req, res) => {
 
     res.json({
       total,
-      pending,
-      inProgress,
-      resolved,
-      rejected,
+      open,
+      hold,
+      close,
+      feedback,
       urgent,
       totalDefectiveMeters
     });

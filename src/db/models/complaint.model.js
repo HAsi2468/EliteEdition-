@@ -21,7 +21,7 @@ const complaintSchema = new mongoose.Schema(
       ]
     },
     priority: { type: String, default: 'Medium', enum: ['Low', 'Medium', 'High', 'Urgent'] },
-    status: { type: String, default: 'Pending', enum: ['Pending', 'In Progress', 'Resolved', 'Rejected'] },
+    status: { type: String, default: 'Open', enum: ['Open', 'Hold', 'Close', 'Feedback', 'Pending', 'In Progress', 'Resolved', 'Rejected'] },
     defectiveMeters: { type: Number, default: 0 },
     description: { type: String, default: '', trim: true },
     photoUrls: [{ type: String, trim: true }],

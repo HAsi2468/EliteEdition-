@@ -18,13 +18,13 @@ const CATEGORIES = [
 ];
 
 const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
-const STATUSES = ['Pending', 'In Progress', 'Resolved', 'Rejected'];
+const STATUSES = ['Open', 'Hold', 'Close', 'Feedback'];
 
 export default function DigitalPrintComplainModule() {
   const [complaints, setComplaints] = useState([]);
   const [parties, setParties] = useState([]);
   const [analytics, setAnalytics] = useState({
-    total: 0, pending: 0, inProgress: 0, resolved: 0, rejected: 0, urgent: 0, totalDefectiveMeters: 0
+    total: 0, open: 0, hold: 0, close: 0, feedback: 0, urgent: 0, totalDefectiveMeters: 0
   });
   const [loading, setLoading] = useState(false);
 
@@ -51,7 +51,7 @@ export default function DigitalPrintComplainModule() {
     designNo: '',
     category: 'Printing Defect',
     priority: 'Medium',
-    status: 'Pending',
+    status: 'Open',
     defectiveMeters: 0,
     description: '',
     photoUrls: [],
@@ -117,7 +117,7 @@ export default function DigitalPrintComplainModule() {
       designNo: '',
       category: 'Printing Defect',
       priority: 'Medium',
-      status: 'Pending',
+      status: 'Open',
       defectiveMeters: 0,
       description: '',
       photoUrls: [],
@@ -146,7 +146,7 @@ export default function DigitalPrintComplainModule() {
       designNo: item.designNo || '',
       category: item.category || 'Printing Defect',
       priority: item.priority || 'Medium',
-      status: item.status || 'Pending',
+      status: item.status || 'Open',
       defectiveMeters: item.defectiveMeters || 0,
       description: item.description || '',
       photoUrls: item.photoUrls || [],
@@ -286,10 +286,10 @@ export default function DigitalPrintComplainModule() {
 
   const getStatusBadge = (s) => {
     switch (s) {
-      case 'Pending': return { bg: 'rgba(234,179,8,0.15)', color: '#eab308', border: 'rgba(234,179,8,0.3)', icon: <Clock size={12} /> };
-      case 'In Progress': return { bg: 'rgba(59,130,246,0.15)', color: '#60a5fa', border: 'rgba(59,130,246,0.3)', icon: <RefreshCw size={12} className="spin-loader" /> };
-      case 'Resolved': return { bg: 'rgba(34,197,94,0.15)', color: '#4ade80', border: 'rgba(34,197,94,0.3)', icon: <CheckCircle2 size={12} /> };
-      case 'Rejected': return { bg: 'rgba(239,68,68,0.15)', color: '#f87171', border: 'rgba(239,68,68,0.3)', icon: <X size={12} /> };
+      case 'Open': case 'Pending': return { bg: 'rgba(234,179,8,0.15)', color: '#eab308', border: 'rgba(234,179,8,0.3)', icon: <Clock size={12} /> };
+      case 'Hold': case 'In Progress': return { bg: 'rgba(249,115,22,0.15)', color: '#f97316', border: 'rgba(249,115,22,0.3)', icon: <AlertCircle size={12} /> };
+      case 'Close': case 'Resolved': return { bg: 'rgba(34,197,94,0.15)', color: '#4ade80', border: 'rgba(34,197,94,0.3)', icon: <CheckCircle2 size={12} /> };
+      case 'Feedback': return { bg: 'rgba(168,85,247,0.15)', color: '#c084fc', border: 'rgba(168,85,247,0.3)', icon: <FileText size={12} /> };
       default: return { bg: 'rgba(255,255,255,0.05)', color: '#9ca3af', border: 'var(--border-light)', icon: null };
     }
   };
@@ -344,22 +344,26 @@ export default function DigitalPrintComplainModule() {
       </div>
 
       {/* KPI Analytical Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.85rem' }}>
         <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #60a5fa' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total Complaints</div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total</div>
           <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 4 }}>{analytics.total}</div>
         </div>
         <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #eab308' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Pending Review</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#eab308', marginTop: 4 }}>{analytics.pending}</div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Open</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#eab308', marginTop: 4 }}>{analytics.open}</div>
         </div>
-        <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f87171' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Urgent Tickets</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#f87171', marginTop: 4 }}>{analytics.urgent}</div>
+        <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f97316' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Hold</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#f97316', marginTop: 4 }}>{analytics.hold}</div>
         </div>
         <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #4ade80' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Resolved Issues</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#4ade80', marginTop: 4 }}>{analytics.resolved}</div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Close</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#4ade80', marginTop: 4 }}>{analytics.close}</div>
+        </div>
+        <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #c084fc' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Feedback</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#c084fc', marginTop: 4 }}>{analytics.feedback}</div>
         </div>
         <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #a78bfa' }}>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Defective Fabric</div>
