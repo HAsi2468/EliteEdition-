@@ -1230,48 +1230,61 @@ export default function DigitalPrintComplainModule() {
 
                   {/* Responsible Person (Multi-Select Pills for ERP Users) */}
                   <div style={{ marginTop: '0.75rem', gridColumn: '1 / -1' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#f43f5e', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                      <span>👥 Responsible Person (Select One or Multiple ERP Users) *</span>
-                      <span style={{ fontSize: '0.68rem', color: '#f43f5e', fontWeight: 900, background: 'rgba(244,63,94,0.15)', padding: '2px 8px', borderRadius: '10px', border: '1px solid rgba(244,63,94,0.3)' }}>
-                        {formVal.responsiblePersons.length} Selected
-                      </span>
-                    </label>
+                    {(() => {
+                      const safeRespPersons = Array.isArray(formVal.responsiblePersons)
+                        ? formVal.responsiblePersons
+                        : (typeof formVal.responsiblePerson === 'string' && formVal.responsiblePerson.trim()
+                            ? formVal.responsiblePerson.split(',').map(s => s.trim()).filter(Boolean)
+                            : []);
+                      const safeStaffList = Array.isArray(staffList) ? staffList : [];
 
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', background: 'rgba(255,255,255,0.03)', padding: '0.6rem', borderRadius: '8px', border: '1px solid rgba(244,63,94,0.3)', maxHeight: '130px', overflowY: 'auto' }}>
-                      {staffList.map((sName, idx) => {
-                        const isSelected = formVal.responsiblePersons.includes(sName);
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              let nextList = [...formVal.responsiblePersons];
-                              if (isSelected) {
-                                nextList = nextList.filter(n => n !== sName);
-                              } else {
-                                nextList.push(sName);
-                              }
-                              setFormVal(prev => ({
-                                ...prev,
-                                responsiblePersons: nextList,
-                                responsiblePerson: nextList.join(', ')
-                              }));
-                            }}
-                            style={{
-                              padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, borderRadius: '20px',
-                              border: isSelected ? '1px solid #f43f5e' : '1px solid var(--border-light)',
-                              background: isSelected ? 'linear-gradient(135deg, #f43f5e, #e11d48)' : 'rgba(255,255,255,0.05)',
-                              color: isSelected ? '#ffffff' : 'var(--text-muted)',
-                              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem',
-                              boxShadow: isSelected ? '0 3px 10px rgba(244,63,94,0.3)' : 'none',
-                              transition: 'all 0.15s'
-                            }}
-                          >
-                            {isSelected ? '✓ ' : '+ '} {sName}
-                          </button>
-                        );
-                      })}
-                    </div>
+                      return (
+                        <>
+                          <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#f43f5e', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                            <span>👥 Responsible Person (Select One or Multiple ERP Users) *</span>
+                            <span style={{ fontSize: '0.68rem', color: '#f43f5e', fontWeight: 900, background: 'rgba(244,63,94,0.15)', padding: '2px 8px', borderRadius: '10px', border: '1px solid rgba(244,63,94,0.3)' }}>
+                              {safeRespPersons.length} Selected
+                            </span>
+                          </label>
+
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', background: 'rgba(255,255,255,0.03)', padding: '0.6rem', borderRadius: '8px', border: '1px solid rgba(244,63,94,0.3)', maxHeight: '130px', overflowY: 'auto' }}>
+                            {safeStaffList.map((sName, idx) => {
+                              const isSelected = safeRespPersons.includes(sName);
+                              return (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => {
+                                    let nextList = [...safeRespPersons];
+                                    if (isSelected) {
+                                      nextList = nextList.filter(n => n !== sName);
+                                    } else {
+                                      nextList.push(sName);
+                                    }
+                                    setFormVal(prev => ({
+                                      ...prev,
+                                      responsiblePersons: nextList,
+                                      responsiblePerson: nextList.join(', ')
+                                    }));
+                                  }}
+                                  style={{
+                                    padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, borderRadius: '20px',
+                                    border: isSelected ? '1px solid #f43f5e' : '1px solid var(--border-light)',
+                                    background: isSelected ? 'linear-gradient(135deg, #f43f5e, #e11d48)' : 'rgba(255,255,255,0.05)',
+                                    color: isSelected ? '#ffffff' : 'var(--text-muted)',
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem',
+                                    boxShadow: isSelected ? '0 3px 10px rgba(244,63,94,0.3)' : 'none',
+                                    transition: 'all 0.15s'
+                                  }}
+                                >
+                                  {isSelected ? '✓ ' : '+ '} {sName}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
