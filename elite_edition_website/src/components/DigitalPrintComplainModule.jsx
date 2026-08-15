@@ -646,7 +646,7 @@ export default function DigitalPrintComplainModule() {
       </div>
 
       {/* Filter Toolbar */}
-      <div className="glass-panel" style={{ padding: '1rem 1.25rem' }}>
+      <div className="glass-panel" style={{ padding: '1rem 1.25rem', overflow: 'visible', position: 'relative', zIndex: 100 }}>
         <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', flex: '1 1 200px' }}>
             <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -660,7 +660,7 @@ export default function DigitalPrintComplainModule() {
           </div>
 
           {/* Invoice-style Date Range Preset Selector Component */}
-          <div style={{ position: 'relative', display: 'inline-block' }}>
+          <div style={{ position: 'relative', display: 'inline-block', zIndex: 200 }}>
             <button
               type="button"
               onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
@@ -671,12 +671,12 @@ export default function DigitalPrintComplainModule() {
                 padding: '0.45rem 1.1rem',
                 borderRadius: '8px',
                 border: '1.5px solid #a78bfa',
-                background: 'var(--panel-bg, #1e1b4b)',
+                background: 'linear-gradient(135deg, #1e1b4b, #312e81)',
                 color: '#ffffff',
                 fontWeight: 700,
                 fontSize: '0.82rem',
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(124, 58, 237, 0.25)',
+                boxShadow: '0 4px 14px rgba(124, 58, 237, 0.35)',
                 transition: 'all 0.2s'
               }}
             >
@@ -688,23 +688,23 @@ export default function DigitalPrintComplainModule() {
             {isDateDropdownOpen && (
               <>
                 <div
-                  style={{ position: 'fixed', inset: 0, zIndex: 998 }}
+                  style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
                   onClick={() => setIsDateDropdownOpen(false)}
                 />
                 <div
                   style={{
                     position: 'absolute',
                     top: 'calc(100% + 6px)',
-                    right: 0,
-                    width: '360px',
+                    left: 0,
+                    width: '350px',
                     maxHeight: '380px',
                     overflowY: 'auto',
-                    background: '#ffffff',
-                    color: '#1e293b',
-                    borderRadius: '10px',
-                    boxShadow: '0 20px 40px rgba(0,0,0,0.35)',
-                    border: '1px solid #cbd5e1',
-                    zIndex: 999,
+                    background: '#0f172a',
+                    color: '#f8fafc',
+                    borderRadius: '12px',
+                    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(167, 139, 250, 0.3)',
+                    border: '1px solid rgba(167, 139, 250, 0.35)',
+                    zIndex: 9999,
                     padding: '0.35rem 0'
                   }}
                 >
@@ -722,18 +722,24 @@ export default function DigitalPrintComplainModule() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          padding: '0.6rem 0.9rem',
+                          padding: '0.6rem 0.95rem',
                           cursor: 'pointer',
-                          background: isSelected ? '#f1f5f9' : 'transparent',
-                          borderBottom: '1px solid #f1f5f9',
+                          background: isSelected ? 'rgba(124, 58, 237, 0.3)' : 'transparent',
+                          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
                           fontSize: '0.82rem',
                           transition: 'background 0.15s'
                         }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) e.currentTarget.style.background = 'transparent';
+                        }}
                       >
-                        <span style={{ fontWeight: isSelected ? 700 : 500, color: isSelected ? '#4338ca' : '#334155' }}>
+                        <span style={{ fontWeight: isSelected ? 800 : 500, color: isSelected ? '#a78bfa' : '#e2e8f0' }}>
                           {opt.name}
                         </span>
-                        <span style={{ fontWeight: 700, fontSize: '0.75rem', color: isSelected ? '#1e1b4b' : '#64748b' }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.74rem', color: isSelected ? '#38bdf8' : '#94a3b8' }}>
                           {rangeInfo.labelText}
                         </span>
                       </div>
@@ -741,21 +747,21 @@ export default function DigitalPrintComplainModule() {
                   })}
 
                   {datePreset === 'custom' && (
-                    <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ padding: '0.75rem 1rem', background: '#1e293b', borderTop: '1px solid rgba(255, 255, 255, 0.1)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                         <div>
-                          <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>From</label>
-                          <input type="date" value={customDateStart} onChange={e => setCustomDateStart(e.target.value)} style={{ width: '100%', padding: '0.3rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
+                          <label style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>From</label>
+                          <input type="date" value={customDateStart} onChange={e => setCustomDateStart(e.target.value)} style={{ width: '100%', padding: '0.35rem', fontSize: '0.8rem', background: '#0f172a', color: '#fff', border: '1px solid #334155', borderRadius: '6px' }} />
                         </div>
                         <div>
-                          <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>To</label>
-                          <input type="date" value={customDateEnd} onChange={e => setCustomDateEnd(e.target.value)} style={{ width: '100%', padding: '0.3rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
+                          <label style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>To</label>
+                          <input type="date" value={customDateEnd} onChange={e => setCustomDateEnd(e.target.value)} style={{ width: '100%', padding: '0.35rem', fontSize: '0.8rem', background: '#0f172a', color: '#fff', border: '1px solid #334155', borderRadius: '6px' }} />
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => setIsDateDropdownOpen(false)}
-                        style={{ padding: '0.4rem', background: '#4338ca', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                        style={{ padding: '0.45rem', background: 'linear-gradient(135deg, #6366f1, #4f46e5)', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}
                       >
                         Apply Custom Range
                       </button>
