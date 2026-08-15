@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api, getBaseUrl } from '../services/api';
 import {
   AlertTriangle, PlusCircle, Search, RefreshCw, Edit2, Trash2, X, Save, Image as ImageIcon,
-  CheckCircle, ShieldAlert, Download, Filter, Eye, AlertCircle, Clock, CheckCircle2, User, FileText, ArrowRight, Calendar
+  CheckCircle, ShieldAlert, Download, Filter, Eye, AlertCircle, Clock, CheckCircle2, User, FileText, ArrowRight, Calendar, MessageSquare
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
@@ -42,7 +42,7 @@ const SUB_CATEGORIES = {
 };
 
 const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
-const STATUSES = ['Open', 'Hold', 'Close', 'Feedback'];
+const STATUSES = ['Open', 'In Progress', 'Hold', 'Pending', 'Feedback', 'Resolved', 'Close', 'Rejected'];
 
 const PRESET_OPTIONS = [
   { id: 'today', name: 'Today' },
@@ -959,8 +959,9 @@ export default function DigitalPrintComplainModule() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
               {complaints.map(item => {
-                const statusMeta = getStatusBadge(item.status);
-                const priorityColor = getPriorityColor(item.priority);
+                const statusMeta = getStatusBadge(item?.status) || { bg: 'rgba(255,255,255,0.05)', color: '#9ca3af', border: 'var(--border-light)' };
+                const priorityColor = getPriorityColor(item?.priority);
+                const statusOptions = Array.from(new Set([...STATUSES, item?.status].filter(Boolean)));
 
                 return (
                   <div
@@ -990,7 +991,7 @@ export default function DigitalPrintComplainModule() {
 
                       {/* Interactive Status Select Dropdown on Card Header */}
                       <select
-                        value={item.status}
+                        value={item.status || 'Open'}
                         onChange={e => handleQuickStatusUpdate(item, e.target.value)}
                         onClick={e => e.stopPropagation()}
                         style={{
@@ -1000,7 +1001,7 @@ export default function DigitalPrintComplainModule() {
                           cursor: 'pointer', outline: 'none'
                         }}
                       >
-                        {STATUSES.map(st => (
+                        {statusOptions.map(st => (
                           <option key={st} value={st} style={{ background: '#1e293b', color: '#fff' }}>
                             {st}
                           </option>
