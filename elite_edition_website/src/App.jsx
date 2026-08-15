@@ -31,6 +31,7 @@ import {
   Check,
   Printer,
   ShieldAlert,
+  AlertTriangle,
   PackageMinus,
   ChevronDown,
   ChevronRight,
@@ -1093,6 +1094,12 @@ export default function App() {
                       <ShoppingBag size={18} /><span>Raw Materials</span>
                     </button>
                   )}
+                  {/* 9. Complain Module */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_complain') || currentUser.permissions?.includes('jobcards_complaints')) && (
+                    <button onClick={() => { setActiveTab('jobcards_complain'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_complain' ? styles.navItemActive : {}) }}>
+                      <AlertTriangle size={18} color="#f43f5e" /><span>Complain Module</span>
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
@@ -1296,6 +1303,12 @@ export default function App() {
                 {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_raw_materials')) && (
                   <button onClick={() => handleNavClick('jobcards_raw_materials')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_raw_materials' ? styles.navItemActive : {}) }}>
                     <ShoppingBag size={18} /><span>Raw Materials</span>
+                  </button>
+                )}
+                {/* 9. Complain Module */}
+                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_complain') || currentUser.permissions?.includes('jobcards_complaints')) && (
+                  <button onClick={() => handleNavClick('jobcards_complain')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_complain' ? styles.navItemActive : {}) }}>
+                    <AlertTriangle size={18} color="#f43f5e" /><span>Complain Module</span>
                   </button>
                 )}
               </>

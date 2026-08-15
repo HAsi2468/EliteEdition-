@@ -751,6 +751,29 @@ export const api = {
     return request('/designs/import-pkd-orders', { method: 'POST', body: JSON.stringify({ items }) });
   },
 
+  // ─── Complaints Module ──────────────────────────────────────────────────────
+  async getComplaints(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/complaints${qs}`);
+  },
+  async getNextComplaintNumber() {
+    return request('/complaints/next-number');
+  },
+  async getComplaintAnalytics() {
+    return request('/complaints/analytics');
+  },
+  async createComplaint(payload) {
+    return request('/complaints', { method: 'POST', body: JSON.stringify(payload) });
+  },
+  async updateComplaint(id, payload) {
+    return request(`/complaints/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+  },
+  async deleteComplaint(id) {
+    return request(`/complaints/${id}`, { method: 'DELETE' });
+  },
+
   // ─── Analytics ──────────────────────────────────────────────────────────────
   async getVariantAnalytics(params = {}) {
     const query = new URLSearchParams();
