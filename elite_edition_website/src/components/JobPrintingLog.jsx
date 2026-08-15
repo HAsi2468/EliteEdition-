@@ -112,60 +112,95 @@ export default function JobPrintingLog() {
   const [rawNotes, setRawNotes] = useState('');
 
   // Section 1: INK CONSUMPTION (LITERS)
-  // Grando Machine Ink (C, M, Y, K in Liters)
-  const [grandoInkC, setGrandoInkC] = useState('');
-  const [grandoInkM, setGrandoInkM] = useState('');
-  const [grandoInkY, setGrandoInkY] = useState('');
-  const [grandoInkK, setGrandoInkK] = useState('');
+  // ── INWARD STATE (Stock Received) ──
+  const [grandoInC, setGrandoInC] = useState('');
+  const [grandoInM, setGrandoInM] = useState('');
+  const [grandoInY, setGrandoInY] = useState('');
+  const [grandoInK, setGrandoInK] = useState('');
 
-  // Printdot Machine Ink (C, M, Y, K in Liters)
-  const [printdotInkC, setPrintdotInkC] = useState('');
-  const [printdotInkM, setPrintdotInkM] = useState('');
-  const [printdotInkY, setPrintdotInkY] = useState('');
-  const [printdotInkK, setPrintdotInkK] = useState('');
+  const [printdotInC, setPrintdotInC] = useState('');
+  const [printdotInM, setPrintdotInM] = useState('');
+  const [printdotInY, setPrintdotInY] = useState('');
+  const [printdotInK, setPrintdotInK] = useState('');
 
-  // Section 2: PAPER CONSUMPTION (PANNA WISE ROLL CONSUMPTION)
-  const [pannaOptionsList, setPannaOptionsList] = useState([]);
-  const [paperTypesList, setPaperTypesList] = useState(['A++', 'A+', 'A']);
-  const [paperEntries, setPaperEntries] = useState([
+  const [inwardPaperEntries, setInwardPaperEntries] = useState([
     { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
   ]);
 
-  // Raw Material Log Mode: OUTWARD (Usage) vs INWARD (Stock Received)
-  const [rawEntryType, setRawEntryType] = useState('OUTWARD');
+  // ── OUTWARD STATE (Usage / Consumption) ──
+  const [grandoOutC, setGrandoOutC] = useState('');
+  const [grandoOutM, setGrandoOutM] = useState('');
+  const [grandoOutY, setGrandoOutY] = useState('');
+  const [grandoOutK, setGrandoOutK] = useState('');
 
-  // Raw Material Summary State for Displaying on Screen & Reports
+  const [printdotOutC, setPrintdotOutC] = useState('');
+  const [printdotOutM, setPrintdotOutM] = useState('');
+  const [printdotOutY, setPrintdotOutY] = useState('');
+  const [printdotOutK, setPrintdotOutK] = useState('');
+
+  const [outwardPaperEntries, setOutwardPaperEntries] = useState([
+    { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+  ]);
+
+  const [pannaOptionsList, setPannaOptionsList] = useState([]);
+  const [paperTypesList, setPaperTypesList] = useState(['A++', 'A+', 'A']);
+
+  // Paper Entry Helper Handlers for INWARD
+  const handleAddInwardPaperEntry = () => {
+    setInwardPaperEntries(prev => [
+      ...prev,
+      { id: prev.length + 1, paperType: paperTypesList[0] || 'A++', paperPanna: pannaOptionsList[0] || '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+    ]);
+  };
+  const handleRemoveInwardPaperEntry = (id) => {
+    setInwardPaperEntries(prev => prev.filter(e => e.id !== id));
+  };
+  const handleInwardPaperEntryChange = (id, field, val) => {
+    setInwardPaperEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: val } : e));
+  };
+
+  // Paper Entry Helper Handlers for OUTWARD
+  const handleAddOutwardPaperEntry = () => {
+    setOutwardPaperEntries(prev => [
+      ...prev,
+      { id: prev.length + 1, paperType: paperTypesList[0] || 'A++', paperPanna: pannaOptionsList[0] || '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+    ]);
+  };
+  const handleRemoveOutwardPaperEntry = (id) => {
+    setOutwardPaperEntries(prev => prev.filter(e => e.id !== id));
+  };
+  const handleOutwardPaperEntryChange = (id, field, val) => {
+    setOutwardPaperEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: val } : e));
+  };
+
+  // Raw Material Summary State for Displaying on Screen
   const [rawMaterialSummary, setRawMaterialSummary] = useState({
-    grandoInk: { C: 0, M: 0, Y: 0, K: 0 },
-    printdotInk: { C: 0, M: 0, Y: 0, K: 0 },
-    paperPanna: {}
+    inward: { grando: { C: 0, M: 0, Y: 0, K: 0 }, printdot: { C: 0, M: 0, Y: 0, K: 0 }, paper: [] },
+    outward: { grando: { C: 0, M: 0, Y: 0, K: 0 }, printdot: { C: 0, M: 0, Y: 0, K: 0 }, paper: [] }
   });
 
-  const fetchRawMaterialSummary = async (targetType = rawEntryType) => {
+  const fetchRawMaterialSummary = async () => {
     try {
       const res = await api.getRawMaterialTransactions();
       if (res && res.data && Array.isArray(res.data)) {
-        const typeLogs = res.data.filter(t => t.type === (targetType || 'OUTWARD'));
-        
-        const filtered = typeLogs.filter(t => {
-          if (!t.date) return true;
-          const dStr = new Date(t.date).toISOString().split('T')[0];
-          if (dateStart && dStr < dateStart) return false;
-          if (dateEnd && dStr > dateEnd) return false;
-          return true;
-        });
+        const inGrando = { C: 0, M: 0, Y: 0, K: 0 };
+        const inPrintdot = { C: 0, M: 0, Y: 0, K: 0 };
+        const inPaperList = [];
 
-        const grando = { C: 0, M: 0, Y: 0, K: 0 };
-        const printdot = { C: 0, M: 0, Y: 0, K: 0 };
-        const pannaMap = {};
-        const paperList = [];
+        const outGrando = { C: 0, M: 0, Y: 0, K: 0 };
+        const outPrintdot = { C: 0, M: 0, Y: 0, K: 0 };
+        const outPaperList = [];
 
         let foundStart = '';
         let foundStop = '';
         let foundShift = '';
         let foundOperator = '';
 
-        typeLogs.forEach(t => {
+        res.data.forEach(t => {
+          if (!t.date) return;
+          const dStr = new Date(t.date).toISOString().split('T')[0];
+          if (rawDate && dStr !== rawDate) return;
+
           if (t.notes) {
             const tm = t.notes.match(/Time:\s*([^\s|]+(?:\s*[AP]M)?)\s*(?:to|-)\s*([^\s|]+(?:\s*[AP]M)?)/i) ||
                        t.notes.match(/(\d{1,2}:\d{2}(?:\s*[AP]M)?)\s*(?:to|-)\s*(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i);
@@ -179,32 +214,27 @@ export default function JobPrintingLog() {
             const op = t.notes.match(/Operator:\s*([^|\]]+)/i);
             if (op && !foundOperator && op[1].trim() !== '—') foundOperator = op[1].trim();
           }
-        });
 
-        if (foundStart) setRawStartTime(foundStart);
-        if (foundStop) setRawStopTime(foundStop);
-        if (foundShift) setRawShift(foundShift);
-        if (foundOperator) setRawOperator(foundOperator);
-
-        filtered.forEach(t => {
           const mName = (t.materialName || '').toLowerCase();
           const q = Number(t.qty) || 0;
+          const isIn = t.type === 'INWARD';
+          const targetG = isIn ? inGrando : outGrando;
+          const targetP = isIn ? inPrintdot : outPrintdot;
+          const targetPaperList = isIn ? inPaperList : outPaperList;
 
           if (mName.includes('grando')) {
-            if (mName.includes('cyan') || t.color === 'Cyan') grando.C += q;
-            else if (mName.includes('magenta') || t.color === 'Magenta') grando.M += q;
-            else if (mName.includes('yellow') || t.color === 'Yellow') grando.Y += q;
-            else if (mName.includes('black') || t.color === 'Black') grando.K += q;
+            if (mName.includes('cyan') || t.color === 'Cyan') targetG.C += q;
+            else if (mName.includes('magenta') || t.color === 'Magenta') targetG.M += q;
+            else if (mName.includes('yellow') || t.color === 'Yellow') targetG.Y += q;
+            else if (mName.includes('black') || t.color === 'Black') targetG.K += q;
           } else if (mName.includes('printdot')) {
-            if (mName.includes('cyan') || t.color === 'Cyan') printdot.C += q;
-            else if (mName.includes('magenta') || t.color === 'Magenta') printdot.M += q;
-            else if (mName.includes('yellow') || t.color === 'Yellow') printdot.Y += q;
-            else if (mName.includes('black') || t.color === 'Black') printdot.K += q;
+            if (mName.includes('cyan') || t.color === 'Cyan') targetP.C += q;
+            else if (mName.includes('magenta') || t.color === 'Magenta') targetP.M += q;
+            else if (mName.includes('yellow') || t.color === 'Yellow') targetP.Y += q;
+            else if (mName.includes('black') || t.color === 'Black') targetP.K += q;
           } else if (mName.includes('paper') || t.panna) {
-            const pKey = t.panna ? (t.panna.toLowerCase().includes('panna') || t.panna.includes('"') ? t.panna : `${t.panna} Panna`) : 'Paper Roll';
-            pannaMap[pKey] = (pannaMap[pKey] || 0) + q;
-            paperList.push({
-              id: paperList.length + 1,
+            targetPaperList.push({
+              id: targetPaperList.length + 1,
               paperType: t.materialName || 'A++',
               paperPanna: t.panna ? (t.panna.toLowerCase().includes('panna') || t.panna.includes('"') ? t.panna : `${t.panna} Panna`) : '44" Panna',
               paperCustomPanna: '',
@@ -213,172 +243,114 @@ export default function JobPrintingLog() {
           }
         });
 
+        if (foundStart) setRawStartTime(foundStart);
+        if (foundStop) setRawStopTime(foundStop);
+        if (foundShift) setRawShift(foundShift);
+        if (foundOperator) setRawOperator(foundOperator);
+
+        // Populate Inward Inputs
+        setGrandoInC(inGrando.C > 0 ? inGrando.C.toString() : '');
+        setGrandoInM(inGrando.M > 0 ? inGrando.M.toString() : '');
+        setGrandoInY(inGrando.Y > 0 ? inGrando.Y.toString() : '');
+        setGrandoInK(inGrando.K > 0 ? inGrando.K.toString() : '');
+
+        setPrintdotInC(inPrintdot.C > 0 ? inPrintdot.C.toString() : '');
+        setPrintdotInM(inPrintdot.M > 0 ? inPrintdot.M.toString() : '');
+        setPrintdotInY(inPrintdot.Y > 0 ? inPrintdot.Y.toString() : '');
+        setPrintdotInK(inPrintdot.K > 0 ? inPrintdot.K.toString() : '');
+
+        setInwardPaperEntries(inPaperList.length > 0 ? inPaperList : [
+          { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+        ]);
+
+        // Populate Outward Inputs
+        setGrandoOutC(outGrando.C > 0 ? outGrando.C.toString() : '');
+        setGrandoOutM(outGrando.M > 0 ? outGrando.M.toString() : '');
+        setGrandoOutY(outGrando.Y > 0 ? outGrando.Y.toString() : '');
+        setGrandoOutK(outGrando.K > 0 ? outGrando.K.toString() : '');
+
+        setPrintdotOutC(outPrintdot.C > 0 ? outPrintdot.C.toString() : '');
+        setPrintdotOutM(outPrintdot.M > 0 ? outPrintdot.M.toString() : '');
+        setPrintdotOutY(outPrintdot.Y > 0 ? outPrintdot.Y.toString() : '');
+        setPrintdotOutK(outPrintdot.K > 0 ? outPrintdot.K.toString() : '');
+
+        setOutwardPaperEntries(outPaperList.length > 0 ? outPaperList : [
+          { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+        ]);
+
         setRawMaterialSummary({
-          grandoInk: grando,
-          printdotInk: printdot,
-          paperPanna: pannaMap
+          inward: { grando: inGrando, printdot: inPrintdot, paper: inPaperList },
+          outward: { grando: outGrando, printdot: outPrintdot, paper: outPaperList }
         });
-
-        // Sync input state for editable summary table when Date Filter changes
-        setGrandoInkC(grando.C > 0 ? grando.C.toString() : '');
-        setGrandoInkM(grando.M > 0 ? grando.M.toString() : '');
-        setGrandoInkY(grando.Y > 0 ? grando.Y.toString() : '');
-        setGrandoInkK(grando.K > 0 ? grando.K.toString() : '');
-
-        setPrintdotInkC(printdot.C > 0 ? printdot.C.toString() : '');
-        setPrintdotInkM(printdot.M > 0 ? printdot.M.toString() : '');
-        setPrintdotInkY(printdot.Y > 0 ? printdot.Y.toString() : '');
-        setPrintdotInkK(printdot.K > 0 ? printdot.K.toString() : '');
-
-        if (paperList.length > 0) {
-          while (paperList.length < 2) {
-            paperList.push({
-              id: paperList.length + 1,
-              paperType: 'A++',
-              paperPanna: '44" Panna',
-              paperCustomPanna: '',
-              paperRollsQty: ''
-            });
-          }
-          setPaperEntries(paperList);
-        } else {
-          setPaperEntries([
-            { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' },
-            { id: 2, paperType: 'A+', paperPanna: '58" Panna', paperCustomPanna: '', paperRollsQty: '' }
-          ]);
-        }
       }
     } catch (err) {
       console.warn('Failed to fetch raw material summary:', err);
     }
   };
 
-  // Save Raw Material Outward Usage
+  // Save Raw Material Inward & Outward Entries simultaneously
   const handleSaveRawMaterialUsage = async (e) => {
     if (e) e.preventDefault();
     setRawMaterialSubmitting(true);
     try {
-      const payload = [];
       const timeInfo = (rawStartTime || rawStopTime) ? ` | Time: ${rawStartTime || '—'} to ${rawStopTime || '—'}` : '';
 
-      // 1. Grando Ink entries (C, M, Y, K in Liters)
-      if (grandoInkC && Number(grandoInkC) > 0) {
-        payload.push({
-          materialName: 'Grando Ink - Cyan (C)',
-          color: 'Cyan',
-          qty: Number(grandoInkC),
-          unit: 'Liters',
-          canSize: 1,
-          date: rawDate,
-          notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
-        });
-      }
-      if (grandoInkM && Number(grandoInkM) > 0) {
-        payload.push({
-          materialName: 'Grando Ink - Magenta (M)',
-          color: 'Magenta',
-          qty: Number(grandoInkM),
-          unit: 'Liters',
-          canSize: 1,
-          date: rawDate,
-          notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
-        });
-      }
-      if (grandoInkY && Number(grandoInkY) > 0) {
-        payload.push({
-          materialName: 'Grando Ink - Yellow (Y)',
-          color: 'Yellow',
-          qty: Number(grandoInkY),
-          unit: 'Liters',
-          canSize: 1,
-          date: rawDate,
-          notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
-        });
-      }
-      if (grandoInkK && Number(grandoInkK) > 0) {
-        payload.push({
-          materialName: 'Grando Ink - Black (K)',
-          color: 'Black',
-          qty: Number(grandoInkK),
-          unit: 'Liters',
-          canSize: 1,
-          date: rawDate,
-          notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
-        });
-      }
+      const inwardPayload = [];
+      const outwardPayload = [];
 
-      // 2. Printdot Ink entries (C, M, Y, K in Liters)
-      if (printdotInkC && Number(printdotInkC) > 0) {
-        payload.push({
-          materialName: 'Printdot Ink - Cyan (C)',
-          color: 'Cyan',
-          qty: Number(printdotInkC),
-          unit: 'Liters',
-          canSize: 1,
-          date: rawDate,
-          notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
-        });
-      }
-      if (printdotInkM && Number(printdotInkM) > 0) {
-        payload.push({
-          materialName: 'Printdot Ink - Magenta (M)',
-          color: 'Magenta',
-          qty: Number(printdotInkM),
-          unit: 'Liters',
-          canSize: 1,
-          date: rawDate,
-          notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
-        });
-      }
-      if (printdotInkY && Number(printdotInkY) > 0) {
-        payload.push({
-          materialName: 'Printdot Ink - Yellow (Y)',
-          color: 'Yellow',
-          qty: Number(printdotInkY),
-          unit: 'Liters',
-          canSize: 1,
-          date: rawDate,
-          notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
-        });
-      }
-      if (printdotInkK && Number(printdotInkK) > 0) {
-        payload.push({
-          materialName: 'Printdot Ink - Black (K)',
-          color: 'Black',
-          qty: Number(printdotInkK),
-          unit: 'Liters',
-          canSize: 1,
-          date: rawDate,
-          notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
-        });
-      }
+      // ── INWARD INKS ──
+      if (grandoInC && Number(grandoInC) > 0) inwardPayload.push({ materialName: 'Grando Ink - Cyan (C)', color: 'Cyan', qty: Number(grandoInC), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+      if (grandoInM && Number(grandoInM) > 0) inwardPayload.push({ materialName: 'Grando Ink - Magenta (M)', color: 'Magenta', qty: Number(grandoInM), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+      if (grandoInY && Number(grandoInY) > 0) inwardPayload.push({ materialName: 'Grando Ink - Yellow (Y)', color: 'Yellow', qty: Number(grandoInY), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+      if (grandoInK && Number(grandoInK) > 0) inwardPayload.push({ materialName: 'Grando Ink - Black (K)', color: 'Black', qty: Number(grandoInK), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
 
-      // 3. Dynamic Paper Consumption Entries
-      paperEntries.forEach(entry => {
+      if (printdotInC && Number(printdotInC) > 0) inwardPayload.push({ materialName: 'Printdot Ink - Cyan (C)', color: 'Cyan', qty: Number(printdotInC), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+      if (printdotInM && Number(printdotInM) > 0) inwardPayload.push({ materialName: 'Printdot Ink - Magenta (M)', color: 'Magenta', qty: Number(printdotInM), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+      if (printdotInY && Number(printdotInY) > 0) inwardPayload.push({ materialName: 'Printdot Ink - Yellow (Y)', color: 'Yellow', qty: Number(printdotInY), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+      if (printdotInK && Number(printdotInK) > 0) inwardPayload.push({ materialName: 'Printdot Ink - Black (K)', color: 'Black', qty: Number(printdotInK), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+
+      inwardPaperEntries.forEach(entry => {
         if (entry.paperRollsQty && Number(entry.paperRollsQty) > 0) {
           const selPanna = entry.paperPanna === 'Custom' ? (entry.paperCustomPanna || '44" Panna') : entry.paperPanna;
-          payload.push({
-            materialName: entry.paperType || 'A++',
-            panna: selPanna,
-            qty: Number(entry.paperRollsQty),
-            unit: 'Rolls',
-            date: rawDate,
+          inwardPayload.push({
+            materialName: entry.paperType || 'A++', panna: selPanna, qty: Number(entry.paperRollsQty), unit: 'Rolls', date: rawDate,
             notes: `[Panna: ${selPanna} | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
           });
         }
       });
 
-      if (payload.length === 0) {
-        alert('Please enter at least one Ink quantity (in Liters) or Paper Roll quantity.');
+      // ── OUTWARD INKS ──
+      if (grandoOutC && Number(grandoOutC) > 0) outwardPayload.push({ materialName: 'Grando Ink - Cyan (C)', color: 'Cyan', qty: Number(grandoOutC), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+      if (grandoOutM && Number(grandoOutM) > 0) outwardPayload.push({ materialName: 'Grando Ink - Magenta (M)', color: 'Magenta', qty: Number(grandoOutM), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+      if (grandoOutY && Number(grandoOutY) > 0) outwardPayload.push({ materialName: 'Grando Ink - Yellow (Y)', color: 'Yellow', qty: Number(grandoOutY), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+      if (grandoOutK && Number(grandoOutK) > 0) outwardPayload.push({ materialName: 'Grando Ink - Black (K)', color: 'Black', qty: Number(grandoOutK), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Grando | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+
+      if (printdotOutC && Number(printdotOutC) > 0) outwardPayload.push({ materialName: 'Printdot Ink - Cyan (C)', color: 'Cyan', qty: Number(printdotOutC), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+      if (printdotOutM && Number(printdotOutM) > 0) outwardPayload.push({ materialName: 'Printdot Ink - Magenta (M)', color: 'Magenta', qty: Number(printdotOutM), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+      if (printdotOutY && Number(printdotOutY) > 0) outwardPayload.push({ materialName: 'Printdot Ink - Yellow (Y)', color: 'Yellow', qty: Number(printdotOutY), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+      if (printdotOutK && Number(printdotOutK) > 0) outwardPayload.push({ materialName: 'Printdot Ink - Black (K)', color: 'Black', qty: Number(printdotOutK), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
+
+      outwardPaperEntries.forEach(entry => {
+        if (entry.paperRollsQty && Number(entry.paperRollsQty) > 0) {
+          const selPanna = entry.paperPanna === 'Custom' ? (entry.paperCustomPanna || '44" Panna') : entry.paperPanna;
+          outwardPayload.push({
+            materialName: entry.paperType || 'A++', panna: selPanna, qty: Number(entry.paperRollsQty), unit: 'Rolls', date: rawDate,
+            notes: `[Panna: ${selPanna} | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+          });
+        }
+      });
+
+      if (inwardPayload.length === 0 && outwardPayload.length === 0) {
+        alert('Please enter at least one Inward or Outward Ink (in Liters) or Paper Roll quantity.');
         return;
       }
 
-      // 🧹 CLEAN PREVIOUS LOGS FOR THIS DATE & ENTRY TYPE SO EDITING REPLACES ACCURATELY
+      // Clean old entries for this date
       try {
         const existingRes = await api.getRawMaterialTransactions();
         if (existingRes && existingRes.data && Array.isArray(existingRes.data)) {
           const oldLogs = existingRes.data.filter(t => {
-            if (t.type !== rawEntryType || !t.date) return false;
+            if (!t.date) return false;
             const tDate = new Date(t.date).toISOString().split('T')[0];
             return tDate === rawDate;
           });
@@ -389,25 +361,19 @@ export default function JobPrintingLog() {
           }
         }
       } catch (cleanErr) {
-        console.warn('Could not clean previous raw material entries:', cleanErr);
+        console.warn('Could not clean previous entries:', cleanErr);
       }
 
-      if (rawEntryType === 'INWARD') {
-        await api.createRawMaterialInward(payload);
-        triggerPushNotification('📦 Raw Material Stock IN Logged', `Added ${payload.length} stock inward entries successfully!`, 'success');
-      } else {
-        await api.createRawMaterialOutward(payload);
-        triggerPushNotification('📦 Raw Material Usage Logged', `Recorded ${payload.length} material consumption entries successfully!`, 'success');
+      if (inwardPayload.length > 0) {
+        await api.createRawMaterialInward(inwardPayload);
       }
-      await fetchRawMaterialSummary(rawEntryType);
+      if (outwardPayload.length > 0) {
+        await api.createRawMaterialOutward(outwardPayload);
+      }
 
-      // Clear fields
-      setGrandoInkC(''); setGrandoInkM(''); setGrandoInkY(''); setGrandoInkK('');
-      setPrintdotInkC(''); setPrintdotInkM(''); setPrintdotInkY(''); setPrintdotInkK('');
-      setRawStartTime(''); setRawStopTime(''); setRawNotes('');
-      setPaperEntries([
-        { id: 1, paperType: paperTypesList[0] || 'A++', paperPanna: pannaOptionsList[0] || '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
-      ]);
+      triggerPushNotification('📦 Raw Material Logs Saved', `Successfully updated raw material entries for ${rawDate}!`, 'success');
+      await fetchRawMaterialSummary();
+
       setShowRawMaterialModal(false);
     } catch (err) {
       alert(err.message || 'Failed to save raw material entry.');
@@ -1978,510 +1944,342 @@ export default function JobPrintingLog() {
         </div>
       )}
 
-      {/* ── 6. GENERATE REPORT / RAW MATERIAL USAGE FORM MODAL ── */}
+      {/* ── 6. GENERATE REPORT / RAW MATERIAL FORM MODAL (50% INWARD | 50% OUTWARD SPLIT VIEW) ── */}
       {showRawMaterialModal && (
         <div className="modal-overlay" onClick={() => setShowRawMaterialModal(false)}>
           <div className="modal-content" style={{
-            maxWidth: '820px',
-            width: '95%',
-            maxHeight: '92vh',
+            maxWidth: '1240px',
+            width: '96%',
+            maxHeight: '94vh',
             background: 'var(--bg-card, #131722)',
-            borderRadius: '16px',
+            borderRadius: '14px',
             border: '1px solid var(--border-light, #2a324b)',
             boxShadow: '0 25px 60px rgba(0,0,0,0.7)',
-            padding: '1.5rem',
+            padding: '1rem',
             display: 'flex',
             flexDirection: 'column',
-            gap: '1.2rem',
-            overflowY: 'auto'
+            gap: '0.6rem'
           }} onClick={e => e.stopPropagation()}>
             
             {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.85rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.4rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: rawEntryType === 'INWARD' ? 'linear-gradient(135deg, #059669, #047857)' : 'linear-gradient(135deg, #d97706, #b45309)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  width: 32, height: 32, borderRadius: 8,
+                  background: 'linear-gradient(135deg, #10b981, #d97706)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}>
-                  <Sparkles size={20} color="#fff" />
+                  <Sparkles size={16} color="#fff" />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                    {rawEntryType === 'INWARD' ? 'GENERATE REPORT / RAW MATERIAL INWARD (STOCK RECEIVED)' : 'GENERATE REPORT / RAW MATERIAL USAGE (OUTWARD)'}
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                    RAW MATERIAL ENTRY — 📥 INWARD (STOCK RECEIVED) & 📤 OUTWARD (USAGE)
                   </h3>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2, margin: 0 }}>
-                    {rawEntryType === 'INWARD'
-                      ? 'Log Ink Received (Liters) & Sublimation/Butter Paper Rolls Received (Stock IN)'
-                      : 'Log Ink Consumption (Liters) & Sublimation/Butter Paper Roll Consumption (Panna Wise)'}
-                  </p>
                 </div>
               </div>
-              <button onClick={() => setShowRawMaterialModal(false)} className="btn-icon"><X size={18} /></button>
+              <button onClick={() => setShowRawMaterialModal(false)} className="btn-icon"><X size={16} /></button>
             </div>
 
-            {/* Entry Mode Switcher: OUTWARD vs INWARD */}
-            <div style={{
-              display: 'flex',
-              gap: '0.6rem',
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid var(--border-light)',
-              borderRadius: '10px',
-              padding: '0.5rem',
-              alignItems: 'center'
-            }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', paddingLeft: '0.4rem', whiteSpace: 'nowrap' }}>
-                LOG TYPE:
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setRawEntryType('OUTWARD');
-                  fetchRawMaterialSummary('OUTWARD');
-                }}
-                style={{
-                  flex: 1,
-                  padding: '0.5rem 0.85rem',
-                  borderRadius: '7px',
-                  border: rawEntryType === 'OUTWARD' ? '2px solid #f59e0b' : '1px solid var(--border-light)',
-                  background: rawEntryType === 'OUTWARD' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'transparent',
-                  color: rawEntryType === 'OUTWARD' ? '#ffffff' : 'var(--text-muted)',
-                  fontWeight: 800,
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <ArrowUpFromLine size={15} /> 📤 OUTWARD (USAGE / CONSUMPTION)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setRawEntryType('INWARD');
-                  fetchRawMaterialSummary('INWARD');
-                }}
-                style={{
-                  flex: 1,
-                  padding: '0.5rem 0.85rem',
-                  borderRadius: '7px',
-                  border: rawEntryType === 'INWARD' ? '2px solid #10b981' : '1px solid var(--border-light)',
-                  background: rawEntryType === 'INWARD' ? 'linear-gradient(135deg, #10b981, #059669)' : 'transparent',
-                  color: rawEntryType === 'INWARD' ? '#ffffff' : 'var(--text-muted)',
-                  fontWeight: 800,
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <ArrowDownToLine size={15} /> 📥 INWARD (STOCK RECEIVED / IN)
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveRawMaterialUsage} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+            <form onSubmit={handleSaveRawMaterialUsage} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               
-              {/* Header Info: Date, Shift, Start Time, Stop Time, Operator */}
+              {/* Header Info Grid: Date, Shift, Start Time, Stop Time, Operator */}
               <div style={{
                 background: 'rgba(255,255,255,0.03)',
                 border: '1px solid var(--border-light)',
-                borderRadius: '10px',
-                padding: '0.85rem 1rem',
+                borderRadius: '8px',
+                padding: '0.45rem 0.75rem',
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                gap: '0.75rem'
+                gridTemplateColumns: '1fr 1.2fr 0.9fr 0.9fr 1.2fr',
+                gap: '0.6rem',
+                alignItems: 'center'
               }}>
                 <div>
-                  <label style={labelStyle}>ENTRY DATE <span style={{ color: '#ef4444' }}>*</span></label>
-                  <input
-                    type="date"
-                    value={rawDate}
-                    onChange={e => setRawDate(e.target.value)}
-                    style={inputStyle}
-                    required
-                  />
+                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>DATE *</label>
+                  <input type="date" value={rawDate} onChange={e => setRawDate(e.target.value)} style={{ ...inputStyle, padding: '0.3rem 0.5rem', fontSize: '0.78rem' }} required />
                 </div>
-
                 <div>
-                  <label style={labelStyle}>SHIFT <span style={{ color: '#ef4444' }}>*</span></label>
-                  <select
-                    value={rawShift}
-                    onChange={e => setRawShift(e.target.value)}
-                    style={inputStyle}
-                    required
-                  >
-                    <option value="Morning">Morning Shift (9 AM - 9 PM)</option>
-                    <option value="Night">Night Shift (9 PM - 9 AM)</option>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>SHIFT *</label>
+                  <select value={rawShift} onChange={e => setRawShift(e.target.value)} style={{ ...inputStyle, padding: '0.3rem 0.5rem', fontSize: '0.78rem' }} required>
+                    <option value="Morning">Morning (9 AM - 9 PM)</option>
+                    <option value="Night">Night (9 PM - 9 AM)</option>
                   </select>
                 </div>
-
                 <div>
-                  <label style={{ ...labelStyle, color: '#38bdf8' }}>START TIME</label>
-                  <input
-                    type="time"
-                    value={rawStartTime}
-                    onChange={e => setRawStartTime(e.target.value)}
-                    style={inputStyle}
-                  />
+                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#38bdf8', display: 'block', marginBottom: '2px' }}>START</label>
+                  <input type="time" value={rawStartTime} onChange={e => setRawStartTime(e.target.value)} style={{ ...inputStyle, padding: '0.3rem 0.4rem', fontSize: '0.78rem' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#a78bfa', display: 'block', marginBottom: '2px' }}>STOP</label>
+                  <input type="time" value={rawStopTime} onChange={e => setRawStopTime(e.target.value)} style={{ ...inputStyle, padding: '0.3rem 0.4rem', fontSize: '0.78rem' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>OPERATOR</label>
+                  <input type="text" list="print-operators-list" placeholder="Operator..." value={rawOperator} onChange={e => setRawOperator(e.target.value)} style={{ ...inputStyle, padding: '0.3rem 0.5rem', fontSize: '0.78rem', fontWeight: 600 }} />
+                </div>
+              </div>
+
+              {/* ── 50% | 50% SPLIT COLUMNS (LEFT: INWARD | RIGHT: OUTWARD) ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                
+                {/* ── LEFT COLUMN (50%): 📥 INWARD (STOCK RECEIVED) ── */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  
+                  {/* INWARD HEADER BADGE */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #059669, #047857)',
+                    color: '#ffffff',
+                    padding: '0.35rem 0.65rem',
+                    borderRadius: '7px',
+                    fontSize: '0.78rem',
+                    fontWeight: 900,
+                    letterSpacing: '0.5px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <ArrowDownToLine size={15} /> 📥 50% INWARD (STOCK RECEIVED / IN)
+                  </div>
+
+                  {/* INK INWARD CARD */}
+                  <div style={{ background: '#ffffff', color: '#0f172a', border: '2px solid #10b981', borderRadius: '8px', padding: '0.55rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#059669', textTransform: 'uppercase' }}>💧 INK INWARD (LITERS)</div>
+                    
+                    {/* Grando Ink Inward */}
+                    <div style={{ background: '#ecfdf5', padding: '0.35rem 0.5rem', borderRadius: '5px', border: '1px solid #a7f3d0' }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#047857', marginBottom: '2px' }}>🖨️ GRANDO INK</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#0284c7', display: 'block', textAlign: 'center' }}>C</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={grandoInC} onChange={e => setGrandoInC(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #0284c7', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#db2777', display: 'block', textAlign: 'center' }}>M</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={grandoInM} onChange={e => setGrandoInM(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #db2777', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#ca8a04', display: 'block', textAlign: 'center' }}>Y</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={grandoInY} onChange={e => setGrandoInY(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #ca8a04', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#334155', display: 'block', textAlign: 'center' }}>K</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={grandoInK} onChange={e => setGrandoInK(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #334155', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* PrintDot Ink Inward */}
+                    <div style={{ background: '#ecfdf5', padding: '0.35rem 0.5rem', borderRadius: '5px', border: '1px solid #a7f3d0' }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#047857', marginBottom: '2px' }}>🖨️ PRINTDOT INK</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#0284c7', display: 'block', textAlign: 'center' }}>C</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={printdotInC} onChange={e => setPrintdotInC(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #0284c7', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#db2777', display: 'block', textAlign: 'center' }}>M</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={printdotInM} onChange={e => setPrintdotInM(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #db2777', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#ca8a04', display: 'block', textAlign: 'center' }}>Y</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={printdotInY} onChange={e => setPrintdotInY(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #ca8a04', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#334155', display: 'block', textAlign: 'center' }}>K</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={printdotInK} onChange={e => setPrintdotInK(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #334155', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* PAPER INWARD CARD */}
+                  <div style={{ background: '#ffffff', color: '#0f172a', border: '2px solid #10b981', borderRadius: '8px', padding: '0.55rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#059669', textTransform: 'uppercase' }}>📜 PAPER INWARD (STOCK IN)</div>
+                      <button type="button" onClick={handleAddInwardPaperEntry} style={{ padding: '0.15rem 0.45rem', fontSize: '0.68rem', fontWeight: 800, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', borderRadius: '4px', cursor: 'pointer' }}>+ Add Row</button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                      {inwardPaperEntries.map((entry, index) => (
+                        <div key={entry.id} style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', background: '#f8fafc', padding: '0.25rem 0.45rem', borderRadius: '5px', border: '1px solid #e2e8f0' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#059669' }}>#{index + 1}</span>
+                          <div style={{ flex: 1 }}>
+                            <select value={entry.paperType} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperType', e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.75rem', background: '#ffffff', border: '1px solid #059669', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
+                              {(paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']).map((p, pIdx) => (
+                                <option key={pIdx} value={p}>{p}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <select value={entry.paperPanna} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperPanna', e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.75rem', background: '#ffffff', border: '1px solid #059669', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
+                              {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => (
+                                <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div style={{ width: '70px' }}>
+                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.75rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #059669', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} />
+                          </div>
+                          {inwardPaperEntries.length > 1 && (
+                            <button type="button" onClick={() => handleRemoveInwardPaperEntry(entry.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.1rem' }}><Trash2 size={13} /></button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                 </div>
 
-                <div>
-                  <label style={{ ...labelStyle, color: '#a78bfa' }}>STOP TIME</label>
-                  <input
-                    type="time"
-                    value={rawStopTime}
-                    onChange={e => setRawStopTime(e.target.value)}
-                    style={inputStyle}
-                  />
+                {/* ── RIGHT COLUMN (50%): 📤 OUTWARD (USAGE / CONSUMPTION) ── */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  
+                  {/* OUTWARD HEADER BADGE */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    color: '#ffffff',
+                    padding: '0.35rem 0.65rem',
+                    borderRadius: '7px',
+                    fontSize: '0.78rem',
+                    fontWeight: 900,
+                    letterSpacing: '0.5px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <ArrowUpFromLine size={15} /> 📤 50% OUTWARD (USAGE / CONSUMPTION)
+                  </div>
+
+                  {/* INK OUTWARD CARD */}
+                  <div style={{ background: '#ffffff', color: '#0f172a', border: '2px solid #f59e0b', borderRadius: '8px', padding: '0.55rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase' }}>💧 INK USAGE (LITERS)</div>
+                    
+                    {/* Grando Ink Outward */}
+                    <div style={{ background: '#fffbeb', padding: '0.35rem 0.5rem', borderRadius: '5px', border: '1px solid #fde68a' }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b45309', marginBottom: '2px' }}>🖨️ GRANDO INK</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#0284c7', display: 'block', textAlign: 'center' }}>C</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={grandoOutC} onChange={e => setGrandoOutC(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #0284c7', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#db2777', display: 'block', textAlign: 'center' }}>M</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={grandoOutM} onChange={e => setGrandoOutM(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #db2777', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#ca8a04', display: 'block', textAlign: 'center' }}>Y</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={grandoOutY} onChange={e => setGrandoOutY(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #ca8a04', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#334155', display: 'block', textAlign: 'center' }}>K</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={grandoOutK} onChange={e => setGrandoOutK(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #334155', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* PrintDot Ink Outward */}
+                    <div style={{ background: '#fffbeb', padding: '0.35rem 0.5rem', borderRadius: '5px', border: '1px solid #fde68a' }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b45309', marginBottom: '2px' }}>🖨️ PRINTDOT INK</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.25rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#0284c7', display: 'block', textAlign: 'center' }}>C</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={printdotOutC} onChange={e => setPrintdotOutC(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #0284c7', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#db2777', display: 'block', textAlign: 'center' }}>M</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={printdotOutM} onChange={e => setPrintdotOutM(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #db2777', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#ca8a04', display: 'block', textAlign: 'center' }}>Y</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={printdotOutY} onChange={e => setPrintdotOutY(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #ca8a04', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.62rem', fontWeight: 900, color: '#334155', display: 'block', textAlign: 'center' }}>K</label>
+                          <input type="number" step="0.01" placeholder="0.00" value={printdotOutK} onChange={e => setPrintdotOutK(e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.78rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #334155', borderRadius: '4px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* PAPER OUTWARD CARD */}
+                  <div style={{ background: '#ffffff', color: '#0f172a', border: '2px solid #f59e0b', borderRadius: '8px', padding: '0.55rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase' }}>📜 PAPER USAGE (CONSUMPTION)</div>
+                      <button type="button" onClick={handleAddOutwardPaperEntry} style={{ padding: '0.15rem 0.45rem', fontSize: '0.68rem', fontWeight: 800, background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', borderRadius: '4px', cursor: 'pointer' }}>+ Add Row</button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                      {outwardPaperEntries.map((entry, index) => (
+                        <div key={entry.id} style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', background: '#f8fafc', padding: '0.25rem 0.45rem', borderRadius: '5px', border: '1px solid #e2e8f0' }}>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#d97706' }}>#{index + 1}</span>
+                          <div style={{ flex: 1 }}>
+                            <select value={entry.paperType} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperType', e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.75rem', background: '#ffffff', border: '1px solid #d97706', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
+                              {(paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']).map((p, pIdx) => (
+                                <option key={pIdx} value={p}>{p}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <select value={entry.paperPanna} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperPanna', e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.75rem', background: '#ffffff', border: '1px solid #d97706', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
+                              {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => (
+                                <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div style={{ width: '70px' }}>
+                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.25rem', fontSize: '0.75rem', textAlign: 'center', background: '#ffffff', border: '1.5px solid #d97706', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} />
+                          </div>
+                          {outwardPaperEntries.length > 1 && (
+                            <button type="button" onClick={() => handleRemoveOutwardPaperEntry(entry.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.1rem' }}><Trash2 size={13} /></button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                 </div>
 
-                <div>
-                  <label style={labelStyle}>OPERATOR NAME</label>
+              </div>
+
+              {/* Remarks / Notes & Action Buttons */}
+              <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', marginTop: '0.2rem' }}>
+                <div style={{ flex: 1 }}>
                   <input
                     type="text"
-                    list="print-operators-list"
-                    placeholder="Select or Type Operator Name..."
-                    value={rawOperator}
-                    onChange={e => setRawOperator(e.target.value)}
-                    style={{ ...inputStyle, fontWeight: 600 }}
+                    placeholder="Remarks / Optional notes..."
+                    value={rawNotes}
+                    onChange={e => setRawNotes(e.target.value)}
+                    style={{ ...inputStyle, padding: '0.35rem 0.6rem', fontSize: '0.78rem' }}
                   />
                 </div>
-              </div>
-
-              {/* ── DIV 1: INK CONSUMPTION / INWARD (BACKGROUND COLOUR: WHITE) ── */}
-              <div style={{
-                background: '#ffffff',
-                color: '#0f172a',
-                border: '1.5px solid #cbd5e1',
-                borderRadius: '12px',
-                padding: '1.1rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-              }}>
-                <div style={{ fontSize: '0.9rem', fontWeight: 900, color: rawEntryType === 'INWARD' ? '#059669' : '#0284c7', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem' }}>
-                  💧 {rawEntryType === 'INWARD' ? 'INK INWARD (STOCK RECEIVED)' : 'INK CONSUMPTION'}
-                </div>
-
-                {/* Sub-Section 1: GRANDO MACHINE INK */}
-                <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', marginBottom: '0.6rem', textTransform: 'uppercase' }}>
-                    🖨️ GRANDO C, M, Y, K INK (IN LITERS)
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
-                    <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7', display: 'block', marginBottom: '0.2rem' }}>CYAN (C) - LITERS</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00 L"
-                        value={grandoInkC}
-                        onChange={e => setGrandoInkC(e.target.value)}
-                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #0284c7', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#db2777', display: 'block', marginBottom: '0.2rem' }}>MAGENTA (M) - LITERS</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00 L"
-                        value={grandoInkM}
-                        onChange={e => setGrandoInkM(e.target.value)}
-                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #db2777', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#ca8a04', display: 'block', marginBottom: '0.2rem' }}>YELLOW (Y) - LITERS</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00 L"
-                        value={grandoInkY}
-                        onChange={e => setGrandoInkY(e.target.value)}
-                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #ca8a04', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#334155', display: 'block', marginBottom: '0.2rem' }}>BLACK (K) - LITERS</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00 L"
-                        value={grandoInkK}
-                        onChange={e => setGrandoInkK(e.target.value)}
-                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #334155', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Sub-Section 2: PRINTDOT MACHINE INK */}
-                <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', marginBottom: '0.6rem', textTransform: 'uppercase' }}>
-                    🖨️ PRINTDOT C, M, Y, K INK (IN LITERS)
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
-                    <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7', display: 'block', marginBottom: '0.2rem' }}>CYAN (C) - LITERS</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00 L"
-                        value={printdotInkC}
-                        onChange={e => setPrintdotInkC(e.target.value)}
-                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #0284c7', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#db2777', display: 'block', marginBottom: '0.2rem' }}>MAGENTA (M) - LITERS</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00 L"
-                        value={printdotInkM}
-                        onChange={e => setPrintdotInkM(e.target.value)}
-                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #db2777', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#ca8a04', display: 'block', marginBottom: '0.2rem' }}>YELLOW (Y) - LITERS</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00 L"
-                        value={printdotInkY}
-                        onChange={e => setPrintdotInkY(e.target.value)}
-                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #ca8a04', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#334155', display: 'block', marginBottom: '0.2rem' }}>BLACK (K) - LITERS</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00 L"
-                        value={printdotInkK}
-                        onChange={e => setPrintdotInkK(e.target.value)}
-                        style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #334155', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* ── DIV 2: PAPER CONSUMPTION (BACKGROUND COLOUR: WHITE) ── */}
-              <div style={{
-                background: '#ffffff',
-                color: '#0f172a',
-                border: '1.5px solid #cbd5e1',
-                borderRadius: '12px',
-                padding: '1.1rem',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#059669', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    📜 {rawEntryType === 'INWARD' ? 'PAPER INWARD (STOCK RECEIVED)' : 'PAPER CONSUMPTION'}
-                  </div>
-                  {!isOlderThan36Hours(rawDate) && (
-                    <button
-                      type="button"
-                      onClick={handleAddPaperEntry}
-                      style={{
-                        padding: '0.35rem 0.85rem',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        background: '#ecfdf5',
-                        color: '#059669',
-                        border: '1.5px solid #a7f3d0',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <PlusCircle size={14} /> + Add More Paper Entry
-                    </button>
-                  )}
-                </div>
-
-                {/* Render Dynamic Paper Entries */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                  {paperEntries.map((entry, index) => (
-                    <div
-                      key={entry.id}
-                      style={{
-                        background: '#f8fafc',
-                        border: '1.5px solid #cbd5e1',
-                        borderRadius: '8px',
-                        padding: '0.85rem',
-                        position: 'relative'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#059669' }}>
-                          Paper Entry #{index + 1}
-                        </span>
-                        {paperEntries.length > 1 && !isOlderThan36Hours(rawDate) && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemovePaperEntry(entry.id)}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#ef4444',
-                              cursor: 'pointer',
-                              padding: '0.2rem',
-                              display: 'flex',
-                              alignItems: 'center'
-                            }}
-                            title="Remove Paper Entry"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        )}
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
-                        <div>
-                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#334155', display: 'block', marginBottom: '0.2rem' }}>PAPER TYPE</label>
-                          <select
-                            value={entry.paperType}
-                            onChange={e => handlePaperEntryChange(entry.id, 'paperType', e.target.value)}
-                            disabled={isOlderThan36Hours(rawDate)}
-                            style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #059669', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
-                          >
-                            {(paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']).map((p, pIdx) => (
-                              <option key={pIdx} value={p}>{p}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#334155', display: 'block', marginBottom: '0.2rem' }}>PAPER PANNA (WIDTH)</label>
-                          <select
-                            value={(() => {
-                              if (!entry.paperPanna) return (pannaOptionsList[0] || '44" Panna');
-                              if (entry.paperPanna === 'Custom') return 'Custom';
-                              const match = pannaOptionsList.find(w => {
-                                const normOpt = String(w).toLowerCase().replace(/panna/g, '').replace(/[^0-9a-z]/g, '');
-                                const normEntry = String(entry.paperPanna).toLowerCase().replace(/panna/g, '').replace(/[^0-9a-z]/g, '');
-                                return normOpt === normEntry;
-                              });
-                              return match || entry.paperPanna;
-                            })()}
-                            onChange={e => handlePaperEntryChange(entry.id, 'paperPanna', e.target.value)}
-                            disabled={isOlderThan36Hours(rawDate)}
-                            style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #059669', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
-                          >
-                            {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => (
-                              <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>
-                            ))}
-                            <option value="Custom">Custom Panna Width</option>
-                          </select>
-                        </div>
-
-                        {entry.paperPanna === 'Custom' && (
-                          <div>
-                            <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#334155', display: 'block', marginBottom: '0.2rem' }}>CUSTOM PANNA WIDTH</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. 50 inch"
-                              value={entry.paperCustomPanna}
-                              onChange={e => handlePaperEntryChange(entry.id, 'paperCustomPanna', e.target.value)}
-                              disabled={isOlderThan36Hours(rawDate)}
-                              style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #059669', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
-                            />
-                          </div>
-                        )}
-
-                        <div>
-                          <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#334155', display: 'block', marginBottom: '0.2rem' }}>ROLLS USED (QTY)</label>
-                          <input
-                            type="number"
-                            step="1"
-                            placeholder="Number of Rolls"
-                            value={entry.paperRollsQty}
-                            onChange={e => handlePaperEntryChange(entry.id, 'paperRollsQty', e.target.value)}
-                            disabled={isOlderThan36Hours(rawDate)}
-                            style={{ width: '100%', padding: '0.45rem', fontSize: '0.82rem', background: '#ffffff', border: '1.5px solid #059669', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Remarks / Notes */}
-              <div>
-                <label style={labelStyle}>REMARKS / NOTES</label>
-                <input
-                  type="text"
-                  placeholder="Additional notes, batch info or job card reference..."
-                  value={rawNotes}
-                  onChange={e => setRawNotes(e.target.value)}
-                  style={inputStyle}
-                />
-              </div>
-
-              {/* Modal Footer Buttons */}
-              {isOlderThan36Hours(rawDate) && (
-                <div style={{ color: '#f87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '0.6rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, textAlign: 'center' }}>
-                  ⚠️ Entries older than 36 hours cannot be modified.
-                </div>
-              )}
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', borderTop: '1px solid var(--border-light)', paddingTop: '1rem' }}>
                 <button
                   type="button"
                   onClick={() => setShowRawMaterialModal(false)}
                   className="btn-secondary"
-                  style={{ padding: '0.6rem 1.25rem', fontSize: '0.85rem', fontWeight: 700 }}
+                  style={{ padding: '0.45rem 1rem', fontSize: '0.8rem', fontWeight: 700 }}
                 >
-                  Close Window
+                  Close
                 </button>
 
-                {!isOlderThan36Hours(rawDate) && (
-                  <button
-                    type="submit"
-                    disabled={rawMaterialSubmitting}
-                    className="btn-primary"
-                    style={{
-                      padding: '0.6rem 1.4rem',
-                      fontSize: '0.85rem',
-                      fontWeight: 800,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      boxShadow: '0 4px 14px rgba(5, 150, 105, 0.4)',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <Sparkles size={16} /> {rawMaterialSubmitting ? 'Saving...' : rawEntryType === 'INWARD' ? 'Save Raw Material Stock IN' : 'Save Raw Material Usage (OUT)'}
-                  </button>
-                )}
+                <button
+                  type="submit"
+                  disabled={rawMaterialSubmitting}
+                  className="btn-primary"
+                  style={{
+                    padding: '0.45rem 1.4rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 900,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'linear-gradient(135deg, #10b981 0%, #d97706 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Sparkles size={15} /> {rawMaterialSubmitting ? 'Saving Entries...' : 'Save Inward & Outward Stock'}
+                </button>
               </div>
 
             </form>
