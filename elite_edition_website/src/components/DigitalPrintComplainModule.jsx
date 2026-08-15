@@ -60,8 +60,33 @@ export default function DigitalPrintComplainModule() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [periodFilter, setPeriodFilter] = useState('all');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
+
+  const handlePeriodChange = (period) => {
+    setPeriodFilter(period);
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    if (period === 'today') {
+      setDateStart(todayStr);
+      setDateEnd(todayStr);
+    } else if (period === 'this_week') {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(now.setDate(diff));
+      setDateStart(monday.toISOString().split('T')[0]);
+      setDateEnd(todayStr);
+    } else if (period === 'this_month') {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      setDateStart(firstDay.toISOString().split('T')[0]);
+      setDateEnd(todayStr);
+    } else if (period === 'all') {
+      setDateStart('');
+      setDateEnd('');
+    }
+  };
 
   // Modals
   const [showModal, setShowModal] = useState(false);
@@ -121,7 +146,7 @@ export default function DigitalPrintComplainModule() {
 
   const fetchAnalytics = async () => {
     try {
-      const data = await api.getComplaintAnalytics();
+      const data = await api.getComplaintAnalytics({ dateStart, dateEnd });
       if (data) setAnalytics(data);
     } catch (e) {
       console.error('Failed to fetch complaint analytics:', e);
@@ -428,30 +453,54 @@ export default function DigitalPrintComplainModule() {
       </div>
 
       {/* KPI Analytical Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.85rem' }}>
-        <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #60a5fa' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Total</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 4 }}>{analytics.total}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.85rem' }}>
+        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #60a5fa' }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Total Complaints</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--text-primary)', marginTop: 2 }}>{analytics.total || 0}</div>
         </div>
-        <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #eab308' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Open</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#eab308', marginTop: 4 }}>{analytics.open}</div>
+
+        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #eab308' }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Open</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#eab308', marginTop: 2 }}>{analytics.open || 0}</div>
         </div>
-        <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #f97316' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Hold</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#f97316', marginTop: 4 }}>{analytics.hold}</div>
+
+        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #f97316' }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Hold</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#f97316', marginTop: 2 }}>{analytics.hold || 0}</div>
         </div>
-        <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #4ade80' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Close</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#4ade80', marginTop: 4 }}>{analytics.close}</div>
+
+        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #4ade80' }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Close</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#4ade80', marginTop: 2 }}>{analytics.close || 0}</div>
         </div>
-        <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #c084fc' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Feedback</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#c084fc', marginTop: 4 }}>{analytics.feedback}</div>
+
+        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #c084fc' }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Feedback</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#c084fc', marginTop: 2 }}>{analytics.feedback || 0}</div>
         </div>
-        <div className="glass-panel" style={{ padding: '1rem', borderLeft: '4px solid #a78bfa' }}>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>Defective Fabric</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#a78bfa', marginTop: 4 }}>{analytics.totalDefectiveMeters} <span style={{ fontSize: '0.85rem' }}>Mtr</span></div>
+
+        {/* Complaint Rate (%) */}
+        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #f43f5e' }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Complaint Rate (%)</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#f43f5e', marginTop: 2 }}>
+            {analytics.complaintRate || '0.00'}%
+          </div>
+          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>Tickets / Dispatched</div>
+        </div>
+
+        {/* Resolution SLA / TAT */}
+        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #38bdf8' }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Resolution SLA/TAT</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#38bdf8', marginTop: 2 }}>
+            {analytics.avgTatFormatted || 'N/A'}
+          </div>
+          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>Avg Open to Close Time</div>
+        </div>
+
+        {/* Defective Fabric Mtr */}
+        <div className="glass-panel" style={{ padding: '0.9rem', borderLeft: '4px solid #a78bfa' }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Defective Fabric</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#a78bfa', marginTop: 2 }}>{analytics.totalDefectiveMeters || 0} <span style={{ fontSize: '0.8rem' }}>Mtr</span></div>
         </div>
       </div>
 
@@ -464,8 +513,47 @@ export default function DigitalPrintComplainModule() {
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search Ticket, Party, Job Card, Design No..."
+              placeholder="Search Ticket, Party, Job Card, Invoice No..."
               style={{ paddingLeft: 32, width: '100%', fontSize: '0.82rem' }}
+            />
+          </div>
+
+          {/* Quick Period Buttons */}
+          <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--bg-main, #111827)', padding: '3px', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+            {[
+              { id: 'today', label: 'Today' },
+              { id: 'this_week', label: 'This Week' },
+              { id: 'this_month', label: 'This Month' },
+              { id: 'all', label: 'All Time' }
+            ].map(p => (
+              <button
+                key={p.id}
+                onClick={() => handlePeriodChange(p.id)}
+                style={{
+                  padding: '0.35rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '4px', border: 'none',
+                  background: periodFilter === p.id ? 'var(--primary)' : 'transparent',
+                  color: periodFilter === p.id ? '#fff' : 'var(--text-muted)', cursor: 'pointer'
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Custom Date Range */}
+          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+            <input
+              type="date"
+              value={dateStart}
+              onChange={e => { setDateStart(e.target.value); setPeriodFilter('custom'); }}
+              style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem' }}
+            />
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>to</span>
+            <input
+              type="date"
+              value={dateEnd}
+              onChange={e => { setDateEnd(e.target.value); setPeriodFilter('custom'); }}
+              style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem' }}
             />
           </div>
 
