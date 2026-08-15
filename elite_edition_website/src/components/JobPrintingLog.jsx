@@ -1522,21 +1522,18 @@ export default function JobPrintingLog() {
 
       </div>
 
-      {/* ── 3B. RAW MATERIAL SUMMARY CARD (OUTWARD CONSUMPTION / INWARD STOCK IN) ── */}
+      {/* ── 3B. RAW MATERIAL SUMMARY CARD (READ-ONLY DISPLAY TABLE ON SCREEN) ── */}
       <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: rawEntryType === 'INWARD' ? '4px solid #10b981' : '4px solid #f59e0b', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{ fontSize: '0.9rem', fontWeight: 800, color: rawEntryType === 'INWARD' ? '#34d399' : '#f59e0b', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Sparkles size={16} /> Raw Material {rawEntryType === 'INWARD' ? 'Inward (Stock Received)' : 'Consumption (Outward)'} Summary
+              <Sparkles size={16} /> Raw Material {rawEntryType === 'INWARD' ? 'Inward (Stock Received)' : 'Outward (Usage)'} Summary
             </div>
 
             <div style={{ display: 'flex', gap: '0.35rem', background: 'rgba(255,255,255,0.04)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
               <button
                 type="button"
-                onClick={() => {
-                  setRawEntryType('OUTWARD');
-                  fetchRawMaterialSummary('OUTWARD');
-                }}
+                onClick={() => setRawEntryType('OUTWARD')}
                 style={{
                   padding: '0.3rem 0.65rem',
                   fontSize: '0.72rem',
@@ -1553,10 +1550,7 @@ export default function JobPrintingLog() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setRawEntryType('INWARD');
-                  fetchRawMaterialSummary('INWARD');
-                }}
+                onClick={() => setRawEntryType('INWARD')}
                 style={{
                   padding: '0.3rem 0.65rem',
                   fontSize: '0.72rem',
@@ -1585,108 +1579,121 @@ export default function JobPrintingLog() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                background: rawEntryType === 'INWARD' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '6px',
-                boxShadow: rawEntryType === 'INWARD' ? '0 3px 10px rgba(16, 185, 129, 0.3)' : '0 3px 10px rgba(245, 158, 11, 0.3)',
+                boxShadow: '0 3px 10px rgba(16, 185, 129, 0.3)',
                 cursor: 'pointer'
               }}
             >
-              <Edit size={14} /> Log / Edit Raw Material
+              <Edit size={14} /> Open Raw Material Entry Modal
             </button>
           )}
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-            <thead>
-              <tr style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1.5px solid var(--border-light)' }}>
-                <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800, width: 120 }}>MACHIN NAME</th>
-                <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#0284c7', width: 85 }}>C</th>
-                <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#ec4899', width: 85 }}>M</th>
-                <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#eab308', width: 85 }}>Y</th>
-                <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#94a3b8', width: 85 }}>K</th>
-                <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800 }}>PAPER TYPE</th>
-                <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800 }}>PANNO</th>
-                <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, width: 110 }}>QTY</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* Row 1: GRANDO */}
-              <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <td style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: '#38bdf8' }}>GRANDO</td>
-                <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#38bdf8' }}>
-                  {rawMaterialSummary.grandoInk.C > 0 ? `${rawMaterialSummary.grandoInk.C.toFixed(2)} L` : '—'}
-                </td>
-                <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#f472b6' }}>
-                  {rawMaterialSummary.grandoInk.M > 0 ? `${rawMaterialSummary.grandoInk.M.toFixed(2)} L` : '—'}
-                </td>
-                <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#facc15' }}>
-                  {rawMaterialSummary.grandoInk.Y > 0 ? `${rawMaterialSummary.grandoInk.Y.toFixed(2)} L` : '—'}
-                </td>
-                <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#94a3b8' }}>
-                  {rawMaterialSummary.grandoInk.K > 0 ? `${rawMaterialSummary.grandoInk.K.toFixed(2)} L` : '—'}
-                </td>
-                <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
-                  {paperEntries[0]?.paperType || '—'}
-                </td>
-                <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
-                  {paperEntries[0]?.paperPanna === 'Custom' ? (paperEntries[0]?.paperCustomPanna || '—') : (paperEntries[0]?.paperPanna || '—')}
-                </td>
-                <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#34d399' }}>
-                  {paperEntries[0]?.paperRollsQty ? `${paperEntries[0].paperRollsQty} Rolls` : '—'}
-                </td>
-              </tr>
+        {(() => {
+          const curSummary = (rawEntryType === 'INWARD' ? rawMaterialSummary?.inward : rawMaterialSummary?.outward) || {
+            grando: { C: 0, M: 0, Y: 0, K: 0 },
+            printdot: { C: 0, M: 0, Y: 0, K: 0 },
+            paper: []
+          };
+          const gInk = curSummary.grando || { C: 0, M: 0, Y: 0, K: 0 };
+          const pInk = curSummary.printdot || { C: 0, M: 0, Y: 0, K: 0 };
+          const paperList = curSummary.paper || [];
 
-              {/* Row 2: PRINTDOT */}
-              <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
-                <td style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: '#f87171' }}>PRINTDOT</td>
-                <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#38bdf8' }}>
-                  {rawMaterialSummary.printdotInk.C > 0 ? `${rawMaterialSummary.printdotInk.C.toFixed(2)} L` : '—'}
-                </td>
-                <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#f472b6' }}>
-                  {rawMaterialSummary.printdotInk.M > 0 ? `${rawMaterialSummary.printdotInk.M.toFixed(2)} L` : '—'}
-                </td>
-                <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#facc15' }}>
-                  {rawMaterialSummary.printdotInk.Y > 0 ? `${rawMaterialSummary.printdotInk.Y.toFixed(2)} L` : '—'}
-                </td>
-                <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#94a3b8' }}>
-                  {rawMaterialSummary.printdotInk.K > 0 ? `${rawMaterialSummary.printdotInk.K.toFixed(2)} L` : '—'}
-                </td>
-                <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
-                  {paperEntries[1]?.paperType || '—'}
-                </td>
-                <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
-                  {paperEntries[1]?.paperPanna === 'Custom' ? (paperEntries[1]?.paperCustomPanna || '—') : (paperEntries[1]?.paperPanna || '—')}
-                </td>
-                <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#34d399' }}>
-                  {paperEntries[1]?.paperRollsQty ? `${paperEntries[1].paperRollsQty} Rolls` : '—'}
-                </td>
-              </tr>
+          return (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1.5px solid var(--border-light)' }}>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800, width: 120 }}>MACHINE</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#0284c7', width: 85 }}>C</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#ec4899', width: 85 }}>M</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#eab308', width: 85 }}>Y</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#94a3b8', width: 85 }}>K</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800 }}>PAPER TYPE</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800 }}>PANNA</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, width: 110 }}>QTY</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Row 1: GRANDO */}
+                  <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
+                    <td style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: '#38bdf8' }}>GRANDO</td>
+                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#38bdf8' }}>
+                      {gInk.C > 0 ? `${gInk.C.toFixed(2)} L` : '—'}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#f472b6' }}>
+                      {gInk.M > 0 ? `${gInk.M.toFixed(2)} L` : '—'}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#facc15' }}>
+                      {gInk.Y > 0 ? `${gInk.Y.toFixed(2)} L` : '—'}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#94a3b8' }}>
+                      {gInk.K > 0 ? `${gInk.K.toFixed(2)} L` : '—'}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
+                      {paperList[0]?.paperType || '—'}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
+                      {paperList[0]?.paperPanna === 'Custom' ? (paperList[0]?.paperCustomPanna || '—') : (paperList[0]?.paperPanna || '—')}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 800, color: rawEntryType === 'INWARD' ? '#10b981' : '#34d399' }}>
+                      {paperList[0]?.paperRollsQty ? `${paperList[0].paperRollsQty} Rolls` : '—'}
+                    </td>
+                  </tr>
 
-              {/* Extra Paper Rows if any */}
-              {paperEntries.slice(2).map((entry, idx) => (
-                <tr key={entry.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                  <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>—</td>
-                  <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
-                  <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
-                  <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
-                  <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
-                  <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
-                    {entry.paperType || '—'}
-                  </td>
-                  <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
-                    {entry.paperPanna === 'Custom' ? (entry.paperCustomPanna || '—') : (entry.paperPanna || '—')}
-                  </td>
-                  <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#34d399' }}>
-                    {entry.paperRollsQty ? `${entry.paperRollsQty} Rolls` : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  {/* Row 2: PRINTDOT */}
+                  <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
+                    <td style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: '#f87171' }}>PRINTDOT</td>
+                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#38bdf8' }}>
+                      {pInk.C > 0 ? `${pInk.C.toFixed(2)} L` : '—'}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#f472b6' }}>
+                      {pInk.M > 0 ? `${pInk.M.toFixed(2)} L` : '—'}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#facc15' }}>
+                      {pInk.Y > 0 ? `${pInk.Y.toFixed(2)} L` : '—'}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#94a3b8' }}>
+                      {pInk.K > 0 ? `${pInk.K.toFixed(2)} L` : '—'}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
+                      {paperList[1]?.paperType || '—'}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
+                      {paperList[1]?.paperPanna === 'Custom' ? (paperList[1]?.paperCustomPanna || '—') : (paperList[1]?.paperPanna || '—')}
+                    </td>
+                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 800, color: rawEntryType === 'INWARD' ? '#10b981' : '#34d399' }}>
+                      {paperList[1]?.paperRollsQty ? `${paperList[1].paperRollsQty} Rolls` : '—'}
+                    </td>
+                  </tr>
+
+                  {/* Extra Paper Rows if any */}
+                  {paperList.slice(2).map((entry) => (
+                    <tr key={entry.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>—</td>
+                      <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
+                      <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
+                      <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
+                      <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
+                      <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
+                        {entry.paperType || '—'}
+                      </td>
+                      <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
+                        {entry.paperPanna === 'Custom' ? (entry.paperCustomPanna || '—') : (entry.paperPanna || '—')}
+                      </td>
+                      <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 800, color: rawEntryType === 'INWARD' ? '#10b981' : '#34d399' }}>
+                        {entry.paperRollsQty ? `${entry.paperRollsQty} Rolls` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── 4. JOB CARD MULTI-RUN HISTORY MODAL ── */}
