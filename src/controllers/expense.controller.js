@@ -1,5 +1,5 @@
 const db = require('../db/models');
-const logger = require('../../config/logger');
+const logger = require('../config/logger');
 
 // Get All Expense / Income Records (with filters)
 const getAll = async (req, res) => {
