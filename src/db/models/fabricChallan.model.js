@@ -50,6 +50,15 @@ const fabricChallanSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
+    shortageMtr: {
+      type: Number,
+      default: null,
+    },
+    shortageMode: {
+      type: String,
+      enum: ['pct', 'mtr'],
+      default: 'pct',
+    },
 
     // Job card details (auto-filled from Job Card)
     jobNo: {

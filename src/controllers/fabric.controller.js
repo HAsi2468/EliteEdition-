@@ -42,7 +42,7 @@ const getDepartmentFilter = (dept) => {
 // Create a new INWARD transaction
 const createInward = async (req, res) => {
   try {
-    const { challanNo, vendorName, fabricQuality, panna, qty, date, notes, shortagePct, department } = req.body;
+    const { challanNo, vendorName, fabricQuality, panna, qty, date, notes, shortagePct, shortageMtr, shortageMode, department } = req.body;
     
     if (!fabricQuality || qty == null || qty < 0) {
       return res.status(400).json({ success: false, error: 'Fabric Quality and a valid Quantity are required.' });
@@ -50,6 +50,16 @@ const createInward = async (req, res) => {
 
     const normFabric = normalizeFabric(fabricQuality);
     const normP = normalizePanna(panna, normFabric);
+
+    const sMode = shortageMode === 'mtr' ? 'mtr' : 'pct';
+    let parsedPct = shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null;
+    let parsedMtr = shortageMtr !== '' && shortageMtr != null ? parseFloat(shortageMtr) : null;
+
+    if (sMode === 'mtr' && parsedMtr != null && qty > 0) {
+      parsedPct = parseFloat(((parsedMtr / qty) * 100).toFixed(2));
+    } else if (sMode === 'pct' && parsedPct != null && qty > 0) {
+      parsedMtr = parseFloat(((qty * parsedPct) / 100).toFixed(2));
+    }
 
     const transaction = new FabricTransaction({
       type: 'INWARD',
@@ -60,7 +70,9 @@ const createInward = async (req, res) => {
       qty,
       date: date ? new Date(date) : new Date(),
       notes,
-      shortagePct: shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null,
+      shortagePct: parsedPct,
+      shortageMtr: parsedMtr,
+      shortageMode: sMode,
       department: department || 'digital_print',
     });
 

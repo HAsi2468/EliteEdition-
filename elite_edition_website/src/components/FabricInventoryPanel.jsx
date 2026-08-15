@@ -399,7 +399,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   // Form states
   const [inwardForm, setInwardForm] = useState({
-    challanNo: '', vendorName: '', fabricQuality: '', panna: '', qty: '', shortagePct: '', date: new Date().toISOString().split('T')[0], notes: ''
+    challanNo: '', vendorName: '', fabricQuality: '', panna: '', qty: '', shortagePct: '', shortageMtr: '', shortageMode: 'pct', date: new Date().toISOString().split('T')[0], notes: ''
   });
   const [outwardForm, setOutwardForm] = useState({
     jobNo: '', challanNo: '', partyName: '', fabricQuality: '', panna: '', lotNo: '', qty: '', date: new Date().toISOString().split('T')[0], notes: ''
@@ -711,7 +711,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       fabricQuality: t.fabricQuality || '',
       panna: t.panna || '',
       qty: t.qty || '',
-      shortagePct: t.shortagePct != null ? t.shortagePct : '',
+      shortagePct: t.shortagePct != null ? String(t.shortagePct) : '',
+      shortageMtr: t.shortageMtr != null ? String(t.shortageMtr) : '',
+      shortageMode: t.shortageMode || (t.shortageMtr != null && !t.shortagePct ? 'mtr' : 'pct'),
       date: t.date ? new Date(t.date).toISOString().split('T')[0] : '',
       notes: t.notes || ''
     });
@@ -721,7 +723,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const closeInwardModal = () => {
     setIsInwardOpen(false);
     setEditingTransaction(null);
-    setInwardForm({ challanNo: '', vendorName: '', fabricQuality: '', panna: '', qty: '', shortagePct: '', date: new Date().toISOString().split('T')[0], notes: '' });
+    setInwardForm({ challanNo: '', vendorName: '', fabricQuality: '', panna: '', qty: '', shortagePct: '', shortageMtr: '', shortageMode: 'pct', date: new Date().toISOString().split('T')[0], notes: '' });
   };
 
   const handleDelete = async () => {
@@ -798,7 +800,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const resetChallanForm = () => {
     setChallanForm({
       date: new Date().toISOString().split('T')[0],
-      partyName: '', lotNo: '', vendorChallanNo: '', deliveryBy: '', fabricName: '', shortagePct: '',
+      partyName: '', lotNo: '', vendorChallanNo: '', deliveryBy: '', fabricName: '', shortagePct: '', shortageMtr: '', shortageMode: 'pct',
       jobNo: '', designNo: '', colour: '', panna: '', pcs: '', billTo: '', shipTo: '',
       tpDetails: emptyTpRows(), notes: '',
     });
@@ -1106,6 +1108,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       deliveryBy: c.deliveryBy || '',
       fabricName: c.fabricName || '',
       shortagePct: c.shortagePct != null ? String(c.shortagePct) : '',
+      shortageMtr: c.shortageMtr != null ? String(c.shortageMtr) : '',
+      shortageMode: c.shortageMode || (c.shortageMtr != null && !c.shortagePct ? 'mtr' : 'pct'),
       jobNo: c.jobNo || '',
       designNo: c.designNo || '',
       colour: c.colour || '',
@@ -3845,9 +3849,39 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       {fabricsList.map((f, i) => <option key={i} value={f} />)}
                     </datalist>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Shortage %</label>
-                    <input type="number" step="0.01" min="0" max="100" value={challanForm.shortagePct} onChange={e => setChallanForm({ ...challanForm, shortagePct: e.target.value })} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="Shortage %" />
+                  <div style={{ flex: 1.2 }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                      Shortage ({challanForm.shortageMode === 'mtr' ? 'Meters' : '%'})
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.3rem' }}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={challanForm.shortageMode === 'mtr' ? (challanForm.shortageMtr || '') : (challanForm.shortagePct || '')}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (challanForm.shortageMode === 'mtr') {
+                            setChallanForm({ ...challanForm, shortageMtr: val, shortagePct: '' });
+                          } else {
+                            setChallanForm({ ...challanForm, shortagePct: val, shortageMtr: '' });
+                          }
+                        }}
+                        style={{ flex: 1, padding: '0.5rem 0.6rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                        placeholder={challanForm.shortageMode === 'mtr' ? "e.g. 5 mtr" : "Shortage %"}
+                      />
+                      <select
+                        value={challanForm.shortageMode || 'pct'}
+                        onChange={e => {
+                          const newMode = e.target.value;
+                          setChallanForm(prev => ({ ...prev, shortageMode: newMode }));
+                        }}
+                        style={{ padding: '0.45rem 0.4rem', fontSize: '0.8rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}
+                      >
+                        <option value="pct">%</option>
+                        <option value="mtr">mtr</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -4014,17 +4048,36 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               </div>
 
               <div>
-                <label style={labelStyle}>Shortage % (Fusing Loss)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={inwardForm.shortagePct}
-                  onChange={e => setInwardForm({ ...inwardForm, shortagePct: e.target.value })}
-                  style={inputStyle}
-                  placeholder="e.g. 3.5 (optional)"
-                />
+                <label style={labelStyle}>Shortage ({inwardForm.shortageMode === 'mtr' ? 'Meters' : 'Percentage %'})</label>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={inwardForm.shortageMode === 'mtr' ? (inwardForm.shortageMtr || '') : (inwardForm.shortagePct || '')}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (inwardForm.shortageMode === 'mtr') {
+                        setInwardForm({ ...inwardForm, shortageMtr: val, shortagePct: '' });
+                      } else {
+                        setInwardForm({ ...inwardForm, shortagePct: val, shortageMtr: '' });
+                      }
+                    }}
+                    style={{ ...inputStyle, flex: 1 }}
+                    placeholder={inwardForm.shortageMode === 'mtr' ? "e.g. 5 mtr" : "e.g. 3.5 %"}
+                  />
+                  <select
+                    value={inwardForm.shortageMode || 'pct'}
+                    onChange={e => {
+                      const newMode = e.target.value;
+                      setInwardForm(prev => ({ ...prev, shortageMode: newMode }));
+                    }}
+                    style={{ ...inputStyle, width: 'auto', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    <option value="pct">% (Pct)</option>
+                    <option value="mtr">mtr (Meters)</option>
+                  </select>
+                </div>
               </div>
 
               <div>

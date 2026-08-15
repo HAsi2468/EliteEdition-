@@ -59,8 +59,17 @@ const fabricTransactionSchema = new mongoose.Schema(
     shortagePct: {
       type: Number,
       min: 0,
-      max: 100,
       default: null,
+    },
+    shortageMtr: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+    shortageMode: {
+      type: String,
+      enum: ['pct', 'mtr'],
+      default: 'pct',
     },
     department: {
       type: String,

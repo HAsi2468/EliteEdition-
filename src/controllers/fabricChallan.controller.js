@@ -58,12 +58,14 @@ const getLotInfo = async (req, res) => {
   }
 };
 
-// ── Helper: compute raw meters from fresh meters + shortage % ──────────────
-function computeRawMeters(totalMtr, shortagePct) {
+// ── Helper: compute raw meters from fresh meters + shortage (% or mtr) ──────
+function computeRawMeters(totalMtr, shortagePct, shortageMtr, shortageMode) {
   const mtr = parseFloat(totalMtr) || 0;
+  if (shortageMode === 'mtr' || (shortageMtr != null && parseFloat(shortageMtr) > 0 && (shortagePct == null || shortagePct === ''))) {
+    const sMtr = parseFloat(shortageMtr) || 0;
+    return parseFloat((mtr + sMtr).toFixed(3));
+  }
   const pct = parseFloat(shortagePct) || 0;
-  // Raw = fresh meters + shortage
-  // e.g. 100 mtr + 5% shortage = 105 raw meters consumed from stock
   return parseFloat((mtr * (1 + pct / 100)).toFixed(3));
 }
 
@@ -300,7 +302,7 @@ const createChallan = async (req, res) => {
   try {
     const {
       date, partyName,
-      lotNo, vendorChallanNo, deliveryBy, fabricName, shortagePct,
+      lotNo, vendorChallanNo, deliveryBy, fabricName, shortagePct, shortageMtr, shortageMode,
       jobNo, designNo, colour, panna,
       tpDetails, pcs,
       notes, createdBy,
@@ -321,6 +323,16 @@ const createChallan = async (req, res) => {
 
     const { totalMtr, totalTp } = computeTotals(sanitizedDetails);
 
+    const sMode = shortageMode === 'mtr' ? 'mtr' : 'pct';
+    let parsedPct = shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null;
+    let parsedMtr = shortageMtr !== '' && shortageMtr != null ? parseFloat(shortageMtr) : null;
+
+    if (sMode === 'mtr' && parsedMtr != null && totalMtr > 0) {
+      parsedPct = parseFloat(((parsedMtr / totalMtr) * 100).toFixed(2));
+    } else if (sMode === 'pct' && parsedPct != null && totalMtr > 0) {
+      parsedMtr = parseFloat(((totalMtr * parsedPct) / 100).toFixed(2));
+    }
+
     const challan = new FabricChallan({
       date: date ? new Date(date) : new Date(),
       partyName: partyName || '',
@@ -328,7 +340,9 @@ const createChallan = async (req, res) => {
       vendorChallanNo: vendorChallanNo || '',
       deliveryBy: deliveryBy || '',
       fabricName: normFabric,
-      shortagePct: shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null,
+      shortagePct: parsedPct,
+      shortageMtr: parsedMtr,
+      shortageMode: sMode,
       jobNo: jobNo || '',
       designNo: designNo || '',
       colour: colour || '',
@@ -342,6 +356,8 @@ const createChallan = async (req, res) => {
       notes: notes || '',
       createdBy: createdBy || '',
     });
+
+    await challan.save();
 
     await challan.save();
 
@@ -502,7 +518,7 @@ const updateChallan = async (req, res) => {
     const { id } = req.params;
     const {
       date, partyName,
-      lotNo, vendorChallanNo, deliveryBy, fabricName, shortagePct,
+      lotNo, vendorChallanNo, deliveryBy, fabricName, shortagePct, shortageMtr, shortageMode,
       jobNo, designNo, colour, panna,
       tpDetails, pcs, notes,
       billTo, shipTo,
@@ -518,7 +534,9 @@ const updateChallan = async (req, res) => {
     if (vendorChallanNo !== undefined) challan.vendorChallanNo = vendorChallanNo;
     if (deliveryBy !== undefined) challan.deliveryBy = deliveryBy;
     if (fabricName !== undefined) challan.fabricName = fabricName;
+    if (shortageMode !== undefined) challan.shortageMode = shortageMode === 'mtr' ? 'mtr' : 'pct';
     if (shortagePct !== undefined) challan.shortagePct = shortagePct !== '' && shortagePct != null ? parseFloat(shortagePct) : null;
+    if (shortageMtr !== undefined) challan.shortageMtr = shortageMtr !== '' && shortageMtr != null ? parseFloat(shortageMtr) : null;
     if (jobNo !== undefined) challan.jobNo = jobNo;
     if (designNo !== undefined) challan.designNo = designNo;
     if (colour !== undefined) challan.colour = colour;
