@@ -173,14 +173,14 @@ export default function DigitalPrintComplainModule() {
     return Array.isArray(list) ? list : ['Other'];
   };
 
-  const handleOpenNew = async () => {
+  const handleOpenNew = () => {
     setEditingItem(null);
     const catList = Array.isArray(dynamicCategories) && dynamicCategories.length > 0 ? dynamicCategories : CATEGORIES;
     const defaultCat = catList[0] || 'Printing Defect';
     const subOptions = getSubCategoryOptions(defaultCat);
 
     setFormVal({
-      complaintNo: '',
+      complaintNo: 'Loading...',
       date: new Date().toISOString().split('T')[0],
       partyName: '',
       assignedTo: '',
@@ -198,15 +198,18 @@ export default function DigitalPrintComplainModule() {
       actionTaken: ''
     });
 
-    try {
-      const res = await api.getNextComplaintNumber();
+    setShowModal(true);
+
+    api.getNextComplaintNumber().then(res => {
       if (res && res.nextComplaintNo) {
         setFormVal(prev => ({ ...prev, complaintNo: res.nextComplaintNo }));
+      } else {
+        setFormVal(prev => ({ ...prev, complaintNo: 'EDP-COMP-1001' }));
       }
-    } catch (e) {
-      console.warn('Failed to fetch next complaint number:', e);
-    }
-    setShowModal(true);
+    }).catch(err => {
+      console.warn('Failed to fetch next complaint number:', err);
+      setFormVal(prev => ({ ...prev, complaintNo: 'EDP-COMP-1001' }));
+    });
   };
 
   const handleOpenEdit = (item) => {
