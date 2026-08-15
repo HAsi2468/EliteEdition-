@@ -146,9 +146,6 @@ export default function DigitalPrintComplainModule() {
       const operators = (cfg && Array.isArray(cfg.operators)) ? cfg.operators : [];
       const autoUsers = (cfg && Array.isArray(cfg.autoScreenUsers)) ? cfg.autoScreenUsers : [];
 
-      const mergedStaff = Array.from(new Set([...userNames, ...autoUsers, ...operators]));
-      setStaffList(mergedStaff);
-
       // 3. Dynamic Categories & Sub-Categories from Print Settings
       if (cfg && Array.isArray(cfg.complaintCategories) && cfg.complaintCategories.length > 0) {
         setDynamicCategories(cfg.complaintCategories);
@@ -161,8 +158,27 @@ export default function DigitalPrintComplainModule() {
     }
   };
 
+  const getSubCategoryOptions = (catName) => {
+    let list = [];
+    if (dynamicSubCategories) {
+      if (Array.isArray(dynamicSubCategories[catName])) {
+        list = dynamicSubCategories[catName];
+      } else if (typeof dynamicSubCategories.get === 'function') {
+        list = dynamicSubCategories.get(catName);
+      }
+    }
+    if (!Array.isArray(list) || list.length === 0) {
+      list = SUB_CATEGORIES[catName] || ['Other'];
+    }
+    return Array.isArray(list) ? list : ['Other'];
+  };
+
   const handleOpenNew = async () => {
     setEditingItem(null);
+    const catList = Array.isArray(dynamicCategories) && dynamicCategories.length > 0 ? dynamicCategories : CATEGORIES;
+    const defaultCat = catList[0] || 'Printing Defect';
+    const subOptions = getSubCategoryOptions(defaultCat);
+
     setFormVal({
       complaintNo: '',
       date: new Date().toISOString().split('T')[0],
@@ -171,8 +187,8 @@ export default function DigitalPrintComplainModule() {
       jobCardNo: '',
       invoiceNo: '',
       designNo: '',
-      category: 'Printing Defect',
-      subCategory: 'Line Defect',
+      category: defaultCat,
+      subCategory: subOptions[0] || '',
       priority: 'Medium',
       status: 'Open',
       defectiveMeters: 0,
