@@ -79,7 +79,7 @@ const getBillingDashboardStats = async (req, res) => {
 // ── 2. GET INVOICES LIST ───────────────────────────────────────────────────────
 const getInvoices = async (req, res) => {
   try {
-    const { search, paymentStatus, page = 1, limit = 20, dateStart, dateEnd } = req.query;
+    const { search, paymentStatus, page = 1, limit = 5000, dateStart, dateEnd } = req.query;
 
     const filter = {};
     if (paymentStatus && paymentStatus !== 'ALL') {

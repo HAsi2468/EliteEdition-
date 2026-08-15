@@ -827,7 +827,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     try {
       const [sRes, iRes, cRes, itemRes] = await Promise.all([
         api.getBillingDashboardStats(),
-        api.getBillingInvoices({ limit: 50, search, paymentStatus: statusFilter }),
+        api.getBillingInvoices({ limit: 5000, search, paymentStatus: statusFilter }),
         api.getBillingCustomers(),
         api.getBillingItems()
       ]);
