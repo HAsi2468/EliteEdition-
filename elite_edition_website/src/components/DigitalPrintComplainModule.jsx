@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api, getBaseUrl } from '../services/api';
 import {
   AlertTriangle, PlusCircle, Search, RefreshCw, Edit2, Trash2, X, Save, Image as ImageIcon,
-  CheckCircle, ShieldAlert, Download, Filter, Eye, AlertCircle, Clock, CheckCircle2, User, FileText, ArrowRight
+  CheckCircle, ShieldAlert, Download, Filter, Eye, AlertCircle, Clock, CheckCircle2, User, FileText, ArrowRight, Calendar
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
@@ -44,6 +44,159 @@ const SUB_CATEGORIES = {
 const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
 const STATUSES = ['Open', 'Hold', 'Close', 'Feedback'];
 
+const PRESET_OPTIONS = [
+  { id: 'today', name: 'Today' },
+  { id: 'yesterday', name: 'Yesterday' },
+  { id: 'this_week', name: 'This Week' },
+  { id: 'last_week', name: 'Last Week' },
+  { id: 'last_7_days', name: 'Last 7 Days' },
+  { id: 'this_month', name: 'This Month' },
+  { id: 'previous_month', name: 'Previous Month' },
+  { id: 'last_30_days', name: 'Last 30 Days' },
+  { id: 'this_quarter', name: 'This Quarter' },
+  { id: 'previous_quarter', name: 'Previous Quarter' },
+  { id: 'current_fiscal_year', name: 'Current Fiscal Year' },
+  { id: 'previous_fiscal_year', name: 'Previous Fiscal Year' },
+  { id: 'last_365_days', name: 'Last 365 Days' },
+  { id: 'all', name: 'All Time' },
+  { id: 'custom', name: 'Custom' }
+];
+
+function getDatePresetRange(preset, customStart = '', customEnd = '') {
+  const now = new Date();
+  let start = null;
+  let end = null;
+  let labelText = '';
+
+  const formatDate = (d) => {
+    if (!d) return '';
+    const day = String(d.getDate()).padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
+
+  switch (preset) {
+    case 'today': {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'yesterday': {
+      const y = new Date(now);
+      y.setDate(now.getDate() - 1);
+      start = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 0, 0, 0);
+      end = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'this_week': {
+      const dayOfWeek = now.getDay();
+      const distToMonday = (dayOfWeek + 6) % 7;
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distToMonday, 0, 0, 0);
+      const sun = new Date(start);
+      sun.setDate(start.getDate() + 6);
+      end = new Date(sun.getFullYear(), sun.getMonth(), sun.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'last_week': {
+      const dayOfWeek = now.getDay();
+      const distToMonday = (dayOfWeek + 6) % 7;
+      const prevMon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distToMonday - 7, 0, 0, 0);
+      start = prevMon;
+      const prevSun = new Date(prevMon);
+      prevSun.setDate(prevMon.getDate() + 6);
+      end = new Date(prevSun.getFullYear(), prevSun.getMonth(), prevSun.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'last_7_days': {
+      const d7 = new Date(now);
+      d7.setDate(now.getDate() - 6);
+      start = new Date(d7.getFullYear(), d7.getMonth(), d7.getDate(), 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'this_month': {
+      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'previous_month': {
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'last_30_days': {
+      const d30 = new Date(now);
+      d30.setDate(now.getDate() - 29);
+      start = new Date(d30.getFullYear(), d30.getMonth(), d30.getDate(), 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'this_quarter': {
+      const m = now.getMonth();
+      const qStartMonth = Math.floor(m / 3) * 3;
+      start = new Date(now.getFullYear(), qStartMonth, 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'previous_quarter': {
+      const m = now.getMonth();
+      const qStartMonth = Math.floor(m / 3) * 3 - 3;
+      start = new Date(now.getFullYear(), qStartMonth, 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), qStartMonth + 3, 0, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'current_fiscal_year': {
+      const yr = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+      start = new Date(yr, 3, 1, 0, 0, 0);
+      end = new Date(yr + 1, 2, 31, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'previous_fiscal_year': {
+      const yr = (now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1) - 1;
+      start = new Date(yr, 3, 1, 0, 0, 0);
+      end = new Date(yr + 1, 2, 31, 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'last_365_days': {
+      const d365 = new Date(now);
+      d365.setDate(now.getDate() - 364);
+      start = new Date(d365.getFullYear(), d365.getMonth(), d365.getDate(), 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      labelText = `${formatDate(start)} - ${formatDate(end)}`;
+      break;
+    }
+    case 'custom': {
+      if (customStart) start = new Date(`${customStart}T00:00:00`);
+      if (customEnd) end = new Date(`${customEnd}T23:59:59`);
+      labelText = start && end ? `${formatDate(start)} - ${formatDate(end)}` : 'Custom Range';
+      break;
+    }
+    case 'all':
+    default: {
+      start = null;
+      end = null;
+      labelText = 'All Time Records';
+      break;
+    }
+  }
+
+  return { start, end, labelText };
+}
+
 export default function DigitalPrintComplainModule() {
   const [complaints, setComplaints] = useState([]);
   const [parties, setParties] = useState([]);
@@ -60,33 +213,14 @@ export default function DigitalPrintComplainModule() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
-  const [periodFilter, setPeriodFilter] = useState('all');
-  const [dateStart, setDateStart] = useState('');
-  const [dateEnd, setDateEnd] = useState('');
+  const [datePreset, setDatePreset] = useState('this_month');
+  const [customDateStart, setCustomDateStart] = useState('');
+  const [customDateEnd, setCustomDateEnd] = useState('');
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
 
-  const handlePeriodChange = (period) => {
-    setPeriodFilter(period);
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-
-    if (period === 'today') {
-      setDateStart(todayStr);
-      setDateEnd(todayStr);
-    } else if (period === 'this_week') {
-      const day = now.getDay();
-      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(now.setDate(diff));
-      setDateStart(monday.toISOString().split('T')[0]);
-      setDateEnd(todayStr);
-    } else if (period === 'this_month') {
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      setDateStart(firstDay.toISOString().split('T')[0]);
-      setDateEnd(todayStr);
-    } else if (period === 'all') {
-      setDateStart('');
-      setDateEnd('');
-    }
-  };
+  const activeRange = getDatePresetRange(datePreset, customDateStart, customDateEnd);
+  const dateStart = activeRange.start ? activeRange.start.toISOString().split('T')[0] : '';
+  const dateEnd = activeRange.end ? activeRange.end.toISOString().split('T')[0] : '';
 
   // Modals
   const [showModal, setShowModal] = useState(false);
@@ -168,10 +302,17 @@ export default function DigitalPrintComplainModule() {
       setParties(mergedParties);
 
       // 2. Staff / Users who have access to Elite Digital Prints (Current & Future)
-      const userList = (uRes && (uRes.results || uRes.data)) ? (uRes.results || uRes.data) : [];
-      const userNames = Array.isArray(userList) ? userList.map(u => u.name || u.fullName || u.username).filter(Boolean) : [];
+      let userList = [];
+      if (Array.isArray(uRes)) userList = uRes;
+      else if (uRes && Array.isArray(uRes.results)) userList = uRes.results;
+      else if (uRes && Array.isArray(uRes.data)) userList = uRes.data;
+
+      const userNames = userList.map(u => typeof u === 'string' ? u : (u.name || u.fullName || u.username)).filter(Boolean);
       const operators = (cfg && Array.isArray(cfg.operators)) ? cfg.operators : [];
       const autoUsers = (cfg && Array.isArray(cfg.autoScreenUsers)) ? cfg.autoScreenUsers : [];
+
+      const mergedStaff = Array.from(new Set([...userNames, ...operators, ...autoUsers])).filter(Boolean);
+      setStaffList(mergedStaff);
 
       // 3. Dynamic Categories & Sub-Categories from Print Settings
       if (cfg && Array.isArray(cfg.complaintCategories) && cfg.complaintCategories.length > 0) {
@@ -518,43 +659,111 @@ export default function DigitalPrintComplainModule() {
             />
           </div>
 
-          {/* Quick Period Buttons */}
-          <div style={{ display: 'flex', gap: '0.25rem', background: 'var(--bg-main, #111827)', padding: '3px', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
-            {[
-              { id: 'today', label: 'Today' },
-              { id: 'this_week', label: 'This Week' },
-              { id: 'this_month', label: 'This Month' },
-              { id: 'all', label: 'All Time' }
-            ].map(p => (
-              <button
-                key={p.id}
-                onClick={() => handlePeriodChange(p.id)}
-                style={{
-                  padding: '0.35rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '4px', border: 'none',
-                  background: periodFilter === p.id ? 'var(--primary)' : 'transparent',
-                  color: periodFilter === p.id ? '#fff' : 'var(--text-muted)', cursor: 'pointer'
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          {/* Invoice-style Date Range Preset Selector Component */}
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+              type="button"
+              onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.65rem',
+                padding: '0.45rem 1.1rem',
+                borderRadius: '8px',
+                border: '1.5px solid #a78bfa',
+                background: 'var(--panel-bg, #1e1b4b)',
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(124, 58, 237, 0.25)',
+                transition: 'all 0.2s'
+              }}
+            >
+              <Calendar size={15} color="#a78bfa" />
+              <span>{PRESET_OPTIONS.find(p => p.id === datePreset)?.name || 'This Month'}</span>
+              <Calendar size={15} color="#a78bfa" />
+            </button>
 
-          {/* Custom Date Range */}
-          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-            <input
-              type="date"
-              value={dateStart}
-              onChange={e => { setDateStart(e.target.value); setPeriodFilter('custom'); }}
-              style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem' }}
-            />
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>to</span>
-            <input
-              type="date"
-              value={dateEnd}
-              onChange={e => { setDateEnd(e.target.value); setPeriodFilter('custom'); }}
-              style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem' }}
-            />
+            {isDateDropdownOpen && (
+              <>
+                <div
+                  style={{ position: 'fixed', inset: 0, zIndex: 998 }}
+                  onClick={() => setIsDateDropdownOpen(false)}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 6px)',
+                    right: 0,
+                    width: '360px',
+                    maxHeight: '380px',
+                    overflowY: 'auto',
+                    background: '#ffffff',
+                    color: '#1e293b',
+                    borderRadius: '10px',
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.35)',
+                    border: '1px solid #cbd5e1',
+                    zIndex: 999,
+                    padding: '0.35rem 0'
+                  }}
+                >
+                  {PRESET_OPTIONS.map(opt => {
+                    const rangeInfo = getDatePresetRange(opt.id, customDateStart, customDateEnd);
+                    const isSelected = datePreset === opt.id;
+                    return (
+                      <div
+                        key={opt.id}
+                        onClick={() => {
+                          setDatePreset(opt.id);
+                          if (opt.id !== 'custom') setIsDateDropdownOpen(false);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.6rem 0.9rem',
+                          cursor: 'pointer',
+                          background: isSelected ? '#f1f5f9' : 'transparent',
+                          borderBottom: '1px solid #f1f5f9',
+                          fontSize: '0.82rem',
+                          transition: 'background 0.15s'
+                        }}
+                      >
+                        <span style={{ fontWeight: isSelected ? 700 : 500, color: isSelected ? '#4338ca' : '#334155' }}>
+                          {opt.name}
+                        </span>
+                        <span style={{ fontWeight: 700, fontSize: '0.75rem', color: isSelected ? '#1e1b4b' : '#64748b' }}>
+                          {rangeInfo.labelText}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {datePreset === 'custom' && (
+                    <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>From</label>
+                          <input type="date" value={customDateStart} onChange={e => setCustomDateStart(e.target.value)} style={{ width: '100%', padding: '0.3rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>To</label>
+                          <input type="date" value={customDateEnd} onChange={e => setCustomDateEnd(e.target.value)} style={{ width: '100%', padding: '0.3rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsDateDropdownOpen(false)}
+                        style={{ padding: '0.4rem', background: '#4338ca', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Apply Custom Range
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Status Filter Buttons */}
