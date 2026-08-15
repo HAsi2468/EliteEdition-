@@ -982,22 +982,24 @@ export default function DigitalPrintComplainModule() {
                         <Eye size={14} /> View & Resolve
                       </button>
 
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        <button
-                          onClick={() => handleOpenEdit(item)}
-                          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
-                          title="Edit Complaint"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item._id, item.complaintNo)}
-                          style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px' }}
-                          title="Delete Ticket"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      {canCreateComplaint && (
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <button
+                            onClick={() => handleOpenEdit(item)}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
+                            title="Edit Complaint"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(item._id, item.complaintNo)}
+                            style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px' }}
+                            title="Delete Ticket"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
