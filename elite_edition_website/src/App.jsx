@@ -50,149 +50,7 @@ import {
 
 import NotificationToastContainer, { triggerPushNotification, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
 
-// ─── Theme definitions ─────────────────────────────────────────────────────
-const THEMES = [
-  {
-    id: 'enterprise',
-    name: 'Enterprise Classic',
-    desc: 'Professional light mode — #f8fafc canvas',
-    swatchClass: 'swatch-enterprise',
-    accent: '#2563eb',
-  },
-  {
-    id: 'midnight',
-    name: 'Premium Midnight',
-    desc: 'Sleek dark mode — #0b0f19 canvas',
-    swatchClass: 'swatch-midnight',
-    accent: '#38bdf8',
-  },
-  {
-    id: 'cyberpunk',
-    name: 'Cyberpunk Analytics',
-    desc: 'High-contrast dark — #090d16 canvas',
-    swatchClass: 'swatch-cyberpunk',
-    accent: '#10b981',
-  },
-];
 
-// ─── ThemePicker component ──────────────────────────────────────────────────
-function ThemePicker({ currentTheme, onSelect }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handleClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
-  const current = THEMES.find(t => t.id === currentTheme) || THEMES[0];
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button
-        className="theme-btn"
-        onClick={() => setOpen(o => !o)}
-        title="Switch Theme"
-      >
-        <Palette size={14} />
-        <span>{current.name}</span>
-      </button>
-
-      {open && ReactDOM.createPortal(
-        <div className="theme-picker-dropdown">
-
-          <div className="theme-picker-title">Choose Colour Theme</div>
-          {THEMES.map(theme => (
-            <button
-              key={theme.id}
-              className={`theme-option${currentTheme === theme.id ? ' active' : ''}`}
-              onClick={() => { onSelect(theme.id); setOpen(false); }}
-            >
-              <div className={`theme-swatch ${theme.swatchClass}`} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="theme-info-name">{theme.name}</div>
-                <div className="theme-info-desc">{theme.desc}</div>
-              </div>
-              {currentTheme === theme.id && <div className="theme-active-dot" />}
-            </button>
-          ))}
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-}
-
-// ─── SidePanelColorPicker component ──────────────────────────────────────────
-const ACCENT_COLORS = [
-  { id: 'cyan', label: 'Electric Cyan', hex: '#38bdf8' },
-  { id: 'purple', label: 'Royal Purple', hex: '#8b5cf6' },
-  { id: 'emerald', label: 'Emerald Cyber', hex: '#10b981' },
-  { id: 'amber', label: 'Sunset Amber', hex: '#f59e0b' },
-  { id: 'pink', label: 'Rose Neon', hex: '#ec4899' },
-  { id: 'blue', label: 'Enterprise Blue', hex: '#2563eb' }
-];
-
-function SidePanelColorPicker() {
-  const [activeColor, setActiveColor] = useState(() => localStorage.getItem('elite_side_panel_accent') || '#38bdf8');
-
-  const applyColor = (hex) => {
-    setActiveColor(hex);
-    const root = document.documentElement;
-    root.style.setProperty('--primary', hex);
-    root.style.setProperty('--primary-dark', hex);
-    root.style.setProperty('--primary-glow', hex + '33');
-    root.style.setProperty('--nav-active-border', hex);
-    root.style.setProperty('--nav-active-bg', hex + '1a');
-    root.style.setProperty('--border-focus', hex + '80');
-    localStorage.setItem('elite_side_panel_accent', hex);
-  };
-
-  useEffect(() => {
-    const saved = localStorage.getItem('elite_side_panel_accent');
-    if (saved) applyColor(saved);
-  }, []);
-
-  return (
-    <div style={{
-      marginTop: 'auto',
-      paddingTop: '0.85rem',
-      borderTop: '1px solid var(--border-light)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '0.4rem'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-          <Palette size={12} color="var(--primary)" /> Side Panel Theme
-        </span>
-      </div>
-      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'space-between' }}>
-        {ACCENT_COLORS.map(c => (
-          <button
-            key={c.id}
-            onClick={() => applyColor(c.hex)}
-            title={c.label}
-            style={{
-              width: '22px',
-              height: '22px',
-              borderRadius: '50%',
-              background: c.hex,
-              border: activeColor === c.hex ? '2px solid #ffffff' : '1px solid transparent',
-              boxShadow: activeColor === c.hex ? `0 0 8px ${c.hex}` : 'none',
-              cursor: 'pointer',
-              transition: 'transform 0.15s ease',
-              padding: 0
-            }}
-            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.2)'}
-            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default function App() {
   const getSavedNavState = () => {
@@ -273,8 +131,6 @@ export default function App() {
     (currentUser.name && currentUser.name.toLowerCase().includes('hasi'))
   );
 
-  // Theme state — persisted to localStorage (default: Enterprise Classic)
-  const [theme, setTheme] = useState(() => localStorage.getItem('elite_theme') || 'enterprise');
   const [isEliteOnlineOpen, setIsEliteOnlineOpen] = useState(true);
 
   // Department permission helpers
@@ -439,11 +295,7 @@ export default function App() {
     }
   }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), isAuthenticated, activeDepartment]);
 
-  // Apply theme to <html> element
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('elite_theme', theme);
-  }, [theme]);
+
   
   // Modal states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -802,11 +654,9 @@ export default function App() {
         </div>
 
         <div style={styles.headerRight} className="header-right-wrap">
-          {/* Theme Picker & Server Config (Visible only to Hasi user) */}
+          {/* Server Config (Visible only to Hasi user) */}
           {isHasiUser && (
             <>
-              <ThemePicker currentTheme={theme} onSelect={setTheme} />
-
               <div style={styles.serverConfigContainer}>
                 <button 
                   onClick={() => setShowServerSettings(!showServerSettings)} 
@@ -1392,28 +1242,7 @@ export default function App() {
               </button>
             )}
 
-            {/* Side Panel Color Customizer for All Users */}
-            <SidePanelColorPicker />
 
-            {/* Theme quick-select dots (Visible only to Hasi user) */}
-            {isHasiUser && (
-              <div style={styles.themeDotsRow}>
-                {THEMES.map(t => (
-                  <button
-                    key={t.id}
-                    title={t.name}
-                    onClick={() => setTheme(t.id)}
-                    style={{
-                      ...styles.themeDot,
-                      background: t.accent,
-                      outline: theme === t.id ? `2px solid ${t.accent}` : '2px solid transparent',
-                      outlineOffset: '2px',
-                      transform: theme === t.id ? 'scale(1.25)' : 'scale(1)',
-                    }}
-                  />
-                ))}
-              </div>
-            )}
           </div>
         </aside>
 
@@ -1689,25 +1518,6 @@ const styles = {
     padding: '0.4rem 0.75rem',
     borderBottom: '1px solid var(--border-light)',
     marginBottom: '0.35rem',
-  },
-  themeDotsRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.5rem',
-    marginTop: '0.5rem',
-    padding: '0.5rem 0',
-    borderTop: '1px solid var(--border-light)',
-  },
-  themeDot: {
-    width: '14px',
-    height: '14px',
-    borderRadius: '50%',
-    border: 'none',
-    cursor: 'pointer',
-    padding: 0,
-    transition: 'all 0.2s ease',
-    flexShrink: 0,
   },
   contentArea: {
     flex: 1,
