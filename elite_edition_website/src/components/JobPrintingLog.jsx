@@ -1350,17 +1350,17 @@ export default function JobPrintingLog() {
             {/* Large Progress Indicator Badge */}
             <div style={{ padding: '0.85rem 1rem', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid var(--border-light)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.4rem', fontWeight: 700 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Progress: <strong style={{ color: 'var(--text-primary)' }}>{selectedJobStats.progressPct}%</strong></span>
-                <span style={{ color: selectedJobStats.statusColor }}>{selectedJobStats.statusText}</span>
+                <span style={{ color: 'var(--text-muted)' }}>Progress: <strong style={{ color: 'var(--text-primary)' }}>{selectedJobStats?.progressPct || 0}%</strong></span>
+                <span style={{ color: selectedJobStats?.statusColor || 'var(--text-primary)' }}>{selectedJobStats?.statusText || ''}</span>
               </div>
 
               {/* Progress Line */}
               <div style={{ width: '100%', height: 10, borderRadius: 5, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
                 <div
                   style={{
-                    width: `${selectedJobStats.progressPct}%`,
+                    width: `${selectedJobStats?.progressPct || 0}%`,
                     height: '100%',
-                    background: selectedJobStats.statusColor,
+                    background: selectedJobStats?.statusColor || '#38bdf8',
                     borderRadius: 5,
                     transition: 'width 0.3s ease'
                   }}
@@ -1370,13 +1370,13 @@ export default function JobPrintingLog() {
 
             {/* Field Details */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.82rem' }}>
-              <div><span style={{ color: 'var(--text-muted)' }}>Party:</span> <strong style={{ color: 'var(--text-primary)' }}>{selectedJob.party || 'Standard Client'}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Fabric:</span> <strong style={{ color: 'var(--text-primary)' }}>{selectedJob.fabric || '—'}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Design:</span> <strong style={{ color: 'var(--primary)' }}>{selectedJob.designName || selectedJob.designNo || '—'}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Panna:</span> <strong style={{ color: 'var(--text-primary)' }}>{selectedJob.panna || '—'}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Target Mtr:</span> <strong style={{ color: '#f59e0b' }}>{selectedJobStats.targetMtr.toFixed(2)} mtr</strong></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Total Printed:</span> <strong style={{ color: '#38bdf8' }}>{selectedJobStats.printedMtr.toFixed(2)} mtr</strong></div>
-              <div style={{ gridColumn: 'span 2' }}><span style={{ color: 'var(--text-muted)' }}>Pending Remaining:</span> <strong style={{ color: selectedJobStats.remainingMtr > 0 ? '#ef4444' : '#10b981' }}>{selectedJobStats.remainingMtr.toFixed(2)} mtr</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Party:</span> <strong style={{ color: 'var(--text-primary)' }}>{selectedJob?.party || 'Standard Client'}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Fabric:</span> <strong style={{ color: 'var(--text-primary)' }}>{selectedJob?.fabric || '—'}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Design:</span> <strong style={{ color: 'var(--primary)' }}>{selectedJob?.designName || selectedJob?.designNo || '—'}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Panna:</span> <strong style={{ color: 'var(--text-primary)' }}>{selectedJob?.panna || '—'}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Target Mtr:</span> <strong style={{ color: '#f59e0b' }}>{(selectedJobStats?.targetMtr || 0).toFixed(2)} mtr</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Total Printed:</span> <strong style={{ color: '#38bdf8' }}>{(selectedJobStats?.printedMtr || 0).toFixed(2)} mtr</strong></div>
+              <div style={{ gridColumn: 'span 2' }}><span style={{ color: 'var(--text-muted)' }}>Pending Remaining:</span> <strong style={{ color: (selectedJobStats?.remainingMtr || 0) > 0 ? '#ef4444' : '#10b981' }}>{(selectedJobStats?.remainingMtr || 0).toFixed(2)} mtr</strong></div>
             </div>
 
             {/* Action button */}
@@ -1719,18 +1719,18 @@ export default function JobPrintingLog() {
             {/* Visual Progress Bar */}
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)', borderRadius: 10, padding: '1rem', marginBottom: '1.2rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.5rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Target: <strong style={{ color: 'var(--text-primary)' }}>{jobHistoryData.summary.targetMtr} mtr</strong></span>
-                <span style={{ color: '#38bdf8' }}>Printed: <strong>{jobHistoryData.summary.totalPrintedMtr.toFixed(2)} mtr</strong> ({jobHistoryData.summary.progressPct}%)</span>
-                <span style={{ color: '#f59e0b' }}>Remaining: <strong>{jobHistoryData.summary.remainingMtr.toFixed(2)} mtr</strong></span>
+                <span style={{ color: 'var(--text-muted)' }}>Target: <strong style={{ color: 'var(--text-primary)' }}>{jobHistoryData?.summary?.targetMtr || 0} mtr</strong></span>
+                <span style={{ color: '#38bdf8' }}>Printed: <strong>{(jobHistoryData?.summary?.totalPrintedMtr || 0).toFixed(2)} mtr</strong> ({jobHistoryData?.summary?.progressPct || 0}%)</span>
+                <span style={{ color: '#f59e0b' }}>Remaining: <strong>{(jobHistoryData?.summary?.remainingMtr || 0).toFixed(2)} mtr</strong></span>
               </div>
 
               {/* Progress bar line */}
               <div style={{ width: '100%', height: 10, borderRadius: 5, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
                 <div
                   style={{
-                    width: `${jobHistoryData.summary.progressPct}%`,
+                    width: `${jobHistoryData?.summary?.progressPct || 0}%`,
                     height: '100%',
-                    background: jobHistoryData.summary.progressPct >= 100 ? '#10b981' : 'linear-gradient(90deg, #38bdf8, #8b5cf6)',
+                    background: (jobHistoryData?.summary?.progressPct || 0) >= 100 ? '#10b981' : 'linear-gradient(90deg, #38bdf8, #8b5cf6)',
                     borderRadius: 5,
                     transition: 'width 0.3s ease'
                   }}
