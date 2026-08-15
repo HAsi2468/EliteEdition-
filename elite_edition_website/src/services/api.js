@@ -797,6 +797,9 @@ export const api = {
   async lookupOrderDetails(searchTerm) {
     return request(`/complaints/lookup-order?query=${encodeURIComponent(searchTerm)}`);
   },
+  async addComplaintComment(id, payload) {
+    return request(`/complaints/${id}/comments`, { method: 'POST', body: JSON.stringify(payload) });
+  },
 
   // ─── Analytics ──────────────────────────────────────────────────────────────
   async getVariantAnalytics(params = {}) {

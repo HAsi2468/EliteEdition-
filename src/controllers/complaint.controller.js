@@ -191,13 +191,53 @@ const update = async (req, res) => {
       payload.resolvedDate = new Date();
     }
 
-    const updated = await db.Complaint.findByIdAndUpdate(id, payload, { new: true, runValidators: true });
-    if (!updated) return res.status(404).json({ error: 'Complaint not found' });
+    const existing = await db.Complaint.findById(id);
+    if (!existing) return res.status(404).json({ error: 'Complaint not found' });
 
+    if (payload.status && payload.status !== existing.status) {
+      const updaterName = payload.updatedBy || payload.userName || 'System';
+      if (!existing.comments) existing.comments = [];
+      existing.comments.push({
+        text: `🔄 Status updated to '${payload.status}'`,
+        userName: updaterName,
+        createdAt: new Date()
+      });
+      payload.comments = existing.comments;
+    }
+
+    const updated = await db.Complaint.findByIdAndUpdate(id, payload, { new: true, runValidators: true });
     res.json(updated);
   } catch (err) {
     logger.error('complaint.update error: %o', err);
     res.status(500).json({ error: err.message || 'Failed to update complaint' });
+  }
+};
+
+// Add Comment to Complaint
+const addComment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { text, userName } = req.body;
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'Comment text is required' });
+    }
+
+    const complaint = await db.Complaint.findById(id);
+    if (!complaint) return res.status(404).json({ error: 'Complaint not found' });
+
+    if (!complaint.comments) complaint.comments = [];
+    complaint.comments.push({
+      text: text.trim(),
+      userName: (userName || 'System').trim(),
+      createdAt: new Date()
+    });
+
+    await complaint.save();
+    res.json(complaint);
+  } catch (err) {
+    logger.error('complaint.addComment error: %o', err);
+    res.status(500).json({ error: err.message || 'Failed to add comment' });
   }
 };
 
@@ -486,4 +526,4 @@ const lookupOrderDetails = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getNextNumber, getOne, create, update, remove, getAnalytics, lookupOrderDetails };
+module.exports = { getAll, getNextNumber, getOne, create, update, remove, getAnalytics, lookupOrderDetails, addComment };

@@ -15,4 +15,6 @@ router.route('/:id')
   .put(ctrl.update)
   .delete(ctrl.remove);
 
+router.post('/:id/comments', ctrl.addComment);
+
 module.exports = router;

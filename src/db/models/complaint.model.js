@@ -21,6 +21,13 @@ const complaintSchema = new mongoose.Schema(
     assignedTo: { type: String, default: '', trim: true },
     responsiblePerson: { type: String, default: '', trim: true },
     responsiblePersons: [{ type: String, trim: true }],
+    comments: [
+      {
+        text: { type: String, required: true, trim: true },
+        userName: { type: String, default: 'System', trim: true },
+        createdAt: { type: Date, default: Date.now }
+      }
+    ],
     createdBy: { type: String, default: 'System', trim: true }
   },
   {

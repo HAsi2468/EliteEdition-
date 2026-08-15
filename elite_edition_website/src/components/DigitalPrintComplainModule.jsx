@@ -573,14 +573,42 @@ export default function DigitalPrintComplainModule() {
 
   const handleQuickStatusUpdate = async (item, newStatus) => {
     try {
-      await api.updateComplaint(item._id, { status: newStatus });
+      const currentUser = api.getCurrentUser();
+      const currentUserName = currentUser ? (currentUser.name || currentUser.fullName || currentUser.username || 'User') : 'User';
+      const res = await api.updateComplaint(item._id, { status: newStatus, updatedBy: currentUserName });
       fetchComplaints();
       fetchAnalytics();
       if (showViewModal && showViewModal._id === item._id) {
-        setShowViewModal(prev => ({ ...prev, status: newStatus }));
+        setShowViewModal(res || { ...showViewModal, status: newStatus });
       }
     } catch (err) {
       triggerEliteAlert('Update Failed', err.message || 'Failed to update status.', 'error');
+    }
+  };
+
+  const [newCommentText, setNewCommentText] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
+
+  const handleAddComment = async (complaintId) => {
+    if (!newCommentText.trim()) return;
+    setPostingComment(true);
+    try {
+      const currentUser = api.getCurrentUser();
+      const currentUserName = currentUser ? (currentUser.name || currentUser.fullName || currentUser.username || 'Staff User') : 'Staff User';
+      const updated = await api.addComplaintComment(complaintId, {
+        text: newCommentText.trim(),
+        userName: currentUserName
+      });
+      setNewCommentText('');
+      fetchComplaints();
+      if (showViewModal && showViewModal._id === complaintId) {
+        setShowViewModal(updated);
+      }
+      triggerEliteAlert('Comment Added', 'Your remark was logged to ticket activity timeline.', 'success');
+    } catch (err) {
+      triggerEliteAlert('Comment Error', err.message || 'Failed to add comment.', 'error');
+    } finally {
+      setPostingComment(false);
     }
   };
 
@@ -960,13 +988,24 @@ export default function DigitalPrintComplainModule() {
                         </div>
                       </div>
 
-                      <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                        fontSize: '0.7rem', fontWeight: 800, padding: '0.25rem 0.6rem', borderRadius: '20px',
-                        background: statusMeta.bg, color: statusMeta.color, border: `1px solid ${statusMeta.border}`
-                      }}>
-                        {statusMeta.icon} {item.status}
-                      </span>
+                      {/* Interactive Status Select Dropdown on Card Header */}
+                      <select
+                        value={item.status}
+                        onChange={e => handleQuickStatusUpdate(item, e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                          fontSize: '0.75rem', fontWeight: 800, padding: '0.25rem 0.6rem', borderRadius: '20px',
+                          background: statusMeta.bg, color: statusMeta.color, border: `1.5px solid ${statusMeta.border}`,
+                          cursor: 'pointer', outline: 'none'
+                        }}
+                      >
+                        {STATUSES.map(st => (
+                          <option key={st} value={st} style={{ background: '#1e293b', color: '#fff' }}>
+                            {st}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     {/* Customer, Assigned To & Responsible Person */}
@@ -1041,12 +1080,20 @@ export default function DigitalPrintComplainModule() {
 
                     {/* Actions Footer */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)', marginTop: 'auto' }}>
-                      <button
-                        onClick={() => setShowViewModal(item)}
-                        style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                      >
-                        <Eye size={14} /> View & Resolve
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <button
+                          onClick={() => setShowViewModal(item)}
+                          style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                        >
+                          <Eye size={14} /> View & Resolve
+                        </button>
+                        <button
+                          onClick={() => setShowViewModal(item)}
+                          style={{ background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', fontSize: '0.7rem', fontWeight: 700, borderRadius: '12px', padding: '2px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                        >
+                          <MessageSquare size={12} /> {item.comments?.length || 0} Comments
+                        </button>
+                      </div>
 
                       {canCreateComplaint && (
                         <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -1527,6 +1574,58 @@ export default function DigitalPrintComplainModule() {
               <div style={{ background: 'rgba(34,197,94,0.06)', padding: '0.85rem', borderRadius: '8px', border: '1px solid rgba(34,197,94,0.2)', fontSize: '0.85rem' }}>
                 <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#4ade80', textTransform: 'uppercase', marginBottom: 4 }}>Action Taken / Corrective Resolution</div>
                 {showViewModal.actionTaken || 'No corrective action recorded yet. Click Edit to add resolution notes.'}
+              </div>
+
+              {/* COMMENTS & ACTIVITY TIMELINE */}
+              <div style={{ background: 'var(--bg-main, #111827)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border-light)', marginTop: '0.2rem' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#60a5fa', textTransform: 'uppercase', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <MessageSquare size={16} /> Ticket Activity & Comments Timeline ({showViewModal.comments?.length || 0})
+                </div>
+
+                {/* Comments List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '200px', overflowY: 'auto', marginBottom: '0.75rem', paddingRight: '0.25rem' }}>
+                  {!showViewModal.comments || showViewModal.comments.length === 0 ? (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>No remarks or activity comments yet. Add the first comment below.</div>
+                  ) : (
+                    showViewModal.comments.map((cm, idx) => (
+                      <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)', fontSize: '0.78rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                          <span style={{ fontWeight: 800, color: cm.userName === 'System' ? '#f59e0b' : '#60a5fa' }}>
+                            👤 {cm.userName}
+                          </span>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                            📅 {cm.createdAt ? new Date(cm.createdAt).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                          </span>
+                        </div>
+                        <div style={{ color: 'var(--text-primary)', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{cm.text}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Add Comment Input */}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    placeholder="Add progress remark or comment with date & time..."
+                    value={newCommentText}
+                    onChange={e => setNewCommentText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleAddComment(showViewModal._id); }}
+                    style={{ flex: 1, padding: '0.45rem 0.75rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'rgba(0,0,0,0.2)', color: '#fff' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleAddComment(showViewModal._id)}
+                    disabled={postingComment || !newCommentText.trim()}
+                    style={{
+                      padding: '0.45rem 1rem', fontSize: '0.75rem', fontWeight: 800, borderRadius: '6px',
+                      background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', color: '#fff', border: 'none',
+                      cursor: postingComment || !newCommentText.trim() ? 'not-allowed' : 'pointer', opacity: postingComment || !newCommentText.trim() ? 0.5 : 1
+                    }}
+                  >
+                    {postingComment ? 'Posting...' : '💬 Post Comment'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
