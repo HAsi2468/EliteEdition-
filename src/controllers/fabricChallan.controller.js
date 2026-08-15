@@ -277,6 +277,9 @@ const normalizeFabric = (val) => {
   if (clean === 'CAMRIK' || clean === 'CEMBRIC' || clean === 'CEMBRIK' || clean === 'CAMBRIK' || clean.includes('CAMRIK') || clean.includes('CEMBRIK')) {
     return 'CAMBRIC';
   }
+  if (clean === 'MAL' || clean === 'POLY MAL' || clean === 'POLYMALL' || clean === 'POLY MLL' || clean === 'POLLY MAL') {
+    return 'POLLY MAL';
+  }
   return clean;
 };
 

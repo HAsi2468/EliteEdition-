@@ -12,6 +12,9 @@ const normalizeFabric = (val) => {
   if (clean === 'CAMRIK' || clean === 'CEMBRIC' || clean === 'CEMBRIK' || clean === 'CAMBRIK' || clean.includes('CAMRIK') || clean.includes('CEMBRIK')) {
     return 'CAMBRIC';
   }
+  if (clean === 'MAL' || clean === 'POLY MAL' || clean === 'POLYMALL' || clean === 'POLY MLL' || clean === 'POLLY MAL') {
+    return 'POLLY MAL';
+  }
   return clean;
 };
 
@@ -253,9 +256,10 @@ const getLotStock = async (req, res) => {
         candidates.push('FRENCH CREP');
         candidates.push('FRENCH CREPE');
       }
-      if (clean.includes('MAL')) {
+      if (clean.includes('MAL') || clean.includes('POLLY')) {
         candidates.push('MAL');
         candidates.push('POLY MAL');
+        candidates.push('POLLY MAL');
       }
       if (clean.includes('REYON') || clean.includes('RAYON')) {
         candidates.push('REYON');
