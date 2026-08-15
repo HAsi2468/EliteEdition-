@@ -2424,59 +2424,59 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
       {/* ── TAX INVOICE PREVIEW / VIEW MODAL ────────────────────────────────── */}
       {viewInvoiceModal && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '750px', maxHeight: '92vh', overflowY: 'auto', padding: '1.5rem', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 12 }}>
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+          <div style={{ width: '100%', maxWidth: '780px', maxHeight: '92vh', overflowY: 'auto', padding: '1.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #e2e8f0', borderRadius: 14, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)' }}>
 
             {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.85rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.9rem', marginBottom: '1.1rem' }}>
               <div>
-                <h3 style={{ margin: 0, color: '#a78bfa', fontWeight: 800, fontSize: '1.15rem' }}>
+                <h3 style={{ margin: 0, color: '#6d28d9', fontWeight: 900, fontSize: '1.25rem' }}>
                   🧾 Tax Invoice — {viewInvoiceModal.invoiceNo}
                 </h3>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                  Invoice Date: {formatDateDDMMYYYY(viewInvoiceModal.invoiceDate)} {viewInvoiceModal.dueDate ? `| Due Date: ${formatDateDDMMYYYY(viewInvoiceModal.dueDate)}` : ''}
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, marginTop: 2, display: 'block' }}>
+                  Invoice Date: <strong>{formatDateDDMMYYYY(viewInvoiceModal.invoiceDate)}</strong> {viewInvoiceModal.dueDate ? `| Due Date: ${formatDateDDMMYYYY(viewInvoiceModal.dueDate)}` : ''}
                   {(viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo) ? ` | Challan No: ${viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo}` : ''}
                 </span>
               </div>
-              <button className="btn-icon" onClick={() => setViewInvoiceModal(null)} style={{ padding: '0.35rem' }}>
+              <button onClick={() => setViewInvoiceModal(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', borderRadius: 8, padding: '0.4rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={18} />
               </button>
             </div>
 
             {/* Billed To & Status Box */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-light)', fontSize: '0.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem', background: '#f8fafc', padding: '1.1rem', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
               <div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>BILLED TO CUSTOMER</div>
-                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary)' }}>{viewInvoiceModal.customer?.businessName || viewInvoiceModal.customer?.name || 'Walk-in Client'}</div>
-                {viewInvoiceModal.customer?.gstin && <div style={{ color: '#a78bfa', fontWeight: 700, marginTop: 2 }}>GSTIN: {viewInvoiceModal.customer.gstin}</div>}
-                {viewInvoiceModal.customer?.billingAddress && <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>{viewInvoiceModal.customer.billingAddress}</div>}
-                {viewInvoiceModal.customer?.phone && <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>Phone: {viewInvoiceModal.customer.phone}</div>}
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.04em' }}>BILLED TO CUSTOMER</div>
+                <div style={{ fontWeight: 900, fontSize: '1.05rem', color: '#0f172a' }}>{viewInvoiceModal.customer?.businessName || viewInvoiceModal.customer?.name || 'Walk-in Client'}</div>
+                {viewInvoiceModal.customer?.gstin && <div style={{ color: '#6d28d9', fontWeight: 700, marginTop: 3 }}>GSTIN: {viewInvoiceModal.customer.gstin}</div>}
+                {viewInvoiceModal.customer?.billingAddress && <div style={{ color: '#475569', marginTop: 3, lineHeight: '1.35' }}>{viewInvoiceModal.customer.billingAddress}</div>}
+                {viewInvoiceModal.customer?.phone && <div style={{ color: '#475569', marginTop: 3 }}>Phone: {viewInvoiceModal.customer.phone}</div>}
               </div>
 
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>INVOICE DETAILS & STATUS</div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.04em' }}>INVOICE DETAILS & STATUS</div>
                 <span style={{
-                  padding: '4px 10px',
+                  padding: '4px 12px',
                   borderRadius: 6,
                   fontSize: '0.78rem',
                   fontWeight: 800,
                   display: 'inline-block',
-                  background: viewInvoiceModal.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.15)' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
-                  color: viewInvoiceModal.paymentStatus === 'PAID' ? '#34d399' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? '#fbbf24' : '#f87171',
-                  border: `1px solid ${viewInvoiceModal.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.3)' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}`
+                  background: viewInvoiceModal.paymentStatus === 'PAID' ? '#ecfdf5' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? '#fffbeb' : '#fef2f2',
+                  color: viewInvoiceModal.paymentStatus === 'PAID' ? '#059669' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? '#d97706' : '#dc2626',
+                  border: `1px solid ${viewInvoiceModal.paymentStatus === 'PAID' ? '#6ee7b7' : viewInvoiceModal.paymentStatus === 'PARTIALLY_PAID' ? '#fcd34d' : '#fca5a5'}`
                 }}>
                   {viewInvoiceModal.paymentStatus || 'UNPAID'}
                 </span>
                 {(viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo) && (
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#38bdf8', marginTop: 4 }}>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#2563eb', marginTop: 5 }}>
                     Challan No: {viewInvoiceModal.ourChallanNo || viewInvoiceModal.challanNo}
                   </div>
                 )}
-                <div style={{ marginTop: '0.4rem', fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-primary)' }}>
+                <div style={{ marginTop: '0.5rem', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
                   Total: {fmtINR(viewInvoiceModal.grandTotal)}
                 </div>
                 {viewInvoiceModal.balanceDue > 0 && (
-                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#f87171', marginTop: 2 }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#dc2626', marginTop: 2 }}>
                     Balance Due: {fmtINR(viewInvoiceModal.balanceDue)}
                   </div>
                 )}
@@ -2484,17 +2484,17 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             </div>
 
             {/* Line Items Table */}
-            <div style={{ marginBottom: '1.25rem', overflowX: 'auto' }}>
-              <table style={{ width: '100%', fontSize: '0.82rem', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <div style={{ marginBottom: '1.25rem', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+              <table style={{ width: '100%', fontSize: '0.83rem', borderCollapse: 'collapse', textAlign: 'left', background: '#ffffff' }}>
                 <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                    <th style={{ padding: '0.6rem', color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>Sr.</th>
-                    <th style={{ padding: '0.6rem', color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', width: '50px' }}>Image</th>
-                    <th style={{ padding: '0.6rem', color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>Item Description & Details</th>
-                    <th style={{ padding: '0.6rem', color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>HSN</th>
-                    <th style={{ padding: '0.6rem', textAlign: 'right', color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>Qty</th>
-                    <th style={{ padding: '0.6rem', textAlign: 'right', color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>Rate</th>
-                    <th style={{ padding: '0.6rem', textAlign: 'right', color: '#94a3b8', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase' }}>Amount</th>
+                  <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
+                    <th style={{ padding: '0.65rem 0.6rem', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Sr.</th>
+                    <th style={{ padding: '0.65rem 0.6rem', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', width: '50px' }}>Image</th>
+                    <th style={{ padding: '0.65rem 0.6rem', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Item Description & Details</th>
+                    <th style={{ padding: '0.65rem 0.6rem', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>HSN</th>
+                    <th style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Qty</th>
+                    <th style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Rate</th>
+                    <th style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#334155', fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase' }}>Amount</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2506,37 +2506,37 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                     if (it.ourChallanNo) secondaryBadges.push(`Challan: ${it.ourChallanNo}`);
 
                     return (
-                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', verticalAlign: 'top' }}>
-                        <td style={{ padding: '0.65rem 0.6rem', color: '#94a3b8', fontWeight: 700 }}>{idx + 1}</td>
-                        <td style={{ padding: '0.65rem 0.6rem' }}>
+                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', verticalAlign: 'top', background: idx % 2 === 0 ? '#ffffff' : '#fafafa' }}>
+                        <td style={{ padding: '0.7rem 0.6rem', color: '#64748b', fontWeight: 700 }}>{idx + 1}</td>
+                        <td style={{ padding: '0.7rem 0.6rem' }}>
                           {it.imageUrl ? (
-                            <img src={it.imageUrl} alt="Item" style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.15)' }} />
+                            <img src={it.imageUrl} alt="Item" style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover', border: '1px solid #cbd5e1' }} />
                           ) : (
-                            <div style={{ width: 38, height: 38, borderRadius: 6, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#94a3b8' }}>No Img</div>
+                            <div style={{ width: 38, height: 38, borderRadius: 6, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#64748b', fontWeight: 600 }}>No Img</div>
                           )}
                         </td>
-                        <td style={{ padding: '0.65rem 0.6rem' }}>
-                          <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#f8fafc' }}>{it.itemName}</div>
+                        <td style={{ padding: '0.7rem 0.6rem' }}>
+                          <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#0f172a' }}>{it.itemName}</div>
                           {jobDisplay && (
-                            <div style={{ fontSize: '0.75rem', color: '#c084fc', fontWeight: 700, marginTop: 3 }}>
+                            <div style={{ fontSize: '0.76rem', color: '#7c3aed', fontWeight: 700, marginTop: 3, display: 'inline-block', background: '#f3e8ff', padding: '2px 8px', borderRadius: 4, border: '1px solid #d8b4fe' }}>
                               📋 {jobDisplay}
                             </div>
                           )}
                           {secondaryBadges.length > 0 && (
-                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: 4 }}>
+                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: 5 }}>
                               {secondaryBadges.map((b, bIdx) => (
-                                <span key={bIdx} style={{ fontSize: '0.7rem', padding: '2px 7px', borderRadius: 4, background: 'rgba(255,255,255,0.08)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.15)', fontWeight: 600 }}>
+                                <span key={bIdx} style={{ fontSize: '0.7rem', padding: '2px 7px', borderRadius: 4, background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', fontWeight: 600 }}>
                                   {b}
                                 </span>
                               ))}
                             </div>
                           )}
-                          {it.description && <div style={{ fontSize: '0.73rem', color: '#cbd5e1', marginTop: 4 }}>{it.description}</div>}
+                          {it.description && <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 4 }}>{it.description}</div>}
                         </td>
-                        <td style={{ padding: '0.65rem 0.6rem', fontWeight: 800, color: '#c084fc' }}>{it.hsnCode || '998821'}</td>
-                        <td style={{ padding: '0.65rem 0.6rem', textAlign: 'right', fontWeight: 800, color: '#f8fafc' }}>{it.qty} {it.unit || 'Meters'}</td>
-                        <td style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#cbd5e1', fontWeight: 600 }}>₹ {it.unitPrice}</td>
-                        <td style={{ padding: '0.65rem 0.6rem', textAlign: 'right', fontWeight: 800, color: '#38bdf8' }}>₹ {Number(it.totalAmount || 0).toFixed(2)}</td>
+                        <td style={{ padding: '0.7rem 0.6rem', fontWeight: 800, color: '#7c3aed' }}>{it.hsnCode || '998821'}</td>
+                        <td style={{ padding: '0.7rem 0.6rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{it.qty} {it.unit || 'Meters'}</td>
+                        <td style={{ padding: '0.7rem 0.6rem', textAlign: 'right', color: '#475569', fontWeight: 600 }}>₹ {it.unitPrice}</td>
+                        <td style={{ padding: '0.7rem 0.6rem', textAlign: 'right', fontWeight: 900, color: '#2563eb' }}>₹ {Number(it.totalAmount || 0).toFixed(2)}</td>
                       </tr>
                     );
                   })}
@@ -2549,63 +2549,63 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               <div>
                 {viewInvoiceModal.notes && (
                   <div style={{ marginBottom: '0.6rem' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Notes:</span>
-                    <div style={{ color: '#e2e8f0', fontSize: '0.82rem', marginTop: 2 }}>{viewInvoiceModal.notes}</div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>NOTES:</span>
+                    <div style={{ color: '#334155', fontSize: '0.83rem', marginTop: 2, background: '#f8fafc', padding: '0.6rem', borderRadius: 6, border: '1px solid #e2e8f0' }}>{viewInvoiceModal.notes}</div>
                   </div>
                 )}
-                <div style={{ fontSize: '0.78rem', color: '#c084fc', fontWeight: 700 }}>
-                  Amount in Words: {numToWords(viewInvoiceModal.grandTotal)}
+                <div style={{ fontSize: '0.8rem', color: '#6d28d9', fontWeight: 700, background: '#f5f3ff', padding: '0.65rem 0.85rem', borderRadius: 8, border: '1px solid #ddd6fe' }}>
+                  Amount in Words: <strong>{numToWords(viewInvoiceModal.grandTotal)}</strong>
                 </div>
               </div>
 
-              <div style={{ background: 'rgba(124,58,237,0.14)', padding: '0.9rem 1.1rem', borderRadius: 10, border: '1px solid rgba(124,58,237,0.3)', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div style={{ background: '#f8fafc', padding: '1rem 1.25rem', borderRadius: 10, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#94a3b8', fontWeight: 600 }}>Subtotal:</span>
-                  <span style={{ color: '#f8fafc', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.subtotal)}</span>
+                  <span style={{ color: '#64748b', fontWeight: 600 }}>Subtotal:</span>
+                  <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.subtotal)}</span>
                 </div>
                 {viewInvoiceModal.igstAmount > 0 ? (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#94a3b8', fontWeight: 600 }}>IGST Tax (18%):</span>
-                    <span style={{ color: '#f8fafc', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.igstAmount)}</span>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>IGST Tax (18%):</span>
+                    <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.igstAmount)}</span>
                   </div>
                 ) : (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#94a3b8', fontWeight: 600 }}>CGST Tax (9%):</span>
-                      <span style={{ color: '#f8fafc', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.cgstAmount || (viewInvoiceModal.totalTax / 2))}</span>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>CGST Tax (9%):</span>
+                      <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.cgstAmount || (viewInvoiceModal.totalTax / 2))}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#94a3b8', fontWeight: 600 }}>SGST Tax (9%):</span>
-                      <span style={{ color: '#f8fafc', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.sgstAmount || (viewInvoiceModal.totalTax / 2))}</span>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>SGST Tax (9%):</span>
+                      <span style={{ color: '#0f172a', fontWeight: 700 }}>{fmtINR(viewInvoiceModal.sgstAmount || (viewInvoiceModal.totalTax / 2))}</span>
                     </div>
                   </>
                 )}
 
                 {/* Round Off Details Row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c084fc', fontWeight: 600 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#7c3aed', fontWeight: 600 }}>
                   <span>Round Off:</span>
                   <span style={{ fontWeight: 700 }}>{viewInvoiceModal.roundOff != null ? (viewInvoiceModal.roundOff > 0 ? '+' : '') + ' ₹ ' + Number(viewInvoiceModal.roundOff).toFixed(2) : '₹ 0.00'}</span>
                 </div>
 
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: '0.4rem', marginTop: '0.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#c084fc', fontWeight: 800, fontSize: '1.05rem' }}>Grand Total:</span>
-                  <span style={{ color: '#34d399', fontWeight: 900, fontSize: '1.15rem' }}>{fmtINR(viewInvoiceModal.grandTotal)}</span>
+                <div style={{ borderTop: '2px solid #e2e8f0', paddingTop: '0.45rem', marginTop: '0.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6d28d9', fontWeight: 800, fontSize: '1.05rem' }}>Grand Total:</span>
+                  <span style={{ color: '#059669', fontWeight: 900, fontSize: '1.25rem' }}>{fmtINR(viewInvoiceModal.grandTotal)}</span>
                 </div>
               </div>
             </div>
 
             {/* Modal Actions */}
-            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              <button className="btn-secondary" onClick={() => setViewInvoiceModal(null)}>Close</button>
-              <button className="btn-primary" style={{ background: 'linear-gradient(135deg,#10b981,#059669)', display: 'inline-flex', alignItems: 'center', gap: '4px' }} onClick={() => openPdfDialog(viewInvoiceModal)}>
+            <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+              <button style={{ padding: '0.5rem 1.1rem', background: '#f1f5f9', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }} onClick={() => setViewInvoiceModal(null)}>Close</button>
+              <button style={{ padding: '0.5rem 1.1rem', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#ffffff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }} onClick={() => openPdfDialog(viewInvoiceModal)}>
                 <Download size={15} /> Download PDF
               </button>
               {viewInvoiceModal.balanceDue > 0 && (
-                <button className="btn-primary" style={{ background: 'linear-gradient(135deg,#7c3aed,#6366f1)', display: 'inline-flex', alignItems: 'center', gap: '4px' }} onClick={() => { const inv = viewInvoiceModal; setViewInvoiceModal(null); setPaymentModalInvoice(inv); setPayAmount(inv.balanceDue); }}>
+                <button style={{ padding: '0.5rem 1.1rem', background: 'linear-gradient(135deg,#7c3aed,#6366f1)', color: '#ffffff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }} onClick={() => { const inv = viewInvoiceModal; setViewInvoiceModal(null); setPaymentModalInvoice(inv); setPayAmount(inv.balanceDue); }}>
                   <CreditCard size={15} /> Record Payment
                 </button>
               )}
-              <button className="btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }} onClick={() => { const inv = viewInvoiceModal; setViewInvoiceModal(null); handleOpenCreateTab(inv); }}>
+              <button style={{ padding: '0.5rem 1.1rem', background: '#ffffff', color: '#1e293b', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }} onClick={() => { const inv = viewInvoiceModal; setViewInvoiceModal(null); handleOpenCreateTab(inv); }}>
                 <Edit2 size={15} /> Edit Invoice
               </button>
             </div>
