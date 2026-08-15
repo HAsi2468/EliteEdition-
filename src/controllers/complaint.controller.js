@@ -286,8 +286,8 @@ const getAnalytics = async (req, res) => {
 // Lookup order details across JobCards, FabricChallans, and Invoices with intelligent cross-linking
 const lookupOrderDetails = async (req, res) => {
   try {
-    const { query = '', jobCardNo = '', challanNo = '', invoiceNo = '' } = req.query;
-    const rawSearch = (query || jobCardNo || challanNo || invoiceNo || '').trim();
+    const { query = '', jobCardNo: qJobCardNo = '', challanNo: qChallanNo = '', invoiceNo: qInvoiceNo = '' } = req.query;
+    const rawSearch = (query || qJobCardNo || qChallanNo || qInvoiceNo || '').trim();
 
     if (!rawSearch) {
       return res.json({ success: false, message: 'No search term provided' });
