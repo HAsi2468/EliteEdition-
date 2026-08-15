@@ -503,19 +503,23 @@ export default function JobPrintingLog() {
           </thead>
           <tbody>
             ${(() => {
-              const grandoC = (grandoInkC && Number(grandoInkC) > 0) ? Number(grandoInkC).toFixed(2) : (rawMaterialSummary.grandoInk.C > 0 ? rawMaterialSummary.grandoInk.C.toFixed(2) : '');
-              const grandoM = (grandoInkM && Number(grandoInkM) > 0) ? Number(grandoInkM).toFixed(2) : (rawMaterialSummary.grandoInk.M > 0 ? rawMaterialSummary.grandoInk.M.toFixed(2) : '');
-              const grandoY = (grandoInkY && Number(grandoInkY) > 0) ? Number(grandoInkY).toFixed(2) : (rawMaterialSummary.grandoInk.Y > 0 ? rawMaterialSummary.grandoInk.Y.toFixed(2) : '');
-              const grandoK = (grandoInkK && Number(grandoInkK) > 0) ? Number(grandoInkK).toFixed(2) : (rawMaterialSummary.grandoInk.K > 0 ? rawMaterialSummary.grandoInk.K.toFixed(2) : '');
+              const outG = rawMaterialSummary?.outward?.grando || { C: 0, M: 0, Y: 0, K: 0 };
+              const outP = rawMaterialSummary?.outward?.printdot || { C: 0, M: 0, Y: 0, K: 0 };
+              const outPapers = rawMaterialSummary?.outward?.paper || [];
 
-              const printdotC = (printdotInkC && Number(printdotInkC) > 0) ? Number(printdotInkC).toFixed(2) : (rawMaterialSummary.printdotInk.C > 0 ? rawMaterialSummary.printdotInk.C.toFixed(2) : '');
-              const printdotM = (printdotInkM && Number(printdotInkM) > 0) ? Number(printdotInkM).toFixed(2) : (rawMaterialSummary.printdotInk.M > 0 ? rawMaterialSummary.printdotInk.M.toFixed(2) : '');
-              const printdotY = (printdotInkY && Number(printdotInkY) > 0) ? Number(printdotInkY).toFixed(2) : (rawMaterialSummary.printdotInk.Y > 0 ? rawMaterialSummary.printdotInk.Y.toFixed(2) : '');
-              const printdotK = (printdotInkK && Number(printdotInkK) > 0) ? Number(printdotInkK).toFixed(2) : (rawMaterialSummary.printdotInk.K > 0 ? rawMaterialSummary.printdotInk.K.toFixed(2) : '');
+              const grandoC = (Number(grandoOutC) > 0) ? Number(grandoOutC).toFixed(2) : (outG.C > 0 ? outG.C.toFixed(2) : '');
+              const grandoM = (Number(grandoOutM) > 0) ? Number(grandoOutM).toFixed(2) : (outG.M > 0 ? outG.M.toFixed(2) : '');
+              const grandoY = (Number(grandoOutY) > 0) ? Number(grandoOutY).toFixed(2) : (outG.Y > 0 ? outG.Y.toFixed(2) : '');
+              const grandoK = (Number(grandoOutK) > 0) ? Number(grandoOutK).toFixed(2) : (outG.K > 0 ? outG.K.toFixed(2) : '');
 
-              const row1Paper = paperEntries[0] || {};
-              const row2Paper = paperEntries[1] || {};
-              const extraPapers = paperEntries.slice(2);
+              const printdotC = (Number(printdotOutC) > 0) ? Number(printdotOutC).toFixed(2) : (outP.C > 0 ? outP.C.toFixed(2) : '');
+              const printdotM = (Number(printdotOutM) > 0) ? Number(printdotOutM).toFixed(2) : (outP.M > 0 ? outP.M.toFixed(2) : '');
+              const printdotY = (Number(printdotOutY) > 0) ? Number(printdotOutY).toFixed(2) : (outP.Y > 0 ? outP.Y.toFixed(2) : '');
+              const printdotK = (Number(printdotOutK) > 0) ? Number(printdotOutK).toFixed(2) : (outP.K > 0 ? outP.K.toFixed(2) : '');
+
+              const row1Paper = outPapers[0] || {};
+              const row2Paper = outPapers[1] || {};
+              const extraPapers = outPapers.slice(2);
 
               const row1Panno = row1Paper.paperPanna === 'Custom' ? (row1Paper.paperCustomPanna || '') : (row1Paper.paperPanna || '');
               const row2Panno = row2Paper.paperPanna === 'Custom' ? (row2Paper.paperCustomPanna || '') : (row2Paper.paperPanna || '');
