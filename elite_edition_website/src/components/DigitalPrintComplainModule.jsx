@@ -325,7 +325,11 @@ export default function DigitalPrintComplainModule() {
       if (res && res.data) {
         let list = res.data;
         if (!isAdmin && currentUserName) {
-          list = list.filter(item => (item.assignedTo || '').toLowerCase().trim() === currentUserName.toLowerCase().trim());
+          const normName = currentUserName.toLowerCase().trim();
+          list = list.filter(item =>
+            (item.assignedTo || '').toLowerCase().trim() === normName ||
+            (item.responsiblePerson || '').toLowerCase().trim() === normName
+          );
         }
         setComplaints(list);
       }

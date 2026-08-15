@@ -20,7 +20,11 @@ const getAll = async (req, res) => {
     const filter = {};
 
     if (assignedTo && assignedTo !== 'All') {
-      filter.assignedTo = new RegExp(`^${assignedTo.trim()}$`, 'i');
+      const userRegex = new RegExp(`^${assignedTo.trim()}$`, 'i');
+      filter.$or = [
+        { assignedTo: userRegex },
+        { responsiblePerson: userRegex }
+      ];
     }
     if (responsiblePerson && responsiblePerson !== 'All') {
       filter.responsiblePerson = new RegExp(`^${responsiblePerson.trim()}$`, 'i');
@@ -204,7 +208,11 @@ const getAnalytics = async (req, res) => {
     const jcFilter = {};
 
     if (assignedTo && assignedTo !== 'All') {
-      filter.assignedTo = new RegExp(`^${assignedTo.trim()}$`, 'i');
+      const userRegex = new RegExp(`^${assignedTo.trim()}$`, 'i');
+      filter.$or = [
+        { assignedTo: userRegex },
+        { responsiblePerson: userRegex }
+      ];
     }
 
     if (dateStart || dateEnd) {
