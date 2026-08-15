@@ -257,6 +257,9 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
   const [bulkDownloading, setBulkDownloading] = useState(false);
 
+  // Auto open Expense create modal
+  const [autoOpenExpenseModal, setAutoOpenExpenseModal] = useState(false);
+
   // ── Ledger System States ──────────────────────────────────────────────────
   const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [ledgerMode, setLedgerMode] = useState('party'); // 'party' or 'master'
@@ -1345,6 +1348,16 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             </button>
             <button
               className="btn-primary"
+              onClick={() => {
+                setActiveTab('expense');
+                setAutoOpenExpenseModal(true);
+              }}
+              style={{ padding: '0.55rem 1.25rem', background: 'linear-gradient(135deg,#f59e0b,#d97706)', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)', fontWeight: 800 }}
+            >
+              <PlusCircle size={16} /> Expense Entry
+            </button>
+            <button
+              className="btn-primary"
               onClick={() => handleOpenCreateTab()}
               style={{ padding: '0.55rem 1.25rem', background: 'linear-gradient(135deg,#7c3aed,#6366f1)', boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)', fontWeight: 800 }}
             >
@@ -2429,7 +2442,10 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
       {/* ── TAB 6: EXPENSE & LEDGER MODULE ───────────────────────────────────── */}
       {activeTab === 'expense' && (
-        <DigitalPrintExpenseModule />
+        <DigitalPrintExpenseModule
+          autoOpenCreate={autoOpenExpenseModal}
+          onModalOpened={() => setAutoOpenExpenseModal(false)}
+        />
       )}
 
       {/* ── TAX INVOICE PREVIEW / VIEW MODAL ────────────────────────────────── */}
