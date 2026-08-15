@@ -111,7 +111,7 @@ const getPrintConfig = async (req, res) => {
 
 const updatePrintConfig = async (req, res) => {
   try {
-    const { action, field, value, machineName, companyData } = req.body;
+    const { action, field, value, machineName, categoryName, companyData } = req.body;
     
     let config = await getConfig();
 
@@ -141,6 +141,7 @@ const updatePrintConfig = async (req, res) => {
 
     const validFields = [
       'categories', 'passes', 'parties', 'widths', 'fabrics', 'designers', 'operators',
+      'complaintCategories', 'complaint_subcategory',
       'paperTypes', 'billToOptions', 'shipToOptions', 'machines',
       'machine_profile', 'temperatures', 'speeds', 'startingJobNo', 'rawMaterials',
       'sublimationPanna', 'sublimationQualities', 'butterPanna', 'inkColors', 'inkCanSizes',
@@ -169,6 +170,20 @@ const updatePrintConfig = async (req, res) => {
         if (!machine.profiles.includes(value)) machine.profiles.push(value);
       } else if (action === 'remove') {
         machine.profiles = machine.profiles.filter(p => p !== value);
+      }
+    } else if (field === 'complaint_subcategory') {
+      if (!categoryName) return res.status(httpStatus.BAD_REQUEST).send('Missing categoryName');
+      if (!config.complaintSubCategories) config.complaintSubCategories = new Map();
+
+      let currentSubList = config.complaintSubCategories.get(categoryName) || [];
+      if (action === 'add') {
+        if (!currentSubList.includes(value)) {
+          currentSubList.push(value);
+          config.complaintSubCategories.set(categoryName, currentSubList);
+        }
+      } else if (action === 'remove') {
+        currentSubList = currentSubList.filter(p => p !== value);
+        config.complaintSubCategories.set(categoryName, currentSubList);
       }
     } else if (field === 'startingJobNo') {
       config.startingJobNo = Number(value) || 1;

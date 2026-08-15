@@ -148,6 +148,14 @@ export default function DigitalPrintComplainModule() {
 
       const mergedStaff = Array.from(new Set([...userNames, ...autoUsers, ...operators]));
       setStaffList(mergedStaff);
+
+      // 3. Dynamic Categories & Sub-Categories from Print Settings
+      if (cfg && Array.isArray(cfg.complaintCategories) && cfg.complaintCategories.length > 0) {
+        setDynamicCategories(cfg.complaintCategories);
+      }
+      if (cfg && cfg.complaintSubCategories && typeof cfg.complaintSubCategories === 'object') {
+        setDynamicSubCategories(cfg.complaintSubCategories);
+      }
     } catch (e) {
       console.warn('Failed to fetch metadata list:', e);
     }
@@ -741,12 +749,12 @@ export default function DigitalPrintComplainModule() {
                       value={formVal.category}
                       onChange={e => {
                         const newCat = e.target.value;
-                        const subOpts = SUB_CATEGORIES[newCat] || ['Other'];
+                        const subOpts = dynamicSubCategories[newCat] || SUB_CATEGORIES[newCat] || ['Other'];
                         setFormVal({ ...formVal, category: newCat, subCategory: subOpts[0] || '' });
                       }}
                       style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
                     >
-                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      {dynamicCategories.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                   <div>
@@ -756,7 +764,7 @@ export default function DigitalPrintComplainModule() {
                       onChange={e => setFormVal({ ...formVal, subCategory: e.target.value })}
                       style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
                     >
-                      {(SUB_CATEGORIES[formVal.category] || ['Other']).map(sub => (
+                      {(dynamicSubCategories[formVal.category] || SUB_CATEGORIES[formVal.category] || ['Other']).map(sub => (
                         <option key={sub} value={sub}>{sub}</option>
                       ))}
                     </select>

@@ -170,14 +170,33 @@ export default function PrintSettings() {
     }
   };
 
-  const handleRemoveMachineProfile = async (machineName, value) => {
-    if (!window.confirm(`Are you sure you want to remove "${value}" from ${machineName}?`)) return;
+  const [newComplaintCategory, setNewComplaintCategory] = useState('');
+  const [newComplaintSubCategory, setNewComplaintSubCategory] = useState({});
+  const [selectedCategoryForSub, setSelectedCategoryForSub] = useState('');
+
+  const handleAddComplaintSubCategory = async (categoryName) => {
+    const val = newComplaintSubCategory[categoryName];
+    if (!val || !val.trim()) return;
     try {
       setActionLoading(true);
-      const updated = await api.updatePrintConfig({ action: 'remove', field: 'machine_profile', machineName, value });
+      const updated = await api.updatePrintConfig({ action: 'add', field: 'complaint_subcategory', categoryName, value: val.trim() });
+      setConfig(updated);
+      setNewComplaintSubCategory(prev => ({ ...prev, [categoryName]: '' }));
+    } catch (err) {
+      console.error(`Failed to add sub-category to ${categoryName}:`, err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRemoveComplaintSubCategory = async (categoryName, value) => {
+    if (!window.confirm(`Are you sure you want to remove "${value}" from ${categoryName}?`)) return;
+    try {
+      setActionLoading(true);
+      const updated = await api.updatePrintConfig({ action: 'remove', field: 'complaint_subcategory', categoryName, value });
       setConfig(updated);
     } catch (err) {
-      console.error(`Failed to remove profile from ${machineName}:`, err);
+      console.error(`Failed to remove sub-category from ${categoryName}:`, err);
     } finally {
       setActionLoading(false);
     }
@@ -567,6 +586,70 @@ export default function PrintSettings() {
       </div>
       {/* Vendor Manager Modal */}
       {isVendorManagerOpen && <CatalogManagerModal initialTab="vendors" context="elite_print" onClose={() => setIsVendorManagerOpen(false)} />}
+
+      {/* Department: Complain Settings */}
+      <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+        {renderDepartmentHeader('🚨 Complain Settings', 'complain', '#f43f5e')}
+        {expandedDepts.complain && (
+          <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
+              {renderSection('Complaint Categories', 'complaintCategories', newComplaintCategory, setNewComplaintCategory, config?.complaintCategories)}
+            </div>
+
+            <div style={{ borderTop: '1px dashed var(--border-light)', paddingTop: '1.5rem' }}>
+              <h4 style={{ fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '1rem', fontWeight: 700 }}>Complaint Sub-Categories</h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
+                {(config?.complaintCategories || []).map(catName => {
+                  const subList = (config?.complaintSubCategories && config.complaintSubCategories[catName]) || [];
+                  return (
+                    <div key={catName} style={{ flex: '1 1 calc(50% - 1rem)', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
+                      <h5 style={{ color: 'var(--text-primary)', fontSize: '0.9rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
+                        <Tag size={14} color="#f43f5e" /> Sub-Categories for "{catName}"
+                      </h5>
+                      
+                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                        <input 
+                          style={styles.input} 
+                          value={newComplaintSubCategory[catName] || ''} 
+                          onChange={e => setNewComplaintSubCategory(prev => ({ ...prev, [catName]: e.target.value }))} 
+                          placeholder={`Add sub-category for ${catName}...`}
+                          onKeyDown={e => e.key === 'Enter' && handleAddComplaintSubCategory(catName)}
+                        />
+                        <button 
+                          className="btn-primary" 
+                          onClick={() => handleAddComplaintSubCategory(catName)}
+                          disabled={actionLoading || !(newComplaintSubCategory[catName] || '').trim()}
+                        >
+                          <Plus size={16} /> Add
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '200px', overflowY: 'auto' }}>
+                        {subList.length === 0 ? (
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>No sub-categories added yet.</div>
+                        ) : (
+                          subList.map(item => (
+                            <div key={item} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: '4px' }}>
+                              <span style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>{item}</span>
+                              <button 
+                                onClick={() => handleRemoveComplaintSubCategory(catName, item)}
+                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.2rem' }}
+                                disabled={actionLoading}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Department: Party Details */}
       <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>

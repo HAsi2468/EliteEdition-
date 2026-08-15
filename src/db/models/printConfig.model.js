@@ -36,6 +36,23 @@ const printConfigSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    complaintCategories: {
+      type: [String],
+      default: ['Printing Defect', 'Color Matching / Shade Difference', 'Fabric Damage', 'Quantity Shortage', 'Delivery Delay', 'Billing Issue', 'Other'],
+    },
+    complaintSubCategories: {
+      type: Map,
+      of: [String],
+      default: {
+        'Printing Defect': ['Line Defect', 'Ink Spot', 'Ghost Printing', 'Streaks', 'Smudge', 'Misalignment', 'White Specks', 'Paper Wrinkle', 'Other Printing Defect'],
+        'Color Matching / Shade Difference': ['Lighter Shade', 'Darker Shade', 'Tone Variation', 'Color Bleeding', 'Sample Mismatch', 'Shade Variation Across Width', 'Other Shade Issue'],
+        'Fabric Damage': ['Hole / Tear', 'Stains / Spots', 'Shrinkage', 'Weaving Flaw', 'Panna Variation', 'Other Fabric Defect'],
+        'Quantity Shortage': ['Meter Shortage', 'Piece Count Shortage', 'Partial Delivery', 'Missing Roll', 'Other Shortage'],
+        'Delivery Delay': ['Late Dispatch', 'Transit Delay', 'Missing Parcel', 'Wrong Address Delivery'],
+        'Billing Issue': ['Rate Mismatch', 'Discount Missing', 'GST Calculation Error', 'Duplicate Bill'],
+        'Other': ['General Customer Issue', 'Packaging Defect', 'Miscellaneous']
+      },
+    },
     paperTypes: {
       type: [String],
       default: [],
