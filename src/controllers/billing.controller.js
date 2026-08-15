@@ -656,7 +656,7 @@ const downloadInvoicePdf = async (req, res) => {
       const S50  = c('#f8fafc', '#f9f9f9');
       const WHT  = '#ffffff';
 
-      const useTwoPages = false;
+      const useTwoPages = items.length > 5;
 
       const drawHeader = (pageLabel) => {
         let Y = PAD;
