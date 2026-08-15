@@ -737,7 +737,7 @@ export default function DigitalPrintComplainModule() {
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', boxShadow: '0 4px 12px rgba(244,63,94,0.3)'
                 }}
               >
-                <PlusCircle size={16} /> + Log New Complaint
+                <PlusCircle size={16} /> + New Complaint Ticket
               </button>
             )}
           </div>
@@ -1140,7 +1140,7 @@ export default function DigitalPrintComplainModule() {
         <div className="glass-panel" style={{ padding: '3rem 2rem', textAlign: 'center', maxWidth: 600, margin: '2rem auto' }}>
           <AlertTriangle size={56} color="#f43f5e" style={{ margin: '0 auto 1rem auto' }} />
           <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 0.5rem 0' }}>
-            Log Quality Complaint Ticket
+            New Complaint Ticket
           </h2>
           <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: '1.5rem', lineHeight: 1.5 }}>
             You have access to log new quality complaints and defect reports for Elite Digital Prints. Click below to submit a new ticket.
@@ -1153,7 +1153,7 @@ export default function DigitalPrintComplainModule() {
               cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.6rem', boxShadow: '0 6px 18px rgba(244,63,94,0.4)'
             }}
           >
-            <PlusCircle size={20} /> + Log New Complaint
+            <PlusCircle size={20} /> + New Complaint Ticket
           </button>
         </div>
       ) : (
@@ -1185,7 +1185,7 @@ export default function DigitalPrintComplainModule() {
             }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <AlertTriangle size={20} color="#f43f5e" />
-                {editingItem ? `Edit Complaint (${formVal.complaintNo})` : 'Log New Quality Complaint Ticket'}
+                {editingItem ? `Edit Complaint (${formVal.complaintNo})` : 'New Complaint Ticket'}
               </h3>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
             </div>
