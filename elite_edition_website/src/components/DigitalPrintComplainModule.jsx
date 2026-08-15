@@ -631,36 +631,98 @@ export default function DigitalPrintComplainModule() {
     }
   };
 
-  const handleExportCSV = () => {
+  const handleExportPDF = () => {
     if (!complaints.length) {
       triggerEliteAlert('Export Notice', 'No complaint records to export.', 'warning');
       return;
     }
-    const headers = ['Complaint No', 'Date', 'Party Name', 'Assigned By', 'Responsible To', 'Job Card No', 'Design No', 'Category', 'Priority', 'Status', 'Defective Meters', 'Description', 'Action Taken'];
-    const rows = complaints.map(c => [
-      `"${c.complaintNo || ''}"`,
-      `"${c.date || ''}"`,
-      `"${c.partyName || ''}"`,
-      `"${c.assignedTo || ''}"`,
-      `"${c.responsiblePerson || ''}"`,
-      `"${c.jobCardNo || ''}"`,
-      `"${c.designNo || ''}"`,
-      `"${c.category || ''}"`,
-      `"${c.priority || ''}"`,
-      `"${c.status || ''}"`,
-      c.defectiveMeters || 0,
-      `"${(c.description || '').replace(/"/g, '""')}"`,
-      `"${(c.actionTaken || '').replace(/"/g, '""')}"`
-    ]);
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      triggerEliteAlert('Export Notice', 'Please allow popups in your browser to view/download PDF.', 'warning');
+      return;
+    }
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Digital_Print_Complaints_Report_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Digital Print Complaints Report - Elite Edition ERP</title>
+        <style>
+          body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 25px; color: #1e293b; background: #fff; margin: 0; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #f43f5e; padding-bottom: 12px; margin-bottom: 20px; }
+          .company-title { font-size: 20px; font-weight: 900; color: #0f172a; letter-spacing: 0.5px; }
+          .report-title { font-size: 13px; font-weight: 700; color: #f43f5e; text-transform: uppercase; margin-top: 4px; }
+          .meta-info { font-size: 11px; color: #64748b; text-align: right; }
+          
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+          th { background: #0f172a; color: #fff; text-transform: uppercase; font-size: 10px; font-weight: 800; padding: 8px 10px; text-align: left; }
+          td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; color: #334155; }
+          tr:nth-child(even) { background: #f8fafc; }
+          
+          .footer { margin-top: 25px; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="company-title">ELITE DIGITAL PRINTS</div>
+            <div class="report-title">QUALITY COMPLAINTS & TICKETS REPORT</div>
+          </div>
+          <div class="meta-info">
+            <div><strong>Date Range:</strong> ${activeRange.labelText}</div>
+            <div><strong>Generated On:</strong> ${new Date().toLocaleString('en-IN')}</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Ticket No</th>
+              <th>Date</th>
+              <th>Customer Party</th>
+              <th>Category</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Assigned By</th>
+              <th>Responsible Person</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${complaints.map(c => `
+              <tr>
+                <td><strong>${c.complaintNo || ''}</strong></td>
+                <td>${c.date || ''}</td>
+                <td>${c.partyName || ''}</td>
+                <td>${c.category || ''}</td>
+                <td>${c.priority || ''}</td>
+                <td>${c.status || ''}</td>
+                <td>${c.assignedTo || ''}</td>
+                <td>${c.responsiblePerson || ''}</td>
+                <td>${c.description || ''}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <div>Elite Edition ERP System &bull; Confidential Quality Report</div>
+          <div>Report Generated Successfully</div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() { window.print(); }, 300);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWin.document.open();
+    printWin.document.write(htmlContent);
+    printWin.document.close();
   };
 
   const getPriorityColor = (p) => {
@@ -718,14 +780,14 @@ export default function DigitalPrintComplainModule() {
           <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
             {canViewDashboard && (
               <button
-                onClick={handleExportCSV}
+                onClick={handleExportPDF}
                 style={{
                   padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 700, borderRadius: '8px',
                   border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.12)', color: '#60a5fa',
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem'
                 }}
               >
-                <Download size={15} /> Export CSV
+                <FileText size={15} color="#38bdf8" /> Export PDF
               </button>
             )}
             {canCreateComplaint && (
