@@ -323,17 +323,24 @@ export default function DigitalPrintComplainModule() {
       }
 
       const res = await api.getComplaints(params);
-      if (res && res.data) {
-        let list = res.data;
-        if (!isAdmin && currentUserName) {
-          const normName = currentUserName.toLowerCase().trim();
-          list = list.filter(item =>
-            (item.assignedTo || '').toLowerCase().trim() === normName ||
-            (item.responsiblePerson || '').toLowerCase().trim() === normName
+      let list = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+      if (!isAdmin && currentUserName) {
+        const normName = currentUserName.toLowerCase().trim();
+        list = list.filter(item => {
+          const aTo = (item.assignedTo || '').toLowerCase();
+          const rPerson = (item.responsiblePerson || '').toLowerCase();
+          const rPersons = Array.isArray(item.responsiblePersons)
+            ? item.responsiblePersons.map(p => (p || '').toLowerCase())
+            : [];
+
+          return (
+            aTo.includes(normName) ||
+            rPerson.includes(normName) ||
+            rPersons.some(p => p.includes(normName))
           );
-        }
-        setComplaints(list);
+        });
       }
+      setComplaints(list);
     } catch (err) {
       console.error('Failed to fetch complaints:', err);
     } finally {
@@ -493,6 +500,18 @@ export default function DigitalPrintComplainModule() {
       actionTaken: item.actionTaken || ''
     });
     setShowModal(true);
+  };
+
+  const handleOpenViewModal = async (item) => {
+    setShowViewModal(item);
+    try {
+      const freshDoc = await api.getComplaintById(item._id);
+      if (freshDoc) {
+        setShowViewModal(freshDoc);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch fresh complaint details:', e);
+    }
   };
 
   const handlePhotoUpload = async (e) => {
@@ -1083,13 +1102,13 @@ export default function DigitalPrintComplainModule() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)', marginTop: 'auto' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         <button
-                          onClick={() => setShowViewModal(item)}
+                          onClick={() => handleOpenViewModal(item)}
                           style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                         >
                           <Eye size={14} /> View & Resolve
                         </button>
                         <button
-                          onClick={() => setShowViewModal(item)}
+                          onClick={() => handleOpenViewModal(item)}
                           style={{ background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', fontSize: '0.7rem', fontWeight: 700, borderRadius: '12px', padding: '2px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                         >
                           <MessageSquare size={12} /> {item.comments?.length || 0} Comments

@@ -20,14 +20,21 @@ const getAll = async (req, res) => {
     const filter = {};
 
     if (assignedTo && assignedTo !== 'All') {
-      const userRegex = new RegExp(`^${assignedTo.trim()}$`, 'i');
+      const cleanUser = assignedTo.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const userRegex = new RegExp(cleanUser, 'i');
       filter.$or = [
         { assignedTo: userRegex },
-        { responsiblePerson: userRegex }
+        { responsiblePerson: userRegex },
+        { responsiblePersons: userRegex }
       ];
     }
     if (responsiblePerson && responsiblePerson !== 'All') {
-      filter.responsiblePerson = new RegExp(`^${responsiblePerson.trim()}$`, 'i');
+      const cleanResp = responsiblePerson.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const rRegex = new RegExp(cleanResp, 'i');
+      filter.$or = [
+        { responsiblePerson: rRegex },
+        { responsiblePersons: rRegex }
+      ];
     }
     if (status && status !== 'All') {
       filter.status = status;
@@ -260,10 +267,12 @@ const getAnalytics = async (req, res) => {
     const jcFilter = {};
 
     if (assignedTo && assignedTo !== 'All') {
-      const userRegex = new RegExp(`^${assignedTo.trim()}$`, 'i');
+      const cleanUser = assignedTo.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const userRegex = new RegExp(cleanUser, 'i');
       filter.$or = [
         { assignedTo: userRegex },
-        { responsiblePerson: userRegex }
+        { responsiblePerson: userRegex },
+        { responsiblePersons: userRegex }
       ];
     }
 
