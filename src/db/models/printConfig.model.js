@@ -32,6 +32,10 @@ const printConfigSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    operators: {
+      type: [String],
+      default: [],
+    },
     paperTypes: {
       type: [String],
       default: [],

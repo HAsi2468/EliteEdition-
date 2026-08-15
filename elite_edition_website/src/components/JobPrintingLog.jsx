@@ -20,23 +20,7 @@ function getAutoShift() {
 }
 
 function isOlderThan36Hours(dateVal) {
-  try {
-    const userStr = localStorage.getItem('elite_user');
-    if (!userStr) return false;
-    const user = JSON.parse(userStr);
-    if (!user || user.role === 'admin') {
-      return false; // Admin can edit ALL dates without 36-hour restriction!
-    }
-  } catch (e) {
-    return false;
-  }
-
-  if (!dateVal) return false;
-  const itemDate = new Date(dateVal).getTime();
-  if (isNaN(itemDate)) return false;
-  const now = Date.now();
-  const diffInHours = (now - itemDate) / (1000 * 60 * 60);
-  return diffInHours > 36;
+  return false; // 36-hour editing restriction stopped / disabled
 }
 
 const DEFAULT_MACHINES = [
@@ -65,6 +49,7 @@ export default function JobPrintingLog() {
   const [logs, setLogs] = useState([]);
   const [jobCards, setJobCards] = useState([]);
   const [machinesList, setMachinesList] = useState(DEFAULT_MACHINES);
+  const [operatorsList, setOperatorsList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -711,6 +696,9 @@ export default function JobPrintingLog() {
       if (res && res.paperTypes && Array.isArray(res.paperTypes) && res.paperTypes.length > 0) {
         setPaperTypesList(res.paperTypes);
       }
+      if (res && res.operators && Array.isArray(res.operators) && res.operators.length > 0) {
+        setOperatorsList(res.operators);
+      }
     } catch (err) {
       console.warn('Failed to load print config options from Print Settings:', err);
     }
@@ -1313,11 +1301,17 @@ export default function JobPrintingLog() {
                 <label style={labelStyle}>OPERATOR NAME</label>
                 <input
                   type="text"
+                  list="print-operators-list"
                   value={form.operatorName}
                   onChange={e => setForm(f => ({ ...f, operatorName: e.target.value }))}
-                  placeholder="Operator Name"
-                  style={inputStyle}
+                  placeholder="Select or Type Operator Name..."
+                  style={{ ...inputStyle, fontWeight: 600 }}
                 />
+                <datalist id="print-operators-list">
+                  {operatorsList.map(op => (
+                    <option key={op} value={op} />
+                  ))}
+                </datalist>
               </div>
 
               <div>
@@ -2035,10 +2029,11 @@ export default function JobPrintingLog() {
                   <label style={labelStyle}>OPERATOR NAME</label>
                   <input
                     type="text"
-                    placeholder="Operator Name"
+                    list="print-operators-list"
+                    placeholder="Select or Type Operator Name..."
                     value={rawOperator}
                     onChange={e => setRawOperator(e.target.value)}
-                    style={inputStyle}
+                    style={{ ...inputStyle, fontWeight: 600 }}
                   />
                 </div>
               </div>

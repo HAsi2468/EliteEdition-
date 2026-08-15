@@ -77,7 +77,32 @@ const getConfig = async () => {
 const getPrintConfig = async (req, res) => {
   try {
     const config = await getConfig();
-    res.status(httpStatus.OK).send(config);
+
+    // Fetch all users with screen access to auto-populate operators list
+    let autoUsers = [];
+    try {
+      const usersWithAccess = await db.user.find({
+        $or: [
+          { role: 'admin' },
+          { permissions: { $in: ['jobcards_printing_log', 'jobcards', 'jobcards_list', 'stitching_jobcards'] } }
+        ]
+      }, { name: 1, email: 1 }).lean();
+
+      autoUsers = usersWithAccess.map(u => (u.name || '').trim()).filter(Boolean);
+    } catch (err) {
+      logger.warn('Failed to fetch auto users for operators: %o', err);
+    }
+
+    const mergedOperators = Array.from(new Set([
+      ...(config.operators || []),
+      ...autoUsers
+    ]));
+
+    const result = config.toObject ? config.toObject() : { ...config };
+    result.operators = mergedOperators;
+    result.autoScreenUsers = autoUsers;
+
+    res.status(httpStatus.OK).send(result);
   } catch (error) {
     logger.error('Error getting print config: %o', error);
     res.status(httpStatus.INTERNAL_SERVER_ERROR).send('Error fetching config');
@@ -115,7 +140,7 @@ const updatePrintConfig = async (req, res) => {
     }
 
     const validFields = [
-      'categories', 'passes', 'parties', 'widths', 'fabrics', 'designers',
+      'categories', 'passes', 'parties', 'widths', 'fabrics', 'designers', 'operators',
       'paperTypes', 'billToOptions', 'shipToOptions', 'machines',
       'machine_profile', 'temperatures', 'speeds', 'startingJobNo', 'rawMaterials',
       'sublimationPanna', 'sublimationQualities', 'butterPanna', 'inkColors', 'inkCanSizes',

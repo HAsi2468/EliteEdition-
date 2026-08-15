@@ -26,6 +26,7 @@ export default function PrintSettings() {
   const [newWidth, setNewWidth] = useState('');
   const [newFabric, setNewFabric] = useState('');
   const [newDesigner, setNewDesigner] = useState('');
+  const [newOperator, setNewOperator] = useState('');
   const [newMachine, setNewMachine] = useState('');
   const [newMachineProfiles, setNewMachineProfiles] = useState({});
   const [newBillTo, setNewBillTo] = useState('');
@@ -468,6 +469,7 @@ export default function PrintSettings() {
             {renderSection('Passes (Quality)', 'passes', newPass, setNewPass, config?.passes)}
             {renderSection('Widths (Panna)', 'widths', newWidth, setNewWidth, config?.widths)}
             {renderSection('Designers', 'designers', newDesigner, setNewDesigner, config?.designers)}
+            {renderSection('Operators (Printing Dept)', 'operators', newOperator, setNewOperator, config?.operators)}
             {renderSection('Paper Types', 'paperTypes', newPaperType, setNewPaperType, config?.paperTypes)}
             {renderSection('Raw Materials', 'rawMaterials', newRawMaterial, setNewRawMaterial, config?.rawMaterials)}
           </div>
