@@ -15,6 +15,8 @@ router.post('/merge-challans', billingController.mergeChallans);
 router.put('/invoices/:id', billingController.updateInvoice);
 router.delete('/invoices/:id', billingController.deleteInvoice);
 router.post('/invoices/:id/payment', billingController.recordPayment);
+router.get('/invoices-bulk-pdf', billingController.downloadBulkInvoicesPdf);
+router.post('/invoices-bulk-pdf', billingController.downloadBulkInvoicesPdf);
 router.get('/invoices/:id/pdf', billingController.downloadInvoicePdf);
 
 // Customers CRUD

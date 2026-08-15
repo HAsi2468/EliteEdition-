@@ -597,12 +597,15 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     if (selectedInvoiceIds.length === 0) return;
     setBulkDownloading(true);
     try {
-      const selectedInvs = invoices.filter(inv => selectedInvoiceIds.includes(inv._id));
-      for (const inv of selectedInvs) {
-        await api.downloadInvoicePdf(inv._id, inv.invoiceNo || 'Invoice');
-        await new Promise(res => setTimeout(res, 400));
-      }
-      triggerPushNotification('📥 Bulk Invoice PDFs Downloaded', `${selectedInvs.length} Invoices downloaded successfully.`, 'success');
+      await api.downloadBulkInvoicesPdf(
+        selectedInvoiceIds,
+        `Combined_Tax_Invoices_${selectedInvoiceIds.length}_Invoices.pdf`
+      );
+      triggerPushNotification(
+        '📥 Combined Invoices PDF Downloaded',
+        `${selectedInvoiceIds.length} Invoices merged into 1 single multi-page PDF document successfully.`,
+        'success'
+      );
     } catch (e) {
       alert('Error during bulk invoice download: ' + e.message);
     } finally {

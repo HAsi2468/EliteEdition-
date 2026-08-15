@@ -1513,6 +1513,28 @@ export const api = {
     console.log(`[PDF Download] Generated & downloaded in ${(performance.now() - t0).toFixed(0)}ms`);
   },
 
+  async downloadBulkInvoicesPdf(ids = [], fileName = 'Combined_Invoices.pdf') {
+    if (!ids || ids.length === 0) return;
+    const t0 = performance.now();
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const url = `${baseUrl}/billing/invoices-bulk-pdf?ids=${ids.join(',')}`;
+    const response = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate combined Invoices PDF');
+    const blob = await response.blob();
+    const objUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objUrl;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(objUrl);
+    console.log(`[Bulk PDF Download] Generated & downloaded combined PDF in ${(performance.now() - t0).toFixed(0)}ms`);
+  },
+
   // Billing Customers
   async getBillingCustomers() {
     return request('/billing/customers');
