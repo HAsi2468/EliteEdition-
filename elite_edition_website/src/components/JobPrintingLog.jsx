@@ -1626,16 +1626,16 @@ export default function JobPrintingLog() {
                   <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <td style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: '#38bdf8' }}>GRANDO</td>
                     <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#38bdf8' }}>
-                      {gInk.C > 0 ? `${gInk.C.toFixed(2)} L` : '—'}
+                      {Number(gInk.C) > 0 ? `${Number(gInk.C).toFixed(2)} L` : '—'}
                     </td>
                     <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#f472b6' }}>
-                      {gInk.M > 0 ? `${gInk.M.toFixed(2)} L` : '—'}
+                      {Number(gInk.M) > 0 ? `${Number(gInk.M).toFixed(2)} L` : '—'}
                     </td>
                     <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#facc15' }}>
-                      {gInk.Y > 0 ? `${gInk.Y.toFixed(2)} L` : '—'}
+                      {Number(gInk.Y) > 0 ? `${Number(gInk.Y).toFixed(2)} L` : '—'}
                     </td>
                     <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#94a3b8' }}>
-                      {gInk.K > 0 ? `${gInk.K.toFixed(2)} L` : '—'}
+                      {Number(gInk.K) > 0 ? `${Number(gInk.K).toFixed(2)} L` : '—'}
                     </td>
                     <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
                       {paperList[0]?.paperType || '—'}
@@ -1652,16 +1652,16 @@ export default function JobPrintingLog() {
                   <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <td style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: '#f87171' }}>PRINTDOT</td>
                     <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#38bdf8' }}>
-                      {pInk.C > 0 ? `${pInk.C.toFixed(2)} L` : '—'}
+                      {Number(pInk.C) > 0 ? `${Number(pInk.C).toFixed(2)} L` : '—'}
                     </td>
                     <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#f472b6' }}>
-                      {pInk.M > 0 ? `${pInk.M.toFixed(2)} L` : '—'}
+                      {Number(pInk.M) > 0 ? `${Number(pInk.M).toFixed(2)} L` : '—'}
                     </td>
                     <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#facc15' }}>
-                      {pInk.Y > 0 ? `${pInk.Y.toFixed(2)} L` : '—'}
+                      {Number(pInk.Y) > 0 ? `${Number(pInk.Y).toFixed(2)} L` : '—'}
                     </td>
                     <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#94a3b8' }}>
-                      {pInk.K > 0 ? `${pInk.K.toFixed(2)} L` : '—'}
+                      {Number(pInk.K) > 0 ? `${Number(pInk.K).toFixed(2)} L` : '—'}
                     </td>
                     <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
                       {paperList[1]?.paperType || '—'}
