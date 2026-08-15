@@ -283,4 +283,102 @@ const getAnalytics = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getNextNumber, getOne, create, update, remove, getAnalytics };
+// Lookup order details across JobCards, FabricChallans, and Invoices
+const lookupOrderDetails = async (req, res) => {
+  try {
+    const { query = '', jobCardNo = '', challanNo = '', invoiceNo = '' } = req.query;
+    const searchTerm = (query || jobCardNo || challanNo || invoiceNo || '').trim();
+
+    if (!searchTerm) {
+      return res.json({ success: false, message: 'No search term provided' });
+    }
+
+    const cleanTerm = searchTerm.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp(cleanTerm, 'i');
+
+    let result = {
+      partyName: '',
+      jobCardNo: '',
+      challanNo: '',
+      invoiceNo: '',
+      designNo: '',
+      totalMeters: 0,
+      foundIn: ''
+    };
+
+    // 1. Search in JobCards
+    if (db.JobCard) {
+      const jc = await db.JobCard.findOne({
+        $or: [{ jobCardNo: regex }, { challanNo: regex }, { invoiceNo: regex }, { jobNo: regex }]
+      }).lean();
+
+      if (jc) {
+        result.partyName = jc.partyName || jc.clientName || jc.party || '';
+        result.jobCardNo = jc.jobCardNo || jc.jobNo || '';
+        result.challanNo = jc.challanNo || '';
+        result.invoiceNo = jc.invoiceNo || '';
+        result.designNo = jc.designNo || jc.designName || '';
+        result.totalMeters = jc.totalMeters || jc.meters || jc.qty || 0;
+        result.foundIn = 'Job Card';
+      }
+    }
+
+    // 2. Search in FabricChallans
+    if (!result.partyName && db.FabricChallan) {
+      const ch = await db.FabricChallan.findOne({
+        $or: [{ challanNo: regex }, { jobCardNo: regex }, { invoiceNo: regex }]
+      }).lean();
+
+      if (ch) {
+        result.partyName = result.partyName || ch.partyName || ch.vendorName || '';
+        result.jobCardNo = result.jobCardNo || ch.jobCardNo || '';
+        result.challanNo = result.challanNo || ch.challanNo || '';
+        result.invoiceNo = result.invoiceNo || ch.invoiceNo || '';
+        result.designNo = result.designNo || ch.designNo || '';
+        result.totalMeters = result.totalMeters || ch.totalMeters || ch.totalQty || 0;
+        result.foundIn = result.foundIn || 'Fabric Challan';
+      }
+    }
+
+    // 3. Search in BillingInvoices
+    if ((!result.partyName || !result.invoiceNo) && db.BillingInvoice) {
+      const inv = await db.BillingInvoice.findOne({
+        $or: [{ invoiceNo: regex }, { eWayBillNo: regex }, { jobCardNo: regex }]
+      }).lean();
+
+      if (inv) {
+        result.partyName = result.partyName || inv.partyName || '';
+        result.invoiceNo = result.invoiceNo || inv.invoiceNo || '';
+        result.jobCardNo = result.jobCardNo || inv.jobCardNo || '';
+        result.challanNo = result.challanNo || inv.challanNo || '';
+        result.designNo = result.designNo || inv.designNo || '';
+        result.foundIn = result.foundIn || 'Invoice';
+      }
+    }
+
+    // 4. Search in GarmentJobCard
+    if (!result.partyName && db.GarmentJobCard) {
+      const gjc = await db.GarmentJobCard.findOne({
+        $or: [{ jobCardNo: regex }, { challanNo: regex }]
+      }).lean();
+
+      if (gjc) {
+        result.partyName = result.partyName || gjc.partyName || gjc.brandName || '';
+        result.jobCardNo = result.jobCardNo || gjc.jobCardNo || '';
+        result.challanNo = result.challanNo || gjc.challanNo || '';
+        result.foundIn = result.foundIn || 'Garment Job Card';
+      }
+    }
+
+    if (!result.partyName && !result.jobCardNo && !result.challanNo && !result.invoiceNo) {
+      return res.json({ success: false, message: 'No matching order found' });
+    }
+
+    res.json({ success: true, data: result });
+  } catch (err) {
+    logger.error('complaint.lookupOrderDetails error: %o', err);
+    res.status(500).json({ error: 'Failed to lookup order details' });
+  }
+};
+
+module.exports = { getAll, getNextNumber, getOne, create, update, remove, getAnalytics, lookupOrderDetails };

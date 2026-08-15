@@ -251,6 +251,48 @@ export default function DigitalPrintComplainModule() {
   });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupMsg, setLookupMsg] = useState(null);
+
+  const handleOrderLookup = async (searchTerm) => {
+    if (!searchTerm || searchTerm.trim().length < 2) return;
+    setLookupLoading(true);
+    setLookupMsg(null);
+
+    try {
+      const res = await api.lookupOrderDetails(searchTerm);
+      if (res && res.success && res.data) {
+        const d = res.data;
+        setFormVal(prev => ({
+          ...prev,
+          partyName: d.partyName || prev.partyName,
+          jobCardNo: d.jobCardNo || prev.jobCardNo,
+          challanNo: d.challanNo || prev.challanNo,
+          invoiceNo: d.invoiceNo || prev.invoiceNo,
+          designNo: d.designNo || prev.designNo,
+          defectiveMeters: (prev.defectiveMeters === 0 && d.totalMeters > 0) ? d.totalMeters : prev.defectiveMeters
+        }));
+
+        if (d.partyName && !parties.includes(d.partyName)) {
+          setParties(prev => [...prev, d.partyName]);
+        }
+
+        setLookupMsg({
+          type: 'success',
+          text: `✨ Linked Order Found! Auto-filled details from ${d.foundIn || 'Database'} (Customer: ${d.partyName || 'Found'})`
+        });
+      } else {
+        setLookupMsg({
+          type: 'error',
+          text: `⚠️ No matching Job Card, Challan, or Invoice found for "${searchTerm}".`
+        });
+      }
+    } catch (err) {
+      console.warn('Order lookup failed:', err);
+    } finally {
+      setLookupLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchComplaints();
@@ -1144,29 +1186,90 @@ export default function DigitalPrintComplainModule() {
                 </div>
               </div>
 
-              {/* SECTION 2: ORDER LINKAGE */}
+              {/* SECTION 2: ORDER LINKAGE WITH AUTO-FETCH */}
               <div style={{ background: 'var(--bg-main, #111827)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase', marginBottom: '0.65rem' }}>
-                  🔗 Order Linkage
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase' }}>
+                    🔗 Order Linkage (Type any No. to Auto-Fill Data)
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const term = formVal.jobCardNo || formVal.challanNo || formVal.invoiceNo;
+                      handleOrderLookup(term);
+                    }}
+                    disabled={lookupLoading}
+                    style={{
+                      padding: '0.25rem 0.65rem', fontSize: '0.72rem', fontWeight: 800, borderRadius: '4px',
+                      border: '1px solid rgba(56,189,248,0.4)', background: 'rgba(56,189,248,0.12)', color: '#38bdf8',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem'
+                    }}
+                  >
+                    {lookupLoading ? <RefreshCw size={12} className="spin-loader" /> : <Search size={12} />}
+                    ⚡ Auto-Fetch Details
+                  </button>
                 </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.75rem' }}>
                   <div>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Job Card No.</label>
-                    <input type="text" placeholder="e.g. JC-1001" value={formVal.jobCardNo} onChange={e => setFormVal({ ...formVal, jobCardNo: e.target.value })} style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }} />
+                    <input
+                      type="text"
+                      placeholder="e.g. JC-1001"
+                      value={formVal.jobCardNo}
+                      onChange={e => setFormVal({ ...formVal, jobCardNo: e.target.value })}
+                      onBlur={e => handleOrderLookup(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleOrderLookup(e.target.value); } }}
+                      style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
+                    />
                   </div>
                   <div>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Challan No.</label>
-                    <input type="text" placeholder="e.g. EDP-CH-1001" value={formVal.challanNo} onChange={e => setFormVal({ ...formVal, challanNo: e.target.value })} style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }} />
+                    <input
+                      type="text"
+                      placeholder="e.g. EDP-CH-1001"
+                      value={formVal.challanNo}
+                      onChange={e => setFormVal({ ...formVal, challanNo: e.target.value })}
+                      onBlur={e => handleOrderLookup(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleOrderLookup(e.target.value); } }}
+                      style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
+                    />
                   </div>
                   <div>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Invoice No.</label>
-                    <input type="text" placeholder="e.g. EDP-INV-1001" value={formVal.invoiceNo} onChange={e => setFormVal({ ...formVal, invoiceNo: e.target.value })} style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }} />
+                    <input
+                      type="text"
+                      placeholder="e.g. EDP-INV-1001"
+                      value={formVal.invoiceNo}
+                      onChange={e => setFormVal({ ...formVal, invoiceNo: e.target.value })}
+                      onBlur={e => handleOrderLookup(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleOrderLookup(e.target.value); } }}
+                      style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
+                    />
                   </div>
                   <div>
                     <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Design No. (Optional)</label>
-                    <input type="text" placeholder="e.g. ED-101" value={formVal.designNo} onChange={e => setFormVal({ ...formVal, designNo: e.target.value })} style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }} />
+                    <input
+                      type="text"
+                      placeholder="e.g. ED-101"
+                      value={formVal.designNo}
+                      onChange={e => setFormVal({ ...formVal, designNo: e.target.value })}
+                      style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
+                    />
                   </div>
                 </div>
+
+                {/* Auto-Fetch Status Message */}
+                {lookupMsg && (
+                  <div style={{
+                    marginTop: '0.65rem', padding: '0.45rem 0.75rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700,
+                    background: lookupMsg.type === 'success' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                    color: lookupMsg.type === 'success' ? '#4ade80' : '#f87171',
+                    border: lookupMsg.type === 'success' ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(239,68,68,0.3)'
+                  }}>
+                    {lookupMsg.text}
+                  </div>
+                )}
               </div>
 
               {/* SECTION 3: COMPLAINT CATEGORY & SUB-CATEGORY */}

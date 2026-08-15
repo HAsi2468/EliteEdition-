@@ -794,6 +794,9 @@ export const api = {
   async deleteComplaint(id) {
     return request(`/complaints/${id}`, { method: 'DELETE' });
   },
+  async lookupOrderDetails(searchTerm) {
+    return request(`/complaints/lookup-order?query=${encodeURIComponent(searchTerm)}`);
+  },
 
   // ─── Analytics ──────────────────────────────────────────────────────────────
   async getVariantAnalytics(params = {}) {
