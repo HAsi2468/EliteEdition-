@@ -234,6 +234,7 @@ export default function DigitalPrintComplainModule() {
     date: new Date().toISOString().split('T')[0],
     partyName: '',
     assignedTo: '',
+    responsiblePerson: '',
     jobCardNo: '',
     challanNo: '',
     invoiceNo: '',
@@ -383,6 +384,7 @@ export default function DigitalPrintComplainModule() {
       date: new Date().toISOString().split('T')[0],
       partyName: '',
       assignedTo: currentUserName,
+      responsiblePerson: '',
       jobCardNo: '',
       challanNo: '',
       invoiceNo: '',
@@ -422,6 +424,7 @@ export default function DigitalPrintComplainModule() {
       date: item.date || new Date().toISOString().split('T')[0],
       partyName: item.partyName || '',
       assignedTo: item.assignedTo || '',
+      responsiblePerson: item.responsiblePerson || '',
       jobCardNo: item.jobCardNo || '',
       challanNo: item.challanNo || '',
       invoiceNo: item.invoiceNo || '',
@@ -911,15 +914,19 @@ export default function DigitalPrintComplainModule() {
                       </span>
                     </div>
 
-                    {/* Customer & Responsible Person */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.78rem' }}>
+                    {/* Customer, Assigned To & Responsible Person */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem', fontSize: '0.78rem' }}>
                       <div>
-                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.68rem' }}>Customer:</span>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.66rem' }}>Customer:</span>
                         <strong style={{ color: 'var(--text-primary)' }}>{item.partyName || 'N/A'}</strong>
                       </div>
                       <div>
-                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.68rem' }}>Assigned To:</span>
-                        <strong style={{ color: 'var(--text-primary)' }}>{item.assignedTo || 'Unassigned'}</strong>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.66rem' }}>Assigned By / To:</span>
+                        <strong style={{ color: '#60a5fa' }}>{item.assignedTo || 'Unassigned'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#f43f5e', display: 'block', fontSize: '0.66rem', fontWeight: 800 }}>Responsible Person:</span>
+                        <strong style={{ color: '#f43f5e' }}>{item.responsiblePerson || 'Unassigned'}</strong>
                       </div>
                     </div>
 
@@ -1080,10 +1087,10 @@ export default function DigitalPrintComplainModule() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.65rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginTop: '0.65rem' }}>
                   {/* Customer Name Dropdown */}
                   <div>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Customer Name (Print Settings Parties) *</label>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Customer Name *</label>
                     <select
                       value={formVal.partyName}
                       onChange={e => setFormVal({ ...formVal, partyName: e.target.value })}
@@ -1097,19 +1104,28 @@ export default function DigitalPrintComplainModule() {
                     </select>
                   </div>
 
-                  {/* Assigned To Dropdown */}
+                  {/* Assigned By / Assigned To */}
                   <div>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Assigned To *</label>
-                    <select
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase' }}>Assigned By / To</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Admin / Manager"
                       value={formVal.assignedTo}
                       onChange={e => setFormVal({ ...formVal, assignedTo: e.target.value })}
                       style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem' }}
-                    >
-                      <option value="">-- Select Assigned User / Admin --</option>
-                      {staffList.map((sName, idx) => (
-                        <option key={idx} value={sName}>{sName}</option>
-                      ))}
-                    </select>
+                    />
+                  </div>
+
+                  {/* Responsible Person (To Solve) */}
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#f43f5e', textTransform: 'uppercase' }}>Responsible Person (To Solve) *</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Printer Operator / Designer"
+                      value={formVal.responsiblePerson}
+                      onChange={e => setFormVal({ ...formVal, responsiblePerson: e.target.value })}
+                      style={{ width: '100%', padding: '0.45rem', fontSize: '0.85rem', border: '1.5px solid rgba(244,63,94,0.4)', background: 'rgba(244,63,94,0.05)' }}
+                    />
                   </div>
                 </div>
               </div>
@@ -1308,7 +1324,8 @@ export default function DigitalPrintComplainModule() {
                 <div><strong>Category:</strong> {showViewModal.category}</div>
                 <div><strong>Sub-Category:</strong> {showViewModal.subCategory || 'N/A'}</div>
                 <div><strong>Severity / Priority:</strong> {showViewModal.priority}</div>
-                <div><strong>Assigned To:</strong> {showViewModal.assignedTo || 'Unassigned'}</div>
+                <div><strong>Assigned By / To:</strong> {showViewModal.assignedTo || 'Unassigned'}</div>
+                <div style={{ color: '#f43f5e', fontWeight: 700 }}><strong>Responsible Person:</strong> {showViewModal.responsiblePerson || 'Unassigned'}</div>
                 <div><strong>Job Card No:</strong> {showViewModal.jobCardNo || 'N/A'}</div>
                 <div><strong>Challan No:</strong> {showViewModal.challanNo || 'N/A'}</div>
                 <div><strong>Invoice No:</strong> {showViewModal.invoiceNo || 'N/A'}</div>

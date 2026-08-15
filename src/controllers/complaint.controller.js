@@ -10,6 +10,7 @@ const getAll = async (req, res) => {
       priority = 'All',
       category = 'All',
       assignedTo = '',
+      responsiblePerson = '',
       dateStart = '',
       dateEnd = '',
       page = 1,
@@ -20,6 +21,9 @@ const getAll = async (req, res) => {
 
     if (assignedTo && assignedTo !== 'All') {
       filter.assignedTo = new RegExp(`^${assignedTo.trim()}$`, 'i');
+    }
+    if (responsiblePerson && responsiblePerson !== 'All') {
+      filter.responsiblePerson = new RegExp(`^${responsiblePerson.trim()}$`, 'i');
     }
     if (status && status !== 'All') {
       filter.status = status;
@@ -49,7 +53,8 @@ const getAll = async (req, res) => {
         { actionTaken: regex },
         { category: regex },
         { subCategory: regex },
-        { assignedTo: regex }
+        { assignedTo: regex },
+        { responsiblePerson: regex }
       ];
     }
 

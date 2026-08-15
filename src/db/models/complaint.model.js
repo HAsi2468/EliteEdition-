@@ -31,6 +31,7 @@ const complaintSchema = new mongoose.Schema(
     actionTaken: { type: String, default: '', trim: true },
     resolvedDate: { type: Date, default: null },
     assignedTo: { type: String, default: '', trim: true },
+    responsiblePerson: { type: String, default: '', trim: true },
     createdBy: { type: String, default: 'System', trim: true }
   },
   {
