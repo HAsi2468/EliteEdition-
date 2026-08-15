@@ -5,6 +5,8 @@ const router = express.Router();
 router.get('/calc-exp-time', ctrl.calcExpTimeEndpoint);
 router.post('/calc-cost', ctrl.calculatePrintCost);
 router.get('/next-number', ctrl.getNextJobCardNumber);
+router.get('/bulk-pdf', ctrl.downloadBulkJobCardsPdf);
+router.post('/bulk-pdf', ctrl.downloadBulkJobCardsPdf);
 router.get('/pdf/:id', ctrl.downloadJobCardPdf);
 router.patch('/:id/stage', ctrl.updateProductionStage);
 router.patch('/:id/proofing', ctrl.updateProofingStatus);

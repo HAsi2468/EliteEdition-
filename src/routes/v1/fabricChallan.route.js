@@ -26,6 +26,10 @@ router.post('/reset-all', c.resetAllChallans);
 // Download challan summary report PDF
 router.get('/report/pdf', c.downloadChallanSummaryPdf);
 
+// Download bulk fabric challans combined PDF
+router.get('/bulk-pdf', c.downloadBulkChallansPdf);
+router.post('/bulk-pdf', c.downloadBulkChallansPdf);
+
 // Download single challan PDF
 router.get('/:id/pdf', c.downloadChallanPdf);
 

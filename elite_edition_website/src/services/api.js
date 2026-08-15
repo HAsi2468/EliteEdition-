@@ -638,6 +638,24 @@ export const api = {
     if (link.parentNode) link.parentNode.removeChild(link);
     window.URL.revokeObjectURL(url);
   },
+  async downloadBulkJobCardPdf(ids = [], fileName = 'Combined_Job_Cards.pdf') {
+    if (!ids || ids.length === 0) return;
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token') || localStorage.getItem('token');
+    const response = await fetch(`${baseUrl}/jobCards/bulk-pdf?ids=${ids.join(',')}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate combined Job Cards PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    if (link.parentNode) link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
   async getNextJobCardNo() {
     return request('/jobCards/next-number');
   },
@@ -1316,6 +1334,25 @@ export const api = {
     link.parentNode.removeChild(link);
   },
 
+  async downloadBulkFabricChallanPdf(ids = [], fileName = 'Combined_Fabric_Challans.pdf') {
+    if (!ids || ids.length === 0) return;
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const response = await fetch(`${baseUrl}/fabric-challan/bulk-pdf?ids=${ids.join(',')}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate combined Fabric Challans PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
   async downloadChallanReportPdf(dateStart, dateEnd, search, fileName) {
     const baseUrl = getBaseUrl();
     const token = localStorage.getItem('elite_auth_token');
@@ -1378,6 +1415,25 @@ export const api = {
     const link = document.createElement('a');
     link.href = url;
     link.setAttribute('download', `Stitching_Challan_${challanNo || 'PCH'}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
+  async downloadBulkStitchingChallanPdf(ids = [], fileName = 'Combined_Stitching_Challans.pdf') {
+    if (!ids || ids.length === 0) return;
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const response = await fetch(`${baseUrl}/stitching-challan/bulk-pdf?ids=${ids.join(',')}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate combined Stitching Challans PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
     document.body.appendChild(link);
     link.click();
     link.parentNode.removeChild(link);

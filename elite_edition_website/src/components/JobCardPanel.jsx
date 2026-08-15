@@ -1652,15 +1652,17 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
     );
   };
 
-  const handleBulkPrintSelectedJobCards = () => {
+  const handleBulkPrintSelectedJobCards = async () => {
     if (selectedJobCardIds.length === 0) return;
-    const selectedList = cards.filter(c => selectedJobCardIds.includes(c._id));
-    selectedList.forEach((card, index) => {
-      setTimeout(() => {
-        triggerJobCardPrint(card);
-      }, index * 600);
-    });
-    triggerPushNotification('🖨️ Bulk Job Cards Print', `Triggered printing for ${selectedList.length} Job Cards.`, 'success');
+    try {
+      await api.downloadBulkJobCardPdf(
+        selectedJobCardIds,
+        `Combined_Job_Cards_${selectedJobCardIds.length}_Cards.pdf`
+      );
+      triggerPushNotification('📥 Combined Job Cards PDF Downloaded', `${selectedJobCardIds.length} Job Cards merged into 1 single multi-page PDF document.`, 'success');
+    } catch (e) {
+      triggerEliteAlert('PDF Error', 'Failed to generate combined Job Cards PDF: ' + e.message, 'error');
+    }
   };
 
   // ── Debounced search: fires API only after user stops typing for 400ms ──────
@@ -2034,8 +2036,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                   className="btn-primary"
                   style={{ padding: '0.45rem 1.1rem', fontSize: '0.82rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
                 >
-                  <Printer size={15} />
-                  Print / Save PDF ({selectedJobCardIds.length})
+                  <Download size={15} />
+                  Download Combined PDF ({selectedJobCardIds.length})
                 </button>
                 <button
                   onClick={() => setSelectedJobCardIds([])}

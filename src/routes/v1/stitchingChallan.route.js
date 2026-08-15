@@ -3,6 +3,8 @@ const ctrl = require('../../controllers/stitchingChallan.controller');
 const router = express.Router();
 
 router.get('/next-no', ctrl.getNextChallanNo);
+router.get('/bulk-pdf', ctrl.downloadBulkChallansPdf);
+router.post('/bulk-pdf', ctrl.downloadBulkChallansPdf);
 router.get('/:id/pdf', ctrl.downloadChallanPdf);
 
 router.route('/')

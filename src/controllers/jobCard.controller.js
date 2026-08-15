@@ -586,6 +586,262 @@ const downloadJobCardPdf = async (req, res) => {
   }
 };
 
+const downloadBulkJobCardsPdf = async (req, res) => {
+  try {
+    let ids = [];
+    if (req.query.ids) {
+      ids = String(req.query.ids).split(',').map(s => s.trim()).filter(Boolean);
+    } else if (req.body && Array.isArray(req.body.ids)) {
+      ids = req.body.ids;
+    }
+
+    if (ids.length === 0) {
+      return res.status(400).send('No Job Card IDs provided.');
+    }
+
+    const jobCards = await db.JobCard.find({ _id: { $in: ids } }).sort({ created_date_time: -1 }).lean();
+    if (jobCards.length === 0) {
+      return res.status(404).send('No matching Job Cards found.');
+    }
+
+    const doc = new PDFDocument({ margin: 0, size: 'A5', autoFirstPage: true });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Combined_Job_Cards_${jobCards.length}_Cards.pdf"`);
+    doc.pipe(res);
+
+    const PW = 419.53, PH = 595.28;
+    const ML = 35;
+    const MR = 12;
+    const CW = PW - ML - MR;
+
+    const punchX = 14;
+    const centerY = PH / 2;
+    const colW_Label = 42;
+    const colW_Val = (CW - 3 * colW_Label) / 3;
+    const rowH = 15;
+    const formatDateStr = (d) => d ? new Date(d).toLocaleDateString('en-IN') : '';
+
+    const logoPath = path.join(__dirname, 'DigitalLogo.png');
+    const logoFallback = path.join(__dirname, 'Logo.png');
+    const activeLogo = fs.existsSync(logoPath) ? logoPath : (fs.existsSync(logoFallback) ? logoFallback : null);
+
+    function extractNames(str) {
+      if (!str || typeof str !== 'string') return [];
+      return str.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
+    }
+
+    for (let jIdx = 0; jIdx < jobCards.length; jIdx++) {
+      const jobCard = jobCards[jIdx];
+      if (jIdx > 0) doc.addPage({ size: 'A5', margin: 0 });
+
+      let imageUrl1 = '';
+      let imageUrl2 = '';
+      const keyStr = jobCard.designName || jobCard.designNo || '';
+      const names = extractNames(keyStr);
+
+      if (names[0]) {
+        const cleanName = names[0].replace(/^ED-/i, '');
+        const design1 = await db.Design.findOne({
+          $or: [
+            { designName: { $regex: `^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
+            { designNo: { $regex: `^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
+          ]
+        }).lean();
+        if (design1 && (design1.imageUrl || design1.imageUrl2)) {
+          imageUrl1 = design1.imageUrl || design1.imageUrl2;
+        }
+      }
+      if (!imageUrl1) imageUrl1 = jobCard.imageUrl1 || '';
+
+      if (names.length >= 2 && names[1]) {
+        const cleanName2 = names[1].replace(/^ED-/i, '');
+        const design2 = await db.Design.findOne({
+          $or: [
+            { designName: { $regex: `^(ED-)?${cleanName2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
+            { designNo: { $regex: `^(ED-)?${cleanName2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
+          ]
+        }).lean();
+        if (design2) imageUrl2 = design2.imageUrl || design2.imageUrl2 || '';
+        if (!imageUrl2) imageUrl2 = jobCard.imageUrl2 || '';
+      }
+
+      const [imgBuf1, imgBuf2] = await Promise.all([getImageBuffer(imageUrl1), getImageBuffer(imageUrl2)]);
+
+      doc.circle(punchX, 140, 7).strokeColor('#9ca3af').lineWidth(0.8).stroke();
+      doc.moveTo(8, centerY).lineTo(20, centerY).strokeColor('#9ca3af').lineWidth(1.2).stroke();
+      doc.fillColor('#9ca3af').fontSize(5).font('Helvetica-Bold')
+        .text('PUNCH', 4, centerY + 4, { width: 20, align: 'center' });
+      doc.circle(punchX, 450, 7).strokeColor('#9ca3af').lineWidth(0.8).stroke();
+
+      let curY = 12;
+      const headerH = 38;
+      doc.rect(ML, curY, CW, headerH).strokeColor('#000000').lineWidth(1.5).stroke();
+
+      const logoW = 85, logoH = 30;
+      if (activeLogo) {
+        try {
+          doc.image(activeLogo, ML + 5, curY + 4, { height: logoH, fit: [logoW, logoH] });
+          doc.image(activeLogo, ML + CW - logoW - 5, curY + 4, { height: logoH, fit: [logoW, logoH] });
+        } catch (e) {}
+      }
+
+      doc.moveTo(ML + logoW + 10, curY).lineTo(ML + logoW + 10, curY + headerH).strokeColor('#000000').lineWidth(1.5).stroke();
+      doc.moveTo(ML + CW - logoW - 10, curY).lineTo(ML + CW - logoW - 10, curY + headerH).strokeColor('#000000').lineWidth(1.5).stroke();
+
+      doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
+        .text('ELITE DIGITAL', ML + logoW + 10, curY + 3, { width: CW - 2 * (logoW + 10), align: 'center' });
+
+      const mName = (jobCard.machineName || '').trim().toUpperCase();
+      const mBg = mName === 'GRANDO' ? '#0b5394' : mName === 'PRINTDOT' ? '#cc0000' : '#ffffff';
+      const mColor = mName ? '#ffffff' : '#000000';
+      const badgeW = 100, badgeH = 13, badgeX = ML + (CW - badgeW) / 2;
+      doc.rect(badgeX, curY + 22, badgeW, badgeH).fillAndStroke(mBg, '#000000');
+      doc.fillColor(mColor).fontSize(8.5).font('Helvetica-Bold')
+        .text(mName || ' ', badgeX, curY + 24, { width: badgeW, align: 'center' });
+
+      curY += headerH + 1;
+
+      const gridRows = [
+        [['JOB NO. :', jobCard.jobNo || ''], ['COLORS :', jobCard.colors || ''], ['DATE :', formatDateStr(jobCard.date)]],
+        [['D. NO. :', jobCard.designNo || jobCard.designName || ''], ['PANNA :', jobCard.panna || ''], ['PASS :', jobCard.pass || '']],
+        [['FABRIC :', jobCard.fabric || ''], ['CON. :', jobCard.consumption || ''], ['ALL OVER :', jobCard.allover || '']],
+        [['PCS :', jobCard.pcs || ''], ['BOTTOM :', jobCard.bottom || ''], ['PN/KM :', jobCard.pnKm || '']],
+        [['TOP :', jobCard.top || ''], ['DUPATTA :', jobCard.dupatta || ''], ['SET-COPY :', jobCard.setCopy || '']],
+      ];
+
+      gridRows.forEach(row => {
+        let x = ML;
+        row.forEach(([lbl, val]) => {
+          doc.rect(x, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(1).stroke();
+          doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold')
+            .text(lbl, x + 2, curY + 3.5, { width: colW_Label - 4, lineBreak: false });
+          x += colW_Label;
+
+          doc.rect(x, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(1).stroke();
+          doc.fillColor('#000000').fontSize(8).font('Helvetica')
+            .text(String(val), x + 3, curY + 3.5, { width: colW_Val - 5, lineBreak: false });
+          x += colW_Val;
+        });
+        curY += rowH;
+      });
+
+      let x6 = ML;
+      doc.rect(x6, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(1).stroke();
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text('SLEEVE :', x6 + 2, curY + 3.5);
+      x6 += colW_Label;
+      doc.rect(x6, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(1).stroke();
+      doc.fillColor('#000000').fontSize(8).font('Helvetica').text(String(jobCard.sleeve || ''), x6 + 3, curY + 3.5);
+      x6 += colW_Val;
+
+      doc.rect(x6, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(1).stroke();
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text('CUT :', x6 + 2, curY + 3.5);
+      x6 += colW_Label;
+      doc.rect(x6, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(1).stroke();
+      doc.fillColor('#000000').fontSize(8).font('Helvetica').text(String(jobCard.cut || ''), x6 + 3, curY + 3.5);
+      x6 += colW_Val;
+
+      const totalHeaderW = colW_Label + colW_Val;
+      doc.rect(x6, curY, totalHeaderW, rowH).strokeColor('#000000').lineWidth(1).stroke();
+      doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold').text('TOTAL MTR', x6, curY + 3.5, { width: totalHeaderW, align: 'center' });
+      curY += rowH;
+
+      let x7 = ML;
+      doc.rect(x7, curY, colW_Label, rowH + 2).strokeColor('#000000').lineWidth(1).stroke();
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text('PARTY :', x7 + 2, curY + 4.5);
+      x7 += colW_Label;
+
+      const partyValW = 2 * colW_Val + colW_Label;
+      doc.rect(x7, curY, partyValW, rowH + 2).strokeColor('#000000').lineWidth(1).stroke();
+      doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold').text(String(jobCard.party || ''), x7 + 3, curY + 4.5);
+      x7 += partyValW;
+
+      doc.rect(x7, curY, totalHeaderW, rowH + 2).strokeColor('#000000').lineWidth(1).stroke();
+      doc.fillColor('#000000').fontSize(11).font('Helvetica-Bold').text(`: ${jobCard.totalMtr || ''}`, x7 + 4, curY + 3);
+      curY += rowH + 3;
+
+      const imgAreaH = 135;
+      doc.rect(ML, curY, CW, imgAreaH).strokeColor('#000000').lineWidth(1.2).stroke();
+
+      try {
+        if (imgBuf1 && imgBuf2) {
+          const halfW = CW / 2;
+          doc.moveTo(ML + halfW, curY).lineTo(ML + halfW, curY + imgAreaH).strokeColor('#000000').lineWidth(1).stroke();
+          doc.image(imgBuf1, ML + 3, curY + 3, { fit: [halfW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
+          doc.image(imgBuf2, ML + halfW + 3, curY + 3, { fit: [halfW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
+        } else if (imgBuf1) {
+          doc.image(imgBuf1, ML + 3, curY + 3, { fit: [CW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
+        } else if (imgBuf2) {
+          doc.image(imgBuf2, ML + 3, curY + 3, { fit: [CW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
+        } else {
+          doc.fillColor('#cccccc').fontSize(11).font('Helvetica-Bold')
+            .text('NO DESIGN IMAGE', ML, curY + imgAreaH / 2 - 6, { width: CW, align: 'center' });
+        }
+      } catch (e) {
+        doc.fillColor('#cccccc').fontSize(11).font('Helvetica-Bold')
+          .text('NO DESIGN IMAGE', ML, curY + imgAreaH / 2 - 6, { width: CW, align: 'center' });
+      }
+
+      curY += imgAreaH + 1;
+
+      if (jobCard.emergencyNotes || jobCard.note1 || jobCard.note2) {
+        const notesList = [];
+        if (jobCard.emergencyNotes) notesList.push({ type: 'emergency', text: `⚠ EMERGENCY: ${jobCard.emergencyNotes}` });
+        if (jobCard.note1) notesList.push({ type: 'normal', text: `NOTE 1: ${jobCard.note1}` });
+        if (jobCard.note2) notesList.push({ type: 'normal', text: `NOTE 2: ${jobCard.note2}` });
+
+        notesList.forEach(n => {
+          const noteH = 16;
+          const bg = n.type === 'emergency' ? '#fee2e2' : '#f3f4f6';
+          doc.rect(ML, curY, CW, noteH).fillAndStroke(bg, '#000000');
+          doc.fillColor(n.type === 'emergency' ? '#dc2626' : '#000000')
+            .fontSize(8).font('Helvetica-Bold')
+            .text(n.text, ML + 5, curY + 3.5, { width: CW - 10, lineBreak: false });
+          curY += noteH;
+        });
+        curY += 1;
+      }
+
+      doc.rect(ML, curY, CW, 14).strokeColor('#000000').lineWidth(1).stroke();
+      doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold')
+        .text('PROCESS & T.P. DETAILS', ML, curY + 3, { width: CW, align: 'center' });
+      curY += 14;
+
+      const tpColLabelW = 55;
+      const tpColValW = (CW - 2 * tpColLabelW) / 2;
+      const tpRowH = 14;
+
+      const tpRows = [
+        [['EXP. TIME :', jobCard.expTime || ''], ['PRINT DATE :', formatDateStr(jobCard.printDate)]],
+        [['FUSING DATE :', formatDateStr(jobCard.fusingDate)], ['PAPER TYPE :', jobCard.paperType || '']],
+        [['FUSING TEMP :', jobCard.temperature || ''], ['SPEED :', jobCard.speed || '']],
+        [['PROFILE :', jobCard.profile || ''], ['DESIGNER :', jobCard.designer || '']],
+        [['C. MATCHING :', jobCard.colourMatching || ''], ['BILL NO. :', jobCard.billNo || '']],
+      ];
+
+      tpRows.forEach(row => {
+        let tx = ML;
+        row.forEach(([lbl, val]) => {
+          doc.rect(tx, curY, tpColLabelW, tpRowH).strokeColor('#000000').lineWidth(1).stroke();
+          doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold')
+            .text(lbl, tx + 2, curY + 3, { width: tpColLabelW - 4, lineBreak: false });
+          tx += tpColLabelW;
+
+          doc.rect(tx, curY, tpColValW, tpRowH).strokeColor('#000000').lineWidth(1).stroke();
+          doc.fillColor('#000000').fontSize(7.5).font('Helvetica')
+            .text(String(val), tx + 3, curY + 3, { width: tpColValW - 5, lineBreak: false });
+          tx += tpColValW;
+        });
+        curY += tpRowH;
+      });
+    }
+
+    doc.end();
+  } catch (err) {
+    logger.error('downloadBulkJobCardsPdf error: %o', err);
+    if (!res.headersSent) res.status(500).send('Error generating bulk Job Cards PDF');
+  }
+};
+
 // ─── Module 1: Dynamic Custom Calculator Endpoint ──────────────────────────────
 const calculatePrintCost = async (req, res) => {
   try {
@@ -724,5 +980,5 @@ const updateProofingStatus = async (req, res) => {
 module.exports = {
   getAllJobCards, getJobCard, createJobCard, updateJobCard,
   deleteJobCard, calcExpTimeEndpoint, getNextJobCardNumber, downloadJobCardPdf,
-  calculatePrintCost, updateProductionStage, updateProofingStatus
+  downloadBulkJobCardsPdf, calculatePrintCost, updateProductionStage, updateProofingStatus
 };

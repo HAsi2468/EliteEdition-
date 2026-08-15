@@ -309,6 +309,49 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
         </div>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedChallanIds.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 1.1rem', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', borderRadius: '10px', boxShadow: '0 4px 14px rgba(16, 185, 129, 0.2)' }}>
+          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <FileText size={16} color="#34d399" />
+            <span>{selectedChallanIds.length} Stitching Challan{selectedChallanIds.length > 1 ? 's' : ''} Selected</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.6rem' }}>
+            <button
+              onClick={async () => {
+                if (selectedChallanIds.length === 0) return;
+                try {
+                  await api.downloadBulkStitchingChallanPdf(selectedChallanIds, `Combined_Stitching_Challans_${selectedChallanIds.length}_Items.pdf`);
+                  triggerEliteAlert('Download Successful', `${selectedChallanIds.length} Stitching Challans merged into 1 single multi-page PDF document.`, 'success');
+                } catch (e) {
+                  triggerEliteAlert('Download Failed', 'Failed to generate combined PDF: ' + e.message, 'error');
+                }
+              }}
+              className="btn-primary"
+              style={{ padding: '0.45rem 1.1rem', fontSize: '0.82rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <Download size={15} />
+              Download Combined PDF ({selectedChallanIds.length})
+            </button>
+            <button
+              onClick={handleMergeSelected}
+              className="btn-primary"
+              style={{ padding: '0.45rem 1.1rem', fontSize: '0.82rem', background: 'linear-gradient(135deg, #7c3aed, #6366f1)', border: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <Receipt size={15} />
+              Merge & Create Invoice ({selectedChallanIds.length}/4)
+            </button>
+            <button
+              onClick={() => setSelectedChallanIds([])}
+              className="btn-secondary"
+              style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem' }}
+            >
+              Clear Selection
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Challan Data Table */}
       <div className="glass-panel" style={{ overflow: 'hidden' }}>
         {loading ? (

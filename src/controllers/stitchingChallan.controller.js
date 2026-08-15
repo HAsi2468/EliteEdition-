@@ -349,6 +349,170 @@ const downloadChallanPdf = async (req, res) => {
   }
 };
 
+// ── GET /stitching-challan/bulk-pdf ───────────────────────────────────────────
+const downloadBulkChallansPdf = async (req, res) => {
+  try {
+    const PDFDocument = require('pdfkit');
+
+    let ids = [];
+    if (req.query.ids) {
+      ids = String(req.query.ids).split(',').map(s => s.trim()).filter(Boolean);
+    } else if (req.body && Array.isArray(req.body.ids)) {
+      ids = req.body.ids;
+    }
+
+    if (ids.length === 0) {
+      return res.status(400).send('No Stitching Challan IDs provided.');
+    }
+
+    const challans = await db.StitchingChallan.find({ _id: { $in: ids } }).sort({ challanNum: 1, created_at: 1 }).lean();
+    if (challans.length === 0) {
+      return res.status(404).send('No matching Stitching Challans found.');
+    }
+
+    const doc = new PDFDocument({ margin: 28, size: 'A4', autoFirstPage: true });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Combined_Stitching_Challans_${challans.length}_Items.pdf"`);
+    doc.pipe(res);
+
+    const PW = 595, PH = 842, ML = 35, MR = 35;
+    const contentWidth = PW - ML - MR;
+    const logoPath = path.join(__dirname, 'Logo.png');
+
+    for (let cIdx = 0; cIdx < challans.length; cIdx++) {
+      const challan = challans[cIdx];
+      if (cIdx > 0) doc.addPage();
+
+      const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {
+        day: '2-digit', month: '2-digit', year: 'numeric'
+      }) : '—';
+
+      doc.strokeColor('#2563eb').lineWidth(1.2)
+         .rect(ML, 25, contentWidth, PH - 50).stroke();
+
+      doc.fillColor('#1e40af').fontSize(9).font('Helvetica-Bold')
+         .text('GARMENT DELIVERY CHALLAN', ML + 10, 32);
+      
+      doc.fillColor('#1e3a8a').fontSize(10).font('Helvetica-Bold')
+         .text('ELITE EDITION', ML, 32, { width: contentWidth, align: 'center' });
+
+      doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
+         .text('Mo. +91 99098 66667', ML, 32, { width: contentWidth - 10, align: 'right' });
+
+      doc.strokeColor('#cbd5e1').lineWidth(0.5)
+         .moveTo(ML, 46).lineTo(PW - MR, 46).stroke();
+
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, ML + (contentWidth - 140) / 2, 52, { width: 140 });
+      } else {
+        doc.fillColor('#1e3a8a').fontSize(20).font('Helvetica-Bold')
+           .text('ELITE EDITION', ML, 60, { width: contentWidth, align: 'center' });
+      }
+
+      doc.fillColor('#475569').fontSize(8).font('Helvetica')
+         .text('Plot No-B/37, Siddheshwar Soc., Punagam Main Road, Surat | GSTIN: 24AANFE0044M1ZG', ML, 102, { width: contentWidth, align: 'center' });
+
+      doc.strokeColor('#1e40af').lineWidth(1)
+         .moveTo(ML, 116).lineTo(PW - MR, 116).stroke();
+
+      let curY = 122;
+      doc.fillColor('#0f172a').fontSize(9).font('Helvetica-Bold')
+         .text(`CHALLAN NO: ${challan.challanNo}`, ML + 8, curY);
+      doc.text(`DATE: ${formattedDate}`, ML + 350, curY);
+
+      curY += 16;
+      doc.font('Helvetica-Bold').text('PARTY NAME: ', ML + 8, curY);
+      doc.font('Helvetica').text(challan.partyName || '—', ML + 85, curY);
+
+      if (challan.deliveryBy) {
+        doc.font('Helvetica-Bold').text('TRANSPORT / BY: ', ML + 350, curY);
+        doc.font('Helvetica').text(challan.deliveryBy, ML + 440, curY);
+      }
+
+      curY += 16;
+      if (challan.billTo) {
+        doc.font('Helvetica-Bold').text('BILL TO: ', ML + 8, curY);
+        doc.font('Helvetica').text(challan.billTo, ML + 60, curY);
+      }
+      if (challan.shipTo) {
+        doc.font('Helvetica-Bold').text('SHIP TO: ', ML + 350, curY);
+        doc.font('Helvetica').text(challan.shipTo, ML + 405, curY);
+      }
+
+      curY += 22;
+      doc.strokeColor('#cbd5e1').lineWidth(0.5)
+         .moveTo(ML, curY).lineTo(PW - MR, curY).stroke();
+
+      curY += 4;
+      const tableTop = curY;
+      const cols = [
+        { name: 'SR', x: ML + 5, w: 25 },
+        { name: 'DESIGN NO', x: ML + 32, w: 105 },
+        { name: 'PARTICULARS / DESCRIPTION', x: ML + 140, w: 220 },
+        { name: 'PCS (QTY)', x: ML + 365, w: 55, align: 'right' },
+        { name: 'RATE (₹)', x: ML + 425, w: 45, align: 'right' },
+        { name: 'AMOUNT (₹)', x: ML + 475, w: 45, align: 'right' },
+      ];
+
+      doc.fillColor('#1e40af').rect(ML, tableTop, contentWidth, 18).fill();
+      cols.forEach(c => {
+        doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold')
+           .text(c.name, c.x, tableTop + 5, { width: c.w, align: c.align || 'left' });
+      });
+
+      curY = tableTop + 20;
+      const items = challan.items || [];
+
+      items.forEach((it, index) => {
+        const rowBg = index % 2 === 0 ? '#f8fafc' : '#ffffff';
+        doc.fillColor(rowBg).rect(ML, curY, contentWidth, 16).fill();
+
+        doc.fillColor('#0f172a').fontSize(8).font('Helvetica');
+        doc.text(String(index + 1), cols[0].x, curY + 4, { width: cols[0].w });
+        doc.font('Helvetica-Bold').text(it.designNo || '—', cols[1].x, curY + 4, { width: cols[1].w });
+        doc.font('Helvetica').text(it.particulars || 'Garment Stitching', cols[2].x, curY + 4, { width: cols[2].w });
+        doc.text(String(it.pcs || 0), cols[3].x, curY + 4, { width: cols[3].w, align: 'right' });
+        doc.text(it.rate ? `₹${it.rate.toFixed(2)}` : '—', cols[4].x, curY + 4, { width: cols[4].w, align: 'right' });
+        doc.font('Helvetica-Bold').text(it.amount ? `₹${it.amount.toFixed(2)}` : '—', cols[5].x, curY + 4, { width: cols[5].w, align: 'right' });
+
+        curY += 16;
+      });
+
+      doc.strokeColor('#1e40af').lineWidth(1)
+         .moveTo(ML, curY + 2).lineTo(PW - MR, curY + 2).stroke();
+
+      curY += 6;
+      doc.fillColor('#0f172a').fontSize(9.5).font('Helvetica-Bold')
+         .text(`TOTAL PIECES: ${challan.totalPcs || 0} Pcs`, ML + 10, curY);
+
+      if (challan.totalAmount > 0) {
+        doc.text(`TOTAL AMOUNT: ₹${(challan.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, ML + 300, curY, { width: contentWidth - 310, align: 'right' });
+      }
+
+      if (challan.notes) {
+        curY += 18;
+        doc.fillColor('#475569').fontSize(8).font('Helvetica-Oblique')
+           .text(`Notes / Instructions: ${challan.notes}`, ML + 10, curY, { width: contentWidth - 20 });
+      }
+
+      const footerY = PH - 90;
+      doc.strokeColor('#cbd5e1').lineWidth(0.5)
+         .moveTo(ML, footerY).lineTo(PW - MR, footerY).stroke();
+
+      doc.fillColor('#475569').fontSize(8).font('Helvetica-Bold');
+      doc.text("PREPARED BY", ML + 20, footerY + 50);
+      doc.text("RECEIVER'S SIGNATURE", ML + 210, footerY + 50);
+      doc.text("FOR ELITE EDITION", ML + 380, footerY + 12);
+      doc.font('Helvetica').text("(Authorized Signatory)", ML + 380, footerY + 50);
+    }
+
+    doc.end();
+  } catch (error) {
+    logger.error('stitchingChallan.downloadBulkChallansPdf error: %o', error);
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
+  }
+};
+
 module.exports = {
   getNextChallanNo,
   createChallan,
@@ -356,5 +520,6 @@ module.exports = {
   getOneChallan,
   updateChallan,
   deleteChallan,
-  downloadChallanPdf
+  downloadChallanPdf,
+  downloadBulkChallansPdf
 };

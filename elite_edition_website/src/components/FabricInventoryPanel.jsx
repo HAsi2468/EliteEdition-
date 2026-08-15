@@ -3360,18 +3360,20 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               <div style={{ display: 'flex', gap: '0.6rem' }}>
                 <button
                   onClick={async () => {
-                    const list = Object.values(selectedChallanMap);
-                    for (const ch of list) {
-                      await handleDownloadChallanPdf(ch._id, ch.challanNo);
-                      await new Promise(r => setTimeout(r, 400));
+                    const ids = Object.keys(selectedChallanMap);
+                    if (ids.length === 0) return;
+                    try {
+                      await api.downloadBulkFabricChallanPdf(ids, `Combined_Fabric_Challans_${ids.length}_Items.pdf`);
+                      triggerPushNotification('📥 Combined Challans PDF Downloaded', `${ids.length} Fabric Challans merged into 1 single multi-page PDF document.`, 'success');
+                    } catch (e) {
+                      alert('Error downloading combined PDF: ' + e.message);
                     }
-                    triggerPushNotification('📥 Bulk Challans PDFs Downloaded', `${list.length} Challan PDFs downloaded.`, 'success');
                   }}
                   className="btn-primary"
                   style={{ padding: '0.45rem 1.1rem', fontSize: '0.82rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
                 >
                   <FileDown size={15} />
-                  Download {Object.keys(selectedChallanMap).length} PDF{Object.keys(selectedChallanMap).length > 1 ? 's' : ''}
+                  Download Combined PDF ({Object.keys(selectedChallanMap).length})
                 </button>
                 <button
                   onClick={() => handleCreateBillFromChallan(Object.values(selectedChallanMap))}
