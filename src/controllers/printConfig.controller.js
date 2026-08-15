@@ -102,6 +102,14 @@ const getPrintConfig = async (req, res) => {
     result.operators = mergedOperators;
     result.autoScreenUsers = autoUsers;
 
+    if (config.complaintSubCategories) {
+      if (config.complaintSubCategories instanceof Map) {
+        result.complaintSubCategories = Object.fromEntries(config.complaintSubCategories);
+      } else if (typeof config.complaintSubCategories === 'object') {
+        result.complaintSubCategories = config.complaintSubCategories;
+      }
+    }
+
     res.status(httpStatus.OK).send(result);
   } catch (error) {
     logger.error('Error getting print config: %o', error);

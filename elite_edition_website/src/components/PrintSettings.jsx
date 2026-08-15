@@ -600,7 +600,16 @@ export default function PrintSettings() {
               <h4 style={{ fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '1rem', fontWeight: 700 }}>Complaint Sub-Categories</h4>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
                 {(config?.complaintCategories || []).map(catName => {
-                  const subList = (config?.complaintSubCategories && config.complaintSubCategories[catName]) || [];
+                  const subObj = config?.complaintSubCategories;
+                  let subList = [];
+                  if (subObj) {
+                    if (Array.isArray(subObj[catName])) {
+                      subList = subObj[catName];
+                    } else if (typeof subObj.get === 'function') {
+                      subList = subObj.get(catName) || [];
+                    }
+                  }
+                  if (!Array.isArray(subList)) subList = [];
                   return (
                     <div key={catName} style={{ flex: '1 1 calc(50% - 1rem)', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1.25rem' }}>
                       <h5 style={{ color: 'var(--text-primary)', fontSize: '0.9rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
