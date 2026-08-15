@@ -632,7 +632,10 @@ const downloadBulkJobCardsPdf = async (req, res) => {
 
     for (let jIdx = 0; jIdx < jobCards.length; jIdx++) {
       const jobCard = jobCards[jIdx];
-      if (jIdx > 0) doc.addPage({ size: 'A5', margin: 0 });
+      if (jIdx > 0) {
+        doc.addPage({ size: 'A5', margin: 0 });
+        doc.font('Helvetica').fontSize(10).fillColor('#000000').strokeColor('#000000').lineWidth(1);
+      }
 
       let imageUrl1 = '';
       let imageUrl2 = '';

@@ -1180,7 +1180,7 @@ const downloadBulkChallansPdf = async (req, res) => {
 
     for (let cIdx = 0; cIdx < challans.length; cIdx++) {
       const challan = challans[cIdx];
-      if (cIdx > 0) doc.addPage();
+      if (cIdx > 0) doc.addPage({ margin: 28, size: 'A4' });
 
       let billTo = challan.billTo || '';
       let shipTo = challan.shipTo || '';

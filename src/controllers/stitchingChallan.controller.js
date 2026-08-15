@@ -381,7 +381,7 @@ const downloadBulkChallansPdf = async (req, res) => {
 
     for (let cIdx = 0; cIdx < challans.length; cIdx++) {
       const challan = challans[cIdx];
-      if (cIdx > 0) doc.addPage();
+      if (cIdx > 0) doc.addPage({ margin: 28, size: 'A4' });
 
       const formattedDate = challan.date ? new Date(challan.date).toLocaleDateString('en-IN', {
         day: '2-digit', month: '2-digit', year: 'numeric'

@@ -1129,7 +1129,7 @@ const downloadInvoicePdf = async (req, res) => {
 
     // Page 2/3/4 (if duplicate requested): Black & White duplicate
     if (includeDuplicate) {
-      doc.addPage();
+      doc.addPage({ margin: 0, size: 'A4' });
       renderPage('DUPLICATE COPY', true);
     }
 
@@ -1236,7 +1236,7 @@ const downloadBulkInvoicesPdf = async (req, res) => {
     for (let invIdx = 0; invIdx < invoices.length; invIdx++) {
       const invoice = invoices[invIdx];
       if (invIdx > 0) {
-        doc.addPage();
+        doc.addPage({ margin: 0, size: 'A4' });
       }
 
       const companyTerms = invoice.terms || config.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
@@ -1762,7 +1762,7 @@ const downloadBulkInvoicesPdf = async (req, res) => {
           doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
             .text(`Continued on Page 2  ›  GST Summary & Payment Details  (Invoice: ${invoice.invoiceNo})`, PAD, PH - PAD - 13, { width: CW, align: 'center' });
 
-          doc.addPage();
+          doc.addPage({ margin: 0, size: 'A4' });
           Y = drawHeader('2 of 2');
           doc.rect(PAD, Y, CW, 18).fill(PRPL);
           doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
