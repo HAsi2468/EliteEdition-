@@ -218,12 +218,12 @@ table {
 }
 
 th {
-  background: var(--bg-th, rgba(17,24,39,0.9));
+  background: #1e293b;
   padding: 1rem;
-  font-weight: 500;
+  font-weight: 700;
   font-size: 0.85rem;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: #ffffff;
   border-bottom: 1px solid var(--border-light);
   letter-spacing: 0.05em;
 }

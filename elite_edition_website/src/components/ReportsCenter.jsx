@@ -1040,37 +1040,37 @@ export default function ReportsCenter({ department }) {
               <div style={{ width: '100%', overflowX: 'auto', padding: '0.5rem 0' }}>
                 <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Date</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Lot #</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Vendor Name</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Vendor Challan No</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Fabric Quality & Panna</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#94a3b8' }}>Inward Quantity (m)</th>
+                    <tr style={{ background: '#1e293b', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Date</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Lot #</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Vendor Name</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Vendor Challan No</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Fabric Quality & Panna</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Inward Quantity (m)</th>
                     </tr>
                   </thead>
                   <tbody>
                     {reportData.map((t, idx) => (
-                      <tr key={t._id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                      <tr key={t._id || idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
+                        <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
                           {formatDateDDMMYYYY(t.date)}
                         </td>
-                        <td style={{ padding: '12px 16px', fontWeight: '700', color: '#fbbf24' }}>
+                        <td style={{ padding: '12px 16px', fontWeight: '800', color: '#d97706' }}>
                           {t.lotNo ? `#${t.lotNo}` : '—'}
                         </td>
-                        <td style={{ padding: '12px 16px', fontWeight: '600', color: '#f8fafc' }}>{t.vendorName || '—'}</td>
-                        <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>{t.challanNo || '—'}</td>
-                        <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                        <td style={{ padding: '12px 16px', fontWeight: '700', color: 'var(--text-primary, #0f172a)' }}>{t.vendorName || '—'}</td>
+                        <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>{t.challanNo || '—'}</td>
+                        <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>
                           {t.fabricQuality || '—'}{t.panna ? ` (${t.panna}")` : ''}
                         </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#34d399' }}>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '800', color: '#16a34a' }}>
                           +{(t.qty || 0).toLocaleString('en-IN')} m
                         </td>
                       </tr>
                     ))}
                     {reportData.length === 0 && (
                       <tr>
-                        <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                        <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
                           No fabric inward records found for selected date range.
                         </td>
                       </tr>
@@ -1084,15 +1084,15 @@ export default function ReportsCenter({ department }) {
               <div style={{ width: '100%', overflowX: 'auto', padding: '0.5rem 0' }}>
                 <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Date</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Lot #</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Party Name</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Bill To</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Challan No</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Fabric Quality & Panna</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#94a3b8' }}>Shortage</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#94a3b8' }}>Dispatched Qty (m)</th>
+                    <tr style={{ background: '#1e293b', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Date</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Lot #</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Party Name</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Bill To</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Challan No</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Fabric Quality & Panna</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Shortage</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Dispatched Qty (m)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1107,23 +1107,23 @@ export default function ReportsCenter({ department }) {
                       }
                       const shortageStr = shortageVal != null ? `${shortageVal}%` : '—';
                       return (
-                        <tr key={t._id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                        <tr key={t._id || idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
+                          <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
                             {formatDateDDMMYYYY(t.date)}
                           </td>
-                          <td style={{ padding: '12px 16px', fontWeight: '700', color: '#fbbf24' }}>
+                          <td style={{ padding: '12px 16px', fontWeight: '800', color: '#d97706' }}>
                             {t.lotNo ? `#${t.lotNo}` : '—'}
                           </td>
-                          <td style={{ padding: '12px 16px', fontWeight: '600', color: '#f8fafc' }}>{t.partyName || '—'}</td>
-                          <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>{t.billTo || t.partyName || '—'}</td>
-                          <td style={{ padding: '12px 16px', color: '#38bdf8' }}>{t.challanNo || '—'}</td>
-                          <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                          <td style={{ padding: '12px 16px', fontWeight: '700', color: 'var(--text-primary, #0f172a)' }}>{t.partyName || '—'}</td>
+                          <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>{t.billTo || t.partyName || '—'}</td>
+                          <td style={{ padding: '12px 16px', fontWeight: '800', color: '#0284c7' }}>{t.challanNo || '—'}</td>
+                          <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>
                             {t.fabricQuality || '—'}{t.panna ? ` (${t.panna}")` : ''}
                           </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'center', color: '#a78bfa', fontWeight: '600' }}>
+                          <td style={{ padding: '12px 16px', textAlign: 'center', color: '#7c3aed', fontWeight: '700' }}>
                             {shortageStr}
                           </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#f87171' }}>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '800', color: '#dc2626' }}>
                             -{(t.qty || 0).toLocaleString('en-IN')} m
                           </td>
                         </tr>
@@ -1131,7 +1131,7 @@ export default function ReportsCenter({ department }) {
                     })}
                     {reportData.length === 0 && (
                       <tr>
-                        <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                        <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
                           No fabric outward records found for selected date range.
                         </td>
                       </tr>
@@ -1145,45 +1145,45 @@ export default function ReportsCenter({ department }) {
               <div style={{ width: '100%', overflowX: 'auto', padding: '0.5rem 0' }}>
                 <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Lot #</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Fabric Quality & Panna</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Vendor Name</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#94a3b8' }}>Total Inward (m)</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#94a3b8' }}>Total Outward (m)</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#94a3b8' }}>Current Lot Balance</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#94a3b8' }}>Status</th>
+                    <tr style={{ background: '#1e293b', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Lot #</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Fabric Quality & Panna</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Vendor Name</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Total Inward (m)</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Total Outward (m)</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Current Lot Balance</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {reportData.map((l, idx) => {
                       const stockVal = l.currentStock || 0;
                       return (
-                        <tr key={l.lotNo || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <td style={{ padding: '12px 16px', fontWeight: '700', color: '#fbbf24' }}>
+                        <tr key={l.lotNo || idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
+                          <td style={{ padding: '12px 16px', fontWeight: '800', color: '#d97706' }}>
                             {l.lotNo ? `#${l.lotNo}` : '—'}
                           </td>
-                          <td style={{ padding: '12px 16px', fontWeight: '600', color: '#f8fafc' }}>
+                          <td style={{ padding: '12px 16px', fontWeight: '700', color: 'var(--text-primary, #0f172a)' }}>
                             {l.fabricQuality || '—'}{l.panna ? ` (${l.panna}")` : ''}
                           </td>
-                          <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>{l.vendorName || '—'}</td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right', color: '#34d399' }}>
+                          <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>{l.vendorName || '—'}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '800', color: '#16a34a' }}>
                             +{(l.totalInward || 0).toLocaleString('en-IN')} m
                           </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right', color: '#f87171' }}>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '800', color: '#dc2626' }}>
                             -{(l.totalOutward || 0).toLocaleString('en-IN')} m
                           </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: stockVal > 0 ? '#34d399' : stockVal < 0 ? '#f87171' : '#94a3b8' }}>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '800', color: stockVal > 0 ? '#16a34a' : stockVal < 0 ? '#dc2626' : '#64748b' }}>
                             {stockVal.toLocaleString('en-IN')} m
                           </td>
                           <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                             <span style={{
-                              padding: '2px 8px',
+                              padding: '3px 10px',
                               borderRadius: '4px',
-                              fontSize: '0.7rem',
-                              fontWeight: '600',
-                              background: stockVal > 0 ? 'rgba(52, 211, 153, 0.15)' : 'rgba(148, 163, 184, 0.15)',
-                              color: stockVal > 0 ? '#34d399' : '#94a3b8'
+                              fontSize: '0.75rem',
+                              fontWeight: '800',
+                              background: stockVal > 0 ? 'rgba(22, 163, 74, 0.15)' : 'rgba(100, 116, 139, 0.15)',
+                              color: stockVal > 0 ? '#16a34a' : '#475569'
                             }}>
                               {stockVal > 0 ? 'Active Stock' : 'Consumed'}
                             </span>
@@ -1193,7 +1193,7 @@ export default function ReportsCenter({ department }) {
                     })}
                     {reportData.length === 0 && (
                       <tr>
-                        <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                        <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
                           No lot-wise fabric balance records found for selected date range.
                         </td>
                       </tr>
@@ -1207,35 +1207,35 @@ export default function ReportsCenter({ department }) {
               <div style={{ width: '100%', overflowX: 'auto', padding: '0.5rem 0' }}>
                 <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Challan No</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Date</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Party Name</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Fabric & Panna</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Job & Design</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#94a3b8' }}>Lot No.</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#94a3b8' }}>Rolls (TPs)</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#94a3b8' }}>Total Dispatched Mtr</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#94a3b8' }}>Action</th>
+                    <tr style={{ background: '#1e293b', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Challan No</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Date</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Party Name</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Fabric & Panna</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Job & Design</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Lot No.</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Rolls (TPs)</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Total Dispatched Mtr</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {reportData.map((c, idx) => (
-                      <tr key={c._id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <td style={{ padding: '12px 16px', fontWeight: '700', color: '#38bdf8' }}>EDP-{c.challanNo}</td>
-                        <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                      <tr key={c._id || idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
+                        <td style={{ padding: '12px 16px', fontWeight: '800', color: '#0284c7' }}>EDP-{c.challanNo}</td>
+                        <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
                           {formatDateDDMMYYYY(c.date)}
                         </td>
-                        <td style={{ padding: '12px 16px', fontWeight: '600', color: '#f8fafc' }}>{c.partyName || '—'}</td>
-                        <td style={{ padding: '12px 16px', color: '#cbd5e1' }}>
+                        <td style={{ padding: '12px 16px', fontWeight: '700', color: 'var(--text-primary, #0f172a)' }}>{c.partyName || '—'}</td>
+                        <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>
                           {c.fabricName || '—'}{c.panna ? ` (${c.panna}")` : ''}
                         </td>
-                        <td style={{ padding: '12px 16px', color: '#94a3b8' }}>
+                        <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>
                           {c.jobNo || '—'} {c.designNo ? `/ ED-${c.designNo.replace(/^ED-/i, '')}` : ''}
                         </td>
-                        <td style={{ padding: '12px 16px', color: '#fbbf24' }}>{c.lotNo ? `#${c.lotNo}` : '—'}</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '600', color: '#f8fafc' }}>{c.totalTp || 0}</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '700', color: '#34d399' }}>
+                        <td style={{ padding: '12px 16px', fontWeight: '800', color: '#d97706' }}>{c.lotNo ? `#${c.lotNo}` : '—'}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: 'var(--text-primary, #0f172a)' }}>{c.totalTp || 0}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '800', color: '#16a34a' }}>
                           {(c.totalMtr || 0).toLocaleString('en-IN')} m
                         </td>
                         <td style={{ padding: '12px 16px', textAlign: 'center' }}>
@@ -1251,7 +1251,7 @@ export default function ReportsCenter({ department }) {
                     ))}
                     {reportData.length === 0 && (
                       <tr>
-                        <td colSpan="9" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                        <td colSpan="9" style={{ padding: '2rem', textAlign: 'center', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
                           No fabric challans found for selected date range.
                         </td>
                       </tr>
