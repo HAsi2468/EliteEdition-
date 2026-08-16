@@ -1575,37 +1575,37 @@ const Workspace = ({ currentUser }) => {
       height: '100%',
       display: isMobile && mobileActiveView === 'sidebar' ? 'none' : 'flex',
       flexDirection: 'column',
-      backgroundColor: 'var(--bg-card, #161b26)',
+      backgroundColor: '#ffffff',
       borderRadius: isMobile ? '0' : '16px',
-      border: isMobile ? 'none' : '1px solid var(--border-light)',
-      boxShadow: isMobile ? 'none' : '0 10px 30px rgba(0,0,0,0.3)',
+      border: isMobile ? 'none' : '1px solid #e2e8f0',
+      boxShadow: isMobile ? 'none' : '0 4px 20px rgba(15, 23, 42, 0.06)',
       overflow: 'hidden'
     },
     roomItem: (isActive) => ({
       padding: isMobile ? '12px 14px' : '10px 14px',
-      borderRadius: '14px',
+      borderRadius: '12px',
       display: 'flex',
       alignItems: 'center',
       gap: '12px',
       cursor: 'pointer',
       backgroundColor: isActive
-        ? 'rgba(56, 189, 248, 0.16)'
-        : 'rgba(255,255,255,0.02)',
-      color: isActive ? '#38bdf8' : 'var(--text-primary)',
+        ? '#eff6ff'
+        : 'transparent',
+      color: isActive ? '#2563eb' : '#334155',
       transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-      fontWeight: isActive ? '600' : '400',
+      fontWeight: isActive ? '700' : '500',
       border: isActive
-        ? '1px solid rgba(56, 189, 248, 0.4)'
-        : '1px solid rgba(255,255,255,0.05)',
-      boxShadow: isActive ? '0 4px 14px rgba(56, 189, 248, 0.15)' : 'none'
+        ? '1px solid #bfdbfe'
+        : '1px solid transparent',
+      boxShadow: isActive ? '0 2px 8px rgba(37, 99, 235, 0.1)' : 'none'
     }),
     header: {
-      padding: isMobile ? '12px 16px' : '18px 24px',
-      borderBottom: '1px solid var(--border-light)',
+      padding: isMobile ? '12px 16px' : '16px 24px',
+      borderBottom: '1px solid #e2e8f0',
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      backgroundColor: 'rgba(22, 27, 38, 0.95)',
+      backgroundColor: '#ffffff',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
       zIndex: 10
@@ -1616,7 +1616,8 @@ const Workspace = ({ currentUser }) => {
       overflowY: 'auto',
       display: 'flex',
       flexDirection: 'column',
-      gap: isMobile ? '14px' : '20px'
+      gap: isMobile ? '14px' : '16px',
+      backgroundColor: '#f8fafc'
     },
     messageBubble: (isMine, isTask) => ({
       position: 'relative',
@@ -1625,48 +1626,48 @@ const Workspace = ({ currentUser }) => {
       padding: isTask ? '0' : isMobile ? '11px 15px' : '13px 18px',
       borderRadius: '18px',
       backgroundColor: isTask
-        ? 'var(--bg-card, #161b26)'
+        ? '#ffffff'
         : isMine
-          ? 'var(--primary, #3b82f6)'
-          : 'rgba(255, 255, 255, 0.05)',
+          ? '#2563eb'
+          : '#ffffff',
       backgroundImage: isMine && !isTask
-        ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)'
+        ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
         : 'none',
-      color: isTask ? 'var(--text-primary)' : isMine ? 'white' : 'var(--text-primary)',
+      color: isTask ? '#0f172a' : isMine ? '#ffffff' : '#0f172a',
       borderBottomRightRadius: isMine ? '4px' : '18px',
       borderBottomLeftRadius: !isMine ? '4px' : '18px',
       alignSelf: isMine ? 'flex-end' : 'flex-start',
       boxShadow: isMine
-        ? '0 4px 14px rgba(37, 99, 235, 0.3)'
-        : '0 2px 8px rgba(0,0,0,0.15)',
+        ? '0 4px 14px rgba(37, 99, 235, 0.25)'
+        : '0 2px 8px rgba(15, 23, 42, 0.05)',
       border: isTask
-        ? '1px solid var(--border-light)'
+        ? '1px solid #e2e8f0'
         : !isMine
-          ? '1px solid rgba(255, 255, 255, 0.08)'
+          ? '1px solid #e2e8f0'
           : 'none',
-      fontSize: isMobile ? '0.9rem' : '0.96rem',
-      lineHeight: '1.45'
+      fontSize: isMobile ? '0.9rem' : '0.95rem',
+      lineHeight: '1.5'
     }),
     taskCard: {
-      header: { padding: '12px 16px', borderBottom: '1px solid var(--border-light)', backgroundColor: 'rgba(0,0,0,0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTopLeftRadius: '12px', borderTopRightRadius: '12px' },
-      body: { padding: '16px', fontSize: '0.9rem', color: 'var(--text-secondary)' },
-      footer: { padding: '12px 16px', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+      header: { padding: '12px 16px', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTopLeftRadius: '12px', borderTopRightRadius: '12px' },
+      body: { padding: '16px', fontSize: '0.9rem', color: '#334155' },
+      footer: { padding: '12px 16px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
       statusSelect: (status) => ({
         padding: '6px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', outline: 'none',
-        backgroundColor: status === 'Done' ? 'var(--success)' : status === 'In Progress' ? 'var(--warning)' : 'var(--bg-main)',
-        color: status === 'To Do' ? 'var(--text-primary)' : 'white'
+        backgroundColor: status === 'Done' ? '#16a34a' : status === 'In Progress' ? '#d97706' : '#f1f5f9',
+        color: status === 'To Do' ? '#0f172a' : 'white'
       }),
       priorityBadge: (priority) => ({
         padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 'bold',
         backgroundColor: priority === 'high' ? 'rgba(239, 68, 68, 0.1)' : priority === 'medium' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-        color: priority === 'high' ? '#ef4444' : priority === 'medium' ? '#f59e0b' : '#10b981'
+        color: priority === 'high' ? '#dc2626' : priority === 'medium' ? '#d97706' : '#16a34a'
       })
     },
-    messageSender: (isMine) => ({ fontSize: '0.75rem', color: isMine ? 'rgba(255,255,255,0.85)' : 'var(--text-secondary)', marginBottom: '4px', display: 'flex', gap: '8px', justifyContent: isMine ? 'flex-end' : 'flex-start', fontWeight: '500' }),
+    messageSender: (isMine) => ({ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px', display: 'flex', gap: '8px', justifyContent: isMine ? 'flex-end' : 'flex-start', fontWeight: '600' }),
     inputArea: {
-      padding: isMobile ? '10px 12px' : '16px 24px',
-      borderTop: '1px solid var(--border-light)',
-      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+      padding: isMobile ? '10px 12px' : '14px 24px',
+      borderTop: '1px solid #e2e8f0',
+      backgroundColor: '#ffffff',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
       position: isMobile ? 'sticky' : 'relative',
@@ -1676,19 +1677,19 @@ const Workspace = ({ currentUser }) => {
     inputForm: { display: 'flex', gap: '10px', alignItems: 'center' },
     inputField: {
       flex: 1,
-      padding: isMobile ? '12px 18px' : '14px 22px',
+      padding: isMobile ? '12px 18px' : '12px 20px',
       borderRadius: '24px',
-      border: '1px solid rgba(255,255,255,0.1)',
-      backgroundColor: 'var(--bg-input, #0b0f19)',
-      color: 'var(--text-primary)',
+      border: '1px solid #cbd5e1',
+      backgroundColor: '#f8fafc',
+      color: '#0f172a',
       outline: 'none',
-      fontSize: isMobile ? '0.92rem' : '0.96rem',
+      fontSize: isMobile ? '0.92rem' : '0.95rem',
       transition: 'border-color 0.2s, box-shadow 0.2s'
     },
     sendBtn: {
-      padding: isMobile ? '11px' : '13px',
+      padding: isMobile ? '11px' : '12px',
       borderRadius: '50%',
-      background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)',
+      background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
       color: 'white',
       border: 'none',
       cursor: 'pointer',
@@ -1696,18 +1697,18 @@ const Workspace = ({ currentUser }) => {
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
-      boxShadow: '0 4px 12px rgba(56, 189, 248, 0.3)',
+      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
       transition: 'transform 0.15s ease'
     },
     createTaskChip: {
-      position: 'absolute', top: '-15px', right: '-10px', backgroundColor: 'var(--accent)', color: 'white', padding: '4px 10px', borderRadius: '16px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', zIndex: 10, border: 'none'
+      position: 'absolute', top: '-15px', right: '-10px', backgroundColor: '#2563eb', color: 'white', padding: '4px 10px', borderRadius: '16px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', zIndex: 10, border: 'none'
     },
-    modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(3, 7, 18, 0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(5px)' },
-    modalContent: { width: '450px', backgroundColor: '#161b26', border: '1px solid var(--border-light, rgba(255,255,255,0.08))', borderRadius: '16px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4)', color: 'var(--text-primary)' },
-    modalContentLarge: { width: '800px', maxWidth: '90%', backgroundColor: '#161b26', border: '1px solid var(--border-light, rgba(255,255,255,0.08))', borderRadius: '16px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4)', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflowY: 'auto' },
+    modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(5px)' },
+    modalContent: { width: '450px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', color: '#0f172a' },
+    modalContentLarge: { width: '800px', maxWidth: '90%', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', color: '#0f172a', display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflowY: 'auto' },
     kanbanContainer: { display: 'flex', gap: '20px', height: '100%', overflowX: 'auto', paddingBottom: '20px' },
-    kanbanColumn: { flex: '1', minWidth: '300px', backgroundColor: 'rgba(22, 27, 38, 0.65)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.08)' },
-    kanbanColHeader: { padding: '15px 20px', fontWeight: 'bold', fontSize: '1rem', borderBottom: '1px solid var(--border-light)', backgroundColor: 'rgba(0,0,0,0.02)' },
+    kanbanColumn: { flex: '1', minWidth: '300px', backgroundColor: '#f8fafc', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #e2e8f0' },
+    kanbanColHeader: { padding: '15px 20px', fontWeight: 'bold', fontSize: '1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#ffffff', color: '#0f172a' },
     kanbanColBody: { padding: '15px', display: 'flex', flexDirection: 'column', gap: '15px', overflowY: 'auto', flex: 1 }
   };
 
@@ -2055,7 +2056,7 @@ const Workspace = ({ currentUser }) => {
     return true;
   });
 
-  const groupRooms = rooms.filter(r => r.type !== 'direct');
+  const groupRooms = rooms.filter(r => r.type !== 'direct').filter((r, idx, arr) => arr.findIndex(t => t.name?.toLowerCase() === r.name?.toLowerCase() || t._id === r._id) === idx);
   const otherUsers = allUsers.filter(u => u._id !== currentUser._id);
   
   // Message content formatter for Markdown & Download Links
@@ -2265,16 +2266,16 @@ const Workspace = ({ currentUser }) => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', backgroundColor: 'var(--bg-card, #161b26)', padding: '4px', borderRadius: '24px', border: '1px solid var(--border-light)' }}>
+        <div style={{ display: 'flex', gap: '6px', backgroundColor: '#f1f5f9', padding: '4px', borderRadius: '24px', border: '1px solid #cbd5e1' }}>
           <button 
             onClick={() => setWorkspaceTab('chat')} 
-            style={{ padding: '8px 24px', borderRadius: '20px', border: 'none', background: workspaceTab === 'chat' ? 'var(--primary)' : 'transparent', color: workspaceTab === 'chat' ? 'white' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
+            style={{ padding: '8px 24px', borderRadius: '20px', border: 'none', background: workspaceTab === 'chat' ? '#2563eb' : 'transparent', color: workspaceTab === 'chat' ? 'white' : '#475569', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
           >
             Chat Rooms
           </button>
           <button 
             onClick={() => setWorkspaceTab('tasks')} 
-            style={{ padding: '8px 24px', borderRadius: '20px', border: 'none', background: workspaceTab === 'tasks' ? 'var(--primary)' : 'transparent', color: workspaceTab === 'tasks' ? 'white' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
+            style={{ padding: '8px 24px', borderRadius: '20px', border: 'none', background: workspaceTab === 'tasks' ? '#2563eb' : 'transparent', color: workspaceTab === 'tasks' ? 'white' : '#475569', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}
           >
             Task Board
           </button>
@@ -2455,11 +2456,11 @@ const Workspace = ({ currentUser }) => {
                           onChange={(e) => setSearchQuery(e.target.value)} 
                           style={{
                             width: '100%',
-                            padding: '6px 12px',
+                            padding: '6px 14px',
                             borderRadius: '16px',
-                            border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-                            backgroundColor: 'var(--bg-input, #0b0f19)',
-                            color: 'var(--text-primary)',
+                            border: '1px solid #cbd5e1',
+                            backgroundColor: '#f8fafc',
+                            color: '#0f172a',
                             fontSize: '0.85rem',
                             outline: 'none'
                           }} 
@@ -2536,32 +2537,32 @@ const Workspace = ({ currentUser }) => {
                   </div>
 
                   {/* Timeline Categories Filters */}
-                  <div style={{ display: 'flex', gap: '8px', padding: '10px 20px', borderBottom: '1px solid var(--border-light, rgba(255,255,255,0.08))', backgroundColor: 'rgba(0,0,0,0.15)', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '8px', padding: '10px 20px', borderBottom: '1px solid #e2e8f0', backgroundColor: '#ffffff', flexWrap: 'wrap' }}>
                     <button 
                       type="button"
                       onClick={() => setChatFilter('all')}
-                      style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', backgroundColor: chatFilter === 'all' ? 'var(--primary)' : 'transparent', color: chatFilter === 'all' ? '#0b0f19' : 'var(--text-secondary)' }}
+                      style={{ padding: '6px 14px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 'bold', border: chatFilter === 'all' ? 'none' : '1px solid #cbd5e1', cursor: 'pointer', backgroundColor: chatFilter === 'all' ? '#2563eb' : '#f1f5f9', color: chatFilter === 'all' ? '#ffffff' : '#475569', boxShadow: chatFilter === 'all' ? '0 2px 8px rgba(37,99,235,0.2)' : 'none' }}
                     >
                       All Messages
                     </button>
                     <button 
                       type="button"
                       onClick={() => setChatFilter('voice')}
-                      style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', backgroundColor: chatFilter === 'voice' ? 'var(--primary)' : 'transparent', color: chatFilter === 'voice' ? '#0b0f19' : 'var(--text-secondary)' }}
+                      style={{ padding: '6px 14px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 'bold', border: chatFilter === 'voice' ? 'none' : '1px solid #cbd5e1', cursor: 'pointer', backgroundColor: chatFilter === 'voice' ? '#2563eb' : '#f1f5f9', color: chatFilter === 'voice' ? '#ffffff' : '#475569', boxShadow: chatFilter === 'voice' ? '0 2px 8px rgba(37,99,235,0.2)' : 'none' }}
                     >
                       🎙️ Memos
                     </button>
                     <button 
                       type="button"
                       onClick={() => setChatFilter('task')}
-                      style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', backgroundColor: chatFilter === 'task' ? 'var(--primary)' : 'transparent', color: chatFilter === 'task' ? '#0b0f19' : 'var(--text-secondary)' }}
+                      style={{ padding: '6px 14px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 'bold', border: chatFilter === 'task' ? 'none' : '1px solid #cbd5e1', cursor: 'pointer', backgroundColor: chatFilter === 'task' ? '#2563eb' : '#f1f5f9', color: chatFilter === 'task' ? '#ffffff' : '#475569', boxShadow: chatFilter === 'task' ? '0 2px 8px rgba(37,99,235,0.2)' : 'none' }}
                     >
                       📋 Tasks
                     </button>
                     <button 
                       type="button"
                       onClick={() => setChatFilter('file')}
-                      style={{ padding: '6px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', border: 'none', cursor: 'pointer', backgroundColor: chatFilter === 'file' ? 'var(--primary)' : 'transparent', color: chatFilter === 'file' ? '#0b0f19' : 'var(--text-secondary)' }}
+                      style={{ padding: '6px 14px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 'bold', border: chatFilter === 'file' ? 'none' : '1px solid #cbd5e1', cursor: 'pointer', backgroundColor: chatFilter === 'file' ? '#2563eb' : '#f1f5f9', color: chatFilter === 'file' ? '#ffffff' : '#475569', boxShadow: chatFilter === 'file' ? '0 2px 8px rgba(37,99,235,0.2)' : 'none' }}
                     >
                       📁 Attachments
                     </button>
