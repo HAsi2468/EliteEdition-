@@ -8,5 +8,7 @@ router.post('/groups/sync', communicationController.syncGroups);
 router.get('/groups/:groupId/messages', communicationController.getGroupMessages);
 router.get('/groups/:groupId/members', communicationController.getGroupMembers);
 router.post('/activity', communicationController.postActivityEvent);
+router.post('/messages/:messageId/acknowledge', communicationController.acknowledgeMessage);
 
 module.exports = router;
+

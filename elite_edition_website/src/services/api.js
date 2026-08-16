@@ -1731,4 +1731,12 @@ export const api = {
       body: JSON.stringify(data),
     });
   },
+
+  async acknowledgeCommunicationMessage(messageId, action = 'acknowledged', userData = {}) {
+    return request(`/communication/messages/${messageId}/acknowledge`, {
+      method: 'POST',
+      body: JSON.stringify({ action, ...userData }),
+    });
+  },
 };
+

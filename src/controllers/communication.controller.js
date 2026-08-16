@@ -178,10 +178,70 @@ const postActivityEvent = async (req, res) => {
   }
 };
 
+/**
+ * Acknowledge or update status on an activity/chat message
+ */
+const acknowledgeMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { action = 'acknowledged' } = req.body;
+    const userId = req.user ? req.user._id : req.body.userId;
+    const userName = req.user ? (req.user.name || req.user.username) : (req.body.userName || 'User');
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'User ID is required' });
+    }
+
+    const message = await ChatMessage.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    // Initialize acknowledgments array if missing
+    if (!message.acknowledgments) message.acknowledgments = [];
+
+    // Check if user already acknowledged this message
+    const existingIndex = message.acknowledgments.findIndex(
+      (a) => String(a.user) === String(userId)
+    );
+
+    if (existingIndex >= 0) {
+      message.acknowledgments[existingIndex].action = action;
+      message.acknowledgments[existingIndex].timestamp = new Date();
+    } else {
+      message.acknowledgments.push({
+        user: userId,
+        userName,
+        action,
+        timestamp: new Date()
+      });
+    }
+
+    await message.save();
+
+    // Broadcast via global socket if io is attached
+    const io = req.app.get('io') || global.io;
+    if (io) {
+      io.to(String(message.roomId)).emit('message-acknowledged', {
+        messageId: message._id,
+        roomId: message.roomId,
+        acknowledgments: message.acknowledgments
+      });
+    }
+
+    res.json({ success: true, data: message });
+  } catch (error) {
+    console.error('Error acknowledging message:', error);
+    res.status(500).json({ success: false, message: 'Failed to acknowledge message', error: error.message });
+  }
+};
+
 module.exports = {
   getGroups,
   getGroupMessages,
   getGroupMembers,
   syncGroups,
   postActivityEvent,
+  acknowledgeMessage,
 };
+

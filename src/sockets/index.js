@@ -28,12 +28,12 @@ const setupSockets = (io) => {
       io.emit('presence-sync', getOnlineUserIds());
     });
 
-    // Handle sending a standard text message (supports quoted replies, attachments, mentions)
+    // Handle sending a standard text message (supports quoted replies, attachments, mentions, priority)
     socket.on('send-message', async (data) => {
       try {
-        const { roomId, senderId, content, replyTo, attachment } = data;
+        const { roomId, senderId, content, replyTo, attachment, priority } = data;
         
-        // Parse mentions
+        // Parse user mentions
         const mentionRegex = /@(\w+)/g;
         const matches = [...content.matchAll(mentionRegex)];
         const usernames = matches.map(m => m[1]);
@@ -43,6 +43,17 @@ const setupSockets = (io) => {
           matchedUsers.forEach(u => mentions.push(u._id));
         }
 
+        // Parse record mentions e.g. @JC-1004, @DES-55, @INV-201
+        const recordMentions = [];
+        const recordRegex = /@(JC|DES|INV)-([a-zA-Z0-9_-]+)/gi;
+        const recordMatches = [...content.matchAll(recordRegex)];
+        recordMatches.forEach((m) => {
+          const prefix = m[1].toUpperCase();
+          const refVal = m[0].replace(/^@/, '');
+          const rType = prefix === 'JC' ? 'jobcard' : prefix === 'DES' ? 'design' : 'invoice';
+          recordMentions.push({ recordType: rType, recordRef: refVal });
+        });
+
         // Save message to MongoDB
         const newMessage = await ChatMessage.create({
           roomId,
@@ -50,8 +61,11 @@ const setupSockets = (io) => {
           content,
           replyTo: replyTo || null,
           type: 'text',
+          msgType: 'human',
+          priority: priority === 'urgent' ? 'urgent' : 'normal',
           attachment: attachment || undefined,
           mentions: mentions,
+          recordMentions: recordMentions,
           readBy: [senderId]
         });
 

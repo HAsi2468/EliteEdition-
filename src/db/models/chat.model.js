@@ -122,6 +122,11 @@ const chatMessageSchema = new mongoose.Schema(
       enum: ['human', 'system_activity'],
       default: 'human',
     },
+    priority: {
+      type: String,
+      enum: ['normal', 'urgent'],
+      default: 'normal',
+    },
     activityMeta: {
       action:          { type: String, default: '' },   // 'CREATE', 'UPDATE', 'DELETE', 'STAGE_CHANGE', etc.
       module:          { type: String, default: '' },   // 'Job Card', 'Invoice', 'Raw Material', etc.
@@ -130,6 +135,20 @@ const chatMessageSchema = new mongoose.Schema(
       department:      { type: String, default: '' },
       permissionScope: { type: String, default: '' },
     },
+    acknowledgments: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        userName: { type: String, default: '' },
+        action: { type: String, default: 'acknowledged' }, // 'acknowledged' | 'in_progress' | 'completed'
+        timestamp: { type: Date, default: Date.now },
+      }
+    ],
+    recordMentions: [
+      {
+        recordType: { type: String, default: 'jobcard' }, // 'jobcard' | 'design' | 'invoice'
+        recordRef: { type: String, default: '' },
+      }
+    ],
   },
   {
     timestamps: true,
