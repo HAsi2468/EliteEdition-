@@ -949,15 +949,9 @@ export default function App() {
                     </button>
                   )}
                   {/* 5. Design Catalog */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) && (
-                    <button onClick={() => { setActiveTab('jobcards_catalogue'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_catalogue' ? styles.navItemActive : {}) }}>
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('jobcards_master')) && (
+                    <button onClick={() => { setActiveTab('jobcards_catalogue'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...((activeTab === 'jobcards_catalogue' || activeTab === 'jobcards_master') ? styles.navItemActive : {}) }}>
                       <BookOpen size={18} /><span>Design Catalog</span>
-                    </button>
-                  )}
-                  {/* 6. Design Master */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master')) && (
-                    <button onClick={() => { setActiveTab('jobcards_master'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_master' ? styles.navItemActive : {}) }}>
-                      <Layers size={18} /><span>Design Master</span>
                     </button>
                   )}
                   {/* 7. Print Settings */}
@@ -1296,11 +1290,8 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_tracking')) &&
                       renderNavItem('jobcards_tracking', 'Job Card Tracking', RefreshCw, null, 'Tracking')
                     }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) &&
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('jobcards_master')) &&
                       renderNavItem('jobcards_catalogue', 'Design Catalog', BookOpen, null, 'Catalog')
-                    }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master')) &&
-                      renderNavItem('jobcards_master', 'Design Master', Layers, null, 'Master')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) &&
                       renderNavItem('jobcards_settings', 'Print Settings', Settings, null, 'Settings')

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api, getBaseUrl } from '../services/api';
 import {
   PlusCircle, Search, RefreshCw, Edit2, Trash2, X, Save, Image,
-  Eye, FileText, ChevronLeft, ChevronRight, CheckCircle, AlertCircle
+  Eye, FileText, ChevronLeft, ChevronRight, CheckCircle, AlertCircle,
+  Layers, BookOpen
 } from 'lucide-react';
 import { COLOR_NAMES, getColorHex, detectDominantColors } from '../utils/colors';
 import imageCompression from 'browser-image-compression';
@@ -12,6 +13,7 @@ import { matchSearchQuery } from '../utils/searchUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 
 import PKDOrdersImportModal from './PKDOrdersImportModal';
+import DesignMaster from './DesignMaster';
 
 // Copy convertDriveUrl helper
 function convertDriveUrl(link) {
@@ -345,11 +347,18 @@ function DesignImageField({ label, name, value, onChange, placeholder }) {
   );
 }
 
-export default function DesignCatalogue({ department }) {
+export default function DesignCatalogue({ department, initialSubTab = 'catalogue' }) {
+  const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
   const [designs, setDesigns] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
   
   // Search & Filters
   const [search, setSearch] = useState('');
@@ -698,8 +707,63 @@ export default function DesignCatalogue({ department }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-      {/* Top Banner */}
-      <div className="glass-panel" style={{ padding: '1.25rem 1.5rem' }}>
+      {/* Sub-tabs Header Navigation for Digital Print Department */}
+      {department !== 'stitching' && (
+        <div className="glass-panel" style={{ padding: '0.55rem 0.85rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('catalogue')}
+            style={{
+              padding: '0.5rem 1.1rem',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid',
+              borderColor: activeSubTab === 'catalogue' ? 'var(--primary)' : 'var(--border-light)',
+              background: activeSubTab === 'catalogue' ? 'linear-gradient(135deg, rgba(56,189,248,0.2), rgba(99,102,241,0.2))' : 'transparent',
+              color: activeSubTab === 'catalogue' ? 'var(--primary)' : 'var(--text-muted)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <BookOpen size={16} />
+            <span>Design Catalog</span>
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('master')}
+            style={{
+              padding: '0.5rem 1.1rem',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid',
+              borderColor: activeSubTab === 'master' ? '#38bdf8' : 'var(--border-light)',
+              background: activeSubTab === 'master' ? 'linear-gradient(135deg, rgba(56,189,248,0.2), rgba(139,92,246,0.2))' : 'transparent',
+              color: activeSubTab === 'master' ? '#38bdf8' : 'var(--text-muted)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Layers size={16} />
+            <span>Design Master Details (100 Pic)</span>
+          </button>
+        </div>
+      )}
+
+      {activeSubTab === 'master' ? (
+        <DesignMaster department={department} />
+      ) : (
+        <>
+          {/* Top Banner */}
+          <div className="glass-panel" style={{ padding: '1.25rem 1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#38bdf8,#8b5cf6)',
@@ -708,7 +772,7 @@ export default function DesignCatalogue({ department }) {
             </div>
             <div>
               <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                {department === 'stitching' ? 'Elite Stitching — Design Room' : 'Design Catalogue'}
+                {department === 'stitching' ? 'Elite Stitching — Design Room' : 'Design Catalog'}
               </h2>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 1 }}>
                 {department === 'stitching' ? 'Store & display master designs for Stitching department' : 'Store & display master designs'} — {total} total designs
@@ -742,24 +806,26 @@ export default function DesignCatalogue({ department }) {
                 <><span style={{ fontSize: '1rem' }}>🎨</span> Auto-set All Colours</>
               )}
             </button>
-            <button
-              onClick={() => setShowPKDImportModal(true)}
-              style={{
-                padding: '0.55rem 1.1rem',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid rgba(56,189,248,0.4)',
-                background: 'linear-gradient(135deg, rgba(56,189,248,0.15), rgba(16,185,129,0.15))',
-                color: '#38bdf8',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem'
-              }}
-            >
-              📥 Import PKD Orders
-            </button>
+            {department === 'stitching' && (
+              <button
+                onClick={() => setShowPKDImportModal(true)}
+                style={{
+                  padding: '0.55rem 1.1rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid rgba(56,189,248,0.4)',
+                  background: 'linear-gradient(135deg, rgba(56,189,248,0.15), rgba(16,185,129,0.15))',
+                  color: '#38bdf8',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                📥 Import PKD Orders
+              </button>
+            )}
             <button className="btn-primary" onClick={openNew} style={{ padding: '0.55rem 1.25rem' }}>
               <PlusCircle size={15} /> New Design
             </button>
@@ -1510,6 +1576,8 @@ export default function DesignCatalogue({ department }) {
           </button>
           <img src={zoomImg} alt="Zoomed view" style={{ maxWidth: '94%', maxHeight: '90%', objectFit: 'contain', borderRadius: '4px', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }} />
         </div>
+      )}
+        </>
       )}
     </div>
   );

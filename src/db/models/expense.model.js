@@ -8,7 +8,7 @@ const expenseSchema = new mongoose.Schema(
     category: { type: String, required: true, default: 'Miscellaneous', trim: true },
     title: { type: String, required: true, trim: true },
     amount: { type: Number, required: true, min: 0 },
-    paymentMode: { type: String, default: 'Cash', enum: ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Petty Cash', 'Other'] },
+    paymentMode: { type: String, default: 'Cash', trim: true },
     paidToOrReceivedFrom: { type: String, default: '', trim: true },
     billNo: { type: String, default: '', trim: true },
     description: { type: String, default: '', trim: true },

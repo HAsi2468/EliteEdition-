@@ -1956,345 +1956,355 @@ export default function JobPrintingLog() {
         </div>
       )}
 
-      {/* ── 6. GENERATE REPORT / RAW MATERIAL FORM MODAL (50% INWARD | 50% OUTWARD SPLIT VIEW) ── */}
+
+      {/* ── 6. RAW MATERIAL FORM MODAL — PREMIUM REDESIGN (50% INWARD | 50% OUTWARD SPLIT VIEW) ── */}
       {showRawMaterialModal && (
-        <div className="modal-overlay" onClick={() => setShowRawMaterialModal(false)}>
-          <div className="modal-content" style={{
-            maxWidth: 1000,
-            width: '95%',
-            background: 'var(--bg-secondary)',
-            borderRadius: '10px',
-            padding: '0.65rem 0.85rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.4rem'
-          }} onClick={e => e.stopPropagation()}>
-            
-            {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.3rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        <div
+          onClick={() => setShowRawMaterialModal(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(15, 23, 42, 0.55)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '1rem',
+            animation: 'fadeIn 0.18s ease-out'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 1020,
+              background: '#ffffff',
+              border: '1px solid rgba(0,0,0,0.09)',
+              borderRadius: '18px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(16,185,129,0.08)',
+              display: 'flex', flexDirection: 'column', gap: 0,
+              overflow: 'hidden',
+              animation: 'scaleUp 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
+
+            {/* ── MODAL HEADER ── */}
+            <div style={{
+              background: 'linear-gradient(135deg, #f0fdf4 0%, #fffbeb 100%)',
+              borderBottom: '1.5px solid #e2e8f0',
+              padding: '0.85rem 1.1rem',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {/* Dual-gradient icon */}
                 <div style={{
-                  width: 26, height: 26, borderRadius: 6,
-                  background: 'linear-gradient(135deg, #10b981, #d97706)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  width: 38, height: 38, borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #f59e0b 100%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 4px 14px rgba(16,185,129,0.4), 0 4px 14px rgba(245,158,11,0.2)',
+                  flexShrink: 0
                 }}>
-                  <Sparkles size={14} color="#fff" />
+                  <Sparkles size={18} color="#fff" />
                 </div>
-                <h3 style={{ fontSize: '0.92rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0, letterSpacing: '0.3px' }}>
-                  RAW MATERIAL ENTRY — 📥 INWARD (STOCK RECEIVED) & 📤 OUTWARD (USAGE)
-                </h3>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 900, color: '#0f172a', letterSpacing: '0.25px' }}>
+                    RAW MATERIAL ENTRY
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '1px' }}>
+                    📥 Inward (Stock Received) &nbsp;&amp;&nbsp; 📤 Outward (Usage / Consumption)
+                  </p>
+                </div>
               </div>
-              <button onClick={() => setShowRawMaterialModal(false)} className="btn-icon" style={{ padding: '2px' }}><X size={15} /></button>
+              <button
+                onClick={() => setShowRawMaterialModal(false)}
+                style={{
+                  background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)',
+                  color: '#64748b', borderRadius: '8px', width: 30, height: 30,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', transition: 'all 0.2s ease', flexShrink: 0
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.25)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.05)'; e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.1)'; }}
+              >
+                <X size={15} />
+              </button>
             </div>
 
-            <form onSubmit={handleSaveRawMaterialUsage} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              
-              {/* Header Info Grid: Date, Shift, Start Time, Stop Time, Operator */}
+            <form onSubmit={handleSaveRawMaterialUsage} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.9rem 1.1rem 1rem' }}>
+
+              {/* ── INFO BAR: Date / Shift / Start / Stop / Operator ── */}
               <div style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid var(--border-light)',
-                borderRadius: '6px',
-                padding: '0.3rem 0.5rem',
                 display: 'grid',
-                gridTemplateColumns: '1fr 1.1fr 0.85fr 0.85fr 1.1fr',
-                gap: '0.4rem',
-                alignItems: 'center'
+                gridTemplateColumns: '1fr 1.15fr 0.85fr 0.85fr 1.1fr',
+                gap: '0.6rem',
+                background: '#f8fafc',
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '10px',
+                padding: '0.6rem 0.75rem',
               }}>
+                {[
+                  { label: 'DATE *', color: 'rgba(255,255,255,0.5)', type: 'date', value: rawDate, setter: setRawDate, required: true },
+                  null, // shift handled separately
+                  { label: 'START', color: '#38bdf8', type: 'time', value: rawStartTime, setter: setRawStartTime },
+                  { label: 'STOP', color: '#a78bfa', type: 'time', value: rawStopTime, setter: setRawStopTime },
+                ].map((f, i) => {
+                  if (f === null) return (
+                    <div key="shift">
+                      <label style={{ fontSize: '0.6rem', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>SHIFT *</label>
+                      <select
+                        value={rawShift}
+                        onChange={e => setRawShift(e.target.value)}
+                        required
+                        style={{ width: '100%', padding: '0.28rem 0.45rem', fontSize: '0.76rem', height: '30px', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 700 }}
+                      >
+                        <option value="Morning">Morning (9 AM – 9 PM)</option>
+                        <option value="Night">Night (9 PM – 9 AM)</option>
+                      </select>
+                    </div>
+                  );
+                  return (
+                    <div key={i}>
+                      <label style={{ fontSize: '0.6rem', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{f.label}</label>
+                      <input
+                        type={f.type} value={f.value} onChange={e => f.setter(e.target.value)} required={f.required}
+                        style={{ width: '100%', padding: '0.28rem 0.45rem', fontSize: '0.76rem', height: '30px', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }}
+                      />
+                    </div>
+                  );
+                })}
                 <div>
-                  <label style={{ fontSize: '0.58rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '1px' }}>DATE *</label>
-                  <input type="date" value={rawDate} onChange={e => setRawDate(e.target.value)} style={{ ...inputStyle, padding: '0.15rem 0.35rem', fontSize: '0.74rem', height: '26px' }} required />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.58rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '1px' }}>SHIFT *</label>
-                  <select value={rawShift} onChange={e => setRawShift(e.target.value)} style={{ ...inputStyle, padding: '0.15rem 0.35rem', fontSize: '0.74rem', height: '26px' }} required>
-                    <option value="Morning">Morning (9 AM - 9 PM)</option>
-                    <option value="Night">Night (9 PM - 9 AM)</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.58rem', fontWeight: 800, color: '#38bdf8', display: 'block', marginBottom: '1px' }}>START</label>
-                  <input type="time" value={rawStartTime} onChange={e => setRawStartTime(e.target.value)} style={{ ...inputStyle, padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.58rem', fontWeight: 800, color: '#a78bfa', display: 'block', marginBottom: '1px' }}>STOP</label>
-                  <input type="time" value={rawStopTime} onChange={e => setRawStopTime(e.target.value)} style={{ ...inputStyle, padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.58rem', fontWeight: 800, color: 'var(--text-muted)', display: 'block', marginBottom: '1px' }}>OPERATOR</label>
-                  <input type="text" list="print-operators-list" placeholder="Operator..." value={rawOperator} onChange={e => setRawOperator(e.target.value)} style={{ ...inputStyle, padding: '0.15rem 0.35rem', fontSize: '0.74rem', fontWeight: 600, height: '26px' }} />
-                </div>
-              </div>
-
-              {/* ── 50% | 50% SPLIT COLUMNS (LEFT: INWARD | RIGHT: OUTWARD) ── */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                
-                {/* ── LEFT COLUMN (50%): 📥 INWARD (STOCK RECEIVED) ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  
-                  {/* INWARD HEADER BADGE */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #059669, #047857)',
-                    color: '#ffffff',
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '5px',
-                    fontSize: '0.72rem',
-                    fontWeight: 900,
-                    letterSpacing: '0.3px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}>
-                    <ArrowDownToLine size={13} /> 📥 50% INWARD (STOCK RECEIVED / IN)
-                  </div>
-
-                  {/* INK INWARD CARD */}
-                  <div style={{ background: '#ffffff', color: '#0f172a', border: '1.5px solid #10b981', borderRadius: '6px', padding: '0.35rem 0.45rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#059669', textTransform: 'uppercase' }}>💧 INK INWARD (LITERS)</div>
-                    
-                    {/* Grando Ink Inward */}
-                    <div style={{ background: '#ecfdf5', padding: '0.2rem 0.35rem', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
-                      <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#047857', marginBottom: '1px' }}>🖨️ GRANDO INK</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.2rem' }}>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#0284c7', display: 'block', textAlign: 'center' }}>C</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={grandoInC} onChange={e => setGrandoInC(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #0284c7', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#db2777', display: 'block', textAlign: 'center' }}>M</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={grandoInM} onChange={e => setGrandoInM(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #db2777', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#ca8a04', display: 'block', textAlign: 'center' }}>Y</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={grandoInY} onChange={e => setGrandoInY(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #ca8a04', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#334155', display: 'block', textAlign: 'center' }}>K</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={grandoInK} onChange={e => setGrandoInK(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #334155', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* PrintDot Ink Inward */}
-                    <div style={{ background: '#ecfdf5', padding: '0.2rem 0.35rem', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
-                      <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#047857', marginBottom: '1px' }}>🖨️ PRINTDOT INK</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.2rem' }}>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#0284c7', display: 'block', textAlign: 'center' }}>C</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={printdotInC} onChange={e => setPrintdotInC(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #0284c7', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#db2777', display: 'block', textAlign: 'center' }}>M</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={printdotInM} onChange={e => setPrintdotInM(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #db2777', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#ca8a04', display: 'block', textAlign: 'center' }}>Y</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={printdotInY} onChange={e => setPrintdotInY(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #ca8a04', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#334155', display: 'block', textAlign: 'center' }}>K</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={printdotInK} onChange={e => setPrintdotInK(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #334155', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* PAPER INWARD CARD */}
-                  <div style={{ background: '#ffffff', color: '#0f172a', border: '1.5px solid #10b981', borderRadius: '6px', padding: '0.35rem 0.45rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#059669', textTransform: 'uppercase' }}>📜 PAPER INWARD (STOCK IN)</div>
-                      <button type="button" onClick={handleAddInwardPaperEntry} style={{ padding: '0.1rem 0.35rem', fontSize: '0.65rem', fontWeight: 800, background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0', borderRadius: '3px', cursor: 'pointer' }}>+ Add Row</button>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                      {inwardPaperEntries.map((entry, index) => (
-                        <div key={entry.id} style={{ display: 'flex', gap: '0.25rem', alignItems: 'center', background: '#f8fafc', padding: '0.15rem 0.35rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
-                          <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#059669' }}>#{index + 1}</span>
-                          <div style={{ flex: 1 }}>
-                            <select value={entry.paperType} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperType', e.target.value)} style={{ width: '100%', padding: '0.12rem 0.25rem', fontSize: '0.73rem', height: '25px', background: '#ffffff', border: '1px solid #059669', borderRadius: '3px', color: '#0f172a', fontWeight: 700 }}>
-                              {(paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']).map((p, pIdx) => (
-                                <option key={pIdx} value={p}>{p}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <select value={entry.paperPanna} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperPanna', e.target.value)} style={{ width: '100%', padding: '0.12rem 0.25rem', fontSize: '0.73rem', height: '25px', background: '#ffffff', border: '1px solid #059669', borderRadius: '3px', color: '#0f172a', fontWeight: 700 }}>
-                              {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => (
-                                <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div style={{ width: '65px' }}>
-                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.73rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #059669', borderRadius: '3px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} />
-                          </div>
-                          {inwardPaperEntries.length > 1 && (
-                            <button type="button" onClick={() => handleRemoveInwardPaperEntry(entry.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.1rem' }}><Trash2 size={12} /></button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* ── RIGHT COLUMN (50%): 📤 OUTWARD (USAGE / CONSUMPTION) ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  
-                  {/* OUTWARD HEADER BADGE */}
-                  <div style={{
-                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                    color: '#ffffff',
-                    padding: '0.25rem 0.5rem',
-                    borderRadius: '5px',
-                    fontSize: '0.72rem',
-                    fontWeight: 900,
-                    letterSpacing: '0.3px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}>
-                    <ArrowUpFromLine size={13} /> 📤 50% OUTWARD (USAGE / CONSUMPTION)
-                  </div>
-
-                  {/* INK OUTWARD CARD */}
-                  <div style={{ background: '#ffffff', color: '#0f172a', border: '1.5px solid #f59e0b', borderRadius: '6px', padding: '0.35rem 0.45rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase' }}>💧 INK USAGE (LITERS)</div>
-                    
-                    {/* Grando Ink Outward */}
-                    <div style={{ background: '#fffbeb', padding: '0.2rem 0.35rem', borderRadius: '4px', border: '1px solid #fde68a' }}>
-                      <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#b45309', marginBottom: '1px' }}>🖨️ GRANDO INK</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.2rem' }}>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#0284c7', display: 'block', textAlign: 'center' }}>C</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={grandoOutC} onChange={e => setGrandoOutC(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #0284c7', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#db2777', display: 'block', textAlign: 'center' }}>M</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={grandoOutM} onChange={e => setGrandoOutM(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #db2777', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#ca8a04', display: 'block', textAlign: 'center' }}>Y</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={grandoOutY} onChange={e => setGrandoOutY(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #ca8a04', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#334155', display: 'block', textAlign: 'center' }}>K</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={grandoOutK} onChange={e => setGrandoOutK(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #334155', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* PrintDot Ink Outward */}
-                    <div style={{ background: '#fffbeb', padding: '0.2rem 0.35rem', borderRadius: '4px', border: '1px solid #fde68a' }}>
-                      <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#b45309', marginBottom: '1px' }}>🖨️ PRINTDOT INK</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.2rem' }}>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#0284c7', display: 'block', textAlign: 'center' }}>C</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={printdotOutC} onChange={e => setPrintdotOutC(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #0284c7', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#db2777', display: 'block', textAlign: 'center' }}>M</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={printdotOutM} onChange={e => setPrintdotOutM(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #db2777', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#ca8a04', display: 'block', textAlign: 'center' }}>Y</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={printdotOutY} onChange={e => setPrintdotOutY(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #ca8a04', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.58rem', fontWeight: 900, color: '#334155', display: 'block', textAlign: 'center' }}>K</label>
-                          <input type="number" step="0.01" placeholder="0.00" value={printdotOutK} onChange={e => setPrintdotOutK(e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.75rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #334155', borderRadius: '3px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* PAPER OUTWARD CARD */}
-                  <div style={{ background: '#ffffff', color: '#0f172a', border: '1.5px solid #f59e0b', borderRadius: '6px', padding: '0.35rem 0.45rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ fontSize: '0.68rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase' }}>📜 PAPER USAGE (CONSUMPTION)</div>
-                      <button type="button" onClick={handleAddOutwardPaperEntry} style={{ padding: '0.1rem 0.35rem', fontSize: '0.65rem', fontWeight: 800, background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', borderRadius: '3px', cursor: 'pointer' }}>+ Add Row</button>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                      {outwardPaperEntries.map((entry, index) => (
-                        <div key={entry.id} style={{ display: 'flex', gap: '0.25rem', alignItems: 'center', background: '#f8fafc', padding: '0.15rem 0.35rem', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
-                          <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#d97706' }}>#{index + 1}</span>
-                          <div style={{ flex: 1 }}>
-                            <select value={entry.paperType} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperType', e.target.value)} style={{ width: '100%', padding: '0.12rem 0.25rem', fontSize: '0.73rem', height: '25px', background: '#ffffff', border: '1px solid #d97706', borderRadius: '3px', color: '#0f172a', fontWeight: 700 }}>
-                              {(paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']).map((p, pIdx) => (
-                                <option key={pIdx} value={p}>{p}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <select value={entry.paperPanna} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperPanna', e.target.value)} style={{ width: '100%', padding: '0.12rem 0.25rem', fontSize: '0.73rem', height: '25px', background: '#ffffff', border: '1px solid #d97706', borderRadius: '3px', color: '#0f172a', fontWeight: 700 }}>
-                              {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => (
-                                <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div style={{ width: '65px' }}>
-                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.12rem 0.2rem', fontSize: '0.73rem', height: '25px', textAlign: 'center', background: '#ffffff', border: '1px solid #d97706', borderRadius: '3px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} />
-                          </div>
-                          {outwardPaperEntries.length > 1 && (
-                            <button type="button" onClick={() => handleRemoveOutwardPaperEntry(entry.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.1rem' }}><Trash2 size={12} /></button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                </div>
-
-              </div>
-
-              {/* Remarks / Notes & Action Buttons */}
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.1rem' }}>
-                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '0.6rem', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>OPERATOR</label>
                   <input
-                    type="text"
-                    placeholder="Remarks / Optional notes..."
-                    value={rawNotes}
-                    onChange={e => setRawNotes(e.target.value)}
-                    style={{ ...inputStyle, padding: '0.2rem 0.5rem', fontSize: '0.75rem', height: '28px' }}
+                    type="text" list="print-operators-list" placeholder="Operator name..." value={rawOperator} onChange={e => setRawOperator(e.target.value)}
+                    style={{ width: '100%', padding: '0.28rem 0.45rem', fontSize: '0.76rem', height: '30px', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }}
                   />
                 </div>
+              </div>
+
+              {/* ── SPLIT COLUMNS: LEFT = INWARD | RIGHT = OUTWARD ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+
+                {/* ════ LEFT: INWARD ════ */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+
+                  {/* Inward Badge */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                    borderRadius: '8px', padding: '0.4rem 0.7rem',
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    boxShadow: '0 4px 14px rgba(5,150,105,0.35)'
+                  }}>
+                    <ArrowDownToLine size={14} color="#fff" />
+                    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#fff', letterSpacing: '0.3px' }}>📥 50% INWARD (STOCK RECEIVED / IN)</span>
+                  </div>
+
+                  {/* Ink Inward Card */}
+                  <div style={{ background: '#fff', borderRadius: '10px', border: '2px solid #10b981', padding: '0.6rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', boxShadow: '0 4px 16px rgba(16,185,129,0.12)' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💧 INK INWARD (LITERS)</div>
+
+                    {/* Grando Ink — Inward */}
+                    <div style={{ background: '#f0fdf4', borderRadius: '7px', border: '1px solid #bbf7d0', padding: '0.4rem 0.5rem' }}>
+                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#047857', marginBottom: '5px' }}>🖨️ GRANDO INK</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
+                        {[['C','#0284c7',grandoInC,setGrandoInC],['M','#db2777',grandoInM,setGrandoInM],['Y','#ca8a04',grandoInY,setGrandoInY],['K','#334155',grandoInK,setGrandoInK]].map(([ch,col,val,set]) => (
+                          <div key={ch}>
+                            <label style={{ fontSize: '0.6rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
+                            <input type="number" step="0.01" placeholder="0.00" value={val} onChange={e => set(e.target.value)}
+                              style={{ width: '100%', padding: '0.15rem', fontSize: '0.78rem', height: '27px', textAlign: 'center', background: '#fff', border: `1.5px solid ${col}`, borderRadius: '5px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box', transition: 'box-shadow 0.15s' }} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* PrintDot Ink — Inward */}
+                    <div style={{ background: '#f0fdf4', borderRadius: '7px', border: '1px solid #bbf7d0', padding: '0.4rem 0.5rem' }}>
+                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#047857', marginBottom: '5px' }}>🖨️ PRINTDOT INK</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
+                        {[['C','#0284c7',printdotInC,setPrintdotInC],['M','#db2777',printdotInM,setPrintdotInM],['Y','#ca8a04',printdotInY,setPrintdotInY],['K','#334155',printdotInK,setPrintdotInK]].map(([ch,col,val,set]) => (
+                          <div key={ch}>
+                            <label style={{ fontSize: '0.6rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
+                            <input type="number" step="0.01" placeholder="0.00" value={val} onChange={e => set(e.target.value)}
+                              style={{ width: '100%', padding: '0.15rem', fontSize: '0.78rem', height: '27px', textAlign: 'center', background: '#fff', border: `1.5px solid ${col}`, borderRadius: '5px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box', transition: 'box-shadow 0.15s' }} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Paper Inward Card */}
+                  <div style={{ background: '#fff', borderRadius: '10px', border: '2px solid #10b981', padding: '0.6rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', boxShadow: '0 4px 16px rgba(16,185,129,0.12)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📜 PAPER INWARD (STOCK IN)</div>
+                      <button type="button" onClick={handleAddInwardPaperEntry}
+                        style={{ padding: '0.15rem 0.5rem', fontSize: '0.67rem', fontWeight: 800, background: '#dcfce7', color: '#059669', border: '1px solid #86efac', borderRadius: '5px', cursor: 'pointer', transition: 'all 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#bbf7d0'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#dcfce7'; }}
+                      >+ Add Row</button>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      {inwardPaperEntries.map((entry, index) => (
+                        <div key={entry.id} style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', background: '#f8fafc', padding: '0.2rem 0.4rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                          <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#059669', minWidth: 18 }}>#{index+1}</span>
+                          <div style={{ flex: 1 }}>
+                            <select value={entry.paperType} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperType', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #10b981', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
+                              {(paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']).map((p, pIdx) => <option key={pIdx} value={p}>{p}</option>)}
+                            </select>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <select value={entry.paperPanna} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperPanna', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #10b981', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
+                              {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>)}
+                            </select>
+                          </div>
+                          <div style={{ width: '62px' }}>
+                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #10b981', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} />
+                          </div>
+                          {inwardPaperEntries.length > 1 && (
+                            <button type="button" onClick={() => handleRemoveInwardPaperEntry(entry.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.1rem', display: 'flex', alignItems: 'center' }}><Trash2 size={13} /></button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* ════ RIGHT: OUTWARD ════ */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+
+                  {/* Outward Badge */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    borderRadius: '8px', padding: '0.4rem 0.7rem',
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    boxShadow: '0 4px 14px rgba(245,158,11,0.35)'
+                  }}>
+                    <ArrowUpFromLine size={14} color="#fff" />
+                    <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#fff', letterSpacing: '0.3px' }}>📤 50% OUTWARD (USAGE / CONSUMPTION)</span>
+                  </div>
+
+                  {/* Ink Outward Card */}
+                  <div style={{ background: '#fff', borderRadius: '10px', border: '2px solid #f59e0b', padding: '0.6rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', boxShadow: '0 4px 16px rgba(245,158,11,0.12)' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💧 INK USAGE (LITERS)</div>
+
+                    {/* Grando Ink — Outward */}
+                    <div style={{ background: '#fffbeb', borderRadius: '7px', border: '1px solid #fde68a', padding: '0.4rem 0.5rem' }}>
+                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#b45309', marginBottom: '5px' }}>🖨️ GRANDO INK</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
+                        {[['C','#0284c7',grandoOutC,setGrandoOutC],['M','#db2777',grandoOutM,setGrandoOutM],['Y','#ca8a04',grandoOutY,setGrandoOutY],['K','#334155',grandoOutK,setGrandoOutK]].map(([ch,col,val,set]) => (
+                          <div key={ch}>
+                            <label style={{ fontSize: '0.6rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
+                            <input type="number" step="0.01" placeholder="0.00" value={val} onChange={e => set(e.target.value)}
+                              style={{ width: '100%', padding: '0.15rem', fontSize: '0.78rem', height: '27px', textAlign: 'center', background: '#fff', border: `1.5px solid ${col}`, borderRadius: '5px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* PrintDot Ink — Outward */}
+                    <div style={{ background: '#fffbeb', borderRadius: '7px', border: '1px solid #fde68a', padding: '0.4rem 0.5rem' }}>
+                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#b45309', marginBottom: '5px' }}>🖨️ PRINTDOT INK</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
+                        {[['C','#0284c7',printdotOutC,setPrintdotOutC],['M','#db2777',printdotOutM,setPrintdotOutM],['Y','#ca8a04',printdotOutY,setPrintdotOutY],['K','#334155',printdotOutK,setPrintdotOutK]].map(([ch,col,val,set]) => (
+                          <div key={ch}>
+                            <label style={{ fontSize: '0.6rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
+                            <input type="number" step="0.01" placeholder="0.00" value={val} onChange={e => set(e.target.value)}
+                              style={{ width: '100%', padding: '0.15rem', fontSize: '0.78rem', height: '27px', textAlign: 'center', background: '#fff', border: `1.5px solid ${col}`, borderRadius: '5px', color: '#0f172a', fontWeight: 700, boxSizing: 'border-box' }} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Paper Outward Card */}
+                  <div style={{ background: '#fff', borderRadius: '10px', border: '2px solid #f59e0b', padding: '0.6rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', boxShadow: '0 4px 16px rgba(245,158,11,0.12)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📜 PAPER USAGE (CONSUMPTION)</div>
+                      <button type="button" onClick={handleAddOutwardPaperEntry}
+                        style={{ padding: '0.15rem 0.5rem', fontSize: '0.67rem', fontWeight: 800, background: '#fef3c7', color: '#d97706', border: '1px solid #fcd34d', borderRadius: '5px', cursor: 'pointer', transition: 'all 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#fde68a'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#fef3c7'; }}
+                      >+ Add Row</button>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      {outwardPaperEntries.map((entry, index) => (
+                        <div key={entry.id} style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', background: '#f8fafc', padding: '0.2rem 0.4rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                          <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#d97706', minWidth: 18 }}>#{index+1}</span>
+                          <div style={{ flex: 1 }}>
+                            <select value={entry.paperType} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperType', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #f59e0b', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
+                              {(paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']).map((p, pIdx) => <option key={pIdx} value={p}>{p}</option>)}
+                            </select>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <select value={entry.paperPanna} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperPanna', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #f59e0b', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
+                              {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>)}
+                            </select>
+                          </div>
+                          <div style={{ width: '62px' }}>
+                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #f59e0b', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} />
+                          </div>
+                          {outwardPaperEntries.length > 1 && (
+                            <button type="button" onClick={() => handleRemoveOutwardPaperEntry(entry.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.1rem', display: 'flex', alignItems: 'center' }}><Trash2 size={13} /></button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* ── FOOTER: Remarks + Actions ── */}
+              <div style={{
+                display: 'flex', gap: '0.65rem', alignItems: 'center',
+                borderTop: '1.5px solid #e2e8f0',
+                paddingTop: '0.75rem', marginTop: '0.1rem'
+              }}>
+                <input
+                  type="text"
+                  placeholder="Remarks / Optional notes..."
+                  value={rawNotes}
+                  onChange={e => setRawNotes(e.target.value)}
+                  style={{
+                    flex: 1, padding: '0.42rem 0.7rem', fontSize: '0.8rem', height: '34px',
+                    background: '#f8fafc', border: '1.5px solid #e2e8f0',
+                    borderRadius: '8px', color: '#0f172a', boxSizing: 'border-box', fontWeight: 500
+                  }}
+                />
                 <button
                   type="button"
                   onClick={() => setShowRawMaterialModal(false)}
-                  className="btn-secondary"
-                  style={{ padding: '0.35rem 0.8rem', fontSize: '0.78rem', fontWeight: 700, height: '28px' }}
+                  style={{
+                    padding: '0 1.1rem', fontSize: '0.82rem', fontWeight: 700, height: '34px',
+                    background: '#f1f5f9', border: '1.5px solid #e2e8f0',
+                    borderRadius: '8px', color: '#475569', cursor: 'pointer',
+                    whiteSpace: 'nowrap', transition: 'all 0.18s ease'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#1e293b'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#475569'; }}
                 >
                   Close
                 </button>
-
                 <button
                   type="submit"
                   disabled={rawMaterialSubmitting}
-                  className="btn-primary"
                   style={{
-                    padding: '0.35rem 1.1rem',
-                    fontSize: '0.8rem',
-                    fontWeight: 900,
-                    height: '28px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    background: 'linear-gradient(135deg, #10b981 0%, #d97706 100%)',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '5px',
-                    boxShadow: '0 3px 10px rgba(16, 185, 129, 0.3)',
-                    cursor: 'pointer'
+                    padding: '0 1.4rem', fontSize: '0.84rem', fontWeight: 900, height: '34px',
+                    background: rawMaterialSubmitting ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #10b981 0%, #d97706 100%)',
+                    border: 'none', borderRadius: '8px', color: '#fff', cursor: rawMaterialSubmitting ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
+                    boxShadow: rawMaterialSubmitting ? 'none' : '0 4px 16px rgba(16,185,129,0.35), 0 4px 16px rgba(217,119,6,0.15)',
+                    transition: 'all 0.2s ease', opacity: rawMaterialSubmitting ? 0.6 : 1
                   }}
+                  onMouseEnter={e => { if (!rawMaterialSubmitting) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 22px rgba(16,185,129,0.5), 0 6px 22px rgba(217,119,6,0.25)'; } }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = rawMaterialSubmitting ? 'none' : '0 4px 16px rgba(16,185,129,0.35), 0 4px 16px rgba(217,119,6,0.15)'; }}
                 >
-                  <Sparkles size={13} /> {rawMaterialSubmitting ? 'Saving...' : 'Save Inward & Outward Stock'}
+                  <Sparkles size={14} />
+                  {rawMaterialSubmitting ? 'Saving...' : 'Save Inward & Outward Stock'}
                 </button>
               </div>
 
             </form>
-
           </div>
         </div>
       )}
+
 
     </div>
   );
