@@ -9,6 +9,9 @@ router.get('/groups/:groupId/messages', communicationController.getGroupMessages
 router.get('/groups/:groupId/members', communicationController.getGroupMembers);
 router.post('/activity', communicationController.postActivityEvent);
 router.post('/messages/:messageId/acknowledge', communicationController.acknowledgeMessage);
+router.get('/users', communicationController.getUsersForDM);
+router.post('/direct', communicationController.createOrGetDirectRoom);
 
 module.exports = router;
+
 

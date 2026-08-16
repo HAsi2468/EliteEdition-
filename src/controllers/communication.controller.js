@@ -236,6 +236,64 @@ const acknowledgeMessage = async (req, res) => {
   }
 };
 
+/**
+ * Get active users list for starting private 1-on-1 direct messages
+ */
+const getUsersForDM = async (req, res) => {
+  try {
+    const currentUserId = req.user ? req.user._id : req.query.userId;
+    const query = currentUserId ? { _id: { $ne: currentUserId } } : {};
+    const users = await User.find(query).select('name username email role department').sort({ name: 1 });
+    res.json({ success: true, data: users });
+  } catch (error) {
+    console.error('Error fetching users for DM:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch users', error: error.message });
+  }
+};
+
+/**
+ * Create or get an existing 1-on-1 direct message room between two users
+ */
+const createOrGetDirectRoom = async (req, res) => {
+  try {
+    const currentUserId = req.user ? req.user._id : req.body.userId;
+    const { targetUserId } = req.body;
+
+    if (!currentUserId || !targetUserId) {
+      return res.status(400).json({ success: false, message: 'Current user ID and Target user ID are required' });
+    }
+
+    // Check if direct room already exists between these 2 users
+    let room = await ChatRoom.findOne({
+      type: 'direct',
+      members: { $all: [currentUserId, targetUserId], $size: 2 }
+    }).populate('members', 'name email role permissions department');
+
+    if (!room) {
+      const u1 = await User.findById(currentUserId);
+      const u2 = await User.findById(targetUserId);
+
+      const name1 = u1 ? (u1.name || u1.username) : 'User';
+      const name2 = u2 ? (u2.name || u2.username) : 'User';
+
+      room = await ChatRoom.create({
+        name: `${name1} & ${name2}`,
+        type: 'direct',
+        members: [currentUserId, targetUserId],
+        department: u2 ? (u2.department || 'General') : 'General',
+        permissionScope: 'direct_msg'
+      });
+
+      room = await ChatRoom.findById(room._id).populate('members', 'name email role permissions department');
+    }
+
+    res.json({ success: true, data: room });
+  } catch (error) {
+    console.error('Error creating/getting direct room:', error);
+    res.status(500).json({ success: false, message: 'Failed to create direct room', error: error.message });
+  }
+};
+
 module.exports = {
   getGroups,
   getGroupMessages,
@@ -243,5 +301,8 @@ module.exports = {
   syncGroups,
   postActivityEvent,
   acknowledgeMessage,
+  getUsersForDM,
+  createOrGetDirectRoom,
 };
+
 

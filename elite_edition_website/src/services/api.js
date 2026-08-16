@@ -1738,5 +1738,17 @@ export const api = {
       body: JSON.stringify({ action, ...userData }),
     });
   },
+
+  async getCommunicationUsers() {
+    return request('/communication/users');
+  },
+
+  async createOrGetDirectRoom(targetUserId) {
+    return request('/communication/direct', {
+      method: 'POST',
+      body: JSON.stringify({ targetUserId }),
+    });
+  },
 };
+
 
