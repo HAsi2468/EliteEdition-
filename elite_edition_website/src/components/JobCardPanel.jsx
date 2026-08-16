@@ -1890,28 +1890,35 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
       ) : (
         <>
           {/* Header banner */}
-          <div className="glass-panel" style={{ padding:'1.25rem 1.5rem' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'1rem' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:'0.85rem' }}>
-                <div style={{ width:44, height:44, borderRadius:12, background:'linear-gradient(135deg,#38bdf8,#8b5cf6)',
-                  display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <FileText size={22} color="#fff"/>
+          <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#38bdf8,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <FileText size={20} color="#fff" />
                 </div>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-                    <h2 style={{ fontSize:'1.2rem', fontWeight:800, color:'var(--text-primary)', margin: 0 }}>
-                      {department === 'stitching' ? 'Elite Stitching' : 'Elite Digital Prints'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                      {department === 'stitching' ? 'Stitching Job Cards' : 'Job Cards & Production'}
                     </h2>
                     <ScreenGroupRoster screenId="jobcards" />
                   </div>
-                  <p style={{ fontSize:'0.78rem', color:'var(--text-muted)', marginTop:1 }}>
-                    {department === 'stitching' ? 'Stitching Job Card Management' : 'Job Card Management'} — {total} total cards
+                  <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                    Production Tracking — {total} Total Cards
                   </p>
                 </div>
               </div>
-              <button className="btn-primary" onClick={openNew} style={{ padding:'0.55rem 1.25rem' }}>
-                <PlusCircle size={15}/> New Job Card
-              </button>
+
+              {/* Entry Buttons Top in Header */}
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  className="btn-primary"
+                  onClick={openNew}
+                  style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#38bdf8,#2563eb)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <PlusCircle size={15} /> New Job Card
+                </button>
+              </div>
             </div>
           </div>
 

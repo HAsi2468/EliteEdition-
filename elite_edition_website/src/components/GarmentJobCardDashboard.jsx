@@ -224,74 +224,63 @@ export default function GarmentJobCardDashboard() {
 
   return (
     <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Header & Main Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
-            <Scissors size={26} color="var(--primary)" />
-            Elite Stitching — 8-Stage Garment Production ERP
-          </h1>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
-            Multi-stage Lot Handover Tracking (Fabric Order ➔ Fabric Check ➔ Cutting ➔ Stitching ➔ Garment Check ➔ Press & Pack ➔ Rack ➔ Delivery)
-          </p>
-        </div>
+      {/* Minimal White Card Header with Entry Button Top Right */}
+      <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10,
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            }}>
+              <Scissors size={20} color="#fff" />
+            </div>
+            <div>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                Stitching Production
+              </h2>
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                8-Stage Garment Handover & Job Cards
+              </p>
+            </div>
+          </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            onClick={handleExportCSV}
-            style={{
-              background: 'rgba(59,130,246,0.15)',
-              border: '1px solid rgba(59,130,246,0.3)',
-              color: '#60a5fa',
-              padding: '0.55rem 1rem',
-              borderRadius: '8px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              fontSize: '0.85rem'
-            }}
-          >
-            <Download size={16} /> Export CSV
-          </button>
-          <button
-            onClick={() => setShowPKDImportModal(true)}
-            style={{
-              background: 'linear-gradient(135deg, rgba(56,189,248,0.15), rgba(16,185,129,0.15))',
-              border: '1px solid rgba(56,189,248,0.4)',
-              color: '#38bdf8',
-              padding: '0.55rem 1rem',
-              borderRadius: '8px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              fontSize: '0.85rem'
-            }}
-          >
-            📥 Import PKD Orders
-          </button>
-          <button
-            onClick={() => { setEditingCard(null); setShowForm(true); }}
-            style={{
-              background: 'var(--primary, #10b981)',
-              border: 'none',
-              color: '#fff',
-              padding: '0.55rem 1.25rem',
-              borderRadius: '8px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              fontSize: '0.85rem',
-              boxShadow: 'var(--shadow-md)'
-            }}
-          >
-            <Plus size={18} /> + New Garment Job Card
-          </button>
+          {/* Entry Buttons Top in Header */}
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => { setEditingCard(null); setShowForm(true); }}
+              style={{
+                padding: '0.45rem 1rem', borderRadius: '8px',
+                background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff',
+                fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px'
+              }}
+            >
+              <Plus size={16} /> New Garment Job Card
+            </button>
+            <button
+              onClick={() => setShowPKDImportModal(true)}
+              style={{
+                padding: '0.45rem 1rem', borderRadius: '8px',
+                border: '1px solid #cbd5e1', background: '#ffffff', color: '#0369a1',
+                fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px'
+              }}
+            >
+              📥 Import PKD Orders
+            </button>
+            <button
+              onClick={handleExportCSV}
+              style={{
+                padding: '0.45rem 1rem', borderRadius: '8px',
+                border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155',
+                fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px'
+              }}
+            >
+              <Download size={15} /> Export CSV
+            </button>
+          </div>
         </div>
       </div>
 

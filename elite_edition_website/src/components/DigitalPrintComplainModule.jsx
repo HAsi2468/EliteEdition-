@@ -757,55 +757,58 @@ export default function DigitalPrintComplainModule() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1rem' }}>
       
-      {/* Top Banner */}
-      <div className="glass-panel" style={{ padding: '1.25rem 1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+      {/* Minimal White Card Header with Entry Button Top Right */}
+      <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{
-              width: 46, height: 46, borderRadius: 12,
+              width: 38, height: 38, borderRadius: 10,
               background: 'linear-gradient(135deg, #f43f5e, #fb923c)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(244,63,94,0.3)'
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
             }}>
-              <AlertTriangle size={24} color="#fff" />
+              <AlertTriangle size={20} color="#fff" />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
-                Elite Digital Print — Complain & Quality ERP
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                Quality Complaints
               </h2>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
-                Customer complaint logging, shade/defect reporting, proof photos & resolution tracking
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                Defect Reporting & Complaint Resolution Logs
               </p>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-            {canViewDashboard && (
-              <button
-                onClick={handleExportPDF}
-                style={{
-                  padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 700, borderRadius: '8px',
-                  border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.12)', color: '#60a5fa',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem'
-                }}
-              >
-                <FileText size={15} color="#38bdf8" /> Export PDF
-              </button>
-            )}
+          {/* Entry Buttons Top in Header */}
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
             {canCreateComplaint && (
               <button
                 onClick={handleOpenNew}
                 style={{
-                  padding: '0.55rem 1.2rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
+                  padding: '0.45rem 1rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
                   border: 'none', background: 'linear-gradient(135deg, #f43f5e, #e11d48)', color: '#fff',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', boxShadow: '0 4px 12px rgba(244,63,94,0.3)'
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
                 }}
               >
-                <PlusCircle size={16} /> + New Complaint Ticket
+                <PlusCircle size={15} /> New Complaint Ticket
+              </button>
+            )}
+            {canViewDashboard && (
+              <button
+                onClick={handleExportPDF}
+                style={{
+                  padding: '0.45rem 1rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
+                  border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+                }}
+              >
+                <FileText size={15} color="#e11d48" /> Export PDF
               </button>
             )}
           </div>
         </div>
-      </div>      {/* Dashboard View (Scoped by Permission) */}
+      </div>
+
+      {/* Dashboard View (Scoped by Permission) */}
       {canViewDashboard ? (
         <>
           {/* KPI Analytical Cards */}

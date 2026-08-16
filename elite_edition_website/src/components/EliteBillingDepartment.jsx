@@ -1329,30 +1329,31 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
       {/* ── TOP BANNER ──────────────────────────────────────────────────────── */}
-      <div className="glass-panel" style={{ padding: '1.25rem 1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#7c3aed,#3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FileText size={22} color="#fff" />
+      <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#7c3aed,#3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <FileText size={20} color="#fff" />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Billing & Invoicing Department</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Billing & Invoicing</h2>
                 <ScreenGroupRoster screenId="jobcards_billing" />
               </div>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 1 }}>
-                Elite Digital Prints — Cloud Accounting & GST Invoicing System
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                GST Invoicing & Cloud Accounting System
               </p>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Entry Buttons Top in Header */}
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               className="btn-primary"
               onClick={() => setShowLedgerModal(true)}
-              style={{ padding: '0.55rem 1.25rem', background: 'linear-gradient(135deg,#10b981,#059669)', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)', fontWeight: 800 }}
+              style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <BookOpen size={16} /> Ledger Reports
+              <BookOpen size={15} /> Ledger Reports
             </button>
             <button
               className="btn-primary"
@@ -1360,33 +1361,33 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 setActiveTab('expense');
                 setAutoOpenExpenseModal(true);
               }}
-              style={{ padding: '0.55rem 1.25rem', background: 'linear-gradient(135deg,#f59e0b,#d97706)', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)', fontWeight: 800 }}
+              style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <PlusCircle size={16} /> Expense Entry
+              <PlusCircle size={15} /> Expense Entry
             </button>
             <button
               className="btn-primary"
               onClick={() => handleOpenCreateTab()}
-              style={{ padding: '0.55rem 1.25rem', background: 'linear-gradient(135deg,#7c3aed,#6366f1)', boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)', fontWeight: 800 }}
+              style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#7c3aed,#6366f1)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <PlusCircle size={16} /> Create Invoice
+              <PlusCircle size={15} /> Create Invoice
             </button>
             <button
               className="btn-primary"
               onClick={handleOpenCreateChallan}
-              style={{ padding: '0.55rem 1.25rem', background: 'linear-gradient(135deg,#0284c7,#2563eb)', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)', fontWeight: 800 }}
+              style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#0284c7,#2563eb)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <Truck size={16} /> Create Challan
+              <Truck size={15} /> Create Challan
             </button>
           </div>
         </div>
 
         {/* Sub-Tabs Bar */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.2rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.8rem', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.85rem', borderTop: '1px solid var(--border-light, #e2e8f0)', paddingTop: '0.65rem', overflowX: 'auto' }}>
           {[
             { id: 'challans', label: '🚚 Challan' },
             { id: 'invoices', label: '🧾 Invoices Directory', count: stats.totalInvoices },
-            ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? '✍️ Edit Invoice' : '✍️ New Invoice Generator' }] : []),
+            ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? '✍️ Edit Invoice' : '✍️ New Invoice' }] : []),
             { id: 'customers', label: `👥 Customers (${customers.length})` },
             { id: 'items', label: `📦 Item (${itemsList.length})` },
             { id: 'expense', label: '💰 Expenses & Ledger' }
@@ -1395,15 +1396,15 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               key={t.id}
               onClick={() => setActiveTab(t.id)}
               style={{
-                padding: '0.5rem 1.1rem',
-                borderRadius: 'var(--radius-sm)',
+                padding: '0.42rem 0.9rem',
+                borderRadius: '8px',
                 fontWeight: 700,
-                fontSize: '0.82rem',
+                fontSize: '0.8rem',
                 cursor: 'pointer',
                 border: '1px solid',
-                borderColor: activeTab === t.id ? '#7c3aed' : 'var(--border-light)',
-                background: activeTab === t.id ? 'rgba(124,58,237,0.18)' : 'transparent',
-                color: activeTab === t.id ? '#a78bfa' : 'var(--text-muted)',
+                borderColor: activeTab === t.id ? '#7c3aed' : 'var(--border-light, #e2e8f0)',
+                background: activeTab === t.id ? '#f3e8ff' : '#ffffff',
+                color: activeTab === t.id ? '#6b21a8' : 'var(--text-muted, #64748b)',
                 transition: 'all 0.15s'
               }}
             >

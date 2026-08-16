@@ -1601,35 +1601,76 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           </span>
         </div>
       )}
-      {/* Header & Navigation */}
+      {/* Minimal White Card Header with Entry Buttons Top Right & Sub-Tabs */}
       {!onlyChallan && (
-        <div className="glass-panel" style={{ display: 'flex', gap: '1rem', padding: '0.75rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', overflowX: 'auto' }}>
+        <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#0284c7,#2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Database size={20} color="#fff" />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                    {department === 'stitching' ? 'Elite Stitching Fabric' : 'Fabric Management'}
+                  </h2>
+                  <ScreenGroupRoster screenId={department === 'stitching' ? 'jobcards_stitching_challan' : 'jobcards_fabric'} />
+                </div>
+                <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                  Lot Stock Tracking & Delivery Challans
+                </p>
+              </div>
+            </div>
+
+            {/* Entry Buttons Top in Header */}
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => handleOpenChallanModal()}
+                style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#0284c7,#2563eb)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Truck size={15} /> New Delivery Challan
+              </button>
+              <button
+                onClick={() => setIsInwardOpen(true)}
+                style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <PlusCircle size={15} /> Inward Roll Stock
+              </button>
+              <button
+                onClick={() => setIsCombinedModalOpen(true)}
+                style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#7c3aed,#6366f1)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <FileDown size={15} /> PDF Report
+              </button>
+            </div>
+          </div>
+
+          {/* Sub-Tabs Bar */}
+          <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.85rem', borderTop: '1px solid var(--border-light, #e2e8f0)', paddingTop: '0.65rem', overflowX: 'auto' }}>
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}
-                style={{ padding: '0.5rem 1.1rem', fontSize: '0.85rem', flexShrink: 0 }}
+                style={{
+                  padding: '0.42rem 0.9rem',
+                  borderRadius: '8px',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: activeTab === tab.id ? '#0284c7' : 'var(--border-light, #e2e8f0)',
+                  background: activeTab === tab.id ? '#e0f2fe' : '#ffffff',
+                  color: activeTab === tab.id ? '#0369a1' : 'var(--text-muted, #64748b)',
+                  transition: 'all 0.15s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
               >
-                <tab.icon size={16} />
+                <tab.icon size={15} />
                 {tab.label}
               </button>
             ))}
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setIsCombinedModalOpen(true)}
-              className="btn-primary"
-              title="Download Department PDF Reports"
-              style={{ gap: '0.45rem', padding: '0.5rem 1.25rem', fontSize: '0.85rem', flexShrink: 0, background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', color: '#ffffff', border: 'none', boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)', fontWeight: 800 }}
-            >
-              <FileDown size={16} /> Download PDF Report
-            </button>
-            <button onClick={fetchData} className="btn-icon" title="Refresh Data" style={{ padding: '0.55rem', flexShrink: 0 }}>
-              <RefreshCw size={18} className={loading ? 'spin-loader' : ''} />
-            </button>
           </div>
         </div>
       )}
