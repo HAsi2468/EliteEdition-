@@ -724,8 +724,10 @@ body {
   }
 
   .app-container > header {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1000 !important;
     flex-shrink: 0 !important;
-    z-index: 100 !important;
   }
 
   .main-layout-container {

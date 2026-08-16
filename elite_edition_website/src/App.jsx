@@ -599,7 +599,7 @@ export default function App() {
   return (
     <div style={styles.appContainer} className="app-container">
       {/* Top Navbar */}
-      <header className="glass-panel" style={styles.header}>
+      <header className="glass-panel app-header" style={styles.header}>
         <div style={styles.headerLeft} className="header-left-wrap">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -609,16 +609,27 @@ export default function App() {
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
-          <div style={styles.logoBadge}>
-            {activeTab === 'workspace' ? 'WS' : activeDepartment === 'digital_print' ? 'EDP' : activeDepartment === 'stitching' ? 'ES' : 'EE'}
-          </div>
-          <div>
-            <h1 style={styles.brandTitle}>
-              {activeTab === 'workspace' ? 'Workspace & Operations' : activeDepartment === 'digital_print' ? 'Elite Digital Print' : activeDepartment === 'stitching' ? 'Elite Stitching' : 'Elite Edition'}
-            </h1>
-            <p style={styles.brandSubtitle}>
-              {activeTab === 'workspace' ? 'Team Collaboration & Real-Time Chat' : activeDepartment === 'digital_print' ? 'Digital Printing & Job Cards' : activeDepartment === 'stitching' ? 'Job Cards, Design Room & Fabric Challans' : 'Inventory Control Center'}
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              background: 'linear-gradient(135deg, var(--primary, #6366f1), #0891b2)',
+              color: '#fff',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.85rem',
+              letterSpacing: '0.02em',
+              flexShrink: 0,
+              boxShadow: '0 2px 8px rgba(99,102,241,0.3)'
+            }}>
+              {activeTab === 'workspace' ? 'WS' : activeDepartment === 'digital_print' ? 'EDP' : activeDepartment === 'stitching' ? 'ES' : 'EE'}
+            </div>
+            <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+              {activeTab === 'workspace' ? 'Workspace' : activeDepartment === 'digital_print' ? 'Elite Print' : activeDepartment === 'stitching' ? 'Elite Stitching' : 'Elite Edition'}
+            </span>
           </div>
 
           {/* Department Switcher Buttons */}
@@ -1066,9 +1077,9 @@ export default function App() {
             flexDirection: 'column',
             gap: '1rem',
             position: 'sticky',
-            top: '76px',
+            top: '62px',
             alignSelf: 'flex-start',
-            maxHeight: 'calc(100vh - 90px)',
+            maxHeight: 'calc(100vh - 74px)',
             overflowY: 'auto',
             transition: 'width 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
             zIndex: 90
@@ -1555,12 +1566,21 @@ const styles = {
     minHeight: '100vh',
   },
   header: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 1000,
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '1rem 1.5rem',
+    padding: '0.4rem 1rem',
     flexWrap: 'wrap',
-    gap: '1rem',
+    gap: '0.75rem',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    borderBottom: '1px solid var(--border-light)',
+    backgroundColor: 'var(--bg-card, #ffffff)',
+    minHeight: '52px',
+    boxShadow: '0 2px 12px rgba(0, 0, 0, 0.04)'
   },
   headerLeft: {
     display: 'flex',
