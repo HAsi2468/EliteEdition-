@@ -47,9 +47,20 @@ const getAll = async (req, res) => {
     }
 
     if (dateStart || dateEnd) {
-      filter.date = {};
-      if (dateStart) filter.date.$gte = dateStart;
-      if (dateEnd) filter.date.$lte = dateEnd;
+      const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
+      const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
+      const minMs = dsStr ? Math.min(new Date(`${dsStr}T00:00:00.000Z`).getTime(), new Date(`${dsStr}T00:00:00.000`).getTime()) : null;
+      const maxMs = deStr ? Math.max(new Date(`${deStr}T23:59:59.999Z`).getTime(), new Date(`${deStr}T23:59:59.999`).getTime()) : null;
+
+      const dateQuery = {};
+      if (minMs) dateQuery.$gte = new Date(minMs);
+      if (maxMs) dateQuery.$lte = new Date(maxMs);
+
+      filter.$or = [
+        { date: dateQuery },
+        { date: { $gte: dsStr, $lte: deStr } },
+        { createdAt: dateQuery }
+      ];
     }
 
     if (search && search.trim()) {

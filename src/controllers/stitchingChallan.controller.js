@@ -91,13 +91,21 @@ const getChallans = async (req, res) => {
     if (partyName) filter.partyName = partyName;
 
     if (dateStart || dateEnd) {
-      filter.date = {};
-      if (dateStart) filter.date.$gte = new Date(dateStart);
-      if (dateEnd) {
-        const end = new Date(dateEnd);
-        end.setHours(23, 59, 59, 999);
-        filter.date.$lte = end;
-      }
+      const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
+      const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
+      const minMs = dsStr ? Math.min(new Date(`${dsStr}T00:00:00.000Z`).getTime(), new Date(`${dsStr}T00:00:00.000`).getTime()) : null;
+      const maxMs = deStr ? Math.max(new Date(`${deStr}T23:59:59.999Z`).getTime(), new Date(`${deStr}T23:59:59.999`).getTime()) : null;
+
+      const dateQuery = {};
+      if (minMs) dateQuery.$gte = new Date(minMs);
+      if (maxMs) dateQuery.$lte = new Date(maxMs);
+
+      filter.$or = [
+        { date: dateQuery },
+        { date: { $gte: dsStr, $lte: deStr } },
+        { created_at: dateQuery },
+        { createdAt: dateQuery }
+      ];
     }
 
     if (search) {

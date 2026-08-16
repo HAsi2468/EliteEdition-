@@ -698,18 +698,20 @@ export default function JobPrintingLog() {
   };
 
   // Load Print Logs List
-  const fetchLogs = async () => {
+  const fetchLogs = async (overrideDateStart, overrideDateEnd) => {
     setLoading(true);
     setError('');
+    const ds = overrideDateStart !== undefined ? overrideDateStart : dateStart;
+    const de = overrideDateEnd !== undefined ? overrideDateEnd : dateEnd;
     try {
       const res = await api.getJobPrintLogs({
         jobNo: searchJob,
         machineName: filterMachine,
-        dateStart,
-        dateEnd,
-        limit: 200
+        dateStart: ds,
+        dateEnd: de,
+        limit: 500
       });
-      if (res.data) setLogs(res.data);
+      if (res && res.data) setLogs(res.data);
       await fetchRawMaterialSummary();
     } catch (err) {
       setError(err.message || 'Failed to load printing logs.');
@@ -855,12 +857,11 @@ export default function JobPrintingLog() {
         notes: ''
       }));
 
-      if (form.date) {
-        setDateStart(form.date);
-        setDateEnd(form.date);
-      }
+      const targetDate = form.date || new Date().toISOString().split('T')[0];
+      setDateStart(targetDate);
+      setDateEnd(targetDate);
 
-      await fetchLogs();
+      await fetchLogs(targetDate, targetDate);
       await fetchJobCards();
       triggerGlobalDataRefresh('jobcards');
 

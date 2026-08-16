@@ -96,13 +96,21 @@ const getInvoices = async (req, res) => {
     }
 
     if (dateStart || dateEnd) {
-      filter.invoiceDate = {};
-      if (dateStart) filter.invoiceDate.$gte = new Date(dateStart);
-      if (dateEnd) {
-        const end = new Date(dateEnd);
-        end.setHours(23, 59, 59, 999);
-        filter.invoiceDate.$lte = end;
-      }
+      const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
+      const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
+      const minMs = dsStr ? Math.min(new Date(`${dsStr}T00:00:00.000Z`).getTime(), new Date(`${dsStr}T00:00:00.000`).getTime()) : null;
+      const maxMs = deStr ? Math.max(new Date(`${deStr}T23:59:59.999Z`).getTime(), new Date(`${deStr}T23:59:59.999`).getTime()) : null;
+
+      const dateQuery = {};
+      if (minMs) dateQuery.$gte = new Date(minMs);
+      if (maxMs) dateQuery.$lte = new Date(maxMs);
+
+      filter.$or = [
+        { invoiceDate: dateQuery },
+        { invoiceDate: { $gte: dsStr, $lte: deStr } },
+        { created_at: dateQuery },
+        { createdAt: dateQuery }
+      ];
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
