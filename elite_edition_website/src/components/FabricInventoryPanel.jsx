@@ -1647,30 +1647,33 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
           {/* Sub-Tabs Bar */}
           <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.85rem', borderTop: '1px solid var(--border-light, #e2e8f0)', paddingTop: '0.65rem', overflowX: 'auto' }}>
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  padding: '0.42rem 0.9rem',
-                  borderRadius: '8px',
-                  fontWeight: 700,
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
-                  border: '1px solid',
-                  borderColor: activeTab === tab.id ? '#0284c7' : 'var(--border-light, #e2e8f0)',
-                  background: activeTab === tab.id ? '#e0f2fe' : '#ffffff',
-                  color: activeTab === tab.id ? '#0369a1' : 'var(--text-muted, #64748b)',
-                  transition: 'all 0.15s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <tab.icon size={15} />
-                {tab.label}
-              </button>
-            ))}
+            {tabs.map(tab => {
+              const TabIcon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  style={{
+                    padding: '0.42rem 0.9rem',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    border: '1px solid',
+                    borderColor: activeTab === tab.id ? '#0284c7' : 'var(--border-light, #e2e8f0)',
+                    background: activeTab === tab.id ? '#e0f2fe' : '#ffffff',
+                    color: activeTab === tab.id ? '#0369a1' : 'var(--text-muted, #64748b)',
+                    transition: 'all 0.15s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  {TabIcon && <TabIcon size={15} />}
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

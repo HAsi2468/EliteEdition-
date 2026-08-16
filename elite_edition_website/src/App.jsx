@@ -1126,6 +1126,7 @@ export default function App() {
               const renderNavItem = (tabKey, label, IconComponent, customColor, shortLabel) => {
                 const isActive = activeTab === tabKey || (tabKey === 'jobcards_stitching_challan' && activeTab === 'jobcards_fabric');
                 const displayShort = shortLabel || label;
+                const NavIcon = IconComponent || FileText;
 
                 if (isSidebarCollapsed) {
                   return (
@@ -1159,7 +1160,7 @@ export default function App() {
                         if (!isActive) e.currentTarget.style.background = 'transparent';
                       }}
                     >
-                      <IconComponent
+                      <NavIcon
                         size={22}
                         color={customColor || (isActive ? 'var(--primary)' : undefined)}
                         style={{ flexShrink: 0 }}
@@ -1208,34 +1209,37 @@ export default function App() {
                       overflow: 'hidden'
                     }}
                   >
-                    <IconComponent size={18} color={customColor || (isActive ? 'var(--primary)' : undefined)} style={{ flexShrink: 0 }} />
+                    <NavIcon size={18} color={customColor || (isActive ? 'var(--primary)' : undefined)} style={{ flexShrink: 0 }} />
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
                   </button>
                 );
               };
 
-              const renderSectionHeader = (label, IconComponent) => (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
-                    gap: '0.45rem',
-                    fontSize: '0.72rem',
-                    fontWeight: '700',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    color: 'var(--text-muted)',
-                    padding: isSidebarCollapsed ? '0.35rem 0' : '0.4rem 0.75rem',
-                    borderBottom: '1px solid var(--border-light)',
-                    marginBottom: '0.35rem'
-                  }}
-                  title={label}
-                >
-                  <IconComponent size={15} color="var(--primary)" style={{ flexShrink: 0 }} />
-                  {!isSidebarCollapsed && <span>{label}</span>}
-                </div>
-              );
+              const renderSectionHeader = (label, IconComponent) => {
+                const HeaderIcon = IconComponent || MessageSquare;
+                return (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
+                      gap: '0.45rem',
+                      fontSize: '0.72rem',
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      color: 'var(--text-muted)',
+                      padding: isSidebarCollapsed ? '0.35rem 0' : '0.4rem 0.75rem',
+                      borderBottom: '1px solid var(--border-light)',
+                      marginBottom: '0.35rem'
+                    }}
+                    title={label}
+                  >
+                    <HeaderIcon size={15} color="var(--primary)" style={{ flexShrink: 0 }} />
+                    {!isSidebarCollapsed && <span>{label}</span>}
+                  </div>
+                );
+              };
 
               if (activeTab === 'workspace') {
                 return (
