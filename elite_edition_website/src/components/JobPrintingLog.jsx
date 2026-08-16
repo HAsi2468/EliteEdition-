@@ -2158,10 +2158,10 @@ export default function JobPrintingLog() {
                               {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>)}
                             </select>
                           </div>
-                          <div style={{ width: '48px' }}>
+                          <div style={{ width: '54px' }}>
                             <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} title="Rolls Quantity" />
                           </div>
-                          <div style={{ width: '56px' }}>
+                          <div style={{ width: '54px' }}>
                             <input type="number" step="0.1" placeholder="Mtr" value={entry.paperMtrQty} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperMtrQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} title="Meters Quantity" />
                           </div>
                           {inwardPaperEntries.length > 1 && (
@@ -2245,10 +2245,10 @@ export default function JobPrintingLog() {
                               {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>)}
                             </select>
                           </div>
-                          <div style={{ width: '48px' }}>
+                          <div style={{ width: '54px' }}>
                             <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} title="Rolls Quantity" />
                           </div>
-                          <div style={{ width: '56px' }}>
+                          <div style={{ width: '54px' }}>
                             <input type="number" step="0.1" placeholder="Mtr" value={entry.paperMtrQty} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperMtrQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} title="Meters Quantity" />
                           </div>
                           {outwardPaperEntries.length > 1 && (
