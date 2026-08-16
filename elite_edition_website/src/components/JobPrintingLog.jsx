@@ -1424,6 +1424,7 @@ export default function JobPrintingLog() {
 
           <DateRangePicker
             preset={datePreset}
+            theme="dark"
             onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
               setDatePreset(p);
               setDateStart(ds);

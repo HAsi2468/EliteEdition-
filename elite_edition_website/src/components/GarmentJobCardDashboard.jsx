@@ -31,6 +31,7 @@ export default function GarmentJobCardDashboard() {
 
   // Filters
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [datePreset, setDatePreset] = useState('all');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
@@ -40,6 +41,14 @@ export default function GarmentJobCardDashboard() {
   const [vendorFilter, setVendorFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [stageFilter, setStageFilter] = useState('All');
+
+  // Debounce search input for silky smooth typing and zero lag
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Analytics State
   const [analytics, setAnalytics] = useState({
@@ -74,7 +83,7 @@ export default function GarmentJobCardDashboard() {
     setError('');
     try {
       const res = await api.getGarmentJobCards({
-        search,
+        search: debouncedSearch,
         dateStart,
         dateEnd,
         design_number: designFilter,
@@ -94,7 +103,7 @@ export default function GarmentJobCardDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [search, dateStart, dateEnd, designFilter, vendorFilter, statusFilter, stageFilter, page]);
+  }, [debouncedSearch, dateStart, dateEnd, designFilter, vendorFilter, statusFilter, stageFilter, page]);
 
   const fetchAnalytics = useCallback(async () => {
     try {
@@ -424,6 +433,7 @@ export default function GarmentJobCardDashboard() {
 
         <DateRangePicker
           preset={datePreset}
+          align="right"
           onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
             setDatePreset(p);
             setDateStart(ds);

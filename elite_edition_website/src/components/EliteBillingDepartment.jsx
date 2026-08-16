@@ -1411,9 +1411,9 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', padding: '0.2rem 0.1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-              <Calendar size={17} color="#a78bfa" />
+              <Calendar size={17} color="#4f46e5" />
               <span>Reporting Period:</span>
-              <span style={{ fontSize: '0.78rem', color: '#a78bfa', fontWeight: 600 }}>({activeRange.labelText})</span>
+              <span style={{ fontSize: '0.78rem', color: '#4f46e5', fontWeight: 700 }}>({activeRange.labelText})</span>
             </div>
 
             <DateRangePicker

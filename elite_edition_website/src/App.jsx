@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom';
 import { api, getBaseUrl, setBaseUrl } from './services/api';
 import Login from './components/Login';
@@ -7,18 +7,20 @@ import InventoryGrid from './components/InventoryGrid';
 import ProductCatalogGrid from './components/ProductCatalogGrid';
 import InventoryForm from './components/InventoryForm';
 import BulkInwardModal from './components/BulkInwardModal';
-import ReportsCenter from './components/ReportsCenter';
 import SalesGrid from './components/SalesGrid';
 import StockOutForm from './components/StockOutForm';
 import CatalogManagerModal from './components/CatalogManagerModal';
-import UnicommerceHub from './components/UnicommerceHub';
-import MyntraHub from './components/MyntraHub';
-import ReturnsManager from './components/ReturnsManager';
 import JobCardPanel from './components/JobCardPanel';
 import StitchingSettings from './components/StitchingSettings';
 import AdminPanel from './components/AdminPanel';
 import Workspace from './components/Workspace';
 import EliteModalDialog from './components/EliteModalDialog';
+
+// Code-splitting lazy loads for heavy tab modules
+const ReportsCenter = lazy(() => import('./components/ReportsCenter'));
+const UnicommerceHub = lazy(() => import('./components/UnicommerceHub'));
+const MyntraHub = lazy(() => import('./components/MyntraHub'));
+const ReturnsManager = lazy(() => import('./components/ReturnsManager'));
 import { 
   LogOut, 
   LayoutDashboard, 
@@ -1238,6 +1240,13 @@ export default function App() {
         <section style={styles.contentArea}>
           {error && <div style={styles.globalError}>{error}</div>}
 
+          <Suspense fallback={
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '1rem', color: 'var(--text-muted)' }}>
+              <RefreshCw size={28} className="spin-loader" color="var(--primary)" />
+              <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>Loading module...</span>
+            </div>
+          }>
+
           {activeTab === 'dashboard' ? (
             <DashboardStats items={items} sales={sales} />
           ) : activeTab === 'elite_online' ? (
@@ -1283,6 +1292,7 @@ export default function App() {
               </p>
             </div>
           )}
+          </Suspense>
 
           {/* Persistent Workspace / Chat (always mounted to listen for socket notifications & record history) */}
           <div style={{ display: activeTab === 'workspace' ? 'block' : 'none', height: '100%' }}>

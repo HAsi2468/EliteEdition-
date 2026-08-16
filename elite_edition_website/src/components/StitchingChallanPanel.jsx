@@ -21,12 +21,20 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
   const [challans, setChallans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [datePreset, setDatePreset] = useState('all');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
   const [selectedChallanIds, setSelectedChallanIds] = useState([]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const handleMergeSelected = () => {
     if (selectedChallanIds.length === 0) return;
@@ -73,14 +81,16 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
   const fetchChallans = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.getStitchingChallans({ search, dateStart, dateEnd });
-      setChallans(res?.data || []);
-    } catch (e) {
-      console.error('Error fetching stitching challans:', e);
+      const res = await api.getStitchingChallans({ search: debouncedSearch, dateStart, dateEnd });
+      if (res && res.success) {
+        setChallans(res.data || []);
+      }
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [search, dateStart, dateEnd]);
+  }, [debouncedSearch, dateStart, dateEnd]);
 
   useEffect(() => {
     fetchChallans();
@@ -306,6 +316,7 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
         </div>
         <DateRangePicker
           preset={datePreset}
+          align="right"
           onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
             setDatePreset(p);
             setDateStart(ds);
