@@ -2248,35 +2248,33 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display:'flex', gap:'0.5rem', borderTop:'1px solid var(--border-light)', paddingTop:'0.7rem' }}>
+                  <div style={{ display:'flex', gap:'0.45rem', borderTop:'1px solid var(--border-light)', paddingTop:'0.7rem', flexWrap:'wrap' }}>
                     <button onClick={()=>handleSendToBilling(c)} className="btn-secondary"
-                      style={{ flex:1, padding:'0.4rem', fontSize:'0.78rem', justifyContent:'center', color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.1)' }}>
-                      <Receipt size={13}/> Invoice
+                      style={{ flex:1, padding:'0.42rem 0.5rem', fontSize:'0.78rem', justifyContent:'center', color: '#4f46e5', borderColor: '#c7d2fe', background: '#eff6ff', fontWeight: 700 }}
+                      title="Create Delivery Challan">
+                      <FileText size={13}/> Challan
                     </button>
                     <button onClick={()=>triggerJobCardPrint(c)} className="btn-secondary"
-                      style={{ flex:1, padding:'0.4rem', fontSize:'0.78rem', justifyContent:'center', color: '#10b981', borderColor: 'rgba(16,185,129,0.3)' }}>
+                      style={{ flex:1, padding:'0.42rem 0.5rem', fontSize:'0.78rem', justifyContent:'center', color: '#059669', borderColor: '#a7f3d0', background: '#ecfdf5', fontWeight: 700 }}
+                      title="Print / Save PDF">
                       <Printer size={13}/> Print / PDF
                     </button>
                     <button onClick={()=>setPreviewCard(c)} className="btn-secondary"
-                      style={{ flex:1, padding:'0.4rem', fontSize:'0.78rem', justifyContent:'center' }}>
+                      style={{ flex:1, padding:'0.42rem 0.5rem', fontSize:'0.78rem', justifyContent:'center', fontWeight: 600 }}>
                       <Eye size={13}/> Preview
                     </button>
                     <button onClick={()=>openEdit(c)} className="btn-secondary"
-                      style={{ flex:1, padding:'0.4rem', fontSize:'0.78rem', justifyContent:'center' }}>
+                      style={{ flex:1, padding:'0.42rem 0.5rem', fontSize:'0.78rem', justifyContent:'center', fontWeight: 600 }}>
                       <Edit2 size={13}/> Edit
                     </button>
                     <button onClick={()=>handleOpenShareModal(c)} className="btn-secondary"
-                      style={{ padding:'0.4rem 0.7rem', fontSize:'0.78rem', borderRadius:'var(--radius-sm)',
-                        background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.2)',
-                        color:'#60a5fa', cursor:'pointer', display:'flex', alignItems:'center', gap:'0.3rem',
-                        fontFamily:'var(--font-sans)', transition:'all 0.15s' }}>
-                      <Send size={13}/>
+                      style={{ flex:1, padding:'0.42rem 0.5rem', fontSize:'0.78rem', justifyContent:'center', color: '#2563eb', borderColor: '#bfdbfe', background: '#eff6ff', fontWeight: 700 }}
+                      title="Share Job Card to Chat">
+                      <Send size={13}/> Share
                     </button>
-                    <button onClick={()=>handleDelete(c._id, c.jobNo)}
-                      style={{ padding:'0.4rem 0.7rem', fontSize:'0.78rem', borderRadius:'var(--radius-sm)',
-                        background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)',
-                        color:'#f87171', cursor:'pointer', display:'flex', alignItems:'center', gap:'0.3rem',
-                        fontFamily:'var(--font-sans)', transition:'all 0.15s' }}>
+                    <button onClick={()=>handleDelete(c._id, c.jobNo)} className="btn-secondary"
+                      style={{ padding:'0.42rem 0.6rem', fontSize:'0.78rem', justifyContent:'center', color: '#dc2626', borderColor: '#fecaca', background: '#fef2f2', fontWeight: 700 }}
+                      title="Delete Job Card">
                       <Trash2 size={13}/>
                     </button>
                   </div>
@@ -2314,58 +2312,119 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         />
       )}
 
+      {/* 🌟 SHARE TO CHAT FLOATING MODAL 🌟 */}
       {showShareModal && (
-        <div className="share-modal-overlay">
-          <div className="share-modal-card">
-            {/* Mobile Top Drag Indicator */}
-            <div style={{ width: '36px', height: '4px', borderRadius: '2px', backgroundColor: 'rgba(255,255,255,0.2)', margin: '0 auto 14px auto' }} />
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(5px)',
+          zIndex: 999999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            width: '100%',
+            maxWidth: '520px',
+            borderRadius: '14px',
+            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
+            border: '1px solid #cbd5e1',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            color: '#0f172a'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.1rem 1.4rem',
+              background: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: '#eff6ff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Send size={18} color="#2563eb" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                    Share Job Card {shareCard?.jobNo ? `— ${shareCard.jobNo}` : ''}
+                  </h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                    Send this job card directly into a team chat channel or direct message.
+                  </p>
+                </div>
+              </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Send size={18} color="var(--primary)" /> Share Job Card to Chat
-              </h3>
               <button 
                 type="button"
                 onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); }} 
-                style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: 30,
+                  height: 30,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#475569'
+                }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleShareJobCard}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Search Channel or Member</label>
+            <form onSubmit={handleShareJobCard} style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Search Channel or Team Member</label>
                 <input 
                   type="text" 
                   value={shareSearch} 
                   onChange={e => setShareSearch(e.target.value)} 
-                  placeholder="Type name to filter..." 
+                  placeholder="Type channel or member name..." 
                   style={{
                     width: '100%',
-                    padding: '12px 16px',
-                    borderRadius: '24px',
-                    border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
-                    backgroundColor: 'var(--bg-input, #0b0f19)',
-                    color: 'var(--text-primary)',
+                    padding: '0.6rem 0.85rem',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
                     outline: 'none',
-                    fontSize: '0.92rem'
+                    fontSize: '0.85rem'
                   }}
                 />
               </div>
 
-              <div style={{ marginBottom: '22px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Chat Destination</label>
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Select Chat Destination</label>
                 <div style={{
                   maxHeight: '230px',
                   overflowY: 'auto',
-                  border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
-                  borderRadius: '16px',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '10px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '4px',
                   padding: '6px',
-                  backgroundColor: 'rgba(0,0,0,0.2)'
+                  backgroundColor: '#f8fafc'
                 }}>
                   {chatRooms
                     .filter(r => {
@@ -2387,16 +2446,16 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                           key={r._id} 
                           onClick={() => setSelectedRoomId(r._id)}
                           style={{
-                            padding: '10px 14px',
-                            borderRadius: '12px',
+                            padding: '8px 12px',
+                            borderRadius: '8px',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '12px',
+                            gap: '10px',
                             cursor: 'pointer',
-                            backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255,255,255,0.02)',
-                            border: isSelected ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid transparent',
-                            color: isSelected ? '#38bdf8' : 'var(--text-primary)',
-                            transition: 'all 0.2s ease',
+                            backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
+                            border: isSelected ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                            color: isSelected ? '#1d4ed8' : '#0f172a',
+                            transition: 'all 0.15s ease',
                           }}
                         >
                           <div style={{
@@ -2404,43 +2463,40 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                             height: '28px',
                             borderRadius: '50%',
                             background: isSelected
-                              ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)'
-                              : 'rgba(255,255,255,0.08)',
-                            color: 'white',
+                              ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                              : '#e2e8f0',
+                            color: isSelected ? '#ffffff' : '#475569',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold'
+                            fontSize: '0.78rem',
+                            fontWeight: '800'
                           }}>
                             {isDirect ? displayName.charAt(0).toUpperCase() : '#'}
                           </div>
-                          <span style={{ fontSize: '0.92rem', fontWeight: isSelected ? '600' : 'normal', flex: 1 }}>{displayName}</span>
-                          {isSelected && <span style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: 'bold' }}>✓</span>}
+                          <span style={{ fontSize: '0.88rem', fontWeight: isSelected ? 700 : 500, flex: 1 }}>{displayName}</span>
+                          {isSelected && <span style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: 800 }}>✓</span>}
                         </div>
                       );
                     })}
                   {chatRooms.length === 0 && (
-                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
                       No active channels or messages found.
                     </div>
                   )}
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button 
                   type="button" 
                   onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); }} 
+                  className="btn-secondary"
                   style={{
-                    padding: '12px 20px',
-                    borderRadius: '24px',
-                    border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
-                    backgroundColor: 'rgba(255,255,255,0.04)',
-                    color: 'var(--text-primary)',
-                    cursor: 'pointer',
-                    fontSize: '0.88rem',
-                    fontWeight: 600
+                    padding: '0.5rem 1.2rem',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    fontWeight: 700
                   }}
                 >
                   Cancel
