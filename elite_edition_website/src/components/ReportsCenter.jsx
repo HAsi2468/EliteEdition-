@@ -348,7 +348,15 @@ export default function ReportsCenter({ department }) {
 
   const getReportTitle = () => {
     switch (activeReportTab) {
-      case 'smart-dashboard': return 'Smart AI Analytics Dashboard';
+      case 'smart-dashboard': return 'Smart AI Analytics Overview';
+      case 'jobcard-reports': return '📋 Job Cards & Production Analytics Report';
+      case 'fabric-reports': return '📦 Fabric Inventory, Rolls & Challans Report';
+      case 'stitching-reports': return '🧵 Stitching, Fusing & Garment Production Report';
+      case 'billing-reports': return '🧾 Billing, GST Invoices & Revenue Report';
+      case 'design-reports': return '🎨 Design Master Catalog & Creative Output Report';
+      case 'rawmaterial-reports': return '🛠️ Raw Material (Paper & Ink) Inventory Report';
+      case 'expense-reports': return '💵 Operational Expenses & Petty Cash Report';
+      case 'complaint-reports': return '⚠️ Quality Defect & Complaint Resolution Report';
       case 'challan-report': return 'Fabric Challan Report';
       case 'fabric-inward': return 'Fabric Inward Report';
       case 'fabric-outward': return 'Fabric Outward Report';
@@ -361,24 +369,22 @@ export default function ReportsCenter({ department }) {
       case 'brand-hourly': return 'Hourly Brand Analysis Report';
       case 'returns-analysis': return 'Returns Brand Report';
       case 'sales-returns-ratio': return 'Ratio of Sale and Return Report';
-      default: return 'Reports';
+      default: return 'Department Operations Report';
     }
   };
 
   const getReportDescription = () => {
     if (activeDepartment === 'elite-print') {
       switch (activeReportTab) {
-        case 'smart-dashboard': return 'Displays real-time low stock warnings, production stage bottlenecks, top designs, and fabric demand forecasting.';
-        case 'challan-report': return 'Consolidated summary of all fabric challans issued, total meterages, roll counts, and party dispatches.';
-        case 'fabric-inward': return 'Ledger of all fabric inward receipts from suppliers with Lot Numbers, Vendor names, and quantities.';
-        case 'fabric-outward': return 'Dispatch ledger of fabric issued for job cards and printing orders, with Lot allocations and party dispatches.';
-        case 'fabric-lotwise': return 'Consolidated lot-level inventory balance comparing total inward vs total outward meters with net remaining stock per Lot.';
-        case 'creative-output': return 'Tracks the number of unique designs a designer completes over time to identify high-output creators.';
-        case 'color-matching': return 'Measures how quickly designers spin up color variants for single prints.';
-        case 'machine-speed': return 'Evaluates machine meterage output grouped by machine name, speed, and passes.';
-        case 'fusing-throughput': return 'Monitors daily completed fusing meters processed by the factory floor.';
-        case 'fabric-variance': return 'Compares theoretical fabric consumption against actual printed meters to highlight wastage.';
-        case 'deadline-adherence': return 'Tracks time variance between expected job delivery times and actual delivery dates.';
+        case 'smart-dashboard': return 'Executive overview of print operations, bottlenecks, low stock warnings, top designs, and 30-day fabric forecasts.';
+        case 'jobcard-reports': return 'Analytics on Job Card creation, stage movements, pending vs completed cards, average print-to-delivery days, bottleneck analysis & delayed job cards (>7 days).';
+        case 'fabric-reports': return 'Comprehensive fabric stock reports including Inward Receipts, Outward Dispatches, Lot-Wise Stock Balances, and Issued Fabric Challans.';
+        case 'stitching-reports': return 'Production output metrics for garment stitching, daily completed fusing meters, and machine printing speeds.';
+        case 'billing-reports': return 'Summary of GST invoices generated, party billing totals, and customer ledger transactions.';
+        case 'design-reports': return 'Tracks unique design patterns completed per designer, color matching turnaround speeds, and top printed design rankings.';
+        case 'rawmaterial-reports': return 'Paper Roll Inward/Outward meterage, ink inventory usage, substrate consumption, and critical low stock warnings.';
+        case 'expense-reports': return 'Daily operational expense logs, petty cash receipts, machine maintenance payments, and vendor disbursements.';
+        case 'complaint-reports': return 'Defect logs for shade variations, digital printing faults, customer complaints, and resolution turnaround times.';
       }
     }
     switch (activeReportTab) {
@@ -396,6 +402,7 @@ export default function ReportsCenter({ department }) {
       default: return '';
     }
   };
+
 
   return (
     <div style={styles.container}>
@@ -469,17 +476,15 @@ export default function ReportsCenter({ department }) {
       <div style={{ ...styles.tabsContainer, marginTop: '0.5rem', background: 'transparent', padding: 0, flexWrap: 'wrap' }}>
         {activeDepartment === 'elite-print' && (
           <>
-            <button onClick={() => setActiveReportTab('smart-dashboard')} style={activeReportTab === 'smart-dashboard' ? styles.subTabActive : styles.subTab}>Smart Dashboard</button>
-            <button onClick={() => setActiveReportTab('fabric-inward')} style={activeReportTab === 'fabric-inward' ? styles.subTabActive : styles.subTab}>Fabric Inward</button>
-            <button onClick={() => setActiveReportTab('fabric-outward')} style={activeReportTab === 'fabric-outward' ? styles.subTabActive : styles.subTab}>Fabric Outward</button>
-            <button onClick={() => setActiveReportTab('fabric-lotwise')} style={activeReportTab === 'fabric-lotwise' ? styles.subTabActive : styles.subTab}>Lot-Wise Fabric</button>
-            <button onClick={() => setActiveReportTab('challan-report')} style={activeReportTab === 'challan-report' ? styles.subTabActive : styles.subTab}>Fabric Challans</button>
-            <button onClick={() => setActiveReportTab('creative-output')} style={activeReportTab === 'creative-output' ? styles.subTabActive : styles.subTab}>Creative Output</button>
-            <button onClick={() => setActiveReportTab('color-matching')} style={activeReportTab === 'color-matching' ? styles.subTabActive : styles.subTab}>Color Matching</button>
-            <button onClick={() => setActiveReportTab('machine-speed')} style={activeReportTab === 'machine-speed' ? styles.subTabActive : styles.subTab}>Machine Speed</button>
-            <button onClick={() => setActiveReportTab('fusing-throughput')} style={activeReportTab === 'fusing-throughput' ? styles.subTabActive : styles.subTab}>Fusing Throughput</button>
-            <button onClick={() => setActiveReportTab('fabric-variance')} style={activeReportTab === 'fabric-variance' ? styles.subTabActive : styles.subTab}>Fabric Variance</button>
-            <button onClick={() => setActiveReportTab('deadline-adherence')} style={activeReportTab === 'deadline-adherence' ? styles.subTabActive : styles.subTab}>Deadline Adherence</button>
+            <button onClick={() => setActiveReportTab('smart-dashboard')} style={activeReportTab === 'smart-dashboard' ? styles.subTabActive : styles.subTab}>📊 Overview Dashboard</button>
+            <button onClick={() => setActiveReportTab('jobcard-reports')} style={activeReportTab === 'jobcard-reports' ? styles.subTabActive : styles.subTab}>📋 Job Cards &amp; Production</button>
+            <button onClick={() => setActiveReportTab('fabric-reports')} style={activeReportTab === 'fabric-reports' ? styles.subTabActive : styles.subTab}>📦 Fabric Inventory &amp; Rolls</button>
+            <button onClick={() => setActiveReportTab('stitching-reports')} style={activeReportTab === 'stitching-reports' ? styles.subTabActive : styles.subTab}>🧵 Stitching &amp; Fusing</button>
+            <button onClick={() => setActiveReportTab('billing-reports')} style={activeReportTab === 'billing-reports' ? styles.subTabActive : styles.subTab}>🧾 Billing &amp; Invoices</button>
+            <button onClick={() => setActiveReportTab('design-reports')} style={activeReportTab === 'design-reports' ? styles.subTabActive : styles.subTab}>🎨 Design Master Catalog</button>
+            <button onClick={() => setActiveReportTab('rawmaterial-reports')} style={activeReportTab === 'rawmaterial-reports' ? styles.subTabActive : styles.subTab}>🛠️ Raw Material (Paper/Ink)</button>
+            <button onClick={() => setActiveReportTab('expense-reports')} style={activeReportTab === 'expense-reports' ? styles.subTabActive : styles.subTab}>💵 Operational Expenses</button>
+            <button onClick={() => setActiveReportTab('complaint-reports')} style={activeReportTab === 'complaint-reports' ? styles.subTabActive : styles.subTab}>⚠️ Quality &amp; Complaints</button>
           </>
         )}
         {activeDepartment === 'sales' && (
