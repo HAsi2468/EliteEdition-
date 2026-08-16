@@ -47,7 +47,9 @@ import {
   Menu,
   X,
   Bell,
-  Scissors
+  Scissors,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
@@ -134,6 +136,18 @@ export default function App() {
   );
 
   const [isEliteOnlineOpen, setIsEliteOnlineOpen] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebar_collapsed');
+    return saved === null ? true : saved === 'true';
+  });
+
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebar_collapsed', String(next));
+      return next;
+    });
+  };
 
   // Department permission helpers
   const EE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
@@ -1044,194 +1058,256 @@ export default function App() {
       <main style={styles.mainLayout} className="main-layout-container">
         
         {/* Left Navigation Sidebar */}
-        <aside style={styles.sidebar} className="sidebar-wrap">
-          <div className="glass-panel" style={styles.navPanel}>
+        <aside
+          style={{
+            width: isSidebarCollapsed ? '68px' : '260px',
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+            position: 'sticky',
+            top: '76px',
+            alignSelf: 'flex-start',
+            maxHeight: 'calc(100vh - 90px)',
+            overflowY: 'auto',
+            transition: 'width 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
+            zIndex: 90
+          }}
+          className="sidebar-wrap"
+        >
+          <div className="glass-panel" style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            {/* Collapse / Expand Toggle Button */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: isSidebarCollapsed ? 'center' : 'space-between',
+              padding: '0.4rem 0.5rem',
+              borderBottom: '1px solid var(--border-light)',
+              marginBottom: '0.35rem'
+            }}>
+              {!isSidebarCollapsed && (
+                <span style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
+                  Navigation
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={toggleSidebarCollapse}
+                title={isSidebarCollapsed ? "Expand Sidebar (Uncollapse)" : "Collapse Sidebar"}
+                style={{
+                  background: isSidebarCollapsed ? 'rgba(99,102,241,0.12)' : 'transparent',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '0.35rem',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {isSidebarCollapsed ? <PanelLeftOpen size={18} color="var(--primary)" /> : <PanelLeftClose size={18} />}
+              </button>
+            </div>
 
-            {activeTab === 'workspace' ? (
-              <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                <div style={styles.sidebarSectionHeader}>
-                  <MessageSquare size={14} color="var(--primary)" />
-                  <span>Workspace & Operations</span>
-                </div>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0.5rem 0 0', lineHeight: 1.4 }}>
-                  Collaborate in real time, view task boards, and chat with team members.
-                </p>
-              </div>
-            ) : activeDepartment === 'stitching' ? (
-              /* ── ELITE STITCHING MODULES ── */
-              <>
-                <div style={styles.sidebarSectionHeader}>
-                  <Scissors size={14} color="var(--primary)" />
-                  <span>Elite Stitching Modules</span>
-                </div>
+            {(() => {
+              const renderNavItem = (tabKey, label, IconComponent, customColor) => {
+                const isActive = activeTab === tabKey || (tabKey === 'jobcards_stitching_challan' && activeTab === 'jobcards_fabric');
+                return (
+                  <button
+                    key={tabKey}
+                    type="button"
+                    onClick={() => handleNavClick(tabKey)}
+                    title={label}
+                    style={{
+                      background: isActive ? 'var(--nav-active-bg, rgba(99,102,241,0.12))' : 'none',
+                      border: 'none',
+                      width: '100%',
+                      padding: isSidebarCollapsed ? '0.75rem 0.4rem' : '0.75rem 0.9rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
+                      gap: isSidebarCollapsed ? '0' : '0.75rem',
+                      borderRadius: 'var(--radius-sm, 8px)',
+                      color: isActive ? 'var(--text-primary, #ffffff)' : 'var(--text-muted, #94a3b8)',
+                      fontSize: '0.88rem',
+                      fontWeight: isActive ? '700' : '500',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.15s ease',
+                      borderLeft: isActive ? '3px solid var(--nav-active-border, #6366f1)' : '3px solid transparent',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <IconComponent size={18} color={customColor || (isActive ? 'var(--primary)' : undefined)} style={{ flexShrink: 0 }} />
+                    {!isSidebarCollapsed && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>}
+                  </button>
+                );
+              };
 
-                {/* 1. Jobcard */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list') || currentUser.permissions?.includes('stitching_jobcards')) && (
-                  <button onClick={() => handleNavClick('jobcards_list')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
-                    <FileText size={18} /><span>Jobcard</span>
-                  </button>
-                )}
-                {/* 2. Design room */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('stitching_design')) && (
-                  <button onClick={() => handleNavClick('jobcards_catalogue')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_catalogue' ? styles.navItemActive : {}) }}>
-                    <BookOpen size={18} /><span>Design room</span>
-                  </button>
-                )}
-                {/* 3. Challan */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric') || currentUser.permissions?.includes('jobcards_stitching_challan') || currentUser.permissions?.includes('stitching_fabric')) && (
-                  <button onClick={() => handleNavClick('jobcards_stitching_challan')} style={{ ...styles.navItem, ...((activeTab === 'jobcards_stitching_challan' || activeTab === 'jobcards_fabric') ? styles.navItemActive : {}) }}>
-                    <Database size={18} /><span>Challan</span>
-                  </button>
-                )}
-                {/* 4. Settings */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings') || currentUser.permissions?.includes('stitching_settings')) && (
-                  <button onClick={() => handleNavClick('jobcards_stitching_settings')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_stitching_settings' ? styles.navItemActive : {}) }}>
-                    <Settings size={18} /><span>Settings</span>
-                  </button>
-                )}
-              </>
-            ) : activeDepartment === 'digital_print' ? (
-              /* ── ELITE DIGITAL PRINT MODULES ── */
-              <>
-                <div style={styles.sidebarSectionHeader}>
-                  <Printer size={14} color="var(--primary)" />
-                  <span>Digital Print Modules</span>
+              const renderSectionHeader = (label, IconComponent) => (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
+                    gap: '0.45rem',
+                    fontSize: '0.72rem',
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    color: 'var(--text-muted)',
+                    padding: isSidebarCollapsed ? '0.4rem 0' : '0.4rem 0.75rem',
+                    borderBottom: '1px solid var(--border-light)',
+                    marginBottom: '0.35rem'
+                  }}
+                  title={label}
+                >
+                  <IconComponent size={15} color="var(--primary)" style={{ flexShrink: 0 }} />
+                  {!isSidebarCollapsed && <span>{label}</span>}
                 </div>
+              );
 
-                {/* 1. Prints Dashboard & Reports */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards')) && (
-                  <button onClick={() => handleNavClick('jobcards')} style={{ ...styles.navItem, ...(activeTab === 'jobcards' ? styles.navItemActive : {}) }}>
-                    <BarChart3 size={18} /><span>Prints Dashboard & Reports</span>
-                  </button>
-                )}
-                {/* 2. Printing Department */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_printing_log')) && (
-                  <button onClick={() => handleNavClick('jobcards_printing_log')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_printing_log' ? styles.navItemActive : {}) }}>
-                    <Printer size={18} /><span>Printing Department</span>
-                  </button>
-                )}
-                {/* 2. Fabric Management */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) && (
-                  <button onClick={() => handleNavClick('jobcards_fabric')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_fabric' ? styles.navItemActive : {}) }}>
-                    <Database size={18} /><span>Fabric Management</span>
-                  </button>
-                )}
-                {/* Billing & Invoicing */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) && (
-                  <button onClick={() => handleNavClick('jobcards_billing')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_billing' ? styles.navItemActive : {}) }}>
-                    <FileText size={18} /><span>Billing & Invoicing</span>
-                  </button>
-                )}
-                {/* 3. Job Card */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
-                  <button onClick={() => handleNavClick('jobcards_list')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
-                    <FileText size={18} /><span>Job Card</span>
-                  </button>
-                )}
-                {/* 4. Job Card Tracking */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_tracking')) && (
-                  <button onClick={() => handleNavClick('jobcards_tracking')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_tracking' ? styles.navItemActive : {}) }}>
-                    <RefreshCw size={18} /><span>Job Card Tracking</span>
-                  </button>
-                )}
-                {/* 5. Design Catalog */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) && (
-                  <button onClick={() => handleNavClick('jobcards_catalogue')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_catalogue' ? styles.navItemActive : {}) }}>
-                    <BookOpen size={18} /><span>Design Catalog</span>
-                  </button>
-                )}
-                {/* 6. Design Master */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master')) && (
-                  <button onClick={() => handleNavClick('jobcards_master')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_master' ? styles.navItemActive : {}) }}>
-                    <Layers size={18} /><span>Design Master</span>
-                  </button>
-                )}
-                {/* 7. Print Settings */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) && (
-                  <button onClick={() => handleNavClick('jobcards_settings')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_settings' ? styles.navItemActive : {}) }}>
-                    <Settings size={18} /><span>Print Settings</span>
-                  </button>
-                )}
-                {/* 8. Raw Materials */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_raw_materials')) && (
-                  <button onClick={() => handleNavClick('jobcards_raw_materials')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_raw_materials' ? styles.navItemActive : {}) }}>
-                    <ShoppingBag size={18} /><span>Raw Materials</span>
-                  </button>
-                )}
-                {/* 9. Complain Module */}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_complain') || currentUser.permissions?.includes('jobcards_complaints') || currentUser.permissions?.includes('complaint_dashboard') || currentUser.permissions?.includes('complaint_create')) && (
-                  <button onClick={() => handleNavClick('jobcards_complain')} style={{ ...styles.navItem, ...(activeTab === 'jobcards_complain' ? styles.navItemActive : {}) }}>
-                    <AlertTriangle size={18} color="#f43f5e" /><span>Complain Module</span>
-                  </button>
-                )}
-              </>
-            ) : (
-              /* ── ELITE EDITION (E-COMMERCE) MODULES ── */
-              <>
-                <div style={styles.sidebarSectionHeader}>
-                  <Store size={14} color="var(--primary)" />
-                  <span>E-Commerce Modules</span>
-                </div>
+              if (activeTab === 'workspace') {
+                return (
+                  <div style={{ padding: isSidebarCollapsed ? '0.5rem 0.2rem' : '0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                    {renderSectionHeader('Workspace', MessageSquare)}
+                    {!isSidebarCollapsed && (
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0.5rem 0 0', lineHeight: 1.4 }}>
+                        Collaborate in real time, view task boards, and chat.
+                      </p>
+                    )}
+                  </div>
+                );
+              }
 
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard')) && (
-                  <button onClick={() => handleNavClick('dashboard')} style={{ ...styles.navItem, ...(activeTab === 'dashboard' ? styles.navItemActive : {}) }}>
-                    <LayoutDashboard size={18} /><span>Dashboard Overview</span>
-                  </button>
-                )}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('inventory')) && (
-                  <button onClick={() => handleNavClick('inventory')} style={{ ...styles.navItem, ...(activeTab === 'inventory' ? styles.navItemActive : {}) }}>
-                    <Database size={18} /><span>Store Inventory</span>
-                  </button>
-                )}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('catalog')) && (
-                  <button onClick={() => handleNavClick('catalog')} style={{ ...styles.navItem, ...(activeTab === 'catalog' ? styles.navItemActive : {}) }}>
-                    <BookOpen size={18} /><span>Product Catalog</span>
-                  </button>
-                )}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('returns')) && (
-                  <button onClick={() => handleNavClick('returns')} style={{ ...styles.navItem, ...(activeTab === 'returns' ? styles.navItemActive : {}) }}>
-                    <PackageMinus size={18} /><span>Returns Department</span>
-                  </button>
-                )}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) && (
-                  <button onClick={() => handleNavClick('sales')} style={{ ...styles.navItem, ...(activeTab === 'sales' ? styles.navItemActive : {}) }}>
-                    <ShoppingBag size={18} /><span>Sales Orders</span>
-                  </button>
-                )}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) && (
-                  <button onClick={() => handleNavClick('reports')} style={{ ...styles.navItem, ...(activeTab === 'reports' ? styles.navItemActive : {}) }}>
-                    <BarChart3 size={18} /><span>Reports Center</span>
-                  </button>
-                )}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('unicommerce')) && (
-                  <button onClick={() => handleNavClick('unicommerce')} style={{ ...styles.navItem, ...(activeTab === 'unicommerce' ? styles.navItemActive : {}) }}>
-                    <RefreshCw size={18} /><span>Uniware Integrations</span>
-                  </button>
-                )}
-                {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) && (
-                  <button onClick={() => handleNavClick('myntra')} style={{ ...styles.navItem, ...(activeTab === 'myntra' ? styles.navItemActive : {}) }}>
-                    <ShoppingBag size={18} /><span>Myntra Integrations</span>
-                  </button>
-                )}
-              </>
-            )}
+              if (activeDepartment === 'stitching') {
+                return (
+                  <>
+                    {renderSectionHeader('Elite Stitching Modules', Scissors)}
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list') || currentUser.permissions?.includes('stitching_jobcards')) &&
+                      renderNavItem('jobcards_list', 'Jobcard', FileText)
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('stitching_design')) &&
+                      renderNavItem('jobcards_catalogue', 'Design room', BookOpen)
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric') || currentUser.permissions?.includes('jobcards_stitching_challan') || currentUser.permissions?.includes('stitching_fabric')) &&
+                      renderNavItem('jobcards_stitching_challan', 'Challan', Database)
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings') || currentUser.permissions?.includes('stitching_settings')) &&
+                      renderNavItem('jobcards_stitching_settings', 'Settings', Settings)
+                    }
+                  </>
+                );
+              }
+
+              if (activeDepartment === 'digital_print') {
+                return (
+                  <>
+                    {renderSectionHeader('Digital Print Modules', Printer)}
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards')) &&
+                      renderNavItem('jobcards', 'Prints Dashboard & Reports', BarChart3)
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_printing_log')) &&
+                      renderNavItem('jobcards_printing_log', 'Printing Department', Printer)
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) &&
+                      renderNavItem('jobcards_fabric', 'Fabric Management', Database)
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) &&
+                      renderNavItem('jobcards_billing', 'Billing & Invoicing', FileText)
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) &&
+                      renderNavItem('jobcards_list', 'Job Card', FileText)
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_tracking')) &&
+                      renderNavItem('jobcards_tracking', 'Job Card Tracking', RefreshCw)
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue')) &&
+                      renderNavItem('jobcards_catalogue', 'Design Catalog', BookOpen)
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master')) &&
+                      renderNavItem('jobcards_master', 'Design Master', Layers)
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) &&
+                      renderNavItem('jobcards_settings', 'Print Settings', Settings)
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_raw_materials')) &&
+                      renderNavItem('jobcards_raw_materials', 'Raw Materials', ShoppingBag)
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_complain') || currentUser.permissions?.includes('jobcards_complaints') || currentUser.permissions?.includes('complaint_dashboard') || currentUser.permissions?.includes('complaint_create')) &&
+                      renderNavItem('jobcards_complain', 'Complain Module', AlertTriangle, '#f43f5e')
+                    }
+                  </>
+                );
+              }
+
+              return (
+                <>
+                  {renderSectionHeader('E-Commerce Modules', Store)}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard')) &&
+                    renderNavItem('dashboard', 'Dashboard Overview', LayoutDashboard)
+                  }
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('inventory')) &&
+                    renderNavItem('inventory', 'Store Inventory', Database)
+                  }
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('catalog')) &&
+                    renderNavItem('catalog', 'Product Catalog', BookOpen)
+                  }
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('returns')) &&
+                    renderNavItem('returns', 'Returns Department', PackageMinus)
+                  }
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) &&
+                    renderNavItem('sales', 'Sales Orders', ShoppingBag)
+                  }
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) &&
+                    renderNavItem('reports', 'Reports Center', BarChart3)
+                  }
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('unicommerce')) &&
+                    renderNavItem('unicommerce', 'Uniware Integrations', RefreshCw)
+                  }
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('myntra')) &&
+                    renderNavItem('myntra', 'Myntra Integrations', ShoppingBag)
+                  }
+                </>
+              );
+            })()}
 
             {currentUser && currentUser.role === 'admin' && (
               <button
+                type="button"
                 onClick={() => handleNavClick('admin')}
+                title="Admin Panel"
                 style={{
-                  ...styles.navItem,
-                  ...(activeTab === 'admin' ? styles.navItemActive : {}),
+                  background: activeTab === 'admin' ? 'var(--nav-active-bg, rgba(99,102,241,0.12))' : 'none',
+                  border: 'none',
+                  width: '100%',
+                  padding: isSidebarCollapsed ? '0.75rem 0.4rem' : '0.75rem 0.9rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: isSidebarCollapsed ? 'center' : 'flex-start',
+                  gap: isSidebarCollapsed ? '0' : '0.75rem',
+                  borderRadius: 'var(--radius-sm, 8px)',
+                  color: activeTab === 'admin' ? 'var(--text-primary, #ffffff)' : 'var(--text-muted, #94a3b8)',
+                  fontSize: '0.88rem',
+                  fontWeight: activeTab === 'admin' ? '700' : '500',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.15s ease',
+                  borderLeft: activeTab === 'admin' ? '3px solid var(--nav-active-border, #6366f1)' : '3px solid transparent',
                   borderTop: '1px solid var(--border-light)',
                   marginTop: '0.5rem',
                   paddingTop: '0.75rem',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden'
                 }}
               >
-                <ShieldAlert size={18} color="var(--primary)" />
-                <span>Admin Panel</span>
+                <ShieldAlert size={18} color="var(--primary)" style={{ flexShrink: 0 }} />
+                {!isSidebarCollapsed && <span>Admin Panel</span>}
               </button>
             )}
-
 
           </div>
         </aside>
