@@ -96,7 +96,8 @@ export default function AdminPanel() {
   });
   const [backupLoading, setBackupLoading] = useState(false);
 
-  // Form State
+  // Form & Modal State
+  const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null); // null means "Add Mode"
   const [formData, setFormData] = useState({
     name: '',
@@ -288,10 +289,26 @@ export default function AdminPanel() {
     });
     setError('');
     setSuccess('');
+    setShowUserModal(true);
+  };
+
+  const handleCreateNewClick = () => {
+    setEditingUser(null);
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      role: 'user',
+      permissions: []
+    });
+    setError('');
+    setSuccess('');
+    setShowUserModal(true);
   };
 
   const handleCancelEdit = () => {
     setEditingUser(null);
+    setShowUserModal(false);
     setFormData({
       name: '',
       email: '',
@@ -331,7 +348,7 @@ export default function AdminPanel() {
           updatePayload.password = formData.password;
         }
 
-        const updatedRes = await api.updateUser(editingUser.id, updatePayload);
+        const updatedRes = await api.updateUser(editingUser.id || editingUser._id, updatePayload);
         const loggedUser = api.getCurrentUser();
         if (loggedUser && (loggedUser.id === editingUser.id || loggedUser._id === editingUser.id)) {
           if (updatedRes && updatedRes.user) {
@@ -355,6 +372,7 @@ export default function AdminPanel() {
         triggerPushNotification('👤 User Account Created', `User "${formData.name}" added successfully!`, 'success');
       }
 
+      setShowUserModal(false);
       handleCancelEdit();
       fetchUsers();
     } catch (err) {
@@ -475,358 +493,448 @@ export default function AdminPanel() {
             </div>
           </div>
 
-          <div style={styles.contentLayout}>
-            {/* Left Side: Users List */}
-            <div className="glass-panel" style={styles.tablePanel}>
-              <div style={styles.panelHeader}>
-                <Sliders size={16} color="var(--primary)" />
-                <h3 style={styles.panelTitle}>Active User Accounts ({users.length})</h3>
-                {loading && <RotateCw size={14} className="spin-loader" style={{ marginLeft: '0.5rem', color: 'var(--text-muted)' }} />}
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  className="btn-primary"
-                  style={{ marginLeft: 'auto', padding: '0.4rem 0.85rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                >
-                  <UserPlus size={14} />
-                  <span>New User</span>
-                </button>
-              </div>
-
-              {/* Live Search Input */}
-              <div style={{ position: 'relative', marginTop: '0.5rem' }}>
-                <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                <input
-                  type="text"
-                  placeholder="Filter users by name, email, or role..."
-                  value={userSearch}
-                  onChange={e => setUserSearch(e.target.value)}
-                  style={{ width: '100%', paddingLeft: 34, fontSize: '0.82rem', background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '6px' }}
-                />
-              </div>
-
-              <div className="table-container" style={styles.tableWrap}>
-                {loading && users.length === 0 ? (
-                  <div style={styles.emptyState}>
-                    <RotateCw size={24} className="spin-loader" color="var(--primary)" />
-                    <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>Loading users list...</p>
-                  </div>
-                ) : users.length === 0 ? (
-                  <div style={styles.emptyState}>
-                    <User size={28} color="var(--text-muted)" />
-                    <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>No user accounts found.</p>
-                  </div>
-                ) : (
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Account</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Allowed Functionalities</th>
-                        <th className="text-center">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users
-                        .filter(u => matchSearchQuery(u, userSearch, ['name', 'email', 'role']))
-                        .map((u) => {
-                          const checkAdmin = u.role === 'admin' || (u.permissions && u.permissions.length === AVAILABLE_SCREENS.length);
-                          const isCurrentlyEditing = editingUser && (editingUser.id === u.id || editingUser._id === u.id);
-
-                          return (
-                            <tr key={u.id || u._id} style={{ background: isCurrentlyEditing ? '#eff6ff' : 'transparent', transition: 'background 0.15s' }}>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                                  <div style={styles.avatar(checkAdmin)}>
-                                    {u.name ? u.name[0].toUpperCase() : 'U'}
-                                  </div>
-                                  <div>
-                                    <span style={{ fontWeight: '700', color: '#0f172a', display: 'block', fontSize: '0.88rem' }}>{u.name}</span>
-                                    {isCurrentlyEditing && (
-                                      <span style={{ fontSize: '0.68rem', color: '#2563eb', fontWeight: 800 }}>[Editing Now]</span>
-                                    )}
-                                  </div>
-                                </div>
-                              </td>
-                              <td style={{ color: '#334155', fontWeight: 500, fontSize: '0.82rem' }}>{u.email}</td>
-                              <td>
-                                <span style={{
-                                  fontSize: '0.7rem',
-                                  fontWeight: 800,
-                                  padding: '2px 8px',
-                                  borderRadius: '6px',
-                                  textTransform: 'uppercase',
-                                  background: checkAdmin ? '#fee2e2' : '#dbeafe',
-                                  color: checkAdmin ? '#dc2626' : '#1d4ed8',
-                                  border: `1px solid ${checkAdmin ? '#fca5a5' : '#93c5fd'}`
-                                }}>
-                                  {checkAdmin ? '🛡️ ADMIN' : '👤 USER'}
-                                </span>
-                              </td>
-                              <td>
-                                <div style={styles.permissionsList}>
-                                  {checkAdmin ? (
-                                    <span style={styles.adminAllBadge}>⚡ FULL SYSTEM ACCESS</span>
-                                  ) : u.permissions && u.permissions.length > 0 ? (
-                                    u.permissions.map(p => {
-                                      const screenObj = AVAILABLE_SCREENS.find(s => s.id === p);
-                                      return (
-                                        <span key={p} style={styles.permissionBadge}>
-                                          {screenObj ? screenObj.label : p}
-                                        </span>
-                                      );
-                                    })
-                                  ) : (
-                                    <span style={styles.noScreensBadge}>NO ACCESS GRANTED</span>
-                                  )}
-                                </div>
-                              </td>
-                              <td>
-                                <div style={styles.actionsCell}>
-                                  <button
-                                    onClick={() => handleEditClick(u)}
-                                    style={{
-                                      padding: '0.35rem 0.6rem',
-                                      background: '#eff6ff',
-                                      border: '1px solid #bfdbfe',
-                                      color: '#2563eb',
-                                      borderRadius: '6px',
-                                      cursor: 'pointer',
-                                      fontSize: '0.78rem',
-                                      fontWeight: 700,
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '4px'
-                                    }}
-                                    title="Edit Credentials"
-                                  >
-                                    <Edit2 size={13} /> Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteUser(u)}
-                                    style={{
-                                      padding: '0.35rem 0.6rem',
-                                      background: '#fef2f2',
-                                      border: '1px solid #fecaca',
-                                      color: '#dc2626',
-                                      borderRadius: '6px',
-                                      cursor: 'pointer',
-                                      fontSize: '0.78rem',
-                                      fontWeight: 700,
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '4px'
-                                    }}
-                                    title="Delete User"
-                                  >
-                                    <Trash2 size={13} /> Delete
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+          {/* 100% Full-Width Users Table Panel */}
+          <div className="glass-panel" style={{ ...styles.tablePanel, width: '100%' }}>
+            <div style={styles.panelHeader}>
+              <Sliders size={16} color="var(--primary)" />
+              <h3 style={styles.panelTitle}>Active User Accounts ({users.length})</h3>
+              {loading && <RotateCw size={14} className="spin-loader" style={{ marginLeft: '0.5rem', color: 'var(--text-muted)' }} />}
+              <button
+                type="button"
+                onClick={handleCreateNewClick}
+                className="btn-primary"
+                style={{ marginLeft: 'auto', padding: '0.45rem 1rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderRadius: '8px' }}
+              >
+                <UserPlus size={15} />
+                <span>Add New User</span>
+              </button>
             </div>
 
-            {/* Right Side: Create/Edit Form */}
-            <div className="glass-panel" style={styles.formPanel}>
-              <div style={styles.panelHeader}>
-                <UserPlus size={16} color="var(--primary)" />
-                <h3 style={styles.panelTitle}>
-                  {editingUser ? `Edit Account Credentials — ${editingUser.name}` : 'Create New Account'}
-                </h3>
-              </div>
+            {/* Live Search Input */}
+            <div style={{ position: 'relative', marginTop: '0.5rem' }}>
+              <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+              <input
+                type="text"
+                placeholder="Filter users by name, email, or role..."
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                style={{ width: '100%', paddingLeft: 34, fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '6px' }}
+              />
+            </div>
 
-              <form onSubmit={handleSubmit} style={styles.form}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Full Name *</label>
-                  <div style={styles.inputWrapper}>
-                    <User size={14} style={styles.inputIcon} />
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      placeholder="e.g. Rahul Sharma"
-                      required
-                      style={styles.formInput}
-                    />
-                  </div>
+            <div className="table-container" style={styles.tableWrap}>
+              {loading && users.length === 0 ? (
+                <div style={styles.emptyState}>
+                  <RotateCw size={24} className="spin-loader" color="var(--primary)" />
+                  <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>Loading users list...</p>
                 </div>
-
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Email Address *</label>
-                  <div style={styles.inputWrapper}>
-                    <Mail size={14} style={styles.inputIcon} />
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      placeholder="rahul@elite.com"
-                      required
-                      style={styles.formInput}
-                    />
-                  </div>
+              ) : users.length === 0 ? (
+                <div style={styles.emptyState}>
+                  <User size={28} color="var(--text-muted)" />
+                  <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>No user accounts found.</p>
                 </div>
+              ) : (
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Account</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Allowed Functionalities</th>
+                      <th className="text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users
+                      .filter(u => matchSearchQuery(u, userSearch, ['name', 'email', 'role']))
+                      .map((u) => {
+                        const checkAdmin = u.role === 'admin' || (u.permissions && u.permissions.length === AVAILABLE_SCREENS.length);
+                        const isCurrentlyEditing = editingUser && (editingUser.id === u.id || editingUser._id === u.id);
 
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    {editingUser ? 'New Password (leave blank to keep current)' : 'Password *'}
-                  </label>
-                  <div style={styles.inputWrapper}>
-                    <Lock size={14} style={styles.inputIcon} />
-                    <input
-                      type="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      placeholder={editingUser ? 'Enter new password...' : 'Enter password...'}
-                      required={!editingUser}
-                      style={styles.formInput}
-                    />
+                        return (
+                          <tr key={u.id || u._id} style={{ background: isCurrentlyEditing ? '#eff6ff' : 'transparent', transition: 'background 0.15s' }}>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                                <div style={styles.avatar(checkAdmin)}>
+                                  {u.name ? u.name[0].toUpperCase() : 'U'}
+                                </div>
+                                <div>
+                                  <span style={{ fontWeight: '700', color: '#0f172a', display: 'block', fontSize: '0.88rem' }}>{u.name}</span>
+                                  {isCurrentlyEditing && (
+                                    <span style={{ fontSize: '0.68rem', color: '#2563eb', fontWeight: 800 }}>[Editing Now]</span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ color: '#334155', fontWeight: 500, fontSize: '0.82rem' }}>{u.email}</td>
+                            <td>
+                              <span style={{
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                textTransform: 'uppercase',
+                                background: checkAdmin ? '#fee2e2' : '#dbeafe',
+                                color: checkAdmin ? '#dc2626' : '#1d4ed8',
+                                border: `1px solid ${checkAdmin ? '#fca5a5' : '#93c5fd'}`
+                              }}>
+                                {checkAdmin ? '🛡️ ADMIN' : '👤 USER'}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={styles.permissionsList}>
+                                {checkAdmin ? (
+                                  <span style={styles.adminAllBadge}>⚡ FULL SYSTEM ACCESS</span>
+                                ) : u.permissions && u.permissions.length > 0 ? (
+                                  u.permissions.map(p => {
+                                    const screenObj = AVAILABLE_SCREENS.find(s => s.id === p);
+                                    return (
+                                      <span key={p} style={styles.permissionBadge}>
+                                        {screenObj ? screenObj.label : p}
+                                      </span>
+                                    );
+                                  })
+                                ) : (
+                                  <span style={styles.noScreensBadge}>NO ACCESS GRANTED</span>
+                                )}
+                              </div>
+                            </td>
+                            <td>
+                              <div style={styles.actionsCell}>
+                                <button
+                                  onClick={() => handleEditClick(u)}
+                                  style={{
+                                    padding: '0.4rem 0.75rem',
+                                    background: '#eff6ff',
+                                    border: '1px solid #bfdbfe',
+                                    color: '#2563eb',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px'
+                                  }}
+                                  title="Edit Credentials"
+                                >
+                                  <Edit2 size={14} /> Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUser(u)}
+                                  style={{
+                                    padding: '0.4rem 0.75rem',
+                                    background: '#fef2f2',
+                                    border: '1px solid #fecaca',
+                                    color: '#dc2626',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px'
+                                  }}
+                                  title="Delete User"
+                                >
+                                  <Trash2 size={14} /> Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* 🌟 FLOATING MODAL OVERLAY FOR USER FORM 🌟 */}
+          {showUserModal && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(5px)',
+              zIndex: 99999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem',
+              animation: 'fadeIn 0.2s ease-out'
+            }}>
+              <div style={{
+                background: '#ffffff',
+                width: '100%',
+                maxWidth: '680px',
+                maxHeight: '90vh',
+                borderRadius: '14px',
+                boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
+                border: '1px solid #cbd5e1',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden'
+              }}>
+                {/* Modal Header */}
+                <div style={{
+                  padding: '1.1rem 1.5rem',
+                  background: '#f8fafc',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <div style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      background: '#eff6ff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <UserPlus size={18} color="#2563eb" />
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                        {editingUser ? `Edit Account — ${editingUser.name}` : 'Create New Account'}
+                      </h3>
+                      <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                        {editingUser ? 'Update user role, credentials, and screen access permissions.' : 'Configure credentials and assign operational screen permissions.'}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Account Role *</label>
-                  <select
-                    name="role"
-                    value={formData.role}
-                    onChange={handleRoleChange}
-                    style={styles.selectInput}
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    style={{
+                      background: '#f1f5f9',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: 32,
+                      height: 32,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#475569',
+                      cursor: 'pointer'
+                    }}
                   >
-                    <option value="user">User (Restricted Screen Access)</option>
-                    <option value="admin">Admin (Full System Access)</option>
-                  </select>
+                    <X size={18} />
+                  </button>
                 </div>
 
-                <div style={styles.formGroup}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                    <label style={styles.label}>Functionality Access (Allowed Screens)</label>
-                    {formData.role !== 'admin' && (
-                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                        <button
-                          type="button"
-                          onClick={() => setFormData(p => ({ ...p, permissions: AVAILABLE_SCREENS.map(s => s.id) }))}
-                          className="btn-secondary"
-                          style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700 }}
-                        >
-                          Select All
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setFormData(p => ({ ...p, permissions: [] }))}
-                          className="btn-secondary"
-                          style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700 }}
-                        >
-                          Clear All
-                        </button>
+                {/* Modal Form Body */}
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
+                  <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+                    <div style={styles.formGroup}>
+                      <label style={styles.label}>Full Name *</label>
+                      <div style={styles.inputWrapper}>
+                        <User size={15} style={styles.inputIcon} />
+                        <input
+                          type="text"
+                          name="name"
+                          value={formData.name}
+                          onChange={handleInputChange}
+                          placeholder="e.g. Rahul Sharma"
+                          required
+                          style={styles.formInput}
+                        />
                       </div>
-                    )}
-                  </div>
-                  <p style={styles.helpText}>
-                    Select which operational modules and screens this user is authorized to open.
-                  </p>
+                    </div>
 
-                  {Array.from(new Set(AVAILABLE_SCREENS.map(s => s.category))).map(cat => {
-                    const catScreens = AVAILABLE_SCREENS.filter(s => s.category === cat);
-                    const allChecked = catScreens.every(s => formData.permissions.includes(s.id));
-                    const catTitle = cat === 'General' ? '⚙️ Core & General' :
-                                     cat === 'Elite Edition' ? '🛍️ Elite Edition (E-Commerce)' :
-                                     cat === 'Elite Digital Print' ? '🖨️ Elite Digital Print' :
-                                     cat === 'Elite Stitching' ? '✂️ Elite Stitching' : `📁 ${cat}`;
+                    <div style={styles.formGroup}>
+                      <label style={styles.label}>Email Address *</label>
+                      <div style={styles.inputWrapper}>
+                        <Mail size={15} style={styles.inputIcon} />
+                        <input
+                          type="email"
+                          name="email"
+                          value={formData.email}
+                          onChange={handleInputChange}
+                          placeholder="rahul@elite.com"
+                          required
+                          style={styles.formInput}
+                        />
+                      </div>
+                    </div>
 
-                    return (
-                      <div key={cat} style={{ marginBottom: '0.85rem', background: '#f8fafc', padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            {catTitle}
-                          </span>
-                          {formData.role !== 'admin' && (
+                    <div style={styles.formGroup}>
+                      <label style={styles.label}>
+                        {editingUser ? 'New Password (leave blank to keep current)' : 'Password *'}
+                      </label>
+                      <div style={styles.inputWrapper}>
+                        <Lock size={15} style={styles.inputIcon} />
+                        <input
+                          type="password"
+                          name="password"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          placeholder={editingUser ? 'Enter new password...' : 'Enter password...'}
+                          required={!editingUser}
+                          style={styles.formInput}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.label}>Account Role *</label>
+                      <select
+                        name="role"
+                        value={formData.role}
+                        onChange={handleRoleChange}
+                        style={styles.selectInput}
+                      >
+                        <option value="user">User (Restricted Screen Access)</option>
+                        <option value="admin">Admin (Full System Access)</option>
+                      </select>
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                        <label style={styles.label}>Functionality Access (Allowed Screens)</label>
+                        {formData.role !== 'admin' && (
+                          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                             <button
                               type="button"
-                              onClick={() => {
-                                const ids = catScreens.map(s => s.id);
-                                setFormData(prev => {
-                                  const hasAll = ids.every(id => prev.permissions.includes(id));
-                                  const updated = hasAll
-                                    ? prev.permissions.filter(id => !ids.includes(id))
-                                    : Array.from(new Set([...prev.permissions, ...ids]));
-                                  return { ...prev, permissions: updated };
-                                });
-                              }}
-                              style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline' }}
+                              onClick={() => setFormData(p => ({ ...p, permissions: AVAILABLE_SCREENS.map(s => s.id) }))}
+                              className="btn-secondary"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700 }}
                             >
-                              {allChecked ? 'Deselect Category' : 'Select Category'}
+                              Select All
                             </button>
-                          )}
-                        </div>
-
-                        <div style={styles.checkboxGrid}>
-                          {catScreens.map(screen => {
-                            const isChecked = formData.permissions.includes(screen.id);
-                            return (
-                              <label
-                                key={screen.id}
-                                style={{
-                                  ...styles.checkboxLabel,
-                                  background: isChecked ? '#eff6ff' : '#ffffff',
-                                  borderColor: isChecked ? '#2563eb' : '#e2e8f0',
-                                  ...(formData.role === 'admin' ? styles.checkboxLabelDisabled : {})
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  disabled={formData.role === 'admin'}
-                                  onChange={() => handlePermissionCheckbox(screen.id)}
-                                  style={styles.checkbox}
-                                />
-                                <span style={{ fontSize: '0.82rem', fontWeight: isChecked ? 700 : 500, color: isChecked ? '#1d4ed8' : '#334155' }}>{screen.label}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
+                            <button
+                              type="button"
+                              onClick={() => setFormData(p => ({ ...p, permissions: [] }))}
+                              className="btn-secondary"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700 }}
+                            >
+                              Clear All
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
+                      <p style={styles.helpText}>
+                        Select which operational modules and screens this user is authorized to open.
+                      </p>
 
-                <div style={styles.formActions}>
-                  {editingUser && (
+                      {Array.from(new Set(AVAILABLE_SCREENS.map(s => s.category))).map(cat => {
+                        const catScreens = AVAILABLE_SCREENS.filter(s => s.category === cat);
+                        const allChecked = catScreens.every(s => formData.permissions.includes(s.id));
+                        const catTitle = cat === 'General' ? '⚙️ Core & General' :
+                                         cat === 'Elite Edition' ? '🛍️ Elite Edition (E-Commerce)' :
+                                         cat === 'Elite Digital Print' ? '🖨️ Elite Digital Print' :
+                                         cat === 'Elite Stitching' ? '✂️ Elite Stitching' : `📁 ${cat}`;
+
+                        return (
+                          <div key={cat} style={{ marginBottom: '0.85rem', background: '#f8fafc', padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                {catTitle}
+                              </span>
+                              {formData.role !== 'admin' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const ids = catScreens.map(s => s.id);
+                                    setFormData(prev => {
+                                      const hasAll = ids.every(id => prev.permissions.includes(id));
+                                      const updated = hasAll
+                                        ? prev.permissions.filter(id => !ids.includes(id))
+                                        : Array.from(new Set([...prev.permissions, ...ids]));
+                                      return { ...prev, permissions: updated };
+                                    });
+                                  }}
+                                  style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline' }}
+                                >
+                                  {allChecked ? 'Deselect Category' : 'Select Category'}
+                                </button>
+                              )}
+                            </div>
+
+                            <div style={styles.checkboxGrid}>
+                              {catScreens.map(screen => {
+                                const isChecked = formData.permissions.includes(screen.id);
+                                return (
+                                  <label
+                                    key={screen.id}
+                                    style={{
+                                      ...styles.checkboxLabel,
+                                      background: isChecked ? '#eff6ff' : '#ffffff',
+                                      borderColor: isChecked ? '#2563eb' : '#e2e8f0',
+                                      ...(formData.role === 'admin' ? styles.checkboxLabelDisabled : {})
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      disabled={formData.role === 'admin'}
+                                      onChange={() => handlePermissionCheckbox(screen.id)}
+                                      style={styles.checkbox}
+                                    />
+                                    <span style={{ fontSize: '0.82rem', fontWeight: isChecked ? 700 : 500, color: isChecked ? '#1d4ed8' : '#334155' }}>{screen.label}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Modal Footer Actions */}
+                  <div style={{
+                    padding: '1rem 1.5rem',
+                    background: '#f8fafc',
+                    borderTop: '1px solid #e2e8f0',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '0.75rem'
+                  }}>
                     <button
                       type="button"
                       onClick={handleCancelEdit}
                       className="btn-secondary"
-                      style={styles.btn}
+                      style={{ padding: '0.55rem 1.2rem', fontSize: '0.85rem', fontWeight: 700, borderRadius: '6px' }}
                     >
-                      <X size={14} />
+                      <X size={15} />
                       <span>Cancel</span>
                     </button>
-                  )}
-                  <button
-                    type="submit"
-                    className="btn-success"
-                    style={{ ...styles.btn, ...styles.submitBtn, background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}
-                    disabled={submitLoading}
-                  >
-                    {submitLoading ? (
-                      <RotateCw size={14} className="spin-loader" />
-                    ) : (
-                      <Save size={14} />
-                    )}
-                    <span>{editingUser ? 'Save Credentials' : 'Create User Account'}</span>
-                  </button>
-                </div>
-              </form>
+                    <button
+                      type="submit"
+                      className="btn-success"
+                      style={{
+                        padding: '0.55rem 1.4rem',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        borderRadius: '6px',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
+                      }}
+                      disabled={submitLoading}
+                    >
+                      {submitLoading ? (
+                        <RotateCw size={15} className="spin-loader" />
+                      ) : (
+                        <Save size={15} />
+                      )}
+                      <span>{editingUser ? 'Save Credentials' : 'Create User Account'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       ) : activeSubTab === 'billing' ? (
         <div style={styles.contentLayout}>
