@@ -1489,141 +1489,239 @@ export default function ReportsCenter({ department }) {
                             </tr>
                           ))
                         )}
-                      </tbody>
-                    </table>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {activeReportTab !== 'smart-dashboard' && (
               <div className="table-container" style={styles.tableWrap}>
-                {activeReportTab === 'creative-output' && (
-              <table>
-                <thead>
-                  <tr>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Designer Name</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Total Designs Produced</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.designerCreativeOutput?.map((item, idx) => (
-                    <tr key={idx}>
-                      <td style={{ padding: '0.75rem' }}>{item._id || 'Unknown Designer'}</td>
-                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--primary)' }}>{item.count}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-            
-            {activeReportTab === 'color-matching' && (
-              <table>
-                <thead>
-                  <tr>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Designer Name</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Total Color Variations</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.colorMatchingEfficiency?.map((item, idx) => (
-                    <tr key={idx}>
-                      <td style={{ padding: '0.75rem' }}>{item._id || 'Unknown Designer'}</td>
-                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--primary)' }}>{item.count}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                {/* 📋 Job Cards & Production */}
+                {activeReportTab === 'jobcard-reports' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--text-primary)' }}>📋 Delayed Job Cards (&gt; 7 Days)</h4>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Job #</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Party Name</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Design</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Created Date</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#94a3b8' }}>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(!reportData.delayedCards || reportData.delayedCards.length === 0) ? (
+                            <tr><td colSpan="5" style={{ padding: '1rem', textAlign: 'center', color: '#94a3b8' }}>✓ No delayed job cards currently.</td></tr>
+                          ) : (
+                            reportData.delayedCards.map((item, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                <td style={{ padding: '10px 14px', fontWeight: '700', color: '#38bdf8' }}>{item.jobNo}</td>
+                                <td style={{ padding: '10px 14px', color: '#f8fafc' }}>{item.party}</td>
+                                <td style={{ padding: '10px 14px', color: '#cbd5e1' }}>{item.designName}</td>
+                                <td style={{ padding: '10px 14px', color: '#cbd5e1' }}>{item.date}</td>
+                                <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                  <span style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700' }}>
+                                    {item.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
 
-            {activeReportTab === 'machine-speed' && (
-              <table>
-                <thead>
-                  <tr>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Machine Name</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Speed Profile</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Passes</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Total Meters Printed</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.machineMeterage?.map((item, idx) => (
-                    <tr key={idx}>
-                      <td style={{ padding: '0.75rem' }}>{item._id?.machineName || 'N/A'}</td>
-                      <td style={{ padding: '0.75rem' }}>{item._id?.speed || 'N/A'}</td>
-                      <td style={{ padding: '0.75rem' }}>{item._id?.pass || 'N/A'}</td>
-                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--primary)' }}>{item.totalMtr?.toFixed(2)} Mtr</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                    <div>
+                      <h4 style={{ margin: '1rem 0 0.8rem 0', color: 'var(--text-primary)' }}>📐 Fabric Consumption Variance</h4>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Job Number</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Theoretical (m)</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Actual Printed (m)</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Variance</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reportData.fabricConsumptionVariance?.slice(0, 20).map((item, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '10px 14px', fontWeight: 600, color: '#f8fafc' }}>{item.jobNo}</td>
+                              <td style={{ padding: '10px 14px', textAlign: 'right', color: '#cbd5e1' }}>{item.theoreticalMtr?.toFixed(2)} m</td>
+                              <td style={{ padding: '10px 14px', textAlign: 'right', color: '#38bdf8' }}>{item.actualMtr?.toFixed(2)} m</td>
+                              <td style={{ padding: '10px 14px', textAlign: 'right', color: item.variance > 0 ? '#ef4444' : '#34d399', fontWeight: 700 }}>
+                                {item.variance > 0 ? `+${item.variance.toFixed(2)} m (Waste)` : `${item.variance.toFixed(2)} m (Saved)`}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
-            {activeReportTab === 'fabric-variance' && (
-              <table>
-                <thead>
-                  <tr>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Job Number</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Theoretical Consumption</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Actual Printed Meters</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Variance (Meters)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.fabricConsumptionVariance?.map((item, idx) => (
-                    <tr key={idx}>
-                      <td style={{ padding: '0.75rem', fontWeight: 600 }}>{item.jobNo}</td>
-                      <td style={{ padding: '0.75rem' }}>{item.theoreticalMtr?.toFixed(2)} Mtr</td>
-                      <td style={{ padding: '0.75rem' }}>{item.actualMtr?.toFixed(2)} Mtr</td>
-                      <td style={{ padding: '0.75rem', color: item.variance > 0 ? '#ef4444' : '#10b981', fontWeight: 600 }}>
-                        {item.variance > 0 ? `+${item.variance.toFixed(2)} (Waste)` : `${item.variance.toFixed(2)} (Saved)`}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                {/* 📦 Fabric Inventory & Rolls */}
+                {activeReportTab === 'fabric-reports' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--text-primary)' }}>🔮 Fabric Demand Forecasting (Next 7 &amp; 30 Days)</h4>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Fabric Quality</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Current Stock</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>7-Day Demand</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>30-Day Demand</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#94a3b8' }}>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reportData.fabricForecasts?.map((item, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '10px 14px', fontWeight: '600', color: '#f8fafc' }}>{item.fabricQuality}</td>
+                              <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '700', color: '#34d399' }}>{item.currentStock} m</td>
+                              <td style={{ padding: '10px 14px', textAlign: 'right', color: '#38bdf8' }}>{item.demand7Days} m</td>
+                              <td style={{ padding: '10px 14px', textAlign: 'right', color: '#cbd5e1' }}>{item.demand30Days} m</td>
+                              <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                <span style={{ background: item.status === 'Safe' ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.15)', color: item.status === 'Safe' ? '#34d399' : '#f87171', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700' }}>
+                                  {item.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
-            {activeReportTab === 'fusing-throughput' && (
-              <table>
-                <thead>
-                  <tr>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Fusing Date</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Completed Jobs</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Total Fusing Meters</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.fusingThroughput?.map((item, idx) => (
-                    <tr key={idx}>
-                      <td style={{ padding: '0.75rem' }}>{item._id}</td>
-                      <td style={{ padding: '0.75rem' }}>{item.completedCount}</td>
-                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--primary)' }}>{item.totalFusingMtr?.toFixed(2)} Mtr</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                {/* 🧵 Stitching & Fusing */}
+                {activeReportTab === 'stitching-reports' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--text-primary)' }}>⚡ Daily Fusing Throughput</h4>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Fusing Date</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#94a3b8' }}>Completed Jobs</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Total Fusing Meters</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reportData.fusingThroughput?.map((item, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '10px 14px', color: '#f8fafc' }}>{item._id}</td>
+                              <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '600' }}>{item.completedCount}</td>
+                              <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '700', color: '#38bdf8' }}>{item.totalFusingMtr?.toFixed(2)} m</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
-            {activeReportTab === 'deadline-adherence' && (
-              <table>
-                <thead>
-                  <tr>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Job Status</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Total Jobs</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Avg Expected Delivery Time (Hours)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.deadlineAdherence?.map((item, idx) => (
-                    <tr key={idx}>
-                      <td style={{ padding: '0.75rem' }}>{item._id}</td>
-                      <td style={{ padding: '0.75rem' }}>{item.totalJobs}</td>
-                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--primary)' }}>{item.avgExpectedTime?.toFixed(1)} hrs</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                {/* 🧾 Billing & Invoices */}
+                {activeReportTab === 'billing-reports' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--text-primary)' }}>🏢 Busiest Parties &amp; Billing Totals</h4>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Party Name</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#94a3b8' }}>Jobs Count</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Total Meterage</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reportData.busiestParties?.map((item, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '10px 14px', fontWeight: '600', color: '#f8fafc' }}>{item._id}</td>
+                              <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '600' }}>{item.count}</td>
+                              <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '700', color: '#34d399' }}>{item.totalMtr?.toFixed(1)} m</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 🎨 Design Master Catalog */}
+                {activeReportTab === 'design-reports' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--text-primary)' }}>🎨 Designer Creative Output</h4>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Designer Name</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Designs Completed</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reportData.designerCreativeOutput?.map((item, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <td style={{ padding: '10px 14px', color: '#f8fafc' }}>{item._id || 'Unknown Designer'}</td>
+                              <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '700', color: '#38bdf8' }}>{item.count}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 🛠️ Raw Material (Paper & Ink) */}
+                {activeReportTab === 'rawmaterial-reports' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--text-primary)' }}>⚠️ Low Stock Warnings (Substrates &amp; Inks)</h4>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Material Item</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Category</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Remaining Balance</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(!reportData.lowStockAlerts || reportData.lowStockAlerts.length === 0) ? (
+                            <tr><td colSpan="3" style={{ padding: '1rem', textAlign: 'center', color: '#94a3b8' }}>✓ All raw materials in healthy stock levels.</td></tr>
+                          ) : (
+                            reportData.lowStockAlerts.map((item, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                <td style={{ padding: '10px 14px', fontWeight: '600', color: '#f8fafc' }}>{item.item}</td>
+                                <td style={{ padding: '10px 14px', color: '#cbd5e1' }}>{item.type}</td>
+                                <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '700', color: '#f87171' }}>{item.qty} {item.unit}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 💵 Operational Expenses */}
+                {activeReportTab === 'expense-reports' && (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                    💵 Operational Expenses Ledger: Select Date Range above and click Fetch Data to load detailed petty cash transaction logs.
+                  </div>
+                )}
+
+                {/* ⚠️ Quality Complaints */}
+                {activeReportTab === 'complaint-reports' && (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                    ⚠️ Quality Complaint Logs: Select Date Range above and click Fetch Data to load shade defect and printing fault logs.
+                  </div>
+                )}
+              </div>
             )}
 
             {activeReportTab === 'stock-value' && (
@@ -2332,8 +2430,6 @@ export default function ReportsCenter({ department }) {
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
               </div>
             )}
           </div>
