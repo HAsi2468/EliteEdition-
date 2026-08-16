@@ -8,11 +8,15 @@ export default function PrintSettings() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [expandedDepts, setExpandedDepts] = useState({
-    design: true,
-    digital: true,
-    fusing: true,
-    party: true,
-    rawMaterials: true
+    profile: false,
+    jobNo: false,
+    design: false,
+    digital: false,
+    fusing: false,
+    rawMaterials: false,
+    expense: false,
+    complain: false,
+    party: false
   });
 
   const toggleDept = (dept) => {
@@ -299,186 +303,192 @@ export default function PrintSettings() {
       </div>
 
       {/* Business Profile & GST Settings Card */}
-      <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem', background: 'rgba(59,130,246,0.02)', border: '1px solid var(--border-light)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              🏢 Business Profile & GST Settings
-            </h3>
-            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Configure your Company Name, GSTIN Number, Billing Address, Phone, and Bank details for Tax Invoices.</p>
+      <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+        {renderDepartmentHeader('🏢 Business Profile & GST Settings', 'profile', '#3b82f6')}
+        {expandedDepts.profile && (
+          <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem', background: 'rgba(59,130,246,0.02)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
+              <div>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Configure your Company Name, GSTIN Number, Billing Address, Phone, and Bank details for Tax Invoices.</p>
+              </div>
+              <button
+                className="btn-primary"
+                onClick={handleSaveCompanyProfile}
+                disabled={actionLoading}
+                style={{ background: 'linear-gradient(135deg,#3b82f6,#2563eb)' }}
+              >
+                {actionLoading ? 'Saving...' : 'Save Profile'}
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Company / Business Name *</label>
+                <input
+                  type="text"
+                  style={styles.input}
+                  value={companyProfile.companyName}
+                  onChange={e => setCompanyProfile(p => ({ ...p, companyName: e.target.value }))}
+                  placeholder="e.g. ELITE DIGITAL PRINTS"
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>GSTIN Number *</label>
+                <input
+                  type="text"
+                  style={styles.input}
+                  value={companyProfile.companyGstin}
+                  onChange={e => setCompanyProfile(p => ({ ...p, companyGstin: e.target.value }))}
+                  placeholder="e.g. 24AAAFE1234F1Z5"
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Phone Number</label>
+                <input
+                  type="text"
+                  style={styles.input}
+                  value={companyProfile.companyPhone}
+                  onChange={e => setCompanyProfile(p => ({ ...p, companyPhone: e.target.value }))}
+                  placeholder="e.g. +91 98790 00000"
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Email Address</label>
+                <input
+                  type="text"
+                  style={styles.input}
+                  value={companyProfile.companyEmail}
+                  onChange={e => setCompanyProfile(p => ({ ...p, companyEmail: e.target.value }))}
+                  placeholder="e.g. info@elitedigitalprints.com"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Company Registered Address</label>
+              <input
+                type="text"
+                style={styles.input}
+                value={companyProfile.companyAddress}
+                onChange={e => setCompanyProfile(p => ({ ...p, companyAddress: e.target.value }))}
+                placeholder="Plot / Street / City / Pincode"
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', borderTop: '1px dashed var(--border-light)', paddingTop: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Bank Name</label>
+                <input
+                  type="text"
+                  style={styles.input}
+                  value={companyProfile.companyBankName}
+                  onChange={e => setCompanyProfile(p => ({ ...p, companyBankName: e.target.value }))}
+                  placeholder="e.g. HDFC Bank"
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Bank Account Number</label>
+                <input
+                  type="text"
+                  style={styles.input}
+                  value={companyProfile.companyAccountNo}
+                  onChange={e => setCompanyProfile(p => ({ ...p, companyAccountNo: e.target.value }))}
+                  placeholder="e.g. 50200012345678"
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>IFSC Code</label>
+                <input
+                  type="text"
+                  style={styles.input}
+                  value={companyProfile.companyIfscCode}
+                  onChange={e => setCompanyProfile(p => ({ ...p, companyIfscCode: e.target.value }))}
+                  placeholder="e.g. HDFC0001234"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', borderTop: '1px dashed var(--border-light)', paddingTop: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Default Payment Due Days</label>
+                <input
+                  type="number"
+                  min="1"
+                  style={styles.input}
+                  value={companyProfile.paymentDueDays}
+                  onChange={e => setCompanyProfile(p => ({ ...p, paymentDueDays: e.target.value }))}
+                  placeholder="e.g. 30"
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Invoice Prefix</label>
+                <input
+                  type="text"
+                  style={styles.input}
+                  value={companyProfile.invoicePrefix}
+                  onChange={e => setCompanyProfile(p => ({ ...p, invoicePrefix: e.target.value }))}
+                  placeholder="e.g. EDP-INV-"
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Starting Invoice Sequence No.</label>
+                <input
+                  type="number"
+                  min="1001"
+                  style={styles.input}
+                  value={companyProfile.startingInvoiceNo}
+                  onChange={e => setCompanyProfile(p => ({ ...p, startingInvoiceNo: e.target.value }))}
+                  placeholder="e.g. 1001"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Default Invoice Terms & Conditions</label>
+              <textarea
+                style={{ ...styles.input, width: '100%', minHeight: '60px', fontFamily: 'inherit' }}
+                value={companyProfile.companyTerms}
+                onChange={e => setCompanyProfile(p => ({ ...p, companyTerms: e.target.value }))}
+                placeholder="Terms printed at bottom of invoices..."
+              />
+            </div>
           </div>
-          <button
-            className="btn-primary"
-            onClick={handleSaveCompanyProfile}
-            disabled={actionLoading}
-            style={{ background: 'linear-gradient(135deg,#3b82f6,#2563eb)' }}
-          >
-            {actionLoading ? 'Saving...' : 'Save Profile'}
-          </button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Company / Business Name *</label>
-            <input
-              type="text"
-              style={styles.input}
-              value={companyProfile.companyName}
-              onChange={e => setCompanyProfile(p => ({ ...p, companyName: e.target.value }))}
-              placeholder="e.g. ELITE DIGITAL PRINTS"
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>GSTIN Number *</label>
-            <input
-              type="text"
-              style={styles.input}
-              value={companyProfile.companyGstin}
-              onChange={e => setCompanyProfile(p => ({ ...p, companyGstin: e.target.value }))}
-              placeholder="e.g. 24AAAFE1234F1Z5"
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Phone Number</label>
-            <input
-              type="text"
-              style={styles.input}
-              value={companyProfile.companyPhone}
-              onChange={e => setCompanyProfile(p => ({ ...p, companyPhone: e.target.value }))}
-              placeholder="e.g. +91 98790 00000"
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Email Address</label>
-            <input
-              type="text"
-              style={styles.input}
-              value={companyProfile.companyEmail}
-              onChange={e => setCompanyProfile(p => ({ ...p, companyEmail: e.target.value }))}
-              placeholder="e.g. info@elitedigitalprints.com"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Company Registered Address</label>
-          <input
-            type="text"
-            style={styles.input}
-            value={companyProfile.companyAddress}
-            onChange={e => setCompanyProfile(p => ({ ...p, companyAddress: e.target.value }))}
-            placeholder="Plot / Street / City / Pincode"
-          />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', borderTop: '1px dashed var(--border-light)', paddingTop: '1rem' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Bank Name</label>
-            <input
-              type="text"
-              style={styles.input}
-              value={companyProfile.companyBankName}
-              onChange={e => setCompanyProfile(p => ({ ...p, companyBankName: e.target.value }))}
-              placeholder="e.g. HDFC Bank"
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Bank Account Number</label>
-            <input
-              type="text"
-              style={styles.input}
-              value={companyProfile.companyAccountNo}
-              onChange={e => setCompanyProfile(p => ({ ...p, companyAccountNo: e.target.value }))}
-              placeholder="e.g. 50200012345678"
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>IFSC Code</label>
-            <input
-              type="text"
-              style={styles.input}
-              value={companyProfile.companyIfscCode}
-              onChange={e => setCompanyProfile(p => ({ ...p, companyIfscCode: e.target.value }))}
-              placeholder="e.g. HDFC0001234"
-            />
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', borderTop: '1px dashed var(--border-light)', paddingTop: '1rem' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Default Payment Due Days</label>
-            <input
-              type="number"
-              min="1"
-              style={styles.input}
-              value={companyProfile.paymentDueDays}
-              onChange={e => setCompanyProfile(p => ({ ...p, paymentDueDays: e.target.value }))}
-              placeholder="e.g. 30"
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Invoice Prefix</label>
-            <input
-              type="text"
-              style={styles.input}
-              value={companyProfile.invoicePrefix}
-              onChange={e => setCompanyProfile(p => ({ ...p, invoicePrefix: e.target.value }))}
-              placeholder="e.g. EDP-INV-"
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Starting Invoice Sequence No.</label>
-            <input
-              type="number"
-              min="1001"
-              style={styles.input}
-              value={companyProfile.startingInvoiceNo}
-              onChange={e => setCompanyProfile(p => ({ ...p, startingInvoiceNo: e.target.value }))}
-              placeholder="e.g. 1001"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Default Invoice Terms & Conditions</label>
-          <textarea
-            style={{ ...styles.input, width: '100%', minHeight: '60px', fontFamily: 'inherit' }}
-            value={companyProfile.companyTerms}
-            onChange={e => setCompanyProfile(p => ({ ...p, companyTerms: e.target.value }))}
-            placeholder="Terms printed at bottom of invoices..."
-          />
-        </div>
+        )}
       </div>
 
       {/* Starting Job Number Setting */}
-      <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', background: 'rgba(168,85,247,0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h4 style={{ color: 'var(--text-primary)', fontSize: '1rem', fontWeight: '600', marginBottom: '0.25rem' }}>Starting Job Card Number</h4>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: 0 }}>Configure the default starting number for new job cards. Auto-increment will start from this number or the highest existing number + 1.</p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <input
-            type="number"
-            min="1"
-            style={{ ...styles.input, width: '120px', textAlign: 'center', fontSize: '1rem', fontWeight: 'bold' }}
-            value={startingJobNo}
-            onChange={e => setStartingJobNo(e.target.value)}
-          />
-          <button
-            className="btn-primary"
-            onClick={handleSaveStartingJobNo}
-            disabled={actionLoading || !startingJobNo || Number(startingJobNo) < 1}
-          >
-            Update
-          </button>
-        </div>
+      <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+        {renderDepartmentHeader('📋 Starting Job Card Number', 'jobNo', '#a855f7')}
+        {expandedDepts.jobNo && (
+          <div style={{ padding: '1.25rem 1.5rem', background: 'rgba(168,85,247,0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: 0 }}>Configure the default starting number for new job cards. Auto-increment will start from this number or the highest existing number + 1.</p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input
+                type="number"
+                min="1"
+                style={{ ...styles.input, width: '120px', textAlign: 'center', fontSize: '1rem', fontWeight: 'bold' }}
+                value={startingJobNo}
+                onChange={e => setStartingJobNo(e.target.value)}
+              />
+              <button
+                className="btn-primary"
+                onClick={handleSaveStartingJobNo}
+                disabled={actionLoading || !startingJobNo || Number(startingJobNo) < 1}
+              >
+                Update
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Department: Design */}
