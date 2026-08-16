@@ -294,6 +294,53 @@ const createOrGetDirectRoom = async (req, res) => {
   }
 };
 
+/**
+ * Admin option to create custom communication activity group
+ */
+const createGroup = async (req, res) => {
+  try {
+    const { name, department = 'General', permissionScope = 'general', subscribedModules = [], subscribedActions = [] } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Group name is required' });
+    }
+
+    // Find all users who match department or permissionScope
+    let matchingUsers = [];
+    if (permissionScope && permissionScope !== 'general') {
+      matchingUsers = await User.find({
+        $or: [
+          { role: 'admin' },
+          { permissions: permissionScope },
+          { department: { $regex: new RegExp(`^${department}$`, 'i') } }
+        ]
+      }).select('_id');
+    } else {
+      matchingUsers = await User.find().select('_id');
+    }
+
+    const memberIds = matchingUsers.map((u) => u._id);
+
+    const room = await ChatRoom.create({
+      name: name.trim(),
+      type: 'group',
+      department: department.trim(),
+      permissionScope: permissionScope.trim(),
+      isSystemGroup: true,
+      subscribedModules: subscribedModules || [],
+      subscribedActions: subscribedActions || [],
+      members: memberIds
+    });
+
+    const populatedRoom = await ChatRoom.findById(room._id).populate('members', 'name email role permissions department');
+
+    res.json({ success: true, data: populatedRoom });
+  } catch (error) {
+    console.error('Error creating custom group:', error);
+    res.status(500).json({ success: false, message: 'Failed to create custom group', error: error.message });
+  }
+};
+
 module.exports = {
   getGroups,
   getGroupMessages,
@@ -303,6 +350,8 @@ module.exports = {
   acknowledgeMessage,
   getUsersForDM,
   createOrGetDirectRoom,
+  createGroup,
 };
+
 
 

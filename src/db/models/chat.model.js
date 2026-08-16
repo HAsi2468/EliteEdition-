@@ -42,6 +42,18 @@ const chatRoomSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    subscribedModules: [
+      {
+        type: String,
+        trim: true,
+      }
+    ],
+    subscribedActions: [
+      {
+        type: String,
+        trim: true,
+      }
+    ],
   },
   {
     timestamps: true,

@@ -56,59 +56,76 @@ async function publishActivity({
 }) {
   try {
     const groupKey = resolveGroupKey(permissionScope, department);
-    let room = await ChatRoom.findOne({ groupKey });
+    
+    // Find primary default room + any custom subscribed groups
+    const matchingRooms = await ChatRoom.find({
+      isSystemGroup: true,
+      $or: [
+        { groupKey: groupKey },
+        { permissionScope: permissionScope },
+        { subscribedModules: module },
+        { subscribedActions: action }
+      ]
+    });
 
-    if (!room) {
-      // Fallback: search by department or first system room
-      room = await ChatRoom.findOne({ isSystemGroup: true, permissionScope }) ||
-             await ChatRoom.findOne({ isSystemGroup: true });
+    let targetRooms = matchingRooms;
+    if (targetRooms.length === 0) {
+      // Fallback: search by any system room
+      const fallbackRoom = await ChatRoom.findOne({ isSystemGroup: true });
+      if (fallbackRoom) targetRooms = [fallbackRoom];
     }
 
-    if (!room) {
+    if (targetRooms.length === 0) {
       console.warn(`[publishActivity] No system ChatRoom found for scope: ${permissionScope}`);
       return null;
     }
 
-    // Resolve senderId (use actorId or fallback to admin/room ID)
-    let senderId = actorId;
-    if (!senderId) {
-      const admin = await User.findOne({ role: 'admin' });
-      senderId = admin ? admin._id : room._id;
-    }
+    let firstPopulatedMsg = null;
 
-    // Create system_activity message
-    const newMessage = await ChatMessage.create({
-      roomId: room._id,
-      senderId,
-      content: description || `[System Activity] ${action} on ${module} #${recordRef}`,
-      type: 'text',
-      msgType: 'system_activity',
-      activityMeta: {
-        action,
-        module,
-        recordRef,
-        recordId: String(recordId || ''),
-        department: department || room.department,
-        permissionScope: permissionScope || room.permissionScope,
-      },
-      readBy: actorId ? [actorId] : []
-    });
+    for (const room of targetRooms) {
+      // Resolve senderId (use actorId or fallback to admin/room ID)
+      let senderId = actorId;
+      if (!senderId) {
+        const admin = await User.findOne({ role: 'admin' });
+        senderId = admin ? admin._id : room._id;
+      }
 
-    const populatedMsg = await ChatMessage.findById(newMessage._id)
-      .populate('senderId', 'name username email role');
-
-    // Emit Socket.IO real-time event to room and all connected users
-    if (ioInstance) {
-      ioInstance.to(String(room._id)).emit('receive-message', populatedMsg);
-      ioInstance.emit('activity-notification', {
+      // Create system_activity message
+      const newMessage = await ChatMessage.create({
         roomId: room._id,
-        groupKey: room.groupKey,
-        groupName: room.name,
-        message: populatedMsg,
+        senderId,
+        content: description || `[System Activity] ${action} on ${module} #${recordRef}`,
+        type: 'text',
+        msgType: 'system_activity',
+        activityMeta: {
+          action,
+          module,
+          recordRef,
+          recordId: String(recordId || ''),
+          department: department || room.department,
+          permissionScope: permissionScope || room.permissionScope,
+        },
+        readBy: actorId ? [actorId] : []
       });
+
+      const populatedMsg = await ChatMessage.findById(newMessage._id)
+        .populate('senderId', 'name username email role');
+
+      if (!firstPopulatedMsg) firstPopulatedMsg = populatedMsg;
+
+      // Emit Socket.IO real-time event to room and all connected users
+      if (ioInstance) {
+        ioInstance.to(String(room._id)).emit('receive-message', populatedMsg);
+        ioInstance.emit('activity-notification', {
+          roomId: room._id,
+          groupKey: room.groupKey,
+          groupName: room.name,
+          message: populatedMsg,
+        });
+      }
     }
 
-    return populatedMsg;
+    return firstPopulatedMsg;
   } catch (error) {
     console.error('Error publishing activity event:', error);
     return null;

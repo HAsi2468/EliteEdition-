@@ -1749,6 +1749,14 @@ export const api = {
       body: JSON.stringify({ targetUserId }),
     });
   },
+
+  async createCommunicationGroup(data) {
+    return request('/communication/groups', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
 };
+
 
 
