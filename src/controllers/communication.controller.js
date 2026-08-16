@@ -341,6 +341,29 @@ const createGroup = async (req, res) => {
   }
 };
 
+/**
+ * Delete / Archive a communication group & clean up messages
+ */
+const deleteGroup = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+
+    const room = await ChatRoom.findById(groupId);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Group not found' });
+    }
+
+    // Delete room document & messages
+    await ChatRoom.findByIdAndDelete(groupId);
+    await ChatMessage.deleteMany({ roomId: groupId });
+
+    res.json({ success: true, message: 'Group and message history deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting group:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete group', error: error.message });
+  }
+};
+
 module.exports = {
   getGroups,
   getGroupMessages,
@@ -351,7 +374,9 @@ module.exports = {
   getUsersForDM,
   createOrGetDirectRoom,
   createGroup,
+  deleteGroup,
 };
+
 
 
 

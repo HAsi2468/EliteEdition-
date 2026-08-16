@@ -1756,7 +1756,14 @@ export const api = {
       body: JSON.stringify(data),
     });
   },
+
+  async deleteCommunicationGroup(groupId) {
+    return request(`/communication/groups/${groupId}`, {
+      method: 'DELETE',
+    });
+  },
 };
+
 
 
 

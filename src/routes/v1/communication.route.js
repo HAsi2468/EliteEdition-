@@ -5,6 +5,7 @@ const router = express.Router();
 
 router.get('/groups', communicationController.getGroups);
 router.post('/groups', communicationController.createGroup);
+router.delete('/groups/:groupId', communicationController.deleteGroup);
 router.post('/groups/sync', communicationController.syncGroups);
 router.get('/groups/:groupId/messages', communicationController.getGroupMessages);
 router.get('/groups/:groupId/members', communicationController.getGroupMembers);
@@ -14,6 +15,7 @@ router.get('/users', communicationController.getUsersForDM);
 router.post('/direct', communicationController.createOrGetDirectRoom);
 
 module.exports = router;
+
 
 
 
