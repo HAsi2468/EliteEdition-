@@ -943,12 +943,6 @@ export default function App() {
                       <FileText size={18} /><span>Job Card</span>
                     </button>
                   )}
-                  {/* 4. Job Card Tracking */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_tracking')) && (
-                    <button onClick={() => { setActiveTab('jobcards_tracking'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_tracking' ? styles.navItemActive : {}) }}>
-                      <RefreshCw size={18} /><span>Job Card Tracking</span>
-                    </button>
-                  )}
                   {/* 5. Design Catalog */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('jobcards_master')) && (
                     <button onClick={() => { setActiveTab('jobcards_catalogue'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...((activeTab === 'jobcards_catalogue' || activeTab === 'jobcards_master') ? styles.navItemActive : {}) }}>
@@ -1287,9 +1281,6 @@ export default function App() {
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) &&
                       renderNavItem('jobcards_list', 'Job Card', FileText, null, 'Job Card')
-                    }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_tracking')) &&
-                      renderNavItem('jobcards_tracking', 'Job Card Tracking', RefreshCw, null, 'Tracking')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('jobcards_master')) &&
                       renderNavItem('jobcards_catalogue', 'Design Catalog', BookOpen, null, 'Catalog')
