@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
 import { matchSearchQuery } from '../utils/searchUtils';
+import PrintSettings from './PrintSettings';
 import {
   UserPlus,
   ShieldAlert,
@@ -25,7 +26,8 @@ import {
   Layers,
   Download,
   FileSpreadsheet,
-  Search
+  Search,
+  Settings
 } from 'lucide-react';
 
 const AVAILABLE_SCREENS = [
@@ -413,27 +415,36 @@ export default function AdminPanel() {
           <ShieldAlert size={22} color="var(--primary)" />
           <div>
             <h2 style={styles.pageTitle}>
-              {activeSubTab === 'users' ? 'Admin User Management' : activeSubTab === 'billing' ? 'Infrastructure Billing Management' : 'System Data Backup & Export'}
+              {activeSubTab === 'users' ? 'Admin User Management' : activeSubTab === 'billing' ? 'Infrastructure Billing Management' : activeSubTab === 'backup' ? 'System Data Backup & Export' : 'System & Business Settings'}
             </h2>
             <p style={styles.pageSubtitle}>
               {activeSubTab === 'users'
                 ? 'Create system users, set passwords, and manage screen-by-screen functionality credentials.'
                 : activeSubTab === 'billing'
                 ? 'Track monthly cloud bills for AWS and MongoDB to monitor hosting costs.'
-                : 'Export comprehensive system data filtered by department and custom date ranges.'}
+                : activeSubTab === 'backup'
+                ? 'Export comprehensive system data filtered by department and custom date ranges.'
+                : 'Manage GST profile details, bank accounts, invoice terms, department dropdown options, and job card settings.'}
             </p>
           </div>
         </div>
       </div>
 
       {/* Sub Tabs Selection */}
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
         <button
           onClick={() => { setActiveSubTab('users'); setError(''); setSuccess(''); }}
           className={activeSubTab === 'users' ? 'btn-primary' : 'btn-secondary'}
           style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem' }}
         >
           <User size={16} /> User Accounts
+        </button>
+        <button
+          onClick={() => { setActiveSubTab('settings'); setError(''); setSuccess(''); }}
+          className={activeSubTab === 'settings' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+        >
+          <Settings size={16} /> System & Business Settings
         </button>
         <button
           onClick={() => { setActiveSubTab('billing'); setError(''); setSuccess(''); }}
@@ -1211,6 +1222,10 @@ export default function AdminPanel() {
             </div>
           </form>
         </div>
+      )}
+
+      {activeSubTab === 'settings' && (
+        <PrintSettings />
       )}
     </div>
   );
