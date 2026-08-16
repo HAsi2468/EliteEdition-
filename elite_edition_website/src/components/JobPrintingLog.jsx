@@ -129,7 +129,7 @@ export default function JobPrintingLog() {
   const [printdotInK, setPrintdotInK] = useState('');
 
   const [inwardPaperEntries, setInwardPaperEntries] = useState([
-    { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+    { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '', paperMtrQty: '' }
   ]);
 
   // ── OUTWARD STATE (Usage / Consumption) ──
@@ -144,7 +144,7 @@ export default function JobPrintingLog() {
   const [printdotOutK, setPrintdotOutK] = useState('');
 
   const [outwardPaperEntries, setOutwardPaperEntries] = useState([
-    { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+    { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '', paperMtrQty: '' }
   ]);
 
   const [pannaOptionsList, setPannaOptionsList] = useState([]);
@@ -154,7 +154,7 @@ export default function JobPrintingLog() {
   const handleAddInwardPaperEntry = () => {
     setInwardPaperEntries(prev => [
       ...prev,
-      { id: prev.length + 1, paperType: paperTypesList[0] || 'A++', paperPanna: pannaOptionsList[0] || '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+      { id: prev.length + 1, paperType: paperTypesList[0] || 'A++', paperPanna: pannaOptionsList[0] || '44" Panna', paperCustomPanna: '', paperRollsQty: '', paperMtrQty: '' }
     ]);
   };
   const handleRemoveInwardPaperEntry = (id) => {
@@ -168,7 +168,7 @@ export default function JobPrintingLog() {
   const handleAddOutwardPaperEntry = () => {
     setOutwardPaperEntries(prev => [
       ...prev,
-      { id: prev.length + 1, paperType: paperTypesList[0] || 'A++', paperPanna: pannaOptionsList[0] || '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+      { id: prev.length + 1, paperType: paperTypesList[0] || 'A++', paperPanna: pannaOptionsList[0] || '44" Panna', paperCustomPanna: '', paperRollsQty: '', paperMtrQty: '' }
     ]);
   };
   const handleRemoveOutwardPaperEntry = (id) => {
@@ -238,12 +238,14 @@ export default function JobPrintingLog() {
             else if (mName.includes('yellow') || t.color === 'Yellow') targetP.Y += q;
             else if (mName.includes('black') || t.color === 'Black') targetP.K += q;
           } else if (mName.includes('paper') || t.panna) {
+            const mtrVal = t.metersPerRoll || (t.notes ? (t.notes.match(/Mtr:\s*([\d.]+)/i) || [])[1] : '');
             targetPaperList.push({
               id: targetPaperList.length + 1,
               paperType: t.materialName || 'A++',
               paperPanna: t.panna ? (t.panna.toLowerCase().includes('panna') || t.panna.includes('"') ? t.panna : `${t.panna} Panna`) : '44" Panna',
               paperCustomPanna: '',
-              paperRollsQty: q ? q.toString() : ''
+              paperRollsQty: q ? q.toString() : '',
+              paperMtrQty: mtrVal ? mtrVal.toString() : ''
             });
           }
         });
@@ -265,7 +267,7 @@ export default function JobPrintingLog() {
         setPrintdotInK(inPrintdot.K > 0 ? inPrintdot.K.toString() : '');
 
         setInwardPaperEntries(inPaperList.length > 0 ? inPaperList : [
-          { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+          { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '', paperMtrQty: '' }
         ]);
 
         // Populate Outward Inputs
@@ -280,7 +282,7 @@ export default function JobPrintingLog() {
         setPrintdotOutK(outPrintdot.K > 0 ? outPrintdot.K.toString() : '');
 
         setOutwardPaperEntries(outPaperList.length > 0 ? outPaperList : [
-          { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '' }
+          { id: 1, paperType: 'A++', paperPanna: '44" Panna', paperCustomPanna: '', paperRollsQty: '', paperMtrQty: '' }
         ]);
 
         setRawMaterialSummary({
@@ -315,11 +317,13 @@ export default function JobPrintingLog() {
       if (printdotInK && Number(printdotInK) > 0) inwardPayload.push({ materialName: 'Printdot Ink - Black (K)', color: 'Black', qty: Number(printdotInK), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
 
       inwardPaperEntries.forEach(entry => {
-        if (entry.paperRollsQty && Number(entry.paperRollsQty) > 0) {
+        const rolls = Number(entry.paperRollsQty) || 0;
+        const mtr = Number(entry.paperMtrQty) || 0;
+        if (rolls > 0 || mtr > 0) {
           const selPanna = entry.paperPanna === 'Custom' ? (entry.paperCustomPanna || '44" Panna') : entry.paperPanna;
           inwardPayload.push({
-            materialName: entry.paperType || 'A++', panna: selPanna, qty: Number(entry.paperRollsQty), unit: 'Rolls', date: rawDate,
-            notes: `[Panna: ${selPanna} | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+            materialName: entry.paperType || 'A++', panna: selPanna, qty: rolls, metersPerRoll: mtr, unit: 'Rolls', date: rawDate,
+            notes: `[Panna: ${selPanna} | Rolls: ${rolls} | Mtr: ${mtr}m | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
           });
         }
       });
@@ -336,11 +340,13 @@ export default function JobPrintingLog() {
       if (printdotOutK && Number(printdotOutK) > 0) outwardPayload.push({ materialName: 'Printdot Ink - Black (K)', color: 'Black', qty: Number(printdotOutK), unit: 'Liters', canSize: 1, date: rawDate, notes: `[Machine: Printdot | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim() });
 
       outwardPaperEntries.forEach(entry => {
-        if (entry.paperRollsQty && Number(entry.paperRollsQty) > 0) {
+        const rolls = Number(entry.paperRollsQty) || 0;
+        const mtr = Number(entry.paperMtrQty) || 0;
+        if (rolls > 0 || mtr > 0) {
           const selPanna = entry.paperPanna === 'Custom' ? (entry.paperCustomPanna || '44" Panna') : entry.paperPanna;
           outwardPayload.push({
-            materialName: entry.paperType || 'A++', panna: selPanna, qty: Number(entry.paperRollsQty), unit: 'Rolls', date: rawDate,
-            notes: `[Panna: ${selPanna} | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
+            materialName: entry.paperType || 'A++', panna: selPanna, qty: rolls, metersPerRoll: mtr, unit: 'Rolls', date: rawDate,
+            notes: `[Panna: ${selPanna} | Rolls: ${rolls} | Mtr: ${mtr}m | Shift: ${rawShift}${timeInfo} | Operator: ${rawOperator || '—'}] ${rawNotes}`.trim()
           });
         }
       });
@@ -2152,8 +2158,11 @@ export default function JobPrintingLog() {
                               {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>)}
                             </select>
                           </div>
-                          <div style={{ width: '62px' }}>
-                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} />
+                          <div style={{ width: '48px' }}>
+                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} title="Rolls Quantity" />
+                          </div>
+                          <div style={{ width: '56px' }}>
+                            <input type="number" step="0.1" placeholder="Mtr" value={entry.paperMtrQty} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperMtrQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} title="Meters Quantity" />
                           </div>
                           {inwardPaperEntries.length > 1 && (
                             <button type="button" onClick={() => handleRemoveInwardPaperEntry(entry.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.1rem', display: 'flex', alignItems: 'center' }}><Trash2 size={13} /></button>
@@ -2236,8 +2245,11 @@ export default function JobPrintingLog() {
                               {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>)}
                             </select>
                           </div>
-                          <div style={{ width: '62px' }}>
-                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} />
+                          <div style={{ width: '48px' }}>
+                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} title="Rolls Quantity" />
+                          </div>
+                          <div style={{ width: '56px' }}>
+                            <input type="number" step="0.1" placeholder="Mtr" value={entry.paperMtrQty} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperMtrQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} title="Meters Quantity" />
                           </div>
                           {outwardPaperEntries.length > 1 && (
                             <button type="button" onClick={() => handleRemoveOutwardPaperEntry(entry.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.1rem', display: 'flex', alignItems: 'center' }}><Trash2 size={13} /></button>
