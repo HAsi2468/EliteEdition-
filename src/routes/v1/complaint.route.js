@@ -5,6 +5,7 @@ const router = express.Router();
 router.get('/analytics', ctrl.getAnalytics);
 router.get('/next-number', ctrl.getNextNumber);
 router.get('/lookup-order', ctrl.lookupOrderDetails);
+router.delete('/clear-all', ctrl.clearAll);
 
 router.route('/')
   .get(ctrl.getAll)

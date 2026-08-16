@@ -246,6 +246,21 @@ const remove = async (req, res) => {
   }
 };
 
+// Clear All Complaints
+const clearAll = async (req, res) => {
+  try {
+    const result = await db.Complaint.deleteMany({});
+    res.json({
+      success: true,
+      message: `Cleared all ${result.deletedCount} complaint ticket records.`,
+      deletedCount: result.deletedCount
+    });
+  } catch (err) {
+    logger.error('complaint.clearAll error: %o', err);
+    res.status(500).json({ error: 'Failed to clear complaints' });
+  }
+};
+
 // Analytics Endpoint
 const getAnalytics = async (req, res) => {
   try {
@@ -522,4 +537,4 @@ const lookupOrderDetails = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getNextNumber, getOne, create, update, remove, getAnalytics, lookupOrderDetails, addComment };
+module.exports = { getAll, getNextNumber, getOne, create, update, remove, clearAll, getAnalytics, lookupOrderDetails, addComment };

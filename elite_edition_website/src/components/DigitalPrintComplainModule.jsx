@@ -591,6 +591,25 @@ export default function DigitalPrintComplainModule() {
     }
   };
 
+  const handleClearAllComplaints = async () => {
+    const confirmed = await triggerEliteConfirm({
+      title: 'Clear All Complaint Records',
+      message: 'Are you sure you want to delete ALL complaint ticket records? This will clear all test tickets and reset complaints data.',
+      confirmText: 'Clear All Complaints',
+      type: 'danger'
+    });
+    if (!confirmed) return;
+
+    try {
+      const res = await api.clearAllComplaints();
+      triggerEliteAlert('Complaints Cleared', res.message || 'All complaint records have been cleared.', 'success');
+      fetchComplaints();
+      fetchAnalytics();
+    } catch (err) {
+      triggerEliteAlert('Clear Error', err.message || 'Failed to clear complaints.', 'error');
+    }
+  };
+
   const handleQuickStatusUpdate = async (item, newStatus) => {
     try {
       const currentUser = api.getCurrentUser();
@@ -802,6 +821,19 @@ export default function DigitalPrintComplainModule() {
                 }}
               >
                 <FileText size={15} color="#e11d48" /> Export PDF
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={handleClearAllComplaints}
+                style={{
+                  padding: '0.45rem 1rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
+                  border: '1px solid #fecdd3', background: '#fff1f2', color: '#e11d48',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+                }}
+                title="Clear all test complaints and reset data"
+              >
+                <Trash2 size={15} color="#e11d48" /> Clear All Tickets
               </button>
             )}
           </div>

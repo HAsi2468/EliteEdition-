@@ -794,6 +794,9 @@ export const api = {
   async deleteComplaint(id) {
     return request(`/complaints/${id}`, { method: 'DELETE' });
   },
+  async clearAllComplaints() {
+    return request('/complaints/clear-all', { method: 'DELETE' });
+  },
   async getComplaintById(id) {
     return request(`/complaints/${id}`);
   },
