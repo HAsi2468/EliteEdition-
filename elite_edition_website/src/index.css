@@ -133,14 +133,14 @@ button, .btn {
 }
 
 .btn-secondary {
-  background: rgba(31, 41, 55, 0.6);
-  border: 1px solid var(--border-light);
-  color: #e5e7eb;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
 }
 .btn-secondary:hover {
-  background: rgba(55, 65, 81, 0.8);
-  border-color: rgba(255, 255, 255, 0.15);
-  color: #fff;
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #0284c7;
 }
 
 .btn-danger {
@@ -232,7 +232,7 @@ td {
   padding: 1rem;
   border-bottom: 1px solid var(--border-light);
   font-size: 0.9rem;
-  color: var(--text-table, #e5e7eb);
+  color: var(--text-table, #0f172a);
 }
 
 tr:last-child td { border-bottom: none; }
