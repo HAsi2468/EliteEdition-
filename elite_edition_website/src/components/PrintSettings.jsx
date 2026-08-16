@@ -293,16 +293,6 @@ export default function PrintSettings({ expenseOnly = false }) {
   if (expenseOnly) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        <div className="glass-panel" style={{ padding: '1.5rem 2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <Settings size={24} color="#10b981" />
-            <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)' }}>💰 Department Expense Settings</h2>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Configure Income Categories (Cash IN), Expense Categories (Cash OUT), and Payment Modes.</p>
-            </div>
-          </div>
-        </div>
-
         <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
           {renderDepartmentHeader('💰 Department Expense Settings', 'expense', '#10b981')}
           {expandedDepts.expense && (

@@ -465,7 +465,7 @@ export default function AdminPanel() {
       {error && <div style={styles.errorBox}>{error}</div>}
       {success && <div style={styles.successBox}>{success}</div>}
 
-      {activeSubTab === 'users' ? (
+      {activeSubTab === 'users' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {/* Summary Metric Cards Header */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
@@ -947,7 +947,9 @@ export default function AdminPanel() {
             </div>
           )}
         </div>
-      ) : activeSubTab === 'billing' ? (
+      )}
+
+      {activeSubTab === 'billing' && (
         <div style={styles.contentLayout}>
           {/* Left Side: Bills List */}
           <div className="glass-panel" style={styles.tablePanel}>
@@ -1128,7 +1130,9 @@ export default function AdminPanel() {
             </form>
           </div>
         </div>
-      ) : (
+      )}
+
+      {activeSubTab === 'backup' && (
         <div className="glass-panel" style={{ padding: '1.75rem', borderRadius: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
             <Database size={24} color="var(--primary)" />
