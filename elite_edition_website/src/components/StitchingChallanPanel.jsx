@@ -253,33 +253,37 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Top Banner */}
-      <div className="glass-panel" style={{ padding: '1.25rem 1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FileText size={22} color="#fff" />
+      {/* Minimal White Card Header with Entry Button Top Right */}
+      <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <FileText size={20} color="#fff" />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  Elite Edition — Garment Delivery Challans
+                <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  Garment Challans
                 </h2>
-                <span style={{ background: 'rgba(37,99,235,0.15)', color: '#60a5fa', fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(37,99,235,0.3)' }}>
+                <span style={{ background: 'rgba(37,99,235,0.15)', color: '#0284c7', fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(37,99,235,0.3)' }}>
                   PCH Sequence
                 </span>
               </div>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 1 }}>
-                Garment delivery challans with Elite Edition logo & auto PCH numbering (up to 30 items per challan)
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                Delivery Challan Register & Auto PCH Numbering
               </p>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          {/* Entry Buttons Top in Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <button onClick={fetchChallans} className="btn-icon" title="Refresh">
               <RefreshCw size={15} className={loading ? 'spin-loader' : ''} />
             </button>
-            <button onClick={openNew} className="btn-primary" style={{ padding: '0.55rem 1.25rem' }}>
+            <button
+              onClick={openNew}
+              style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
               <Plus size={16} /> New Stitching Challan
             </button>
           </div>

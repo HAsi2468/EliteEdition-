@@ -1591,16 +1591,6 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
-      {department === 'stitching' && (
-        <div className="glass-panel" style={{ padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderLeft: '4px solid var(--primary)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>Elite Stitching — Fabric Management & Challans</span>
-          </div>
-          <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: '4px', background: 'rgba(56,189,248,0.15)', color: 'var(--primary)', fontWeight: 700 }}>
-            Stitching Department
-          </span>
-        </div>
-      )}
       {/* Minimal White Card Header with Entry Buttons Top Right & Sub-Tabs */}
       {!onlyChallan && (
         <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
