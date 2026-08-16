@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Calendar } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import ReactDOM from 'react-dom';
+import { Calendar, ChevronDown } from 'lucide-react';
 
 export const PRESET_OPTIONS = [
   { id: 'today', name: 'Today' },
@@ -179,8 +180,11 @@ export default function DateRangePicker({
   const [isOpen, setIsOpen] = useState(false);
   const [localCustomStart, setLocalCustomStart] = useState(customStart);
   const [localCustomEnd, setLocalCustomEnd] = useState(customEnd);
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0, width: 360 });
 
   const containerRef = useRef(null);
+  const buttonRef = useRef(null);
+  const popoverRef = useRef(null);
 
   useEffect(() => {
     setLocalCustomStart(customStart);
@@ -190,16 +194,63 @@ export default function DateRangePicker({
     setLocalCustomEnd(customEnd);
   }, [customEnd]);
 
+  // Recalculate popover position to float above/below smartly without clipping
+  const updatePosition = useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const popoverWidth = Math.min(360, window.innerWidth - 24);
+      const popoverHeight = 400;
+      const windowHeight = window.innerHeight;
+      const windowWidth = window.innerWidth;
+
+      // Vertical position calculation (open downward unless close to bottom)
+      let top = rect.bottom + 6;
+      if (top + popoverHeight > windowHeight - 12 && rect.top > popoverHeight + 12) {
+        top = Math.max(12, rect.top - popoverHeight - 6);
+      }
+
+      // Horizontal position calculation (smart left/right alignment)
+      let left = rect.left;
+      if (align === 'right' || (rect.left + popoverWidth > windowWidth - 12)) {
+        left = Math.max(12, rect.right - popoverWidth);
+      }
+
+      setPopoverPos({
+        top,
+        left,
+        width: popoverWidth
+      });
+    }
+  }, [align]);
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+      const handleScrollOrResize = () => updatePosition();
+      window.addEventListener('scroll', handleScrollOrResize, true);
+      window.addEventListener('resize', handleScrollOrResize);
+      return () => {
+        window.removeEventListener('scroll', handleScrollOrResize, true);
+        window.removeEventListener('resize', handleScrollOrResize);
+      };
+    }
+  }, [isOpen, updatePosition]);
+
   // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event) {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+      if (
+        containerRef.current && !containerRef.current.contains(event.target) &&
+        popoverRef.current && !popoverRef.current.contains(event.target)
+      ) {
         setIsOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
 
   const activeRange = getDatePresetRange(preset, localCustomStart, localCustomEnd);
   const activePresetObj = PRESET_OPTIONS.find(p => p.id === preset) || PRESET_OPTIONS[5];
@@ -232,24 +283,178 @@ export default function DateRangePicker({
 
   const isDark = theme === 'dark';
 
+  const popoverMenu = isOpen ? (
+    <div
+      ref={popoverRef}
+      style={{
+        position: 'fixed',
+        top: `${popoverPos.top}px`,
+        left: `${popoverPos.left}px`,
+        width: `${popoverPos.width}px`,
+        maxHeight: '400px',
+        overflowY: 'auto',
+        background: isDark ? '#0f172a' : '#ffffff',
+        color: isDark ? '#f8fafc' : '#0f172a',
+        borderRadius: '12px',
+        boxShadow: isDark
+          ? '0 20px 50px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(167, 139, 250, 0.3)'
+          : '0 20px 45px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.1)',
+        border: isDark
+          ? '1px solid rgba(167, 139, 250, 0.35)'
+          : '1px solid #cbd5e1',
+        zIndex: 999999,
+        padding: '0.35rem 0',
+        animation: 'fadeIn 0.15s ease-out'
+      }}
+    >
+      {PRESET_OPTIONS.map(opt => {
+        const rangeInfo = getDatePresetRange(opt.id, localCustomStart, localCustomEnd);
+        const isSelected = preset === opt.id;
+        return (
+          <div
+            key={opt.id}
+            onClick={() => handleSelectPreset(opt.id)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.85rem',
+              padding: '0.6rem 0.95rem',
+              cursor: 'pointer',
+              background: isSelected
+                ? (isDark ? 'rgba(124, 58, 237, 0.3)' : 'rgba(79, 70, 229, 0.08)')
+                : 'transparent',
+              borderBottom: isDark
+                ? '1px solid rgba(255, 255, 255, 0.06)'
+                : '1px solid #f1f5f9',
+              fontSize: '0.82rem',
+              transition: 'background 0.15s'
+            }}
+            onMouseEnter={(e) => {
+              if (!isSelected) {
+                e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isSelected) {
+                e.currentTarget.style.background = 'transparent';
+              }
+            }}
+          >
+            <span
+              style={{
+                fontWeight: isSelected ? 800 : 600,
+                color: isSelected
+                  ? (isDark ? '#a78bfa' : '#4f46e5')
+                  : (isDark ? '#e2e8f0' : '#0f172a'),
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {opt.name}
+            </span>
+            <span
+              style={{
+                fontWeight: isSelected ? 700 : 500,
+                fontSize: '0.75rem',
+                color: isSelected
+                  ? (isDark ? '#38bdf8' : '#2563eb')
+                  : (isDark ? '#94a3b8' : '#64748b'),
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {rangeInfo.labelText}
+            </span>
+          </div>
+        );
+      })}
+
+      {preset === 'custom' && (
+        <div
+          style={{
+            padding: '0.75rem 1rem',
+            background: isDark ? '#1e293b' : '#f8fafc',
+            borderTop: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid #e2e8f0',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.5rem'
+          }}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            <div>
+              <label style={{ fontSize: '0.72rem', color: isDark ? '#94a3b8' : '#64748b', fontWeight: 600 }}>From</label>
+              <input
+                type="date"
+                value={localCustomStart}
+                onChange={e => setLocalCustomStart(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.35rem',
+                  fontSize: '0.8rem',
+                  background: isDark ? '#0f172a' : '#ffffff',
+                  color: isDark ? '#fff' : '#0f172a',
+                  border: isDark ? '1px solid #334155' : '1px solid #cbd5e1',
+                  borderRadius: '6px'
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: '0.72rem', color: isDark ? '#94a3b8' : '#64748b', fontWeight: 600 }}>To</label>
+              <input
+                type="date"
+                value={localCustomEnd}
+                onChange={e => setLocalCustomEnd(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.35rem',
+                  fontSize: '0.8rem',
+                  background: isDark ? '#0f172a' : '#ffffff',
+                  color: isDark ? '#fff' : '#0f172a',
+                  border: isDark ? '1px solid #334155' : '1px solid #cbd5e1',
+                  borderRadius: '6px'
+                }}
+              />
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleApplyCustom}
+            style={{
+              padding: '0.45rem',
+              background: 'linear-gradient(135deg, #4f46e5, #4338ca)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)'
+            }}
+          >
+            Apply Custom Range
+          </button>
+        </div>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div
       ref={containerRef}
       style={{
         position: 'relative',
         display: 'inline-block',
-        zIndex: isOpen ? 99999 : 100,
         ...style
       }}
     >
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         title={activeRange.labelText ? `Active: ${activeRange.labelText}` : activePresetObj.name}
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '0.55rem',
+          gap: '0.5rem',
           padding: '0.48rem 0.95rem',
           borderRadius: '8px',
           border: isDark ? '1.5px solid #a78bfa' : '1.5px solid #cbd5e1',
@@ -282,162 +487,10 @@ export default function DateRangePicker({
       >
         <Calendar size={15} color={isDark ? '#a78bfa' : '#4f46e5'} />
         <span>{activePresetObj.name}</span>
-        <Calendar size={15} color={isDark ? '#a78bfa' : '#4f46e5'} />
+        <ChevronDown size={14} color={isDark ? '#a78bfa' : '#64748b'} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
       </button>
 
-      {isOpen && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            left: align === 'right' ? 'auto' : 0,
-            right: align === 'right' ? 0 : 'auto',
-            width: '360px',
-            maxWidth: '92vw',
-            maxHeight: '400px',
-            overflowY: 'auto',
-            background: isDark ? '#0f172a' : '#ffffff',
-            color: isDark ? '#f8fafc' : '#0f172a',
-            borderRadius: '12px',
-            boxShadow: isDark
-              ? '0 20px 50px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(167, 139, 250, 0.3)'
-              : '0 20px 45px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08)',
-            border: isDark
-              ? '1px solid rgba(167, 139, 250, 0.35)'
-              : '1px solid #cbd5e1',
-            zIndex: 99999,
-            padding: '0.35rem 0'
-          }}
-        >
-          {PRESET_OPTIONS.map(opt => {
-            const rangeInfo = getDatePresetRange(opt.id, localCustomStart, localCustomEnd);
-            const isSelected = preset === opt.id;
-            return (
-              <div
-                key={opt.id}
-                onClick={() => handleSelectPreset(opt.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.85rem',
-                  padding: '0.6rem 0.95rem',
-                  cursor: 'pointer',
-                  background: isSelected
-                    ? (isDark ? 'rgba(124, 58, 237, 0.3)' : 'rgba(79, 70, 229, 0.08)')
-                    : 'transparent',
-                  borderBottom: isDark
-                    ? '1px solid rgba(255, 255, 255, 0.06)'
-                    : '1px solid #f1f5f9',
-                  fontSize: '0.82rem',
-                  transition: 'background 0.15s'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSelected) {
-                    e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSelected) {
-                    e.currentTarget.style.background = 'transparent';
-                  }
-                }}
-              >
-                <span
-                  style={{
-                    fontWeight: isSelected ? 800 : 600,
-                    color: isSelected
-                      ? (isDark ? '#a78bfa' : '#4f46e5')
-                      : (isDark ? '#e2e8f0' : '#0f172a'),
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {opt.name}
-                </span>
-                <span
-                  style={{
-                    fontWeight: isSelected ? 700 : 500,
-                    fontSize: '0.75rem',
-                    color: isSelected
-                      ? (isDark ? '#38bdf8' : '#2563eb')
-                      : (isDark ? '#94a3b8' : '#64748b'),
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {rangeInfo.labelText}
-                </span>
-              </div>
-            );
-          })}
-
-          {preset === 'custom' && (
-            <div
-              style={{
-                padding: '0.75rem 1rem',
-                background: isDark ? '#1e293b' : '#f8fafc',
-                borderTop: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid #e2e8f0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem'
-              }}
-            >
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.72rem', color: isDark ? '#94a3b8' : '#64748b', fontWeight: 600 }}>From</label>
-                  <input
-                    type="date"
-                    value={localCustomStart}
-                    onChange={e => setLocalCustomStart(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.35rem',
-                      fontSize: '0.8rem',
-                      background: isDark ? '#0f172a' : '#ffffff',
-                      color: isDark ? '#fff' : '#0f172a',
-                      border: isDark ? '1px solid #334155' : '1px solid #cbd5e1',
-                      borderRadius: '6px'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.72rem', color: isDark ? '#94a3b8' : '#64748b', fontWeight: 600 }}>To</label>
-                  <input
-                    type="date"
-                    value={localCustomEnd}
-                    onChange={e => setLocalCustomEnd(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.35rem',
-                      fontSize: '0.8rem',
-                      background: isDark ? '#0f172a' : '#ffffff',
-                      color: isDark ? '#fff' : '#0f172a',
-                      border: isDark ? '1px solid #334155' : '1px solid #cbd5e1',
-                      borderRadius: '6px'
-                    }}
-                  />
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleApplyCustom}
-                style={{
-                  padding: '0.45rem',
-                  background: 'linear-gradient(135deg, #4f46e5, #4338ca)',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '0.78rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)'
-                }}
-              >
-                Apply Custom Range
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      {isOpen && ReactDOM.createPortal(popoverMenu, document.body)}
     </div>
   );
 }
