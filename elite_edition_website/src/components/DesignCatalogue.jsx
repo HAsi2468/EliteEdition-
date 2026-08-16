@@ -707,141 +707,177 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-      {/* Sub-tabs Header Navigation for Digital Print Department */}
-      {department !== 'stitching' && (
-        <div className="glass-panel" style={{ padding: '0.55rem 0.85rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('catalogue')}
-            style={{
-              padding: '0.5rem 1.1rem',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid',
-              borderColor: activeSubTab === 'catalogue' ? 'var(--primary)' : 'var(--border-light)',
-              background: activeSubTab === 'catalogue' ? 'linear-gradient(135deg, rgba(56,189,248,0.2), rgba(99,102,241,0.2))' : 'transparent',
-              color: activeSubTab === 'catalogue' ? 'var(--primary)' : 'var(--text-muted)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <BookOpen size={16} />
-            <span>Design Catalog</span>
-          </button>
-          
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('master')}
-            style={{
-              padding: '0.5rem 1.1rem',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid',
-              borderColor: activeSubTab === 'master' ? '#38bdf8' : 'var(--border-light)',
-              background: activeSubTab === 'master' ? 'linear-gradient(135deg, rgba(56,189,248,0.2), rgba(139,92,246,0.2))' : 'transparent',
-              color: activeSubTab === 'master' ? '#38bdf8' : 'var(--text-muted)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            <Layers size={16} />
-            <span>Design Master Details (100 Pic)</span>
-          </button>
-        </div>
-      )}
-
-      {activeSubTab === 'master' ? (
-        <DesignMaster department={department} />
-      ) : (
-        <>
-          {/* Top Banner */}
-          <div className="glass-panel" style={{ padding: '1.25rem 1.5rem' }}>
+      
+      {/* ══ UNIFIED HEADER GLASS PANEL ══ */}
+      <div className="glass-panel" style={{ padding: '1.1rem 1.35rem 0.85rem 1.35rem', borderRadius: '14px', display: 'flex', flexDirection: 'column', gap: '0.85rem', boxShadow: 'var(--shadow-md)' }}>
+        
+        {/* Top Header Row: Title & Subtitle + Action Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+          
+          {/* Left Title & Icon */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#38bdf8,#8b5cf6)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Image size={22} color="#fff" />
+            <div style={{
+              width: 44, height: 44, borderRadius: 12,
+              background: 'linear-gradient(135deg, #6366f1 0%, #3b82f6 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)',
+              color: '#fff', flexShrink: 0
+            }}>
+              <Image size={22} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' }}>
                 {department === 'stitching' ? 'Elite Stitching — Design Room' : 'Design Catalog'}
               </h2>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 1 }}>
-                {department === 'stitching' ? 'Store & display master designs for Stitching department' : 'Store & display master designs'} — {total} total designs
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0 0', fontWeight: 500 }}>
+                {department === 'stitching' ? 'Store & display master designs for Stitching department' : 'Store & display master designs'} — <strong>{total}</strong> total designs
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+
+          {/* Right Action Buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
             <button
+              type="button"
               onClick={handleBulkAutoDetectColors}
               disabled={bulkDetecting}
               style={{
-                padding: '0.55rem 1.1rem',
+                padding: '0.5rem 1rem',
                 fontSize: '0.8rem',
-                fontWeight: 700,
-                fontFamily: 'var(--font-sans)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid rgba(139,92,246,0.4)',
-                background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(56,189,248,0.12))',
-                color: '#a78bfa',
+                fontWeight: 800,
+                borderRadius: '8px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                color: '#ffffff',
                 cursor: bulkDetecting ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.4rem',
-                transition: 'all 0.2s',
+                boxShadow: '0 3px 10px rgba(124, 58, 237, 0.25)',
+                transition: 'all 0.15s ease',
                 opacity: bulkDetecting ? 0.6 : 1
               }}
             >
               {bulkDetecting ? (
                 <><RefreshCw size={14} className="spin-loader" /> Processing...</>
               ) : (
-                <><span style={{ fontSize: '1rem' }}>🎨</span> Auto-set All Colours</>
+                <><span style={{ fontSize: '0.9rem' }}>🎨</span> Auto-set All Colours</>
               )}
             </button>
+
             {department === 'stitching' && (
               <button
+                type="button"
                 onClick={() => setShowPKDImportModal(true)}
                 style={{
-                  padding: '0.55rem 1.1rem',
+                  padding: '0.5rem 1rem',
                   fontSize: '0.8rem',
-                  fontWeight: 700,
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid rgba(56,189,248,0.4)',
-                  background: 'linear-gradient(135deg, rgba(56,189,248,0.15), rgba(16,185,129,0.15))',
-                  color: '#38bdf8',
+                  fontWeight: 800,
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#ffffff',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.4rem'
+                  gap: '0.4rem',
+                  boxShadow: '0 3px 10px rgba(16, 185, 129, 0.25)'
                 }}
               >
                 📥 Import PKD Orders
               </button>
             )}
-            <button className="btn-primary" onClick={openNew} style={{ padding: '0.55rem 1.25rem' }}>
-              <PlusCircle size={15} /> New Design
+
+            <button
+              type="button"
+              onClick={openNew}
+              style={{
+                padding: '0.5rem 1.15rem',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                borderRadius: '8px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                color: '#ffffff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                boxShadow: '0 3px 12px rgba(37, 99, 235, 0.3)'
+              }}
+            >
+              <PlusCircle size={15} />
+              <span>New Design</span>
             </button>
           </div>
         </div>
+
+        {/* Divider Line */}
+        <div style={{ height: '1px', background: 'var(--border-light)', width: '100%', margin: '0.2rem 0' }} />
+
+        {/* Bottom Sub-Tab Navigation Bar */}
+        {department !== 'stitching' && (
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setActiveSubTab('catalogue')}
+              style={{
+                padding: '0.45rem 1rem',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                borderRadius: '8px',
+                border: activeSubTab === 'catalogue' ? '1.5px solid #6366f1' : '1px solid var(--border-light)',
+                background: activeSubTab === 'catalogue' ? 'rgba(99, 102, 241, 0.12)' : 'var(--bg-card, #ffffff)',
+                color: activeSubTab === 'catalogue' ? '#4f46e5' : 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <BookOpen size={15} />
+              <span>Design Catalog</span>
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => setActiveSubTab('master')}
+              style={{
+                padding: '0.45rem 1rem',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                borderRadius: '8px',
+                border: activeSubTab === 'master' ? '1.5px solid #6366f1' : '1px solid var(--border-light)',
+                background: activeSubTab === 'master' ? 'rgba(99, 102, 241, 0.12)' : 'var(--bg-card, #ffffff)',
+                color: activeSubTab === 'master' ? '#4f46e5' : 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Layers size={15} />
+              <span>Design Master Details (100 Pic)</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {showPKDImportModal && (
-        <PKDOrdersImportModal
-          onClose={() => setShowPKDImportModal(false)}
-          onImportSuccess={() => {
-            fetchDesigns();
-            fetchCategories();
-          }}
-        />
-      )}
+      {activeSubTab === 'master' ? (
+        <DesignMaster department={department} />
+      ) : (
+        <>
+          {showPKDImportModal && (
+            <PKDOrdersImportModal
+              onClose={() => setShowPKDImportModal(false)}
+              onImportSuccess={() => {
+                fetchDesigns();
+                fetchCategories();
+              }}
+            />
+          )}
 
       {/* Filter panel */}
       <div className="glass-panel" style={{ padding: '1rem 1.25rem' }}>
