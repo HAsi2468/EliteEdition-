@@ -1877,32 +1877,27 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         <RawMaterialsPanel />
       ) : effectiveSubTab === 'complain' || effectiveSubTab === 'complaint' || effectiveSubTab === 'complaints' ? (
         <DigitalPrintComplainModule />
-      ) : effectiveSubTab === 'expense' || effectiveSubTab === 'expenses' ? (
-        <DigitalPrintExpenseModule />
-      ) : effectiveSubTab === 'tracking' ? (
-        <JobCardTracking onPreview={setPreviewCard} />
       ) : effectiveSubTab === 'settings' || effectiveSubTab === 'stitching_settings' ? (
         department === 'stitching' ? <StitchingSettings /> : <PrintSettings />
       ) : effectiveSubTab === 'jobcards' ? (
         <ReportsCenter department="elite-print" />
       ) : (
-        <>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
           {/* Header banner */}
-          <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
+          <div className="glass-panel" style={{ padding: '1.1rem 1.35rem 0.85rem 1.35rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: 'var(--shadow-md)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#38bdf8,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <FileText size={20} color="#fff" />
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#38bdf8,#2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 14px rgba(37,99,235,0.3)', color: '#fff' }}>
+                  <FileText size={22} />
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                    <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' }}>
                       {department === 'stitching' ? 'Stitching Job Cards' : 'Job Cards & Production'}
                     </h2>
-                    <ScreenGroupRoster screenId="jobcards" />
                   </div>
-                  <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                    Production Tracking — {total} Total Cards
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0', fontWeight: 500 }}>
+                    Production &amp; Stage Tracking — <strong>{total}</strong> Total Cards
                   </p>
                 </div>
               </div>
@@ -1910,15 +1905,71 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
               {/* Entry Buttons Top in Header */}
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button
+                  type="button"
                   className="btn-primary"
                   onClick={openNew}
-                  style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#38bdf8,#2563eb)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  style={{ padding: '0.5rem 1.15rem', borderRadius: '8px', background: 'linear-gradient(135deg,#38bdf8,#2563eb)', color: '#fff', fontSize: '0.8rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 3px 12px rgba(37,99,235,0.3)' }}
                 >
                   <PlusCircle size={15} /> New Job Card
                 </button>
               </div>
             </div>
+
+            {/* Divider Line */}
+            <div style={{ height: '1px', background: 'var(--border-light)', width: '100%', margin: '0.6rem 0 0.4rem 0' }} />
+
+            {/* Sub-Tab Navigation Bar */}
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setOverrideSubTab('list')}
+                style={{
+                  padding: '0.45rem 1rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  borderRadius: '8px',
+                  border: (effectiveSubTab === 'list' || effectiveSubTab === 'jobcards') ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
+                  background: (effectiveSubTab === 'list' || effectiveSubTab === 'jobcards') ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card, #ffffff)',
+                  color: (effectiveSubTab === 'list' || effectiveSubTab === 'jobcards') ? '#1d4ed8' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <FileText size={15} />
+                <span>📋 Production Cards</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOverrideSubTab('tracking')}
+                style={{
+                  padding: '0.45rem 1rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  borderRadius: '8px',
+                  border: effectiveSubTab === 'tracking' ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
+                  background: effectiveSubTab === 'tracking' ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card, #ffffff)',
+                  color: effectiveSubTab === 'tracking' ? '#1d4ed8' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <RefreshCw size={15} />
+                <span>🔄 Job Card Tracking</span>
+              </button>
+            </div>
           </div>
+
+          {effectiveSubTab === 'tracking' ? (
+            <JobCardTracking onPreview={setPreviewCard} />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
 
       {/* Filters */}
       <div className="glass-panel" style={{ padding:'1rem 1.25rem' }}>
@@ -2534,8 +2585,10 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
           </div>
         </div>
       )}
-        </>
-      )}
-    </div>
-  );
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+);
 }
