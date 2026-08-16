@@ -293,15 +293,11 @@ export default function DateRangePicker({
         width: `${popoverPos.width}px`,
         maxHeight: '400px',
         overflowY: 'auto',
-        background: isDark ? '#0f172a' : '#ffffff',
-        color: isDark ? '#f8fafc' : '#0f172a',
+        background: '#ffffff',
+        color: '#0f172a',
         borderRadius: '12px',
-        boxShadow: isDark
-          ? '0 20px 50px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(167, 139, 250, 0.3)'
-          : '0 20px 45px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.1)',
-        border: isDark
-          ? '1px solid rgba(167, 139, 250, 0.35)'
-          : '1px solid #cbd5e1',
+        boxShadow: '0 20px 45px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08)',
+        border: '1px solid #cbd5e1',
         zIndex: 999999,
         padding: '0.35rem 0',
         animation: 'fadeIn 0.15s ease-out'
@@ -317,22 +313,20 @@ export default function DateRangePicker({
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justify: 'space-between',
               gap: '0.85rem',
               padding: '0.6rem 0.95rem',
               cursor: 'pointer',
               background: isSelected
-                ? (isDark ? 'rgba(124, 58, 237, 0.3)' : 'rgba(79, 70, 229, 0.08)')
+                ? 'rgba(79, 70, 229, 0.08)'
                 : 'transparent',
-              borderBottom: isDark
-                ? '1px solid rgba(255, 255, 255, 0.06)'
-                : '1px solid #f1f5f9',
+              borderBottom: '1px solid #f1f5f9',
               fontSize: '0.82rem',
               transition: 'background 0.15s'
             }}
             onMouseEnter={(e) => {
               if (!isSelected) {
-                e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc';
+                e.currentTarget.style.background = '#f8fafc';
               }
             }}
             onMouseLeave={(e) => {
@@ -345,8 +339,8 @@ export default function DateRangePicker({
               style={{
                 fontWeight: isSelected ? 800 : 600,
                 color: isSelected
-                  ? (isDark ? '#a78bfa' : '#4f46e5')
-                  : (isDark ? '#e2e8f0' : '#0f172a'),
+                  ? '#4f46e5'
+                  : '#0f172a',
                 whiteSpace: 'nowrap'
               }}
             >
@@ -357,8 +351,8 @@ export default function DateRangePicker({
                 fontWeight: isSelected ? 700 : 500,
                 fontSize: '0.75rem',
                 color: isSelected
-                  ? (isDark ? '#38bdf8' : '#2563eb')
-                  : (isDark ? '#94a3b8' : '#64748b'),
+                  ? '#2563eb'
+                  : '#64748b',
                 whiteSpace: 'nowrap'
               }}
             >
@@ -372,8 +366,8 @@ export default function DateRangePicker({
         <div
           style={{
             padding: '0.75rem 1rem',
-            background: isDark ? '#1e293b' : '#f8fafc',
-            borderTop: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid #e2e8f0',
+            background: '#f8fafc',
+            borderTop: '1px solid #e2e8f0',
             display: 'flex',
             flexDirection: 'column',
             gap: '0.5rem'
@@ -381,7 +375,7 @@ export default function DateRangePicker({
         >
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
             <div>
-              <label style={{ fontSize: '0.72rem', color: isDark ? '#94a3b8' : '#64748b', fontWeight: 600 }}>From</label>
+              <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>From</label>
               <input
                 type="date"
                 value={localCustomStart}
@@ -390,15 +384,15 @@ export default function DateRangePicker({
                   width: '100%',
                   padding: '0.35rem',
                   fontSize: '0.8rem',
-                  background: isDark ? '#0f172a' : '#ffffff',
-                  color: isDark ? '#fff' : '#0f172a',
-                  border: isDark ? '1px solid #334155' : '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  border: '1px solid #cbd5e1',
                   borderRadius: '6px'
                 }}
               />
             </div>
             <div>
-              <label style={{ fontSize: '0.72rem', color: isDark ? '#94a3b8' : '#64748b', fontWeight: 600 }}>To</label>
+              <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>To</label>
               <input
                 type="date"
                 value={localCustomEnd}
@@ -407,9 +401,9 @@ export default function DateRangePicker({
                   width: '100%',
                   padding: '0.35rem',
                   fontSize: '0.8rem',
-                  background: isDark ? '#0f172a' : '#ffffff',
-                  color: isDark ? '#fff' : '#0f172a',
-                  border: isDark ? '1px solid #334155' : '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  border: '1px solid #cbd5e1',
                   borderRadius: '6px'
                 }}
               />
@@ -457,37 +451,29 @@ export default function DateRangePicker({
           gap: '0.5rem',
           padding: '0.48rem 0.95rem',
           borderRadius: '8px',
-          border: isDark ? '1.5px solid #a78bfa' : '1.5px solid #cbd5e1',
-          background: isDark
-            ? 'linear-gradient(135deg, #1e1b4b, #312e81)'
-            : '#ffffff',
-          color: isDark ? '#ffffff' : '#0f172a',
+          border: '1px solid #cbd5e1',
+          background: '#ffffff',
+          color: '#0f172a',
           fontWeight: 700,
           fontSize: '0.82rem',
           cursor: 'pointer',
-          boxShadow: isDark
-            ? '0 4px 14px rgba(124, 58, 237, 0.35)'
-            : '0 2px 6px rgba(15, 23, 42, 0.06)',
+          boxShadow: '0 2px 6px rgba(15, 23, 42, 0.06)',
           transition: 'all 0.18s ease',
           whiteSpace: 'nowrap',
           ...buttonStyle
         }}
         onMouseEnter={(e) => {
-          if (!isDark) {
-            e.currentTarget.style.borderColor = '#6366f1';
-            e.currentTarget.style.background = '#f8fafc';
-          }
+          e.currentTarget.style.borderColor = '#6366f1';
+          e.currentTarget.style.background = '#f8fafc';
         }}
         onMouseLeave={(e) => {
-          if (!isDark) {
-            e.currentTarget.style.borderColor = '#cbd5e1';
-            e.currentTarget.style.background = '#ffffff';
-          }
+          e.currentTarget.style.borderColor = '#cbd5e1';
+          e.currentTarget.style.background = '#ffffff';
         }}
       >
-        <Calendar size={15} color={isDark ? '#a78bfa' : '#4f46e5'} />
+        <Calendar size={15} color="#4f46e5" />
         <span>{activePresetObj.name}</span>
-        <ChevronDown size={14} color={isDark ? '#a78bfa' : '#64748b'} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+        <ChevronDown size={14} color="#64748b" style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
       </button>
 
       {isOpen && ReactDOM.createPortal(popoverMenu, document.body)}
