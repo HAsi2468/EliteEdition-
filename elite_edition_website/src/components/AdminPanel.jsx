@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
+import { matchSearchQuery } from '../utils/searchUtils';
 import {
   UserPlus,
   ShieldAlert,
@@ -23,7 +24,8 @@ import {
   Calendar,
   Layers,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Search
 } from 'lucide-react';
 
 const AVAILABLE_SCREENS = [
@@ -67,6 +69,7 @@ const AVAILABLE_SCREENS = [
 
 export default function AdminPanel() {
   const [users, setUsers] = useState([]);
+  const [userSearch, setUserSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState('');
@@ -434,302 +437,395 @@ export default function AdminPanel() {
       {success && <div style={styles.successBox}>{success}</div>}
 
       {activeSubTab === 'users' ? (
-        <div style={styles.contentLayout}>
-          {/* Left Side: Users List */}
-          <div className="glass-panel" style={styles.tablePanel}>
-            <div style={styles.panelHeader}>
-              <Sliders size={16} color="var(--primary)" />
-              <h3 style={styles.panelTitle}>Active Accounts</h3>
-              {loading && <RotateCw size={14} className="spin-loader" style={{ marginLeft: '0.5rem', color: 'var(--text-muted)' }} />}
-              <button
-                type="button"
-                onClick={handleCancelEdit}
-                className="btn-primary"
-                style={{ marginLeft: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-              >
-                <UserPlus size={13} />
-                <span>Add New User</span>
-              </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Summary Metric Cards Header */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div className="glass-panel" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.85rem', borderLeft: '4px solid #2563eb' }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <User size={20} color="#2563eb" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Total Registered Accounts</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginTop: 2 }}>{users.length} Users</div>
+              </div>
             </div>
 
-            <div className="table-container" style={styles.tableWrap}>
-              {loading && users.length === 0 ? (
-                <div style={styles.emptyState}>
-                  <RotateCw size={24} className="spin-loader" color="var(--primary)" />
-                  <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>Loading users list...</p>
+            <div className="glass-panel" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.85rem', borderLeft: '4px solid #dc2626' }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ShieldAlert size={20} color="#dc2626" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Administrator Roles</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#dc2626', marginTop: 2 }}>
+                  {users.filter(u => u.role === 'admin' || (u.permissions && u.permissions.length === AVAILABLE_SCREENS.length)).length} Admins
                 </div>
-              ) : users.length === 0 ? (
-                <div style={styles.emptyState}>
-                  <User size={28} color="var(--text-muted)" />
-                  <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>No user accounts found.</p>
-                </div>
-              ) : (
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th>Allowed Screens</th>
-                      <th className="text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.map((u) => {
-                      const checkAdmin = u.role === 'admin' || (u.permissions && u.permissions.length === AVAILABLE_SCREENS.length);
+              </div>
+            </div>
 
-                      return (
-                        <tr key={u.id}>
-                          <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <div style={styles.avatar(checkAdmin)}>
-                                {u.name ? u.name[0].toUpperCase() : 'U'}
-                              </div>
-                              <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{u.name}</span>
-                            </div>
-                          </td>
-                          <td>{u.email}</td>
-                          <td>
-                            <span className={`badge ${checkAdmin ? 'badge-danger' : 'badge-success'}`}>
-                              {checkAdmin ? 'ADMIN' : 'USER'}
-                            </span>
-                          </td>
-                          <td>
-                            <div style={styles.permissionsList}>
-                              {checkAdmin ? (
-                                <span style={styles.adminAllBadge}>ALL SCREENS</span>
-                              ) : u.permissions && u.permissions.length > 0 ? (
-                                u.permissions.map(p => {
-                                  const screenObj = AVAILABLE_SCREENS.find(s => s.id === p);
-                                  return (
-                                    <span key={p} style={styles.permissionBadge}>
-                                      {screenObj ? screenObj.label : p}
-                                    </span>
-                                  );
-                                })
-                              ) : (
-                                <span style={styles.noScreensBadge}>NO SCREENS</span>
-                              )}
-                            </div>
-                          </td>
-                          <td>
-                            <div style={styles.actionsCell}>
-                              <button
-                                onClick={() => handleEditClick(u)}
-                                className="btn-icon"
-                                title="Edit Credentials"
-                              >
-                                <Edit2 size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteUser(u)}
-                                className="btn-icon"
-                                style={styles.trashBtn}
-                                title="Delete User"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
+            <div className="glass-panel" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.85rem', borderLeft: '4px solid #16a34a' }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <UserPlus size={20} color="#16a34a" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Standard Accounts</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#16a34a', marginTop: 2 }}>
+                  {users.filter(u => u.role !== 'admin' && (u.permissions?.length !== AVAILABLE_SCREENS.length)).length} Standard Users
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Right Side: Create/Edit Form */}
-          <div className="glass-panel" style={styles.formPanel}>
-            <div style={styles.panelHeader}>
-              <UserPlus size={16} color="var(--primary)" />
-              <h3 style={styles.panelTitle}>
-                {editingUser ? `Edit User Credentials — ${editingUser.name}` : 'Create New User'}
-              </h3>
-            </div>
-
-            <form onSubmit={handleSubmit} style={styles.form}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Full Name *</label>
-                <div style={styles.inputWrapper}>
-                  <User size={14} style={styles.inputIcon} />
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="Enter user's name..."
-                    required
-                    style={styles.formInput}
-                  />
-                </div>
-              </div>
-
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Email Address *</label>
-                <div style={styles.inputWrapper}>
-                  <Mail size={14} style={styles.inputIcon} />
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder="user@elite.com..."
-                    required
-                    style={styles.formInput}
-                  />
-                </div>
-              </div>
-
-              <div style={styles.formGroup}>
-                <label style={styles.label}>
-                  {editingUser ? 'New Password (leave blank to keep current)' : 'Password *'}
-                </label>
-                <div style={styles.inputWrapper}>
-                  <Lock size={14} style={styles.inputIcon} />
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    placeholder={editingUser ? 'Enter new password...' : 'Enter password...'}
-                    required={!editingUser}
-                    style={styles.formInput}
-                  />
-                </div>
-              </div>
-
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Account Role *</label>
-                <select
-                  name="role"
-                  value={formData.role}
-                  onChange={handleRoleChange}
-                  style={styles.selectInput}
-                >
-                  <option value="user">User (Restricted Access)</option>
-                  <option value="admin">Admin (Full Access)</option>
-                </select>
-              </div>
-
-              <div style={styles.formGroup}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                  <label style={styles.label}>Functionality Access (Allowed Screens)</label>
-                  {formData.role !== 'admin' && (
-                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        onClick={() => setFormData(p => ({ ...p, permissions: AVAILABLE_SCREENS.map(s => s.id) }))}
-                        className="btn-secondary"
-                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem' }}
-                      >
-                        Select All
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFormData(p => ({ ...p, permissions: [] }))}
-                        className="btn-secondary"
-                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem' }}
-                      >
-                        Clear All
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <p style={styles.helpText}>
-                  Select which screens and operational tabs this user is permitted to see.
-                </p>
-
-                {Array.from(new Set(AVAILABLE_SCREENS.map(s => s.category))).map(cat => {
-                  const catScreens = AVAILABLE_SCREENS.filter(s => s.category === cat);
-                  const allChecked = catScreens.every(s => formData.permissions.includes(s.id));
-                  const catTitle = cat === 'General' ? '⚙️ Core & General' :
-                                   cat === 'Elite Edition' ? '🛍️ Elite Edition (E-Commerce)' :
-                                   cat === 'Elite Digital Print' ? '🖨️ Elite Digital Print' :
-                                   cat === 'Elite Stitching' ? '✂️ Elite Stitching' : `📁 ${cat}`;
-
-                  return (
-                    <div key={cat} style={{ marginBottom: '1rem', background: 'rgba(0,0,0,0.15)', padding: '0.65rem 0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-light)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          {catTitle}
-                        </span>
-                        {formData.role !== 'admin' && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const ids = catScreens.map(s => s.id);
-                              setFormData(prev => {
-                                const hasAll = ids.every(id => prev.permissions.includes(id));
-                                const updated = hasAll
-                                  ? prev.permissions.filter(id => !ids.includes(id))
-                                  : Array.from(new Set([...prev.permissions, ...ids]));
-                                return { ...prev, permissions: updated };
-                              });
-                            }}
-                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.72rem', cursor: 'pointer', textDecoration: 'underline' }}
-                          >
-                            {allChecked ? 'Deselect Category' : 'Select Category'}
-                          </button>
-                        )}
-                      </div>
-
-                      <div style={styles.checkboxGrid}>
-                        {catScreens.map(screen => {
-                          const isChecked = formData.permissions.includes(screen.id);
-                          return (
-                            <label
-                              key={screen.id}
-                              style={{
-                                ...styles.checkboxLabel,
-                                ...(formData.role === 'admin' ? styles.checkboxLabelDisabled : {})
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                disabled={formData.role === 'admin'}
-                                onChange={() => handlePermissionCheckbox(screen.id)}
-                                style={styles.checkbox}
-                              />
-                              <span style={{ fontSize: '0.83rem', color: isChecked ? 'var(--text-primary)' : 'var(--text-muted)' }}>{screen.label}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div style={styles.formActions}>
-                {editingUser && (
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="btn-secondary"
-                    style={styles.btn}
-                  >
-                    <X size={14} />
-                    <span>Cancel</span>
-                  </button>
-                )}
+          <div style={styles.contentLayout}>
+            {/* Left Side: Users List */}
+            <div className="glass-panel" style={styles.tablePanel}>
+              <div style={styles.panelHeader}>
+                <Sliders size={16} color="var(--primary)" />
+                <h3 style={styles.panelTitle}>Active User Accounts ({users.length})</h3>
+                {loading && <RotateCw size={14} className="spin-loader" style={{ marginLeft: '0.5rem', color: 'var(--text-muted)' }} />}
                 <button
-                  type="submit"
-                  className="btn-success"
-                  style={{ ...styles.btn, ...styles.submitBtn }}
-                  disabled={submitLoading}
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="btn-primary"
+                  style={{ marginLeft: 'auto', padding: '0.4rem 0.85rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                 >
-                  {submitLoading ? (
-                    <RotateCw size={14} className="spin-loader" />
-                  ) : (
-                    <Save size={14} />
-                  )}
-                  <span>{editingUser ? 'Save Credentials' : 'Create User'}</span>
+                  <UserPlus size={14} />
+                  <span>New User</span>
                 </button>
               </div>
-            </form>
+
+              {/* Live Search Input */}
+              <div style={{ position: 'relative', marginTop: '0.5rem' }}>
+                <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                <input
+                  type="text"
+                  placeholder="Filter users by name, email, or role..."
+                  value={userSearch}
+                  onChange={e => setUserSearch(e.target.value)}
+                  style={{ width: '100%', paddingLeft: 34, fontSize: '0.82rem', background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '6px' }}
+                />
+              </div>
+
+              <div className="table-container" style={styles.tableWrap}>
+                {loading && users.length === 0 ? (
+                  <div style={styles.emptyState}>
+                    <RotateCw size={24} className="spin-loader" color="var(--primary)" />
+                    <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>Loading users list...</p>
+                  </div>
+                ) : users.length === 0 ? (
+                  <div style={styles.emptyState}>
+                    <User size={28} color="var(--text-muted)" />
+                    <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>No user accounts found.</p>
+                  </div>
+                ) : (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Account</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Allowed Functionalities</th>
+                        <th className="text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users
+                        .filter(u => matchSearchQuery(u, userSearch, ['name', 'email', 'role']))
+                        .map((u) => {
+                          const checkAdmin = u.role === 'admin' || (u.permissions && u.permissions.length === AVAILABLE_SCREENS.length);
+                          const isCurrentlyEditing = editingUser && (editingUser.id === u.id || editingUser._id === u.id);
+
+                          return (
+                            <tr key={u.id || u._id} style={{ background: isCurrentlyEditing ? '#eff6ff' : 'transparent', transition: 'background 0.15s' }}>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                                  <div style={styles.avatar(checkAdmin)}>
+                                    {u.name ? u.name[0].toUpperCase() : 'U'}
+                                  </div>
+                                  <div>
+                                    <span style={{ fontWeight: '700', color: '#0f172a', display: 'block', fontSize: '0.88rem' }}>{u.name}</span>
+                                    {isCurrentlyEditing && (
+                                      <span style={{ fontSize: '0.68rem', color: '#2563eb', fontWeight: 800 }}>[Editing Now]</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={{ color: '#334155', fontWeight: 500, fontSize: '0.82rem' }}>{u.email}</td>
+                              <td>
+                                <span style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: 800,
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  textTransform: 'uppercase',
+                                  background: checkAdmin ? '#fee2e2' : '#dbeafe',
+                                  color: checkAdmin ? '#dc2626' : '#1d4ed8',
+                                  border: `1px solid ${checkAdmin ? '#fca5a5' : '#93c5fd'}`
+                                }}>
+                                  {checkAdmin ? '🛡️ ADMIN' : '👤 USER'}
+                                </span>
+                              </td>
+                              <td>
+                                <div style={styles.permissionsList}>
+                                  {checkAdmin ? (
+                                    <span style={styles.adminAllBadge}>⚡ FULL SYSTEM ACCESS</span>
+                                  ) : u.permissions && u.permissions.length > 0 ? (
+                                    u.permissions.map(p => {
+                                      const screenObj = AVAILABLE_SCREENS.find(s => s.id === p);
+                                      return (
+                                        <span key={p} style={styles.permissionBadge}>
+                                          {screenObj ? screenObj.label : p}
+                                        </span>
+                                      );
+                                    })
+                                  ) : (
+                                    <span style={styles.noScreensBadge}>NO ACCESS GRANTED</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td>
+                                <div style={styles.actionsCell}>
+                                  <button
+                                    onClick={() => handleEditClick(u)}
+                                    style={{
+                                      padding: '0.35rem 0.6rem',
+                                      background: '#eff6ff',
+                                      border: '1px solid #bfdbfe',
+                                      color: '#2563eb',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      fontSize: '0.78rem',
+                                      fontWeight: 700,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                    title="Edit Credentials"
+                                  >
+                                    <Edit2 size={13} /> Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteUser(u)}
+                                    style={{
+                                      padding: '0.35rem 0.6rem',
+                                      background: '#fef2f2',
+                                      border: '1px solid #fecaca',
+                                      color: '#dc2626',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      fontSize: '0.78rem',
+                                      fontWeight: 700,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                    title="Delete User"
+                                  >
+                                    <Trash2 size={13} /> Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            {/* Right Side: Create/Edit Form */}
+            <div className="glass-panel" style={styles.formPanel}>
+              <div style={styles.panelHeader}>
+                <UserPlus size={16} color="var(--primary)" />
+                <h3 style={styles.panelTitle}>
+                  {editingUser ? `Edit Account Credentials — ${editingUser.name}` : 'Create New Account'}
+                </h3>
+              </div>
+
+              <form onSubmit={handleSubmit} style={styles.form}>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Full Name *</label>
+                  <div style={styles.inputWrapper}>
+                    <User size={14} style={styles.inputIcon} />
+                    <input
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      placeholder="e.g. Rahul Sharma"
+                      required
+                      style={styles.formInput}
+                    />
+                  </div>
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Email Address *</label>
+                  <div style={styles.inputWrapper}>
+                    <Mail size={14} style={styles.inputIcon} />
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      placeholder="rahul@elite.com"
+                      required
+                      style={styles.formInput}
+                    />
+                  </div>
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>
+                    {editingUser ? 'New Password (leave blank to keep current)' : 'Password *'}
+                  </label>
+                  <div style={styles.inputWrapper}>
+                    <Lock size={14} style={styles.inputIcon} />
+                    <input
+                      type="password"
+                      name="password"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      placeholder={editingUser ? 'Enter new password...' : 'Enter password...'}
+                      required={!editingUser}
+                      style={styles.formInput}
+                    />
+                  </div>
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Account Role *</label>
+                  <select
+                    name="role"
+                    value={formData.role}
+                    onChange={handleRoleChange}
+                    style={styles.selectInput}
+                  >
+                    <option value="user">User (Restricted Screen Access)</option>
+                    <option value="admin">Admin (Full System Access)</option>
+                  </select>
+                </div>
+
+                <div style={styles.formGroup}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                    <label style={styles.label}>Functionality Access (Allowed Screens)</label>
+                    {formData.role !== 'admin' && (
+                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => setFormData(p => ({ ...p, permissions: AVAILABLE_SCREENS.map(s => s.id) }))}
+                          className="btn-secondary"
+                          style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700 }}
+                        >
+                          Select All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData(p => ({ ...p, permissions: [] }))}
+                          className="btn-secondary"
+                          style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700 }}
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <p style={styles.helpText}>
+                    Select which operational modules and screens this user is authorized to open.
+                  </p>
+
+                  {Array.from(new Set(AVAILABLE_SCREENS.map(s => s.category))).map(cat => {
+                    const catScreens = AVAILABLE_SCREENS.filter(s => s.category === cat);
+                    const allChecked = catScreens.every(s => formData.permissions.includes(s.id));
+                    const catTitle = cat === 'General' ? '⚙️ Core & General' :
+                                     cat === 'Elite Edition' ? '🛍️ Elite Edition (E-Commerce)' :
+                                     cat === 'Elite Digital Print' ? '🖨️ Elite Digital Print' :
+                                     cat === 'Elite Stitching' ? '✂️ Elite Stitching' : `📁 ${cat}`;
+
+                    return (
+                      <div key={cat} style={{ marginBottom: '0.85rem', background: '#f8fafc', padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            {catTitle}
+                          </span>
+                          {formData.role !== 'admin' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const ids = catScreens.map(s => s.id);
+                                setFormData(prev => {
+                                  const hasAll = ids.every(id => prev.permissions.includes(id));
+                                  const updated = hasAll
+                                    ? prev.permissions.filter(id => !ids.includes(id))
+                                    : Array.from(new Set([...prev.permissions, ...ids]));
+                                  return { ...prev, permissions: updated };
+                                });
+                              }}
+                              style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline' }}
+                            >
+                              {allChecked ? 'Deselect Category' : 'Select Category'}
+                            </button>
+                          )}
+                        </div>
+
+                        <div style={styles.checkboxGrid}>
+                          {catScreens.map(screen => {
+                            const isChecked = formData.permissions.includes(screen.id);
+                            return (
+                              <label
+                                key={screen.id}
+                                style={{
+                                  ...styles.checkboxLabel,
+                                  background: isChecked ? '#eff6ff' : '#ffffff',
+                                  borderColor: isChecked ? '#2563eb' : '#e2e8f0',
+                                  ...(formData.role === 'admin' ? styles.checkboxLabelDisabled : {})
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  disabled={formData.role === 'admin'}
+                                  onChange={() => handlePermissionCheckbox(screen.id)}
+                                  style={styles.checkbox}
+                                />
+                                <span style={{ fontSize: '0.82rem', fontWeight: isChecked ? 700 : 500, color: isChecked ? '#1d4ed8' : '#334155' }}>{screen.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={styles.formActions}>
+                  {editingUser && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="btn-secondary"
+                      style={styles.btn}
+                    >
+                      <X size={14} />
+                      <span>Cancel</span>
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="btn-success"
+                    style={{ ...styles.btn, ...styles.submitBtn, background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}
+                    disabled={submitLoading}
+                  >
+                    {submitLoading ? (
+                      <RotateCw size={14} className="spin-loader" />
+                    ) : (
+                      <Save size={14} />
+                    )}
+                    <span>{editingUser ? 'Save Credentials' : 'Create User Account'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       ) : activeSubTab === 'billing' ? (
@@ -1079,49 +1175,53 @@ const styles = {
     flex: 1
   },
   avatar: (isAdmin) => ({
-    width: '28px',
-    height: '28px',
+    width: '32px',
+    height: '32px',
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '0.8rem',
-    fontWeight: 'bold',
-    color: 'var(--text-primary)',
+    fontSize: '0.85rem',
+    fontWeight: '800',
+    color: '#ffffff',
+    boxShadow: isAdmin ? '0 2px 8px rgba(220, 38, 38, 0.25)' : '0 2px 8px rgba(37, 99, 235, 0.25)',
     background: isAdmin
-      ? 'linear-gradient(135deg, #ef4444, #b91c1c)'
-      : 'linear-gradient(135deg, var(--primary), #0891b2)'
+      ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+      : 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)'
   }),
   permissionsList: {
     display: 'flex',
-    gap: '0.25rem',
+    gap: '0.3rem',
     flexWrap: 'wrap',
-    maxWidth: '300px'
+    maxWidth: '320px'
   },
   permissionBadge: {
     fontSize: '0.7rem',
-    background: 'rgba(6, 182, 212, 0.08)',
-    border: '1px solid rgba(6, 182, 212, 0.15)',
-    color: 'var(--primary)',
-    padding: '0.1rem 0.4rem',
+    fontWeight: 600,
+    background: '#eff6ff',
+    border: '1px solid #bfdbfe',
+    color: '#1d4ed8',
+    padding: '0.15rem 0.45rem',
     borderRadius: '4px'
   },
   adminAllBadge: {
-    fontSize: '0.7rem',
-    background: 'rgba(239, 68, 68, 0.08)',
-    border: '1px solid rgba(239, 68, 68, 0.2)',
-    color: '#fca5a5',
-    padding: '0.1rem 0.4rem',
+    fontSize: '0.72rem',
+    background: '#fee2e2',
+    border: '1px solid #fca5a5',
+    color: '#dc2626',
+    padding: '0.15rem 0.55rem',
     borderRadius: '4px',
-    fontWeight: 'bold'
+    fontWeight: '800',
+    letterSpacing: '0.02em'
   },
   noScreensBadge: {
     fontSize: '0.7rem',
-    background: 'rgba(255, 255, 255, 0.04)',
-    border: '1px solid var(--border-light)',
-    color: 'var(--text-muted)',
-    padding: '0.1rem 0.4rem',
-    borderRadius: '4px'
+    background: '#f1f5f9',
+    border: '1px solid #cbd5e1',
+    color: '#64748b',
+    padding: '0.15rem 0.45rem',
+    borderRadius: '4px',
+    fontWeight: 600
   },
   actionsCell: {
     display: 'flex',
@@ -1129,8 +1229,9 @@ const styles = {
     justifyContent: 'center'
   },
   trashBtn: {
-    color: '#fca5a5',
-    borderColor: 'rgba(239, 68, 68, 0.1)'
+    color: '#dc2626',
+    borderColor: '#fecaca',
+    background: '#fef2f2'
   },
   emptyState: {
     display: 'flex',
@@ -1151,9 +1252,9 @@ const styles = {
     gap: '0.35rem'
   },
   label: {
-    fontSize: '0.8rem',
-    fontWeight: '500',
-    color: '#d1d5db',
+    fontSize: '0.82rem',
+    fontWeight: '700',
+    color: '#1e293b',
     marginLeft: '2px'
   },
   inputWrapper: {
@@ -1164,45 +1265,56 @@ const styles = {
   inputIcon: {
     position: 'absolute',
     left: '0.75rem',
-    color: 'var(--text-muted)'
+    color: '#64748b'
   },
   formInput: {
     width: '100%',
-    paddingLeft: '2.2rem'
+    paddingLeft: '2.2rem',
+    background: '#ffffff',
+    border: '1px solid #cbd5e1',
+    color: '#0f172a',
+    borderRadius: '6px',
+    fontSize: '0.88rem'
   },
   formInputWithoutIcon: {
     width: '100%',
+    background: '#ffffff',
+    border: '1px solid #cbd5e1',
+    color: '#0f172a',
+    borderRadius: '6px',
+    fontSize: '0.88rem'
   },
   selectInput: {
     width: '100%',
     padding: '0.65rem 0.75rem',
-    background: 'rgba(17, 24, 39, 0.7)',
-    border: '1px solid var(--border-light)',
-    color: 'var(--text-primary)',
-    borderRadius: 'var(--radius-sm)',
-    fontSize: '0.9rem',
+    background: '#ffffff',
+    border: '1px solid #cbd5e1',
+    color: '#0f172a',
+    borderRadius: '6px',
+    fontSize: '0.88rem',
+    fontWeight: 600,
     outline: 'none',
   },
   helpText: {
-    fontSize: '0.7rem',
-    color: 'var(--text-muted)',
-    margin: '0 0 0.25rem 2px'
+    fontSize: '0.72rem',
+    color: '#64748b',
+    margin: '0 0 0.25rem 2px',
+    fontWeight: 500
   },
   checkboxGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '0.75rem',
-    background: 'rgba(255, 255, 255, 0.02)',
-    border: '1px solid var(--border-light)',
-    padding: '1rem',
-    borderRadius: 'var(--radius-sm)'
+    gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+    gap: '0.5rem',
   },
   checkboxLabel: {
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
     cursor: 'pointer',
-    color: '#d1d5db',
+    padding: '0.45rem 0.6rem',
+    borderRadius: '6px',
+    border: '1px solid #e2e8f0',
+    transition: 'all 0.15s ease',
     userSelect: 'none'
   },
   checkboxLabelDisabled: {
@@ -1210,7 +1322,10 @@ const styles = {
     cursor: 'not-allowed'
   },
   checkbox: {
-    cursor: 'pointer'
+    cursor: 'pointer',
+    accentColor: '#2563eb',
+    width: '15px',
+    height: '15px'
   },
   formActions: {
     display: 'flex',
@@ -1223,26 +1338,30 @@ const styles = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '0.4rem',
-    fontSize: '0.85rem'
+    fontSize: '0.85rem',
+    borderRadius: '6px',
+    fontWeight: 700
   },
   submitBtn: {
     flex: 1,
     justifyContent: 'center'
   },
   errorBox: {
-    background: 'rgba(239, 68, 68, 0.08)',
-    border: '1px solid rgba(239, 68, 68, 0.15)',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
     borderRadius: '6px',
     padding: '0.65rem 0.75rem',
-    color: '#fca5a5',
-    fontSize: '0.8rem'
+    color: '#dc2626',
+    fontWeight: 700,
+    fontSize: '0.82rem'
   },
   successBox: {
-    background: 'rgba(16, 185, 129, 0.08)',
-    border: '1px solid rgba(16, 185, 129, 0.15)',
+    background: '#f0fdf4',
+    border: '1px solid #bbf7d0',
     borderRadius: '6px',
     padding: '0.65rem 0.75rem',
-    color: '#a7f3d0',
-    fontSize: '0.8rem'
+    color: '#16a34a',
+    fontWeight: 700,
+    fontSize: '0.82rem'
   }
 };
