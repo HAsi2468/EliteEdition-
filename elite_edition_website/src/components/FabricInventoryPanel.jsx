@@ -1617,19 +1617,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <ScreenGroupRoster screenId={department === 'stitching' ? 'jobcards_stitching_challan' : 'jobcards_fabric'} />
                 </div>
                 <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                  Lot Stock Tracking & Delivery Challans
+                  Lot Stock Tracking & Rolls Management
                 </p>
               </div>
             </div>
 
             {/* Entry Buttons Top in Header */}
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => handleOpenChallanModal()}
-                style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#0284c7,#2563eb)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <Truck size={15} /> New Delivery Challan
-              </button>
               <button
                 onClick={() => setIsInwardOpen(true)}
                 style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
