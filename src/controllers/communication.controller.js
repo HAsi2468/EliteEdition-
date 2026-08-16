@@ -28,9 +28,16 @@ const getGroups = async (req, res) => {
       };
     }
 
-    const rooms = await ChatRoom.find(query)
+    let rooms = await ChatRoom.find(query)
       .populate('members', 'name email role permissions')
       .sort({ updatedAt: -1 });
+
+    if (rooms.length === 0) {
+      await syncCommunicationGroups();
+      rooms = await ChatRoom.find(query)
+        .populate('members', 'name email role permissions')
+        .sort({ updatedAt: -1 });
+    }
 
     // Fetch unread count & latest message snippet for each room
     const roomsWithMeta = await Promise.all(
