@@ -1506,16 +1506,16 @@ export default function ReportsCenter({ department }) {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Job #</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Party Name</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Design</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Created Date</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#94a3b8' }}>Status</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#e2e8f0' }}>Job #</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#e2e8f0' }}>Party Name</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#e2e8f0' }}>Design</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#e2e8f0' }}>Created Date</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#e2e8f0' }}>Status</th>
                           </tr>
                         </thead>
                         <tbody>
                           {(!reportData.delayedCards || reportData.delayedCards.length === 0) ? (
-                            <tr><td colSpan="5" style={{ padding: '1rem', textAlign: 'center', color: '#94a3b8' }}>✓ No delayed job cards currently.</td></tr>
+                            <tr><td colSpan="5" style={{ padding: '1rem', textAlign: 'center', color: '#e2e8f0' }}>✓ No delayed job cards currently.</td></tr>
                           ) : (
                             reportData.delayedCards.map((item, idx) => (
                               <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -1540,10 +1540,10 @@ export default function ReportsCenter({ department }) {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Job Number</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Theoretical (m)</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Actual Printed (m)</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Variance</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#e2e8f0' }}>Job Number</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#e2e8f0' }}>Theoretical (m)</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#e2e8f0' }}>Actual Printed (m)</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#e2e8f0' }}>Variance</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1571,11 +1571,11 @@ export default function ReportsCenter({ department }) {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Fabric Quality</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Current Stock</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>7-Day Demand</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>30-Day Demand</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#94a3b8' }}>Status</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#e2e8f0' }}>Fabric Quality</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#e2e8f0' }}>Current Stock</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#e2e8f0' }}>7-Day Demand</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#e2e8f0' }}>30-Day Demand</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#e2e8f0' }}>Status</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1606,9 +1606,9 @@ export default function ReportsCenter({ department }) {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Fusing Date</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#94a3b8' }}>Completed Jobs</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Total Fusing Meters</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#e2e8f0' }}>Fusing Date</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#e2e8f0' }}>Completed Jobs</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#e2e8f0' }}>Total Fusing Meters</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1633,9 +1633,9 @@ export default function ReportsCenter({ department }) {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Party Name</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#94a3b8' }}>Jobs Count</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Total Meterage</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#e2e8f0' }}>Party Name</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#e2e8f0' }}>Jobs Count</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#e2e8f0' }}>Total Meterage</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1660,8 +1660,8 @@ export default function ReportsCenter({ department }) {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Designer Name</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Designs Completed</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#e2e8f0' }}>Designer Name</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#e2e8f0' }}>Designs Completed</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1685,14 +1685,14 @@ export default function ReportsCenter({ department }) {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Material Item</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#94a3b8' }}>Category</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#94a3b8' }}>Remaining Balance</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#e2e8f0' }}>Material Item</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#e2e8f0' }}>Category</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#e2e8f0' }}>Remaining Balance</th>
                           </tr>
                         </thead>
                         <tbody>
                           {(!reportData.lowStockAlerts || reportData.lowStockAlerts.length === 0) ? (
-                            <tr><td colSpan="3" style={{ padding: '1rem', textAlign: 'center', color: '#94a3b8' }}>✓ All raw materials in healthy stock levels.</td></tr>
+                            <tr><td colSpan="3" style={{ padding: '1rem', textAlign: 'center', color: '#e2e8f0' }}>✓ All raw materials in healthy stock levels.</td></tr>
                           ) : (
                             reportData.lowStockAlerts.map((item, idx) => (
                               <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -1710,14 +1710,14 @@ export default function ReportsCenter({ department }) {
 
                 {/* 💵 Operational Expenses */}
                 {activeReportTab === 'expense-reports' && (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                  <div style={{ padding: '2rem', textAlign: 'center', color: '#e2e8f0' }}>
                     💵 Operational Expenses Ledger: Select Date Range above and click Fetch Data to load detailed petty cash transaction logs.
                   </div>
                 )}
 
                 {/* ⚠️ Quality Complaints */}
                 {activeReportTab === 'complaint-reports' && (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                  <div style={{ padding: '2rem', textAlign: 'center', color: '#e2e8f0' }}>
                     ⚠️ Quality Complaint Logs: Select Date Range above and click Fetch Data to load shade defect and printing fault logs.
                   </div>
                 )}
@@ -2713,7 +2713,7 @@ const styles = {
   },
   pageSubtitle: {
     fontSize: '0.8rem',
-    color: 'var(--text-muted)',
+    color: '#cbd5e1',
     marginTop: '2px',
   },
   tabsContainer: {
@@ -2726,7 +2726,7 @@ const styles = {
   tab: {
     background: 'none',
     border: 'none',
-    color: 'var(--text-muted)',
+    color: '#cbd5e1',
     padding: '0.6rem 1.1rem',
     fontSize: '0.85rem',
     fontWeight: '500',
@@ -2739,7 +2739,7 @@ const styles = {
   tabActive: {
     background: 'rgba(6, 182, 212, 0.1)',
     border: '1px solid rgba(6, 182, 212, 0.2)',
-    color: 'var(--text-primary)',
+    color: '#ffffff',
     padding: '0.6rem 1.1rem',
     fontSize: '0.85rem',
     fontWeight: '600',
@@ -2749,22 +2749,22 @@ const styles = {
     gap: '0.4rem',
   },
   subTab: {
-    background: 'none',
-    color: 'var(--text-muted)',
-    padding: '0.4rem 0.8rem',
-    fontSize: '0.8rem',
-    fontWeight: '500',
+    background: 'rgba(255, 255, 255, 0.03)',
+    color: '#cbd5e1',
+    padding: '0.45rem 0.85rem',
+    fontSize: '0.82rem',
+    fontWeight: '600',
     borderRadius: '16px',
     transition: 'all var(--transition-fast)',
-    border: '1px solid transparent',
+    border: '1px solid rgba(255, 255, 255, 0.08)',
   },
   subTabActive: {
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid var(--border-light)',
-    color: 'var(--text-primary)',
-    padding: '0.4rem 0.8rem',
-    fontSize: '0.8rem',
-    fontWeight: '600',
+    background: 'rgba(56, 189, 248, 0.2)',
+    border: '1px solid #38bdf8',
+    color: '#ffffff',
+    padding: '0.45rem 0.85rem',
+    fontSize: '0.82rem',
+    fontWeight: '700',
     borderRadius: '16px',
   },
   filterCard: {
@@ -2785,8 +2785,8 @@ const styles = {
   },
   label: {
     fontSize: '0.75rem',
-    fontWeight: '600',
-    color: 'var(--text-muted)',
+    fontWeight: '700',
+    color: '#e2e8f0',
     display: 'flex',
     alignItems: 'center',
     gap: '0.3rem',
@@ -2796,6 +2796,7 @@ const styles = {
     width: '100%',
     padding: '0.5rem 0.75rem',
     fontSize: '0.85rem',
+    color: '#f8fafc',
   },
   actionsGroup: {
     display: 'flex',
@@ -2833,14 +2834,14 @@ const styles = {
   summaryValue: {
     fontSize: '1.2rem',
     fontWeight: '700',
-    color: 'var(--text-primary)',
+    color: '#ffffff',
   },
   summaryLabel: {
     fontSize: '0.7rem',
-    color: 'var(--text-muted)',
+    color: '#cbd5e1',
     marginTop: '2px',
     textTransform: 'uppercase',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   tableCard: {
     padding: '1.5rem',
