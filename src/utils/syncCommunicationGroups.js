@@ -99,6 +99,11 @@ async function syncCommunicationGroups() {
 
       const memberIds = Array.from(new Set(matchingUsers.map(u => String(u._id))));
 
+      if (room && room.isArchived) {
+        // User/Admin explicitly deleted this group. Do not resurrect it.
+        continue;
+      }
+
       if (!room) {
         room = await ChatRoom.create({
           name: groupDef.name,

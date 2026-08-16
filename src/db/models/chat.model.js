@@ -21,6 +21,11 @@ const chatRoomSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    description: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     // ── Authority-Based Communication Module fields ──
     department: {
       type: String,

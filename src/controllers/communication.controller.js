@@ -306,7 +306,7 @@ const createOrGetDirectRoom = async (req, res) => {
  */
 const createGroup = async (req, res) => {
   try {
-    const { name, department = 'General', permissionScope = 'general', subscribedModules = [], subscribedActions = [] } = req.body;
+    const { name, description = '', department = 'General', permissionScope = 'general', subscribedModules = [], subscribedActions = [] } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Group name is required' });
@@ -330,6 +330,7 @@ const createGroup = async (req, res) => {
 
     const room = await ChatRoom.create({
       name: name.trim(),
+      description: description.trim(),
       type: 'group',
       department: department.trim(),
       permissionScope: permissionScope.trim(),
@@ -349,7 +350,7 @@ const createGroup = async (req, res) => {
 };
 
 /**
- * Delete / Archive a communication group & clean up messages
+ * Delete / Archive a communication group permanently & clean up messages
  */
 const deleteGroup = async (req, res) => {
   try {
@@ -360,8 +361,11 @@ const deleteGroup = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Group not found' });
     }
 
-    // Delete room document & messages
-    await ChatRoom.findByIdAndDelete(groupId);
+    // Mark as archived so syncCommunicationGroups will NEVER resurrect it!
+    room.isArchived = true;
+    await room.save();
+
+    // Clean up message history
     await ChatMessage.deleteMany({ roomId: groupId });
 
     res.json({ success: true, message: 'Group and message history deleted successfully' });
@@ -370,6 +374,7 @@ const deleteGroup = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to delete group', error: error.message });
   }
 };
+
 
 module.exports = {
   getGroups,
