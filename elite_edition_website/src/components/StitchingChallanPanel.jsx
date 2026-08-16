@@ -5,6 +5,8 @@ import { matchSearchQuery } from '../utils/searchUtils';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 
+import DateRangePicker from './DateRangePicker';
+
 const MAX_ITEMS = 30;
 
 const DEFAULT_ITEM = () => ({
@@ -19,8 +21,11 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
   const [challans, setChallans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [datePreset, setDatePreset] = useState('all');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
+  const [customDateStart, setCustomDateStart] = useState('');
+  const [customDateEnd, setCustomDateEnd] = useState('');
   const [selectedChallanIds, setSelectedChallanIds] = useState([]);
 
   const handleMergeSelected = () => {
@@ -299,14 +304,20 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
             style={{ width: '100%', paddingLeft: '2rem', paddingRight: '0.75rem', paddingTop: '0.45rem', paddingBottom: '0.45rem', fontSize: '0.85rem' }}
           />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>From:</span>
-          <input type="date" value={dateStart} onChange={e => setDateStart(e.target.value)} style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem' }} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>To:</span>
-          <input type="date" value={dateEnd} onChange={e => setDateEnd(e.target.value)} style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem' }} />
-        </div>
+        <DateRangePicker
+          preset={datePreset}
+          onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+            setDatePreset(p);
+            setDateStart(ds);
+            setDateEnd(de);
+          }}
+          customStart={customDateStart}
+          customEnd={customDateEnd}
+          onCustomChange={(s, e) => {
+            setCustomDateStart(s);
+            setCustomDateEnd(e);
+          }}
+        />
       </div>
 
       {/* Bulk Action Bar */}

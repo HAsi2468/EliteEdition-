@@ -9,6 +9,7 @@ import DigitalPrintExpenseModule from './DigitalPrintExpenseModule';
 import ScreenGroupRoster from './ScreenGroupRoster';
 import { dispatchScreenGroupEvent } from '../services/screenGroupService';
 import { triggerEliteAlert } from './EliteModalDialog';
+import DateRangePicker from './DateRangePicker';
 import {
   FileText,
   Plus,
@@ -1415,111 +1416,16 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               <span style={{ fontSize: '0.78rem', color: '#a78bfa', fontWeight: 600 }}>({activeRange.labelText})</span>
             </div>
 
-            {/* Date Range Preset Selector Component */}
-            <div style={{ position: 'relative', display: 'inline-block' }}>
-              <button
-                type="button"
-                onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.65rem',
-                  padding: '0.5rem 1.1rem',
-                  borderRadius: '8px',
-                  border: '1.5px solid #a78bfa',
-                  background: 'var(--panel-bg, #1e1b4b)',
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 14px rgba(124, 58, 237, 0.25)',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <Calendar size={16} color="#a78bfa" />
-                <span>{PRESET_OPTIONS.find(p => p.id === datePreset)?.name || 'This Month'}</span>
-                <Calendar size={16} color="#a78bfa" />
-              </button>
-
-              {isDateDropdownOpen && (
-                <>
-                  <div
-                    style={{ position: 'fixed', inset: 0, zIndex: 998 }}
-                    onClick={() => setIsDateDropdownOpen(false)}
-                  />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 'calc(100% + 6px)',
-                      right: 0,
-                      width: '380px',
-                      maxHeight: '400px',
-                      overflowY: 'auto',
-                      background: '#ffffff',
-                      color: '#1e293b',
-                      borderRadius: '10px',
-                      boxShadow: '0 20px 40px rgba(0,0,0,0.35)',
-                      border: '1px solid #cbd5e1',
-                      zIndex: 999,
-                      padding: '0.35rem 0'
-                    }}
-                  >
-                    {PRESET_OPTIONS.map(opt => {
-                      const rangeInfo = getDatePresetRange(opt.id, customDateStart, customDateEnd);
-                      const isSelected = datePreset === opt.id;
-                      return (
-                        <div
-                          key={opt.id}
-                          onClick={() => {
-                            setDatePreset(opt.id);
-                            if (opt.id !== 'custom') setIsDateDropdownOpen(false);
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justify: 'space-between',
-                            padding: '0.65rem 1rem',
-                            cursor: 'pointer',
-                            background: isSelected ? '#f1f5f9' : 'transparent',
-                            borderBottom: '1px solid #f1f5f9',
-                            fontSize: '0.84rem',
-                            transition: 'background 0.15s'
-                          }}
-                        >
-                          <span style={{ fontWeight: isSelected ? 700 : 500, color: isSelected ? '#4338ca' : '#334155' }}>
-                            {opt.name}
-                          </span>
-                          <span style={{ fontWeight: 700, fontSize: '0.78rem', color: isSelected ? '#1e1b4b' : '#64748b' }}>
-                            {rangeInfo.labelText}
-                          </span>
-                        </div>
-                      );
-                    })}
-
-                    {datePreset === 'custom' && (
-                      <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                          <div>
-                            <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>From</label>
-                            <input type="date" value={customDateStart} onChange={e => setCustomDateStart(e.target.value)} style={{ width: '100%', padding: '0.3rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
-                          </div>
-                          <div>
-                            <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>To</label>
-                            <input type="date" value={customDateEnd} onChange={e => setCustomDateEnd(e.target.value)} style={{ width: '100%', padding: '0.3rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px' }} />
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setIsDateDropdownOpen(false)}
-                          style={{ padding: '0.4rem', background: '#4338ca', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
-                        >
-                          Apply Custom Range
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+            <DateRangePicker
+              preset={datePreset}
+              onChange={({ preset: p }) => setDatePreset(p)}
+              customStart={customDateStart}
+              customEnd={customDateEnd}
+              onCustomChange={(s, e) => {
+                setCustomDateStart(s);
+                setCustomDateEnd(e);
+              }}
+            />
           </div>
 
           {/* KPI CARDS GRID */}

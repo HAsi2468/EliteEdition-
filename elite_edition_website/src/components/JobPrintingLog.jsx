@@ -10,6 +10,7 @@ import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import JobCardTooltip from './JobCardTooltip';
+import DateRangePicker from './DateRangePicker';
 
 // Automatic Shift Calculator:
 // Morning Shift: 9:00 AM (09:00) to 8:59 PM (20:59)
@@ -57,8 +58,11 @@ export default function JobPrintingLog() {
   // Filters State
   const [searchJob, setSearchJob] = useState('');
   const [filterMachine, setFilterMachine] = useState('');
+  const [datePreset, setDatePreset] = useState('today');
   const [dateStart, setDateStart] = useState(() => new Date().toISOString().split('T')[0]);
   const [dateEnd, setDateEnd] = useState(() => new Date().toISOString().split('T')[0]);
+  const [customDateStart, setCustomDateStart] = useState('');
+  const [customDateEnd, setCustomDateEnd] = useState('');
 
   // Edit Mode state
   const [editingLogId, setEditingLogId] = useState(null);
@@ -1418,25 +1422,20 @@ export default function JobPrintingLog() {
             {machinesList.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
-            <input
-              type="date"
-              value={dateStart}
-              onChange={e => setDateStart(e.target.value)}
-              style={{ padding: '0.45rem 0.6rem', fontSize: '0.82rem', borderRadius: 4, border: '1px solid var(--border-light)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>To:</span>
-            <input
-              type="date"
-              value={dateEnd}
-              onChange={e => setDateEnd(e.target.value)}
-              style={{ padding: '0.45rem 0.6rem', fontSize: '0.82rem', borderRadius: 4, border: '1px solid var(--border-light)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
-            />
-          </div>
+          <DateRangePicker
+            preset={datePreset}
+            onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+              setDatePreset(p);
+              setDateStart(ds);
+              setDateEnd(de);
+            }}
+            customStart={customDateStart}
+            customEnd={customDateEnd}
+            onCustomChange={(s, e) => {
+              setCustomDateStart(s);
+              setCustomDateEnd(e);
+            }}
+          />
 
           <button onClick={fetchLogs} className="btn-icon" title="Refresh Logs">
             <RefreshCw size={15} className={loading ? 'spin-loader' : ''} />

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
 import { Search, RefreshCw, Save, Check, Clipboard, ChevronLeft, ChevronRight } from 'lucide-react';
 import JobCardTooltip from './JobCardTooltip';
+import DateRangePicker from './DateRangePicker';
 
 export default function JobCardTracking({ onPreview }) {
   const [cards, setCards] = useState([]);
@@ -10,8 +11,11 @@ export default function JobCardTracking({ onPreview }) {
   const [search, setSearch] = useState('');
   
   // Date range filters
+  const [datePreset, setDatePreset] = useState('all');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
+  const [customDateStart, setCustomDateStart] = useState('');
+  const [customDateEnd, setCustomDateEnd] = useState('');
   
   // Pagination
   const [page, setPage] = useState(1);
@@ -210,25 +214,21 @@ export default function JobCardTracking({ onPreview }) {
             />
           </div>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: '0 1 auto' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
-            <input
-              type="date"
-              value={dateStart}
-              onChange={e => { setDateStart(e.target.value); setPage(1); }}
-              style={{ padding: '0.45rem 0.6rem', fontSize: '0.82rem', width: '135px' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: '0 1 auto' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>To:</span>
-            <input
-              type="date"
-              value={dateEnd}
-              onChange={e => { setDateEnd(e.target.value); setPage(1); }}
-              style={{ padding: '0.45rem 0.6rem', fontSize: '0.82rem', width: '135px' }}
-            />
-          </div>
+          <DateRangePicker
+            preset={datePreset}
+            onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+              setDatePreset(p);
+              setDateStart(ds);
+              setDateEnd(de);
+              setPage(1);
+            }}
+            customStart={customDateStart}
+            customEnd={customDateEnd}
+            onCustomChange={(s, e) => {
+              setCustomDateStart(s);
+              setCustomDateEnd(e);
+            }}
+          />
 
           <button onClick={fetchCards} className="btn-icon" title="Refresh">
             <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />

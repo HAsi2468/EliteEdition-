@@ -20,6 +20,7 @@ import StitchingChallanPanel from './StitchingChallanPanel';
 import StitchingSettings from './StitchingSettings';
 import DigitalPrintComplainModule from './DigitalPrintComplainModule';
 import DigitalPrintExpenseModule from './DigitalPrintExpenseModule';
+import DateRangePicker from './DateRangePicker';
 import ScreenGroupRoster from './ScreenGroupRoster';
 import { dispatchScreenGroupEvent } from '../services/screenGroupService';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
@@ -1611,8 +1612,11 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
   const [statusFilter, setStatusFilter] = useState('All');
   const [sortBy, setSortBy] = useState('jobNo');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [datePreset, setDatePreset] = useState('all');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
+  const [customDateStart, setCustomDateStart] = useState('');
+  const [customDateEnd, setCustomDateEnd] = useState('');
   const [formCard, setFormCard] = useState(null);   // null=closed, {}=new, {...}=edit
   const [showForm, setShowForm] = useState(false);
   const [previewCard, setPreviewCard] = useState(null);
@@ -1918,24 +1922,21 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
               placeholder="Search Job No., Party, Design…"
               style={{ paddingLeft:32, width:'100%', fontSize:'0.85rem' }}/>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
-            <input
-              type="date"
-              value={dateStart}
-              onChange={e => { setDateStart(e.target.value); setPage(1); }}
-              style={{ padding: '0.45rem 0.6rem', fontSize: '0.82rem', width: '135px', borderRadius: '4px', border: '1px solid var(--border-light)', background: 'var(--nav-bg)', color: 'var(--text-primary)' }}
-            />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>To:</span>
-            <input
-              type="date"
-              value={dateEnd}
-              onChange={e => { setDateEnd(e.target.value); setPage(1); }}
-              style={{ padding: '0.45rem 0.6rem', fontSize: '0.82rem', width: '135px', borderRadius: '4px', border: '1px solid var(--border-light)', background: 'var(--nav-bg)', color: 'var(--text-primary)' }}
-            />
-          </div>
+          <DateRangePicker
+            preset={datePreset}
+            onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+              setDatePreset(p);
+              setDateStart(ds);
+              setDateEnd(de);
+              setPage(1);
+            }}
+            customStart={customDateStart}
+            customEnd={customDateEnd}
+            onCustomChange={(s, e) => {
+              setCustomDateStart(s);
+              setCustomDateEnd(e);
+            }}
+          />
           {['All','Pending','In Progress','Done'].map(s=>(
             <button key={s} onClick={()=>{ setStatusFilter(s); setPage(1); }}
               style={{ padding:'0.45rem 0.9rem', fontSize:'0.8rem', borderRadius:'var(--radius-sm)',

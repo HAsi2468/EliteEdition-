@@ -8,6 +8,7 @@ import { matchSearchQuery } from '../utils/searchUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 
 import PKDOrdersImportModal from './PKDOrdersImportModal';
+import DateRangePicker from './DateRangePicker';
 
 const PIPELINE_STAGES = [
   { stage_number: 1, key: '1_fabric_order', name: 'Fabric Order', icon: '🧵', color: '#60a5fa', desc: 'Fabric Procurement & Requisition' },
@@ -30,8 +31,11 @@ export default function GarmentJobCardDashboard() {
 
   // Filters
   const [search, setSearch] = useState('');
+  const [datePreset, setDatePreset] = useState('all');
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
+  const [customDateStart, setCustomDateStart] = useState('');
+  const [customDateEnd, setCustomDateEnd] = useState('');
   const [designFilter, setDesignFilter] = useState('');
   const [vendorFilter, setVendorFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -418,19 +422,19 @@ export default function GarmentJobCardDashboard() {
           />
         </div>
 
-        <input
-          type="date"
-          title="Start Date"
-          value={dateStart}
-          onChange={e => setDateStart(e.target.value)}
-          style={filterInputStyle}
-        />
-        <input
-          type="date"
-          title="End Date"
-          value={dateEnd}
-          onChange={e => setDateEnd(e.target.value)}
-          style={filterInputStyle}
+        <DateRangePicker
+          preset={datePreset}
+          onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+            setDatePreset(p);
+            setDateStart(ds);
+            setDateEnd(de);
+          }}
+          customStart={customDateStart}
+          customEnd={customDateEnd}
+          onCustomChange={(s, e) => {
+            setCustomDateStart(s);
+            setCustomDateEnd(e);
+          }}
         />
 
         <input

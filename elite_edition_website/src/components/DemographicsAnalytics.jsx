@@ -13,6 +13,8 @@ import {
   ToggleRight,
 } from 'lucide-react';
 
+import DateRangePicker from './DateRangePicker';
+
 const fmt = (n) => Number(n || 0).toLocaleString('en-IN');
 const fmtCurrency = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
@@ -21,11 +23,11 @@ export default function DemographicsAnalytics() {
   const [demoData, setDemoData] = useState(null);
   const [heatmapData, setHeatmapData] = useState(null);
   const [heatmapLoading, setHeatmapLoading] = useState(false);
-  const [dateStart, setDateStart] = useState(() => {
-    const d = new Date(); d.setFullYear(d.getFullYear() - 1);
-    return d.toISOString().split('T')[0];
-  });
-  const [dateEnd, setDateEnd] = useState(() => new Date().toISOString().split('T')[0]);
+  const [datePreset, setDatePreset] = useState('all');
+  const [dateStart, setDateStart] = useState('');
+  const [dateEnd, setDateEnd] = useState('');
+  const [customDateStart, setCustomDateStart] = useState('');
+  const [customDateEnd, setCustomDateEnd] = useState('');
   const [stateFilter, setStateFilter] = useState('');
   const [heatmapDimension, setHeatmapDimension] = useState('category'); // 'category' | 'color'
   const [sortField, setSortField] = useState('orders');
@@ -85,15 +87,20 @@ export default function DemographicsAnalytics() {
         <div style={styles.filterLeft}>
           <Filter size={14} color="var(--primary)" />
           <span style={styles.filterLabel}>Filters</span>
-          <div style={styles.inputGroup}>
-            <Calendar size={12} color="var(--text-muted)" />
-            <input type="date" value={dateStart} onChange={(e) => setDateStart(e.target.value)} style={styles.dateInput} />
-          </div>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>to</span>
-          <div style={styles.inputGroup}>
-            <Calendar size={12} color="var(--text-muted)" />
-            <input type="date" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)} style={styles.dateInput} />
-          </div>
+          <DateRangePicker
+            preset={datePreset}
+            onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+              setDatePreset(p);
+              setDateStart(ds);
+              setDateEnd(de);
+            }}
+            customStart={customDateStart}
+            customEnd={customDateEnd}
+            onCustomChange={(s, e) => {
+              setCustomDateStart(s);
+              setCustomDateEnd(e);
+            }}
+          />
           {demoData && demoData.availableStates && (
             <select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} style={styles.selectInput}>
               <option value="">All States</option>

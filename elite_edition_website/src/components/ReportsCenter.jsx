@@ -21,6 +21,8 @@ import {
   X
 } from 'lucide-react';
 
+import DateRangePicker from './DateRangePicker';
+
 export default function ReportsCenter({ department }) {
   const [activeDepartment, setActiveDepartment] = useState(() => {
     if (department === 'elite-online') return 'sales';
@@ -30,8 +32,14 @@ export default function ReportsCenter({ department }) {
     if (department === 'elite-online') return 'sales';
     return 'smart-dashboard';
   }); 
-  const [dateStart, setDateStart] = useState(() => new Date().toISOString().split('T')[0]);
+  const [datePreset, setDatePreset] = useState('this_month');
+  const [dateStart, setDateStart] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  });
   const [dateEnd, setDateEnd] = useState(() => new Date().toISOString().split('T')[0]);
+  const [customDateStart, setCustomDateStart] = useState('');
+  const [customDateEnd, setCustomDateEnd] = useState('');
   const [timeStart, setTimeStart] = useState('00:00');
   const [timeEnd, setTimeEnd] = useState('23:59');
   const [searchCode, setSearchCode] = useState('');
@@ -506,42 +514,22 @@ export default function ReportsCenter({ department }) {
       <div className="glass-panel" style={styles.filterCard}>
         <div style={styles.filterRow}>
           {activeReportTab !== 'stock-value' && (
-            <>
-              <div style={styles.filterItem}>
-                <label style={styles.label}><Calendar size={13} /> Start Date</label>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                  <input 
-                    type="date" 
-                    value={dateStart} 
-                    onChange={(e) => setDateStart(e.target.value)} 
-                    style={styles.input} 
-                  />
-                  <input 
-                    type="time" 
-                    value={timeStart} 
-                    onChange={(e) => setTimeStart(e.target.value)} 
-                    style={{ ...styles.input, width: '90px' }} 
-                  />
-                </div>
-              </div>
-              <div style={styles.filterItem}>
-                <label style={styles.label}><Calendar size={13} /> End Date</label>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                  <input 
-                    type="date" 
-                    value={dateEnd} 
-                    onChange={(e) => setDateEnd(e.target.value)} 
-                    style={styles.input} 
-                  />
-                  <input 
-                    type="time" 
-                    value={timeEnd} 
-                    onChange={(e) => setTimeEnd(e.target.value)} 
-                    style={{ ...styles.input, width: '90px' }} 
-                  />
-                </div>
-              </div>
-            </>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <DateRangePicker
+                preset={datePreset}
+                onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                  setDatePreset(p);
+                  setDateStart(ds);
+                  setDateEnd(de);
+                }}
+                customStart={customDateStart}
+                customEnd={customDateEnd}
+                onCustomChange={(s, e) => {
+                  setCustomDateStart(s);
+                  setCustomDateEnd(e);
+                }}
+              />
+            </div>
           )}
 
           {(activeReportTab === 'sales' || activeReportTab === 'brand' || activeReportTab === 'brand-hourly') && (

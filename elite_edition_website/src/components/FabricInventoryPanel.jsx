@@ -7,6 +7,7 @@ import { dispatchScreenGroupEvent } from '../services/screenGroupService';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
+import DateRangePicker from './DateRangePicker';
 import {
   RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
   Layers, Database, Settings, Trash2, FileDown, Search, X,
@@ -63,8 +64,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [challanStatusFilter, setChallanStatusFilter] = useState('All');
   // Ref to always hold latest challan filter values — prevents stale closure in setInterval
   const challanFiltersRef = useRef({ search: '', dateStart: '', dateEnd: '', status: 'All' });
+  const [challanDatePreset, setChallanDatePreset] = useState('all');
   const [challanDateStart, setChallanDateStart] = useState('');
   const [challanDateEnd, setChallanDateEnd] = useState('');
+  const [customChallanDateStart, setCustomChallanDateStart] = useState('');
+  const [customChallanDateEnd, setCustomChallanDateEnd] = useState('');
   const [isChallanOpen, setIsChallanOpen] = useState(false);
   const [editingChallan, setEditingChallan] = useState(null);
   const [challanLotLoading, setChallanLotLoading] = useState(false);
@@ -3340,14 +3344,20 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <option value="INVOICED">Invoiced</option>
                 </select>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
-                <input type="date" value={challanDateStart} onChange={e => setChallanDateStart(e.target.value)} style={{ ...inputStyle, width: '130px', padding: '0.35rem 0.5rem' }} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>To:</span>
-                <input type="date" value={challanDateEnd} onChange={e => setChallanDateEnd(e.target.value)} style={{ ...inputStyle, width: '130px', padding: '0.35rem 0.5rem' }} />
-              </div>
+              <DateRangePicker
+                preset={challanDatePreset}
+                onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                  setChallanDatePreset(p);
+                  setChallanDateStart(ds);
+                  setChallanDateEnd(de);
+                }}
+                customStart={customChallanDateStart}
+                customEnd={customChallanDateEnd}
+                onCustomChange={(s, e) => {
+                  setCustomChallanDateStart(s);
+                  setCustomChallanDateEnd(e);
+                }}
+              />
               <button className="btn-primary" onClick={() => { resetChallanForm(); setEditingChallan(null); setIsChallanOpen(true); }} style={{ padding: '0.45rem 1rem', fontSize: '0.85rem', fontWeight: 800 }}>
                 <PlusCircle size={16} /> New Challan
               </button>
