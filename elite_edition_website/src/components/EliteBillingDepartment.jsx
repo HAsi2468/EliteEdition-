@@ -933,7 +933,14 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
   useEffect(() => {
     if (initialChallanData) {
-      loadInvoiceFromChallan(initialChallanData);
+      if (initialChallanData.isJobCardChallan) {
+        setActiveTab('challans');
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('open-new-challan', { detail: initialChallanData }));
+        }, 100);
+      } else {
+        loadInvoiceFromChallan(initialChallanData);
+      }
     }
   }, [initialChallanData]);
 

@@ -766,9 +766,25 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   }, [isChallanOpen, isInwardOpen, isOutwardOpen, isSaFormOpen, isTransferFormOpen]);
 
   useEffect(() => {
-    const handleOpenModal = () => {
+    const handleOpenModal = (event) => {
       resetChallanForm();
       setEditingChallan(null);
+      if (event && event.detail) {
+        const d = event.detail;
+        const totalMtrVal = parseFloat(d.totalMtr) || parseFloat(d.pcs) || '';
+        setChallanForm(prev => ({
+          ...prev,
+          date: d.date ? String(d.date).split('T')[0] : new Date().toISOString().split('T')[0],
+          partyName: d.party || d.partyName || d.customerName || '',
+          billTo: d.party || d.partyName || d.customerName || '',
+          jobNo: d.jobNo || '',
+          fabricName: d.fabric || d.fabricName || '',
+          designNo: d.designNo || d.designName || '',
+          lotNo: d.lotNo || '',
+          vendorChallanNo: d.partyChallan || d.vendorChallanNo || '',
+          tpDetails: totalMtrVal ? [{ id: 1, tpNo: 1, tpMeter: String(totalMtrVal) }] : emptyTpRows()
+        }));
+      }
       setIsChallanOpen(true);
     };
     window.addEventListener('open-new-challan', handleOpenModal);

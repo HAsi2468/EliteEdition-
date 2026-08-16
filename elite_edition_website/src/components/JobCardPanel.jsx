@@ -1810,6 +1810,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
 
   const handleSendToBilling = (c) => {
     const challanData = {
+      isJobCardChallan: true,
       challanNo: c.billNo || c.ourChallanNo || c.jobNo,
       jobNo: c.jobNo,
       party: c.party,
@@ -1821,6 +1822,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
       vendorChallanNo: c.partyChallan,
       ourChallanNo: c.ourChallanNo || c.jobNo,
       date: c.date,
+      totalMtr: c.totalMtr,
       items: [
         {
           designNo: c.designNo || c.designName,
