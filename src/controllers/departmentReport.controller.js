@@ -206,71 +206,87 @@ const getElitePrintReports = async (req, res) => {
     ]);
 
     // 10. Average print-to-delivery days
-    const printToDelivery = await JobCard.aggregate([
-      {
-        $match: {
-          ...matchStage,
-          printDate: { $exists: true, $ne: "" },
-          deliveryDate: { $exists: true, $ne: "" }
-        }
-      },
-      {
-        $project: {
-          daysDiff: {
-            $divide: [
-              {
-                $subtract: [
-                  { $dateFromString: { dateString: "$deliveryDate" } },
-                  { $dateFromString: { dateString: "$printDate" } }
-                ]
-              },
-              1000 * 60 * 60 * 24
-            ]
+    let avgPrintToDeliveryDays = 0;
+    try {
+      const printToDelivery = await JobCard.aggregate([
+        {
+          $match: {
+            ...matchStage,
+            printDate: { $exists: true, $ne: "" },
+            deliveryDate: { $exists: true, $ne: "" }
+          }
+        },
+        {
+          $project: {
+            daysDiff: {
+              $divide: [
+                {
+                  $subtract: [
+                    { $dateFromString: { dateString: "$deliveryDate", onError: null, onNull: null } },
+                    { $dateFromString: { dateString: "$printDate", onError: null, onNull: null } }
+                  ]
+                },
+                1000 * 60 * 60 * 24
+              ]
+            }
+          }
+        },
+        {
+          $match: { daysDiff: { $ne: null } }
+        },
+        {
+          $group: {
+            _id: null,
+            avgDays: { $avg: "$daysDiff" },
+            count: { $sum: 1 }
           }
         }
-      },
-      {
-        $group: {
-          _id: null,
-          avgDays: { $avg: "$daysDiff" },
-          count: { $sum: 1 }
-        }
+      ]);
+      if (printToDelivery[0] && printToDelivery[0].avgDays != null) {
+        avgPrintToDeliveryDays = Number(printToDelivery[0].avgDays.toFixed(1));
       }
-    ]);
+    } catch (err) {
+      console.error('Error calculating print to delivery days:', err);
+    }
 
     // 11. Bottleneck Stage Analysis
-    const stageTimes = await JobCard.aggregate([
-      { $match: matchStage },
-      {
-        $project: {
-          dateObj: { $cond: { if: { $and: ["$date", { $ne: ["$date", ""] }] }, then: { $dateFromString: { dateString: "$date" } }, else: null } },
-          printDateObj: { $cond: { if: { $and: ["$printDate", { $ne: ["$printDate", ""] }] }, then: { $dateFromString: { dateString: "$printDate" } }, else: null } },
-          fusingDateObj: { $cond: { if: { $and: ["$fusingDate", { $ne: ["$fusingDate", ""] }] }, then: { $dateFromString: { dateString: "$fusingDate" } }, else: null } },
-          deliveryDateObj: { $cond: { if: { $and: ["$deliveryDate", { $ne: ["$deliveryDate", ""] }] }, then: { $dateFromString: { dateString: "$deliveryDate" } }, else: null } },
+    let bottleneck = { avgPrintHrs: 0, avgFusingHrs: 0, avgDeliveryHrs: 0 };
+    try {
+      const stageTimes = await JobCard.aggregate([
+        { $match: matchStage },
+        {
+          $project: {
+            dateObj: { $cond: { if: { $and: ["$date", { $ne: ["$date", ""] }] }, then: { $dateFromString: { dateString: "$date", onError: null, onNull: null } }, else: null } },
+            printDateObj: { $cond: { if: { $and: ["$printDate", { $ne: ["$printDate", ""] }] }, then: { $dateFromString: { dateString: "$printDate", onError: null, onNull: null } }, else: null } },
+            fusingDateObj: { $cond: { if: { $and: ["$fusingDate", { $ne: ["$fusingDate", ""] }] }, then: { $dateFromString: { dateString: "$fusingDate", onError: null, onNull: null } }, else: null } },
+            deliveryDateObj: { $cond: { if: { $and: ["$deliveryDate", { $ne: ["$deliveryDate", ""] }] }, then: { $dateFromString: { dateString: "$deliveryDate", onError: null, onNull: null } }, else: null } },
+          }
+        },
+        {
+          $project: {
+            printDuration: { $cond: { if: { $and: ["$dateObj", "$printDateObj"] }, then: { $subtract: ["$printDateObj", "$dateObj"] }, else: null } },
+            fusingDuration: { $cond: { if: { $and: ["$printDateObj", "$fusingDateObj"] }, then: { $subtract: ["$fusingDateObj", "$printDateObj"] }, else: null } },
+            deliveryDuration: { $cond: { if: { $and: ["$fusingDateObj", "$deliveryDateObj"] }, then: { $subtract: ["$deliveryDateObj", "$fusingDateObj"] }, else: null } },
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            avgPrintHrs: { $avg: { $divide: ["$printDuration", 1000 * 60 * 60] } },
+            avgFusingHrs: { $avg: { $divide: ["$fusingDuration", 1000 * 60 * 60] } },
+            avgDeliveryHrs: { $avg: { $divide: ["$deliveryDuration", 1000 * 60 * 60] } },
+          }
         }
-      },
-      {
-        $project: {
-          printDuration: { $cond: { if: { $and: ["$dateObj", "$printDateObj"] }, then: { $subtract: ["$printDateObj", "$dateObj"] }, else: null } },
-          fusingDuration: { $cond: { if: { $and: ["$printDateObj", "$fusingDateObj"] }, then: { $subtract: ["$fusingDateObj", "$printDateObj"] }, else: null } },
-          deliveryDuration: { $cond: { if: { $and: ["$fusingDateObj", "$deliveryDateObj"] }, then: { $subtract: ["$deliveryDateObj", "$fusingDateObj"] }, else: null } },
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          avgPrintHrs: { $avg: { $divide: ["$printDuration", 1000 * 60 * 60] } },
-          avgFusingHrs: { $avg: { $divide: ["$fusingDuration", 1000 * 60 * 60] } },
-          avgDeliveryHrs: { $avg: { $divide: ["$deliveryDuration", 1000 * 60 * 60] } },
-        }
-      }
-    ]);
-    const avgTimes = stageTimes[0] || {};
-    const bottleneck = {
-      avgPrintHrs: avgTimes.avgPrintHrs ? Number(avgTimes.avgPrintHrs.toFixed(1)) : 0,
-      avgFusingHrs: avgTimes.avgFusingHrs ? Number(avgTimes.avgFusingHrs.toFixed(1)) : 0,
-      avgDeliveryHrs: avgTimes.avgDeliveryHrs ? Number(avgTimes.avgDeliveryHrs.toFixed(1)) : 0
-    };
+      ]);
+      const avgTimes = stageTimes[0] || {};
+      bottleneck = {
+        avgPrintHrs: avgTimes.avgPrintHrs ? Number(avgTimes.avgPrintHrs.toFixed(1)) : 0,
+        avgFusingHrs: avgTimes.avgFusingHrs ? Number(avgTimes.avgFusingHrs.toFixed(1)) : 0,
+        avgDeliveryHrs: avgTimes.avgDeliveryHrs ? Number(avgTimes.avgDeliveryHrs.toFixed(1)) : 0
+      };
+    } catch (err) {
+      console.error('Error calculating bottleneck times:', err);
+    }
 
     // Delayed Job Cards (not Done, older than 7 days)
     const sevenDaysAgo = new Date();
@@ -424,7 +440,7 @@ const getElitePrintReports = async (req, res) => {
         topDesigns,
         busiestParties,
         fabricTrends,
-        avgPrintToDelivery: printToDelivery[0] ? Number(printToDelivery[0].avgDays.toFixed(1)) : 0,
+        avgPrintToDelivery: avgPrintToDeliveryDays,
         bottleneck,
         delayedCards,
         fabricForecasts,
