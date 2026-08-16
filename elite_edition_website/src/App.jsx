@@ -14,6 +14,7 @@ import JobCardPanel from './components/JobCardPanel';
 import StitchingSettings from './components/StitchingSettings';
 import AdminPanel from './components/AdminPanel';
 import Workspace from './components/Workspace';
+import CommunicationPanel from './components/CommunicationPanel';
 import EliteModalDialog from './components/EliteModalDialog';
 
 // Code-splitting lazy loads for heavy tab modules
@@ -669,12 +670,12 @@ export default function App() {
 
             {hasWorkspaceAccess && (
               <button
-                onClick={() => { setActiveTab('workspace'); setMobileMenuOpen(false); }}
-                className={`dept-switch-btn ${activeTab === 'workspace' ? 'active' : ''}`}
-                title="Open Workspace / Chat"
+                onClick={() => { setActiveTab('communication'); setMobileMenuOpen(false); }}
+                className={`dept-switch-btn ${activeTab === 'communication' || activeTab === 'workspace' ? 'active' : ''}`}
+                title="Open Department Communication & Activity Stream"
               >
                 <MessageSquare size={15} />
-                <span>Workspace / Chat</span>
+                <span>Inter-Dept Communication</span>
               </button>
             )}
           </div>
@@ -1452,6 +1453,8 @@ export default function App() {
             <UnicommerceHub />
           ) : activeTab === 'myntra' ? (
             <MyntraHub />
+          ) : activeTab === 'communication' ? (
+            <CommunicationPanel currentUser={currentUser} onNavigateTab={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'workspace' ? null : activeTab === 'admin' ? (
             <AdminPanel />
           ) : (

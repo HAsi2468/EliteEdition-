@@ -4,6 +4,7 @@ const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
+const { publishActivity } = require('../utils/activityEvent');
 
 // ─── Google Drive URL converter ───────────────────────────────────────────────
 function convertDriveUrl(link) {
@@ -272,6 +273,20 @@ const createJobCard = async (req, res) => {
     if (body.panna && body.pass && body.totalMtr && body.machineName)
       body.expTime = calcExpTime(body.panna, body.pass, body.totalMtr, body.machineName);
     const card = await db.JobCard.create(body);
+
+    // Publish Authority Activity Event
+    publishActivity({
+      actorId: req.user?._id,
+      actorName: req.user?.name || body.createdBy || 'Operator',
+      action: 'CREATE',
+      module: 'Job Card',
+      recordRef: card.jobNo || 'N/A',
+      recordId: card._id,
+      permissionScope: 'jobcards',
+      department: 'Production',
+      description: `📋 **New Job Card #${card.jobNo || ''}** created for party **"${card.party || 'Client'}"** (${card.totalMtr || 0}m, ${card.machineName || 'Machine'}) by ${req.user?.name || body.createdBy || 'Operator'}.`
+    }).catch(e => logger.warn('publishActivity failed on job card create: %s', e.message));
+
     res.status(201).json(card);
   } catch (err) {
     logger.error('createJobCard error: %o', err);
@@ -306,6 +321,20 @@ const updateJobCard = async (req, res) => {
     else if (printStatus==='Printing Done' || fusingStatus==='Fusing Done' || deliveryStatus==='Delivery Done') body.status='In Progress';
     else body.status='Pending';
     const card = await db.JobCard.findByIdAndUpdate(req.params.id, body, { new:true, runValidators:true }).lean();
+
+    // Publish Authority Activity Event
+    publishActivity({
+      actorId: req.user?._id,
+      actorName: req.user?.name || 'Operator',
+      action: 'UPDATE',
+      module: 'Job Card',
+      recordRef: card.jobNo || 'N/A',
+      recordId: card._id,
+      permissionScope: 'jobcards',
+      department: 'Production',
+      description: `🔄 **Job Card #${card.jobNo || ''}** updated: Status **'${card.status}'** (Print: ${card.printStatus || 'Pending'}, Fusing: ${card.fusingStatus || 'Pending'}) by ${req.user?.name || 'Operator'}.`
+    }).catch(e => logger.warn('publishActivity failed on job card update: %s', e.message));
+
     res.json(card);
   } catch (err) {
     logger.error('updateJobCard error: %o', err);

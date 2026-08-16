@@ -1976,9 +1976,9 @@ export default function JobPrintingLog() {
             style={{
               width: '100%', maxWidth: 1020,
               background: '#ffffff',
-              border: '1px solid rgba(0,0,0,0.09)',
-              borderRadius: '18px',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(16,185,129,0.08)',
+              border: '1px solid #e2e8f0',
+              borderRadius: '14px',
+              boxShadow: '0 20px 60px rgba(15,23,42,0.14), 0 4px 16px rgba(37,99,235,0.06)',
               display: 'flex', flexDirection: 'column', gap: 0,
               overflow: 'hidden',
               animation: 'scaleUp 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
@@ -1987,7 +1987,7 @@ export default function JobPrintingLog() {
 
             {/* ── MODAL HEADER ── */}
             <div style={{
-              background: 'linear-gradient(135deg, #f0fdf4 0%, #fffbeb 100%)',
+              background: '#f8fafc',
               borderBottom: '1.5px solid #e2e8f0',
               padding: '0.85rem 1.1rem',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center'
@@ -1996,9 +1996,9 @@ export default function JobPrintingLog() {
                 {/* Dual-gradient icon */}
                 <div style={{
                   width: 38, height: 38, borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #10b981 0%, #f59e0b 100%)',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 4px 14px rgba(16,185,129,0.4), 0 4px 14px rgba(245,158,11,0.2)',
+                  boxShadow: '0 4px 14px rgba(37,99,235,0.3)',
                   flexShrink: 0
                 }}>
                   <Sparkles size={18} color="#fff" />
@@ -2086,22 +2086,22 @@ export default function JobPrintingLog() {
 
                   {/* Inward Badge */}
                   <div style={{
-                    background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                     borderRadius: '8px', padding: '0.4rem 0.7rem',
                     display: 'flex', alignItems: 'center', gap: '6px',
-                    boxShadow: '0 4px 14px rgba(5,150,105,0.35)'
+                    boxShadow: '0 4px 14px rgba(37,99,235,0.25)'
                   }}>
                     <ArrowDownToLine size={14} color="#fff" />
                     <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#fff', letterSpacing: '0.3px' }}>📥 50% INWARD (STOCK RECEIVED / IN)</span>
                   </div>
 
                   {/* Ink Inward Card */}
-                  <div style={{ background: '#fff', borderRadius: '10px', border: '2px solid #10b981', padding: '0.6rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', boxShadow: '0 4px 16px rgba(16,185,129,0.12)' }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💧 INK INWARD (LITERS)</div>
+                  <div style={{ background: '#fff', borderRadius: '10px', border: '1.5px solid #2563eb', padding: '0.6rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', boxShadow: '0 4px 16px rgba(37,99,235,0.08)' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💧 INK INWARD (LITERS)</div>
 
                     {/* Grando Ink — Inward */}
-                    <div style={{ background: '#f0fdf4', borderRadius: '7px', border: '1px solid #bbf7d0', padding: '0.4rem 0.5rem' }}>
-                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#047857', marginBottom: '5px' }}>🖨️ GRANDO INK</div>
+                    <div style={{ background: '#eff6ff', borderRadius: '7px', border: '1px solid #bfdbfe', padding: '0.4rem 0.5rem' }}>
+                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1d4ed8', marginBottom: '5px' }}>🖨️ GRANDO INK</div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
                         {[['C','#0284c7',grandoInC,setGrandoInC],['M','#db2777',grandoInM,setGrandoInM],['Y','#ca8a04',grandoInY,setGrandoInY],['K','#334155',grandoInK,setGrandoInK]].map(([ch,col,val,set]) => (
                           <div key={ch}>
@@ -2114,8 +2114,8 @@ export default function JobPrintingLog() {
                     </div>
 
                     {/* PrintDot Ink — Inward */}
-                    <div style={{ background: '#f0fdf4', borderRadius: '7px', border: '1px solid #bbf7d0', padding: '0.4rem 0.5rem' }}>
-                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#047857', marginBottom: '5px' }}>🖨️ PRINTDOT INK</div>
+                    <div style={{ background: '#eff6ff', borderRadius: '7px', border: '1px solid #bfdbfe', padding: '0.4rem 0.5rem' }}>
+                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1d4ed8', marginBottom: '5px' }}>🖨️ PRINTDOT INK</div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
                         {[['C','#0284c7',printdotInC,setPrintdotInC],['M','#db2777',printdotInM,setPrintdotInM],['Y','#ca8a04',printdotInY,setPrintdotInY],['K','#334155',printdotInK,setPrintdotInK]].map(([ch,col,val,set]) => (
                           <div key={ch}>
@@ -2129,31 +2129,31 @@ export default function JobPrintingLog() {
                   </div>
 
                   {/* Paper Inward Card */}
-                  <div style={{ background: '#fff', borderRadius: '10px', border: '2px solid #10b981', padding: '0.6rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', boxShadow: '0 4px 16px rgba(16,185,129,0.12)' }}>
+                  <div style={{ background: '#fff', borderRadius: '10px', border: '1.5px solid #2563eb', padding: '0.6rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', boxShadow: '0 4px 16px rgba(37,99,235,0.08)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📜 PAPER INWARD (STOCK IN)</div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📜 PAPER INWARD (STOCK IN)</div>
                       <button type="button" onClick={handleAddInwardPaperEntry}
-                        style={{ padding: '0.15rem 0.5rem', fontSize: '0.67rem', fontWeight: 800, background: '#dcfce7', color: '#059669', border: '1px solid #86efac', borderRadius: '5px', cursor: 'pointer', transition: 'all 0.15s' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = '#bbf7d0'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = '#dcfce7'; }}
+                        style={{ padding: '0.15rem 0.5rem', fontSize: '0.67rem', fontWeight: 800, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '5px', cursor: 'pointer', transition: 'all 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#dbeafe'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff'; }}
                       >+ Add Row</button>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                       {inwardPaperEntries.map((entry, index) => (
                         <div key={entry.id} style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', background: '#f8fafc', padding: '0.2rem 0.4rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                          <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#059669', minWidth: 18 }}>#{index+1}</span>
+                          <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#2563eb', minWidth: 18 }}>#{index+1}</span>
                           <div style={{ flex: 1 }}>
-                            <select value={entry.paperType} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperType', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #10b981', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
+                            <select value={entry.paperType} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperType', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
                               {(paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']).map((p, pIdx) => <option key={pIdx} value={p}>{p}</option>)}
                             </select>
                           </div>
                           <div style={{ flex: 1 }}>
-                            <select value={entry.paperPanna} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperPanna', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #10b981', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
+                            <select value={entry.paperPanna} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperPanna', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
                               {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>)}
                             </select>
                           </div>
                           <div style={{ width: '62px' }}>
-                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #10b981', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} />
+                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} />
                           </div>
                           {inwardPaperEntries.length > 1 && (
                             <button type="button" onClick={() => handleRemoveInwardPaperEntry(entry.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.1rem', display: 'flex', alignItems: 'center' }}><Trash2 size={13} /></button>
@@ -2170,22 +2170,22 @@ export default function JobPrintingLog() {
 
                   {/* Outward Badge */}
                   <div style={{
-                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                    background: 'linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%)',
                     borderRadius: '8px', padding: '0.4rem 0.7rem',
                     display: 'flex', alignItems: 'center', gap: '6px',
-                    boxShadow: '0 4px 14px rgba(245,158,11,0.35)'
+                    boxShadow: '0 4px 14px rgba(30,64,175,0.25)'
                   }}>
                     <ArrowUpFromLine size={14} color="#fff" />
                     <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#fff', letterSpacing: '0.3px' }}>📤 50% OUTWARD (USAGE / CONSUMPTION)</span>
                   </div>
 
                   {/* Ink Outward Card */}
-                  <div style={{ background: '#fff', borderRadius: '10px', border: '2px solid #f59e0b', padding: '0.6rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', boxShadow: '0 4px 16px rgba(245,158,11,0.12)' }}>
-                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💧 INK USAGE (LITERS)</div>
+                  <div style={{ background: '#fff', borderRadius: '10px', border: '1.5px solid #1e40af', padding: '0.6rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', boxShadow: '0 4px 16px rgba(30,64,175,0.08)' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>💧 INK USAGE (LITERS)</div>
 
                     {/* Grando Ink — Outward */}
-                    <div style={{ background: '#fffbeb', borderRadius: '7px', border: '1px solid #fde68a', padding: '0.4rem 0.5rem' }}>
-                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#b45309', marginBottom: '5px' }}>🖨️ GRANDO INK</div>
+                    <div style={{ background: '#f0f7ff', borderRadius: '7px', border: '1px solid #93c5fd', padding: '0.4rem 0.5rem' }}>
+                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1e3a8a', marginBottom: '5px' }}>🖨️ GRANDO INK</div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
                         {[['C','#0284c7',grandoOutC,setGrandoOutC],['M','#db2777',grandoOutM,setGrandoOutM],['Y','#ca8a04',grandoOutY,setGrandoOutY],['K','#334155',grandoOutK,setGrandoOutK]].map(([ch,col,val,set]) => (
                           <div key={ch}>
@@ -2198,8 +2198,8 @@ export default function JobPrintingLog() {
                     </div>
 
                     {/* PrintDot Ink — Outward */}
-                    <div style={{ background: '#fffbeb', borderRadius: '7px', border: '1px solid #fde68a', padding: '0.4rem 0.5rem' }}>
-                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#b45309', marginBottom: '5px' }}>🖨️ PRINTDOT INK</div>
+                    <div style={{ background: '#f0f7ff', borderRadius: '7px', border: '1px solid #93c5fd', padding: '0.4rem 0.5rem' }}>
+                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1e3a8a', marginBottom: '5px' }}>🖨️ PRINTDOT INK</div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
                         {[['C','#0284c7',printdotOutC,setPrintdotOutC],['M','#db2777',printdotOutM,setPrintdotOutM],['Y','#ca8a04',printdotOutY,setPrintdotOutY],['K','#334155',printdotOutK,setPrintdotOutK]].map(([ch,col,val,set]) => (
                           <div key={ch}>
@@ -2213,31 +2213,31 @@ export default function JobPrintingLog() {
                   </div>
 
                   {/* Paper Outward Card */}
-                  <div style={{ background: '#fff', borderRadius: '10px', border: '2px solid #f59e0b', padding: '0.6rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', boxShadow: '0 4px 16px rgba(245,158,11,0.12)' }}>
+                  <div style={{ background: '#fff', borderRadius: '10px', border: '1.5px solid #1e40af', padding: '0.6rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', boxShadow: '0 4px 16px rgba(30,64,175,0.08)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📜 PAPER USAGE (CONSUMPTION)</div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📜 PAPER USAGE (CONSUMPTION)</div>
                       <button type="button" onClick={handleAddOutwardPaperEntry}
-                        style={{ padding: '0.15rem 0.5rem', fontSize: '0.67rem', fontWeight: 800, background: '#fef3c7', color: '#d97706', border: '1px solid #fcd34d', borderRadius: '5px', cursor: 'pointer', transition: 'all 0.15s' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = '#fde68a'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = '#fef3c7'; }}
+                        style={{ padding: '0.15rem 0.5rem', fontSize: '0.67rem', fontWeight: 800, background: '#f0f7ff', color: '#1e40af', border: '1px solid #93c5fd', borderRadius: '5px', cursor: 'pointer', transition: 'all 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#dbeafe'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#f0f7ff'; }}
                       >+ Add Row</button>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                       {outwardPaperEntries.map((entry, index) => (
                         <div key={entry.id} style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', background: '#f8fafc', padding: '0.2rem 0.4rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                          <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#d97706', minWidth: 18 }}>#{index+1}</span>
+                          <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#1e40af', minWidth: 18 }}>#{index+1}</span>
                           <div style={{ flex: 1 }}>
-                            <select value={entry.paperType} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperType', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #f59e0b', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
+                            <select value={entry.paperType} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperType', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
                               {(paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']).map((p, pIdx) => <option key={pIdx} value={p}>{p}</option>)}
                             </select>
                           </div>
                           <div style={{ flex: 1 }}>
-                            <select value={entry.paperPanna} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperPanna', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #f59e0b', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
+                            <select value={entry.paperPanna} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperPanna', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
                               {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>)}
                             </select>
                           </div>
                           <div style={{ width: '62px' }}>
-                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #f59e0b', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} />
+                            <input type="number" step="1" placeholder="Rolls" value={entry.paperRollsQty} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperRollsQty', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.2rem', fontSize: '0.74rem', height: '26px', textAlign: 'center', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 800, boxSizing: 'border-box' }} />
                           </div>
                           {outwardPaperEntries.length > 1 && (
                             <button type="button" onClick={() => handleRemoveOutwardPaperEntry(entry.id)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.1rem', display: 'flex', alignItems: 'center' }}><Trash2 size={13} /></button>
@@ -2285,15 +2285,16 @@ export default function JobPrintingLog() {
                   type="submit"
                   disabled={rawMaterialSubmitting}
                   style={{
-                    padding: '0 1.4rem', fontSize: '0.84rem', fontWeight: 900, height: '34px',
-                    background: rawMaterialSubmitting ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg, #10b981 0%, #d97706 100%)',
-                    border: 'none', borderRadius: '8px', color: '#fff', cursor: rawMaterialSubmitting ? 'not-allowed' : 'pointer',
+                    padding: '0 1.4rem', fontSize: '0.84rem', fontWeight: 700, height: '34px',
+                    background: rawMaterialSubmitting ? '#f1f5f9' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                    border: 'none', borderRadius: '8px', color: rawMaterialSubmitting ? '#94a3b8' : '#fff',
+                    cursor: rawMaterialSubmitting ? 'not-allowed' : 'pointer',
                     display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap',
-                    boxShadow: rawMaterialSubmitting ? 'none' : '0 4px 16px rgba(16,185,129,0.35), 0 4px 16px rgba(217,119,6,0.15)',
+                    boxShadow: rawMaterialSubmitting ? 'none' : '0 4px 14px rgba(37,99,235,0.3)',
                     transition: 'all 0.2s ease', opacity: rawMaterialSubmitting ? 0.6 : 1
                   }}
-                  onMouseEnter={e => { if (!rawMaterialSubmitting) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 22px rgba(16,185,129,0.5), 0 6px 22px rgba(217,119,6,0.25)'; } }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = rawMaterialSubmitting ? 'none' : '0 4px 16px rgba(16,185,129,0.35), 0 4px 16px rgba(217,119,6,0.15)'; }}
+                  onMouseEnter={e => { if (!rawMaterialSubmitting) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(37,99,235,0.4)'; } }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = rawMaterialSubmitting ? 'none' : '0 4px 14px rgba(37,99,235,0.3)'; }}
                 >
                   <Sparkles size={14} />
                   {rawMaterialSubmitting ? 'Saving...' : 'Save Inward & Outward Stock'}

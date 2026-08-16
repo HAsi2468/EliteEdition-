@@ -1704,4 +1704,31 @@ export const api = {
     a.remove();
     window.URL.revokeObjectURL(url);
   },
+
+  // ── Authority-Based Inter-Department Communication ───────────────────────
+  async getCommunicationGroups() {
+    return request('/communication/groups');
+  },
+
+  async getCommunicationMessages(groupId, params = {}) {
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') queryParams.append(k, v); });
+    const qs = queryParams.toString() ? `?${queryParams.toString()}` : '';
+    return request(`/communication/groups/${groupId}/messages${qs}`);
+  },
+
+  async getCommunicationMembers(groupId) {
+    return request(`/communication/groups/${groupId}/members`);
+  },
+
+  async syncCommunicationGroups() {
+    return request('/communication/groups/sync', { method: 'POST' });
+  },
+
+  async postActivityEvent(data) {
+    return request('/communication/activity', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
 };

@@ -21,6 +21,27 @@ const chatRoomSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    // ── Authority-Based Communication Module fields ──
+    department: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    permissionScope: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    groupKey: {
+      type: String,
+      default: null,
+      sparse: true,
+      trim: true,
+    },
+    isSystemGroup: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
@@ -94,6 +115,20 @@ const chatMessageSchema = new mongoose.Schema(
     isPinned: {
       type: Boolean,
       default: false
+    },
+    // ── Authority-Based Communication Module fields ──
+    msgType: {
+      type: String,
+      enum: ['human', 'system_activity'],
+      default: 'human',
+    },
+    activityMeta: {
+      action:          { type: String, default: '' },   // 'CREATE', 'UPDATE', 'DELETE', 'STAGE_CHANGE', etc.
+      module:          { type: String, default: '' },   // 'Job Card', 'Invoice', 'Raw Material', etc.
+      recordRef:       { type: String, default: '' },   // Human-readable ref e.g. 'JC-1024'
+      recordId:        { type: String, default: '' },   // MongoDB _id string if applicable
+      department:      { type: String, default: '' },
+      permissionScope: { type: String, default: '' },
     },
   },
   {

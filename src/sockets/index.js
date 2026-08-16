@@ -1,4 +1,4 @@
-const { ChatMessage, Task, User } = require('../db/models');
+const { setActivitySocketIo } = require('../utils/activityEvent');
 
 const activeUsers = new Map(); // socket.id -> userId
 const getOnlineUserIds = () => {
@@ -6,6 +6,7 @@ const getOnlineUserIds = () => {
 };
 
 const setupSockets = (io) => {
+  setActivitySocketIo(io);
   // Middleware for Socket Auth can go here
   // io.use((socket, next) => { ... });
 
