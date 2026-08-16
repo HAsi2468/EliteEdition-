@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import { Settings, Plus, Trash2, Tag, ArrowRightCircle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import CatalogManagerModal from './CatalogManagerModal';
 
-export default function PrintSettings() {
+export default function PrintSettings({ expenseOnly = false }) {
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -14,7 +14,7 @@ export default function PrintSettings() {
     digital: false,
     fusing: false,
     rawMaterials: false,
-    expense: false,
+    expense: expenseOnly ? true : false,
     complain: false,
     party: false
   });
@@ -289,6 +289,33 @@ export default function PrintSettings() {
       </div>
     );
   };
+
+  if (expenseOnly) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="glass-panel" style={{ padding: '1.5rem 2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Settings size={24} color="#10b981" />
+            <div>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)' }}>💰 Department Expense Settings</h2>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Configure Income Categories (Cash IN), Expense Categories (Cash OUT), and Payment Modes.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+          {renderDepartmentHeader('💰 Department Expense Settings', 'expense', '#10b981')}
+          {expandedDepts.expense && (
+            <div style={{ padding: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
+              {renderSection('Income Categories (Cash IN)', 'expenseInCategories', newExpenseInCategory, setNewExpenseInCategory, config?.expenseInCategories)}
+              {renderSection('Expense Categories (Cash OUT)', 'expenseOutCategories', newExpenseOutCategory, setNewExpenseOutCategory, config?.expenseOutCategories)}
+              {renderSection('Expense Payment Modes', 'expensePaymentModes', newExpensePaymentMode, setNewExpensePaymentMode, config?.expensePaymentModes)}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

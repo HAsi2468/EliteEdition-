@@ -415,7 +415,7 @@ export default function AdminPanel() {
           <ShieldAlert size={22} color="var(--primary)" />
           <div>
             <h2 style={styles.pageTitle}>
-              {activeSubTab === 'users' ? 'Admin User Management' : activeSubTab === 'billing' ? 'Infrastructure Billing Management' : activeSubTab === 'backup' ? 'System Data Backup & Export' : 'System & Business Settings'}
+              {activeSubTab === 'users' ? 'Admin User Management' : activeSubTab === 'billing' ? 'Infrastructure Billing Management' : activeSubTab === 'backup' ? 'System Data Backup & Export' : 'Department Expense Settings'}
             </h2>
             <p style={styles.pageSubtitle}>
               {activeSubTab === 'users'
@@ -424,7 +424,7 @@ export default function AdminPanel() {
                 ? 'Track monthly cloud bills for AWS and MongoDB to monitor hosting costs.'
                 : activeSubTab === 'backup'
                 ? 'Export comprehensive system data filtered by department and custom date ranges.'
-                : 'Manage GST profile details, bank accounts, invoice terms, department dropdown options, and job card settings.'}
+                : 'Configure Cash IN categories, Cash OUT categories, and Payment Modes for department expense entry forms.'}
             </p>
           </div>
         </div>
@@ -444,7 +444,7 @@ export default function AdminPanel() {
           className={activeSubTab === 'settings' ? 'btn-primary' : 'btn-secondary'}
           style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
         >
-          <Settings size={16} /> System & Business Settings
+          <Settings size={16} /> Expense Settings
         </button>
         <button
           onClick={() => { setActiveSubTab('billing'); setError(''); setSuccess(''); }}
@@ -1225,7 +1225,7 @@ export default function AdminPanel() {
       )}
 
       {activeSubTab === 'settings' && (
-        <PrintSettings />
+        <PrintSettings expenseOnly={true} />
       )}
     </div>
   );
