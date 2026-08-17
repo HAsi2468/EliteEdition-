@@ -1018,7 +1018,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       // Fetch lot numbers that have this fabric
       if (primaryJob.fabric) {
         try {
-          const res = await api.getFabricLotStock({ fabricQuality: primaryJob.fabric });
+          const res = await api.getFabricLotStock({ fabricQuality: primaryJob.fabric, panna: primaryJob.panna });
           if (res.success && res.data) {
             setAvailableLots(res.data);
           }
@@ -1031,6 +1031,15 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       setAvailableLots([]);
     }
   };
+
+  useEffect(() => {
+    if (isChallanOpen && challanForm.fabricName) {
+      api.getFabricLotStock({ fabricQuality: challanForm.fabricName, panna: challanForm.panna || undefined })
+        .then(res => {
+          if (res.success && res.data) setAvailableLots(res.data);
+        }).catch(() => { });
+    }
+  }, [isChallanOpen, challanForm.fabricName, challanForm.panna]);
 
   // Toggle job card pill selection for Challan form
   const toggleChallanJobPill = (jobNoToToggle) => {
@@ -1143,7 +1152,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     });
 
     if (c.fabricName) {
-      api.getFabricLotStock({ fabricQuality: c.fabricName }).then(res => {
+      api.getFabricLotStock({ fabricQuality: c.fabricName, panna: c.panna }).then(res => {
         if (res.success && res.data) setAvailableLots(res.data);
       }).catch(() => { });
     } else {

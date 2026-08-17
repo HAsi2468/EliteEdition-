@@ -112,6 +112,10 @@ async function allocateLotsForChallan(fabricName, panna, rawLotNoStr, tpDetails,
     } else if (fabricName && fabricName.trim()) {
       const cleanFabric = fabricName.trim();
       matchFilter.fabricQuality = new RegExp(`^${cleanFabric.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i');
+      if (panna && panna.trim()) {
+        const cleanPanna = panna.trim().replace(/['"]/g, '');
+        matchFilter.panna = new RegExp(`^${cleanPanna}$`, 'i');
+      }
     }
     
     const pipeline = [
