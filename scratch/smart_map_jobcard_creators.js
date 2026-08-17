@@ -32,13 +32,19 @@ async function run() {
       } else if (uKey === 'DEVANSU') {
         mappedName = 'Devansu';
       } else if (uKey === 'RUSHABH') {
-        mappedName = 'Rushabh';
+        mappedName = 'Rushabh Patel';
       } else if (uKey === 'JAY') {
-        mappedName = 'JAY';
+        mappedName = 'Jay Patel';
       } else if (uKey === 'RAM') {
-        mappedName = 'Ram';
+        mappedName = 'Ram Patel';
       } else if (uKey === 'DEV') {
         mappedName = 'Dev Patel';
+      } else if (uKey === 'DHRUV') {
+        mappedName = 'Dhruv Patel';
+      } else if (uKey === 'HARSHIL') {
+        mappedName = 'Harshil Sidapara';
+      } else if (uKey === 'KAUSHIK' || uKey === 'KAUSHIK SIR') {
+        mappedName = 'Kaushik Nakum';
       } else if (uKey === 'RC') {
         mappedName = 'RC';
       } else if (uKey === 'OE' || uKey === 'OFAB') {
