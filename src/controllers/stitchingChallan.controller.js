@@ -71,6 +71,28 @@ const createChallan = async (req, res) => {
     body.totalAmount = parseFloat(totalAmount.toFixed(2));
 
     const challan = await db.StitchingChallan.create(body);
+
+    // Publish Authority Activity Event
+    try {
+      const { publishActivity } = require('../utils/activityEvent');
+      const uName = req.user?.name || body.userName || body.createdBy || 'Staff User';
+      const uId = req.user?._id || body.userId;
+      const desNo = challan.items && challan.items.length > 0 ? (challan.items[0].designNo || 'N/A') : 'N/A';
+      publishActivity({
+        actorId: uId,
+        actorName: uName,
+        action: 'CREATE',
+        module: 'Stitching Challan',
+        recordRef: challan.challanNo,
+        recordId: challan._id,
+        permissionScope: 'stitching_department',
+        department: 'Stitching',
+        description: `🪡 **New Stitching Challan #${challan.challanNo}** created for Karigar/Party: **"${challan.partyName || 'Tailor'}"** | Qty: **${totalPcs} pcs** | Design: **${desNo}** | Total Amount: **₹${totalAmount}** by **${uName}**.`
+      }).catch(e => logger.warn('publishActivity stitching challan create failed: %s', e.message));
+    } catch (e) {
+      logger.warn('Failed to publish activity for stitching challan: %o', e);
+    }
+
     res.status(201).json({ success: true, data: challan });
   } catch (error) {
     logger.error('stitchingChallan.create error: %o', error);

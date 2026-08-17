@@ -208,6 +208,28 @@ const createInvoice = async (req, res) => {
 
     const invoice = await BillingInvoice.create(invoiceData);
 
+    // Publish Authority Activity Event
+    try {
+      const { publishActivity } = require('../utils/activityEvent');
+      const uName = req.user?.name || invoiceData.createdBy || 'Staff User';
+      const uId = req.user?._id || invoiceData.userId;
+      const cName = invoice.customer ? (invoice.customer.businessName || invoice.customer.name) : 'Client';
+      const itemCnt = invoice.items ? invoice.items.length : 0;
+      publishActivity({
+        actorId: uId,
+        actorName: uName,
+        action: 'CREATE',
+        module: 'Billing Invoice',
+        recordRef: invoice.invoiceNo,
+        recordId: invoice._id,
+        permissionScope: 'billing',
+        department: 'Billing',
+        description: `🧾 **Tax Invoice #${invoice.invoiceNo}** generated for Client: **"${cName}"** | Total: **₹${invoice.grandTotal || 0}** | Items: **${itemCnt}** by **${uName}**.`
+      }).catch(e => console.warn('publishActivity invoice create failed: %s', e.message));
+    } catch (e) {
+      console.warn('Failed to publish activity for invoice:', e.message);
+    }
+
     // Lock linked Challans to INVOICED if status is FINAL (or default save)
     if (invoice.linkedChallanIds && invoice.linkedChallanIds.length > 0) {
       await FabricChallan.updateMany(

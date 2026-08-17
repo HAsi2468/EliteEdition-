@@ -169,6 +169,26 @@ const create = async (req, res) => {
 
     const newComplaint = await db.Complaint.create(payload);
 
+    // Publish Authority Activity Event
+    try {
+      const { publishActivity } = require('../utils/activityEvent');
+      const uName = req.user?.name || payload.userName || payload.createdBy || 'Staff User';
+      const uId = req.user?._id || payload.userId;
+      publishActivity({
+        actorId: uId,
+        actorName: uName,
+        action: 'CREATE',
+        module: 'Digital Print Complaint',
+        recordRef: newComplaint.complaintNo,
+        recordId: newComplaint._id,
+        permissionScope: 'complaints',
+        department: 'Quality',
+        description: `🚨 **New Complaint Ticket #${newComplaint.complaintNo}** logged for Party: **"${newComplaint.partyName}"** | Category: **${newComplaint.category || 'General'}** | Defective Mtr: **${newComplaint.defectiveMeters || 0}m** | Priority: **${newComplaint.priority || 'Normal'}** by **${uName}**.`
+      }).catch(e => logger.warn('publishActivity complaint create failed: %s', e.message));
+    } catch (e) {
+      logger.warn('Failed to publish activity for complaint: %o', e);
+    }
+
     // Broadcast High/Urgent Complaint Notification to [EDP] Billing & Invoicing chat group if applicable
     if (['High', 'Urgent'].includes(payload.priority)) {
       try {

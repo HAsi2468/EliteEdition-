@@ -388,7 +388,25 @@ const createChallan = async (req, res) => {
 
     await challan.save();
 
-    await challan.save();
+    // Publish Authority Activity Event
+    try {
+      const { publishActivity } = require('../utils/activityEvent');
+      const uName = req.user?.name || createdBy || 'Staff User';
+      const uId = req.user?._id || req.body.userId;
+      publishActivity({
+        actorId: uId,
+        actorName: uName,
+        action: 'CREATE',
+        module: 'Fabric Inward',
+        recordRef: String(challan.challanNo || 'N/A'),
+        recordId: challan._id,
+        permissionScope: 'jobcards_fabric',
+        department: 'Fabric',
+        description: `🧵 **New Fabric Inward Challan #${challan.challanNo}** created for Party: **"${partyName || 'Vendor'}"** | Fabric: **${normFabric}** | Qty: **${totalMtr}m** (${totalTp} T.P.) | Lot: **${finalLotNoStr || 'N/A'}** by **${uName}**.`
+      }).catch(e => console.warn('publishActivity fabric challan failed:', e.message));
+    } catch (e) {
+      console.warn('Failed to publish activity for fabric challan:', e.message);
+    }
 
     // ── Auto-create OUTWARD fabric transactions (lot-wise) ──────────────
     if (fabricName && totalMtr > 0 && Object.keys(lotGroups).length > 0) {

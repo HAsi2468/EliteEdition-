@@ -277,6 +277,12 @@ const createJobCard = async (req, res) => {
     // Publish Authority Activity Event
     const creatorId = req.user?._id || body.userId || body.createdById;
     const creatorName = req.user?.name || body.userName || body.createdBy || 'Operator';
+    const dNo = card.designName || card.designNo || 'N/A';
+    const fab = card.fabric || 'N/A';
+    const mtr = card.totalMtr ? `${card.totalMtr}m` : '0m';
+    const pcsStr = card.pcs ? ` (${card.pcs} pcs)` : '';
+    const mach = card.machineName || 'Machine';
+
     publishActivity({
       actorId: creatorId,
       actorName: creatorName,
@@ -286,7 +292,7 @@ const createJobCard = async (req, res) => {
       recordId: card._id,
       permissionScope: 'jobcards',
       department: 'Production',
-      description: `📋 **New Job Card #${card.jobNo || ''}** created for party **"${card.party || 'Client'}"** (${card.totalMtr || 0}m, ${card.machineName || 'Machine'}) by ${creatorName}.`
+      description: `📋 **New Job Card #${card.jobNo || ''}** created for party **"${card.party || 'Client'}"** | Design: **${dNo}** | Fabric: **${fab}** | Qty: **${mtr}**${pcsStr} | Machine: **${mach}** by **${creatorName}**.`
     }).catch(e => logger.warn('publishActivity failed on job card create: %s', e.message));
 
     res.status(201).json(card);
@@ -327,6 +333,10 @@ const updateJobCard = async (req, res) => {
     // Publish Authority Activity Event
     const editorId = req.user?._id || body.userId || body.updatedById;
     const editorName = req.user?.name || body.userName || body.updatedBy || 'Operator';
+    const edNo = card.designName || card.designNo || 'N/A';
+    const efab = card.fabric || 'N/A';
+    const emtr = card.totalMtr ? `${card.totalMtr}m` : '0m';
+
     publishActivity({
       actorId: editorId,
       actorName: editorName,
@@ -336,7 +346,7 @@ const updateJobCard = async (req, res) => {
       recordId: card._id,
       permissionScope: 'jobcards',
       department: 'Production',
-      description: `🔄 **Job Card #${card.jobNo || ''}** updated: Status **'${card.status}'** (Print: ${card.printStatus || 'Pending'}, Fusing: ${card.fusingStatus || 'Pending'}) by ${editorName}.`
+      description: `🔄 **Job Card #${card.jobNo || ''}** updated for party **"${card.party || 'Client'}"** | Design: **${edNo}** | Fabric: **${efab}** (${emtr}) | Status: **'${card.status}'** (Print: ${card.printStatus || 'Pending'}, Fusing: ${card.fusingStatus || 'Pending'}, Delivery: ${card.deliveryStatus || 'Pending'}) by **${editorName}**.`
     }).catch(e => logger.warn('publishActivity failed on job card update: %s', e.message));
 
     res.json(card);

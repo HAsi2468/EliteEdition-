@@ -146,6 +146,27 @@ const create = async (req, res) => {
     }
 
     const created = await db.Expense.create(payload);
+
+    // Publish Authority Activity Event
+    try {
+      const { publishActivity } = require('../utils/activityEvent');
+      const uName = req.user?.name || payload.userName || payload.createdBy || 'Staff User';
+      const uId = req.user?._id || payload.userId;
+      publishActivity({
+        actorId: uId,
+        actorName: uName,
+        action: 'CREATE',
+        module: 'Finance Expense',
+        recordRef: created.voucherNo,
+        recordId: created._id,
+        permissionScope: 'finance_expenses',
+        department: 'Finance',
+        description: `💸 **Expense Voucher #${created.voucherNo}** logged for Purpose: **"${created.title}"** | Category: **${created.category}** | Amount: **₹${created.amount}** (${created.type === 'IN' ? 'Income' : 'Expense'}) by **${uName}**.`
+      }).catch(e => logger.warn('publishActivity expense create failed: %s', e.message));
+    } catch (e) {
+      logger.warn('Failed to publish activity for expense: %o', e);
+    }
+
     res.status(201).json(created);
   } catch (err) {
     logger.error('expense.create error: %o', err);

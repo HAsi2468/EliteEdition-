@@ -416,7 +416,11 @@ const setupSockets = (io) => {
         }
 
         // Post automated Bot Message into contextual chat thread
-        const botMessageContent = `🤖 **Bot Log:** Job Card **#${card.jobNo}** stage changed to **'${newStage}'** by ${actorName || 'Operator'}.`;
+        const desInfo = card.designName || card.designNo || 'N/A';
+        const fabInfo = card.fabric || 'N/A';
+        const qtyInfo = card.totalMtr ? `${card.totalMtr}m` : '0m';
+        const botMessageContent = `🤖 **Bot Log:** Job Card **#${card.jobNo}** (${card.party || 'Client'}) stage changed to **'${newStage}'** | Design: **${desInfo}** | Fabric: **${fabInfo}** by **${actorName || 'Operator'}**.`;
+        
         const botMsg = await ChatMessageModel.create({
           roomId,
           senderId: actorId || card.orderChatRoomId,
@@ -424,6 +428,19 @@ const setupSockets = (io) => {
           type: 'text',
           readBy: [actorId].filter(Boolean)
         });
+
+        const { publishActivity } = require('../utils/activityEvent');
+        publishActivity({
+          actorId: actorId,
+          actorName: actorName || 'Operator',
+          action: 'STAGE_ADVANCE',
+          module: 'Job Card',
+          recordRef: card.jobNo || 'N/A',
+          recordId: card._id,
+          permissionScope: 'jobcards',
+          department: 'Production',
+          description: `⚡ **Job Card #${card.jobNo}** stage advanced to **'${newStage}'** | Party: **"${card.party || 'Client'}"** | Design: **${desInfo}** | Fabric: **${fabInfo}** (${qtyInfo}) by **${actorName || 'Operator'}**.`
+        }).catch(e => console.warn('publishActivity stage advance failed:', e.message));
 
         const populatedBotMsg = await ChatMessageModel.findById(botMsg._id)
           .populate('senderId', 'name username email');
