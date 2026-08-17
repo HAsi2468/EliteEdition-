@@ -20,6 +20,72 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [activeTab, setActiveTab] = useState(onlyChallan ? 'challan' : initialTab);
   const currentUser = api.getCurrentUser();
 
+  const renderJobNoBadge = (jobNoRaw) => {
+    if (!jobNoRaw) return '—';
+    const cleanStr = String(jobNoRaw).replace(/^#?JOB\s*NO\.?\s*-\s*/i, '').trim();
+    if (!cleanStr) return '—';
+
+    const parts = cleanStr.split(/[,/]+/).map(p => p.trim()).filter(Boolean);
+    if (parts.length === 0) return '—';
+
+    if (parts.length === 1) {
+      const num = parts[0].replace(/^#?JOB-?/i, '');
+      return (
+        <span style={{
+          display: 'inline-block',
+          whiteSpace: 'nowrap',
+          padding: '0.2rem 0.5rem',
+          borderRadius: 4,
+          fontWeight: 800,
+          color: '#38bdf8',
+          background: 'rgba(56,189,248,0.12)',
+          border: '1px solid rgba(56,189,248,0.25)',
+          fontSize: '0.78rem'
+        }}>
+          #{num}
+        </span>
+      );
+    }
+
+    const firstTwo = parts.slice(0, 2).map(p => `#${p.replace(/^#?JOB-?/i, '')}`).join(', ');
+    const remainingCount = parts.length - 2;
+    const fullTooltip = parts.map(p => `#${p.replace(/^#?JOB-?/i, '')}`).join(', ');
+
+    return (
+      <span
+        title={`Linked Job Cards (${parts.length}): ${fullTooltip}`}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          whiteSpace: 'nowrap',
+          padding: '0.2rem 0.5rem',
+          borderRadius: 4,
+          fontWeight: 800,
+          color: '#38bdf8',
+          background: 'rgba(56,189,248,0.12)',
+          border: '1px solid rgba(56,189,248,0.25)',
+          fontSize: '0.78rem',
+          cursor: 'help'
+        }}
+      >
+        <span>{firstTwo}</span>
+        {remainingCount > 0 && (
+          <span style={{
+            background: 'rgba(56,189,248,0.25)',
+            color: '#38bdf8',
+            fontSize: '0.68rem',
+            padding: '1px 5px',
+            borderRadius: 4,
+            fontWeight: 900
+          }}>
+            +{remainingCount}
+          </span>
+        )}
+      </span>
+    );
+  };
+
   const normalizeFabricName = (val, pannaVal = '') => {
     if (!val) return '';
     let str = String(val).trim().toUpperCase();
@@ -2697,7 +2763,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   {outwardTx.map(t => (
                     <tr key={t._id}>
                       <td>{formatDateDDMMYYYY(t.date)}</td>
-                      <td>{t.jobNo}</td>
+                      <td>{renderJobNoBadge(t.jobNo)}</td>
                       <td>{t.challanNo || '-'}</td>
                       <td>{t.partyName}</td>
                       <td>{t.fabricQuality}</td>
@@ -3600,21 +3666,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       </td>
                       <td style={{ padding: '0.6rem 0.5rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{ch.fabricName || '—'}</td>
                       <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
-                        {ch.jobNo ? (
-                          <span style={{
-                            display: 'inline-block',
-                            whiteSpace: 'nowrap',
-                            padding: '0.2rem 0.5rem',
-                            borderRadius: 4,
-                            fontWeight: 800,
-                            color: '#38bdf8',
-                            background: 'rgba(56,189,248,0.12)',
-                            border: '1px solid rgba(56,189,248,0.25)',
-                            fontSize: '0.78rem'
-                          }}>
-                            #{String(ch.jobNo).replace(/^#?JOB\s*NO\.?\s*-\s*/i, '').trim()}
-                          </span>
-                        ) : '—'}
+                        {renderJobNoBadge(ch.jobNo)}
                       </td>
                       <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>{ch.panna || '—'}</td>
                       <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--text-primary)' }}>{ch.totalTp}</td>
