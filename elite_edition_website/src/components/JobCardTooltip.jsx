@@ -108,6 +108,11 @@ export default function JobCardTooltip({ card, children, style = {} }) {
               <span style={{ color: '#64748b', fontSize: '0.65rem', display: 'block' }}>OPERATOR</span>
               <strong style={{ color: '#f1f5f9' }}>{card.operatorName || 'Not Set'}</strong>
             </div>
+
+            <div>
+              <span style={{ color: '#64748b', fontSize: '0.65rem', display: 'block' }}>CREATED BY</span>
+              <strong style={{ color: '#a78bfa' }}>{card.createdByName || card.createdBy || 'Staff User'}</strong>
+            </div>
           </div>
 
           {/* Progress bar */}

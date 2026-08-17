@@ -270,13 +270,14 @@ const createJobCard = async (req, res) => {
 
     await syncDesignImage(body);
 
-    if (body.panna && body.pass && body.totalMtr && body.machineName)
-      body.expTime = calcExpTime(body.panna, body.pass, body.totalMtr, body.machineName);
+    const creatorName = req.user?.name || body.userName || body.createdBy || 'Staff User';
+    const creatorId = req.user?._id || body.userId || body.createdById;
+    body.createdBy = creatorName;
+    body.createdByName = creatorName;
+    if (creatorId) body.userId = creatorId;
+
     const card = await db.JobCard.create(body);
 
-    // Publish Authority Activity Event
-    const creatorId = req.user?._id || body.userId || body.createdById;
-    const creatorName = req.user?.name || body.userName || body.createdBy || 'Operator';
     const dNo = card.designName || card.designNo || 'N/A';
     const fab = card.fabric || 'N/A';
     const mtr = card.totalMtr ? `${card.totalMtr}m` : '0m';
@@ -325,14 +326,16 @@ const updateJobCard = async (req, res) => {
     if (body.printStatus    === 'Printing Done'  && !body.printDate    && !existingCard.printDate)    body.printDate    = new Date().toISOString().split('T')[0];
     if (body.fusingStatus   === 'Fusing Done'    && !body.fusingDate   && !existingCard.fusingDate)   body.fusingDate   = new Date().toISOString().split('T')[0];
     if (body.deliveryStatus === 'Delivery Done'  && !body.deliveryDate && !existingCard.deliveryDate) body.deliveryDate = new Date().toISOString().split('T')[0];
+    const editorName = req.user?.name || body.userName || body.updatedBy || 'Staff User';
+    const editorId = req.user?._id || body.userId || body.updatedById;
+    body.updatedBy = editorName;
+    body.updatedByName = editorName;
+
     if (printStatus==='Printing Done' && fusingStatus==='Fusing Done' && deliveryStatus==='Delivery Done') body.status='Done';
     else if (printStatus==='Printing Done' || fusingStatus==='Fusing Done' || deliveryStatus==='Delivery Done') body.status='In Progress';
     else body.status='Pending';
     const card = await db.JobCard.findByIdAndUpdate(req.params.id, body, { new:true, runValidators:true }).lean();
 
-    // Publish Authority Activity Event
-    const editorId = req.user?._id || body.userId || body.updatedById;
-    const editorName = req.user?.name || body.userName || body.updatedBy || 'Operator';
     const edNo = card.designName || card.designNo || 'N/A';
     const efab = card.fabric || 'N/A';
     const emtr = card.totalMtr ? `${card.totalMtr}m` : '0m';

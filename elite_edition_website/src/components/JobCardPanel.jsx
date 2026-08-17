@@ -2244,6 +2244,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                         >
                           Date {sortBy === 'date' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                         </th>
+                        <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Created By</th>
                         <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
                         <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Actions</th>
                       </tr>
@@ -2281,6 +2282,11 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>{c.panna || '—'}</td>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 600 }}>{c.totalMtr || '—'}</td>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>{formatDateDDMMYYYY(c.date)}</td>
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                        <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#a78bfa', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(124, 58, 237, 0.25)' }}>
+                          {c.createdByName || c.createdBy || 'Staff User'}
+                        </span>
+                      </td>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem' }}><StatusBadge status={c.status} /></td>
                       <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
@@ -2375,6 +2381,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                       ['Fabric', c.fabric], ['Date', formatDateDDMMYYYY(c.date)],
                       ['Designer', c.designer], ['C.Match', c.colourMatching],
                       ['Total Mtr', c.totalMtr], ['EXP.TIME', c.expTime],
+                      ['Created By', c.createdByName || c.createdBy || 'Staff User'],
                     ].map(([k,v])=>(
                       <div key={k} style={{ display:'flex', gap:'0.3rem' }}>
                         <span style={{ color:'var(--text-muted)', fontWeight:600, flexShrink:0 }}>{k}:</span>
