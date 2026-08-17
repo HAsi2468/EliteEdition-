@@ -5,11 +5,17 @@ const PDFDocument = require('pdfkit');
 // Normalize functions to merge matching fabric and panna widths (e.g. 58" and 58)
 const normalizeFabric = (val, pannaVal = '') => {
   if (!val) return '';
-  let clean = String(val).trim().toUpperCase();
-  const matchPannaInName = clean.match(/\s+(44|58|36|56|46)$/);
-  let panna = matchPannaInName ? matchPannaInName[1] : pannaVal;
-  let base = clean.replace(/\s+(44|58|36|56|46)$/, '').trim();
+  let str = String(val).trim().toUpperCase();
 
+  let extractedPanna = '';
+  const pannaMatches = str.match(/(?:\s+(\d+))+\s*$/);
+  if (pannaMatches) {
+    const digits = pannaMatches[0].trim().split(/\s+/);
+    extractedPanna = digits[digits.length - 1];
+    str = str.replace(/(?:\s+(\d+))+\s*$/, '').trim();
+  }
+
+  let base = str;
   if (base === 'CREPE' || base === 'CRAPE' || base === 'FRANCH CREPE' || base === 'FRENCH CREP' || base.includes('CREPE') || base.includes('CRAPE') || base.includes('CREP')) {
     base = 'FRENCH CREPE';
   } else if (base === 'CAMRIK' || base === 'CEMBRIC' || base === 'CEMBRIK' || base === 'CAMBRIK' || base.includes('CAMRIK') || base.includes('CEMBRIK')) {
@@ -18,14 +24,14 @@ const normalizeFabric = (val, pannaVal = '') => {
     base = 'POLLY MAL';
   }
 
-  let cleanPanna = panna ? String(panna).trim().replace(/['"]/g, '') : '';
-  if (cleanPanna === '46' || cleanPanna === '56') cleanPanna = '58';
-  if (!cleanPanna || cleanPanna.toUpperCase() === 'UNKNOWN') {
-    if (base.includes('ARMANI')) cleanPanna = '44';
-    else cleanPanna = '58';
+  let finalPanna = extractedPanna || (pannaVal ? String(pannaVal).trim().replace(/['"]/g, '') : '');
+  if (finalPanna === '46' || finalPanna === '56') finalPanna = '58';
+  if (!finalPanna || finalPanna.toUpperCase() === 'UNKNOWN' || isNaN(parseInt(finalPanna, 10))) {
+    if (base.includes('ARMANI')) finalPanna = '44';
+    else finalPanna = '58';
   }
 
-  return `${base} ${cleanPanna}`;
+  return `${base} ${finalPanna}`;
 };
 
 const normalizePanna = (val, fabricName = '') => {

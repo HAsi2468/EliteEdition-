@@ -21,11 +21,17 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   const normalizeFabricName = (val, pannaVal = '') => {
     if (!val) return '';
-    let clean = String(val).trim().toUpperCase();
-    const matchPannaInName = clean.match(/\s+(44|58|36|56|46)$/);
-    let panna = matchPannaInName ? matchPannaInName[1] : pannaVal;
-    let base = clean.replace(/\s+(44|58|36|56|46)$/, '').trim();
+    let str = String(val).trim().toUpperCase();
 
+    let extractedPanna = '';
+    const pannaMatches = str.match(/(?:\s+(\d+))+\s*$/);
+    if (pannaMatches) {
+      const digits = pannaMatches[0].trim().split(/\s+/);
+      extractedPanna = digits[digits.length - 1];
+      str = str.replace(/(?:\s+(\d+))+\s*$/, '').trim();
+    }
+
+    let base = str;
     if (base === 'CREPE' || base === 'CRAPE' || base === 'FRANCH CREPE' || base === 'FRENCH CREP' || base.includes('CREPE') || base.includes('CRAPE') || base.includes('CREP')) {
       base = 'FRENCH CREPE';
     } else if (base === 'CAMRIK' || base === 'CEMBRIC' || base === 'CEMBRIK' || base === 'CAMBRIK' || base.includes('CAMRIK') || base.includes('CEMBRIK')) {
@@ -34,14 +40,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       base = 'POLLY MAL';
     }
 
-    let cleanPanna = panna ? String(panna).trim().replace(/['"]/g, '') : '';
-    if (cleanPanna === '46' || cleanPanna === '56') cleanPanna = '58';
-    if (!cleanPanna || cleanPanna.toUpperCase() === 'UNKNOWN') {
-      if (base.includes('ARMANI')) cleanPanna = '44';
-      else cleanPanna = '58';
+    let finalPanna = extractedPanna || (pannaVal ? String(pannaVal).trim().replace(/['"]/g, '') : '');
+    if (finalPanna === '46' || finalPanna === '56') finalPanna = '58';
+    if (!finalPanna || finalPanna.toUpperCase() === 'UNKNOWN' || isNaN(parseInt(finalPanna, 10))) {
+      if (base.includes('ARMANI')) finalPanna = '44';
+      else finalPanna = '58';
     }
 
-    return `${base} ${cleanPanna}`;
+    return `${base} ${finalPanna}`;
   };
 
   const getDefaultPannaForFabric = (fabricName, currentPanna = '') => {
@@ -3549,9 +3555,26 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       </td>
                       <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>{formatDateDDMMYYYY(ch.date)}</td>
                       <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: '#a78bfa' }}>{ch.billTo || ch.partyName || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '0.6rem 0.5rem', maxWidth: '220px' }}>
                         {ch.lotNo != null && String(ch.lotNo).trim() !== '' ? (
-                          <span style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', padding: '2px 6px', borderRadius: 4, fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(16,185,129,0.25)' }}>
+                          <span
+                            title={`#${ch.lotNo}`}
+                            style={{
+                              display: 'inline-block',
+                              maxWidth: '200px',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              verticalAlign: 'middle',
+                              background: 'rgba(16,185,129,0.12)',
+                              color: '#10b981',
+                              padding: '2px 8px',
+                              borderRadius: 6,
+                              fontWeight: 700,
+                              fontSize: '0.75rem',
+                              border: '1px solid rgba(16,185,129,0.25)'
+                            }}
+                          >
                             #{ch.lotNo}
                           </span>
                         ) : '—'}
