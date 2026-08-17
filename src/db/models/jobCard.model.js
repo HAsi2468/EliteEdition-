@@ -80,7 +80,17 @@ const jobCardSchema = new mongoose.Schema(
     createdByName:    { type: String, default: '', trim: true },
     updatedBy:        { type: String, default: '', trim: true },
     updatedByName:    { type: String, default: '', trim: true },
-    userId:           { type: String, default: '', trim: true },
+    auditTrail: [
+      {
+        performedBy: { type: String, default: '' },
+        performedByName: { type: String, default: '' },
+        performedById: { type: String, default: '' },
+        action: { type: String, default: 'UPDATE' },
+        timestamp: { type: Date, default: Date.now },
+        details: { type: String, default: '' },
+        changesSummary: { type: String, default: '' }
+      }
+    ],
     orderChatRoomId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatRoom' }
   },
   {

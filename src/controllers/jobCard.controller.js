@@ -276,6 +276,18 @@ const createJobCard = async (req, res) => {
     body.createdByName = creatorName;
     if (creatorId) body.userId = creatorId;
 
+    body.auditTrail = [
+      {
+        performedBy: creatorName,
+        performedByName: creatorName,
+        performedById: String(creatorId || ''),
+        action: 'CREATE',
+        timestamp: new Date(),
+        details: `Job Card created for party "${body.party || ''}" (Qty: ${body.totalMtr || 0}m, Fabric: ${body.fabric || ''})`,
+        changesSummary: 'Job Card Created'
+      }
+    ];
+
     const card = await db.JobCard.create(body);
 
     const dNo = card.designName || card.designNo || 'N/A';
@@ -334,6 +346,45 @@ const updateJobCard = async (req, res) => {
     if (printStatus==='Printing Done' && fusingStatus==='Fusing Done' && deliveryStatus==='Delivery Done') body.status='Done';
     else if (printStatus==='Printing Done' || fusingStatus==='Fusing Done' || deliveryStatus==='Delivery Done') body.status='In Progress';
     else body.status='Pending';
+
+    // Track detailed field diffs for Mistakes & Revision History Audit Log
+    const changesArr = [];
+    const fieldsToTrack = [
+      ['party', 'Party Name'],
+      ['designName', 'Design'],
+      ['designNo', 'Design No'],
+      ['fabric', 'Fabric'],
+      ['totalMtr', 'Total Meters'],
+      ['pcs', 'Pcs'],
+      ['colors', 'Colors'],
+      ['panna', 'Panna'],
+      ['status', 'Status'],
+      ['printStatus', 'Print Status'],
+      ['fusingStatus', 'Fusing Status'],
+      ['deliveryStatus', 'Delivery Status'],
+      ['machineName', 'Machine']
+    ];
+
+    fieldsToTrack.forEach(([field, label]) => {
+      if (body[field] !== undefined && String(body[field]).trim() !== String(existingCard[field] || '').trim()) {
+        changesArr.push(`${label}: '${existingCard[field] || 'None'}' ➔ '${body[field]}'`);
+      }
+    });
+
+    const auditEntry = {
+      performedBy: editorName,
+      performedByName: editorName,
+      performedById: String(editorId || ''),
+      action: changesArr.length > 0 ? 'UPDATE' : 'EDIT',
+      timestamp: new Date(),
+      details: changesArr.length > 0 ? `Changed: ${changesArr.join('; ')}` : 'Updated Job Card details',
+      changesSummary: changesArr.join('; ')
+    };
+
+    // Append to auditTrail array in MongoDB
+    const updatedAuditTrail = Array.isArray(existingCard.auditTrail) ? [...existingCard.auditTrail, auditEntry] : [auditEntry];
+    body.auditTrail = updatedAuditTrail;
+
     const card = await db.JobCard.findByIdAndUpdate(req.params.id, body, { new:true, runValidators:true }).lean();
 
     const edNo = card.designName || card.designNo || 'N/A';
