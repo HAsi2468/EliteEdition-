@@ -32,7 +32,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     }
 
     let base = str;
-    if (base === 'REYON' || base === 'RAYON' || base === 'POLY REYON' || base === 'POLY RAYON' || base.includes('REYON') || base.includes('RAYON')) {
+    if (base === 'LINEN' || base === 'KOINUR LINEN' || base === 'KOHINUR LINEN' || base === 'KOHINOOR LINEN' || base.includes('KOINUR') || base.includes('KOHINOOR') || base.includes('KOHINUR')) {
+      base = 'KOHINOOR LINEN';
+    } else if (base === 'REYON' || base === 'RAYON' || base === 'POLY REYON' || base === 'POLY RAYON' || base.includes('REYON') || base.includes('RAYON')) {
       if (base.includes('30 SPN')) {
         base = 'POLY REYON 30 SPN';
       } else {
