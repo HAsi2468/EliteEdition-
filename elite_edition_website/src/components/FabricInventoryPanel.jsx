@@ -3525,7 +3525,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     <th style={{ padding: '0.65rem 0.5rem' }}>Bill To / Party</th>
                     <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '75px' }}>Lot No</th>
                     <th style={{ padding: '0.65rem 0.5rem' }}>Fabric</th>
-                    <th style={{ padding: '0.65rem 0.5rem', width: '100px' }}>Job No</th>
+                    <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '110px' }}>Job No</th>
                     <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '60px' }}>Panna</th>
                     <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '45px' }}>TP</th>
                     <th style={{ padding: '0.65rem 0.5rem', textAlign: 'right', whiteSpace: 'nowrap', width: '100px' }}>Total Mtr</th>
@@ -3598,8 +3598,24 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           </span>
                         ) : '—'}
                       </td>
-                      <td style={{ padding: '0.6rem 0.5rem', color: 'var(--text-primary)' }}>{ch.fabricName || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.5rem', color: '#38bdf8', fontWeight: 700, width: '100px', wordBreak: 'break-word', whiteSpace: 'normal' }}>{ch.jobNo ? `#${String(ch.jobNo).trim()}` : '—'}</td>
+                      <td style={{ padding: '0.6rem 0.5rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{ch.fabricName || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
+                        {ch.jobNo ? (
+                          <span style={{
+                            display: 'inline-block',
+                            whiteSpace: 'nowrap',
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: 4,
+                            fontWeight: 800,
+                            color: '#38bdf8',
+                            background: 'rgba(56,189,248,0.12)',
+                            border: '1px solid rgba(56,189,248,0.25)',
+                            fontSize: '0.78rem'
+                          }}>
+                            #{String(ch.jobNo).replace(/^#?JOB\s*NO\.?\s*-\s*/i, '').trim()}
+                          </span>
+                        ) : '—'}
+                      </td>
                       <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>{ch.panna || '—'}</td>
                       <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--text-primary)' }}>{ch.totalTp}</td>
                       <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontWeight: 900, color: '#10b981', whiteSpace: 'nowrap', fontSize: '0.88rem' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
