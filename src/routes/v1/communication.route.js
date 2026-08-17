@@ -13,6 +13,7 @@ router.post('/activity', communicationController.postActivityEvent);
 router.post('/messages/:messageId/acknowledge', communicationController.acknowledgeMessage);
 router.get('/users', communicationController.getUsersForDM);
 router.post('/direct', communicationController.createOrGetDirectRoom);
+router.post('/force-reload-all', communicationController.forceReloadAllUsers);
 
 module.exports = router;
 

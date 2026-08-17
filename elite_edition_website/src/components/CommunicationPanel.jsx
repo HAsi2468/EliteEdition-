@@ -604,6 +604,24 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
               <RefreshCw size={13} className={syncing ? 'spin-loader' : ''} />
               <span>{syncing ? 'Syncing...' : 'Sync Groups'}</span>
             </button>
+
+            <button
+              onClick={async () => {
+                if (!window.confirm('Are you sure you want to force a hard reload for ALL connected users across the company? Connected browsers will clear caches and reload immediately.')) return;
+                try {
+                  await api.forceReloadAllUsers();
+                  alert('⚡ Hard reload signal sent to all connected users!');
+                } catch (err) {
+                  alert('Failed to send reload signal: ' + err.message);
+                }
+              }}
+              className="btn-secondary"
+              style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', gap: '0.4rem', borderRadius: '8px', color: '#f59e0b', borderColor: '#f59e0b40' }}
+              title="Force clear cache & hard reload all connected users instantly"
+            >
+              <Zap size={13} color="#f59e0b" />
+              <span>Hard Refresh All Users</span>
+            </button>
           </div>
         )}
       </div>

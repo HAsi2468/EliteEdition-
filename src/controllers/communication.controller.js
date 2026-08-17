@@ -373,8 +373,24 @@ const deleteGroup = async (req, res) => {
     console.error('Error deleting group:', error);
     res.status(500).json({ success: false, message: 'Failed to delete group', error: error.message });
   }
+/**
+ * Admin endpoint to broadcast force hard-reload signal to all connected Socket clients
+ */
+const forceReloadAllUsers = async (req, res) => {
+  try {
+    const io = req.app.get('socketio') || global.io;
+    if (io) {
+      io.emit('force-system-reload', {
+        timestamp: Date.now(),
+        by: req.user ? (req.user.name || req.user.username) : 'System Admin'
+      });
+    }
+    res.json({ success: true, message: 'Hard reload signal broadcast to all connected clients.' });
+  } catch (error) {
+    console.error('Error broadcasting force reload:', error);
+    res.status(500).json({ success: false, message: 'Failed to broadcast force reload signal', error: error.message });
+  }
 };
-
 
 module.exports = {
   getGroups,
@@ -387,6 +403,7 @@ module.exports = {
   createOrGetDirectRoom,
   createGroup,
   deleteGroup,
+  forceReloadAllUsers,
 };
 
 

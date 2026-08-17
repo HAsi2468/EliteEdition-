@@ -1770,6 +1770,12 @@ export const api = {
       method: 'DELETE',
     });
   },
+
+  async forceReloadAllUsers() {
+    return request('/communication/force-reload-all', {
+      method: 'POST',
+    });
+  },
 };
 
 

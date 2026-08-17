@@ -20,6 +20,18 @@ export const SocketProvider = ({ children }) => {
       autoConnect: true,
     });
 
+    newSocket.on('force-system-reload', (data) => {
+      console.log('⚡ Force system reload signal received:', data);
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          for (let name of names) caches.delete(name);
+        });
+      }
+      setTimeout(() => {
+        window.location.reload(true);
+      }, 300);
+    });
+
     setSocket(newSocket);
 
     return () => newSocket.close();
