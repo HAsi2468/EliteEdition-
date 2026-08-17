@@ -1210,8 +1210,8 @@ function JobCardForm({ card, onSave, onClose, department }) {
     setSaving(true); setError('');
     const cleanFabric = normalizeFabricName(form.fabric, form.panna);
     const cleanDesign = cleanDesignNameString(form.designName || form.designNo);
-    const activeUser = currentUser || {};
-    const uName = activeUser.name || activeUser.username || 'Staff User';
+    const activeUser = currentUser || api.getCurrentUser() || {};
+    const uName = activeUser.name || activeUser.username || 'HASI';
     const uId = activeUser._id || activeUser.id || '';
     const payload = {
       ...form,

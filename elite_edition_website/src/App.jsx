@@ -1439,7 +1439,7 @@ export default function App() {
           ) : activeTab === 'reports' ? (
             <ReportsCenter />
           ) : activeTab.startsWith('jobcards') ? (
-            <JobCardPanel activeSubTab={activeTab === 'jobcards' ? 'jobcards' : activeTab.replace('jobcards_', '')} department={activeDepartment} />
+            <JobCardPanel currentUser={currentUser} activeSubTab={activeTab === 'jobcards' ? 'jobcards' : activeTab.replace('jobcards_', '')} department={activeDepartment} />
           ) : activeTab === 'unicommerce' ? (
             <UnicommerceHub />
           ) : activeTab === 'myntra' ? (
