@@ -492,11 +492,70 @@ const downloadJobCardPdf = async (req, res) => {
       return cleaned.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
     }
 
-    const keyStr = jobCard.designName || jobCard.designNo || '';
-    const names = extractNames(keyStr);
+// ─── Render Job Card PDF A5 Page (Image 2 Exact Spec Layout) ──────────────────
+async function renderJobCardA5Page(doc, jobCard, activeLogo) {
+  const PW = 419.53, PH = 595.28;
+  const ML = 32, MR = 10;
+  const CW = PW - ML - MR; // ~377.53 pt
 
-    if (names[0]) {
-      const cleanName = names[0].replace(/^ED-/i, '');
+  const formatDateStr = (d) => {
+    if (!d) return '';
+    try {
+      const dt = new Date(d);
+      if (isNaN(dt.getTime())) return String(d);
+      const day = String(dt.getDate()).padStart(2, '0');
+      const month = String(dt.getMonth() + 1).padStart(2, '0');
+      const year = dt.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch (e) {
+      return String(d);
+    }
+  };
+
+  // Helper to extract design names
+  const areDesignsEquivalent = (a, b) => {
+    if (!a || !b) return false;
+    const s1 = String(a).trim().toUpperCase();
+    const s2 = String(b).trim().toUpperCase();
+    if (s1 === s2) return true;
+    const clean1 = s1.replace(/^(ED|PKD)[-\s]?/i, '').trim();
+    const clean2 = s2.replace(/^(ED|PKD)[-\s]?/i, '').trim();
+    return clean1 && clean2 && clean1 === clean2;
+  };
+
+  const cleanDesignNameString = (str) => {
+    if (!str || typeof str !== 'string') return '';
+    const parts = str.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
+    if (parts.length <= 1) return str.trim();
+    const uniqueList = [];
+    for (const p of parts) {
+      const existingIdx = uniqueList.findIndex(u => areDesignsEquivalent(u, p));
+      if (existingIdx === -1) {
+        uniqueList.push(p);
+      } else {
+        if (/^(ED|PKD)-/i.test(p) && !/^(ED|PKD)-/i.test(uniqueList[existingIdx])) {
+          uniqueList[existingIdx] = p;
+        }
+      }
+    }
+    return uniqueList.join(', ');
+  };
+
+  const extractNames = (str) => {
+    if (!str || typeof str !== 'string') return [];
+    const cleaned = cleanDesignNameString(str);
+    return cleaned.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
+  };
+
+  // Resolve Design Images
+  let imageUrl1 = '';
+  let imageUrl2 = '';
+  const keyStr = jobCard.designName || jobCard.designNo || '';
+  const names = extractNames(keyStr);
+
+  if (names[0]) {
+    const cleanName = names[0].replace(/^ED-/i, '');
+    try {
       const design1 = await db.Design.findOne({
         $or: [
           { designName: { $regex: `^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
@@ -506,11 +565,13 @@ const downloadJobCardPdf = async (req, res) => {
       if (design1 && (design1.imageUrl || design1.imageUrl2)) {
         imageUrl1 = design1.imageUrl || design1.imageUrl2;
       }
-    }
-    if (!imageUrl1) imageUrl1 = jobCard.imageUrl1 || '';
+    } catch (e) {}
+  }
+  if (!imageUrl1) imageUrl1 = jobCard.imageUrl1 || '';
 
-    if (names.length >= 2 && names[1]) {
-      const cleanName2 = names[1].replace(/^ED-/i, '');
+  if (names.length >= 2 && names[1]) {
+    const cleanName2 = names[1].replace(/^ED-/i, '');
+    try {
       const design2 = await db.Design.findOne({
         $or: [
           { designName: { $regex: `^(ED-)?${cleanName2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
@@ -518,208 +579,321 @@ const downloadJobCardPdf = async (req, res) => {
         ]
       }).lean();
       if (design2) imageUrl2 = design2.imageUrl || design2.imageUrl2 || '';
-      if (!imageUrl2) imageUrl2 = jobCard.imageUrl2 || '';
+    } catch (e) {}
+    if (!imageUrl2) imageUrl2 = jobCard.imageUrl2 || '';
+  }
+
+  const [imgBuf1, imgBuf2] = await Promise.all([getImageBuffer(imageUrl1), getImageBuffer(imageUrl2)]);
+
+  // 1. PUNCH HOLE GUIDE (Left Margin)
+  const punchX = 14;
+  const centerY = PH / 2;
+  doc.circle(punchX, 130, 7).strokeColor('#9ca3af').lineWidth(0.8).stroke();
+  doc.moveTo(8, centerY).lineTo(20, centerY).strokeColor('#9ca3af').lineWidth(1.2).stroke();
+  doc.fillColor('#9ca3af').fontSize(5).font('Helvetica-Bold')
+    .text('PUNCH', 4, centerY + 4, { width: 20, align: 'center' });
+  doc.circle(punchX, 450, 7).strokeColor('#9ca3af').lineWidth(0.8).stroke();
+
+  let curY = 10;
+
+  // 2. HEADER BOX
+  const headerH = 36;
+  doc.rect(ML, curY, CW, headerH).strokeColor('#000000').lineWidth(1.5).stroke();
+
+  const logoW = 85, logoH = 28;
+  if (activeLogo) {
+    try {
+      doc.image(activeLogo, ML + 5, curY + 4, { height: logoH, fit: [logoW, logoH] });
+      doc.image(activeLogo, ML + CW - logoW - 5, curY + 4, { height: logoH, fit: [logoW, logoH] });
+    } catch (e) {}
+  }
+
+  doc.moveTo(ML + logoW + 10, curY).lineTo(ML + logoW + 10, curY + headerH).strokeColor('#000000').lineWidth(1.5).stroke();
+  doc.moveTo(ML + CW - logoW - 10, curY).lineTo(ML + CW - logoW - 10, curY + headerH).strokeColor('#000000').lineWidth(1.5).stroke();
+
+  doc.fillColor('#000000').fontSize(13.5).font('Helvetica-Bold')
+    .text('ELITE DIGITAL', ML + logoW + 10, curY + 3, { width: CW - 2 * (logoW + 10), align: 'center' });
+
+  const mName = (jobCard.machineName || '').trim().toUpperCase();
+  const mBg = mName === 'GRANDO' ? '#0b5394' : mName === 'PRINTDOT' ? '#cc0000' : '#cc0000';
+  const mColor = '#ffffff';
+  const badgeW = 110, badgeH = 12, badgeX = ML + (CW - badgeW) / 2;
+  doc.rect(badgeX, curY + 21, badgeW, badgeH).fillAndStroke(mBg, '#000000');
+  doc.fillColor(mColor).fontSize(8).font('Helvetica-Bold')
+    .text(mName || 'PRINTDOT', badgeX, curY + 23, { width: badgeW, align: 'center' });
+
+  curY += headerH + 1;
+
+  // 3. MAIN FIELDS GRID TABLE
+  const colW_Label = 44;
+  const colW_Val = (CW - 3 * colW_Label) / 3;
+  const rowH = 13.5;
+
+  const gridRows = [
+    [['JOB NO. :', jobCard.jobNo || ''], ['COLORS :', jobCard.colors || ''], ['DATE :', formatDateStr(jobCard.date)]],
+    [['D. NO. :', jobCard.designNo || jobCard.designName || ''], ['PANNA :', jobCard.panna || ''], ['PASS :', jobCard.pass || '']],
+    [['FABRIC :', jobCard.fabric || ''], ['CON. :', jobCard.consumption || ''], ['ALL OVER :', jobCard.allover || '']],
+    [['PCS :', jobCard.pcs || ''], ['BOTTOM :', jobCard.bottom || ''], ['PN/KM :', jobCard.pnKm || '']],
+    [['TOP :', jobCard.top || ''], ['DUPATTA :', jobCard.dupatta || ''], ['SET-COPY :', jobCard.setCopy || '']],
+  ];
+
+  gridRows.forEach(row => {
+    let x = ML;
+    row.forEach(([lbl, val]) => {
+      doc.rect(x, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
+      doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold')
+        .text(lbl, x + 2, curY + 3, { width: colW_Label - 4, lineBreak: false });
+      x += colW_Label;
+
+      doc.rect(x, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold')
+        .text(String(val || ''), x + 3, curY + 3, { width: colW_Val - 5, lineBreak: false });
+      x += colW_Val;
+    });
+    curY += rowH;
+  });
+
+  // Row 6: SLEEVE, CUT, TOTAL MTR Header
+  let x6 = ML;
+  doc.rect(x6, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold').text('SLEEVE :', x6 + 2, curY + 3, { lineBreak: false });
+  x6 += colW_Label;
+  doc.rect(x6, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.sleeve || ''), x6 + 3, curY + 3, { lineBreak: false });
+  x6 += colW_Val;
+
+  doc.rect(x6, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold').text('CUT :', x6 + 2, curY + 3, { lineBreak: false });
+  x6 += colW_Label;
+  doc.rect(x6, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.cut || ''), x6 + 3, curY + 3, { lineBreak: false });
+  x6 += colW_Val;
+
+  const totalHeaderW = colW_Label + colW_Val;
+  doc.rect(x6, curY, totalHeaderW, rowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold').text('TOTAL MTR', x6, curY + 3, { width: totalHeaderW, align: 'center' });
+  curY += rowH;
+
+  // Row 7: PARTY and TOTAL MTR Value
+  let x7 = ML;
+  doc.rect(x7, curY, colW_Label, rowH + 2).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold').text('PARTY :', x7 + 2, curY + 4, { lineBreak: false });
+  x7 += colW_Label;
+
+  const partyValW = 2 * colW_Val + colW_Label;
+  doc.rect(x7, curY, partyValW, rowH + 2).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold').text(String(jobCard.party || ''), x7 + 3, curY + 4, { lineBreak: false });
+  x7 += partyValW;
+
+  doc.rect(x7, curY, totalHeaderW, rowH + 2).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(11).font('Helvetica-Bold').text(`: ${jobCard.totalMtr || ''}`, x7 + 4, curY + 2.5);
+  curY += rowH + 3;
+
+  // 4. DESIGN IMAGE CONTAINER
+  const imgAreaH = 125;
+  doc.rect(ML, curY, CW, imgAreaH).strokeColor('#000000').lineWidth(1.2).stroke();
+
+  try {
+    if (imgBuf1 && imgBuf2) {
+      const halfW = CW / 2;
+      doc.moveTo(ML + halfW, curY).lineTo(ML + halfW, curY + imgAreaH).strokeColor('#000000').lineWidth(1).stroke();
+      doc.image(imgBuf1, ML + 3, curY + 3, { fit: [halfW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
+      doc.image(imgBuf2, ML + halfW + 3, curY + 3, { fit: [halfW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
+    } else if (imgBuf1) {
+      doc.image(imgBuf1, ML + 3, curY + 3, { fit: [CW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
+    } else if (imgBuf2) {
+      doc.image(imgBuf2, ML + 3, curY + 3, { fit: [CW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
+    } else {
+      doc.fillColor('#cccccc').fontSize(11).font('Helvetica-Bold')
+        .text('NO DESIGN IMAGE', ML, curY + imgAreaH / 2 - 6, { width: CW, align: 'center' });
+    }
+  } catch (e) {
+    doc.fillColor('#cccccc').fontSize(11).font('Helvetica-Bold')
+      .text('NO DESIGN IMAGE', ML, curY + imgAreaH / 2 - 6, { width: CW, align: 'center' });
+  }
+
+  curY += imgAreaH + 1;
+
+  // 5. NOTES CONTAINER
+  const noteH = 13.5;
+  // NOTE 1
+  doc.rect(ML, curY, CW, noteH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text('NOTE 1 :', ML + 4, curY + 3);
+  if (jobCard.note1) {
+    doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.note1), ML + 52, curY + 3, { width: CW - 56, lineBreak: false });
+  }
+  curY += noteH;
+
+  // EMRG. NOTE
+  doc.rect(ML, curY, CW, noteH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#dc2626').fontSize(7.5).font('Helvetica-Bold').text('EMRG. NOTE :', ML + 4, curY + 3);
+  if (jobCard.emergencyNotes) {
+    doc.fillColor('#dc2626').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.emergencyNotes), ML + 75, curY + 3, { width: CW - 80, lineBreak: false });
+  }
+  curY += noteH;
+
+  // NOTE 2
+  doc.rect(ML, curY, CW, noteH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text('NOTE 2 :', ML + 4, curY + 3);
+  if (jobCard.note2) {
+    doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.note2), ML + 52, curY + 3, { width: CW - 56, lineBreak: false });
+  }
+  curY += noteH + 1;
+
+  // 6. PROCESS & T.P. DETAILS TABLE (Exact Image 2 Specification Grid)
+  const pLabelW = 60;
+  const pValW = (CW - 2 * pLabelW) / 2;
+  const pRowH = 13.5;
+
+  const procRows = [
+    [['DESIGNER :', jobCard.designer || ''], ['C. M. :', jobCard.colourMatching || '']],
+    [['EXP. TIME :', jobCard.expTime || ''], ['PAPER TYPE :', jobCard.paperType || '']],
+    [['OPERATER:', jobCard.operatorName || ''], ['PRINT DATE :', formatDateStr(jobCard.printDate)]],
+    [['ROLL NO. :', jobCard.rollNo || ''], ['PRINT METER :', jobCard.printMtr || '']],
+  ];
+
+  procRows.forEach(row => {
+    let px = ML;
+    row.forEach(([lbl, val]) => {
+      doc.rect(px, curY, pLabelW, pRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+      doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold')
+        .text(lbl, px + 3, curY + 3, { width: pLabelW - 5, lineBreak: false });
+      px += pLabelW;
+
+      doc.rect(px, curY, pValW, pRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold')
+        .text(String(val || ''), px + 4, curY + 3, { width: pValW - 6, lineBreak: false });
+      px += pValW;
+    });
+    curY += pRowH;
+  });
+
+  // Fusing Temp & Speed Row
+  let fx = ML;
+  const fLabel1W = 38, fLabel2W = 44, fVal1W = 75, fLabel3W = 44, fVal2W = CW - (fLabel1W + fLabel2W + fVal1W + fLabel3W);
+  doc.rect(fx, curY, fLabel1W, pRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold').text('FUSING', fx, curY + 3, { width: fLabel1W, align: 'center' });
+  fx += fLabel1W;
+
+  doc.rect(fx, curY, fLabel2W, pRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold').text('TEMP. :', fx + 2, curY + 3, { lineBreak: false });
+  fx += fLabel2W;
+
+  doc.rect(fx, curY, fVal1W, pRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.temperature || ''), fx, curY + 3, { width: fVal1W, align: 'center' });
+  fx += fVal1W;
+
+  doc.rect(fx, curY, fLabel3W, pRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold').text('SPEED :', fx + 2, curY + 3, { lineBreak: false });
+  fx += fLabel3W;
+
+  doc.rect(fx, curY, fVal2W, pRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.speed || ''), fx, curY + 3, { width: fVal2W, align: 'center' });
+  curY += pRowH;
+
+  // Name & Date Row
+  let nx = ML;
+  const nLabel1W = 55, nVal1W = 100, nLabel2W = 44, nVal2W = CW - (nLabel1W + nVal1W + nLabel2W);
+  doc.rect(nx, curY, nLabel1W, pRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold').text('NAME:', nx + 3, curY + 3, { lineBreak: false });
+  nx += nLabel1W;
+
+  doc.rect(nx, curY, nVal1W, pRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(String(jobCard.fusingOperator || ''), nx + 3, curY + 3, { width: nVal1W - 5, lineBreak: false });
+  nx += nVal1W;
+
+  doc.rect(nx, curY, nLabel2W, pRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7).font('Helvetica-Bold').text('DATE :', nx + 2, curY + 3, { lineBreak: false });
+  nx += nLabel2W;
+
+  doc.rect(nx, curY, nVal2W, pRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text(formatDateStr(jobCard.fusingDate), nx + 3, curY + 3, { width: nVal2W - 5, lineBreak: false });
+  curY += pRowH + 1;
+
+  // 7. T.P. METER & T.P. WESTAGE METER TABLE (Exact Image 2 Bottom Grid)
+  const tpTableW = CW;
+  const mainTpW = tpTableW * 0.83; // ~313.35 pt
+  const westageW = tpTableW - mainTpW; // ~64.18 pt
+
+  // Header Row
+  doc.rect(ML, curY, mainTpW, 14).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text('T.P. METER', ML, curY + 3, { width: mainTpW, align: 'center' });
+
+  doc.rect(ML + mainTpW, curY, westageW, 14).strokeColor('#000000').lineWidth(0.8).stroke();
+  doc.fillColor('#000000').fontSize(5.2).font('Helvetica-Bold').text('T.P. WESTAGE METER', ML + mainTpW + 1, curY + 2, { width: westageW - 2, align: 'center' });
+  curY += 14;
+
+  // 5 Grid Rows for T.P. Meter (1-5, 6-10, 11-15, 16-19, 20-23 + Westage 1-3)
+  const subLabelW = 15;
+  const subPairW = mainTpW / 5;
+  const subValW = subPairW - subLabelW;
+
+  const westageSubLabelW = 14;
+  const westageSubValW = westageW - westageSubLabelW;
+
+  const gridData = [
+    [['1)', ''], ['6)', ''], ['11)', ''], ['16)', ''], ['20)', ''], ['1)', '']],
+    [['2)', ''], ['7)', ''], ['12)', ''], ['17)', ''], ['21)', ''], ['2)', '']],
+    [['3)', ''], ['8)', ''], ['13)', ''], ['18)', ''], ['22)', ''], ['3)', '']],
+    [['4)', ''], ['9)', ''], ['14)', ''], ['19)', ''], ['23)', ''], ['', '']],
+    [['5)', ''], ['10)', ''], ['15)', ''], ['TOTAL :-', ''], ['', ''], ['', '']]
+  ];
+
+  const tpGridRowH = 12;
+  gridData.forEach((row, rIdx) => {
+    let tX = ML;
+    for (let cIdx = 0; cIdx < 5; cIdx++) {
+      const [lbl, val] = row[cIdx];
+      if (rIdx === 4 && cIdx === 3) {
+        const totalSpanW = subPairW + subLabelW;
+        doc.rect(tX, curY, totalSpanW, tpGridRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+        doc.fillColor('#000000').fontSize(6.5).font('Helvetica-Bold').text('TOTAL :-', tX, curY + 2.5, { width: totalSpanW - 3, align: 'right' });
+        tX += totalSpanW;
+        cIdx++;
+        doc.rect(tX, curY, subValW, tpGridRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+        doc.fillColor('#000000').fontSize(6.5).font('Helvetica').text('', tX + 2, curY + 2.5);
+        tX += subValW;
+        continue;
+      }
+
+      doc.rect(tX, curY, subLabelW, tpGridRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+      doc.fillColor('#000000').fontSize(6.5).font('Helvetica-Bold').text(lbl, tX, curY + 2.5, { width: subLabelW, align: 'center' });
+      tX += subLabelW;
+
+      doc.rect(tX, curY, subValW, tpGridRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+      doc.fillColor('#000000').fontSize(6.5).font('Helvetica').text(val, tX + 2, curY + 2.5);
+      tX += subValW;
     }
 
-    const [imgBuf1, imgBuf2] = await Promise.all([getImageBuffer(imageUrl1), getImageBuffer(imageUrl2)]);
+    const [wLbl, wVal] = row[5];
+    doc.rect(tX, curY, westageSubLabelW, tpGridRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+    doc.fillColor('#000000').fontSize(6.5).font('Helvetica-Bold').text(wLbl, tX, curY + 2.5, { width: westageSubLabelW, align: 'center' });
+    tX += westageSubLabelW;
 
-    // ── PDF Creation (A5 Size) ──
-    const doc = new PDFDocument({ margin: 0, size: 'A5', autoFirstPage: true });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="JobCard_${jobCard.jobNo || 'preview'}.pdf"`);
-    doc.pipe(res);
+    doc.rect(tX, curY, westageSubValW, tpGridRowH).strokeColor('#000000').lineWidth(0.8).stroke();
+    doc.fillColor('#000000').fontSize(6.5).font('Helvetica').text(wVal, tX + 2, curY + 2.5);
 
-    const PW = 419.53, PH = 595.28;
-    const ML = 35; // Left margin with room for Punch guide
-    const MR = 12;
-    const CW = PW - ML - MR; // ~372.5 pt
+    curY += tpGridRowH;
+  });
+}
 
-    // ── 1. PUNCH HOLE GUIDE (Left Margin) ──
-    const punchX = 14;
-    doc.circle(punchX, 140, 7).strokeColor('#9ca3af').lineWidth(0.8).stroke();
-    const centerY = PH / 2;
-    doc.moveTo(8, centerY).lineTo(20, centerY).strokeColor('#9ca3af').lineWidth(1.2).stroke();
-    doc.fillColor('#9ca3af').fontSize(5).font('Helvetica-Bold')
-      .text('PUNCH', 4, centerY + 4, { width: 20, align: 'center' });
-    doc.circle(punchX, 450, 7).strokeColor('#9ca3af').lineWidth(0.8).stroke();
-
-    // ── 2. HEADER BOX ──
-    let curY = 12;
-    const headerH = 38;
-    doc.rect(ML, curY, CW, headerH).strokeColor('#000000').lineWidth(1.5).stroke();
+const downloadJobCardPdf = async (req, res) => {
+  try {
+    const jobCard = await db.JobCard.findById(req.params.id).lean();
+    if (!jobCard) {
+      return res.status(404).json({ error: 'Job card not found' });
+    }
 
     const logoPath = path.join(__dirname, 'DigitalLogo.png');
     const logoFallback = path.join(__dirname, 'Logo.png');
     const activeLogo = fs.existsSync(logoPath) ? logoPath : (fs.existsSync(logoFallback) ? logoFallback : null);
 
-    const logoW = 85, logoH = 30;
-    if (activeLogo) {
-      try {
-        doc.image(activeLogo, ML + 5, curY + 4, { height: logoH, fit: [logoW, logoH] });
-        doc.image(activeLogo, ML + CW - logoW - 5, curY + 4, { height: logoH, fit: [logoW, logoH] });
-      } catch (e) {}
-    }
+    const doc = new PDFDocument({ margin: 0, size: 'A5', autoFirstPage: true });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="JobCard_${jobCard.jobNo || 'preview'}.pdf"`);
+    doc.pipe(res);
 
-    doc.moveTo(ML + logoW + 10, curY).lineTo(ML + logoW + 10, curY + headerH).strokeColor('#000000').lineWidth(1.5).stroke();
-    doc.moveTo(ML + CW - logoW - 10, curY).lineTo(ML + CW - logoW - 10, curY + headerH).strokeColor('#000000').lineWidth(1.5).stroke();
-
-    doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
-      .text('ELITE DIGITAL', ML + logoW + 10, curY + 3, { width: CW - 2 * (logoW + 10), align: 'center' });
-
-    const mName = (jobCard.machineName || '').trim().toUpperCase();
-    const mBg = mName === 'GRANDO' ? '#0b5394' : mName === 'PRINTDOT' ? '#cc0000' : '#ffffff';
-    const mColor = mName ? '#ffffff' : '#000000';
-    const badgeW = 100, badgeH = 13, badgeX = ML + (CW - badgeW) / 2;
-    doc.rect(badgeX, curY + 22, badgeW, badgeH).fillAndStroke(mBg, '#000000');
-    doc.fillColor(mColor).fontSize(8.5).font('Helvetica-Bold')
-      .text(mName || ' ', badgeX, curY + 24, { width: badgeW, align: 'center' });
-
-    curY += headerH + 1;
-
-    // ── 3. MAIN FIELDS GRID TABLE ──
-    const colW_Label = 42;
-    const colW_Val = (CW - 3 * colW_Label) / 3; // ~82 pt
-    const rowH = 15;
-
-    const formatDateStr = (d) => d ? new Date(d).toLocaleDateString('en-IN') : '';
-
-    const gridRows = [
-      [['JOB NO. :', jobCard.jobNo || ''], ['COLORS :', jobCard.colors || ''], ['DATE :', formatDateStr(jobCard.date)]],
-      [['D. NO. :', jobCard.designNo || jobCard.designName || ''], ['PANNA :', jobCard.panna || ''], ['PASS :', jobCard.pass || '']],
-      [['FABRIC :', jobCard.fabric || ''], ['CON. :', jobCard.consumption || ''], ['ALL OVER :', jobCard.allover || '']],
-      [['PCS :', jobCard.pcs || ''], ['BOTTOM :', jobCard.bottom || ''], ['PN/KM :', jobCard.pnKm || '']],
-      [['TOP :', jobCard.top || ''], ['DUPATTA :', jobCard.dupatta || ''], ['SET-COPY :', jobCard.setCopy || '']],
-    ];
-
-    gridRows.forEach(row => {
-      let x = ML;
-      row.forEach(([lbl, val]) => {
-        doc.rect(x, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(1).stroke();
-        doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold')
-          .text(lbl, x + 2, curY + 3.5, { width: colW_Label - 4, lineBreak: false });
-        x += colW_Label;
-
-        doc.rect(x, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(1).stroke();
-        doc.fillColor('#000000').fontSize(8).font('Helvetica')
-          .text(String(val), x + 3, curY + 3.5, { width: colW_Val - 5, lineBreak: false });
-        x += colW_Val;
-      });
-      curY += rowH;
-    });
-
-    // Row 6: SLEEVE, CUT, TOTAL MTR Header
-    let x6 = ML;
-    doc.rect(x6, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(1).stroke();
-    doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text('SLEEVE :', x6 + 2, curY + 3.5);
-    x6 += colW_Label;
-    doc.rect(x6, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(1).stroke();
-    doc.fillColor('#000000').fontSize(8).font('Helvetica').text(String(jobCard.sleeve || ''), x6 + 3, curY + 3.5);
-    x6 += colW_Val;
-
-    doc.rect(x6, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(1).stroke();
-    doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text('CUT :', x6 + 2, curY + 3.5);
-    x6 += colW_Label;
-    doc.rect(x6, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(1).stroke();
-    doc.fillColor('#000000').fontSize(8).font('Helvetica').text(String(jobCard.cut || ''), x6 + 3, curY + 3.5);
-    x6 += colW_Val;
-
-    const totalHeaderW = colW_Label + colW_Val;
-    doc.rect(x6, curY, totalHeaderW, rowH).strokeColor('#000000').lineWidth(1).stroke();
-    doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold').text('TOTAL MTR', x6, curY + 3.5, { width: totalHeaderW, align: 'center' });
-    curY += rowH;
-
-    // Row 7: PARTY and TOTAL MTR Value
-    let x7 = ML;
-    doc.rect(x7, curY, colW_Label, rowH + 2).strokeColor('#000000').lineWidth(1).stroke();
-    doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text('PARTY :', x7 + 2, curY + 4.5);
-    x7 += colW_Label;
-
-    const partyValW = 2 * colW_Val + colW_Label;
-    doc.rect(x7, curY, partyValW, rowH + 2).strokeColor('#000000').lineWidth(1).stroke();
-    doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold').text(String(jobCard.party || ''), x7 + 3, curY + 4.5);
-    x7 += partyValW;
-
-    doc.rect(x7, curY, totalHeaderW, rowH + 2).strokeColor('#000000').lineWidth(1).stroke();
-    doc.fillColor('#000000').fontSize(11).font('Helvetica-Bold').text(`: ${jobCard.totalMtr || ''}`, x7 + 4, curY + 3);
-    curY += rowH + 3;
-
-    // ── 4. DESIGN IMAGE CONTAINER ──
-    const imgAreaH = 135;
-    doc.rect(ML, curY, CW, imgAreaH).strokeColor('#000000').lineWidth(1.2).stroke();
-
-    try {
-      if (imgBuf1 && imgBuf2) {
-        const halfW = CW / 2;
-        doc.moveTo(ML + halfW, curY).lineTo(ML + halfW, curY + imgAreaH).strokeColor('#000000').lineWidth(1).stroke();
-        doc.image(imgBuf1, ML + 3, curY + 3, { fit: [halfW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
-        doc.image(imgBuf2, ML + halfW + 3, curY + 3, { fit: [halfW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
-      } else if (imgBuf1) {
-        doc.image(imgBuf1, ML + 3, curY + 3, { fit: [CW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
-      } else if (imgBuf2) {
-        doc.image(imgBuf2, ML + 3, curY + 3, { fit: [CW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
-      } else {
-        doc.fillColor('#cccccc').fontSize(11).font('Helvetica-Bold')
-          .text('NO DESIGN IMAGE', ML, curY + imgAreaH / 2 - 6, { width: CW, align: 'center' });
-      }
-    } catch (e) {
-      doc.fillColor('#cccccc').fontSize(11).font('Helvetica-Bold')
-        .text('NO DESIGN IMAGE', ML, curY + imgAreaH / 2 - 6, { width: CW, align: 'center' });
-    }
-
-    curY += imgAreaH + 1;
-
-    // ── 5. NOTES CONTAINER ──
-    if (jobCard.emergencyNotes || jobCard.note1 || jobCard.note2) {
-      const notesList = [];
-      if (jobCard.emergencyNotes) notesList.push({ type: 'emergency', text: `⚠ EMERGENCY: ${jobCard.emergencyNotes}` });
-      if (jobCard.note1) notesList.push({ type: 'normal', text: `NOTE 1: ${jobCard.note1}` });
-      if (jobCard.note2) notesList.push({ type: 'normal', text: `NOTE 2: ${jobCard.note2}` });
-
-      notesList.forEach(n => {
-        const noteH = 16;
-        const bg = n.type === 'emergency' ? '#fee2e2' : '#f3f4f6';
-        doc.rect(ML, curY, CW, noteH).fillAndStroke(bg, '#000000');
-        doc.fillColor(n.type === 'emergency' ? '#dc2626' : '#000000')
-          .fontSize(8).font('Helvetica-Bold')
-          .text(n.text, ML + 5, curY + 3.5, { width: CW - 10, lineBreak: false });
-        curY += noteH;
-      });
-      curY += 1;
-    }
-
-    // ── 6. T.P. METER & PROCESS DETAILS TABLE ──
-    doc.rect(ML, curY, CW, 14).strokeColor('#000000').lineWidth(1).stroke();
-    doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold')
-      .text('PROCESS & T.P. DETAILS', ML, curY + 3, { width: CW, align: 'center' });
-    curY += 14;
-
-    const tpColLabelW = 55;
-    const tpColValW = (CW - 2 * tpColLabelW) / 2; // ~131 pt
-    const tpRowH = 14;
-
-    const tpRows = [
-      [['EXP. TIME :', jobCard.expTime || ''], ['PRINT DATE :', formatDateStr(jobCard.printDate)]],
-      [['FUSING DATE :', formatDateStr(jobCard.fusingDate)], ['PAPER TYPE :', jobCard.paperType || '']],
-      [['FUSING TEMP :', jobCard.temperature || ''], ['SPEED :', jobCard.speed || '']],
-      [['PROFILE :', jobCard.profile || ''], ['DESIGNER :', jobCard.designer || '']],
-      [['C. MATCHING :', jobCard.colourMatching || ''], ['BILL NO. :', jobCard.billNo || '']],
-    ];
-
-    tpRows.forEach(row => {
-      let tx = ML;
-      row.forEach(([lbl, val]) => {
-        doc.rect(tx, curY, tpColLabelW, tpRowH).strokeColor('#000000').lineWidth(1).stroke();
-        doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold')
-          .text(lbl, tx + 2, curY + 3, { width: tpColLabelW - 4, lineBreak: false });
-        tx += tpColLabelW;
-
-        doc.rect(tx, curY, tpColValW, tpRowH).strokeColor('#000000').lineWidth(1).stroke();
-        doc.fillColor('#000000').fontSize(7.5).font('Helvetica')
-          .text(String(val), tx + 3, curY + 3, { width: tpColValW - 5, lineBreak: false });
-        tx += tpColValW;
-      });
-      curY += tpRowH;
-    });
+    await renderJobCardA5Page(doc, jobCard, activeLogo);
 
     doc.end();
   } catch (err) {
@@ -746,268 +920,20 @@ const downloadBulkJobCardsPdf = async (req, res) => {
       return res.status(404).send('No matching Job Cards found.');
     }
 
+    const logoPath = path.join(__dirname, 'DigitalLogo.png');
+    const logoFallback = path.join(__dirname, 'Logo.png');
+    const activeLogo = fs.existsSync(logoPath) ? logoPath : (fs.existsSync(logoFallback) ? logoFallback : null);
+
     const doc = new PDFDocument({ margin: 0, size: 'A5', autoFirstPage: true });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Combined_Job_Cards_${jobCards.length}_Cards.pdf"`);
     doc.pipe(res);
 
-    const PW = 419.53, PH = 595.28;
-    const ML = 35;
-    const MR = 12;
-    const CW = PW - ML - MR;
-
-    const punchX = 14;
-    const centerY = PH / 2;
-    const colW_Label = 42;
-    const colW_Val = (CW - 3 * colW_Label) / 3;
-    const rowH = 15;
-    const formatDateStr = (d) => d ? new Date(d).toLocaleDateString('en-IN') : '';
-
-    const logoPath = path.join(__dirname, 'DigitalLogo.png');
-    const logoFallback = path.join(__dirname, 'Logo.png');
-    const activeLogo = fs.existsSync(logoPath) ? logoPath : (fs.existsSync(logoFallback) ? logoFallback : null);
-
-    function areDesignsEquivalent(a, b) {
-      if (!a || !b) return false;
-      const s1 = String(a).trim().toUpperCase();
-      const s2 = String(b).trim().toUpperCase();
-      if (s1 === s2) return true;
-      const clean1 = s1.replace(/^(ED|PKD)[-\s]?/i, '').trim();
-      const clean2 = s2.replace(/^(ED|PKD)[-\s]?/i, '').trim();
-      if (clean1 && clean2 && clean1 === clean2) return true;
-      return false;
-    }
-
-    function cleanDesignNameString(str) {
-      if (!str || typeof str !== 'string') return '';
-      const parts = str.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
-      if (parts.length <= 1) return str.trim();
-      const uniqueList = [];
-      for (const p of parts) {
-        const existingIdx = uniqueList.findIndex(u => areDesignsEquivalent(u, p));
-        if (existingIdx === -1) {
-          uniqueList.push(p);
-        } else {
-          if (/^(ED|PKD)-/i.test(p) && !/^(ED|PKD)-/i.test(uniqueList[existingIdx])) {
-            uniqueList[existingIdx] = p;
-          }
-        }
-      }
-      return uniqueList.join(', ');
-    }
-
-    function extractNames(str) {
-      if (!str || typeof str !== 'string') return [];
-      const cleaned = cleanDesignNameString(str);
-      return cleaned.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
-    }
-
     for (let jIdx = 0; jIdx < jobCards.length; jIdx++) {
-      const jobCard = jobCards[jIdx];
       if (jIdx > 0) {
         doc.addPage({ size: 'A5', margin: 0 });
-        doc.font('Helvetica').fontSize(10).fillColor('#000000').strokeColor('#000000').lineWidth(1);
       }
-
-      let imageUrl1 = '';
-      let imageUrl2 = '';
-      const keyStr = jobCard.designName || jobCard.designNo || '';
-      const names = extractNames(keyStr);
-
-      if (names[0]) {
-        const cleanName = names[0].replace(/^ED-/i, '');
-        const design1 = await db.Design.findOne({
-          $or: [
-            { designName: { $regex: `^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
-            { designNo: { $regex: `^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
-          ]
-        }).lean();
-        if (design1 && (design1.imageUrl || design1.imageUrl2)) {
-          imageUrl1 = design1.imageUrl || design1.imageUrl2;
-        }
-      }
-      if (!imageUrl1) imageUrl1 = jobCard.imageUrl1 || '';
-
-      if (names.length >= 2 && names[1]) {
-        const cleanName2 = names[1].replace(/^ED-/i, '');
-        const design2 = await db.Design.findOne({
-          $or: [
-            { designName: { $regex: `^(ED-)?${cleanName2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
-            { designNo: { $regex: `^(ED-)?${cleanName2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
-          ]
-        }).lean();
-        if (design2) imageUrl2 = design2.imageUrl || design2.imageUrl2 || '';
-        if (!imageUrl2) imageUrl2 = jobCard.imageUrl2 || '';
-      }
-
-      const [imgBuf1, imgBuf2] = await Promise.all([getImageBuffer(imageUrl1), getImageBuffer(imageUrl2)]);
-
-      doc.circle(punchX, 140, 7).strokeColor('#9ca3af').lineWidth(0.8).stroke();
-      doc.moveTo(8, centerY).lineTo(20, centerY).strokeColor('#9ca3af').lineWidth(1.2).stroke();
-      doc.fillColor('#9ca3af').fontSize(5).font('Helvetica-Bold')
-        .text('PUNCH', 4, centerY + 4, { width: 20, align: 'center' });
-      doc.circle(punchX, 450, 7).strokeColor('#9ca3af').lineWidth(0.8).stroke();
-
-      let curY = 12;
-      const headerH = 38;
-      doc.rect(ML, curY, CW, headerH).strokeColor('#000000').lineWidth(1.5).stroke();
-
-      const logoW = 85, logoH = 30;
-      if (activeLogo) {
-        try {
-          doc.image(activeLogo, ML + 5, curY + 4, { height: logoH, fit: [logoW, logoH] });
-          doc.image(activeLogo, ML + CW - logoW - 5, curY + 4, { height: logoH, fit: [logoW, logoH] });
-        } catch (e) {}
-      }
-
-      doc.moveTo(ML + logoW + 10, curY).lineTo(ML + logoW + 10, curY + headerH).strokeColor('#000000').lineWidth(1.5).stroke();
-      doc.moveTo(ML + CW - logoW - 10, curY).lineTo(ML + CW - logoW - 10, curY + headerH).strokeColor('#000000').lineWidth(1.5).stroke();
-
-      doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
-        .text('ELITE DIGITAL', ML + logoW + 10, curY + 3, { width: CW - 2 * (logoW + 10), align: 'center' });
-
-      const mName = (jobCard.machineName || '').trim().toUpperCase();
-      const mBg = mName === 'GRANDO' ? '#0b5394' : mName === 'PRINTDOT' ? '#cc0000' : '#ffffff';
-      const mColor = mName ? '#ffffff' : '#000000';
-      const badgeW = 100, badgeH = 13, badgeX = ML + (CW - badgeW) / 2;
-      doc.rect(badgeX, curY + 22, badgeW, badgeH).fillAndStroke(mBg, '#000000');
-      doc.fillColor(mColor).fontSize(8.5).font('Helvetica-Bold')
-        .text(mName || ' ', badgeX, curY + 24, { width: badgeW, align: 'center' });
-
-      curY += headerH + 1;
-
-      const gridRows = [
-        [['JOB NO. :', jobCard.jobNo || ''], ['COLORS :', jobCard.colors || ''], ['DATE :', formatDateStr(jobCard.date)]],
-        [['D. NO. :', jobCard.designNo || jobCard.designName || ''], ['PANNA :', jobCard.panna || ''], ['PASS :', jobCard.pass || '']],
-        [['FABRIC :', jobCard.fabric || ''], ['CON. :', jobCard.consumption || ''], ['ALL OVER :', jobCard.allover || '']],
-        [['PCS :', jobCard.pcs || ''], ['BOTTOM :', jobCard.bottom || ''], ['PN/KM :', jobCard.pnKm || '']],
-        [['TOP :', jobCard.top || ''], ['DUPATTA :', jobCard.dupatta || ''], ['SET-COPY :', jobCard.setCopy || '']],
-      ];
-
-      gridRows.forEach(row => {
-        let x = ML;
-        row.forEach(([lbl, val]) => {
-          doc.rect(x, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(1).stroke();
-          doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold')
-            .text(lbl, x + 2, curY + 3.5, { width: colW_Label - 4, lineBreak: false });
-          x += colW_Label;
-
-          doc.rect(x, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(1).stroke();
-          doc.fillColor('#000000').fontSize(8).font('Helvetica')
-            .text(String(val), x + 3, curY + 3.5, { width: colW_Val - 5, lineBreak: false });
-          x += colW_Val;
-        });
-        curY += rowH;
-      });
-
-      let x6 = ML;
-      doc.rect(x6, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(1).stroke();
-      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text('SLEEVE :', x6 + 2, curY + 3.5);
-      x6 += colW_Label;
-      doc.rect(x6, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(1).stroke();
-      doc.fillColor('#000000').fontSize(8).font('Helvetica').text(String(jobCard.sleeve || ''), x6 + 3, curY + 3.5);
-      x6 += colW_Val;
-
-      doc.rect(x6, curY, colW_Label, rowH).strokeColor('#000000').lineWidth(1).stroke();
-      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text('CUT :', x6 + 2, curY + 3.5);
-      x6 += colW_Label;
-      doc.rect(x6, curY, colW_Val, rowH).strokeColor('#000000').lineWidth(1).stroke();
-      doc.fillColor('#000000').fontSize(8).font('Helvetica').text(String(jobCard.cut || ''), x6 + 3, curY + 3.5);
-      x6 += colW_Val;
-
-      const totalHeaderW = colW_Label + colW_Val;
-      doc.rect(x6, curY, totalHeaderW, rowH).strokeColor('#000000').lineWidth(1).stroke();
-      doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold').text('TOTAL MTR', x6, curY + 3.5, { width: totalHeaderW, align: 'center' });
-      curY += rowH;
-
-      let x7 = ML;
-      doc.rect(x7, curY, colW_Label, rowH + 2).strokeColor('#000000').lineWidth(1).stroke();
-      doc.fillColor('#000000').fontSize(7.5).font('Helvetica-Bold').text('PARTY :', x7 + 2, curY + 4.5);
-      x7 += colW_Label;
-
-      const partyValW = 2 * colW_Val + colW_Label;
-      doc.rect(x7, curY, partyValW, rowH + 2).strokeColor('#000000').lineWidth(1).stroke();
-      doc.fillColor('#000000').fontSize(8.5).font('Helvetica-Bold').text(String(jobCard.party || ''), x7 + 3, curY + 4.5);
-      x7 += partyValW;
-
-      doc.rect(x7, curY, totalHeaderW, rowH + 2).strokeColor('#000000').lineWidth(1).stroke();
-      doc.fillColor('#000000').fontSize(11).font('Helvetica-Bold').text(`: ${jobCard.totalMtr || ''}`, x7 + 4, curY + 3);
-      curY += rowH + 3;
-
-      const imgAreaH = 135;
-      doc.rect(ML, curY, CW, imgAreaH).strokeColor('#000000').lineWidth(1.2).stroke();
-
-      try {
-        if (imgBuf1 && imgBuf2) {
-          const halfW = CW / 2;
-          doc.moveTo(ML + halfW, curY).lineTo(ML + halfW, curY + imgAreaH).strokeColor('#000000').lineWidth(1).stroke();
-          doc.image(imgBuf1, ML + 3, curY + 3, { fit: [halfW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
-          doc.image(imgBuf2, ML + halfW + 3, curY + 3, { fit: [halfW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
-        } else if (imgBuf1) {
-          doc.image(imgBuf1, ML + 3, curY + 3, { fit: [CW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
-        } else if (imgBuf2) {
-          doc.image(imgBuf2, ML + 3, curY + 3, { fit: [CW - 6, imgAreaH - 6], align: 'center', valignment: 'center' });
-        } else {
-          doc.fillColor('#cccccc').fontSize(11).font('Helvetica-Bold')
-            .text('NO DESIGN IMAGE', ML, curY + imgAreaH / 2 - 6, { width: CW, align: 'center' });
-        }
-      } catch (e) {
-        doc.fillColor('#cccccc').fontSize(11).font('Helvetica-Bold')
-          .text('NO DESIGN IMAGE', ML, curY + imgAreaH / 2 - 6, { width: CW, align: 'center' });
-      }
-
-      curY += imgAreaH + 1;
-
-      if (jobCard.emergencyNotes || jobCard.note1 || jobCard.note2) {
-        const notesList = [];
-        if (jobCard.emergencyNotes) notesList.push({ type: 'emergency', text: `⚠ EMERGENCY: ${jobCard.emergencyNotes}` });
-        if (jobCard.note1) notesList.push({ type: 'normal', text: `NOTE 1: ${jobCard.note1}` });
-        if (jobCard.note2) notesList.push({ type: 'normal', text: `NOTE 2: ${jobCard.note2}` });
-
-        notesList.forEach(n => {
-          const noteH = 16;
-          const bg = n.type === 'emergency' ? '#fee2e2' : '#f3f4f6';
-          doc.rect(ML, curY, CW, noteH).fillAndStroke(bg, '#000000');
-          doc.fillColor(n.type === 'emergency' ? '#dc2626' : '#000000')
-            .fontSize(8).font('Helvetica-Bold')
-            .text(n.text, ML + 5, curY + 3.5, { width: CW - 10, lineBreak: false });
-          curY += noteH;
-        });
-        curY += 1;
-      }
-
-      doc.rect(ML, curY, CW, 14).strokeColor('#000000').lineWidth(1).stroke();
-      doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold')
-        .text('PROCESS & T.P. DETAILS', ML, curY + 3, { width: CW, align: 'center' });
-      curY += 14;
-
-      const tpColLabelW = 55;
-      const tpColValW = (CW - 2 * tpColLabelW) / 2;
-      const tpRowH = 14;
-
-      const tpRows = [
-        [['EXP. TIME :', jobCard.expTime || ''], ['PRINT DATE :', formatDateStr(jobCard.printDate)]],
-        [['FUSING DATE :', formatDateStr(jobCard.fusingDate)], ['PAPER TYPE :', jobCard.paperType || '']],
-        [['FUSING TEMP :', jobCard.temperature || ''], ['SPEED :', jobCard.speed || '']],
-        [['PROFILE :', jobCard.profile || ''], ['DESIGNER :', jobCard.designer || '']],
-        [['C. MATCHING :', jobCard.colourMatching || ''], ['BILL NO. :', jobCard.billNo || '']],
-      ];
-
-      tpRows.forEach(row => {
-        let tx = ML;
-        row.forEach(([lbl, val]) => {
-          doc.rect(tx, curY, tpColLabelW, tpRowH).strokeColor('#000000').lineWidth(1).stroke();
-          doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold')
-            .text(lbl, tx + 2, curY + 3, { width: tpColLabelW - 4, lineBreak: false });
-          tx += tpColLabelW;
-
-          doc.rect(tx, curY, tpColValW, tpRowH).strokeColor('#000000').lineWidth(1).stroke();
-          doc.fillColor('#000000').fontSize(7.5).font('Helvetica')
-            .text(String(val), tx + 3, curY + 3, { width: tpColValW - 5, lineBreak: false });
-          tx += tpColValW;
-        });
-        curY += tpRowH;
-      });
+      await renderJobCardA5Page(doc, jobCards[jIdx], activeLogo);
     }
 
     doc.end();
