@@ -36,7 +36,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   const getDefaultPannaForFabric = (fabricName, currentPanna = '') => {
     let clean = currentPanna ? String(currentPanna).trim().replace(/['"]/g, '') : '';
-    if (clean === '46') return '56';
+    if (clean === '46' || clean === '56') return '58';
     if (!clean || clean.toUpperCase() === 'UNKNOWN') {
       const fabUpper = String(fabricName || '').trim().toUpperCase();
       if (fabUpper.includes('ARMANI')) {
