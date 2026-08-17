@@ -1,7 +1,8 @@
-const mongoose = require('mongoose');
+const path = require('path');
 const dotenv = require('dotenv');
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
+const db = require('../src/db/models');
 const FabricTransaction = require('../src/db/models/fabricTransaction.model');
 const JobCard = require('../src/db/models/jobCard.model');
 const FabricChallan = require('../src/db/models/fabricChallan.model');
@@ -9,9 +10,14 @@ const FabricStockAdjustment = require('../src/db/models/fabricStockAdjustment.mo
 const PrintConfig = require('../src/db/models/printConfig.model');
 
 async function run() {
-  const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/elite_edition';
-  console.log('Connecting to Mongo:', mongoUri);
-  await mongoose.connect(mongoUri);
+  console.log('\n--- Waiting for Mongoose connection ---');
+  await new Promise((resolve) => {
+    if (db.mongoose.connection.readyState === 1) {
+      resolve();
+    } else {
+      db.mongoose.connection.once('connected', resolve);
+    }
+  });
 
   console.log('\n--- Checking FabricTransactions ---');
   const fabTxs = await FabricTransaction.find({
@@ -81,7 +87,7 @@ async function run() {
   }
 
   console.log('\n✅ ALL DB RECORDS UPDATED TO "FRENCH CREPE"');
-  await mongoose.disconnect();
+  process.exit(0);
 }
 
 run().catch(err => {
