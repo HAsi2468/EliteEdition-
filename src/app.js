@@ -69,14 +69,19 @@ app.use(async (req, res, next) => {
       } else {
         req.user = {
           _id: userId,
-          name: userName || 'Staff User',
-          username: userName || 'Staff User'
+          name: userName || 'HASI',
+          username: userName || 'HASI'
         };
       }
     } else if (userName) {
       req.user = {
         name: userName,
         username: userName
+      };
+    } else {
+      req.user = {
+        name: 'HASI',
+        username: 'HASI'
       };
     }
   } catch (err) {

@@ -217,6 +217,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   });
 
   // Lot Transfer state
+  const [selectedChallanHistory, setSelectedChallanHistory] = useState(null);
   const [lotTransfers, setLotTransfers] = useState([]);
   const [transferSearch, setTransferSearch] = useState('');
   const [transferDateStart, setTransferDateStart] = useState('');
@@ -2745,10 +2746,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     <th
                       onClick={() => {
                         if (outwardSortBy === 'qty') {
-                          setOutwardSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+                          setOutwardSortOrder(outwardSortOrder === 'asc' ? 'desc' : 'asc');
                         } else {
                           setOutwardSortBy('qty');
-                          setOutwardSortOrder('desc');
+                          setOutwardSortOrder('asc');
                         }
                       }}
                       style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -2756,6 +2757,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       Qty (mtr) {outwardSortBy === 'qty' ? (outwardSortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                     </th>
                     <th>Notes</th>
+                    <th>Logged By</th>
                     <th>Action</th>
                   </tr>
                 </thead>
@@ -2794,8 +2796,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                                     {badges.map((badge, bIdx) => (
                                       <span key={bIdx} style={{
-                                        fontSize: '0.72rem',
-                                        color: bIdx === 0 ? 'var(--primary-light)' : 'var(--success)',
+                                        fontSize: '0.7rem',
+                                        fontWeight: 600,
+                                        color: bIdx === 0 ? '#38bdf8' : '#34d399',
                                         background: bIdx === 0 ? 'rgba(14, 165, 233, 0.08)' : 'rgba(16, 185, 129, 0.08)',
                                         border: bIdx === 0 ? '1px solid rgba(14, 165, 233, 0.15)' : '1px solid rgba(16, 185, 129, 0.15)',
                                         padding: '2px 6px',
@@ -2815,7 +2818,20 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           return t.notes || '—';
                         })()}
                       </td>
+                      <td>
+                        <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#a78bfa', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(124, 58, 237, 0.25)' }}>
+                          {t.createdByName || t.createdBy || 'HASI'}
+                        </span>
+                      </td>
                       <td style={{ whiteSpace: 'nowrap' }}>
+                        <button
+                          className="btn-icon"
+                          title="View Audit History"
+                          style={{ color: '#fbbf24', marginRight: '0.5rem' }}
+                          onClick={() => setSelectedChallanHistory(t)}
+                        >
+                          <Clock size={15} />
+                        </button>
                         <button
                           className="btn-icon"
                           title="Edit Outward Transaction"
@@ -4768,6 +4784,49 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delivery Challan Staff Audit History Modal */}
+      {selectedChallanHistory && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 99999,
+          background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }}>
+          <div style={{
+            width: '100%', maxWidth: '600px', background: '#0f172a', border: '1px solid rgba(56, 189, 248, 0.3)',
+            borderRadius: '14px', padding: '1.25rem', color: '#f8fafc', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Clock size={18} /> Delivery Challan #{selectedChallanHistory.challanNo || selectedChallanHistory.jobNo} — Staff Audit Log
+                </h3>
+                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+                  Staff attribution for this fabric dispatch / delivery transaction.
+                </p>
+              </div>
+              <button className="btn-icon" onClick={() => setSelectedChallanHistory(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.25rem', borderRadius: '10px', background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f1f5f9' }}>Logged By (Staff):</span>
+                <span style={{ padding: '3px 10px', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.18)', color: '#a78bfa', fontWeight: 800, fontSize: '0.85rem', border: '1px solid rgba(124, 58, 237, 0.3)' }}>
+                  {selectedChallanHistory.createdByName || selectedChallanHistory.createdBy || 'HASI'}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.82rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.75rem' }}>
+                <div>Party: <strong style={{ color: '#f8fafc' }}>{selectedChallanHistory.partyName || 'Client'}</strong></div>
+                <div>Fabric: <strong style={{ color: '#f8fafc' }}>{selectedChallanHistory.fabricQuality} ({selectedChallanHistory.qty} mtr)</strong></div>
+                <div>Date Logged: <strong style={{ color: '#f8fafc' }}>{formatDateDDMMYYYY(selectedChallanHistory.date)}</strong></div>
+                {selectedChallanHistory.notes && <div>Notes: <strong style={{ color: '#f8fafc' }}>{selectedChallanHistory.notes}</strong></div>}
+              </div>
+            </div>
           </div>
         </div>
       )}

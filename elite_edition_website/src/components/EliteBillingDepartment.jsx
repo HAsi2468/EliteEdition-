@@ -244,6 +244,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   });
 
   const [invoices, setInvoices] = useState([]);
+  const [selectedInvoiceHistory, setSelectedInvoiceHistory] = useState(null);
   const [customers, setCustomers] = useState([]);
   const [itemsList, setItemsList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -1566,13 +1567,14 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                       <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Paid Amount</th>
                       <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Balance Due</th>
                       <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Created By</th>
                       <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {displayedInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={10} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <td colSpan={11} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                           No invoices found for the selected date range ({activeRange.labelText}).
                         </td>
                       </tr>
@@ -1627,10 +1629,18 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                             {inv.paymentStatus}
                           </span>
                         </td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem' }}>
+                          <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#a78bfa', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(124, 58, 237, 0.25)' }}>
+                            {inv.createdByName || inv.createdBy || 'HASI'}
+                          </span>
+                        </td>
                         <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
                             <button onClick={() => setViewInvoiceModal(inv)} className="btn-icon" title="View Tax Invoice Details">
                               <Eye size={14} color="#38bdf8" />
+                            </button>
+                            <button onClick={() => setSelectedInvoiceHistory(inv)} className="btn-icon" title="View Audit History">
+                              <Clock size={14} color="#fbbf24" />
                             </button>
                             <button onClick={() => openPdfDialog(inv)} className="btn-icon" title="Download GST PDF">
                               <Download size={14} color="#a78bfa" />
@@ -3016,6 +3026,49 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Tax Invoice Staff Audit History Modal */}
+      {selectedInvoiceHistory && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 99999,
+          background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }}>
+          <div style={{
+            width: '100%', maxWidth: '600px', background: '#0f172a', border: '1px solid rgba(56, 189, 248, 0.3)',
+            borderRadius: '14px', padding: '1.25rem', color: '#f8fafc', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Clock size={18} /> Tax Invoice #{selectedInvoiceHistory.invoiceNo} — Staff Audit Log
+                </h3>
+                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+                  Staff member attribution for invoice generation and billing history.
+                </p>
+              </div>
+              <button className="btn-icon" onClick={() => setSelectedInvoiceHistory(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.25rem', borderRadius: '10px', background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f1f5f9' }}>Generated By (Staff):</span>
+                <span style={{ padding: '3px 10px', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.18)', color: '#a78bfa', fontWeight: 800, fontSize: '0.85rem', border: '1px solid rgba(124, 58, 237, 0.3)' }}>
+                  {selectedInvoiceHistory.createdByName || selectedInvoiceHistory.createdBy || 'HASI'}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.82rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.75rem' }}>
+                <div>Customer: <strong style={{ color: '#f8fafc' }}>{selectedInvoiceHistory.customer?.businessName || selectedInvoiceHistory.customer?.name || 'Client'}</strong></div>
+                <div>Grand Total: <strong style={{ color: '#34d399' }}>{fmtINR(selectedInvoiceHistory.grandTotal)}</strong></div>
+                <div>Invoice Date: <strong style={{ color: '#f8fafc' }}>{formatDateDDMMYYYY(selectedInvoiceHistory.invoiceDate)}</strong></div>
+                <div>Payment Status: <strong style={{ color: selectedInvoiceHistory.paymentStatus === 'PAID' ? '#34d399' : '#f87171' }}>{selectedInvoiceHistory.paymentStatus}</strong></div>
+              </div>
+            </div>
           </div>
         </div>
       )}

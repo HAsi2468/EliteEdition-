@@ -65,20 +65,18 @@ async function publishActivity({
       }
     }
 
-    // 2. If realUserName is still generic or empty, try fallback lookups
-    if (!realUserName || ['Admin', 'Operator', 'System Bot', 'System'].includes(realUserName)) {
-      if (actorName && !['Admin', 'Operator', 'System Bot', 'System'].includes(actorName.trim())) {
+    // 2. If realUserName is still generic or empty, default to HASI
+    if (!realUserName || ['Admin', 'Operator', 'System Bot', 'System', 'Staff User'].includes(realUserName)) {
+      if (actorName && !['Admin', 'Operator', 'System Bot', 'System', 'Staff User'].includes(actorName.trim())) {
         realUserName = actorName.trim();
+      } else {
+        realUserName = 'HASI';
       }
     }
 
     // 3. Format final description replacing generic "by Admin" with actual user name
     let finalDescription = description || `[System Activity] ${action} on ${module} #${recordRef}`;
-    if (realUserName && !['Admin', 'Operator', 'System Bot'].includes(realUserName)) {
-      finalDescription = finalDescription.replace(/by (Admin|Operator|System Bot)\.?$/i, `by **${realUserName}**.`);
-    } else if (realUserName) {
-      finalDescription = finalDescription.replace(/by (Admin|Operator|System Bot)\.?$/i, `by **${realUserName}**.`);
-    }
+    finalDescription = finalDescription.replace(/by \*{0,2}(Admin|Operator|System Bot|Staff User)\*{0,2}\.?$/i, `by **${realUserName}**.`);
 
     const groupKey = resolveGroupKey(permissionScope, department);
     

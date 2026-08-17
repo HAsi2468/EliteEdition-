@@ -19,6 +19,7 @@ const DEFAULT_ITEM = () => ({
 
 export default function StitchingChallanPanel({ onNavigateToBilling }) {
   const [challans, setChallans] = useState([]);
+  const [selectedStitchingHistory, setSelectedStitchingHistory] = useState(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -417,6 +418,7 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
                   <th style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 700, textAlign: 'center' }}>Total Pcs</th>
                   <th style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 700, textAlign: 'right' }}>Total Amount</th>
                   <th style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 700 }}>Delivery By</th>
+                  <th style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 700 }}>Created By</th>
                   <th style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontWeight: 700, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -465,8 +467,21 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
                     <td style={{ padding: '0.75rem 1rem', color: 'var(--text-primary)' }}>
                       {c.deliveryBy || '—'}
                     </td>
+                    <td style={{ padding: '0.75rem 1rem' }}>
+                      <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#a78bfa', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(124, 58, 237, 0.25)' }}>
+                        {c.createdByName || c.createdBy || 'HASI'}
+                      </span>
+                    </td>
                     <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
+                        <button
+                          onClick={() => setSelectedStitchingHistory(c)}
+                          className="btn-secondary"
+                          style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem', color: '#fbbf24', borderColor: '#fde68a', background: '#fffbeb' }}
+                          title="View Audit History"
+                        >
+                          <Clock size={13} /> History
+                        </button>
                         <button
                           onClick={() => handleDownloadPdf(c)}
                           className="btn-secondary"
@@ -827,6 +842,49 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
                   <div>FOR ELITE EDITION</div>
                   <div style={{ marginTop: '1.8rem', fontWeight: 'normal' }}>(Authorized Signatory)</div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stitching Challan Staff Audit History Modal */}
+      {selectedStitchingHistory && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 99999,
+          background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }}>
+          <div style={{
+            width: '100%', maxWidth: '600px', background: '#0f172a', border: '1px solid rgba(56, 189, 248, 0.3)',
+            borderRadius: '14px', padding: '1.25rem', color: '#f8fafc', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Clock size={18} /> Stitching Challan #{selectedStitchingHistory.challanNo} — Staff Audit Log
+                </h3>
+                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+                  Staff member attribution for this stitching delivery transaction.
+                </p>
+              </div>
+              <button className="btn-icon" onClick={() => setSelectedStitchingHistory(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.25rem', borderRadius: '10px', background: 'rgba(30, 41, 59, 0.7)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f1f5f9' }}>Created By (Staff):</span>
+                <span style={{ padding: '3px 10px', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.18)', color: '#a78bfa', fontWeight: 800, fontSize: '0.85rem', border: '1px solid rgba(124, 58, 237, 0.3)' }}>
+                  {selectedStitchingHistory.createdByName || selectedStitchingHistory.createdBy || 'HASI'}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.82rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '0.75rem' }}>
+                <div>Party: <strong style={{ color: '#f8fafc' }}>{selectedStitchingHistory.partyName || 'Client'}</strong></div>
+                <div>Total Pieces: <strong style={{ color: '#34d399' }}>{selectedStitchingHistory.totalPcs || 0} Pcs</strong></div>
+                <div>Challan Date: <strong style={{ color: '#f8fafc' }}>{formatDateDDMMYYYY(selectedStitchingHistory.date)}</strong></div>
+                {selectedStitchingHistory.notes && <div>Notes: <strong style={{ color: '#f8fafc' }}>{selectedStitchingHistory.notes}</strong></div>}
               </div>
             </div>
           </div>

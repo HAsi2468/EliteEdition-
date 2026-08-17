@@ -28,7 +28,7 @@ async function run() {
     userMap[sId] = u.name || u.username || 'Staff User';
   });
 
-  const defaultAdminName = users.find(u => u.role === 'admin')?.name || users[0]?.name || 'Parth Asodariya';
+  const defaultAdminName = 'HASI';
   console.log(`\nDefault primary staff name for untagged records: "${defaultAdminName}"`);
 
   // 1. Update Job Cards
