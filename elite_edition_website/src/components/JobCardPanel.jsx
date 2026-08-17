@@ -1457,6 +1457,31 @@ function JobCardForm({ card, onSave, onClose, department }) {
             <Field label="Date" name="date" type="date" form={form} onChange={onChange} half/>
             <Field label="Status" name="status" form={form} onChange={onChange}
               options={['Pending','In Progress','Done']} half/>
+            <div style={{ display:'flex', flexDirection:'column', gap:'0.3rem', flex: '1 1 calc(33% - 0.4rem)', minWidth:130 }}>
+              <label style={{ fontSize:'0.68rem', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>
+                Created By (Staff Member)
+              </label>
+              <select 
+                name="createdBy" 
+                value={form.createdBy || form.createdByName || ''} 
+                onChange={(e) => setForm(f => ({ ...f, createdBy: e.target.value, createdByName: e.target.value }))}
+                style={{ padding: '0.5rem 0.7rem', fontSize: '0.85rem', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontWeight: 600 }}
+              >
+                <option value="Parth Asodariya">Parth Asodariya</option>
+                <option value="Harshil">Harshil</option>
+                <option value="HASI">HASI</option>
+                <option value="Rushabh">Rushabh</option>
+                <option value="JAY">JAY</option>
+                <option value="Ram">Ram</option>
+                <option value="Ajay Bind">Ajay Bind</option>
+                <option value="Dev Patel">Dev Patel</option>
+                <option value="Dhruv Patel">Dhruv Patel</option>
+                <option value="Durgesh Yadav">Durgesh Yadav</option>
+                <option value="Kaushik sir">Kaushik sir</option>
+                <option value="EliteAC">EliteAC</option>
+                <option value="Elite Edition">Elite Edition</option>
+              </select>
+            </div>
           </div>
 
           {/* Section: Party Details */}
