@@ -59,7 +59,9 @@ const getDepartmentFilter = (dept) => {
   if (dept === 'stitching') {
     return { department: 'stitching' };
   } else if (dept === 'digital_print') {
-    return { $or: [{ department: 'digital_print' }, { department: { $exists: false } }, { department: null }, { department: '' }] };
+    // $in with null matches both null values AND missing fields ($exists: false)
+    // This enables index usage, unlike $or with $exists
+    return { department: { $in: ['digital_print', null, ''] } };
   }
   return {};
 };

@@ -18,6 +18,7 @@ import JobPrintingLog from './JobPrintingLog';
 import GarmentJobCardDashboard from './GarmentJobCardDashboard';
 import StitchingChallanPanel from './StitchingChallanPanel';
 import StitchingSettings from './StitchingSettings';
+import { areDesignsEquivalent, cleanDesignNameString, extractDesignNames } from '../utils/designUtils';
 
 const normalizeFabricName = (val, pannaVal = '') => {
   if (!val) return '';
@@ -145,14 +146,6 @@ function convertDriveUrl(link) {
 }
 
 // ─── Extract multiple design names helper ────────────────────────────────────
-function extractDesignNames(str) {
-  if (!str || typeof str !== 'string') return [];
-  return str
-    .split(/[,&/+]|\band\b/i)
-    .map(s => s.trim())
-    .filter(Boolean);
-}
-
 // ─── Blank form ──────────────────────────────────────────────────────────────
 const BLANK = {
   jobNo:'', designNo:'', designName:'', category:'', fabric:'', pcs:'', top:'', sleeve:'',
@@ -184,72 +177,248 @@ function StatusBadge({ status }) {
 }
 
 // ─── Print / PDF template (matches the physical job card layout) ─────────────
-export function triggerJobCardPrint(card) {
-  if (!card) return;
-  let imageUrl1 = card.imageUrl1 || '';
-  let imageUrl2 = card.imageUrl2 || '';
-
-  function extractNames(str) {
-    if (!str || typeof str !== 'string') return [];
-    return str.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
-  }
-
-  const keyStr = card.designName || card.designNo || '';
-  const names = extractNames(keyStr);
-  const showTwoImages = names.length >= 2;
-
-  const img1 = convertDriveUrl(imageUrl1);
-  const img2 = showTwoImages ? convertDriveUrl(imageUrl2) : '';
-
-  let imgAreaHtml = '';
-  if (img1 && img2) {
-    imgAreaHtml = `
-    <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
-      <div style="flex: 1; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-        <img src="${img1}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
-      </div>
-      <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-        <img src="${img2}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
-      </div>
-    </div>`;
-  } else if (img1) {
-    imgAreaHtml = `
-    <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
-      <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-        <img src="${img1}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
-      </div>
-    </div>`;
-  } else if (img2) {
-    imgAreaHtml = `
-    <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
-      <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-        <img src="${img2}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
-      </div>
-    </div>`;
-  } else {
-    imgAreaHtml = `
-    <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
-      <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 2px;">
-        <span style="color:#ccc; font-size: 10pt; font-weight: bold;">NO DESIGN IMAGE</span>
-      </div>
-    </div>`;
-  }
+export function triggerJobCardPrint(cardOrCards) {
+  if (!cardOrCards) return;
+  const cards = Array.isArray(cardOrCards) ? cardOrCards : [cardOrCards];
+  if (cards.length === 0) return;
 
   const win = window.open('', '_blank', 'width=600,height=800');
   if (!win) return;
 
-  const dateStr = card.date ? (card.date.includes('-') ? card.date.split('-').reverse().join('/') : card.date) : '';
-  const printDateStr = card.printDate ? (card.printDate.includes('-') ? card.printDate.split('-').reverse().join('/') : card.printDate) : '';
+  const titleText = cards.length === 1 ? `Job Card ${cards[0].jobNo || ''}` : `${cards.length} Job Cards`;
+
+  const pagesHtml = cards.map((card, idx) => {
+    let imageUrl1 = card.imageUrl1 || '';
+    let imageUrl2 = card.imageUrl2 || '';
+
+    const keyStr = card.designName || card.designNo || '';
+    const names = extractDesignNames(keyStr);
+    const showTwoImages = names.length >= 2;
+
+    const img1 = convertDriveUrl(imageUrl1);
+    const img2 = showTwoImages ? convertDriveUrl(imageUrl2) : '';
+
+    let imgAreaHtml = '';
+    if (img1 && img2) {
+      imgAreaHtml = `
+      <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
+        <div style="flex: 1; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
+          <img src="${img1}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
+        </div>
+        <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
+          <img src="${img2}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
+        </div>
+      </div>`;
+    } else if (img1) {
+      imgAreaHtml = `
+      <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
+        <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
+          <img src="${img1}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
+        </div>
+      </div>`;
+    } else if (img2) {
+      imgAreaHtml = `
+      <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
+        <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
+          <img src="${img2}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
+        </div>
+      </div>`;
+    } else {
+      imgAreaHtml = `
+      <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
+        <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 2px;">
+          <span style="color:#ccc; font-size: 10pt; font-weight: bold;">NO DESIGN IMAGE</span>
+        </div>
+      </div>`;
+    }
+
+    const dateStr = card.date ? (card.date.includes('-') ? card.date.split('-').reverse().join('/') : card.date) : '';
+    const printDateStr = card.printDate ? (card.printDate.includes('-') ? card.printDate.split('-').reverse().join('/') : card.printDate) : '';
+    const isLast = idx === cards.length - 1;
+
+    return `
+    <div class="card-page ${!isLast ? 'page-break' : ''}">
+      <div class="punch-guide">
+        <div class="punch-hole top"></div>
+        <div class="punch-center">
+          <svg width="10" height="8" viewBox="0 0 10 8">
+            <line x1="0" y1="4" x2="10" y2="4" stroke="#9ca3af" stroke-width="1.5"/>
+            <polyline points="7,1 10,4 7,7" fill="none" stroke="#9ca3af" stroke-width="1.5"/>
+          </svg>
+          <div class="punch-text">PUNCH</div>
+        </div>
+        <div class="punch-hole bottom"></div>
+      </div>
+      
+      <div class="wrap">
+      <!-- HEADER -->
+      <div class="header">
+        <div class="logo-box">
+          <img src="${window.location.origin}/DigitalLogo.png" alt="Elite Digital Prints" style="height: 36px; object-fit: contain; filter: invert(0);">
+        </div>
+        <div class="center-box">
+          <div class="center-title">ELITE DIGITAL</div>
+          <div class="machine-box" style="background: ${card.machineName === 'GRANDO' ? '#0b5394' : card.machineName === 'PRINTDOT' ? '#cc0000' : '#fff'}; color: ${card.machineName ? '#fff' : '#000'};">
+            ${card.machineName || '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}
+          </div>
+        </div>
+        <div class="logo-box-right">
+          <img src="${window.location.origin}/DigitalLogo.png" alt="Elite Digital Prints" style="height: 36px; object-fit: contain;">
+        </div>
+      </div>
+
+      <!-- MAIN FIELDS TABLE -->
+      <table style="margin-top:1px">
+        <tr>
+          <td class="label">JOB NO. :</td><td class="val">${card.jobNo || ''}</td>
+          <td class="label">COLORS :</td><td class="val">${card.colors || ''}</td>
+          <td class="label">DATE :</td><td class="val">${dateStr}</td>
+        </tr>
+        <tr>
+          <td class="label">D. NO. :</td><td class="val">${cleanDesignNameString(card.designNo || card.designName || '')}</td>
+          <td class="label">PANNA :</td><td class="val">${card.panna || ''}</td>
+          <td class="label">PASS :</td><td class="val">${card.pass || ''}</td>
+        </tr>
+        <tr>
+          <td class="label">FABRIC :</td><td class="val">${card.fabric || ''}</td>
+          <td class="label">CON. :</td><td class="val">${card.consumption || ''}</td>
+          <td class="label">ALL OVER :</td><td class="val">${card.allover || ''}</td>
+        </tr>
+        <tr>
+          <td class="label">PCS :</td><td class="val">${card.pcs || ''}</td>
+          <td class="label">BOTTOM :</td><td class="val">${card.bottom || ''}</td>
+          <td class="label">PN/KM :</td><td class="val">${card.pnKm || ''}</td>
+        </tr>
+        <tr>
+          <td class="label">TOP :</td><td class="val">${card.top || ''}</td>
+          <td class="label">DUPATTA :</td><td class="val">${card.dupatta || ''}</td>
+          <td class="label">SET-COPY :</td><td class="val">${card.setCopy || ''}</td>
+        </tr>
+        <tr>
+          <td class="label">SLEEVE :</td><td class="val">${card.sleeve || ''}</td>
+          <td class="label">CUT :</td><td class="val">${card.cut || ''}</td>
+          <td colspan="2" style="text-align: center; font-weight: 800; background: #fff;">TOTAL MTR</td>
+        </tr>
+        <tr>
+          <td class="label">PARTY:</td><td colspan="3" class="val">${card.party || ''}</td>
+          <td colspan="2" style="font-weight: 900; font-size: 11.5pt; padding-left: 10px;">: ${card.totalMtr || ''}</td>
+        </tr>
+      </table>
+
+      ${imgAreaHtml}
+
+      <div class="notes-container">
+        <div class="note-row">NOTE 1 : ${card.note1 || ''}</div>
+        <div class="note-row-emergency">EMRG. NOTE : ${card.emergencyNotes || ''}</div>
+        <div class="note-row">NOTE 2 : ${card.note2 || ''}</div>
+      </div>
+
+      <table style="width: 100%; margin-top: 1px;">
+        <tr>
+          <td class="label" style="width: 15%;">DESIGNER :</td>
+          <td class="val" style="width: 35%;">${card.designer || ''}</td>
+          <td class="label" style="width: 15%;">C. M.:</td>
+          <td class="val" style="width: 35%;">${card.colourMatching || ''}</td>
+        </tr>
+        <tr>
+          <td class="label">EXP. TIME :</td>
+          <td class="val">${card.expTime || ''}</td>
+          <td class="label">PAPER TYPE :</td>
+          <td class="val">${card.paperType || ''}</td>
+        </tr>
+      </table>
+
+      <table style="width: 100%; margin-top: 1px;">
+        <tr>
+          <td class="label" style="width: 15%;">OPERATER:</td>
+          <td class="val" style="width: 35%;">${card.operatorName || ''}</td>
+          <td class="label" style="width: 15%;">PRINT DATE :</td>
+          <td class="val" style="width: 35%;">${printDateStr}</td>
+        </tr>
+        <tr>
+          <td class="label">ROLL NO. :</td>
+          <td class="val"></td>
+          <td class="label">PRINT METER :</td>
+          <td class="val" style="font-weight: 700;">${card.printMtr || ''}</td>
+        </tr>
+      </table>
+
+      <table style="width: 100%; margin-top: 1px;">
+        <tr>
+          <td class="label" style="width: 15%; text-align: center; font-weight: 800;">FUSING</td>
+          <td class="label" style="width: 15%;">TEMP. :</td>
+          <td class="val" style="width: 20%; text-align: center; font-weight: 800;">${card.temperature || ''}</td>
+          <td class="label" style="width: 15%;">SPEED :</td>
+          <td class="val" style="width: 35%; text-align: center; font-weight: 800;">${card.speed || ''}</td>
+        </tr>
+        <tr>
+          <td class="label" style="text-align: center; font-weight: 800;">NAME:</td>
+          <td class="val" colspan="2"></td>
+          <td class="label">DATE :</td>
+          <td class="val"></td>
+        </tr>
+      </table>
+
+      <table class="tp-table">
+        <tr>
+          <th colspan="10" style="text-align: center; font-weight: 800;">T.P. METER</th>
+          <th colspan="2" style="font-size: 6.5pt; font-weight: 800; line-height: 1.1; padding: 2px;">T.P.<br/>WESTAGE<br/>METER</th>
+        </tr>
+        <tr>
+          <td class="tp-label">1)</td><td class="tp-val"></td>
+          <td class="tp-label">6)</td><td class="tp-val"></td>
+          <td class="tp-label">11)</td><td class="tp-val"></td>
+          <td class="tp-label">16)</td><td class="tp-val"></td>
+          <td class="tp-label">20)</td><td class="tp-val"></td>
+          <td class="tp-label" style="width: 25px;">1)</td><td class="tp-val"></td>
+        </tr>
+        <tr>
+          <td class="tp-label">2)</td><td class="tp-val"></td>
+          <td class="tp-label">7)</td><td class="tp-val"></td>
+          <td class="tp-label">12)</td><td class="tp-val"></td>
+          <td class="tp-label">17)</td><td class="tp-val"></td>
+          <td class="tp-label">21)</td><td class="tp-val"></td>
+          <td class="tp-label">2)</td><td class="tp-val"></td>
+        </tr>
+        <tr>
+          <td class="tp-label">3)</td><td class="tp-val"></td>
+          <td class="tp-label">8)</td><td class="tp-val"></td>
+          <td class="tp-label">13)</td><td class="tp-val"></td>
+          <td class="tp-label">18)</td><td class="tp-val"></td>
+          <td class="tp-label">22)</td><td class="tp-val"></td>
+          <td class="tp-label">3)</td><td class="tp-val"></td>
+        </tr>
+        <tr>
+          <td class="tp-label">4)</td><td class="tp-val"></td>
+          <td class="tp-label">9)</td><td class="tp-val"></td>
+          <td class="tp-label">14)</td><td class="tp-val"></td>
+          <td class="tp-label">19)</td><td class="tp-val"></td>
+          <td class="tp-label">23)</td><td class="tp-val"></td>
+          <td class="tp-label"></td><td class="tp-val"></td>
+        </tr>
+        <tr>
+          <td class="tp-label">5)</td><td class="tp-val"></td>
+          <td class="tp-label">10)</td><td class="tp-val"></td>
+          <td class="tp-label">15)</td><td class="tp-val"></td>
+          <td colspan="3" style="font-weight: 800; font-size: 7.2pt; text-align: right; padding-right: 5px;">TOTAL :-</td><td class="tp-val"></td>
+          <td class="tp-label"></td><td class="tp-val"></td>
+        </tr>
+      </table>
+    </div>
+  </div>`;
+  }).join('\n');
 
   win.document.write(`<!DOCTYPE html><html><head>
-    <title>Job Card ${card.jobNo || ''}</title>
+    <title>${titleText}</title>
     <style>
       @page { size: A5; margin: 8mm; }
       @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .page-break { page-break-after: always; break-after: page; }
       }
       * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
       body { background: #fff; color: #000; font-size: 9pt; line-height: 1.2; position: relative; padding-left: 12mm; }
+      .card-page { width: 100%; position: relative; }
       .wrap { width: 100%; display: flex; flex-direction: column; gap: 1px; }
       
       /* Header styles */
@@ -296,8 +465,6 @@ export function triggerJobCardPrint(card) {
         margin-top: 1px;
         text-transform: uppercase;
         text-align: center;
-        background: ${card.machineName === 'GRANDO' ? '#0b5394' : card.machineName === 'PRINTDOT' ? '#cc0000' : '#fff'};
-        color: ${card.machineName ? '#fff' : '#000'};
       }
 
       /* Tables */
@@ -374,171 +541,7 @@ export function triggerJobCardPrint(card) {
       }
     </style>
   </head><body>
-    <div class="punch-guide">
-      <div class="punch-hole top"></div>
-      <div class="punch-center">
-        <svg width="10" height="8" viewBox="0 0 10 8">
-          <line x1="0" y1="4" x2="10" y2="4" stroke="#9ca3af" stroke-width="1.5"/>
-          <polyline points="7,1 10,4 7,7" fill="none" stroke="#9ca3af" stroke-width="1.5"/>
-        </svg>
-        <div class="punch-text">PUNCH</div>
-      </div>
-      <div class="punch-hole bottom"></div>
-    </div>
-    
-    <div class="wrap">
-    <!-- HEADER -->
-    <div class="header">
-      <div class="logo-box">
-        <img src="${window.location.origin}/DigitalLogo.png" alt="Elite Digital Prints" style="height: 36px; object-fit: contain; filter: invert(0);">
-      </div>
-      <div class="center-box">
-        <div class="center-title">ELITE DIGITAL</div>
-        <div class="machine-box">${card.machineName || '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}</div>
-      </div>
-      <div class="logo-box-right">
-        <img src="${window.location.origin}/DigitalLogo.png" alt="Elite Digital Prints" style="height: 36px; object-fit: contain;">
-      </div>
-    </div>
-
-    <!-- MAIN FIELDS TABLE -->
-    <table style="margin-top:1px">
-      <tr>
-        <td class="label">JOB NO. :</td><td class="val">${card.jobNo || ''}</td>
-        <td class="label">COLORS :</td><td class="val">${card.colors || ''}</td>
-        <td class="label">DATE :</td><td class="val">${dateStr}</td>
-      </tr>
-      <tr>
-        <td class="label">D. NO. :</td><td class="val">${card.designNo || card.designName || ''}</td>
-        <td class="label">PANNA :</td><td class="val">${card.panna || ''}</td>
-        <td class="label">PASS :</td><td class="val">${card.pass || ''}</td>
-      </tr>
-      <tr>
-        <td class="label">FABRIC :</td><td class="val">${card.fabric || ''}</td>
-        <td class="label">CON. :</td><td class="val">${card.consumption || ''}</td>
-        <td class="label">ALL OVER :</td><td class="val">${card.allover || ''}</td>
-      </tr>
-      <tr>
-        <td class="label">PCS :</td><td class="val">${card.pcs || ''}</td>
-        <td class="label">BOTTOM :</td><td class="val">${card.bottom || ''}</td>
-        <td class="label">PN/KM :</td><td class="val">${card.pnKm || ''}</td>
-      </tr>
-      <tr>
-        <td class="label">TOP :</td><td class="val">${card.top || ''}</td>
-        <td class="label">DUPATTA :</td><td class="val">${card.dupatta || ''}</td>
-        <td class="label">SET-COPY :</td><td class="val">${card.setCopy || ''}</td>
-      </tr>
-      <tr>
-        <td class="label">SLEEVE :</td><td class="val">${card.sleeve || ''}</td>
-        <td class="label">CUT :</td><td class="val">${card.cut || ''}</td>
-        <td colspan="2" style="text-align: center; font-weight: 800; background: #fff;">TOTAL MTR</td>
-      </tr>
-      <tr>
-        <td class="label">PARTY:</td><td colspan="3" class="val">${card.party || ''}</td>
-        <td colspan="2" style="font-weight: 900; font-size: 11.5pt; padding-left: 10px;">: ${card.totalMtr || ''}</td>
-      </tr>
-    </table>
-
-    ${imgAreaHtml}
-
-    <div class="notes-container">
-      <div class="note-row">NOTE 1 : ${card.note1 || ''}</div>
-      <div class="note-row-emergency">EMRG. NOTE : ${card.emergencyNotes || ''}</div>
-      <div class="note-row">NOTE 2 : ${card.note2 || ''}</div>
-    </div>
-
-    <table style="width: 100%; margin-top: 1px;">
-      <tr>
-        <td class="label" style="width: 15%;">DESIGNER :</td>
-        <td class="val" style="width: 35%;">${card.designer || ''}</td>
-        <td class="label" style="width: 15%;">C. M.:</td>
-        <td class="val" style="width: 35%;">${card.colourMatching || ''}</td>
-      </tr>
-      <tr>
-        <td class="label">EXP. TIME :</td>
-        <td class="val">${card.expTime || ''}</td>
-        <td class="label">PAPER TYPE :</td>
-        <td class="val">${card.paperType || ''}</td>
-      </tr>
-    </table>
-
-    <table style="width: 100%; margin-top: 1px;">
-      <tr>
-        <td class="label" style="width: 15%;">OPERATER:</td>
-        <td class="val" style="width: 35%;">${card.operatorName || ''}</td>
-        <td class="label" style="width: 15%;">PRINT DATE :</td>
-        <td class="val" style="width: 35%;">${printDateStr}</td>
-      </tr>
-      <tr>
-        <td class="label">ROLL NO. :</td>
-        <td class="val"></td>
-        <td class="label">PRINT METER :</td>
-        <td class="val" style="font-weight: 700;">${card.printMtr || ''}</td>
-      </tr>
-    </table>
-
-    <table style="width: 100%; margin-top: 1px;">
-      <tr>
-        <td class="label" style="width: 15%; text-align: center; font-weight: 800;">FUSING</td>
-        <td class="label" style="width: 15%;">TEMP. :</td>
-        <td class="val" style="width: 20%; text-align: center; font-weight: 800;">${card.temperature || ''}</td>
-        <td class="label" style="width: 15%;">SPEED :</td>
-        <td class="val" style="width: 35%; text-align: center; font-weight: 800;">${card.speed || ''}</td>
-      </tr>
-      <tr>
-        <td class="label" style="text-align: center; font-weight: 800;">NAME:</td>
-        <td class="val" colspan="2"></td>
-        <td class="label">DATE :</td>
-        <td class="val"></td>
-      </tr>
-    </table>
-
-    <table class="tp-table">
-      <tr>
-        <th colspan="10" style="text-align: center; font-weight: 800;">T.P. METER</th>
-        <th colspan="2" style="font-size: 6.5pt; font-weight: 800; line-height: 1.1; padding: 2px;">T.P.<br/>WESTAGE<br/>METER</th>
-      </tr>
-      <tr>
-        <td class="tp-label">1)</td><td class="tp-val"></td>
-        <td class="tp-label">6)</td><td class="tp-val"></td>
-        <td class="tp-label">11)</td><td class="tp-val"></td>
-        <td class="tp-label">16)</td><td class="tp-val"></td>
-        <td class="tp-label">20)</td><td class="tp-val"></td>
-        <td class="tp-label" style="width: 25px;">1)</td><td class="tp-val"></td>
-      </tr>
-      <tr>
-        <td class="tp-label">2)</td><td class="tp-val"></td>
-        <td class="tp-label">7)</td><td class="tp-val"></td>
-        <td class="tp-label">12)</td><td class="tp-val"></td>
-        <td class="tp-label">17)</td><td class="tp-val"></td>
-        <td class="tp-label">21)</td><td class="tp-val"></td>
-        <td class="tp-label">2)</td><td class="tp-val"></td>
-      </tr>
-      <tr>
-        <td class="tp-label">3)</td><td class="tp-val"></td>
-        <td class="tp-label">8)</td><td class="tp-val"></td>
-        <td class="tp-label">13)</td><td class="tp-val"></td>
-        <td class="tp-label">18)</td><td class="tp-val"></td>
-        <td class="tp-label">22)</td><td class="tp-val"></td>
-        <td class="tp-label">3)</td><td class="tp-val"></td>
-      </tr>
-      <tr>
-        <td class="tp-label">4)</td><td class="tp-val"></td>
-        <td class="tp-label">9)</td><td class="tp-val"></td>
-        <td class="tp-label">14)</td><td class="tp-val"></td>
-        <td class="tp-label">19)</td><td class="tp-val"></td>
-        <td class="tp-label">23)</td><td class="tp-val"></td>
-        <td class="tp-label"></td><td class="tp-val"></td>
-      </tr>
-      <tr>
-        <td class="tp-label">5)</td><td class="tp-val"></td>
-        <td class="tp-label">10)</td><td class="tp-val"></td>
-        <td class="tp-label">15)</td><td class="tp-val"></td>
-        <td colspan="3" style="font-weight: 800; font-size: 7.2pt; text-align: right; padding-right: 5px;">TOTAL :-</td><td class="tp-val"></td>
-        <td class="tp-label"></td><td class="tp-val"></td>
-      </tr>
-    </table>
-  </div>
+    ${pagesHtml}
   <script>
     window.onload = function() {
       var imgs = document.getElementsByTagName('img');
@@ -1045,7 +1048,8 @@ function JobCardForm({ card, onSave, onClose, department }) {
   const selectDesign = (d, imageMode = 'both') => {
     setSelectedDesign(d);
 
-    const existingNames = extractDesignNames(form.designName || form.designNo);
+    const rawInput = (form.designName || form.designNo || '').trim();
+    const existingNames = extractDesignNames(rawInput);
     const dName = d.designName || d.designNo;
 
     let newDesignName = dName;
@@ -1059,17 +1063,25 @@ function JobCardForm({ card, onSave, onClose, department }) {
       img1 = d.imageUrl2 || d.imageUrl || '';
       img2 = '';
     } else {
-      if (existingNames.length > 0 && existingNames[0].toLowerCase() !== dName.toLowerCase()) {
-        // Multiple designs selected! Combine as "Design1, Design2"
-        newDesignName = `${existingNames[0]}, ${dName}`;
+      const hasMultiDelimiter = /[,&/+]|\band\b/i.test(rawInput);
 
-        const d1 = designsList.find(item =>
-          (item.designName && item.designName.toLowerCase() === existingNames[0].toLowerCase()) ||
-          (item.designNo && String(item.designNo).toLowerCase() === existingNames[0].toLowerCase())
-        );
+      if (hasMultiDelimiter && existingNames.length > 0) {
+        const nonDupExisting = existingNames.filter(n => !areDesignsEquivalent(n, dName));
+        if (nonDupExisting.length > 0) {
+          newDesignName = cleanDesignNameString(`${nonDupExisting.join(', ')}, ${dName}`);
 
-        img1 = (d1 && (d1.imageUrl || d1.imageUrl2)) || form.imageUrl1 || '';
-        img2 = d.imageUrl || d.imageUrl2 || '';
+          const d1 = designsList.find(item =>
+            (item.designName && areDesignsEquivalent(item.designName, nonDupExisting[0])) ||
+            (item.designNo && areDesignsEquivalent(item.designNo, nonDupExisting[0]))
+          );
+
+          img1 = (d1 && (d1.imageUrl || d1.imageUrl2)) || form.imageUrl1 || '';
+          img2 = d.imageUrl || d.imageUrl2 || '';
+        } else {
+          newDesignName = dName;
+          img1 = d.imageUrl || d.imageUrl2 || '';
+          img2 = d.imageUrl2 && d.imageUrl2 !== img1 ? d.imageUrl2 : '';
+        }
       } else if (d.imageUrl && d.imageUrl2) {
         img1 = d.imageUrl;
         img2 = d.imageUrl2;
@@ -1126,16 +1138,12 @@ function JobCardForm({ card, onSave, onClose, department }) {
     if (!val) return designsList;
 
     const names = val.split(/[,&/+]|\band\b/i).map(s => s.trim());
-    const lastTerm = (names[names.length - 1] || val).toLowerCase();
+    const lastTerm = (names[names.length - 1] || val).trim();
 
     if (!lastTerm) return designsList;
 
     return designsList.filter(d =>
-      (d.designName && d.designName.toLowerCase().includes(lastTerm)) ||
-      (d.designNo && String(d.designNo).toLowerCase().includes(lastTerm)) ||
-      (d.category && d.category.toLowerCase().includes(lastTerm)) ||
-      (d.fabricName && d.fabricName.toLowerCase().includes(lastTerm)) ||
-      (d.designerName && d.designerName.toLowerCase().includes(lastTerm))
+      matchSearchQuery(d, lastTerm, ['designName', 'designNo', 'category', 'fabricName', 'designerName'])
     );
   }, [form.designName, form.designNo, designsList]);
 
@@ -1201,8 +1209,11 @@ function JobCardForm({ card, onSave, onClose, department }) {
     if (!form.jobNo.trim()) { setError('Job No. is required.'); return; }
     setSaving(true); setError('');
     const cleanFabric = normalizeFabricName(form.fabric, form.panna);
+    const cleanDesign = cleanDesignNameString(form.designName || form.designNo);
     const payload = {
       ...form,
+      designName: cleanDesign || form.designName,
+      designNo: cleanDesign || form.designNo,
       fabric: cleanFabric || form.fabric,
       department: department || (card?.department) || 'digital_print',
       category: form.category || (department === 'stitching' ? 'Stitching' : '')
@@ -1325,6 +1336,12 @@ function JobCardForm({ card, onSave, onClose, department }) {
                 name="designName"
                 value={form.designName}
                 onChange={handleDesignNameChange}
+                onBlur={() => {
+                  const cleaned = cleanDesignNameString(form.designName || form.designNo);
+                  if (cleaned !== form.designName) {
+                    setForm(f => ({ ...f, designName: cleaned, designNo: cleaned }));
+                  }
+                }}
                 onFocus={() => setShowSuggestions(true)}
                 placeholder="Type or select Design No. (e.g. ED1, ED2)..."
                 style={{
@@ -1708,14 +1725,20 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
 
   const handleBulkPrintSelectedJobCards = async () => {
     if (selectedJobCardIds.length === 0) return;
-    try {
-      await api.downloadBulkJobCardPdf(
-        selectedJobCardIds,
-        `Combined_Job_Cards_${selectedJobCardIds.length}_Cards.pdf`
-      );
-      triggerPushNotification('📥 Combined Job Cards PDF Downloaded', `${selectedJobCardIds.length} Job Cards merged into 1 single multi-page PDF document.`, 'success');
-    } catch (e) {
-      triggerEliteAlert('PDF Error', 'Failed to generate combined Job Cards PDF: ' + e.message, 'error');
+    const selectedCards = cards.filter(c => selectedJobCardIds.includes(c._id));
+    if (selectedCards.length > 0) {
+      triggerJobCardPrint(selectedCards);
+      triggerPushNotification('🖨️ Multi-Select Job Cards Print', `Opened ${selectedCards.length} Job Cards in physical A5 print view.`, 'success');
+    } else {
+      try {
+        await api.downloadBulkJobCardPdf(
+          selectedJobCardIds,
+          `Combined_Job_Cards_${selectedJobCardIds.length}_Cards.pdf`
+        );
+        triggerPushNotification('📥 Combined Job Cards PDF Downloaded', `${selectedJobCardIds.length} Job Cards merged into 1 single multi-page PDF document.`, 'success');
+      } catch (e) {
+        triggerEliteAlert('PDF Error', 'Failed to generate combined Job Cards PDF: ' + e.message, 'error');
+      }
     }
   };
 

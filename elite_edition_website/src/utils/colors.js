@@ -142,27 +142,55 @@ function hexToRgb(hex) {
 }
 
 /**
- * Euclidean distance between two RGB colors
+ * Convert RGB (0-255) to HSV (h: 0-360, s: 0-1, v: 0-1)
  */
-function colorDistance(c1, c2) {
-  return Math.sqrt(
-    Math.pow(c1.r - c2.r, 2) +
-    Math.pow(c1.g - c2.g, 2) +
-    Math.pow(c1.b - c2.b, 2)
-  );
+function rgbToHsv(r, g, b) {
+  const rNorm = r / 255;
+  const gNorm = g / 255;
+  const bNorm = b / 255;
+
+  const max = Math.max(rNorm, gNorm, bNorm);
+  const min = Math.min(rNorm, gNorm, bNorm);
+  const d = max - min;
+
+  let h = 0;
+  const s = max === 0 ? 0 : d / max;
+  const v = max;
+
+  if (max !== min) {
+    switch (max) {
+      case rNorm: h = (gNorm - bNorm) / d + (gNorm < bNorm ? 6 : 0); break;
+      case gNorm: h = (bNorm - rNorm) / d + 2; break;
+      case bNorm: h = (rNorm - gNorm) / d + 4; break;
+    }
+    h /= 6;
+  }
+
+  return { h: Math.round(h * 360), s, v };
 }
 
 /**
- * Find the closest predefined color name for an RGB value
+ * Perceptual Red-Mean color distance (human visual perception model)
+ */
+function perceptualColorDistance(c1, c2) {
+  const rMean = (c1.r + c2.r) / 2;
+  const dr = c1.r - c2.r;
+  const dg = c1.g - c2.g;
+  const db = c1.b - c2.b;
+  return Math.sqrt((2 + rMean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rMean) / 256) * db * db);
+}
+
+/**
+ * Find the closest predefined fabric color name using perceptual distance
  */
 function findClosestColorName(rgb) {
   let minDist = Infinity;
-  let closest = 'Black';
+  let closest = 'White';
 
   for (const [name, hex] of Object.entries(COLOR_MAP)) {
     const mapRgb = hexToRgb(hex);
     if (!mapRgb) continue;
-    const dist = colorDistance(rgb, mapRgb);
+    const dist = perceptualColorDistance(rgb, mapRgb);
     if (dist < minDist) {
       minDist = dist;
       closest = name;
@@ -173,8 +201,7 @@ function findClosestColorName(rgb) {
 
 /**
  * Detect dominant color(s) from an image source (base64 data URL or http/https URL).
- * Returns a Promise that resolves to an array of { name, hex, percentage } objects,
- * sorted by dominance (most dominant first).
+ * Uses Advanced Perceptual HSV Analysis with background canvas filtering.
  * 
  * @param {string} imageSrc - base64 data URL or image URL
  * @param {number} topN - number of dominant colors to return (default 3)
@@ -188,7 +215,6 @@ export function detectDominantColors(imageSrc, topN = 3) {
     }
 
     const img = new window.Image();
-    // Enable CORS for remote URLs
     if (!imageSrc.startsWith('data:')) {
       img.crossOrigin = 'Anonymous';
     }
@@ -196,8 +222,7 @@ export function detectDominantColors(imageSrc, topN = 3) {
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
-        // Downsample to 100x100 for performance
-        const size = 100;
+        const size = 120;
         canvas.width = size;
         canvas.height = size;
         const ctx = canvas.getContext('2d');
@@ -206,9 +231,9 @@ export function detectDominantColors(imageSrc, topN = 3) {
         const imageData = ctx.getImageData(0, 0, size, size);
         const pixels = imageData.data;
 
-        // Quantize pixels into buckets (4-bit per channel = 16 levels)
-        const buckets = {};
-        let totalPixels = 0;
+        // Step 1: Analyze pixels and filter out background/margin paper noise
+        const validPixels = [];
+        let backgroundCount = 0;
 
         for (let i = 0; i < pixels.length; i += 4) {
           const r = pixels[i];
@@ -216,35 +241,64 @@ export function detectDominantColors(imageSrc, topN = 3) {
           const b = pixels[i + 2];
           const a = pixels[i + 3];
 
-          // Skip transparent/near-transparent pixels
-          if (a < 128) continue;
+          if (a < 128) continue; // Skip transparent
 
-          // Quantize to 16 levels per channel
-          const qr = Math.round(r / 16) * 16;
-          const qg = Math.round(g / 16) * 16;
-          const qb = Math.round(b / 16) * 16;
+          const hsv = rgbToHsv(r, g, b);
+          const isWhiteBackground = r > 235 && g > 235 && b > 235;
+          const isNearWhiteCanvas = hsv.v > 0.90 && hsv.s < 0.08;
+          const isExtremeBlackMargin = hsv.v < 0.05;
 
-          const key = `${qr},${qg},${qb}`;
-          if (!buckets[key]) {
-            buckets[key] = { r: 0, g: 0, b: 0, count: 0 };
+          if (isWhiteBackground || isNearWhiteCanvas || isExtremeBlackMargin) {
+            backgroundCount++;
+          } else {
+            validPixels.push({ r, g, b, hsv });
           }
-          buckets[key].r += r;
-          buckets[key].g += g;
-          buckets[key].b += b;
-          buckets[key].count += 1;
-          totalPixels += 1;
         }
 
-        if (totalPixels === 0) {
+        // If design contains artwork pixels (>5% of total), analyze artwork pixels.
+        // Otherwise, fall back to analyzing all non-transparent pixels.
+        const pixelsToAnalyze = validPixels.length > (pixels.length / 4) * 0.05 ? validPixels : [];
+        if (pixelsToAnalyze.length === 0) {
+          for (let i = 0; i < pixels.length; i += 4) {
+            const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3];
+            if (a >= 128) pixelsToAnalyze.push({ r, g, b, hsv: rgbToHsv(r, g, b) });
+          }
+        }
+
+        if (pixelsToAnalyze.length === 0) {
           resolve([{ name: 'White', hex: '#FFFFFF', percentage: 100 }]);
           return;
         }
 
-        // Sort buckets by count (most frequent first)
-        const sorted = Object.values(buckets)
-          .sort((a, b) => b.count - a.count);
+        // Step 2: Quantize artwork pixels into HSV / RGB buckets & weight by saturation
+        const buckets = {};
+        let totalWeight = 0;
 
-        // Get top N dominant colors (skip very similar ones)
+        for (const p of pixelsToAnalyze) {
+          // Quantize RGB to 16-level buckets
+          const qr = Math.round(p.r / 16) * 16;
+          const qg = Math.round(p.g / 16) * 16;
+          const qb = Math.round(p.b / 16) * 16;
+          const key = `${qr},${qg},${qb}`;
+
+          // Give extra weight to saturated colors so design patterns are prioritized over pale backgrounds
+          const weight = 1.0 + (p.hsv.s * 2.5);
+
+          if (!buckets[key]) {
+            buckets[key] = { r: 0, g: 0, b: 0, weight: 0, count: 0 };
+          }
+          buckets[key].r += p.r * weight;
+          buckets[key].g += p.g * weight;
+          buckets[key].b += p.b * weight;
+          buckets[key].weight += weight;
+          buckets[key].count += 1;
+          totalWeight += weight;
+        }
+
+        // Step 3: Sort buckets by weighted dominance
+        const sorted = Object.values(buckets).sort((a, b) => b.weight - a.weight);
+
+        // Step 4: Map dominant clusters to closest predefined textile colors
         const results = [];
         const usedNames = new Set();
 
@@ -252,19 +306,16 @@ export function detectDominantColors(imageSrc, topN = 3) {
           if (results.length >= topN) break;
 
           const avgRgb = {
-            r: Math.round(bucket.r / bucket.count),
-            g: Math.round(bucket.g / bucket.count),
-            b: Math.round(bucket.b / bucket.count)
+            r: Math.round(bucket.r / bucket.weight),
+            g: Math.round(bucket.g / bucket.weight),
+            b: Math.round(bucket.b / bucket.weight)
           };
 
           const name = findClosestColorName(avgRgb);
-
-          // Skip duplicate color names
           if (usedNames.has(name)) continue;
           usedNames.add(name);
 
-          const percentage = Math.round((bucket.count / totalPixels) * 100);
-
+          const percentage = Math.round((bucket.weight / totalWeight) * 100);
           results.push({
             name,
             hex: COLOR_MAP[name] || '#000000',
@@ -272,7 +323,7 @@ export function detectDominantColors(imageSrc, topN = 3) {
           });
         }
 
-        resolve(results.length > 0 ? results : [{ name: 'Black', hex: '#000000', percentage: 100 }]);
+        resolve(results.length > 0 ? results : [{ name: 'White', hex: '#FFFFFF', percentage: 100 }]);
       } catch (err) {
         reject(new Error('Failed to analyze image pixels: ' + err.message));
       }

@@ -105,5 +105,11 @@ fabricStockAdjustmentSchema.pre('validate', async function () {
   }
 });
 
+// ── Indexes for query optimization ──
+// Stock adjustment queries
+fabricStockAdjustmentSchema.index({ fabricQuality: 1, panna: 1 });
+// Auto-increment sequence lookup
+fabricStockAdjustmentSchema.index({ saSeq: -1 });
+
 const FabricStockAdjustment = mongoose.model('FabricStockAdjustment', fabricStockAdjustmentSchema);
 module.exports = FabricStockAdjustment;

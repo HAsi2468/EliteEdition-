@@ -104,4 +104,14 @@ const billingInvoiceSchema = new mongoose.Schema(
   }
 );
 
+// ── Indexes for query optimization ──
+// Date-sorted invoice listing
+billingInvoiceSchema.index({ invoiceDate: -1 });
+// Filter by PAID/UNPAID
+billingInvoiceSchema.index({ paymentStatus: 1 });
+// Customer lookup on invoices
+billingInvoiceSchema.index({ 'customer.name': 1 });
+// Auto-increment sequence lookup
+billingInvoiceSchema.index({ invoiceSeq: -1 });
+
 module.exports = mongoose.model('BillingInvoice', billingInvoiceSchema);

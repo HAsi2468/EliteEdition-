@@ -88,5 +88,15 @@ const jobCardSchema = new mongoose.Schema(
   }
 );
 
+// ── Indexes for query optimization ──
+// Main listing filter + getFabricRequirement
+jobCardSchema.index({ status: 1, printStatus: 1, department: 1 });
+// Search and departmentReport busiest parties
+jobCardSchema.index({ party: 1 });
+// getFabricRequirement and departmentReport fabric trends
+jobCardSchema.index({ fabric: 1 });
+// Default sort order for job card listing
+jobCardSchema.index({ created_date_time: -1 });
+
 const JobCard = mongoose.model('JobCard', jobCardSchema);
 module.exports = JobCard;

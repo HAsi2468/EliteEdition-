@@ -115,5 +115,11 @@ const productSchema = new mongoose.Schema(
 	}
 );
 
+// ── Indexes for query optimization ──
+// Product brand filtering/aggregation
+productSchema.index({ brand: 1 });
+// Category-based queries
+productSchema.index({ categoryName: 1 });
+
 const Product = mongoose.model('Product', productSchema);
 module.exports = Product;

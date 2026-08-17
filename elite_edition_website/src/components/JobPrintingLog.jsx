@@ -8,6 +8,7 @@ import {
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
+import { cleanDesignNameString } from '../utils/designUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import JobCardTooltip from './JobCardTooltip';
 import DateRangePicker from './DateRangePicker';
@@ -1384,7 +1385,7 @@ export default function JobPrintingLog() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.82rem' }}>
               <div><span style={{ color: 'var(--text-muted)' }}>Party:</span> <strong style={{ color: 'var(--text-primary)' }}>{selectedJob?.party || 'Standard Client'}</strong></div>
               <div><span style={{ color: 'var(--text-muted)' }}>Fabric:</span> <strong style={{ color: 'var(--text-primary)' }}>{selectedJob?.fabric || '—'}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Design:</span> <strong style={{ color: 'var(--primary)' }}>{selectedJob?.designName || selectedJob?.designNo || '—'}</strong></div>
+              <div><span style={{ color: 'var(--text-muted)' }}>Design:</span> <strong style={{ color: 'var(--primary)' }}>{cleanDesignNameString(selectedJob?.designName || selectedJob?.designNo || '') || '—'}</strong></div>
               <div><span style={{ color: 'var(--text-muted)' }}>Panna:</span> <strong style={{ color: 'var(--text-primary)' }}>{selectedJob?.panna || '—'}</strong></div>
               <div><span style={{ color: 'var(--text-muted)' }}>Target Mtr:</span> <strong style={{ color: '#f59e0b' }}>{(selectedJobStats?.targetMtr || 0).toFixed(2)} mtr</strong></div>
               <div><span style={{ color: 'var(--text-muted)' }}>Total Printed:</span> <strong style={{ color: '#38bdf8' }}>{(selectedJobStats?.printedMtr || 0).toFixed(2)} mtr</strong></div>

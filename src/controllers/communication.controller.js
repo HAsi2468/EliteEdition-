@@ -263,7 +263,7 @@ const getUsersForDM = async (req, res) => {
  */
 const createOrGetDirectRoom = async (req, res) => {
   try {
-    const currentUserId = req.user ? req.user._id : req.body.userId;
+    const currentUserId = (req.user && req.user._id) ? req.user._id : (req.body.userId || req.query.userId);
     const { targetUserId } = req.body;
 
     if (!currentUserId || !targetUserId) {

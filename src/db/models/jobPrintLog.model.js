@@ -56,5 +56,11 @@ const jobPrintLogSchema = new mongoose.Schema(
   }
 );
 
+// ── Indexes for query optimization ──
+// departmentReport machine meterage aggregation
+jobPrintLogSchema.index({ machineName: 1, date: 1 });
+// Join/lookup by job card reference
+jobPrintLogSchema.index({ jobCardId: 1 });
+
 const JobPrintLog = mongoose.model('JobPrintLog', jobPrintLogSchema);
 module.exports = JobPrintLog;

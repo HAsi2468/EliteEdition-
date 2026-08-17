@@ -6,6 +6,7 @@ import ScreenGroupRoster from './ScreenGroupRoster';
 import { dispatchScreenGroupEvent } from '../services/screenGroupService';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
+import { cleanDesignNameString } from '../utils/designUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import DateRangePicker from './DateRangePicker';
 import {
@@ -808,7 +809,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           billTo: d.party || d.partyName || d.customerName || '',
           jobNo: d.jobNo || '',
           fabricName: d.fabric || d.fabricName || '',
-          designNo: d.designNo || d.designName || '',
+          designNo: cleanDesignNameString(d.designNo || d.designName || ''),
           lotNo: d.lotNo || '',
           vendorChallanNo: d.partyChallan || d.vendorChallanNo || '',
           tpDetails: totalMtrVal ? [{ id: 1, tpNo: 1, tpMeter: String(totalMtrVal) }] : emptyTpRows()
@@ -1025,7 +1026,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
     if (matchedJobs.length > 0) {
       const combinedJobNo = Array.from(new Set(matchedJobs.map(j => j.jobNo))).join(', ');
-      const combinedDesigns = Array.from(new Set(matchedJobs.map(j => j.designNo).filter(Boolean))).join(', ');
+      const combinedDesigns = cleanDesignNameString(Array.from(new Set(matchedJobs.map(j => j.designNo).filter(Boolean))).join(', '));
       const combinedColors = Array.from(new Set(matchedJobs.map(j => j.colors).filter(Boolean))).join(', ');
       const primaryJob = matchedJobs[0];
 

@@ -1707,7 +1707,10 @@ export const api = {
 
   // ── Authority-Based Inter-Department Communication ───────────────────────
   async getCommunicationGroups() {
-    return request('/communication/groups');
+    const user = this.getCurrentUser();
+    const uId = user ? (user._id || user.id) : '';
+    const qs = uId ? `?userId=${uId}` : '';
+    return request(`/communication/groups${qs}`);
   },
 
   async getCommunicationMessages(groupId, params = {}) {
@@ -1740,13 +1743,18 @@ export const api = {
   },
 
   async getCommunicationUsers() {
-    return request('/communication/users');
+    const user = this.getCurrentUser();
+    const uId = user ? (user._id || user.id) : '';
+    const qs = uId ? `?userId=${uId}` : '';
+    return request(`/communication/users${qs}`);
   },
 
-  async createOrGetDirectRoom(targetUserId) {
+  async createOrGetDirectRoom(targetUserId, currentUserId) {
+    const user = this.getCurrentUser();
+    const uId = currentUserId || (user ? (user._id || user.id) : '');
     return request('/communication/direct', {
       method: 'POST',
-      body: JSON.stringify({ targetUserId }),
+      body: JSON.stringify({ targetUserId, userId: uId }),
     });
   },
 

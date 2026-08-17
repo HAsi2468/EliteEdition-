@@ -75,5 +75,11 @@ const rawMaterialTransactionSchema = new mongoose.Schema(
   }
 );
 
+// ── Indexes for query optimization ──
+// Stock overview aggregation
+rawMaterialTransactionSchema.index({ materialName: 1, type: 1 });
+// Date range queries
+rawMaterialTransactionSchema.index({ date: 1 });
+
 const RawMaterialTransaction = mongoose.model('RawMaterialTransaction', rawMaterialTransactionSchema);
 module.exports = RawMaterialTransaction;

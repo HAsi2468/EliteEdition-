@@ -161,5 +161,17 @@ fabricChallanSchema.pre('save', async function () {
   }
 });
 
+// ── Indexes for query optimization ──
+// Challan queries filtering by fabric and panna
+fabricChallanSchema.index({ fabricName: 1, panna: 1 });
+// Challan listing and search
+fabricChallanSchema.index({ partyName: 1 });
+// Filtering by PENDING/INVOICED/CANCELLED
+fabricChallanSchema.index({ status: 1 });
+// Lookup challans by job number
+fabricChallanSchema.index({ jobNo: 1 });
+// Default sort for listing
+fabricChallanSchema.index({ createdAt: -1 });
+
 const FabricChallan = mongoose.model('FabricChallan', fabricChallanSchema);
 module.exports = FabricChallan;

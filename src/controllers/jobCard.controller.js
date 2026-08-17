@@ -359,17 +359,20 @@ const getNextJobCardNumber = async (req, res) => {
   try {
     const config    = await db.PrintConfig.findOne({ isConfig: true });
     const startingNo = config && config.startingJobNo ? config.startingJobNo : 1;
-    const cards     = await db.JobCard.find({}, { jobNo: 1 }).lean();
-    let maxNo = startingNo - 1;
-    cards.forEach(c => {
-      if (!c.jobNo) return;
-      const num = Number(c.jobNo);
-      if (!isNaN(num)) { if (num > maxNo) maxNo = num; }
-      else {
-        const m = String(c.jobNo).match(/(\d+)/);
-        if (m) { const p=Number(m[1]); if (!isNaN(p) && p>maxNo) maxNo=p; }
-      }
-    });
+    // Use aggregation to extract numeric part and find max — avoids full collection transfer to Node
+    const [result] = await db.JobCard.aggregate([
+      { $addFields: {
+          jobNoNum: { $convert: {
+            input: { $let: {
+              vars: { m: { $regexFind: { input: '$jobNo', regex: '\\d+' } } },
+              in: '$$m.match'
+            }},
+            to: 'int', onError: 0, onNull: 0
+          }}
+      }},
+      { $group: { _id: null, maxNo: { $max: '$jobNoNum' } } }
+    ]);
+    const maxNo = result ? Math.max(result.maxNo, startingNo - 1) : startingNo - 1;
     res.json({ nextJobNo: `JOB NO.- ${maxNo+1}` });
   } catch (err) {
     logger.error('getNextJobCardNumber error: %o', err);
@@ -386,9 +389,39 @@ const downloadJobCardPdf = async (req, res) => {
     let imageUrl1 = '';
     let imageUrl2 = '';
 
+    function areDesignsEquivalent(a, b) {
+      if (!a || !b) return false;
+      const s1 = String(a).trim().toUpperCase();
+      const s2 = String(b).trim().toUpperCase();
+      if (s1 === s2) return true;
+      const clean1 = s1.replace(/^(ED|PKD)[-\s]?/i, '').trim();
+      const clean2 = s2.replace(/^(ED|PKD)[-\s]?/i, '').trim();
+      if (clean1 && clean2 && clean1 === clean2) return true;
+      return false;
+    }
+
+    function cleanDesignNameString(str) {
+      if (!str || typeof str !== 'string') return '';
+      const parts = str.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
+      if (parts.length <= 1) return str.trim();
+      const uniqueList = [];
+      for (const p of parts) {
+        const existingIdx = uniqueList.findIndex(u => areDesignsEquivalent(u, p));
+        if (existingIdx === -1) {
+          uniqueList.push(p);
+        } else {
+          if (/^(ED|PKD)-/i.test(p) && !/^(ED|PKD)-/i.test(uniqueList[existingIdx])) {
+            uniqueList[existingIdx] = p;
+          }
+        }
+      }
+      return uniqueList.join(', ');
+    }
+
     function extractNames(str) {
       if (!str || typeof str !== 'string') return [];
-      return str.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
+      const cleaned = cleanDesignNameString(str);
+      return cleaned.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
     }
 
     const keyStr = jobCard.designName || jobCard.designNo || '';
@@ -666,9 +699,39 @@ const downloadBulkJobCardsPdf = async (req, res) => {
     const logoFallback = path.join(__dirname, 'Logo.png');
     const activeLogo = fs.existsSync(logoPath) ? logoPath : (fs.existsSync(logoFallback) ? logoFallback : null);
 
+    function areDesignsEquivalent(a, b) {
+      if (!a || !b) return false;
+      const s1 = String(a).trim().toUpperCase();
+      const s2 = String(b).trim().toUpperCase();
+      if (s1 === s2) return true;
+      const clean1 = s1.replace(/^(ED|PKD)[-\s]?/i, '').trim();
+      const clean2 = s2.replace(/^(ED|PKD)[-\s]?/i, '').trim();
+      if (clean1 && clean2 && clean1 === clean2) return true;
+      return false;
+    }
+
+    function cleanDesignNameString(str) {
+      if (!str || typeof str !== 'string') return '';
+      const parts = str.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
+      if (parts.length <= 1) return str.trim();
+      const uniqueList = [];
+      for (const p of parts) {
+        const existingIdx = uniqueList.findIndex(u => areDesignsEquivalent(u, p));
+        if (existingIdx === -1) {
+          uniqueList.push(p);
+        } else {
+          if (/^(ED|PKD)-/i.test(p) && !/^(ED|PKD)-/i.test(uniqueList[existingIdx])) {
+            uniqueList[existingIdx] = p;
+          }
+        }
+      }
+      return uniqueList.join(', ');
+    }
+
     function extractNames(str) {
       if (!str || typeof str !== 'string') return [];
-      return str.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
+      const cleaned = cleanDesignNameString(str);
+      return cleaned.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
     }
 
     for (let jIdx = 0; jIdx < jobCards.length; jIdx++) {

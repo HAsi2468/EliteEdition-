@@ -91,5 +91,17 @@ fabricTransactionSchema.pre('save', async function () {
   }
 });
 
+// ── Indexes for query optimization ──
+// Stock overview & panna grouping (getStockOverview, getStockByPanna, getTransactions)
+fabricTransactionSchema.index({ type: 1, department: 1 });
+// Lot stock lookup (getLotStock, fabricChallan lot queries)
+fabricTransactionSchema.index({ fabricQuality: 1, panna: 1, type: 1 });
+// Lot remnant check (createOutward auto-clear, fabricChallan lot calc)
+fabricTransactionSchema.index({ lotNo: 1, type: 1 });
+// Auto-increment: findOne({ type: 'INWARD' }).sort({ lotNo: -1 })
+fabricTransactionSchema.index({ type: 1, lotNo: -1 });
+// Date range queries (downloadLedgerPdf)
+fabricTransactionSchema.index({ date: 1 });
+
 const FabricTransaction = mongoose.model('FabricTransaction', fabricTransactionSchema);
 module.exports = FabricTransaction;
