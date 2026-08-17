@@ -448,50 +448,6 @@ const getNextJobCardNumber = async (req, res) => {
   }
 };
 
-// ─── PDF Generator (Physical A5 Layout) ─────────────────────────────────────────
-const downloadJobCardPdf = async (req, res) => {
-  try {
-    const jobCard = await db.JobCard.findById(req.params.id).lean();
-    if (!jobCard) return res.status(404).json({ error: 'Job Card not found' });
-
-    let imageUrl1 = '';
-    let imageUrl2 = '';
-
-    function areDesignsEquivalent(a, b) {
-      if (!a || !b) return false;
-      const s1 = String(a).trim().toUpperCase();
-      const s2 = String(b).trim().toUpperCase();
-      if (s1 === s2) return true;
-      const clean1 = s1.replace(/^(ED|PKD)[-\s]?/i, '').trim();
-      const clean2 = s2.replace(/^(ED|PKD)[-\s]?/i, '').trim();
-      if (clean1 && clean2 && clean1 === clean2) return true;
-      return false;
-    }
-
-    function cleanDesignNameString(str) {
-      if (!str || typeof str !== 'string') return '';
-      const parts = str.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
-      if (parts.length <= 1) return str.trim();
-      const uniqueList = [];
-      for (const p of parts) {
-        const existingIdx = uniqueList.findIndex(u => areDesignsEquivalent(u, p));
-        if (existingIdx === -1) {
-          uniqueList.push(p);
-        } else {
-          if (/^(ED|PKD)-/i.test(p) && !/^(ED|PKD)-/i.test(uniqueList[existingIdx])) {
-            uniqueList[existingIdx] = p;
-          }
-        }
-      }
-      return uniqueList.join(', ');
-    }
-
-    function extractNames(str) {
-      if (!str || typeof str !== 'string') return [];
-      const cleaned = cleanDesignNameString(str);
-      return cleaned.split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
-    }
-
 // ─── Render Job Card PDF A5 Page (Image 2 Exact Spec Layout) ──────────────────
 async function renderJobCardA5Page(doc, jobCard, activeLogo) {
   const PW = 419.53, PH = 595.28;
