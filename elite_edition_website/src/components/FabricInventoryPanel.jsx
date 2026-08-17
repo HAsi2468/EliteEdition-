@@ -32,7 +32,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     }
 
     let base = str;
-    if (base === 'CREPE' || base === 'CRAPE' || base === 'FRANCH CREPE' || base === 'FRENCH CREP' || base.includes('CREPE') || base.includes('CRAPE') || base.includes('CREP')) {
+    if (base === 'REYON' || base === 'RAYON' || base === 'POLY REYON' || base === 'POLY RAYON' || base.includes('REYON') || base.includes('RAYON')) {
+      if (base.includes('30 SPN')) {
+        base = 'POLY REYON 30 SPN';
+      } else {
+        base = 'POLY REYON';
+      }
+    } else if (base === 'CREPE' || base === 'CRAPE' || base === 'FRANCH CREPE' || base === 'FRENCH CREP' || base.includes('CREPE') || base.includes('CRAPE') || base.includes('CREP')) {
       base = 'FRENCH CREPE';
     } else if (base === 'CAMRIK' || base === 'CEMBRIC' || base === 'CEMBRIK' || base === 'CAMBRIK' || base.includes('CAMRIK') || base.includes('CEMBRIK')) {
       base = 'CAMBRIC';
@@ -41,7 +47,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     }
 
     let finalPanna = extractedPanna || (pannaVal ? String(pannaVal).trim().replace(/['"]/g, '') : '');
-    if (finalPanna === '46' || finalPanna === '56') finalPanna = '58';
+    if (finalPanna === '38' || finalPanna === '46' || finalPanna === '56') finalPanna = '58';
     if (!finalPanna || finalPanna.toUpperCase() === 'UNKNOWN' || isNaN(parseInt(finalPanna, 10))) {
       if (base.includes('ARMANI')) finalPanna = '44';
       else finalPanna = '58';
@@ -1778,9 +1784,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             <span style={{ fontSize: '0.65rem', background: 'var(--danger)', color: '#fff', borderRadius: '4px', padding: '2px 6px', fontWeight: 700 }}>EMPTY</span>
                           )}
                         </div>
-                        <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.25rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        <div style={{ display: 'flex', gap: '1.2rem', marginTop: '0.25rem', fontSize: '0.78rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
                           <span>In: <strong style={{ color: 'var(--success)' }}>{Number(item.totalInward || 0).toFixed(2)} mtr</strong></span>
-                          <span>Out: <strong style={{ color: 'var(--danger)' }}>{Number(item.totalOutward || 0).toFixed(2)} mtr</strong></span>
+                          <span>Out: <strong style={{ color: '#f87171' }}>{Number(item.freshOutward || (item.totalOutward - (item.totalShortage || 0)) || item.totalOutward).toFixed(2)} mtr</strong></span>
+                          {item.totalShortage > 0 && (
+                            <span>Shortage: <strong style={{ color: '#fbbf24' }}>+{Number(item.totalShortage).toFixed(2)} mtr</strong></span>
+                          )}
+                          <span>Net Out: <strong style={{ color: '#ef4444' }}>{Number(item.totalOutward || 0).toFixed(2)} mtr</strong></span>
                           <span>{pannaRows.length} panna variant{pannaRows.length !== 1 ? 's' : ''}</span>
                         </div>
                       </div>

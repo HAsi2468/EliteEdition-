@@ -16,7 +16,13 @@ const normalizeFabric = (val, pannaVal = '') => {
   }
 
   let base = str;
-  if (base === 'CREPE' || base === 'CRAPE' || base === 'FRANCH CREPE' || base === 'FRENCH CREP' || base.includes('CREPE') || base.includes('CRAPE') || base.includes('CREP')) {
+  if (base === 'REYON' || base === 'RAYON' || base === 'POLY REYON' || base === 'POLY RAYON' || base.includes('REYON') || base.includes('RAYON')) {
+    if (base.includes('30 SPN')) {
+      base = 'POLY REYON 30 SPN';
+    } else {
+      base = 'POLY REYON';
+    }
+  } else if (base === 'CREPE' || base === 'CRAPE' || base === 'FRANCH CREPE' || base === 'FRENCH CREP' || base.includes('CREPE') || base.includes('CRAPE') || base.includes('CREP')) {
     base = 'FRENCH CREPE';
   } else if (base === 'CAMRIK' || base === 'CEMBRIC' || base === 'CEMBRIK' || base === 'CAMBRIK' || base.includes('CAMRIK') || base.includes('CEMBRIK')) {
     base = 'CAMBRIC';
@@ -25,7 +31,7 @@ const normalizeFabric = (val, pannaVal = '') => {
   }
 
   let finalPanna = extractedPanna || (pannaVal ? String(pannaVal).trim().replace(/['"]/g, '') : '');
-  if (finalPanna === '46' || finalPanna === '56') finalPanna = '58';
+  if (finalPanna === '38' || finalPanna === '46' || finalPanna === '56') finalPanna = '58';
   if (!finalPanna || finalPanna.toUpperCase() === 'UNKNOWN' || isNaN(parseInt(finalPanna, 10))) {
     if (base.includes('ARMANI')) finalPanna = '44';
     else finalPanna = '58';
@@ -236,8 +242,29 @@ const getStockOverview = async (req, res) => {
           totalInward: {
             $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] }
           },
-          totalOutward: {
+          freshOutward: {
             $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] }
+          },
+          totalShortage: {
+            $sum: {
+              $cond: [
+                { $eq: ['$type', 'OUTWARD'] },
+                {
+                  $cond: [
+                    { $and: [{ $ne: ['$shortageMtr', null] }, { $gt: ['$shortageMtr', 0] }] },
+                    '$shortageMtr',
+                    {
+                      $cond: [
+                        { $and: [{ $ne: ['$shortagePct', null] }, { $gt: ['$shortagePct', 0] }] },
+                        { $multiply: ['$qty', { $divide: ['$shortagePct', 100] }] },
+                        0
+                      ]
+                    }
+                  ]
+                },
+                0
+              ]
+            }
           }
         }
       },
@@ -245,8 +272,10 @@ const getStockOverview = async (req, res) => {
         $project: {
           fabricQuality: '$_id',
           totalInward: 1,
-          totalOutward: 1,
-          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
+          freshOutward: 1,
+          totalShortage: 1,
+          totalOutward: { $add: ['$freshOutward', '$totalShortage'] },
+          currentStock: { $subtract: ['$totalInward', { $add: ['$freshOutward', '$totalShortage'] }] },
           _id: 0
         }
       },
@@ -263,15 +292,26 @@ const getStockOverview = async (req, res) => {
         normalizedStockMap.set(normName, {
           fabricQuality: normName,
           totalInward: 0,
+          freshOutward: 0,
+          totalShortage: 0,
           totalOutward: 0,
           currentStock: 0
         });
       }
       const existing = normalizedStockMap.get(normName);
       existing.totalInward += item.totalInward || 0;
+      existing.freshOutward += item.freshOutward || 0;
+      existing.totalShortage += item.totalShortage || 0;
       existing.totalOutward += item.totalOutward || 0;
       existing.currentStock += item.currentStock || 0;
     }
+    const finalStock = Array.from(normalizedStockMap.values()).sort((a, b) => a.fabricQuality.localeCompare(b.fabricQuality));
+    res.status(200).json({ success: true, data: finalStock });
+  } catch (error) {
+    console.error('Error calculating fabric stock:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
     const finalStock = Array.from(normalizedStockMap.values()).sort((a, b) => a.fabricQuality.localeCompare(b.fabricQuality));
     res.status(200).json({ success: true, data: finalStock });
   } catch (error) {
@@ -480,7 +520,28 @@ const getStockByPanna = async (req, res) => {
         $group: {
           _id: { fabricQuality: '$fabricQuality', panna: { $ifNull: ['$panna', 'Unknown'] } },
           totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
-          totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } },
+          freshOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } },
+          totalShortage: {
+            $sum: {
+              $cond: [
+                { $eq: ['$type', 'OUTWARD'] },
+                {
+                  $cond: [
+                    { $and: [{ $ne: ['$shortageMtr', null] }, { $gt: ['$shortageMtr', 0] }] },
+                    '$shortageMtr',
+                    {
+                      $cond: [
+                        { $and: [{ $ne: ['$shortagePct', null] }, { $gt: ['$shortagePct', 0] }] },
+                        { $multiply: ['$qty', { $divide: ['$shortagePct', 100] }] },
+                        0
+                      ]
+                    }
+                  ]
+                },
+                0
+              ]
+            }
+          },
           lotCount: { $addToSet: '$lotNo' }
         }
       },
@@ -489,8 +550,10 @@ const getStockByPanna = async (req, res) => {
           fabricQuality: '$_id.fabricQuality',
           panna: '$_id.panna',
           totalInward: 1,
-          totalOutward: 1,
-          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
+          freshOutward: 1,
+          totalShortage: 1,
+          totalOutward: { $add: ['$freshOutward', '$totalShortage'] },
+          currentStock: { $subtract: ['$totalInward', { $add: ['$freshOutward', '$totalShortage'] }] },
           lotCount: { $size: { $filter: { input: '$lotCount', cond: { $ne: ['$$this', null] } } } },
           _id: 0
         }
@@ -508,6 +571,8 @@ const getStockByPanna = async (req, res) => {
           fabricQuality: normName,
           panna: item.panna,
           totalInward: 0,
+          freshOutward: 0,
+          totalShortage: 0,
           totalOutward: 0,
           currentStock: 0,
           lotCount: 0
@@ -515,6 +580,8 @@ const getStockByPanna = async (req, res) => {
       }
       const existing = normalizedPannaMap.get(key);
       existing.totalInward += item.totalInward || 0;
+      existing.freshOutward += item.freshOutward || 0;
+      existing.totalShortage += item.totalShortage || 0;
       existing.totalOutward += item.totalOutward || 0;
       existing.currentStock += item.currentStock || 0;
       existing.lotCount += item.lotCount || 0;

@@ -287,7 +287,13 @@ const normalizeFabric = (val, pannaVal = '') => {
   }
 
   let base = str;
-  if (base === 'CREPE' || base === 'CRAPE' || base === 'FRANCH CREPE' || base === 'FRENCH CREP' || base.includes('CREPE') || base.includes('CRAPE') || base.includes('CREP')) {
+  if (base === 'REYON' || base === 'RAYON' || base === 'POLY REYON' || base === 'POLY RAYON' || base.includes('REYON') || base.includes('RAYON')) {
+    if (base.includes('30 SPN')) {
+      base = 'POLY REYON 30 SPN';
+    } else {
+      base = 'POLY REYON';
+    }
+  } else if (base === 'CREPE' || base === 'CRAPE' || base === 'FRANCH CREPE' || base === 'FRENCH CREP' || base.includes('CREPE') || base.includes('CRAPE') || base.includes('CREP')) {
     base = 'FRENCH CREPE';
   } else if (base === 'CAMRIK' || base === 'CEMBRIC' || base === 'CEMBRIK' || base === 'CAMBRIK' || base.includes('CAMRIK') || base.includes('CEMBRIK')) {
     base = 'CAMBRIC';
@@ -296,7 +302,7 @@ const normalizeFabric = (val, pannaVal = '') => {
   }
 
   let finalPanna = extractedPanna || (pannaVal ? String(pannaVal).trim().replace(/['"]/g, '') : '');
-  if (finalPanna === '46' || finalPanna === '56') finalPanna = '58';
+  if (finalPanna === '38' || finalPanna === '46' || finalPanna === '56') finalPanna = '58';
   if (!finalPanna || finalPanna.toUpperCase() === 'UNKNOWN' || isNaN(parseInt(finalPanna, 10))) {
     if (base.includes('ARMANI')) finalPanna = '44';
     else finalPanna = '58';
