@@ -275,16 +275,18 @@ const createJobCard = async (req, res) => {
     const card = await db.JobCard.create(body);
 
     // Publish Authority Activity Event
+    const creatorId = req.user?._id || body.userId || body.createdById;
+    const creatorName = req.user?.name || body.userName || body.createdBy || 'Operator';
     publishActivity({
-      actorId: req.user?._id,
-      actorName: req.user?.name || body.createdBy || 'Operator',
+      actorId: creatorId,
+      actorName: creatorName,
       action: 'CREATE',
       module: 'Job Card',
       recordRef: card.jobNo || 'N/A',
       recordId: card._id,
       permissionScope: 'jobcards',
       department: 'Production',
-      description: `📋 **New Job Card #${card.jobNo || ''}** created for party **"${card.party || 'Client'}"** (${card.totalMtr || 0}m, ${card.machineName || 'Machine'}) by ${req.user?.name || body.createdBy || 'Operator'}.`
+      description: `📋 **New Job Card #${card.jobNo || ''}** created for party **"${card.party || 'Client'}"** (${card.totalMtr || 0}m, ${card.machineName || 'Machine'}) by ${creatorName}.`
     }).catch(e => logger.warn('publishActivity failed on job card create: %s', e.message));
 
     res.status(201).json(card);
@@ -323,16 +325,18 @@ const updateJobCard = async (req, res) => {
     const card = await db.JobCard.findByIdAndUpdate(req.params.id, body, { new:true, runValidators:true }).lean();
 
     // Publish Authority Activity Event
+    const editorId = req.user?._id || body.userId || body.updatedById;
+    const editorName = req.user?.name || body.userName || body.updatedBy || 'Operator';
     publishActivity({
-      actorId: req.user?._id,
-      actorName: req.user?.name || 'Operator',
+      actorId: editorId,
+      actorName: editorName,
       action: 'UPDATE',
       module: 'Job Card',
       recordRef: card.jobNo || 'N/A',
       recordId: card._id,
       permissionScope: 'jobcards',
       department: 'Production',
-      description: `🔄 **Job Card #${card.jobNo || ''}** updated: Status **'${card.status}'** (Print: ${card.printStatus || 'Pending'}, Fusing: ${card.fusingStatus || 'Pending'}) by ${req.user?.name || 'Operator'}.`
+      description: `🔄 **Job Card #${card.jobNo || ''}** updated: Status **'${card.status}'** (Print: ${card.printStatus || 'Pending'}, Fusing: ${card.fusingStatus || 'Pending'}) by ${editorName}.`
     }).catch(e => logger.warn('publishActivity failed on job card update: %s', e.message));
 
     res.json(card);

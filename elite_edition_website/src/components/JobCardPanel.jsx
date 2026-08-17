@@ -1210,13 +1210,22 @@ function JobCardForm({ card, onSave, onClose, department }) {
     setSaving(true); setError('');
     const cleanFabric = normalizeFabricName(form.fabric, form.panna);
     const cleanDesign = cleanDesignNameString(form.designName || form.designNo);
+    const activeUser = currentUser || {};
+    const uName = activeUser.name || activeUser.username || 'Staff User';
+    const uId = activeUser._id || activeUser.id || '';
     const payload = {
       ...form,
       designName: cleanDesign || form.designName,
       designNo: cleanDesign || form.designNo,
       fabric: cleanFabric || form.fabric,
       department: department || (card?.department) || 'digital_print',
-      category: form.category || (department === 'stitching' ? 'Stitching' : '')
+      category: form.category || (department === 'stitching' ? 'Stitching' : ''),
+      userId: uId,
+      createdById: uId,
+      updatedById: uId,
+      userName: uName,
+      createdBy: form.createdBy || uName,
+      updatedBy: uName
     };
     try {
       if (card?._id) {

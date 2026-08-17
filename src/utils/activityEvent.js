@@ -55,6 +55,31 @@ async function publishActivity({
   description
 }) {
   try {
+    let realUserName = (actorName || '').trim();
+
+    // 1. If actorId is provided, look up the exact user's name from MongoDB
+    if (actorId) {
+      const u = await User.findById(actorId).lean();
+      if (u && (u.name || u.username)) {
+        realUserName = u.name || u.username;
+      }
+    }
+
+    // 2. If realUserName is still generic or empty, try fallback lookups
+    if (!realUserName || ['Admin', 'Operator', 'System Bot', 'System'].includes(realUserName)) {
+      if (actorName && !['Admin', 'Operator', 'System Bot', 'System'].includes(actorName.trim())) {
+        realUserName = actorName.trim();
+      }
+    }
+
+    // 3. Format final description replacing generic "by Admin" with actual user name
+    let finalDescription = description || `[System Activity] ${action} on ${module} #${recordRef}`;
+    if (realUserName && !['Admin', 'Operator', 'System Bot'].includes(realUserName)) {
+      finalDescription = finalDescription.replace(/by (Admin|Operator|System Bot)\.?$/i, `by **${realUserName}**.`);
+    } else if (realUserName) {
+      finalDescription = finalDescription.replace(/by (Admin|Operator|System Bot)\.?$/i, `by **${realUserName}**.`);
+    }
+
     const groupKey = resolveGroupKey(permissionScope, department);
     
     // Find primary default room + any custom subscribed groups
@@ -94,7 +119,7 @@ async function publishActivity({
       const newMessage = await ChatMessage.create({
         roomId: room._id,
         senderId,
-        content: description || `[System Activity] ${action} on ${module} #${recordRef}`,
+        content: finalDescription,
         type: 'text',
         msgType: 'system_activity',
         activityMeta: {
