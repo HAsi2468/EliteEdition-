@@ -43,10 +43,47 @@ app.use(compression());
 app.use(cors());
 // CORS preflight handled by app.use(cors())
 
-app.use(cookieParser());
+const jwtUtils = require('./utils/auth');
 
-// jwt authentication
-// app.use(jwt());
+// Automatic User Context Middleware
+app.use(async (req, res, next) => {
+  try {
+    let userId = req.headers['x-user-id'] || req.query?.userId || req.body?.userId;
+    let userName = req.headers['x-user-name'] || req.body?.userName;
+    let authHeader = req.headers['authorization'];
+
+    if (!userId && authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = await jwtUtils.verifyToken(token);
+        if (decoded && (decoded.userId || decoded.id || decoded.sub)) {
+          userId = decoded.userId || decoded.id || decoded.sub;
+        }
+      } catch (e) {}
+    }
+
+    if (userId) {
+      const u = await userModel.findById(userId).lean();
+      if (u) {
+        req.user = u;
+      } else {
+        req.user = {
+          _id: userId,
+          name: userName || 'Staff User',
+          username: userName || 'Staff User'
+        };
+      }
+    } else if (userName) {
+      req.user = {
+        name: userName,
+        username: userName
+      };
+    }
+  } catch (err) {
+    console.warn('[authMiddleware] Error resolving user:', err.message);
+  }
+  next();
+});
 
 
 

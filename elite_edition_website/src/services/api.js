@@ -30,9 +30,19 @@ const request = async (path, options = {}) => {
     throw new Error('Network offline. Please check your internet connection.');
   }
   
+  const userStr = localStorage.getItem('elite_user');
+  let currUser = null;
+  if (userStr) {
+    try { currUser = JSON.parse(userStr); } catch (e) {}
+  }
+  const uId = currUser?.id || currUser?._id || '';
+  const uName = currUser?.name || currUser?.fullName || currUser?.username || '';
+
   const headers = {
     ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(uId ? { 'X-User-Id': uId } : {}),
+    ...(uName ? { 'X-User-Name': uName } : {}),
     ...options.headers,
   };
   
