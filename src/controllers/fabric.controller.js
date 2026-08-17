@@ -3,19 +3,29 @@ const FabricStockAdjustment = require('../db/models/fabricStockAdjustment.model'
 const PDFDocument = require('pdfkit');
 
 // Normalize functions to merge matching fabric and panna widths (e.g. 58" and 58)
-const normalizeFabric = (val) => {
+const normalizeFabric = (val, pannaVal = '') => {
   if (!val) return '';
   let clean = String(val).trim().toUpperCase();
-  if (clean === 'CREPE' || clean === 'CRAPE' || clean === 'FRANCH CREPE' || clean === 'FRENCH CREP' || clean.includes('CREPE') || clean.includes('CRAPE') || clean.includes('CREP')) {
-    return 'FRENCH CREPE';
+  const matchPannaInName = clean.match(/\s+(44|58|36|56|46)$/);
+  let panna = matchPannaInName ? matchPannaInName[1] : pannaVal;
+  let base = clean.replace(/\s+(44|58|36|56|46)$/, '').trim();
+
+  if (base === 'CREPE' || base === 'CRAPE' || base === 'FRANCH CREPE' || base === 'FRENCH CREP' || base.includes('CREPE') || base.includes('CRAPE') || base.includes('CREP')) {
+    base = 'FRENCH CREPE';
+  } else if (base === 'CAMRIK' || base === 'CEMBRIC' || base === 'CEMBRIK' || base === 'CAMBRIK' || base.includes('CAMRIK') || base.includes('CEMBRIK')) {
+    base = 'CAMBRIC';
+  } else if (base === 'MAL' || base === 'POLY MAL' || base === 'POLYMALL' || base === 'POLY MLL' || base === 'POLLY MAL') {
+    base = 'POLLY MAL';
   }
-  if (clean === 'CAMRIK' || clean === 'CEMBRIC' || clean === 'CEMBRIK' || clean === 'CAMBRIK' || clean.includes('CAMRIK') || clean.includes('CEMBRIK')) {
-    return 'CAMBRIC';
+
+  let cleanPanna = panna ? String(panna).trim().replace(/['"]/g, '') : '';
+  if (cleanPanna === '46' || cleanPanna === '56') cleanPanna = '58';
+  if (!cleanPanna || cleanPanna.toUpperCase() === 'UNKNOWN') {
+    if (base.includes('ARMANI')) cleanPanna = '44';
+    else cleanPanna = '58';
   }
-  if (clean === 'MAL' || clean === 'POLY MAL' || clean === 'POLYMALL' || clean === 'POLY MLL' || clean === 'POLLY MAL') {
-    return 'POLLY MAL';
-  }
-  return clean;
+
+  return `${base} ${cleanPanna}`;
 };
 
 const normalizePanna = (val, fabricName = '') => {
