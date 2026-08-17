@@ -22,7 +22,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const normalizeFabricName = (val) => {
     if (!val) return '';
     let clean = String(val).trim().toUpperCase();
-    if (clean === 'CREPE' || clean === 'CRAPE' || clean === 'FRANCH CREPE' || clean === 'FRENCH CREP' || clean.includes('CREPE') || clean.includes('CRAPE')) {
+    if (clean === 'CREPE' || clean === 'CRAPE' || clean === 'FRANCH CREPE' || clean === 'FRENCH CREP' || clean.includes('CREPE') || clean.includes('CRAPE') || clean.includes('CREP')) {
       return 'FRENCH CREPE';
     }
     if (clean === 'CAMRIK' || clean === 'CEMBRIC' || clean === 'CEMBRIK' || clean === 'CAMBRIK' || clean.includes('CAMRIK') || clean.includes('CEMBRIK')) {

@@ -6,7 +6,7 @@ const PDFDocument = require('pdfkit');
 const normalizeFabric = (val) => {
   if (!val) return '';
   let clean = String(val).trim().toUpperCase();
-  if (clean === 'CREPE' || clean === 'CRAPE' || clean === 'FRANCH CREPE' || clean === 'FRENCH CREP' || clean.includes('CREPE') || clean.includes('CRAPE')) {
+  if (clean === 'CREPE' || clean === 'CRAPE' || clean === 'FRANCH CREPE' || clean === 'FRENCH CREP' || clean.includes('CREPE') || clean.includes('CRAPE') || clean.includes('CREP')) {
     return 'FRENCH CREPE';
   }
   if (clean === 'CAMRIK' || clean === 'CEMBRIC' || clean === 'CEMBRIK' || clean === 'CAMBRIK' || clean.includes('CAMRIK') || clean.includes('CEMBRIK')) {
@@ -239,7 +239,24 @@ const getStockOverview = async (req, res) => {
     ];
 
     const stock = await FabricTransaction.aggregate(pipeline);
-    res.status(200).json({ success: true, data: stock });
+    const normalizedStockMap = new Map();
+    for (const item of stock) {
+      const normName = normalizeFabric(item.fabricQuality);
+      if (!normalizedStockMap.has(normName)) {
+        normalizedStockMap.set(normName, {
+          fabricQuality: normName,
+          totalInward: 0,
+          totalOutward: 0,
+          currentStock: 0
+        });
+      }
+      const existing = normalizedStockMap.get(normName);
+      existing.totalInward += item.totalInward || 0;
+      existing.totalOutward += item.totalOutward || 0;
+      existing.currentStock += item.currentStock || 0;
+    }
+    const finalStock = Array.from(normalizedStockMap.values()).sort((a, b) => a.fabricQuality.localeCompare(b.fabricQuality));
+    res.status(200).json({ success: true, data: finalStock });
   } catch (error) {
     console.error('Error calculating fabric stock:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -488,7 +505,28 @@ const getStockByPanna = async (req, res) => {
     ];
 
     const result = await FabricTransaction.aggregate(pipeline);
-    res.status(200).json({ success: true, data: result });
+    const normalizedPannaMap = new Map();
+    for (const item of result) {
+      const normName = normalizeFabric(item.fabricQuality);
+      const key = `${normName}|||${item.panna}`;
+      if (!normalizedPannaMap.has(key)) {
+        normalizedPannaMap.set(key, {
+          fabricQuality: normName,
+          panna: item.panna,
+          totalInward: 0,
+          totalOutward: 0,
+          currentStock: 0,
+          lotCount: 0
+        });
+      }
+      const existing = normalizedPannaMap.get(key);
+      existing.totalInward += item.totalInward || 0;
+      existing.totalOutward += item.totalOutward || 0;
+      existing.currentStock += item.currentStock || 0;
+      existing.lotCount += item.lotCount || 0;
+    }
+    const finalPanna = Array.from(normalizedPannaMap.values()).sort((a, b) => a.fabricQuality.localeCompare(b.fabricQuality));
+    res.status(200).json({ success: true, data: finalPanna });
   } catch (error) {
     console.error('Error fetching panna-wise stock:', error);
     res.status(500).json({ success: false, error: error.message });
