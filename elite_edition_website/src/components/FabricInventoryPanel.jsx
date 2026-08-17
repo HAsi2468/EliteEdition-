@@ -603,14 +603,15 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const handleInwardSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const payload = { ...inwardForm, department: department || 'digital_print' };
+    const cleanFabric = normalizeFabricName(inwardForm.fabricQuality, inwardForm.panna);
+    const payload = { ...inwardForm, fabricQuality: cleanFabric || inwardForm.fabricQuality, department: department || 'digital_print' };
     try {
       if (editingTransaction) {
         await api.updateFabricTransaction(editingTransaction._id, payload);
         triggerPushNotification('🧵 Fabric Transaction Updated', 'Inward fabric transaction updated.', 'info');
       } else {
         await api.createFabricInward(payload);
-        triggerPushNotification('🧵 Fabric Inward Added', `${inwardForm.qty || ''}M of ${inwardForm.fabricQuality} inward recorded!`, 'success');
+        triggerPushNotification('🧵 Fabric Inward Added', `${inwardForm.qty || ''}M of ${cleanFabric || inwardForm.fabricQuality} inward recorded!`, 'success');
       }
       setIsInwardOpen(false);
       setEditingTransaction(null);
@@ -626,7 +627,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const handleOutwardSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const payload = { ...outwardForm, department: department || 'digital_print' };
+    const cleanFabric = normalizeFabricName(outwardForm.fabricQuality, outwardForm.panna);
+    const payload = { ...outwardForm, fabricQuality: cleanFabric || outwardForm.fabricQuality, department: department || 'digital_print' };
     try {
       if (editingOutwardTransaction) {
         await api.updateFabricTransaction(editingOutwardTransaction._id, payload);
@@ -669,8 +671,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       return;
     }
     setLoading(true);
+    const cleanFabric = normalizeFabricName(transferForm.fabricQuality, transferForm.panna);
+    const payload = { ...transferForm, fabricQuality: cleanFabric || transferForm.fabricQuality };
     try {
-      const res = await api.createLotTransfer(transferForm);
+      const res = await api.createLotTransfer(payload);
       if (res.success) {
         triggerPushNotification('🔄 Lot Transfer Complete', res.message || `Transferred ${transferForm.qty}m to Lot #${transferForm.destLotNo}`, 'success');
         setIsTransferFormOpen(false);
@@ -1120,9 +1124,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const handleChallanSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    const cleanFabric = normalizeFabricName(challanForm.fabricName, challanForm.panna);
     try {
       const payload = {
         ...challanForm,
+        fabricName: cleanFabric || challanForm.fabricName,
         totalMtr: challanTotalMtr,
         totalTp: challanTotalTp,
         tpDetails: challanForm.tpDetails

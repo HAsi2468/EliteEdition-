@@ -18,6 +18,45 @@ import JobPrintingLog from './JobPrintingLog';
 import GarmentJobCardDashboard from './GarmentJobCardDashboard';
 import StitchingChallanPanel from './StitchingChallanPanel';
 import StitchingSettings from './StitchingSettings';
+
+const normalizeFabricName = (val, pannaVal = '') => {
+  if (!val) return '';
+  let str = String(val).trim().toUpperCase();
+
+  let extractedPanna = '';
+  const pannaMatches = str.match(/(?:\s+(\d+))+\s*$/);
+  if (pannaMatches) {
+    const digits = pannaMatches[0].trim().split(/\s+/);
+    extractedPanna = digits[digits.length - 1];
+    str = str.replace(/(?:\s+(\d+))+\s*$/, '').trim();
+  }
+
+  let base = str;
+  if (base === 'LINEN' || base === 'KOINUR LINEN' || base === 'KOHINUR LINEN' || base === 'KOHINOOR LINEN' || base.includes('KOINUR') || base.includes('KOHINOOR') || base.includes('KOHINUR')) {
+    base = 'KOHINOOR LINEN';
+  } else if (base === 'REYON' || base === 'RAYON' || base === 'POLY REYON' || base === 'POLY RAYON' || base.includes('REYON') || base.includes('RAYON')) {
+    if (base.includes('30 SPN')) {
+      base = 'POLY REYON 30 SPN';
+    } else {
+      base = 'POLY REYON';
+    }
+  } else if (base === 'CREPE' || base === 'CRAPE' || base === 'FRANCH CREPE' || base === 'FRENCH CREP' || base.includes('CREPE') || base.includes('CRAPE') || base.includes('CREP')) {
+    base = 'FRENCH CREPE';
+  } else if (base === 'CAMRIK' || base === 'CEMBRIC' || base === 'CEMBRIK' || base === 'CAMBRIK' || base.includes('CAMRIK') || base.includes('CEMBRIK')) {
+    base = 'CAMBRIC';
+  } else if (base === 'MAL' || base === 'POLY MAL' || base === 'POLYMALL' || base === 'POLY MLL' || base === 'POLLY MAL') {
+    base = 'POLLY MAL';
+  }
+
+  let finalPanna = extractedPanna || (pannaVal ? String(pannaVal).trim().replace(/['"]/g, '') : '');
+  if (finalPanna === '38' || finalPanna === '46' || finalPanna === '56') finalPanna = '58';
+  if (!finalPanna || finalPanna.toUpperCase() === 'UNKNOWN' || isNaN(parseInt(finalPanna, 10))) {
+    if (base.includes('ARMANI')) finalPanna = '44';
+    else finalPanna = '58';
+  }
+
+  return `${base} ${finalPanna}`;
+};
 import DigitalPrintComplainModule from './DigitalPrintComplainModule';
 import DigitalPrintExpenseModule from './DigitalPrintExpenseModule';
 import DateRangePicker from './DateRangePicker';
@@ -680,6 +719,14 @@ function Field({ label, name, form, onChange, type='text', options, half, readOn
                 name={name} 
                 value={form[name]} 
                 onChange={onChange} 
+                onBlur={(e) => {
+                  if (name === 'fabric' && e.target.value) {
+                    const norm = normalizeFabricName(e.target.value, form.panna);
+                    if (norm && norm !== form[name]) {
+                      onChange({ target: { name: 'fabric', value: norm } });
+                    }
+                  }
+                }}
                 list={`${name}-options`}
                 readOnly={readOnly}
                 placeholder="Select or type..."
@@ -1153,8 +1200,10 @@ function JobCardForm({ card, onSave, onClose, department }) {
     e.preventDefault();
     if (!form.jobNo.trim()) { setError('Job No. is required.'); return; }
     setSaving(true); setError('');
+    const cleanFabric = normalizeFabricName(form.fabric, form.panna);
     const payload = {
       ...form,
+      fabric: cleanFabric || form.fabric,
       department: department || (card?.department) || 'digital_print',
       category: form.category || (department === 'stitching' ? 'Stitching' : '')
     };
