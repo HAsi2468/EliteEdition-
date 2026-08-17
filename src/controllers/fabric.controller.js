@@ -276,45 +276,22 @@ const getStockOverview = async (req, res) => {
 
 const getLotStock = async (req, res) => {
   try {
-    const { fabricQuality, department } = req.query;
+    const { fabricQuality, panna, department } = req.query;
     const matchStage = getDepartmentFilter(department);
-    if (fabricQuality) {
+    if (fabricQuality && fabricQuality.trim()) {
       const clean = fabricQuality.trim().toUpperCase();
-      const candidates = [clean];
-      
-      if (clean.includes('SUDAR')) {
-        candidates.push('SUDARSHAN');
-        candidates.push('SUDARSUN');
-      }
-      if (clean.includes('SUMM')) {
-        candidates.push('SUMMER COOL');
-        candidates.push('SUMMAR COOL');
-      }
-      if (clean.includes('CREP') || clean.includes('CREPE') || clean.includes('CRAPE')) {
-        candidates.push('CREPE');
-        candidates.push('CRAPE');
-        candidates.push('FRENCH CREP');
-        candidates.push('FRENCH CREPE');
-      }
-      if (clean.includes('MAL') || clean.includes('POLLY')) {
-        candidates.push('MAL');
-        candidates.push('POLY MAL');
-        candidates.push('POLLY MAL');
-      }
-      if (clean.includes('REYON') || clean.includes('RAYON')) {
-        candidates.push('REYON');
-        candidates.push('RAYON');
-      }
-      if (clean.includes('CAMBRIC') || clean.includes('CEMBRIC') || clean.includes('CEMBRIK') || clean.includes('CAMRIK')) {
-        candidates.push('CAMBRIC');
-        candidates.push('CEMBRIC');
-        candidates.push('CEMBRIK');
-        candidates.push('CAMRIK');
+      const safeClean = clean.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+
+      const andConds = [
+        { fabricQuality: new RegExp(`^${safeClean}`, 'i') }
+      ];
+
+      if (panna && panna.trim()) {
+        const cleanP = panna.trim().replace(/['"]/g, '');
+        andConds.push({ panna: new RegExp(`^${cleanP}$`, 'i') });
       }
 
-      matchStage.fabricQuality = {
-        $in: candidates.map(c => new RegExp(`^${c}$`, 'i'))
-      };
+      matchStage.$and = andConds;
     }
 
     const pipeline = [

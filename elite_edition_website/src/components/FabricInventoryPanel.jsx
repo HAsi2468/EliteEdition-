@@ -835,9 +835,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       jobNo: '', designNo: '', colour: '', panna: '', pcs: '', billTo: '', shipTo: '',
       tpDetails: emptyTpRows(), notes: '',
     });
-    api.getFabricLotStock({}).then(res => {
-      if (res.success && res.data) setAvailableLots(res.data);
-    }).catch(() => setAvailableLots([]));
+    setAvailableLots([]);
   };
 
   const fetchChallans = async () => {
@@ -3837,7 +3835,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   </datalist>
 
                   {/* Available Lot Buttons Chips */}
-                  {availableLots.length > 0 && (
+                  {availableLots.length > 0 ? (
                     <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.25rem', maxHeight: '75px', overflowY: 'auto' }}>
                       {availableLots.slice(0, 15).map((lot, idx) => {
                         const selectedList = String(challanForm.lotNo || '').split(/[,\s&]+/).map(s => s.trim()).filter(Boolean);
@@ -3872,6 +3870,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         );
                       })}
                     </div>
+                  ) : (
+                    challanForm.fabricName ? (
+                      <div style={{ marginTop: '0.35rem', fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic' }}>
+                        No in-stock lots found for {challanForm.fabricName}
+                      </div>
+                    ) : null
                   )}
                 </div>
 
@@ -3912,9 +3916,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       list="challan-fabrics"
                       value={challanForm.fabricName}
                       onChange={e => {
-                        const normFab = normalizeFabricName(e.target.value);
-                        const autoP = getDefaultPannaForFabric(normFab, challanForm.panna);
-                        setChallanForm({ ...challanForm, fabricName: normFab, panna: autoP });
+                        setChallanForm({ ...challanForm, fabricName: e.target.value });
+                      }}
+                      onBlur={e => {
+                        if (e.target.value) {
+                          const normFab = normalizeFabricName(e.target.value);
+                          const autoP = getDefaultPannaForFabric(normFab, challanForm.panna);
+                          setChallanForm(prev => ({ ...prev, fabricName: normFab, panna: autoP }));
+                        }
                       }}
                       style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
                       placeholder="Fabric quality..."
