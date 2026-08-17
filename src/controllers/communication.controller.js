@@ -373,6 +373,8 @@ const deleteGroup = async (req, res) => {
     console.error('Error deleting group:', error);
     res.status(500).json({ success: false, message: 'Failed to delete group', error: error.message });
   }
+};
+
 /**
  * Admin endpoint to broadcast force hard-reload signal to all connected Socket clients
  */
