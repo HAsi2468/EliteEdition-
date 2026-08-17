@@ -5,13 +5,13 @@ async function run() {
   await mongoose.connect(process.env.MONGODB_URL);
   console.log('--- Cleaning Up Generic "Admin" Creator Names & Chat Messages ---');
 
-  const User = mongoose.model('User', new mongoose.Schema({}, { strict: false }), 'users');
+  const User = mongoose.model('User', new mongoose.Schema({}, { strict: false }), 'user');
   const JobCard = mongoose.model('JobCard', new mongoose.Schema({}, { strict: false }), 'jobCards');
-  const ChatMessage = mongoose.model('ChatMessage', new mongoose.Schema({}, { strict: false }), 'chatMessages');
+  const ChatMessage = mongoose.model('ChatMessage', new mongoose.Schema({}, { strict: false }), 'chatmessages');
 
   // Find primary admin or user
   const adminUser = await User.findOne({ role: 'admin' }).lean() || await User.findOne({}).lean();
-  const realName = adminUser ? (adminUser.name || adminUser.username || 'Harshil') : 'Harshil';
+  const realName = adminUser ? (adminUser.name || adminUser.username || 'Parth Asodariya') : 'Parth Asodariya';
   console.log(`Using real staff name: "${realName}" (User ID: ${adminUser ? adminUser._id : 'N/A'})`);
 
   // 1. Update Job Cards

@@ -172,8 +172,8 @@ const chatMessageSchema = new mongoose.Schema(
   }
 );
 
-const ChatRoom = mongoose.model('ChatRoom', chatRoomSchema);
-const ChatMessage = mongoose.model('ChatMessage', chatMessageSchema);
+const ChatRoom = mongoose.model('ChatRoom', chatRoomSchema, 'chatrooms');
+const ChatMessage = mongoose.model('ChatMessage', chatMessageSchema, 'chatmessages');
 
 module.exports = {
   ChatRoom,
