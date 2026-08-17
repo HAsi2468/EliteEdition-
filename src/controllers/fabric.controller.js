@@ -312,13 +312,6 @@ const getStockOverview = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
-    const finalStock = Array.from(normalizedStockMap.values()).sort((a, b) => a.fabricQuality.localeCompare(b.fabricQuality));
-    res.status(200).json({ success: true, data: finalStock });
-  } catch (error) {
-    console.error('Error calculating fabric stock:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-};
 
 const getLotStock = async (req, res) => {
   try {
