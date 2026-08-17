@@ -2112,7 +2112,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           <div style={{ color: 'var(--danger)', fontWeight: 600 }}>Outward: -{Number(lot.totalOutward || 0).toFixed(2)} mtr</div>
                         </div>
 
-                        <div style={{ textAlign: 'right', minWidth: '110px' }}>
+                        <div style={{ textAlign: 'right', minWidth: '130px' }}>
                           <div style={{ fontSize: '1.3rem', fontWeight: 800, color: statusColor }}>
                             {Number(lot.currentStock || 0).toFixed(2)} <span style={{ fontSize: '0.75rem' }}>mtr</span>
                           </div>
@@ -2129,6 +2129,20 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           }}>
                             {statusLabel}
                           </span>
+                          {lot.totalInward > 0 && (() => {
+                            const usagePct = Math.min(100, Math.round(((lot.totalOutward || 0) / lot.totalInward) * 100));
+                            const pColor = usagePct >= 100 ? '#ef4444' : usagePct >= 85 ? '#f59e0b' : '#10b981';
+                            return (
+                              <div style={{ marginTop: '5px', width: '120px' }} title={`Dispatched: ${(lot.totalOutward || 0).toFixed(1)}m of ${lot.totalInward.toFixed(1)}m Inward (${usagePct}% used)`}>
+                                <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                                  <div style={{ width: `${usagePct}%`, height: '100%', background: pColor, borderRadius: '3px', transition: 'width 0.3s ease' }} />
+                                </div>
+                                <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '1px', textAlign: 'center', fontWeight: 600 }}>
+                                  {usagePct}% Dispatched
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {lot.currentStock < 0 && (
@@ -3658,26 +3672,46 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: '#a78bfa' }}>{ch.billTo || ch.partyName || '—'}</td>
                       <td style={{ padding: '0.6rem 0.5rem', maxWidth: '220px' }}>
                         {ch.lotNo != null && String(ch.lotNo).trim() !== '' ? (
-                          <span
-                            title={`#${ch.lotNo}`}
-                            style={{
-                              display: 'inline-block',
-                              maxWidth: '200px',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              verticalAlign: 'middle',
-                              background: 'rgba(16,185,129,0.12)',
-                              color: '#10b981',
-                              padding: '2px 8px',
-                              borderRadius: 6,
-                              fontWeight: 700,
-                              fontSize: '0.75rem',
-                              border: '1px solid rgba(16,185,129,0.25)'
-                            }}
-                          >
-                            #{ch.lotNo}
-                          </span>
+                          <div>
+                            <span
+                              title={`#${ch.lotNo}`}
+                              style={{
+                                display: 'inline-block',
+                                maxWidth: '200px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                verticalAlign: 'middle',
+                                background: 'rgba(16,185,129,0.12)',
+                                color: '#10b981',
+                                padding: '2px 8px',
+                                borderRadius: 6,
+                                fontWeight: 700,
+                                fontSize: '0.75rem',
+                                border: '1px solid rgba(16,185,129,0.25)'
+                              }}
+                            >
+                              #{ch.lotNo}
+                            </span>
+                            {(() => {
+                              const lotInfo = lotRecords.find(l => String(l.lotNo) === String(ch.lotNo));
+                              if (!lotInfo || !lotInfo.totalInward) return null;
+                              const totalIn = lotInfo.totalInward;
+                              const totalOut = lotInfo.totalOutward;
+                              const usagePct = Math.min(100, Math.round((totalOut / totalIn) * 100));
+                              const pColor = usagePct >= 100 ? '#ef4444' : usagePct >= 85 ? '#f59e0b' : '#10b981';
+                              return (
+                                <div style={{ marginTop: '3px', width: '100%', maxWidth: '140px' }} title={`Lot #${ch.lotNo}: ${totalOut.toFixed(1)}m dispatched of ${totalIn.toFixed(1)}m inward (${usagePct}% used)`}>
+                                  <div style={{ width: '100%', height: '5px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${usagePct}%`, height: '100%', background: pColor, borderRadius: '3px', transition: 'width 0.3s ease' }} />
+                                  </div>
+                                  <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '1px', fontWeight: 600 }}>
+                                    {usagePct}% used ({lotInfo.currentStock.toFixed(0)}m left)
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
                         ) : '—'}
                       </td>
                       <td style={{ padding: '0.6rem 0.5rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{ch.fabricName || '—'}</td>
@@ -4002,6 +4036,59 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         No in-stock lots found for {challanForm.fabricName}
                       </div>
                     ) : null
+                  )}
+
+                  {/* DYNAMIC LOT STOCK TAKING PROGRESS BAR */}
+                  {selectedLotsList.length > 0 && selectedLotsTotalStock > 0 && (
+                    <div style={{
+                      marginTop: '0.65rem',
+                      padding: '0.65rem 0.85rem',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', fontSize: '0.76rem', fontWeight: 700, color: '#334155' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span>📊</span> Lot Stock Taking Progress (Lot #{selectedLotsList.join(', #')}):
+                        </span>
+                        <span>
+                          <strong style={{ color: challanTotalMtr > selectedLotsTotalStock ? '#dc2626' : '#0284c7' }}>
+                            {challanTotalMtr.toFixed(2)}m
+                          </strong> / {selectedLotsTotalStock.toFixed(2)}m
+                        </span>
+                      </div>
+
+                      {(() => {
+                        const pct = Math.min(100, Math.round((challanTotalMtr / selectedLotsTotalStock) * 100));
+                        const isOver = challanTotalMtr > selectedLotsTotalStock;
+                        const isNearFull = pct >= 85 && !isOver;
+                        const barBg = isOver ? 'linear-gradient(90deg, #ef4444, #dc2626)' : isNearFull ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 'linear-gradient(90deg, #10b981, #059669)';
+                        const remainMtr = selectedLotsTotalStock - challanTotalMtr;
+
+                        return (
+                          <>
+                            <div style={{ width: '100%', height: '10px', background: '#e2e8f0', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
+                              <div style={{
+                                width: `${pct}%`,
+                                height: '100%',
+                                background: barBg,
+                                borderRadius: '6px',
+                                transition: 'width 0.3s ease'
+                              }} />
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.3rem', fontSize: '0.7rem', fontWeight: 600 }}>
+                              <span style={{ color: isOver ? '#dc2626' : isNearFull ? '#d97706' : '#059669' }}>
+                                {pct}% Stock Taken {isOver ? '(EXCEEDED AVAILABLE LOT STOCK!)' : ''}
+                              </span>
+                              <span style={{ color: remainMtr < 0 ? '#dc2626' : '#475569' }}>
+                                {remainMtr < 0 ? `Deficit: ${Math.abs(remainMtr).toFixed(2)}m` : `Remaining Stock: ${remainMtr.toFixed(2)}m`}
+                              </span>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
                   )}
                 </div>
 
