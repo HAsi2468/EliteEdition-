@@ -1258,31 +1258,31 @@ function JobCardForm({ card, onSave, onClose, department }) {
 
   return (
     <div className="modal-overlay" style={{ alignItems:'flex-start', paddingTop:'1rem' }}>
-      <div style={{ background:'var(--bg-modal,#111827)', border:'1px solid var(--border-light)',
-        borderRadius:'var(--radius-lg)', width:'100%', maxWidth:900,
-        boxShadow:'var(--shadow-lg)', overflow:'hidden', maxHeight:'96vh', display:'flex', flexDirection:'column' }}>
-
         {/* Header */}
-        <div style={{ padding:'1.25rem 1.5rem', borderBottom:'1px solid var(--border-light)',
-          display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:'0.75rem' }}>
-            <div style={{ width:36, height:36, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center',
-              background: form.machineName === 'GRANDO' ? '#0b5394' : form.machineName === 'PRINTDOT' ? '#ea4444' : 'var(--primary-glow)',
-              transition:'background 0.3s ease' }}>
-              <Cpu size={18} color="#fff"/>
-            </div>
-            <div>
-              <h3 style={{ fontSize:'1.05rem', fontWeight:700, color:'var(--text-primary)' }}>
-                {card ? `Edit Job Card — ${card.jobNo}` : 'New Job Card'}
-              </h3>
-              <p style={{ fontSize:'0.75rem', color:'var(--text-muted)', marginTop:1 }}>Elite Digital Prints</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="btn-icon"><X size={16}/></button>
-        </div>
+        <form onSubmit={handleSubmit} style={{ background:'var(--bg-modal,#111827)', border:'1px solid var(--border-light)',
+          borderRadius:'var(--radius-lg)', width:'100%', maxWidth:900,
+          boxShadow:'var(--shadow-lg)', overflow:'hidden', maxHeight:'96vh', display:'flex', flexDirection:'column' }}>
 
-        {/* Scrollable body */}
-        <form onSubmit={handleSubmit} style={{ overflowY:'auto', padding:'1.25rem 1.5rem', flex:1 }}>
+          <div style={{ padding:'1.25rem 1.5rem', borderBottom:'1px solid var(--border-light)',
+            display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:'0.75rem' }}>
+              <div style={{ width:36, height:36, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center',
+                background: form.machineName === 'GRANDO' ? '#0b5394' : form.machineName === 'PRINTDOT' ? '#ea4444' : 'var(--primary-glow)',
+                transition:'background 0.3s ease' }}>
+                <Cpu size={18} color="#fff"/>
+              </div>
+              <div>
+                <h3 style={{ fontSize:'1.05rem', fontWeight:700, color:'var(--text-primary)' }}>
+                  {card ? `Edit Job Card — ${card.jobNo}` : 'New Job Card'}
+                </h3>
+                <p style={{ fontSize:'0.75rem', color:'var(--text-muted)', marginTop:1 }}>Elite Digital Prints</p>
+              </div>
+            </div>
+            <button type="button" onClick={onClose} className="btn-icon"><X size={16}/></button>
+          </div>
+
+          {/* Scrollable body */}
+          <div style={{ overflowY:'auto', padding:'1.25rem 1.5rem', flex:1 }}>
           {error && <div style={{ background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)',
             borderRadius:'var(--radius-sm)', padding:'0.6rem 0.9rem', color:'#fca5a5',
             fontSize:'0.8rem', marginBottom:'1rem' }}>{error}</div>}
@@ -1686,18 +1686,18 @@ function JobCardForm({ card, onSave, onClose, department }) {
             <ImageField label="Image 1 — Design / Pattern" name="imageUrl1" form={form} onChange={onChange} index={1}/>
             <ImageField label="Image 2 — Fabric / Full View" name="imageUrl2" form={form} onChange={onChange} index={2}/>
           </div>
-        </form>
+          </div>
 
         {/* Footer */}
         <div style={{ padding:'1rem 1.5rem', borderTop:'1px solid var(--border-light)',
           display:'flex', gap:'0.75rem', justifyContent:'flex-end', flexShrink:0 }}>
           <button type="button" onClick={onClose} className="btn-secondary" style={{ padding:'0.55rem 1.2rem' }}>Cancel</button>
-          <button type="submit" form="jcForm" className="btn-primary" style={{ padding:'0.55rem 1.4rem' }} disabled={saving}>
+          <button type="submit" className="btn-primary" style={{ padding:'0.55rem 1.4rem' }} disabled={saving}>
             <Save size={14}/>
             {saving ? 'Saving...' : card ? 'Update Job Card' : 'Create Job Card'}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
