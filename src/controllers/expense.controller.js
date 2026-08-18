@@ -87,32 +87,46 @@ const getAll = async (req, res) => {
   }
 };
 
-// Get Next Voucher Number (e.g. EE-EXP-1001, EF-EXP-1001)
+// Helper to generate a guaranteed unique expense voucher number
+async function generateUniqueVoucherNo(companyEntity = 'Elite Digital Print') {
+  const prefixMap = {
+    'Elite Edition': 'EE-EXP-',
+    'Elite Fabtex': 'EF-EXP-',
+    'Elite Stitching': 'ES-EXP-',
+    'Elite Online': 'EO-EXP-',
+    'Elite Digital Print': 'EDP-EXP-'
+  };
+  const prefix = prefixMap[companyEntity] || 'EDP-EXP-';
+
+  const expenses = await db.Expense.find({}, { voucherNo: 1 }).lean();
+  let maxNo = 1000;
+
+  expenses.forEach(e => {
+    if (!e.voucherNo) return;
+    const match = String(e.voucherNo).match(/(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxNo) maxNo = num;
+    }
+  });
+
+  let candidate = `${prefix}${maxNo + 1}`;
+  let counter = maxNo + 1;
+
+  while (await db.Expense.exists({ voucherNo: candidate })) {
+    counter++;
+    candidate = `${prefix}${counter}`;
+  }
+
+  return candidate;
+}
+
+// Get Next Voucher Number (e.g. EE-EXP-1001, EF-EXP-1001, EDP-EXP-1001)
 const getNextVoucherNo = async (req, res) => {
   try {
     const { companyEntity } = req.query;
-    const filter = companyEntity ? { companyEntity } : {};
-    const prefixMap = {
-      'Elite Edition': 'EE-EXP-',
-      'Elite Fabtex': 'EF-EXP-',
-      'Elite Stitching': 'ES-EXP-',
-      'Elite Online': 'EO-EXP-',
-      'Elite Digital Print': 'EDP-EXP-'
-    };
-    const prefix = prefixMap[companyEntity] || 'EXP-';
-    const expenses = await db.Expense.find(filter, { voucherNo: 1 }).lean();
-    let maxNo = 1000;
-
-    expenses.forEach(e => {
-      if (!e.voucherNo) return;
-      const match = String(e.voucherNo).match(/EXP-(\d+)/i);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (!isNaN(num) && num > maxNo) maxNo = num;
-      }
-    });
-
-    res.json({ nextVoucherNo: `${prefix}${maxNo + 1}` });
+    const nextVoucherNo = await generateUniqueVoucherNo(companyEntity || 'Elite Digital Print');
+    res.json({ nextVoucherNo });
   } catch (err) {
     logger.error('expense.getNextVoucherNo error: %o', err);
     res.status(500).json({ error: 'Failed to generate next voucher number' });
@@ -141,18 +155,8 @@ const create = async (req, res) => {
       return res.status(400).json({ error: 'Valid Amount (> 0) is required' });
     }
 
-    if (!payload.voucherNo) {
-      const expenses = await db.Expense.find({}, { voucherNo: 1 }).lean();
-      let maxNo = 1000;
-      expenses.forEach(e => {
-        if (!e.voucherNo) return;
-        const match = String(e.voucherNo).match(/(?:EDP-EXP-)(\d+)/i);
-        if (match) {
-          const num = parseInt(match[1], 10);
-          if (!isNaN(num) && num > maxNo) maxNo = num;
-        }
-      });
-      payload.voucherNo = `EDP-EXP-${maxNo + 1}`;
+    if (!payload.voucherNo || (await db.Expense.exists({ voucherNo: payload.voucherNo }))) {
+      payload.voucherNo = await generateUniqueVoucherNo(payload.companyEntity || 'Elite Digital Print');
     }
 
     const activeUserName = req.headers['x-user-name'] || req.user?.name || payload.userName || payload.createdBy || 'Staff User';
