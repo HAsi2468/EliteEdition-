@@ -31,4 +31,8 @@ router.post('/items', billingController.createItem);
 router.put('/items/:id', billingController.updateItem);
 router.delete('/items/:id', billingController.deleteItem);
 
+// Company Settings CRUD
+router.get('/company-settings', billingController.getCompanySettings);
+router.put('/company-settings', billingController.updateCompanySettings);
+
 module.exports = router;

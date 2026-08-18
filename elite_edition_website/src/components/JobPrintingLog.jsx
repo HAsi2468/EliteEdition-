@@ -6,7 +6,7 @@ import {
   X, Download, Eye, Layers3, Activity, Tag, Sparkles, FileText, ArrowUpFromLine, ArrowDownToLine
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
-import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
+import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { cleanDesignNameString } from '../utils/designUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
@@ -60,8 +60,8 @@ export default function JobPrintingLog() {
   const [searchJob, setSearchJob] = useState('');
   const [filterMachine, setFilterMachine] = useState('');
   const [datePreset, setDatePreset] = useState('today');
-  const [dateStart, setDateStart] = useState(() => new Date().toISOString().split('T')[0]);
-  const [dateEnd, setDateEnd] = useState(() => new Date().toISOString().split('T')[0]);
+  const [dateStart, setDateStart] = useState(() => toLocalYMD());
+  const [dateEnd, setDateEnd] = useState(() => toLocalYMD());
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
 
@@ -79,7 +79,7 @@ export default function JobPrintingLog() {
     machineName: '',
     pass: '1 PASS',
     meters: '',
-    date: new Date().toISOString().split('T')[0],
+    date: toLocalYMD(),
     operatorName: accountFullName, // BY DEFAULT PRE-FILLED WITH ACCOUNT FULL NAME
     shift: getAutoShift(), // AUTOMATICALLY SET BASED ON TIME (Morning/Night)
     notes: ''
@@ -93,8 +93,8 @@ export default function JobPrintingLog() {
 
   // Dedicated Digital Operator Report Modal State
   const [showReportModal, setShowReportModal] = useState(false);
-  const [reportStartDate, setReportStartDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [reportEndDate, setReportEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [reportStartDate, setReportStartDate] = useState(() => toLocalYMD());
+  const [reportEndDate, setReportEndDate] = useState(() => toLocalYMD());
   const [reportStartTime, setReportStartTime] = useState('');
   const [reportEndTime, setReportEndTime] = useState('');
   const [reportMachine, setReportMachine] = useState('');
@@ -110,7 +110,7 @@ export default function JobPrintingLog() {
   const [rawMaterialSubmitting, setRawMaterialSubmitting] = useState(false);
   const [rawEntryType, setRawEntryType] = useState('OUTWARD');
 
-  const [rawDate, setRawDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [rawDate, setRawDate] = useState(() => toLocalYMD());
   const [rawShift, setRawShift] = useState(() => getAutoShift());
   const [rawStartTime, setRawStartTime] = useState('');
   const [rawStopTime, setRawStopTime] = useState('');
@@ -864,7 +864,7 @@ export default function JobPrintingLog() {
         notes: ''
       }));
 
-      const targetDate = form.date || new Date().toISOString().split('T')[0];
+      const targetDate = form.date || toLocalYMD();
       setDateStart(targetDate);
       setDateEnd(targetDate);
 

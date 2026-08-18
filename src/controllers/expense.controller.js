@@ -11,10 +11,14 @@ const getAll = async (req, res) => {
       dateStart = '',
       dateEnd = '',
       page = 1,
-      limit = 200
+      limit = 200,
+      companyEntity
     } = req.query;
 
-    const filter = { department: 'digital_print' };
+    const filter = {};
+    if (companyEntity) {
+      filter.companyEntity = companyEntity;
+    }
 
     if (type && type !== 'All') {
       filter.type = type.toUpperCase();
@@ -83,22 +87,32 @@ const getAll = async (req, res) => {
   }
 };
 
-// Get Next Voucher Number (e.g. EDP-EXP-1001)
+// Get Next Voucher Number (e.g. EE-EXP-1001, EF-EXP-1001)
 const getNextVoucherNo = async (req, res) => {
   try {
-    const expenses = await db.Expense.find({}, { voucherNo: 1 }).lean();
+    const { companyEntity } = req.query;
+    const filter = companyEntity ? { companyEntity } : {};
+    const prefixMap = {
+      'Elite Edition': 'EE-EXP-',
+      'Elite Fabtex': 'EF-EXP-',
+      'Elite Stitching': 'ES-EXP-',
+      'Elite Online': 'EO-EXP-',
+      'Elite Digital Print': 'EDP-EXP-'
+    };
+    const prefix = prefixMap[companyEntity] || 'EXP-';
+    const expenses = await db.Expense.find(filter, { voucherNo: 1 }).lean();
     let maxNo = 1000;
 
     expenses.forEach(e => {
       if (!e.voucherNo) return;
-      const match = String(e.voucherNo).match(/(?:EDP-EXP-)(\d+)/i);
+      const match = String(e.voucherNo).match(/EXP-(\d+)/i);
       if (match) {
         const num = parseInt(match[1], 10);
         if (!isNaN(num) && num > maxNo) maxNo = num;
       }
     });
 
-    res.json({ nextVoucherNo: `EDP-EXP-${maxNo + 1}` });
+    res.json({ nextVoucherNo: `${prefix}${maxNo + 1}` });
   } catch (err) {
     logger.error('expense.getNextVoucherNo error: %o', err);
     res.status(500).json({ error: 'Failed to generate next voucher number' });
@@ -141,16 +155,16 @@ const create = async (req, res) => {
       payload.voucherNo = `EDP-EXP-${maxNo + 1}`;
     }
 
-    if (req.user) {
-      payload.createdBy = req.user.name || req.user.fullName || req.user.username || 'System';
-    }
+    const activeUserName = req.headers['x-user-name'] || req.user?.name || payload.userName || payload.createdBy || 'Staff User';
+    payload.createdBy = activeUserName;
+    payload.createdByName = activeUserName;
 
     const created = await db.Expense.create(payload);
 
     // Publish Authority Activity Event
     try {
       const { publishActivity } = require('../utils/activityEvent');
-      const uName = req.user?.name || payload.userName || payload.createdBy || 'Staff User';
+      const uName = activeUserName;
       const uId = req.user?._id || payload.userId;
       publishActivity({
         actorId: uId,
@@ -179,6 +193,10 @@ const update = async (req, res) => {
   try {
     const { id } = req.params;
     const payload = req.body;
+
+    const editorName = req.headers['x-user-name'] || req.user?.name || payload.userName || payload.updatedBy || 'Staff User';
+    payload.updatedBy = editorName;
+    payload.updatedByName = editorName;
 
     const updated = await db.Expense.findByIdAndUpdate(id, payload, { new: true, runValidators: true });
     if (!updated) return res.status(404).json({ error: 'Expense record not found' });

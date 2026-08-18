@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const billingCustomerSchema = new mongoose.Schema(
   {
+    companyEntity: { type: String, default: 'Elite Online', index: true },
     name: { type: String, required: true },
     businessName: { type: String, default: '' },
     phone: { type: String, default: '' },

@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 
 const complaintSchema = new mongoose.Schema(
   {
-    complaintNo: { type: String, required: true, unique: true, trim: true },
+    companyEntity: { type: String, default: 'Elite Digital Print', index: true },
+    complaintNo: { type: String, required: true, trim: true },
     date: { type: String, default: () => new Date().toISOString().split('T')[0] },
     partyName: { type: String, required: true, trim: true },
     jobCardNo: { type: String, default: '', trim: true },
@@ -28,14 +29,17 @@ const complaintSchema = new mongoose.Schema(
         createdAt: { type: Date, default: Date.now }
       }
     ],
-    createdBy: { type: String, default: 'System', trim: true }
+    createdBy: { type: String, default: 'System', trim: true },
+    createdByName: { type: String, default: 'System', trim: true },
+    updatedBy: { type: String, default: '', trim: true },
+    updatedByName: { type: String, default: '', trim: true }
   },
   {
     timestamps: true
   }
 );
 
-complaintSchema.index({ complaintNo: 1 });
+complaintSchema.index({ companyEntity: 1, complaintNo: 1 });
 complaintSchema.index({ partyName: 1 });
 complaintSchema.index({ status: 1 });
 

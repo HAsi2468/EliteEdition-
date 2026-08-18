@@ -198,7 +198,7 @@ function getDatePresetRange(preset, customStart = '', customEnd = '') {
   return { start, end, labelText };
 }
 
-export default function DigitalPrintComplainModule() {
+export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digital Print' }) {
   const [complaints, setComplaints] = useState([]);
   const [parties, setParties] = useState([]);
   const [staffList, setStaffList] = useState([]);
@@ -300,7 +300,7 @@ export default function DigitalPrintComplainModule() {
     fetchComplaints();
     fetchAnalytics();
     fetchParties();
-  }, [search, statusFilter, priorityFilter, categoryFilter, dateStart, dateEnd]);
+  }, [search, statusFilter, priorityFilter, categoryFilter, dateStart, dateEnd, companyEntity]);
 
   const fetchComplaints = async () => {
     setLoading(true);
@@ -310,6 +310,7 @@ export default function DigitalPrintComplainModule() {
       const currentUserName = currentUser ? (currentUser.name || currentUser.fullName || currentUser.username || '') : '';
 
       const params = {
+        companyEntity,
         search,
         status: statusFilter,
         priority: priorityFilter,
@@ -355,7 +356,7 @@ export default function DigitalPrintComplainModule() {
       const isAdmin = !currentUser || currentUser.role === 'admin';
       const currentUserName = currentUser ? (currentUser.name || currentUser.fullName || currentUser.username || '') : '';
 
-      const params = { dateStart, dateEnd };
+      const params = { companyEntity, dateStart, dateEnd };
       if (!isAdmin && currentUserName) {
         params.assignedTo = currentUserName;
       }
@@ -371,7 +372,7 @@ export default function DigitalPrintComplainModule() {
     try {
       const [pRes, cfg, uRes] = await Promise.all([
         api.getParties({ limit: 1000 }).catch(() => ({ data: [] })),
-        api.getPrintConfig().catch(() => ({})),
+        api.getPrintConfig(companyEntity).catch(() => ({})),
         api.getUsers({ limit: 500 }).catch(() => ({ results: [], data: [] }))
       ]);
 
@@ -435,6 +436,7 @@ export default function DigitalPrintComplainModule() {
     const subOptions = getSubCategoryOptions(defaultCat);
 
     setFormVal({
+      companyEntity,
       complaintNo: 'Loading...',
       date: new Date().toISOString().split('T')[0],
       partyName: '',
@@ -458,15 +460,15 @@ export default function DigitalPrintComplainModule() {
 
     setShowModal(true);
 
-    api.getNextComplaintNumber().then(res => {
+    api.getNextComplaintNumber(companyEntity).then(res => {
       if (res && res.nextComplaintNo) {
         setFormVal(prev => ({ ...prev, complaintNo: res.nextComplaintNo }));
       } else {
-        setFormVal(prev => ({ ...prev, complaintNo: 'EDP-COMP-1001' }));
+        setFormVal(prev => ({ ...prev, complaintNo: 'COMP-1001' }));
       }
     }).catch(err => {
       console.warn('Failed to fetch next complaint number:', err);
-      setFormVal(prev => ({ ...prev, complaintNo: 'EDP-COMP-1001' }));
+      setFormVal(prev => ({ ...prev, complaintNo: 'COMP-1001' }));
     });
   };
 
@@ -994,8 +996,16 @@ export default function DigitalPrintComplainModule() {
                             {item.priority}
                           </span>
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>
-                          {item.date ? new Date(item.date).toLocaleDateString('en-IN') : ''}
+                        <div style={{ fontSize: '0.73rem', color: '#64748b', marginTop: 2, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span>{item.date ? new Date(item.date).toLocaleDateString('en-IN') : ''}</span>
+                          <span style={{ fontSize: '0.7rem', color: '#0284c7', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                            👤 By: {item.createdByName || item.createdBy || 'Staff User'}
+                          </span>
+                          {item.updatedByName && item.updatedByName !== (item.createdByName || item.createdBy) && (
+                            <span style={{ fontSize: '0.68rem', color: '#475569', background: '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>
+                              ✏️ Edit: {item.updatedByName}
+                            </span>
+                          )}
                         </div>
                       </div>
 

@@ -184,7 +184,7 @@ function getDatePresetRange(preset, customStart = '', customEnd = '') {
   return { start, end, labelText };
 }
 
-export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onModalOpened = null }) {
+export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onModalOpened = null, companyEntity = 'Elite Digital Print' }) {
   const [expenses, setExpenses] = useState([]);
   const [summary, setSummary] = useState({ totalIn: 0, totalOut: 0, netBalance: 0, totalVouchers: 0 });
   const [loading, setLoading] = useState(false);
@@ -196,7 +196,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
 
   // Load Print Config
   useEffect(() => {
-    api.getPrintConfig()
+    api.getPrintConfig(companyEntity)
       .then(cfg => {
         if (cfg) {
           if (Array.isArray(cfg.expenseInCategories) && cfg.expenseInCategories.length > 0) {
@@ -211,7 +211,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
         }
       })
       .catch(err => console.warn('Failed to load print config for expense categories:', err));
-  }, []);
+  }, [companyEntity]);
 
   // Trigger modal auto open if requested
   useEffect(() => {
@@ -242,6 +242,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
 
   // Form State
   const [formVal, setFormVal] = useState({
+    companyEntity,
     voucherNo: '',
     date: new Date().toISOString().split('T')[0],
     type: 'OUT',
@@ -259,12 +260,13 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
 
   useEffect(() => {
     fetchExpenses();
-  }, [search, typeFilter, categoryFilter, dateStart, dateEnd]);
+  }, [search, typeFilter, categoryFilter, dateStart, dateEnd, companyEntity]);
 
   const fetchExpenses = async () => {
     setLoading(true);
     try {
       const params = {
+        companyEntity,
         search,
         type: typeFilter,
         category: categoryFilter,
@@ -296,7 +298,8 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       : (outCategories && outCategories[0] ? outCategories[0] : DEFAULT_OUT_CATEGORIES[0]);
 
     setFormVal({
-      voucherNo: 'EDP-EXP-...',
+      companyEntity,
+      voucherNo: 'EXP-...',
       date: new Date().toISOString().split('T')[0],
       type: defaultType,
       category: defaultCat,
@@ -311,15 +314,15 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     setShowModal(true);
 
     try {
-      const numRes = await api.getNextExpenseVoucherNo();
+      const numRes = await api.getNextExpenseVoucherNo(companyEntity);
       if (numRes && numRes.nextVoucherNo) {
         setFormVal(prev => ({ ...prev, voucherNo: numRes.nextVoucherNo }));
       } else {
-        setFormVal(prev => ({ ...prev, voucherNo: `EDP-EXP-${Date.now().toString().slice(-4)}` }));
+        setFormVal(prev => ({ ...prev, voucherNo: `EXP-${Date.now().toString().slice(-4)}` }));
       }
     } catch (e) {
       console.error('Failed to fetch next voucher number:', e);
-      setFormVal(prev => ({ ...prev, voucherNo: `EDP-EXP-${Date.now().toString().slice(-4)}` }));
+      setFormVal(prev => ({ ...prev, voucherNo: `EXP-${Date.now().toString().slice(-4)}` }));
     }
   };
 
@@ -797,6 +800,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Amount (₹)</th>
                       <th style={{ padding: '0.75rem 1rem' }}>Payment Mode</th>
                       <th style={{ padding: '0.75rem 1rem' }}>Vendor / Person</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Logged By</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Actions</th>
                     </tr>
                   </thead>
@@ -846,6 +850,11 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                           </td>
                           <td style={{ padding: '0.75rem 1rem', color: 'var(--text-primary)' }}>
                             {item.paidToOrReceivedFrom || 'N/A'}
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', color: 'var(--text-primary)' }}>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#0284c7', background: '#e0f2fe', padding: '2px 7px', borderRadius: '4px', border: '1px solid #bae6fd' }}>
+                              👤 {item.createdByName || item.createdBy || 'Staff User'}
+                            </span>
                           </td>
                           <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
                             <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>

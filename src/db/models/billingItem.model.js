@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const billingItemSchema = new mongoose.Schema(
   {
+    companyEntity: { type: String, default: 'Elite Online', index: true },
     itemName: { type: String, required: true },
     hsnCode: { type: String, default: '998821' }, // Default HSN/SAC for Printing Services
     unitPrice: { type: Number, required: true, default: 0 },

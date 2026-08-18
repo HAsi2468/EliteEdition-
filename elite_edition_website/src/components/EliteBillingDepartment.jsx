@@ -231,7 +231,7 @@ function getDatePresetRange(preset, customStart = '', customEnd = '') {
 }
 
 export default function EliteBillingDepartment({ initialChallanData = null, department = 'digital_print', companyEntity = 'Elite Edition' }) {
-  const [activeTab, setActiveTab] = useState('challans'); // 'challans', 'invoices', 'dashboard', 'create', 'customers', 'items'
+  const [activeTab, setActiveTab] = useState(() => (companyEntity === 'Elite Edition' || companyEntity === 'Elite Fabtex' ? 'invoices' : 'challans')); // 'challans', 'invoices', 'dashboard', 'create', 'customers', 'items'
   const [challanDept, setChallanDept] = useState(() => (department === 'stitching' ? 'stitching' : 'digital_print'));
   const [stats, setStats] = useState({
     totalInvoices: 0,
@@ -835,10 +835,10 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     setError('');
     try {
       const [sRes, iRes, cRes, itemRes] = await Promise.all([
-        api.getBillingDashboardStats(),
-        api.getBillingInvoices({ limit: 5000, search, paymentStatus: statusFilter }),
-        api.getBillingCustomers(),
-        api.getBillingItems()
+        api.getBillingDashboardStats(companyEntity),
+        api.getBillingInvoices({ companyEntity, search, paymentStatus: statusFilter }),
+        api.getBillingCustomers(companyEntity),
+        api.getBillingItems(companyEntity)
       ]);
 
       if (sRes.data) setStats(sRes.data);
@@ -854,7 +854,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
   useEffect(() => {
     loadData();
-  }, [search, statusFilter]);
+  }, [search, statusFilter, companyEntity]);
 
   // Auto-populate Invoice from Challan with Saved Customer Auto-Selection & Multi-Challan Merging
   const loadInvoiceFromChallan = async (chInput) => {
@@ -967,7 +967,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     } else {
       setEditingInvoiceId(null);
       try {
-        const nextRes = await api.getNextInvoiceNo();
+        const nextRes = await api.getNextInvoiceNo(companyEntity);
         const cfg = await api.getPrintConfig().catch(() => ({}));
         const dueDays = cfg?.paymentDueDays || 30;
         const termsStr = cfg?.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
@@ -1169,6 +1169,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       const { manualRoundOff, ...formRest } = invoiceForm;
       const payload = {
         ...formRest,
+        companyEntity: companyEntity || 'Elite Online',
         items: calculatedInvoice.items,
         subtotal: calculatedInvoice.subtotal,
         discountTotal: calculatedInvoice.discountTotal,
@@ -1256,7 +1257,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         setCustomers(prev => prev.map(c => c._id === editingCustomerId ? res.data : c));
         triggerPushNotification('✏️ Customer Updated', `Customer "${custForm.name}" updated.`, 'success');
       } else {
-        const res = await api.createBillingCustomer(custForm);
+        const res = await api.createBillingCustomer({ ...custForm, companyEntity });
         setCustomers(prev => [...prev, res.data]);
         triggerPushNotification('👥 Customer Created', `Customer "${custForm.name}" registered.`, 'success');
       }
@@ -1295,7 +1296,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         setItemsList(prev => prev.map(i => i._id === editingItemId ? res.data : i));
         triggerPushNotification('✏️ Product Updated', `Product "${itemForm.itemName}" updated.`, 'success');
       } else {
-        const res = await api.createBillingItem(itemForm);
+        const res = await api.createBillingItem({ ...itemForm, companyEntity });
         setItemsList(prev => [...prev, res.data]);
         triggerPushNotification('📦 Product Created', `Product "${itemForm.itemName}" cataloged.`, 'success');
       }
@@ -2367,6 +2368,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       {/* ── TAB 6: EXPENSE & LEDGER MODULE ───────────────────────────────────── */}
       {activeTab === 'expense' && (
         <DigitalPrintExpenseModule
+          companyEntity={companyEntity}
           autoOpenCreate={autoOpenExpenseModal}
           onModalOpened={() => setAutoOpenExpenseModal(false)}
         />

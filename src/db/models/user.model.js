@@ -20,6 +20,14 @@ const userSchema = new mongoose.Schema(
 			enum: ['admin', 'user'],
 			default: 'user',
 		},
+		isMainAdmin: {
+			type: Boolean,
+			default: false,
+		},
+		allowedCompanies: {
+			type: [String],
+			default: ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex'],
+		},
 		permissions: {
 			type: [String],
 			default: [],

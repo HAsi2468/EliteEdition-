@@ -789,8 +789,9 @@ export const api = {
     const qs = query.toString() ? `?${query.toString()}` : '';
     return request(`/complaints${qs}`);
   },
-  async getNextComplaintNumber() {
-    return request('/complaints/next-number');
+  async getNextComplaintNumber(companyEntity) {
+    const qs = companyEntity ? `?companyEntity=${encodeURIComponent(companyEntity)}` : '';
+    return request(`/complaints/next-number${qs}`);
   },
   async getComplaintAnalytics(params = {}) {
     const query = new URLSearchParams();
@@ -833,8 +834,9 @@ export const api = {
     const qs = query.toString() ? `?${query.toString()}` : '';
     return request(`/expenses/analytics${qs}`);
   },
-  async getNextExpenseVoucherNo() {
-    return request('/expenses/next-number');
+  async getNextExpenseVoucherNo(companyEntity) {
+    const qs = companyEntity ? `?companyEntity=${encodeURIComponent(companyEntity)}` : '';
+    return request(`/expenses/next-number${qs}`);
   },
   async createExpense(payload) {
     return request('/expenses', { method: 'POST', body: JSON.stringify(payload) });
@@ -1550,8 +1552,8 @@ export const api = {
   },
 
   // ── Billing & Invoicing Department ───────────────────────────────────────
-  async getBillingDashboardStats() {
-    return request('/billing/dashboard-stats');
+  async getBillingDashboardStats(companyEntity = 'Elite Online') {
+    return request(`/billing/dashboard-stats?companyEntity=${encodeURIComponent(companyEntity)}`);
   },
 
   async getBillingInvoices(params = {}) {
@@ -1559,8 +1561,8 @@ export const api = {
     return request(`/billing/invoices?${query.toString()}`);
   },
 
-  async getNextInvoiceNo() {
-    return request('/billing/invoices/next-no');
+  async getNextInvoiceNo(companyEntity = 'Elite Online') {
+    return request(`/billing/invoices/next-no?companyEntity=${encodeURIComponent(companyEntity)}`);
   },
 
   async getBillingInvoiceById(id) {
@@ -1643,8 +1645,8 @@ export const api = {
   },
 
   // Billing Customers
-  async getBillingCustomers() {
-    return request('/billing/customers');
+  async getBillingCustomers(companyEntity = 'Elite Online') {
+    return request(`/billing/customers?companyEntity=${encodeURIComponent(companyEntity)}`);
   },
 
   async createBillingCustomer(data) {
@@ -1666,8 +1668,8 @@ export const api = {
   },
 
   // Billing Items
-  async getBillingItems() {
-    return request('/billing/items');
+  async getBillingItems(companyEntity = 'Elite Online') {
+    return request(`/billing/items?companyEntity=${encodeURIComponent(companyEntity)}`);
   },
 
   async createBillingItem(data) {
@@ -1686,6 +1688,18 @@ export const api = {
 
   async deleteBillingItem(id) {
     return request(`/billing/items/${id}`, { method: 'DELETE' });
+  },
+
+  // Company Settings
+  async getCompanySettings(companyEntity = 'Elite Online') {
+    return request(`/billing/company-settings?companyEntity=${encodeURIComponent(companyEntity)}`);
+  },
+
+  async updateCompanySettings(data) {
+    return request('/billing/company-settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   },
 
   // Data Backup

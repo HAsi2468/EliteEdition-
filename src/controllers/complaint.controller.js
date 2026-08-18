@@ -14,10 +14,14 @@ const getAll = async (req, res) => {
       dateStart = '',
       dateEnd = '',
       page = 1,
-      limit = 100
+      limit = 100,
+      companyEntity
     } = req.query;
 
     const filter = {};
+    if (companyEntity) {
+      filter.companyEntity = companyEntity;
+    }
 
     if (assignedTo && assignedTo !== 'All') {
       const cleanUser = assignedTo.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
@@ -106,22 +110,32 @@ const getAll = async (req, res) => {
   }
 };
 
-// Get Next Complaint Ticket Number (e.g. EDP-COMP-1001)
+// Get Next Complaint Ticket Number (e.g. EE-COMP-1001, EF-COMP-1001)
 const getNextNumber = async (req, res) => {
   try {
-    const complaints = await db.Complaint.find({}, { complaintNo: 1 }).lean();
+    const { companyEntity } = req.query;
+    const filter = companyEntity ? { companyEntity } : {};
+    const prefixMap = {
+      'Elite Edition': 'EE-COMP-',
+      'Elite Fabtex': 'EF-COMP-',
+      'Elite Stitching': 'ES-COMP-',
+      'Elite Online': 'EO-COMP-',
+      'Elite Digital Print': 'EDP-COMP-'
+    };
+    const prefix = prefixMap[companyEntity] || 'COMP-';
+    const complaints = await db.Complaint.find(filter, { complaintNo: 1 }).lean();
     let maxNo = 1000;
 
     complaints.forEach(c => {
       if (!c.complaintNo) return;
-      const match = String(c.complaintNo).match(/(?:EDP-)?COMP-(\d+)/i);
+      const match = String(c.complaintNo).match(/COMP-(\d+)/i);
       if (match) {
         const num = parseInt(match[1], 10);
         if (!isNaN(num) && num > maxNo) maxNo = num;
       }
     });
 
-    res.json({ nextComplaintNo: `EDP-COMP-${maxNo + 1}` });
+    res.json({ nextComplaintNo: `${prefix}${maxNo + 1}` });
   } catch (err) {
     logger.error('complaint.getNextNumber error: %o', err);
     res.status(500).json({ error: 'Failed to generate next complaint number' });
@@ -167,12 +181,16 @@ const create = async (req, res) => {
       payload.complaintNo = `EDP-COMP-${maxNo + 1}`;
     }
 
+    const activeUserName = req.headers['x-user-name'] || req.user?.name || payload.userName || payload.createdBy || 'Staff User';
+    payload.createdBy = activeUserName;
+    payload.createdByName = activeUserName;
+
     const newComplaint = await db.Complaint.create(payload);
 
     // Publish Authority Activity Event
     try {
       const { publishActivity } = require('../utils/activityEvent');
-      const uName = req.user?.name || payload.userName || payload.createdBy || 'Staff User';
+      const uName = activeUserName;
       const uId = req.user?._id || payload.userId;
       publishActivity({
         actorId: uId,
@@ -218,6 +236,10 @@ const update = async (req, res) => {
   try {
     const { id } = req.params;
     const payload = req.body;
+
+    const editorName = req.headers['x-user-name'] || req.user?.name || payload.userName || payload.updatedBy || 'Staff User';
+    payload.updatedBy = editorName;
+    payload.updatedByName = editorName;
 
     if (Array.isArray(payload.responsiblePersons)) {
       payload.responsiblePerson = payload.responsiblePersons.join(', ');

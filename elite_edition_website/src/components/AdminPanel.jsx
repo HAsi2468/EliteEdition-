@@ -68,6 +68,8 @@ export default function AdminPanel() {
     email: '',
     password: '',
     role: 'user',
+    isMainAdmin: false,
+    allowedCompanies: ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex'],
     permissions: []
   });
 
@@ -242,6 +244,8 @@ export default function AdminPanel() {
     });
   };
 
+  const ALL_COMPANY_NAMES = ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex'];
+
   const handleEditClick = (user) => {
     setEditingUser(user);
     setFormData({
@@ -249,6 +253,8 @@ export default function AdminPanel() {
       email: user.email || '',
       password: '',
       role: user.role || (user.permissions?.length === AVAILABLE_SCREENS.length ? 'admin' : 'user'),
+      isMainAdmin: Boolean(user.isMainAdmin || user.email === 'harshitsidapara2468@gmail.com'),
+      allowedCompanies: Array.isArray(user.allowedCompanies) && user.allowedCompanies.length > 0 ? user.allowedCompanies : ALL_COMPANY_NAMES,
       permissions: user.permissions || []
     });
     setError('');
@@ -263,6 +269,8 @@ export default function AdminPanel() {
       email: '',
       password: '',
       role: 'user',
+      isMainAdmin: false,
+      allowedCompanies: ALL_COMPANY_NAMES,
       permissions: []
     });
     setError('');
@@ -278,6 +286,8 @@ export default function AdminPanel() {
       email: '',
       password: '',
       role: 'user',
+      isMainAdmin: false,
+      allowedCompanies: ALL_COMPANY_NAMES,
       permissions: []
     });
     setError('');
@@ -306,6 +316,8 @@ export default function AdminPanel() {
           name: formData.name.trim(),
           email: formData.email.trim(),
           role: formData.role,
+          isMainAdmin: formData.isMainAdmin,
+          allowedCompanies: formData.allowedCompanies,
           permissions: formData.permissions
         };
         if (formData.password) {
@@ -322,14 +334,16 @@ export default function AdminPanel() {
           }
         }
 
-        setSuccess(`User "${formData.name}" credentials updated successfully.`);
-        triggerPushNotification('👤 User Updated', `User "${formData.name}" credentials updated successfully!`, 'info');
+        setSuccess(`User "${formData.name}" credentials & company permissions updated successfully.`);
+        triggerPushNotification('👤 User Updated', `User "${formData.name}" updated successfully!`, 'info');
       } else {
         await api.createUser({
           name: formData.name.trim(),
           email: formData.email.trim(),
           password: formData.password,
           role: formData.role,
+          isMainAdmin: formData.isMainAdmin,
+          allowedCompanies: formData.allowedCompanies,
           permissions: formData.permissions
         });
         setSuccess(`User "${formData.name}" created successfully.`);
@@ -512,7 +526,8 @@ export default function AdminPanel() {
                     <tr>
                       <th>Account</th>
                       <th>Email</th>
-                      <th>Role</th>
+                      <th>Role & Hierarchy</th>
+                      <th>Allocated Companies</th>
                       <th>Allowed Functionalities</th>
                       <th className="text-center">Actions</th>
                     </tr>
@@ -521,8 +536,12 @@ export default function AdminPanel() {
                     {users
                       .filter(u => matchSearchQuery(u, userSearch, ['name', 'email', 'role']))
                       .map((u) => {
-                        const checkAdmin = u.role === 'admin' || (u.permissions && u.permissions.length === AVAILABLE_SCREENS.length);
+                        const isMain = Boolean(u.isMainAdmin || u.email === 'harshitsidapara2468@gmail.com');
+                        const checkAdmin = u.role === 'admin' || isMain;
                         const isCurrentlyEditing = editingUser && (editingUser.id === u.id || editingUser._id === u.id);
+                        const userCompanies = Array.isArray(u.allowedCompanies) && u.allowedCompanies.length > 0
+                          ? u.allowedCompanies
+                          : ALL_COMPANY_NAMES;
 
                         return (
                           <tr key={u.id || u._id} style={{ background: isCurrentlyEditing ? '#eff6ff' : 'transparent', transition: 'background 0.15s' }}>
@@ -532,7 +551,9 @@ export default function AdminPanel() {
                                   {u.name ? u.name[0].toUpperCase() : 'U'}
                                 </div>
                                 <div>
-                                  <span style={{ fontWeight: '700', color: '#0f172a', display: 'block', fontSize: '0.88rem' }}>{u.name}</span>
+                                  <span style={{ fontWeight: '700', color: '#0f172a', display: 'block', fontSize: '0.88rem' }}>
+                                    {u.name} {isMain && <span title="Super Master Admin">👑</span>}
+                                  </span>
                                   {isCurrentlyEditing && (
                                     <span style={{ fontSize: '0.68rem', color: '#2563eb', fontWeight: 800 }}>[Editing Now]</span>
                                   )}
@@ -544,15 +565,28 @@ export default function AdminPanel() {
                               <span style={{
                                 fontSize: '0.7rem',
                                 fontWeight: 800,
-                                padding: '2px 8px',
+                                padding: '3px 9px',
                                 borderRadius: '6px',
                                 textTransform: 'uppercase',
-                                background: checkAdmin ? '#fee2e2' : '#dbeafe',
-                                color: checkAdmin ? '#dc2626' : '#1d4ed8',
-                                border: `1px solid ${checkAdmin ? '#fca5a5' : '#93c5fd'}`
+                                background: isMain ? '#fef3c7' : checkAdmin ? '#fee2e2' : '#dbeafe',
+                                color: isMain ? '#92400e' : checkAdmin ? '#dc2626' : '#1d4ed8',
+                                border: `1px solid ${isMain ? '#fcd34d' : checkAdmin ? '#fca5a5' : '#93c5fd'}`
                               }}>
-                                {checkAdmin ? '🛡️ ADMIN' : '👤 USER'}
+                                {isMain ? '👑 MAIN ADMIN' : checkAdmin ? '🛡️ COMPANY ADMIN' : '👤 USER'}
                               </span>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                {isMain ? (
+                                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#047857', background: '#d1fae5', padding: '2px 7px', borderRadius: '4px', border: '1px solid #a7f3d0' }}>
+                                    🌐 ALL COMPANIES (MASTER)
+                                  </span>
+                                ) : userCompanies.map(c => (
+                                  <span key={c} style={{ fontSize: '0.68rem', fontWeight: 700, color: '#334155', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                                    {c}
+                                  </span>
+                                ))}
+                              </div>
                             </td>
                             <td>
                               <div style={styles.permissionsList}>
@@ -757,16 +791,111 @@ export default function AdminPanel() {
                     </div>
 
                     <div style={styles.formGroup}>
-                      <label style={styles.label}>Account Role *</label>
+                      <label style={styles.label}>Account Role & Hierarchy *</label>
                       <select
                         name="role"
-                        value={formData.role}
-                        onChange={handleRoleChange}
+                        value={formData.isMainAdmin ? 'main_admin' : formData.role}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === 'main_admin') {
+                            setFormData(prev => ({
+                              ...prev,
+                              role: 'admin',
+                              isMainAdmin: true,
+                              allowedCompanies: ALL_COMPANY_NAMES,
+                              permissions: AVAILABLE_SCREENS.map(s => s.id)
+                            }));
+                          } else if (val === 'admin') {
+                            setFormData(prev => ({
+                              ...prev,
+                              role: 'admin',
+                              isMainAdmin: false,
+                              permissions: AVAILABLE_SCREENS.map(s => s.id)
+                            }));
+                          } else {
+                            setFormData(prev => ({
+                              ...prev,
+                              role: 'user',
+                              isMainAdmin: false
+                            }));
+                          }
+                        }}
                         style={styles.selectInput}
                       >
-                        <option value="user">User (Restricted Screen Access)</option>
-                        <option value="admin">Admin (Full System Access)</option>
+                        <option value="user">👤 Standard User (Restricted Screen Access)</option>
+                        <option value="admin">🛡️ Company Admin (Allocated Company Authority)</option>
+                        <option value="main_admin">👑 Main Admin / Super Admin (Hasi Master Control)</option>
                       </select>
+                    </div>
+
+                    {/* Allocated Companies Checkbox Grid */}
+                    <div style={styles.formGroup}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                        <label style={styles.label}>🏢 Allocated Companies (Admin Entity Access)</label>
+                        {!formData.isMainAdmin && (
+                          <div style={{ display: 'flex', gap: '0.35rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => setFormData(p => ({ ...p, allowedCompanies: ALL_COMPANY_NAMES }))}
+                              className="btn-secondary"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700 }}
+                            >
+                              Select All
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFormData(p => ({ ...p, allowedCompanies: [] }))}
+                              className="btn-secondary"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700 }}
+                            >
+                              Clear All
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <p style={styles.helpText}>
+                        Select which company entities this Admin user is authorized to manage and access in the top company bar.
+                      </p>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.5rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                        {ALL_COMPANY_NAMES.map(comp => {
+                          const isChecked = formData.allowedCompanies.includes(comp);
+                          return (
+                            <label
+                              key={comp}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.45rem 0.65rem',
+                                borderRadius: '6px',
+                                border: `1px solid ${isChecked ? '#2563eb' : '#cbd5e1'}`,
+                                background: isChecked ? '#eff6ff' : '#ffffff',
+                                cursor: formData.isMainAdmin ? 'not-allowed' : 'pointer',
+                                fontSize: '0.8rem',
+                                fontWeight: isChecked ? 700 : 500,
+                                color: isChecked ? '#1d4ed8' : '#334155'
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked || formData.isMainAdmin}
+                                disabled={formData.isMainAdmin}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setFormData(prev => {
+                                    const nextComps = checked
+                                      ? Array.from(new Set([...prev.allowedCompanies, comp]))
+                                      : prev.allowedCompanies.filter(c => c !== comp);
+                                    return { ...prev, allowedCompanies: nextComps };
+                                  });
+                                }}
+                              />
+                              <span>{comp}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div style={styles.formGroup}>

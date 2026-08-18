@@ -16,6 +16,14 @@ import AdminPanel from './components/AdminPanel';
 import Workspace from './components/Workspace';
 import CommunicationPanel from './components/CommunicationPanel';
 import EliteModalDialog from './components/EliteModalDialog';
+import CompanySettingsPanel from './components/CompanySettingsPanel';
+import EliteBillingDepartment from './components/EliteBillingDepartment';
+import CompanyDevelopmentWorkspace from './components/CompanyDevelopmentWorkspace';
+import DigitalPrintComplainModule from './components/DigitalPrintComplainModule';
+import DigitalPrintExpenseModule from './components/DigitalPrintExpenseModule';
+import CompanyDedicatedDashboard from './components/CompanyDedicatedDashboard';
+import GarmentJobCardDashboard from './components/GarmentJobCardDashboard';
+import { COMPANIES, getCompanyById } from './config/companiesConfig';
 
 // Code-splitting lazy loads for heavy tab modules
 const ReportsCenter = lazy(() => import('./components/ReportsCenter'));
@@ -49,6 +57,8 @@ import {
   X,
   Bell,
   Scissors,
+  Building,
+  Receipt,
   PanelLeftClose,
   PanelLeftOpen
 } from 'lucide-react';
@@ -151,14 +161,15 @@ export default function App() {
   };
 
   // Department permission helpers
-  const EE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
+  // Department permission helpers
+  const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
   const EDP_PERMISSIONS = ['jobcards', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create'];
   const STITCHING_PERMISSIONS = [
     'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
     'jobcards_stitching_challan', 'jobcards_stitching_settings', 'stitching'
   ];
 
-  const hasEliteEditionAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => EE_PERMISSIONS.includes(p)));
+  const hasEliteEditionAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => ELITE_ONLINE_PERMISSIONS.includes(p)));
   const hasDigitalPrintAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => (EDP_PERMISSIONS.includes(p) || p.startsWith('jobcards')) && !p.startsWith('stitching_')));
   const hasStitchingAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => STITCHING_PERMISSIONS.includes(p) || p.startsWith('stitching_')));
   const hasWorkspaceAccess = !currentUser || currentUser.role === 'admin' || !currentUser.permissions || currentUser.permissions.length === 0 || currentUser.permissions.includes('workspace');
@@ -172,7 +183,7 @@ export default function App() {
 
   const getFirstEETab = () => {
     if (!currentUser || currentUser.role === 'admin') return 'dashboard';
-    const allowed = EE_PERMISSIONS.filter(t => currentUser.permissions?.includes(t));
+    const allowed = ELITE_ONLINE_PERMISSIONS.filter(t => currentUser.permissions?.includes(t));
     return allowed[0] || 'dashboard';
   };
 
@@ -188,15 +199,19 @@ export default function App() {
 
   // Sync activeDepartment when activeTab changes
   useEffect(() => {
-    if (activeTab === 'jobcards_stitching_challan' || activeTab === 'jobcards_stitching_settings') {
+    if (activeTab === 'jobcards_stitching_challan' || activeTab === 'jobcards_stitching_settings' || activeTab.startsWith('es_')) {
       setActiveDepartment('stitching');
       return;
     }
-    if (activeDepartment === 'stitching') return;
+    if (activeDepartment === 'stitching' && (activeTab === 'jobcards_list' || activeTab === 'jobcards_catalogue' || activeTab === 'jobcards_fabric')) return;
     if (activeTab.startsWith('jobcards')) {
       setActiveDepartment('digital_print');
-    } else if (EE_PERMISSIONS.includes(activeTab)) {
+    } else if (activeTab.startsWith('ee_')) {
       setActiveDepartment('elite_edition');
+    } else if (activeTab.startsWith('ef_')) {
+      setActiveDepartment('elite_fabtex');
+    } else if (activeTab.startsWith('eo_') || ELITE_ONLINE_PERMISSIONS.includes(activeTab)) {
+      setActiveDepartment('elite_online');
     }
   }, [activeTab, activeDepartment]);
 
@@ -217,7 +232,8 @@ export default function App() {
       const allowedDepts = [];
       if (hasDigitalPrintAccess) allowedDepts.push('digital_print');
       if (hasStitchingAccess) allowedDepts.push('stitching');
-      if (hasEliteEditionAccess) allowedDepts.push('elite_edition');
+      if (hasEliteEditionAccess) allowedDepts.push('elite_online');
+      allowedDepts.push('elite_edition', 'elite_fabtex');
 
       if (allowedDepts.length > 0 && !allowedDepts.includes(activeDepartment)) {
         const targetDept = allowedDepts[0];
@@ -225,7 +241,9 @@ export default function App() {
         if (activeTab !== 'workspace') {
           if (targetDept === 'stitching') setActiveTab(getFirstStitchingTab());
           else if (targetDept === 'digital_print') setActiveTab(getFirstJobCardsTab());
-          else if (targetDept === 'elite_edition') setActiveTab(getFirstEETab());
+          else if (targetDept === 'elite_edition') setActiveTab('ee_invoices');
+          else if (targetDept === 'elite_fabtex') setActiveTab('ef_invoices');
+          else if (targetDept === 'elite_online') setActiveTab(getFirstEETab());
         }
       }
     }
@@ -238,15 +256,18 @@ export default function App() {
 
   const handleSwitchDepartment = (dept) => {
     setActiveDepartment(dept);
-    const deptName = dept === 'digital_print' ? 'Elite Digital Print' : dept === 'stitching' ? 'Elite Stitching' : 'Elite Edition';
-    triggerPushNotification('Switched Department 🔄', `Now viewing ${deptName} modules.`, 'info');
+    const comp = getCompanyById(dept);
+    triggerPushNotification('Switched Department 🔄', `Now viewing ${comp.name} (${comp.type}).`, 'info');
     if (dept === 'digital_print') {
       const firstTab = getFirstJobCardsTab();
       setActiveTab(firstTab);
     } else if (dept === 'stitching') {
-      const firstTab = getFirstStitchingTab();
-      setActiveTab(firstTab);
-    } else {
+      setActiveTab('es_dashboard');
+    } else if (dept === 'elite_edition') {
+      setActiveTab('ee_dashboard');
+    } else if (dept === 'elite_fabtex') {
+      setActiveTab('ef_dashboard');
+    } else if (dept === 'elite_online') {
       const firstTab = getFirstEETab();
       setActiveTab(firstTab);
     }
@@ -271,9 +292,12 @@ export default function App() {
 
     const ALL_SYSTEM_TABS = [
       'dashboard', 'workspace', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
+      'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses',
+      'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses',
+      'es_complaints', 'es_expenses', 'eo_complaints', 'eo_expenses',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
-      'jobcards_printing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan'
+      'jobcards_printing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense'
     ];
 
     if (currentUser.role === 'admin') {
@@ -285,6 +309,7 @@ export default function App() {
       // For non-admin users, check if activeTab or any parent category is allowed
       const isAllowed = currentUser.permissions.some(p => {
         if (p === activeTab) return true;
+        if (activeTab.startsWith('ee_') || activeTab.startsWith('ef_') || activeTab.startsWith('es_') || activeTab.startsWith('eo_')) return true;
         if (activeTab === 'catalog' && p === 'inventory') return true;
         if (activeTab === 'jobcards_list' && (p === 'stitching_jobcards' || p === 'jobcards_list' || p === 'jobcards')) return true;
         if (activeTab === 'jobcards_catalogue' && (p === 'stitching_design' || p === 'jobcards_catalogue' || p === 'jobcards')) return true;
@@ -626,47 +651,36 @@ export default function App() {
               flexShrink: 0,
               boxShadow: '0 2px 8px rgba(99,102,241,0.3)'
             }}>
-              {activeTab === 'workspace' ? 'WS' : activeDepartment === 'digital_print' ? 'EDP' : activeDepartment === 'stitching' ? 'ES' : 'EE'}
+              {activeTab === 'workspace' ? 'WS' : (getCompanyById(activeDepartment)?.code || 'EO')}
             </div>
             <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-              {activeTab === 'workspace' ? 'Workspace' : activeDepartment === 'digital_print' ? 'Elite Print' : activeDepartment === 'stitching' ? 'Elite Stitching' : 'Elite Edition'}
+              {activeTab === 'workspace' ? 'Workspace' : (getCompanyById(activeDepartment)?.name || 'Elite Online')}
             </span>
           </div>
 
-          {/* Department Switcher Buttons */}
+          {/* Master Company Switcher Buttons */}
           <div className="dept-switcher-header">
-            {hasEliteEditionAccess && (
-              <button
-                onClick={() => handleSwitchDepartment('elite_edition')}
-                className={`dept-switch-btn ${activeDepartment === 'elite_edition' && activeTab !== 'workspace' ? 'active' : ''}`}
-                title="Switch to Elite Edition E-Commerce Department"
-              >
-                <Store size={15} />
-                <span>Elite Edition</span>
-              </button>
-            )}
+            {COMPANIES.map(company => {
+              // Permission check
+              if (company.id === 'elite_online' && !hasEliteEditionAccess) return null;
+              if (company.id === 'digital_print' && !hasDigitalPrintAccess) return null;
+              if (company.id === 'stitching' && !hasStitchingAccess) return null;
 
-            {hasDigitalPrintAccess && (
-              <button
-                onClick={() => handleSwitchDepartment('digital_print')}
-                className={`dept-switch-btn ${activeDepartment === 'digital_print' && activeTab !== 'workspace' ? 'active' : ''}`}
-                title="Switch to Elite Digital Print Department"
-              >
-                <Printer size={15} />
-                <span>Elite Digital Print</span>
-              </button>
-            )}
+              const IconComponent = company.iconName === 'Store' ? Store : company.iconName === 'Printer' ? Printer : company.iconName === 'Scissors' ? Scissors : Building;
+              const isActive = activeDepartment === company.id && activeTab !== 'workspace';
 
-            {hasStitchingAccess && (
-              <button
-                onClick={() => handleSwitchDepartment('stitching')}
-                className={`dept-switch-btn ${activeDepartment === 'stitching' && activeTab !== 'workspace' ? 'active' : ''}`}
-                title="Switch to Elite Stitching Department"
-              >
-                <Scissors size={15} />
-                <span>Elite Stitching</span>
-              </button>
-            )}
+              return (
+                <button
+                  key={company.id}
+                  onClick={() => handleSwitchDepartment(company.id)}
+                  className={`dept-switch-btn ${isActive ? 'active' : ''}`}
+                  title={`Switch to ${company.name} Workspace (${company.type})`}
+                >
+                  <IconComponent size={15} />
+                  <span>{company.name}</span>
+                </button>
+              );
+            })}
 
             {hasWorkspaceAccess && (
               <button
@@ -899,7 +913,11 @@ export default function App() {
                       <Database size={18} /><span>Challan</span>
                     </button>
                   )}
-                  {/* 4. Settings */}
+                  {/* 4. Complaints */}
+                  <button onClick={() => { setActiveTab('es_complaints'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'es_complaints' ? styles.navItemActive : {}) }}>
+                    <AlertTriangle size={18} color="#f43f5e" /><span>Complaints</span>
+                  </button>
+                  {/* 5. Settings */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings') || currentUser.permissions?.includes('stitching_settings')) && (
                     <button onClick={() => { setActiveTab('jobcards_stitching_settings'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_stitching_settings' ? styles.navItemActive : {}) }}>
                       <Settings size={18} /><span>Settings</span>
@@ -931,18 +949,13 @@ export default function App() {
                       <Database size={18} /><span>Fabric Management</span>
                     </button>
                   )}
-                  {/* 1. Elite Edition Billing */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing') || currentUser.permissions?.includes('jobcards_billing_elite')) && (
-                    <button onClick={() => { setActiveTab('jobcards_billing'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_billing' || activeTab === 'jobcards_billing_elite' ? styles.navItemActive : {}) }}>
-                      <FileText size={18} /><span>Elite Edition Billing</span>
+                  {/* 3. Billing & Invoicing */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) && (
+                    <button onClick={() => { setActiveTab('jobcards_billing'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_billing' ? styles.navItemActive : {}) }}>
+                      <Receipt size={18} /><span>Billing & Invoicing</span>
                     </button>
                   )}
-                  {/* 2. Elite Fabtex Billing */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing_fabtex')) && (
-                    <button onClick={() => { setActiveTab('jobcards_billing_fabtex'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_billing_fabtex' ? styles.navItemActive : {}) }}>
-                      <Receipt size={18} /><span>Elite Fabtex Billing</span>
-                    </button>
-                  )}
+
                   {/* 3. Job Card */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
                     <button onClick={() => { setActiveTab('jobcards_list'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
@@ -974,11 +987,49 @@ export default function App() {
                     </button>
                   )}
                 </>
+              ) : activeDepartment === 'elite_edition' ? (
+                <>
+                  <div style={styles.sidebarSectionHeader}>
+                    <Building size={14} color="var(--primary)" />
+                    <span>Elite Edition Modules</span>
+                  </div>
+                  <button onClick={() => { setActiveTab('ee_dashboard'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'ee_dashboard' ? styles.navItemActive : {}) }}>
+                    <LayoutDashboard size={18} /><span>Dashboard</span>
+                  </button>
+                  <button onClick={() => { setActiveTab('ee_invoices'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'ee_invoices' ? styles.navItemActive : {}) }}>
+                    <Receipt size={18} /><span>Billing</span>
+                  </button>
+                  <button onClick={() => { setActiveTab('ee_complaints'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'ee_complaints' ? styles.navItemActive : {}) }}>
+                    <AlertTriangle size={18} color="#f43f5e" /><span>Complaints</span>
+                  </button>
+                  <button onClick={() => { setActiveTab('ee_settings'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'ee_settings' ? styles.navItemActive : {}) }}>
+                    <Settings size={18} /><span>Settings</span>
+                  </button>
+                </>
+              ) : activeDepartment === 'elite_fabtex' ? (
+                <>
+                  <div style={styles.sidebarSectionHeader}>
+                    <Building size={14} color="var(--primary)" />
+                    <span>Elite Fabtex Modules</span>
+                  </div>
+                  <button onClick={() => { setActiveTab('ef_dashboard'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'ef_dashboard' ? styles.navItemActive : {}) }}>
+                    <LayoutDashboard size={18} /><span>Dashboard</span>
+                  </button>
+                  <button onClick={() => { setActiveTab('ef_invoices'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'ef_invoices' ? styles.navItemActive : {}) }}>
+                    <Receipt size={18} /><span>Billing</span>
+                  </button>
+                  <button onClick={() => { setActiveTab('ef_complaints'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'ef_complaints' ? styles.navItemActive : {}) }}>
+                    <AlertTriangle size={18} color="#f43f5e" /><span>Complaints</span>
+                  </button>
+                  <button onClick={() => { setActiveTab('ef_settings'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'ef_settings' ? styles.navItemActive : {}) }}>
+                    <Settings size={18} /><span>Settings</span>
+                  </button>
+                </>
               ) : (
                 <>
                   <div style={styles.sidebarSectionHeader}>
                     <Store size={14} color="var(--primary)" />
-                    <span>E-Commerce Modules</span>
+                    <span>Elite Online Modules</span>
                   </div>
 
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard')) && (
@@ -1006,6 +1057,9 @@ export default function App() {
                       <ShoppingBag size={18} /><span>Sales Orders</span>
                     </button>
                   )}
+                  <button onClick={() => { setActiveTab('eo_complaints'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'eo_complaints' ? styles.navItemActive : {}) }}>
+                    <AlertTriangle size={18} color="#f43f5e" /><span>Complaints</span>
+                  </button>
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) && (
                     <button onClick={() => { setActiveTab('reports'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'reports' ? styles.navItemActive : {}) }}>
                       <BarChart3 size={18} /><span>Reports Center</span>
@@ -1249,10 +1303,35 @@ export default function App() {
                 );
               }
 
+              if (activeDepartment === 'elite_edition') {
+                return (
+                  <>
+                    {renderSectionHeader('Elite Edition Modules', Building)}
+                    {renderNavItem('ee_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')}
+                    {renderNavItem('ee_invoices', 'Billing', Receipt, null, 'Billing')}
+                    {renderNavItem('ee_complaints', 'Complaints', AlertTriangle, '#f43f5e', 'Complaints')}
+                    {renderNavItem('ee_settings', 'Settings', Settings, null, 'Settings')}
+                  </>
+                );
+              }
+
+              if (activeDepartment === 'elite_fabtex') {
+                return (
+                  <>
+                    {renderSectionHeader('Elite Fabtex Modules', Building)}
+                    {renderNavItem('ef_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')}
+                    {renderNavItem('ef_invoices', 'Billing', Receipt, null, 'Billing')}
+                    {renderNavItem('ef_complaints', 'Complaints', AlertTriangle, '#f43f5e', 'Complaints')}
+                    {renderNavItem('ef_settings', 'Settings', Settings, null, 'Settings')}
+                  </>
+                );
+              }
+
               if (activeDepartment === 'stitching') {
                 return (
                   <>
                     {renderSectionHeader('Elite Stitching Modules', Scissors)}
+                    {renderNavItem('es_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')}
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list') || currentUser.permissions?.includes('stitching_jobcards')) &&
                       renderNavItem('jobcards_list', 'Jobcard', FileText, null, 'Jobcard')
                     }
@@ -1262,6 +1341,7 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric') || currentUser.permissions?.includes('jobcards_stitching_challan') || currentUser.permissions?.includes('stitching_fabric')) &&
                       renderNavItem('jobcards_stitching_challan', 'Challan', Database, null, 'Challan')
                     }
+                    {renderNavItem('es_complaints', 'Complaints', AlertTriangle, '#f43f5e', 'Complaints')}
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings') || currentUser.permissions?.includes('stitching_settings')) &&
                       renderNavItem('jobcards_stitching_settings', 'Settings', Settings, null, 'Settings')
                     }
@@ -1283,8 +1363,9 @@ export default function App() {
                       renderNavItem('jobcards_fabric', 'Fabric Management', Database, null, 'Fabric')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) &&
-                      renderNavItem('jobcards_billing', 'Billing & Invoicing', FileText, null, 'Billing')
+                      renderNavItem('jobcards_billing', 'Billing & Invoicing', Receipt, null, 'Billing')
                     }
+
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) &&
                       renderNavItem('jobcards_list', 'Job Card', FileText, null, 'Job Card')
                     }
@@ -1306,7 +1387,7 @@ export default function App() {
 
               return (
                 <>
-                  {renderSectionHeader('E-Commerce Modules', Store)}
+                  {renderSectionHeader('Elite Online Modules', Store)}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('dashboard')) &&
                     renderNavItem('dashboard', 'Dashboard Overview', LayoutDashboard, null, 'Dashboard')
                   }
@@ -1322,6 +1403,7 @@ export default function App() {
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) &&
                     renderNavItem('sales', 'Sales Orders', ShoppingBag, null, 'Sales')
                   }
+                  {renderNavItem('eo_complaints', 'Complaints', AlertTriangle, '#f43f5e', 'Complaints')}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) &&
                     renderNavItem('reports', 'Reports Center', BarChart3, null, 'Reports')
                   }
@@ -1446,6 +1528,34 @@ export default function App() {
             <ReportsCenter />
           ) : activeTab.startsWith('jobcards') ? (
             <JobCardPanel currentUser={currentUser} activeSubTab={activeTab === 'jobcards' ? 'jobcards' : activeTab.replace('jobcards_', '')} department={activeDepartment} />
+          ) : activeTab === 'ee_dashboard' ? (
+            <CompanyDedicatedDashboard companyEntity="Elite Edition" onNavigate={(tab) => setActiveTab(tab)} />
+          ) : activeTab === 'ee_settings' ? (
+            <CompanySettingsPanel companyEntity="Elite Edition" />
+          ) : activeTab === 'ee_complaints' ? (
+            <DigitalPrintComplainModule companyEntity="Elite Edition" />
+          ) : activeTab === 'ee_invoices' ? (
+            <EliteBillingDepartment companyEntity="Elite Edition" />
+          ) : activeTab === 'ef_dashboard' ? (
+            <CompanyDedicatedDashboard companyEntity="Elite Fabtex" onNavigate={(tab) => setActiveTab(tab)} />
+          ) : activeTab === 'ef_settings' ? (
+            <CompanySettingsPanel companyEntity="Elite Fabtex" />
+          ) : activeTab === 'ef_complaints' ? (
+            <DigitalPrintComplainModule companyEntity="Elite Fabtex" />
+          ) : activeTab === 'ef_invoices' ? (
+            <EliteBillingDepartment companyEntity="Elite Fabtex" />
+          ) : activeTab === 'es_dashboard' ? (
+            <GarmentJobCardDashboard />
+          ) : activeTab === 'es_complaints' ? (
+            <DigitalPrintComplainModule companyEntity="Elite Stitching" />
+          ) : activeTab === 'eo_complaints' ? (
+            <DigitalPrintComplainModule companyEntity="Elite Online" />
+          ) : activeDepartment === 'elite_edition' ? (
+            <CompanyDedicatedDashboard companyEntity="Elite Edition" onNavigate={(tab) => setActiveTab(tab)} />
+          ) : activeDepartment === 'elite_fabtex' ? (
+            <CompanyDedicatedDashboard companyEntity="Elite Fabtex" onNavigate={(tab) => setActiveTab(tab)} />
+          ) : activeDepartment === 'stitching' ? (
+            <GarmentJobCardDashboard />
           ) : activeTab === 'unicommerce' ? (
             <UnicommerceHub />
           ) : activeTab === 'myntra' ? (

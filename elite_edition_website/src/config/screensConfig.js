@@ -16,12 +16,20 @@ export const AVAILABLE_SCREENS = [
   { id: 'myntra', label: 'Myntra Integrations', category: 'General' },
   { id: 'admin', label: 'Admin User & Infrastructure Settings', category: 'General' },
 
-  // Elite Edition (E-Commerce)
-  { id: 'elite_online', label: 'Elite Online: Dashboard', category: 'Elite Edition' },
-  { id: 'inventory', label: 'Elite Online: Store Inventory', category: 'Elite Edition' },
-  { id: 'catalog', label: 'Elite Online: Product Catalog', category: 'Elite Edition' },
-  { id: 'returns', label: 'Elite Online: Returns Department', category: 'Elite Edition' },
-  { id: 'sales', label: 'Elite Online: Sales Orders', category: 'Elite Edition' },
+  // Elite Online (E-Commerce)
+  { id: 'elite_online', label: 'Elite Online: Dashboard', category: 'Elite Online' },
+  { id: 'inventory', label: 'Elite Online: Store Inventory', category: 'Elite Online' },
+  { id: 'catalog', label: 'Elite Online: Product Catalog', category: 'Elite Online' },
+  { id: 'returns', label: 'Elite Online: Returns Department', category: 'Elite Online' },
+  { id: 'sales', label: 'Elite Online: Sales Orders', category: 'Elite Online' },
+
+  // Elite Edition (New Company)
+  { id: 'ee_invoices', label: 'Elite Edition: Invoices & GST Billing', category: 'Elite Edition' },
+  { id: 'ee_settings', label: 'Elite Edition: Company Settings', category: 'Elite Edition' },
+
+  // Elite Fabtex (New Company)
+  { id: 'ef_invoices', label: 'Elite Fabtex: Invoices & GST Billing', category: 'Elite Fabtex' },
+  { id: 'ef_settings', label: 'Elite Fabtex: Company Settings', category: 'Elite Fabtex' },
 
   // Elite Digital Print
   { id: 'jobcards', label: 'Elite Prints: Dashboard', category: 'Elite Digital Print' },

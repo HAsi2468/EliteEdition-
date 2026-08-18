@@ -32,7 +32,22 @@ export class ErrorBoundary extends React.Component {
 
   handleCopyError = () => {
     const errText = `Elite Edition Error Report:\nTime: ${new Date().toISOString()}\nMessage: ${this.state.error?.message || 'Unknown'}\nStack: ${this.state.errorInfo?.componentStack || 'N/A'}`;
-    navigator.clipboard.writeText(errText);
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(errText).catch(() => {});
+    } else {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = errText;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      } catch (e) {
+        console.warn('Clipboard fallback failed:', e);
+      }
+    }
     this.setState({ copied: true });
     setTimeout(() => this.setState({ copied: false }), 2500);
   };

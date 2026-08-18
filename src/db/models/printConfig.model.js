@@ -2,11 +2,14 @@ const mongoose = require('mongoose');
 
 const printConfigSchema = new mongoose.Schema(
   {
-    // A singleton identifier
+    companyEntity: {
+      type: String,
+      default: 'Elite Online',
+      index: true,
+    },
     isConfig: {
       type: Boolean,
       default: true,
-      unique: true,
     },
     categories: {
       type: [String],
@@ -193,9 +196,21 @@ const printConfigSchema = new mongoose.Schema(
       type: String,
       default: '+91 98790 00000',
     },
+    companyLogo: {
+      type: String,
+      default: '',
+    },
+    companyState: {
+      type: String,
+      default: 'Gujarat',
+    },
+    companyStateCode: {
+      type: String,
+      default: '24',
+    },
     companyEmail: {
       type: String,
-      default: 'info@elitedigitalprints.com',
+      default: 'info@company.com',
     },
     companyBankName: {
       type: String,

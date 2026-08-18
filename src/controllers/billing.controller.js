@@ -32,8 +32,12 @@ function numToWords(amount) {
 // ── 1. DASHBOARD STATS ────────────────────────────────────────────────────────
 const getBillingDashboardStats = async (req, res) => {
   try {
-    const totalInvoices = await BillingInvoice.countDocuments();
-    const invoices = await BillingInvoice.find().lean();
+    const { companyEntity } = req.query;
+    const filter = {};
+    if (companyEntity) filter.companyEntity = companyEntity;
+
+    const totalInvoices = await BillingInvoice.countDocuments(filter);
+    const invoices = await BillingInvoice.find(filter).lean();
 
     let totalInvoiced = 0;
     let totalPaid = 0;
@@ -79,9 +83,13 @@ const getBillingDashboardStats = async (req, res) => {
 // ── 2. GET INVOICES LIST ───────────────────────────────────────────────────────
 const getInvoices = async (req, res) => {
   try {
-    const { search, paymentStatus, page = 1, limit = 5000, dateStart, dateEnd } = req.query;
+    const { search, paymentStatus, page = 1, limit = 5000, dateStart, dateEnd, companyEntity } = req.query;
 
     const filter = {};
+    if (companyEntity) {
+      filter.companyEntity = companyEntity;
+    }
+
     if (paymentStatus && paymentStatus !== 'ALL') {
       filter.paymentStatus = paymentStatus;
     }
@@ -150,14 +158,25 @@ const getInvoiceById = async (req, res) => {
 // ── 4. GET NEXT INVOICE NUMBER ──────────────────────────────────────────────
 const getNextInvoiceNo = async (req, res) => {
   try {
+    const { companyEntity = 'Elite Online' } = req.query;
     const PrintConfig = require('../db/models/printConfig.model');
-    const config = await PrintConfig.findOne({ isConfig: true }).lean() || {};
-    const START_SEQ = Number(config.startingInvoiceNo) || 1001;
-    const prefix = config.invoicePrefix || 'EDP-INV-';
+    let defaultPrefix = 'EDP-INV-';
+    let defaultStartSeq = 1001;
+    if (companyEntity === 'Elite Edition') {
+      defaultPrefix = 'EE-2627-';
+      defaultStartSeq = 1;
+    } else if (companyEntity === 'Elite Fabtex') {
+      defaultPrefix = 'EF-2627-';
+      defaultStartSeq = 1;
+    }
 
-    const lastInvoice = await BillingInvoice.findOne({}, 'invoiceSeq').sort({ invoiceSeq: -1 });
+    const config = await PrintConfig.findOne({ companyEntity }).lean() || {};
+    const START_SEQ = config.startingInvoiceNo != null ? Number(config.startingInvoiceNo) : defaultStartSeq;
+    const prefix = config.invoicePrefix || defaultPrefix;
+
+    const lastInvoice = await BillingInvoice.findOne({ companyEntity }, 'invoiceSeq').sort({ invoiceSeq: -1 });
     const nextSeq = lastInvoice && lastInvoice.invoiceSeq ? Math.max(lastInvoice.invoiceSeq + 1, START_SEQ) : START_SEQ;
-    const invoiceNo = `${prefix}${nextSeq}`;
+    const invoiceNo = `${prefix}${String(nextSeq).padStart(4, '0')}`;
 
     res.json({ success: true, nextSeq, prefix, invoiceNo });
   } catch (error) {
@@ -187,9 +206,9 @@ const createInvoice = async (req, res) => {
       };
     }
 
-    if (!invoiceData.createdBy) {
-      invoiceData.createdBy = req.user?.name || req.user?.username || 'Admin';
-    }
+    const activeUserName = req.headers['x-user-name'] || req.user?.name || invoiceData.createdBy || 'Staff User';
+    invoiceData.createdBy = activeUserName;
+    invoiceData.createdByName = activeUserName;
 
     // Auto-calculate balance due
     const grandTotal = parseFloat(invoiceData.grandTotal) || 0;
@@ -252,6 +271,10 @@ const createInvoice = async (req, res) => {
 const updateInvoice = async (req, res) => {
   try {
     const invoiceData = req.body;
+    const editorName = req.headers['x-user-name'] || req.user?.name || invoiceData.updatedBy || 'Staff User';
+    invoiceData.updatedBy = editorName;
+    invoiceData.updatedByName = editorName;
+
     const grandTotal = parseFloat(invoiceData.grandTotal) || 0;
     const paidAmount = parseFloat(invoiceData.paidAmount) || 0;
     const balanceDue = Math.max(0, parseFloat((grandTotal - paidAmount).toFixed(2)));
@@ -520,20 +543,21 @@ const downloadInvoicePdf = async (req, res) => {
 
     const PrintConfig = require('../db/models/printConfig.model');
     const JobCard = require('../db/models/jobCard.model');
-    const config = await PrintConfig.findOne({ isConfig: true }).lean() || {};
+    const companyEntity = invoice.companyEntity || 'Elite Online';
+    const config = await PrintConfig.findOne({ companyEntity }).lean() || await PrintConfig.findOne({ isConfig: true }).lean() || {};
 
-    const rawCompName = config.companyName || 'ELITE DIGITAL PRINTS';
+    const rawCompName = config.companyName || companyEntity.toUpperCase();
     const companyDisplayName = rawCompName.replace(/\s*\([^)]*\)/g, '').trim();
-    const companyGstin   = config.companyGstin   || '24AANFE0044M1ZG';
-    const companyAddress = config.companyAddress  || 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, Surat - 395006';
-    const companyPhone   = config.companyPhone   || '+91 98790 00000';
-    const companyState   = config.companyState   || 'Gujarat';
+    const companyGstin   = config.companyGstin || '';
+    const companyAddress = config.companyAddress || '';
+    const companyPhone   = config.companyPhone || '';
+    const companyState   = config.companyState || 'Gujarat';
     const companyStateCode = config.companyStateCode || '24';
     const companyTerms   = invoice.terms || config.companyTerms ||
       'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
-    const bankName   = config.companyBankName  || 'ICICI Bank';
-    const bankAcNo   = config.companyAccountNo || 'N/A';
-    const bankIfsc   = config.companyIfscCode  || 'N/A';
+    const bankName   = config.companyBankName || '';
+    const bankAcNo   = config.companyAccountNo || '';
+    const bankIfsc   = config.companyIfscCode || '';
 
     const doc = new PDFDocument({ margin: 0, size: 'A4', autoFirstPage: true, bufferPages: true });
     res.setHeader('Content-Type', 'application/pdf');
@@ -543,7 +567,20 @@ const downloadInvoicePdf = async (req, res) => {
     const PW = 595.28, PH = 841.89;
     const PAD = 18;
     const CW = PW - PAD * 2;
-    const logoPath = path.join(__dirname, 'Logo.png');
+    let logoBufferOrPath = path.join(__dirname, 'Logo.png');
+    if (config.companyLogo && typeof config.companyLogo === 'string' && config.companyLogo.trim()) {
+      const logoStr = config.companyLogo.trim();
+      if (logoStr.startsWith('data:image/')) {
+        try {
+          const base64Data = logoStr.split(',')[1];
+          if (base64Data) {
+            logoBufferOrPath = Buffer.from(base64Data, 'base64');
+          }
+        } catch (e) {}
+      } else if (fs.existsSync(logoStr)) {
+        logoBufferOrPath = logoStr;
+      }
+    }
 
     // ── HELPERS ─────────────────────────────────────────────────────────────────
     const formatDate = (d) => {
@@ -698,8 +735,8 @@ const downloadInvoicePdf = async (req, res) => {
         const hdrH = 62;
         doc.rect(PAD, Y, CW, hdrH).fill(S50);
 
-        if (fs.existsSync(logoPath)) {
-          try { doc.image(logoPath, PAD + 6, Y + 6, { width: 110, height: 50, fit: [110, 50] }); } catch(e) {}
+        if (logoBufferOrPath) {
+          try { doc.image(logoBufferOrPath, PAD + 6, Y + 6, { width: 110, height: 50, fit: [110, 50] }); } catch(e) {}
         }
 
         doc.fillColor(S900).fontSize(12).font('Helvetica-Bold')
@@ -1269,7 +1306,33 @@ const downloadBulkInvoicesPdf = async (req, res) => {
         doc.addPage({ margin: 0, size: 'A4' });
       }
 
-      const companyTerms = invoice.terms || config.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
+      const companyEntity = invoice.companyEntity || 'Elite Online';
+      const companyConfig = await PrintConfig.findOne({ companyEntity }).lean() || await PrintConfig.findOne({ isConfig: true }).lean() || {};
+
+      const rawCompName = companyConfig.companyName || companyEntity.toUpperCase();
+      const companyDisplayName = rawCompName.replace(/\s*\([^)]*\)/g, '').trim();
+      const companyGstin   = companyConfig.companyGstin || '';
+      const companyAddress = companyConfig.companyAddress || '';
+      const companyPhone   = companyConfig.companyPhone || '';
+      const companyState   = companyConfig.companyState || 'Gujarat';
+      const companyStateCode = companyConfig.companyStateCode || '24';
+      const companyTerms   = invoice.terms || companyConfig.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.';
+      const bankName   = companyConfig.companyBankName || '';
+      const bankAcNo   = companyConfig.companyAccountNo || '';
+      const bankIfsc   = companyConfig.companyIfscCode || '';
+
+      let bulkLogoBufferOrPath = path.join(__dirname, 'Logo.png');
+      if (companyConfig.companyLogo && typeof companyConfig.companyLogo === 'string' && companyConfig.companyLogo.trim()) {
+        const logoStr = companyConfig.companyLogo.trim();
+        if (logoStr.startsWith('data:image/')) {
+          try {
+            const base64Data = logoStr.split(',')[1];
+            if (base64Data) bulkLogoBufferOrPath = Buffer.from(base64Data, 'base64');
+          } catch(e) {}
+        } else if (fs.existsSync(logoStr)) {
+          bulkLogoBufferOrPath = logoStr;
+        }
+      }
       const items = invoice.items || [];
       const allJobNumsSet = new Set();
       items.forEach(it => {
@@ -1373,8 +1436,8 @@ const downloadBulkInvoicesPdf = async (req, res) => {
           const hdrH = 62;
           doc.rect(PAD, Y, CW, hdrH).fill(S50);
 
-          if (fs.existsSync(logoPath)) {
-            try { doc.image(logoPath, PAD + 6, Y + 6, { width: 110, height: 50, fit: [110, 50] }); } catch(e) {}
+          if (bulkLogoBufferOrPath) {
+            try { doc.image(bulkLogoBufferOrPath, PAD + 6, Y + 6, { width: 110, height: 50, fit: [110, 50] }); } catch(e) {}
           }
 
           doc.fillColor(S900).fontSize(12).font('Helvetica-Bold')
@@ -1826,7 +1889,10 @@ const downloadBulkInvoicesPdf = async (req, res) => {
 // ── 10. CUSTOMER CRUD ────────────────────────────────────────────────────────
 const getCustomers = async (req, res) => {
   try {
-    const customers = await BillingCustomer.find().sort({ name: 1 }).lean();
+    const { companyEntity } = req.query;
+    const filter = {};
+    if (companyEntity) filter.companyEntity = companyEntity;
+    const customers = await BillingCustomer.find(filter).sort({ name: 1 }).lean();
     res.json({ success: true, data: customers });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -1863,7 +1929,10 @@ const deleteCustomer = async (req, res) => {
 // ── 11. ITEM CRUD ────────────────────────────────────────────────────────────
 const getItems = async (req, res) => {
   try {
-    const items = await BillingItem.find().sort({ itemName: 1 }).lean();
+    const { companyEntity } = req.query;
+    const filter = {};
+    if (companyEntity) filter.companyEntity = companyEntity;
+    const items = await BillingItem.find(filter).sort({ itemName: 1 }).lean();
     res.json({ success: true, data: items });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -1897,6 +1966,68 @@ const deleteItem = async (req, res) => {
   }
 };
 
+// ── 12. COMPANY SETTINGS CRUD ────────────────────────────────────────────────
+const getCompanySettings = async (req, res) => {
+  try {
+    const { companyEntity = 'Elite Online' } = req.query;
+    const PrintConfig = require('../db/models/printConfig.model');
+    let config = await PrintConfig.findOne({ companyEntity }).lean();
+    if (!config) {
+      const masterConfig = (await PrintConfig.findOne({ isConfig: true }).lean()) || {};
+      let compName = companyEntity.toUpperCase();
+      let prefix = 'EE-2627-';
+      if (companyEntity === 'Elite Fabtex') {
+        prefix = 'EF-2627-';
+      } else if (companyEntity === 'Elite Online' || companyEntity === 'Elite Digital Print') {
+        prefix = 'EDP-INV-';
+      }
+      config = await PrintConfig.create({
+        companyEntity,
+        companyName: masterConfig.companyName || compName,
+        invoicePrefix: prefix,
+        startingInvoiceNo: companyEntity === 'Elite Online' ? 1001 : 1,
+        companyGstin: masterConfig.companyGstin || '',
+        companyAddress: masterConfig.companyAddress || '',
+        companyPhone: masterConfig.companyPhone || '',
+        companyEmail: masterConfig.companyEmail || '',
+        companyLogo: masterConfig.companyLogo || '',
+        companyState: masterConfig.companyState || 'Gujarat',
+        companyStateCode: masterConfig.companyStateCode || '24',
+        companyBankName: masterConfig.companyBankName || '',
+        companyAccountNo: masterConfig.companyAccountNo || '',
+        companyIfscCode: masterConfig.companyIfscCode || '',
+        companyTerms: masterConfig.companyTerms || 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
+        categories: masterConfig.categories || ['Cotton', 'Polyester', 'Silk'],
+        paperTypes: masterConfig.paperTypes || ['A++', 'A+', 'A'],
+        fabrics: masterConfig.fabrics || ['Rayon', 'Cotton', 'Poly'],
+        widths: masterConfig.widths || ['44"', '58"', '60"'],
+        passes: masterConfig.passes || ['1 Pass', '2 Pass'],
+        expenseInCategories: masterConfig.expenseInCategories || ['Petty Cash Top-up', 'Client Payment / Advance', 'Scrap / Waste Sale', 'Refund / Cashback', 'Other Receipt'],
+        expenseOutCategories: masterConfig.expenseOutCategories || ['Machine Maintenance & Service', 'Ink & Consumables', 'Spare Parts & Repairs', 'Paper & Transfer Film', 'Tea & Refreshments', 'Carriage & Freight', 'Salary / Daily Wages', 'Electricity & Utility', 'Stationery & Office', 'Other Expense'],
+        expensePaymentModes: masterConfig.expensePaymentModes || ['Cash', 'UPI / GPay / PhonePe', 'Bank Transfer (NEFT/RTGS)', 'Cheque', 'Credit / Debit Card', 'Other']
+      });
+    }
+    res.json({ success: true, data: config });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+const updateCompanySettings = async (req, res) => {
+  try {
+    const { companyEntity = 'Elite Online' } = req.body;
+    const PrintConfig = require('../db/models/printConfig.model');
+    const updated = await PrintConfig.findOneAndUpdate(
+      { companyEntity },
+      { ...req.body, companyEntity },
+      { new: true, upsert: true }
+    );
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   getBillingDashboardStats,
   getInvoices,
@@ -1916,5 +2047,7 @@ module.exports = {
   getItems,
   createItem,
   updateItem,
-  deleteItem
+  deleteItem,
+  getCompanySettings,
+  updateCompanySettings
 };

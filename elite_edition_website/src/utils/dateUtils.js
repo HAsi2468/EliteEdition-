@@ -46,3 +46,13 @@ export function formatDateTimeDDMMYYYY(dateVal) {
     return String(dateVal);
   }
 }
+
+export function toLocalYMD(dateVal = new Date()) {
+  if (!dateVal) return '';
+  const d = dateVal instanceof Date ? dateVal : new Date(dateVal);
+  if (isNaN(d.getTime())) return '';
+  const yr = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const dy = String(d.getDate()).padStart(2, '0');
+  return `${yr}-${mo}-${dy}`;
+}
