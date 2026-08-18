@@ -1988,9 +1988,9 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'1.2rem' }}>
-      {department === 'stitching' && (effectiveSubTab === 'list' || effectiveSubTab === 'jobcards') ? (
+      {department === 'stitching' && effectiveSubTab === 'dashboard' ? (
         <GarmentJobCardDashboard />
-      ) : department === 'stitching' && (effectiveSubTab === 'challan' || effectiveSubTab === 'fabric_challan' || effectiveSubTab === 'stitching_challan' || effectiveSubTab === 'fabric') ? (
+      ) : department === 'stitching' && (effectiveSubTab === 'challan' || effectiveSubTab === 'fabric_challan' || effectiveSubTab === 'stitching_challan') ? (
         <StitchingChallanPanel onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); }} />
       ) : effectiveSubTab === 'catalogue' || effectiveSubTab === 'master' ? (
         <DesignCatalogue department={department} initialSubTab={effectiveSubTab === 'master' ? 'master' : 'catalogue'} />

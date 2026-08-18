@@ -292,9 +292,9 @@ export default function App() {
 
     const ALL_SYSTEM_TABS = [
       'dashboard', 'workspace', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
-      'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses',
-      'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses',
-      'es_complaints', 'es_expenses', 'eo_complaints', 'eo_expenses',
+      'ee_dashboard', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses',
+      'ef_dashboard', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses',
+      'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'eo_complaints', 'eo_expenses',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
       'jobcards_printing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense'
@@ -1342,8 +1342,8 @@ export default function App() {
                       renderNavItem('jobcards_stitching_challan', 'Challan', Database, null, 'Challan')
                     }
                     {renderNavItem('es_complaints', 'Complaints', AlertTriangle, '#f43f5e', 'Complaints')}
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings') || currentUser.permissions?.includes('stitching_settings')) &&
-                      renderNavItem('jobcards_stitching_settings', 'Settings', Settings, null, 'Settings')
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings') || currentUser.permissions?.includes('stitching_settings') || currentUser.permissions?.includes('es_settings')) &&
+                      renderNavItem('es_settings', 'Settings', Settings, null, 'Settings')
                     }
                   </>
                 );
@@ -1546,6 +1546,11 @@ export default function App() {
             <EliteBillingDepartment companyEntity="Elite Fabtex" />
           ) : activeTab === 'es_dashboard' ? (
             <GarmentJobCardDashboard />
+          ) : activeTab === 'es_settings' || activeTab === 'jobcards_stitching_settings' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <CompanySettingsPanel companyEntity="Elite Stitching" />
+              <StitchingSettings />
+            </div>
           ) : activeTab === 'es_complaints' ? (
             <DigitalPrintComplainModule companyEntity="Elite Stitching" />
           ) : activeTab === 'eo_complaints' ? (

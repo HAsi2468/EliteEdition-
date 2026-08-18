@@ -34,6 +34,7 @@ import { AVAILABLE_SCREENS } from '../config/screensConfig';
 export default function AdminPanel() {
   const [users, setUsers] = useState([]);
   const [userSearch, setUserSearch] = useState('');
+  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState('All');
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState('');
@@ -497,16 +498,31 @@ export default function AdminPanel() {
               </button>
             </div>
 
-            {/* Live Search Input */}
-            <div style={{ position: 'relative', marginTop: '0.5rem' }}>
-              <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-              <input
-                type="text"
-                placeholder="Filter users by name, email, or role..."
-                value={userSearch}
-                onChange={e => setUserSearch(e.target.value)}
-                style={{ width: '100%', paddingLeft: 34, fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '6px' }}
-              />
+            {/* Live Search & Per-Company Scope Filter */}
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: '1 1 240px' }}>
+                <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                <input
+                  type="text"
+                  placeholder="Filter users by name, email, or role..."
+                  value={userSearch}
+                  onChange={e => setUserSearch(e.target.value)}
+                  style={{ width: '100%', paddingLeft: 34, fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '6px' }}
+                />
+              </div>
+
+              <select
+                value={selectedCompanyFilter}
+                onChange={e => setSelectedCompanyFilter(e.target.value)}
+                style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 700, cursor: 'pointer' }}
+              >
+                <option value="All">🌐 All Companies Scope ({users.length})</option>
+                <option value="Elite Edition">🏢 Elite Edition ({users.filter(u => u.allowedCompanies?.includes('Elite Edition')).length})</option>
+                <option value="Elite Fabtex">🏢 Elite Fabtex ({users.filter(u => u.allowedCompanies?.includes('Elite Fabtex')).length})</option>
+                <option value="Elite Online">🏪 Elite Online ({users.filter(u => u.allowedCompanies?.includes('Elite Online')).length})</option>
+                <option value="Elite Stitching">🏭 Elite Stitching ({users.filter(u => u.allowedCompanies?.includes('Elite Stitching')).length})</option>
+                <option value="Elite Digital Print">🖨️ Elite Digital Print ({users.filter(u => u.allowedCompanies?.includes('Elite Digital Print')).length})</option>
+              </select>
             </div>
 
             <div className="table-container" style={styles.tableWrap}>
@@ -534,7 +550,11 @@ export default function AdminPanel() {
                   </thead>
                   <tbody>
                     {users
-                      .filter(u => matchSearchQuery(u, userSearch, ['name', 'email', 'role']))
+                      .filter(u => {
+                        const matchesSearch = matchSearchQuery(u, userSearch, ['name', 'email', 'role']);
+                        const matchesCompany = selectedCompanyFilter === 'All' || (Array.isArray(u.allowedCompanies) && u.allowedCompanies.includes(selectedCompanyFilter));
+                        return matchesSearch && matchesCompany;
+                      })
                       .map((u) => {
                         const isMain = Boolean(u.isMainAdmin || u.email === 'harshitsidapara2468@gmail.com');
                         const checkAdmin = u.role === 'admin' || isMain;

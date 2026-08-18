@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { Settings, Plus, Trash2, Tag, ArrowRightCircle, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import CatalogManagerModal from './CatalogManagerModal';
+import CompanySettingsPanel from './CompanySettingsPanel';
 
 export default function PrintSettings({ expenseOnly = false }) {
   const [config, setConfig] = useState(null);
@@ -309,6 +310,7 @@ export default function PrintSettings({ expenseOnly = false }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <CompanySettingsPanel companyEntity="Elite Digital Print" />
       <div className="glass-panel" style={{ padding: '1.5rem 2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <Settings size={24} color="#a855f7" />

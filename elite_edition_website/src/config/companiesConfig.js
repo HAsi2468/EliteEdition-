@@ -30,7 +30,7 @@ export const COMPANIES = [
     name: 'Elite Stitching',
     type: 'Garment Stitching & Manufacturing',
     iconName: 'Scissors',
-    defaultTab: 'jobcards_list',
+    defaultTab: 'es_dashboard',
     badgeColor: '#3b82f6',
     description: 'Stitching job cards, design room & stitching fabric challans.'
   },

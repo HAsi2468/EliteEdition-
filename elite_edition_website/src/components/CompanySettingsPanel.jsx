@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { Building, CreditCard, Save, RefreshCw, FileText, Upload, Image as ImageIcon, Trash2, Plus, Sliders, CheckCircle2 } from 'lucide-react';
-import { triggerEliteAlert } from './EliteModalDialog';
+import { 
+  Building, CreditCard, Save, RefreshCw, FileText, Upload, Image as ImageIcon, 
+  Trash2, Plus, Sliders, CheckCircle2, Users, User, UserPlus, Shield, Key, 
+  Lock, Check, X, Search, Edit2
+} from 'lucide-react';
+import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
+import { AVAILABLE_SCREENS } from '../config/screensConfig';
 
 const getCompanyAccentColor = (entity) => {
   return 'var(--primary)';
@@ -29,7 +34,6 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     categories: [],
     paperTypes: [],
     fabrics: [],
-    widths: [],
     passes: []
   });
 
@@ -41,9 +45,137 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     passes: ''
   });
 
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'users', 'tags'
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [userSubmitLoading, setUserSubmitLoading] = useState(false);
+  const [userFormData, setUserFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'user',
+    isMainAdmin: false,
+    permissions: []
+  });
+
+  const fetchCompanyUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const res = await api.getUsers({ limit: 200 });
+      if (res && res.users) {
+        const companyStaff = (res.users.rows || []).filter(u => 
+          Array.isArray(u.allowedCompanies) && u.allowedCompanies.includes(companyEntity)
+        );
+        setUsers(companyStaff);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch company users:', err);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadSettings();
   }, [companyEntity]);
+
+  useEffect(() => {
+    if (activeTab === 'users') {
+      fetchCompanyUsers();
+    }
+  }, [activeTab, companyEntity]);
+
+  const handleCreateStaffUser = () => {
+    setEditingUser(null);
+    setUserFormData({
+      name: '',
+      email: '',
+      password: '',
+      role: 'user',
+      isMainAdmin: false,
+      permissions: []
+    });
+    setShowUserModal(true);
+  };
+
+  const handleEditStaffUser = (u) => {
+    setEditingUser(u);
+    setUserFormData({
+      name: u.name || '',
+      email: u.email || '',
+      password: '',
+      role: u.role || 'user',
+      isMainAdmin: Boolean(u.isMainAdmin || u.email === 'harshitsidapara2468@gmail.com'),
+      permissions: u.permissions || []
+    });
+    setShowUserModal(true);
+  };
+
+  const handleUserSubmit = async (e) => {
+    e.preventDefault();
+    if (!userFormData.name.trim() || !userFormData.email.trim()) {
+      triggerEliteAlert('Validation Error', 'Name and Email are required for staff user.', 'error');
+      return;
+    }
+    if (!editingUser && !userFormData.password) {
+      triggerEliteAlert('Validation Error', 'Password is required for new staff account.', 'error');
+      return;
+    }
+
+    setUserSubmitLoading(true);
+    try {
+      if (editingUser) {
+        const updatePayload = {
+          name: userFormData.name.trim(),
+          email: userFormData.email.trim(),
+          role: userFormData.role,
+          isMainAdmin: userFormData.isMainAdmin,
+          allowedCompanies: Array.from(new Set([...(editingUser.allowedCompanies || []), companyEntity])),
+          permissions: userFormData.permissions
+        };
+        if (userFormData.password) {
+          updatePayload.password = userFormData.password;
+        }
+        await api.updateUser(editingUser.id || editingUser._id, updatePayload);
+        triggerEliteAlert('Staff Account Updated', `Staff user "${userFormData.name}" updated successfully for ${companyEntity}.`, 'success');
+      } else {
+        await api.createUser({
+          name: userFormData.name.trim(),
+          email: userFormData.email.trim(),
+          password: userFormData.password,
+          role: userFormData.role,
+          isMainAdmin: userFormData.isMainAdmin,
+          allowedCompanies: [companyEntity],
+          permissions: userFormData.permissions
+        });
+        triggerEliteAlert('Staff Account Created', `Staff user "${userFormData.name}" created for ${companyEntity}.`, 'success');
+      }
+      setShowUserModal(false);
+      fetchCompanyUsers();
+    } catch (err) {
+      triggerEliteAlert('Error', err.message || 'Failed to save staff user.', 'error');
+    } finally {
+      setUserSubmitLoading(false);
+    }
+  };
+
+  const handleDeleteStaffUser = async (u) => {
+    const isConfirmed = await triggerEliteConfirm(
+      'Delete Staff Account',
+      `Are you sure you want to delete staff account "${u.name}" (${u.email})?`
+    );
+    if (!isConfirmed) return;
+    try {
+      await api.deleteUser(u.id || u._id);
+      triggerEliteAlert('Deleted', `Staff user "${u.name}" deleted.`, 'success');
+      fetchCompanyUsers();
+    } catch (err) {
+      triggerEliteAlert('Error', err.message || 'Failed to delete user.', 'error');
+    }
+  };
 
   const loadSettings = async () => {
     setLoading(true);
@@ -174,7 +306,290 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {/* Subtab Navigation Bar */}
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('profile')}
+          className={activeTab === 'profile' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '0.6rem 1.25rem', fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px' }}
+        >
+          <Building size={16} /> 🏢 Corporate Profile & GST
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('users')}
+          className={activeTab === 'users' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '0.6rem 1.25rem', fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px' }}
+        >
+          <Users size={16} /> 👥 Staff Accounts & Access ({users.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('tags')}
+          className={activeTab === 'tags' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '0.6rem 1.25rem', fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px' }}
+        >
+          <Sliders size={16} /> ⚙️ Dynamic Dropdowns & Tags
+        </button>
+      </div>
+
+      {/* TAB 2: STAFF ACCOUNTS & PERMISSIONS FOR THIS COMPANY */}
+      {activeTab === 'users' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div className="glass-panel" style={{ padding: '1.25rem 1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Users size={18} color={accentColor} /> {companyEntity} — Staff Accounts & Access Control
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                  Staff accounts authorized to access <strong>{companyEntity}</strong> dashboards, billing, and tools.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCreateStaffUser}
+                className="btn-primary"
+                style={{ padding: '0.55rem 1.1rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', borderRadius: '8px', background: accentColor, borderColor: accentColor }}
+              >
+                <UserPlus size={16} /> + Add Staff Account
+              </button>
+            </div>
+
+            {/* Staff Search Filter */}
+            <div style={{ position: 'relative', marginTop: '1rem' }}>
+              <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+              <input
+                type="text"
+                placeholder="Filter staff by name or email..."
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                style={{ width: '100%', paddingLeft: 34, fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '6px' }}
+              />
+            </div>
+          </div>
+
+          {/* Staff Accounts Table */}
+          <div className="glass-panel" style={{ padding: '1.25rem', overflowX: 'auto' }}>
+            {usersLoading ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <RefreshCw className="spin" size={24} color={accentColor} />
+                <p style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>Loading staff users list...</p>
+              </div>
+            ) : users.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <User size={32} color={accentColor} />
+                <p style={{ marginTop: '0.5rem', fontWeight: 600 }}>No staff users allocated to {companyEntity} yet.</p>
+                <button onClick={handleCreateStaffUser} className="btn-primary" style={{ marginTop: '0.5rem', padding: '0.4rem 1rem', fontSize: '0.82rem' }}>
+                  Add First Staff User
+                </button>
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-light)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                    <th style={{ padding: '0.65rem' }}>Staff Member</th>
+                    <th style={{ padding: '0.65rem' }}>Email Address</th>
+                    <th style={{ padding: '0.65rem' }}>Role</th>
+                    <th style={{ padding: '0.65rem' }}>Screen Permissions</th>
+                    <th style={{ padding: '0.65rem', textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users
+                    .filter(u => !userSearch || u.name?.toLowerCase().includes(userSearch.toLowerCase()) || u.email?.toLowerCase().includes(userSearch.toLowerCase()))
+                    .map(u => (
+                      <tr key={u.id || u._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <td style={{ padding: '0.75rem 0.65rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: `${accentColor}30`, color: accentColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800 }}>
+                              {(u.name || 'U').charAt(0).toUpperCase()}
+                            </div>
+                            {u.name}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.75rem 0.65rem', color: 'var(--text-muted)' }}>{u.email}</td>
+                        <td style={{ padding: '0.75rem 0.65rem' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '999px',
+                            fontSize: '0.7rem',
+                            fontWeight: 800,
+                            background: u.isMainAdmin || u.email === 'harshitsidapara2468@gmail.com' ? '#ef444420' : u.role === 'admin' ? '#3b82f620' : '#10b98120',
+                            color: u.isMainAdmin || u.email === 'harshitsidapara2468@gmail.com' ? '#f87171' : u.role === 'admin' ? '#60a5fa' : '#34d399',
+                            border: `1px solid ${u.isMainAdmin || u.email === 'harshitsidapara2468@gmail.com' ? '#ef444450' : u.role === 'admin' ? '#3b82f650' : '#10b98150'}`
+                          }}>
+                            {u.isMainAdmin || u.email === 'harshitsidapara2468@gmail.com' ? '👑 MAIN ADMIN' : u.role === 'admin' ? '🛡️ COMPANY ADMIN' : '👤 STANDARD STAFF'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 0.65rem' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {u.role === 'admin' ? 'FULL ACCESS' : `${u.permissions?.length || 0} screens permitted`}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 0.65rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                            <button
+                              onClick={() => handleEditStaffUser(u)}
+                              className="btn-secondary"
+                              style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                              title="Edit Staff Access"
+                            >
+                              <Edit2 size={13} /> Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteStaffUser(u)}
+                              style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '4px', cursor: 'pointer' }}
+                              title="Delete Account"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* STAFF USER EDIT / CREATE MODAL */}
+      {showUserModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+            border: `1px solid ${accentColor}50`,
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '560px',
+            padding: '1.75rem',
+            color: '#f8fafc',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <UserPlus size={18} color={accentColor} />
+                {editingUser ? `Edit Staff User: ${editingUser.name}` : `Create New Staff for ${companyEntity}`}
+              </h3>
+              <button onClick={() => setShowUserModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUserSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.35rem' }}>Staff Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Ramesh Sharma"
+                  value={userFormData.name}
+                  onChange={e => setUserFormData(f => ({ ...f, name: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.88rem', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.35rem' }}>Email Address *</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. ramesh@elite.com"
+                  value={userFormData.email}
+                  onChange={e => setUserFormData(f => ({ ...f, email: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.88rem', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.35rem' }}>
+                  Password {editingUser ? '(Leave blank to keep existing password)' : '*'}
+                </label>
+                <input
+                  type="password"
+                  placeholder={editingUser ? '••••••••' : 'Enter password'}
+                  value={userFormData.password}
+                  onChange={e => setUserFormData(f => ({ ...f, password: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.88rem', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.35rem' }}>Staff Role & Authorization</label>
+                <select
+                  value={userFormData.role}
+                  onChange={e => setUserFormData(f => ({ ...f, role: e.target.value, permissions: e.target.value === 'admin' ? AVAILABLE_SCREENS.map(s => s.id) : f.permissions }))}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.88rem', borderRadius: '6px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontWeight: 600 }}
+                >
+                  <option value="user">👤 Standard User (Selected Permissions Only)</option>
+                  <option value="admin">🛡️ Company Admin (Full Access to {companyEntity})</option>
+                </select>
+              </div>
+
+              {/* Screen Permissions selector for standard users */}
+              {userFormData.role !== 'admin' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.35rem' }}>
+                    Permitted Screens ({userFormData.permissions.length} selected)
+                  </label>
+                  <div style={{ maxHeight: '160px', overflowY: 'auto', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '0.5rem' }}>
+                    {AVAILABLE_SCREENS.map(scr => {
+                      const isChecked = userFormData.permissions.includes(scr.id);
+                      return (
+                        <label key={scr.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.5rem', cursor: 'pointer', fontSize: '0.78rem', color: isChecked ? '#38bdf8' : '#94a3b8' }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              setUserFormData(f => {
+                                const exists = f.permissions.includes(scr.id);
+                                return {
+                                  ...f,
+                                  permissions: exists ? f.permissions.filter(p => p !== scr.id) : [...f.permissions, scr.id]
+                                };
+                              });
+                            }}
+                          />
+                          {scr.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setShowUserModal(false)} className="btn-secondary" style={{ padding: '0.5rem 1rem' }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={userSubmitLoading} className="btn-primary" style={{ padding: '0.5rem 1.5rem', background: accentColor, borderColor: accentColor }}>
+                  {userSubmitLoading ? 'Saving...' : editingUser ? 'Update Staff Account' : 'Create Staff Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* FORM FOR PROFILE AND TAGS */}
+      {(activeTab === 'profile' || activeTab === 'tags') && (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {/* Company Logo & Letterhead Header */}
         <div className="glass-panel" style={{ padding: '1.5rem', borderTop: `3px solid ${accentColor}` }}>
           <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: accentColor, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
@@ -518,6 +933,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
           </button>
         </div>
       </form>
+      )}
     </div>
   );
 }
