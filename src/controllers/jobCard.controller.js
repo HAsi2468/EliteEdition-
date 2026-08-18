@@ -344,8 +344,22 @@ const updateJobCard = async (req, res) => {
     if (body.fusingDate) body.fusingDate = normalizeDateStr(body.fusingDate);
     if (body.deliveryDate) body.deliveryDate = normalizeDateStr(body.deliveryDate);
 
-    const existingCard = await db.JobCard.findById(req.params.id);
-    if (!existingCard) return res.status(404).json({ error: 'Job card not found' });
+    let targetId = req.params.id;
+    let existingCard = null;
+    if (mongoose.Types.ObjectId.isValid(targetId)) {
+      existingCard = await db.JobCard.findById(targetId);
+    }
+    if (!existingCard) {
+      existingCard = await db.JobCard.findOne({
+        $or: [
+          { jobNo: targetId },
+          { jobNo: `JOB NO.- ${targetId}` },
+          { jobNo: targetId.replace('JOB NO.- ', '') }
+        ]
+      });
+    }
+    if (!existingCard) return res.status(404).json({ error: `Job card not found for ID or Job No: ${targetId}` });
+    targetId = existingCard._id;
 
     syncDesignImage(body, existingCard).catch(e => logger.warn('syncDesignImage failed: %s', e.message));
 
@@ -405,7 +419,7 @@ const updateJobCard = async (req, res) => {
     const updatedAuditTrail = Array.isArray(existingCard.auditTrail) ? [...existingCard.auditTrail, auditEntry] : [auditEntry];
     body.auditTrail = updatedAuditTrail;
 
-    const card = await db.JobCard.findByIdAndUpdate(req.params.id, body, { new:true, runValidators:true }).lean();
+    const card = await db.JobCard.findByIdAndUpdate(targetId, body, { new:true, runValidators:true }).lean();
 
     const edNo = card.designName || card.designNo || 'N/A';
     const efab = card.fabric || 'N/A';
