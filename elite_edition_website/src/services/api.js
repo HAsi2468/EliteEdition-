@@ -4,9 +4,12 @@ const DEFAULT_URL = '/v1';
 export const getBaseUrl = () => {
   const stored = localStorage.getItem('elite_api_base_url');
   if (stored) {
+    if (stored.includes('3.7.174.180') || stored.includes('localhost:3001') || stored.includes('127.0.0.1')) {
+      localStorage.removeItem('elite_api_base_url');
+      return DEFAULT_URL;
+    }
     return stored;
   }
-  // Fallback to default URL
   return DEFAULT_URL;
 };
 

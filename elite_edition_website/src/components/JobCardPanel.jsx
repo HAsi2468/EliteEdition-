@@ -1692,8 +1692,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
         <div style={{ padding:'1rem 1.5rem', borderTop:'1px solid var(--border-light)',
           display:'flex', gap:'0.75rem', justifyContent:'flex-end', flexShrink:0 }}>
           <button type="button" onClick={onClose} className="btn-secondary" style={{ padding:'0.55rem 1.2rem' }}>Cancel</button>
-          <button type="submit" form="jcForm" className="btn-primary" style={{ padding:'0.55rem 1.4rem' }}
-            onClick={handleSubmit} disabled={saving}>
+          <button type="submit" form="jcForm" className="btn-primary" style={{ padding:'0.55rem 1.4rem' }} disabled={saving}>
             <Save size={14}/>
             {saving ? 'Saving...' : card ? 'Update Job Card' : 'Create Job Card'}
           </button>
