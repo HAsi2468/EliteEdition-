@@ -787,9 +787,9 @@ export default function App() {
           <div className="mobile-drawer-content" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={styles.logoBadge}>{activeDepartment === 'digital_print' ? 'EDP' : activeDepartment === 'stitching' ? 'ES' : 'EE'}</div>
+                <div style={styles.logoBadge}>{getCompanyById(activeDepartment)?.code || 'EO'}</div>
                 <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                  {activeDepartment === 'digital_print' ? 'Elite Digital Print' : activeDepartment === 'stitching' ? 'Elite Stitching' : 'Elite Edition'}
+                  {getCompanyById(activeDepartment)?.name || 'Elite Online'}
                 </span>
               </div>
               <button onClick={() => setMobileMenuOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: '0.25rem' }}>
@@ -799,36 +799,28 @@ export default function App() {
 
             {/* Department Switcher Buttons inside Mobile Drawer */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-              {hasEliteEditionAccess && (
-                <button
-                  onClick={() => { handleSwitchDepartment('elite_edition'); setMobileMenuOpen(false); }}
-                  className={`dept-switch-btn ${activeDepartment === 'elite_edition' && activeTab !== 'workspace' ? 'active' : ''}`}
-                  style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
-                >
-                  <Store size={16} />
-                  <span>Elite Edition</span>
-                </button>
-              )}
-              {hasDigitalPrintAccess && (
-                <button
-                  onClick={() => { handleSwitchDepartment('digital_print'); setMobileMenuOpen(false); }}
-                  className={`dept-switch-btn ${activeDepartment === 'digital_print' && activeTab !== 'workspace' ? 'active' : ''}`}
-                  style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
-                >
-                  <Printer size={16} />
-                  <span>Elite Digital Print</span>
-                </button>
-              )}
-              {hasStitchingAccess && (
-                <button
-                  onClick={() => { handleSwitchDepartment('stitching'); setMobileMenuOpen(false); }}
-                  className={`dept-switch-btn ${activeDepartment === 'stitching' && activeTab !== 'workspace' ? 'active' : ''}`}
-                  style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
-                >
-                  <Scissors size={16} />
-                  <span>Elite Stitching</span>
-                </button>
-              )}
+              {COMPANIES.map(company => {
+                if (!isCompanyAllowed(company.name)) return null;
+                if (company.id === 'elite_online' && !hasEliteEditionAccess) return null;
+                if (company.id === 'digital_print' && !hasDigitalPrintAccess) return null;
+                if (company.id === 'stitching' && !hasStitchingAccess) return null;
+
+                const IconComponent = company.iconName === 'Store' ? Store : company.iconName === 'Printer' ? Printer : company.iconName === 'Scissors' ? Scissors : Building;
+                const isActive = activeDepartment === company.id && activeTab !== 'workspace';
+
+                return (
+                  <button
+                    key={company.id}
+                    onClick={() => { handleSwitchDepartment(company.id); setMobileMenuOpen(false); }}
+                    className={`dept-switch-btn ${isActive ? 'active' : ''}`}
+                    style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
+                  >
+                    <IconComponent size={16} />
+                    <span>{company.name}</span>
+                  </button>
+                );
+              })}
+
               {hasWorkspaceAccess && (
                 <button
                   onClick={() => { setActiveTab('workspace'); setMobileMenuOpen(false); }}
