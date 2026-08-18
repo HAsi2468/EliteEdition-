@@ -931,10 +931,16 @@ export default function App() {
                       <Database size={18} /><span>Fabric Management</span>
                     </button>
                   )}
-                  {/* Billing & Invoicing */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) && (
-                    <button onClick={() => { setActiveTab('jobcards_billing'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_billing' ? styles.navItemActive : {}) }}>
-                      <FileText size={18} /><span>Billing & Invoicing</span>
+                  {/* 1. Elite Edition Billing */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing') || currentUser.permissions?.includes('jobcards_billing_elite')) && (
+                    <button onClick={() => { setActiveTab('jobcards_billing'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_billing' || activeTab === 'jobcards_billing_elite' ? styles.navItemActive : {}) }}>
+                      <FileText size={18} /><span>Elite Edition Billing</span>
+                    </button>
+                  )}
+                  {/* 2. Elite Fabtex Billing */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing_fabtex')) && (
+                    <button onClick={() => { setActiveTab('jobcards_billing_fabtex'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_billing_fabtex' ? styles.navItemActive : {}) }}>
+                      <Receipt size={18} /><span>Elite Fabtex Billing</span>
                     </button>
                   )}
                   {/* 3. Job Card */}

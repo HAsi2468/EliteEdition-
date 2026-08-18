@@ -29,45 +29,7 @@ import {
   Search,
   Settings
 } from 'lucide-react';
-
-const AVAILABLE_SCREENS = [
-  // General & Core
-  { id: 'dashboard', label: 'Dashboard Overview', category: 'General' },
-  { id: 'workspace', label: 'Workspace / Chat', category: 'General' },
-  { id: 'reports', label: 'Reports Center', category: 'General' },
-  { id: 'unicommerce', label: 'Uniware Integrations', category: 'General' },
-  { id: 'myntra', label: 'Myntra Integrations', category: 'General' },
-  { id: 'admin', label: 'Admin User & Infrastructure Settings', category: 'General' },
-
-  // Elite Edition (E-Commerce)
-  { id: 'elite_online', label: 'Elite Online: Dashboard', category: 'Elite Edition' },
-  { id: 'inventory', label: 'Elite Online: Store Inventory', category: 'Elite Edition' },
-  { id: 'catalog', label: 'Elite Online: Product Catalog', category: 'Elite Edition' },
-  { id: 'returns', label: 'Elite Online: Returns Department', category: 'Elite Edition' },
-  { id: 'sales', label: 'Elite Online: Sales Orders', category: 'Elite Edition' },
-
-  // Elite Digital Print
-  { id: 'jobcards', label: 'Elite Prints: Dashboard', category: 'Elite Digital Print' },
-  { id: 'jobcards_list', label: 'Elite Prints: Job Card', category: 'Elite Digital Print' },
-  { id: 'jobcards_catalogue', label: 'Elite Prints: Design Catalog', category: 'Elite Digital Print' },
-  { id: 'jobcards_tracking', label: 'Elite Prints: Job Card Tracking', category: 'Elite Digital Print' },
-  { id: 'jobcards_printing_log', label: 'Elite Prints: Printing Department', category: 'Elite Digital Print' },
-  { id: 'jobcards_master', label: 'Elite Prints: Design Master (100 Pic)', category: 'Elite Digital Print' },
-  { id: 'jobcards_fabric', label: 'Elite Prints: Fabric Management', category: 'Elite Digital Print' },
-  { id: 'jobcards_raw_materials', label: 'Elite Prints: Raw Materials', category: 'Elite Digital Print' },
-  { id: 'jobcards_billing', label: 'Elite Prints: Billing & Invoicing', category: 'Elite Digital Print' },
-  { id: 'complaint_dashboard', label: 'Elite Prints: Complaint Dashboard (View Only)', category: 'Elite Digital Print' },
-  { id: 'complaint_create', label: 'Elite Prints: Log New Complaint (Create Access)', category: 'Elite Digital Print' },
-  { id: 'expense_dashboard', label: 'Elite Prints: Department Expenses (View Only)', category: 'Elite Digital Print' },
-  { id: 'expense_create', label: 'Elite Prints: Log Department Expense (IN/OUT)', category: 'Elite Digital Print' },
-  { id: 'jobcards_settings', label: 'Elite Prints: Settings', category: 'Elite Digital Print' },
-
-  // Elite Stitching
-  { id: 'stitching_jobcards', label: 'Elite Stitching: Job Card Tracking', category: 'Elite Stitching' },
-  { id: 'stitching_design', label: 'Elite Stitching: Design Room', category: 'Elite Stitching' },
-  { id: 'stitching_fabric', label: 'Elite Stitching: Fabric Challans', category: 'Elite Stitching' },
-  { id: 'stitching_settings', label: 'Elite Stitching: Settings', category: 'Elite Stitching' },
-];
+import { AVAILABLE_SCREENS } from '../config/screensConfig';
 
 export default function AdminPanel() {
   const [users, setUsers] = useState([]);

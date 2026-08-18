@@ -235,8 +235,8 @@ function DashboardStats({ items, sales }) {
           <div className="glass-panel" style={styles.card}>
             <div style={styles.cardHeader}>
               <span style={styles.cardTitle}>Order Statuses</span>
-              <div style={{ ...styles.iconContainer, background: 'rgba(255, 255, 255, 0.05)' }}>
-                <Activity size={20} color="#fff" />
+              <div style={{ ...styles.iconContainer, background: 'rgba(37, 99, 235, 0.1)' }}>
+                <Activity size={20} color="#2563eb" />
               </div>
             </div>
             <div style={styles.cardValue}>
@@ -338,7 +338,7 @@ function DashboardStats({ items, sales }) {
                     <text 
                       x={p.x} 
                       y={p.y - 12} 
-                      fill="#fff" 
+                      fill="#2563eb" 
                       fontSize="9" 
                       fontWeight="bold"
                       textAnchor="middle"
@@ -398,7 +398,7 @@ function DashboardStats({ items, sales }) {
                   ))}
                   {/* Center Text */}
                   <text x="80" y="75" textAnchor="middle" fill="var(--text-muted)" fontSize="8" fontWeight="600" letterSpacing="0.05em">TOTAL</text>
-                  <text x="80" y="93" textAnchor="middle" fill="#fff" fontSize="14" fontWeight="bold">{totalStock}</text>
+                  <text x="80" y="93" textAnchor="middle" fill="#0f172a" fontSize="14" fontWeight="bold">{totalStock}</text>
                 </svg>
                 
                 {/* Donut Legend */}
@@ -477,7 +477,7 @@ function DashboardStats({ items, sales }) {
                       <text 
                         x={paddingLeft + barWidth + 8} 
                         y={y + 12} 
-                        fill="#fff" 
+                        fill="#0f172a" 
                         fontSize="9" 
                         fontWeight="bold"
                       >
@@ -607,9 +607,9 @@ function DashboardStats({ items, sales }) {
                       <text 
                         x={xCenter} 
                         y={220 - paddingBottom + 16} 
-                        fill="#e5e7eb" 
+                        fill="#0f172a" 
                         fontSize="8" 
-                        fontWeight="500" 
+                        fontWeight="600" 
                         textAnchor="middle"
                       >
                         {d.name}
@@ -760,8 +760,8 @@ const styles = {
   },
   sectionTitle: {
     fontSize: '1rem',
-    fontWeight: '600',
-    color: '#e5e7eb',
+    fontWeight: '800',
+    color: '#0f172a',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
   },
@@ -899,8 +899,8 @@ const styles = {
     flexShrink: 0,
   },
   legendName: {
-    color: '#d1d5db',
-    fontWeight: '500',
+    color: '#1e293b',
+    fontWeight: '600',
     flex: 1,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -923,8 +923,8 @@ const styles = {
     fontSize: '0.8rem',
   },
   itemNameText: {
-    color: '#e5e7eb',
-    fontWeight: '500',
+    color: '#0f172a',
+    fontWeight: '600',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -981,8 +981,8 @@ const styles = {
   },
   alertItemName: {
     fontSize: '0.8rem',
-    fontWeight: '500',
-    color: '#e5e7eb',
+    fontWeight: '600',
+    color: '#0f172a',
   },
   alertMeta: {
     fontSize: '0.7rem',

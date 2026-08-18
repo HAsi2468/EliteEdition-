@@ -1227,9 +1227,17 @@ function JobCardForm({ card, onSave, onClose, department }) {
       createdBy: form.createdBy || uName,
       updatedBy: uName
     };
+
+    delete payload._id;
+    delete payload.id;
+    delete payload.created_date_time;
+    delete payload.modified_date_time;
+    delete payload.__v;
+
     try {
-      if (card?._id) {
-        await api.updateJobCard(card._id, payload);
+      if (card?._id || card?.id) {
+        const targetId = card._id || card.id;
+        await api.updateJobCard(targetId, payload);
         triggerPushNotification('📝 Job Card Updated', `Job Card #${form.jobNo} saved successfully.`, 'info');
       } else {
         await api.createJobCard(payload);
@@ -1974,8 +1982,10 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         <DesignCatalogue department={department} initialSubTab={effectiveSubTab === 'master' ? 'master' : 'catalogue'} />
       ) : effectiveSubTab === 'fabric' ? (
         <FabricInventoryPanel department={department} onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); }} />
-      ) : effectiveSubTab === 'billing' ? (
-        <EliteBillingDepartment initialChallanData={billingChallanData} department={department} />
+      ) : effectiveSubTab === 'billing' || effectiveSubTab === 'billing_elite' ? (
+        <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity="Elite Edition" />
+      ) : effectiveSubTab === 'billing_fabtex' ? (
+        <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity="Elite Fabtex" />
       ) : effectiveSubTab === 'printing_log' || effectiveSubTab === 'print_entry' ? (
         <JobPrintingLog />
       ) : effectiveSubTab === 'engine' || effectiveSubTab === 'split_view' ? (

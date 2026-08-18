@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { uniwareApi } from '../services/uniware';
 import { Search, ChevronLeft, ChevronRight, SlidersHorizontal, RefreshCw, ShoppingBag } from 'lucide-react';
+import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
+import { matchSearchQuery } from '../utils/searchUtils';
 
 export default function SalesGrid() {
   const [orders, setOrders] = useState([]);
@@ -49,13 +51,13 @@ export default function SalesGrid() {
 
   // Debounced filters or search on trigger
   useEffect(() => {
-    fetchOrders();
-    const interval = setInterval(fetchOrders, 30000);
+    fetchOrders(false);
+    const interval = setInterval(() => fetchOrders(true), 30000);
     return () => clearInterval(interval);
   }, [page, sortField, sortOrder, statusFilter]);
 
-  const fetchOrders = async () => {
-    setLoading(true);
+  const fetchOrders = async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError('');
     try {
       const params = {
@@ -76,9 +78,9 @@ export default function SalesGrid() {
         }
       }
     } catch (err) {
-      setError(err.message || 'Failed to fetch sales orders.');
+      if (!isSilent) setError(err.message || 'Failed to fetch sales orders.');
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
@@ -207,7 +209,9 @@ export default function SalesGrid() {
               </tr>
             </thead>
             <tbody>
-              {orders.map((order, idx) => {
+              {orders
+                .filter(order => matchSearchQuery(order, skuSearch || citySearch, ['itemSKUCode', 'shippingAddressCity', 'shippingAddressState', 'category', 'saleOrderStatus', 'saleOrderItemCode', 'saleOrderCode']))
+                .map((order, idx) => {
                 const status = (order.saleOrderStatus || '').toUpperCase();
                 let statusClass = 'badge-warning';
                 if (status === 'DELIVERED') statusClass = 'badge-success';
@@ -216,13 +220,7 @@ export default function SalesGrid() {
                 return (
                   <tr key={order.id || idx}>
                     <td>
-                      {order.orderDate ? new Date(order.orderDate).toLocaleDateString('en-IN', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) : 'N/A'}
+                      {formatDateTimeDDMMYYYY(order.orderDate)}
                     </td>
                     <td>
                       <div style={styles.skuCell}>

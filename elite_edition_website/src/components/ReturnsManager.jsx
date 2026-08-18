@@ -11,6 +11,7 @@ import {
   ListTodo,
   History
 } from 'lucide-react';
+import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
 
 export default function ReturnsManager() {
   const [activeTab, setActiveTab] = useState('process');
@@ -394,7 +395,7 @@ export default function ReturnsManager() {
             ) : (
               refinishQueue.map(item => (
                 <tr key={item._id}>
-                  <td>{new Date(item.createdAt).toLocaleDateString()}</td>
+                  <td>{formatDateDDMMYYYY(item.createdAt)}</td>
                   <td style={{ fontWeight: 'bold' }}>{item.referenceId}</td>
                   <td>{item.sku}</td>
                   <td>{item.quantity}</td>
@@ -448,7 +449,7 @@ export default function ReturnsManager() {
             ) : (
               history.map(item => (
                 <tr key={item._id}>
-                  <td>{new Date(item.createdAt).toLocaleString()}</td>
+                  <td>{formatDateTimeDDMMYYYY(item.createdAt)}</td>
                   <td style={{ fontWeight: 'bold' }}>{item.referenceId}</td>
                   <td>{item.sku}</td>
                   <td>

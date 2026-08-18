@@ -4,6 +4,7 @@ import { uniwareApi } from '../services/uniware';
 import VariantAnalytics from './VariantAnalytics';
 import DemographicsAnalytics from './DemographicsAnalytics';
 import GrowthMetrics from './GrowthMetrics';
+import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import {
   RefreshCw,
   Activity,
@@ -683,7 +684,7 @@ export default function UnicommerceHub() {
                         </td>
                         <td style={{ color: '#e5e7eb', fontSize: '0.8rem' }}>{item.referenceCode}</td>
                         <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                          {new Date(item.created).toLocaleDateString('en-IN')}
+                          {formatDateDDMMYYYY(item.created)}
                         </td>
                         <td>
                           {item.returnItems && item.returnItems.map((ri, i) => (
@@ -766,7 +767,7 @@ export default function UnicommerceHub() {
                       return (
                         <tr key={order._id || orderId}>
                           <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                            {order.orderDate ? new Date(order.orderDate).toLocaleDateString('en-IN') : 'N/A'}
+                            {formatDateDDMMYYYY(order.orderDate)}
                           </td>
                           <td style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
                             {order.saleOrderItemCode || 'N/A'}

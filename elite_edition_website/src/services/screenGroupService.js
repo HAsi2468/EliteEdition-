@@ -1,64 +1,11 @@
 import { triggerPushNotification } from '../components/NotificationToast';
 import { api } from './api';
+import { SCREEN_GROUPS, getDynamicScreenGroup } from '../config/screensConfig';
 
-export const SCREEN_GROUPS = {
-  jobcards: {
-    id: 'jobcards',
-    name: '[EDP] Job Cards',
-    deptShort: 'EDP',
-    screenName: 'Job Cards',
-    permissionKeys: ['jobcards', 'jobcards_list', 'stitching_jobcards'],
-    description: 'Digital Printing & Production Job Cards Group'
-  },
-  jobcards_fabric: {
-    id: 'jobcards_fabric',
-    name: '[EDP] Fabric Inventory',
-    deptShort: 'EDP',
-    screenName: 'Fabric Inventory',
-    permissionKeys: ['jobcards_fabric', 'jobcards_stitching_challan', 'stitching_fabric'],
-    description: 'Fabric Inward, Outward & Dispatch Challans Group'
-  },
-  jobcards_billing: {
-    id: 'jobcards_billing',
-    name: '[EDP] Billing & Invoicing',
-    deptShort: 'EDP',
-    screenName: 'Billing & Invoicing',
-    permissionKeys: ['jobcards_billing', 'invoices'],
-    description: 'GST Invoicing, Accounts & Receivables Group'
-  },
-  jobcards_catalogue: {
-    id: 'jobcards_catalogue',
-    name: '[EDP] Design Room',
-    deptShort: 'EDP',
-    screenName: 'Design Room',
-    permissionKeys: ['jobcards_catalogue', 'stitching_design'],
-    description: 'Design Library, Master Assets & Patterns Group'
-  },
-  stitching_department: {
-    id: 'stitching_department',
-    name: '[ST] Stitching Department',
-    deptShort: 'ST',
-    screenName: 'Stitching Department',
-    permissionKeys: ['stitching_jobcards', 'stitching_fabric', 'stitching_design'],
-    description: 'Stitching Production & Fabric Challans Group'
-  },
-  inventory: {
-    id: 'inventory',
-    name: '[EE] E-Commerce Inventory',
-    deptShort: 'EE',
-    screenName: 'E-Commerce Inventory',
-    permissionKeys: ['inventory', 'catalog', 'sales'],
-    description: 'Elite Edition Online Inventory & Dispatch Group'
-  }
-};
+export { SCREEN_GROUPS };
 
 export const getScreenGroupInfo = (screenId, allUsers = []) => {
-  const group = SCREEN_GROUPS[screenId] || {
-    id: screenId,
-    name: 'Operations Team Group',
-    permissionKeys: [screenId],
-    description: 'Screen Operations Group'
-  };
+  const group = getDynamicScreenGroup(screenId);
 
   const currentLoggedInUser = api.getCurrentUser();
   const admins = [];
@@ -91,7 +38,7 @@ export const getScreenGroupInfo = (screenId, allUsers = []) => {
 };
 
 export const dispatchScreenGroupEvent = (screenId, title, message, actionTab = null) => {
-  const group = SCREEN_GROUPS[screenId] || { name: 'Operations Group' };
+  const group = getDynamicScreenGroup(screenId);
   const currentUser = api.getCurrentUser();
   const creatorName = currentUser?.username || currentUser?.name || currentUser?.email || 'Admin';
   const roleBadge = currentUser?.role === 'admin' ? '👑 Admin' : '👤 Staff';

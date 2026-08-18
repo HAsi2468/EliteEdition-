@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Edit2, Trash2, Printer, Search, Plus, SlidersHorizontal, Eye, TrendingDown, MoreVertical, Sparkles } from 'lucide-react';
+import { formatDateDDMMYYYY } from '../utils/dateUtils';
+import { matchSearchQuery } from '../utils/searchUtils';
 
 export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockOut, onOpenManager, onBulkInward }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -23,11 +25,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
   // Filter & Search Logic
   const filteredItems = items
     .filter(item => {
-      const matchSearch = 
-        (item.itemName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.party || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.skuCode || '').toLowerCase().includes(searchTerm.toLowerCase());
-      
+      const matchSearch = matchSearchQuery(item, searchTerm, ['itemName', 'party', 'skuCode', 'category', 'notes']);
       const matchSize = sizeFilter === 'All' || item.size === sizeFilter;
       
       return matchSearch && matchSize;
@@ -370,7 +368,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                         </div>
                         <div>
                           <div style={styles.itemName}>{item.itemName}</div>
-                          <div style={styles.itemMeta}>Created: {item.created_date_time ? new Date(item.created_date_time).toLocaleDateString('en-IN') : 'N/A'}</div>
+                          <div style={styles.itemMeta}>Created: {formatDateDDMMYYYY(item.created_date_time)}</div>
                         </div>
                       </div>
                     </td>

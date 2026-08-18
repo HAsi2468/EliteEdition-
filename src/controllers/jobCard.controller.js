@@ -318,7 +318,13 @@ const createJobCard = async (req, res) => {
 
 const updateJobCard = async (req, res) => {
   try {
-    const body = req.body;
+    const body = { ...req.body };
+    delete body._id;
+    delete body.id;
+    delete body.created_date_time;
+    delete body.modified_date_time;
+    delete body.__v;
+
     if (body.date) body.date = normalizeDateStr(body.date);
     if (body.printDate) body.printDate = normalizeDateStr(body.printDate);
     if (body.fusingDate) body.fusingDate = normalizeDateStr(body.fusingDate);
