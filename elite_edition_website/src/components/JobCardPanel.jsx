@@ -1221,7 +1221,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
     setSaving(true); setError('');
     const cleanFabric = normalizeFabricName(form.fabric, form.panna);
     const cleanDesign = cleanDesignNameString(form.designName || form.designNo);
-    const activeUser = currentUser || api.getCurrentUser() || {};
+    const activeUser = api.getCurrentUser() || {};
     const uName = activeUser.name || activeUser.username || 'HASI';
     const uId = activeUser._id || activeUser.id || '';
     const payload = {
