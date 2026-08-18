@@ -4055,51 +4055,98 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     ) : null
                   )}
 
-                  {/* DYNAMIC LOT STOCK TAKING PROGRESS BAR */}
-                  {selectedLotsList.length > 0 && selectedLotsTotalStock > 0 && (
+                  {/* DYNAMIC PROPER LOT STOCK PROGRESS BAR */}
+                  {selectedLotsList.length > 0 && (
                     <div style={{
                       marginTop: '0.65rem',
-                      padding: '0.65rem 0.85rem',
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
+                      padding: '0.75rem 0.9rem',
+                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                      border: challanTotalMtr > selectedLotsTotalStock ? '1px solid #fca5a5' : '1px solid #cbd5e1',
+                      borderRadius: '10px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', fontSize: '0.76rem', fontWeight: 700, color: '#334155' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <span>📊</span> Lot Stock Taking Progress (Lot #{selectedLotsList.join(', #')}):
-                        </span>
-                        <span>
-                          <strong style={{ color: challanTotalMtr > selectedLotsTotalStock ? '#dc2626' : '#0284c7' }}>
-                            {challanTotalMtr.toFixed(2)}m
-                          </strong> / {selectedLotsTotalStock.toFixed(2)}m
-                        </span>
+                      {/* Top Header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '1rem' }}>📊</span>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
+                            Lot Stock Fulfillment ({selectedLotsList.length} {selectedLotsList.length === 1 ? 'Lot' : 'Lots'})
+                          </span>
+                          <span style={{
+                            fontSize: '0.66rem',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '10px',
+                            background: '#e2e8f0',
+                            color: '#334155'
+                          }}>
+                            {selectedLotsList.length <= 3 ? `#${selectedLotsList.join(', #')}` : `#${selectedLotsList.slice(0, 3).join(', #')} +${selectedLotsList.length - 3} more`}
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                          <span style={{ color: challanTotalMtr > selectedLotsTotalStock ? '#dc2626' : '#0284c7' }}>
+                            {challanTotalMtr.toFixed(2)}m taken
+                          </span>
+                          <span style={{ color: '#64748b' }}> / {selectedLotsTotalStock.toFixed(2)}m stock</span>
+                        </div>
                       </div>
 
+                      {/* Mathematical Progress Calculations */}
                       {(() => {
-                        const pct = Math.min(100, Math.round((challanTotalMtr / selectedLotsTotalStock) * 100));
+                        const hasStock = selectedLotsTotalStock > 0;
+                        const realPct = hasStock ? Math.round((challanTotalMtr / selectedLotsTotalStock) * 100) : (challanTotalMtr > 0 ? 999 : 0);
+                        const fillWidth = Math.min(100, realPct);
                         const isOver = challanTotalMtr > selectedLotsTotalStock;
-                        const isNearFull = pct >= 85 && !isOver;
-                        const barBg = isOver ? 'linear-gradient(90deg, #ef4444, #dc2626)' : isNearFull ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 'linear-gradient(90deg, #10b981, #059669)';
-                        const remainMtr = selectedLotsTotalStock - challanTotalMtr;
+                        const isNearFull = realPct >= 85 && !isOver;
+
+                        const barBg = isOver
+                          ? 'linear-gradient(90deg, #ef4444 0%, #b91c1c 100%)'
+                          : isNearFull
+                          ? 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)'
+                          : 'linear-gradient(90deg, #10b981 0%, #059669 100%)';
+
+                        const balance = selectedLotsTotalStock - challanTotalMtr;
 
                         return (
                           <>
-                            <div style={{ width: '100%', height: '10px', background: '#e2e8f0', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
+                            {/* Track Container */}
+                            <div style={{
+                              width: '100%',
+                              height: '12px',
+                              background: '#e2e8f0',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              position: 'relative',
+                              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.1)'
+                            }}>
                               <div style={{
-                                width: `${pct}%`,
+                                width: `${fillWidth}%`,
                                 height: '100%',
                                 background: barBg,
-                                borderRadius: '6px',
-                                transition: 'width 0.3s ease'
+                                borderRadius: '8px',
+                                transition: 'width 0.35s ease'
                               }} />
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.3rem', fontSize: '0.7rem', fontWeight: 600 }}>
-                              <span style={{ color: isOver ? '#dc2626' : isNearFull ? '#d97706' : '#059669' }}>
-                                {pct}% Stock Taken {isOver ? '(EXCEEDED AVAILABLE LOT STOCK!)' : ''}
+
+                            {/* Status Footer Metrics */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem', fontSize: '0.72rem', fontWeight: 700 }}>
+                              <span style={{ color: isOver ? '#dc2626' : isNearFull ? '#d97706' : '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                {isOver ? (
+                                  <>⚠️ <span>{realPct}% Allocated — EXCEEDED AVAILABLE STOCK!</span></>
+                                ) : (
+                                  <>✅ <span>{realPct}% Stock Taken ({fillWidth}% of Lot Capacity)</span></>
+                                )}
                               </span>
-                              <span style={{ color: remainMtr < 0 ? '#dc2626' : '#475569' }}>
-                                {remainMtr < 0 ? `Deficit: ${Math.abs(remainMtr).toFixed(2)}m` : `Remaining Stock: ${remainMtr.toFixed(2)}m`}
+
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                background: isOver ? '#fee2e2' : '#dcfce7',
+                                color: isOver ? '#991b1b' : '#166534',
+                                border: isOver ? '1px solid #fca5a5' : '1px solid #86efac'
+                              }}>
+                                {isOver ? `Deficit: ${Math.abs(balance).toFixed(2)} mtr` : `Remaining: ${balance.toFixed(2)} mtr`}
                               </span>
                             </div>
                           </>
