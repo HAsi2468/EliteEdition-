@@ -1660,8 +1660,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   }).sort((a, b) => {
     const numA = parseInt(a.lotNo, 10);
     const numB = parseInt(b.lotNo, 10);
-    if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-    return a.lotNo.localeCompare(b.lotNo);
+    if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+    return b.lotNo.localeCompare(a.lotNo);
   });
 
   const filteredLots = lotRecords.filter(l => {
@@ -1686,10 +1686,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   const selectedLotsList = parseSelectedLots(challanForm.lotNo);
 
-  // Calculate sum of available meters from the selected lots
+  // Calculate sum of available meters from the selected lots (searching both lotRecords and availableLots)
   const selectedLotsTotalStock = selectedLotsList.reduce((sum, lotNo) => {
-    const lotStockItem = availableLots.find(l => String(l.lotNo) === lotNo);
-    return sum + (lotStockItem ? lotStockItem.currentStock : 0);
+    const lotStockItem = lotRecords.find(l => String(l.lotNo) === lotNo) || availableLots.find(l => String(l.lotNo) === lotNo);
+    return sum + (lotStockItem ? (lotStockItem.currentStock || 0) : 0);
   }, 0);
 
   const activeJob = findMatchingJobCard(challanForm.jobNo);
@@ -3987,48 +3987,65 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     placeholder="Select or type e.g. 252, 280, 291..."
                   />
                   <datalist id="challan-lot-options">
-                    {availableLots.map((l, i) => (
-                      <option key={i} value={String(l.lotNo)}>
-                        Lot #{l.lotNo} — {l.fabricQuality} ({l.panna ? String(l.panna).replace(/['"]/g, '') : '58'}) [{l.currentStock ? `${l.currentStock}m` : ''}]
-                      </option>
-                    ))}
+                    {(() => {
+                      const sorted = [...availableLots].sort((a, b) => {
+                        const numA = parseInt(a.lotNo, 10);
+                        const numB = parseInt(b.lotNo, 10);
+                        if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+                        return String(b.lotNo).localeCompare(String(a.lotNo));
+                      });
+                      return sorted.map((l, i) => (
+                        <option key={i} value={String(l.lotNo)}>
+                          Lot #{l.lotNo} — {l.fabricQuality} ({l.panna ? String(l.panna).replace(/['"]/g, '') : '58'}) [{l.currentStock ? `${parseFloat(l.currentStock).toFixed(2)}m` : ''}]
+                        </option>
+                      ));
+                    })()}
                   </datalist>
 
                   {/* Available Lot Buttons Chips */}
                   {availableLots.length > 0 ? (
-                    <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.25rem', maxHeight: '75px', overflowY: 'auto' }}>
-                      {availableLots.slice(0, 15).map((lot, idx) => {
-                        const selectedList = String(challanForm.lotNo || '').split(/[,\s&]+/).map(s => s.trim()).filter(Boolean);
-                        const isSelected = selectedList.includes(String(lot.lotNo));
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              let newLotStr;
-                              if (isSelected) {
-                                newLotStr = selectedList.filter(x => x !== String(lot.lotNo)).join(', ');
-                              } else {
-                                newLotStr = [...selectedList, String(lot.lotNo)].join(', ');
-                              }
-                              handleChallanLotChange(newLotStr);
-                            }}
-                            style={{
-                              padding: '0.15rem 0.45rem',
-                              fontSize: '0.68rem',
-                              borderRadius: '10px',
-                              border: isSelected ? '1px solid #0284c7' : '1px solid #cbd5e1',
-                              background: isSelected ? '#0284c7' : '#ffffff',
-                              color: isSelected ? '#ffffff' : '#475569',
-                              cursor: 'pointer',
-                              fontWeight: 700,
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            {isSelected ? '✓ ' : '+ '} Lot #{lot.lotNo} ({lot.fabricQuality || ''} {lot.currentStock ? `${lot.currentStock}m` : ''})
-                          </button>
-                        );
-                      })}
+                    <div style={{ marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.25rem', maxHeight: '90px', overflowY: 'auto' }}>
+                      {(() => {
+                        const sortedLots = [...availableLots].sort((a, b) => {
+                          const numA = parseInt(a.lotNo, 10);
+                          const numB = parseInt(b.lotNo, 10);
+                          if (!isNaN(numA) && !isNaN(numB)) return numB - numA;
+                          return String(b.lotNo).localeCompare(String(a.lotNo));
+                        });
+                        return sortedLots.slice(0, 35).map((lot, idx) => {
+                          const selectedList = String(challanForm.lotNo || '').split(/[,\s&]+/).map(s => s.trim()).filter(Boolean);
+                          const isSelected = selectedList.includes(String(lot.lotNo));
+                          const formattedStock = lot.currentStock != null ? parseFloat(lot.currentStock).toFixed(2) : '0.00';
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                let newLotStr;
+                                if (isSelected) {
+                                  newLotStr = selectedList.filter(x => x !== String(lot.lotNo)).join(', ');
+                                } else {
+                                  newLotStr = [...selectedList, String(lot.lotNo)].join(', ');
+                                }
+                                handleChallanLotChange(newLotStr);
+                              }}
+                              style={{
+                                padding: '0.15rem 0.45rem',
+                                fontSize: '0.68rem',
+                                borderRadius: '10px',
+                                border: isSelected ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                                background: isSelected ? '#0284c7' : '#ffffff',
+                                color: isSelected ? '#ffffff' : '#475569',
+                                cursor: 'pointer',
+                                fontWeight: 700,
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {isSelected ? '✓ ' : '+ '} Lot #{lot.lotNo} ({formattedStock}m)
+                            </button>
+                          );
+                        });
+                      })()}
                     </div>
                   ) : (
                     challanForm.fabricName ? (

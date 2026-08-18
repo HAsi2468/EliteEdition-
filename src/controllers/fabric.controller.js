@@ -374,7 +374,7 @@ const getLotStock = async (req, res) => {
           currentStock: { $gt: 0 }
         }
       },
-      { $sort: { lotNo: 1 } } // Sort ascending: clear earliest lot numbers first (FIFO)!
+      { $sort: { lotNo: -1 } } // Sort descending: latest lot numbers first!
     ];
 
     const lotStock = await FabricTransaction.aggregate(pipeline);
