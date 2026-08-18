@@ -372,9 +372,6 @@ export default function ReturnsManager() {
           <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--text-primary)' }}>Refinishing Queue</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Items returned by customers that need repacking/ironing before being added to live stock.</p>
         </div>
-        <button className="btn-secondary" onClick={fetchRefinishQueue}>
-          <RefreshCw size={16} className={loading ? 'spin-loader' : ''} /> Refresh
-        </button>
       </div>
 
       <div className="table-container">
@@ -425,9 +422,6 @@ export default function ReturnsManager() {
           <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--text-primary)' }}>Returns History & Claims</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Master ledger of all returns. Use this to file SPF claims for Disputed items.</p>
         </div>
-        <button className="btn-secondary" onClick={fetchHistory}>
-          <RefreshCw size={16} className={loading ? 'spin-loader' : ''} /> Refresh
-        </button>
       </div>
 
       <div className="table-container">

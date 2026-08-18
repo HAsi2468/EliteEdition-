@@ -143,9 +143,6 @@ export default function DesignMaster({ department }) {
               style={{ paddingLeft: 32, width: '100%', fontSize: '0.85rem' }}
             />
           </div>
-          <button onClick={fetchDesigns} className="btn-icon" title="Refresh">
-            <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
-          </button>
         </div>
       </div>
 

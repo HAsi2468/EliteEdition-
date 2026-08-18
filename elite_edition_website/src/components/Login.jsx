@@ -1,51 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { api, getBaseUrl, setBaseUrl } from '../services/api';
-import { Shield, Server, Activity, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import React, { useState } from 'react';
+import { api } from '../services/api';
+import { Shield, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export default function Login({ onLoginSuccess }) {
-  const [email, setEmail] = useState('admin@elite.com'); // prefill a helper default if appropriate, or leave empty
+  const [email, setEmail] = useState('admin@elite.com');
   const [password, setPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
-  const [serverMode, setServerMode] = useState('prod'); // 'prod' or 'local' or 'custom'
-  const [customServerUrl, setCustomServerUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [serverUrlDisplay, setServerUrlDisplay] = useState(getBaseUrl());
-
-  useEffect(() => {
-    const current = getBaseUrl();
-    if (current.includes('localhost') || current.includes('127.0.0.1')) {
-      setServerMode('local');
-    } else if (current.includes('3.7.174.180')) {
-      setServerMode('prod');
-    } else {
-      setServerMode('custom');
-      setCustomServerUrl(current.replace('/v1', ''));
-    }
-  }, []);
-
-  const handleServerChange = (mode) => {
-    setServerMode(mode);
-    let targetUrl = '';
-    if (mode === 'prod') {
-      targetUrl = '/v1';
-    } else if (mode === 'local') {
-      targetUrl = 'http://localhost:3001/v1';
-    } else {
-      targetUrl = customServerUrl || 'http://localhost:3001/v1';
-    }
-    setBaseUrl(targetUrl);
-    setServerUrlDisplay(getBaseUrl());
-  };
-
-  const handleCustomUrlChange = (e) => {
-    const val = e.target.value;
-    setCustomServerUrl(val);
-    if (serverMode === 'custom') {
-      setBaseUrl(val);
-      setServerUrlDisplay(getBaseUrl());
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -112,60 +74,6 @@ export default function Login({ onLoginSuccess }) {
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-          </div>
-
-          <div style={styles.divider}>
-            <span style={styles.dividerText}>Server Config</span>
-          </div>
-
-          <div style={styles.serverSelector}>
-            <button
-              type="button"
-              onClick={() => handleServerChange('prod')}
-              style={{
-                ...styles.serverBtn,
-                ...(serverMode === 'prod' ? styles.serverBtnActive : {}),
-              }}
-            >
-              Production
-            </button>
-            <button
-              type="button"
-              onClick={() => handleServerChange('local')}
-              style={{
-                ...styles.serverBtn,
-                ...(serverMode === 'local' ? styles.serverBtnActive : {}),
-              }}
-            >
-              Localhost
-            </button>
-            <button
-              type="button"
-              onClick={() => handleServerChange('custom')}
-              style={{
-                ...styles.serverBtn,
-                ...(serverMode === 'custom' ? styles.serverBtnActive : {}),
-              }}
-            >
-              Custom
-            </button>
-          </div>
-
-          {serverMode === 'custom' && (
-            <div style={styles.inputGroup}>
-              <input
-                type="text"
-                value={customServerUrl}
-                onChange={handleCustomUrlChange}
-                placeholder="http://192.168.1.100:3001"
-                style={styles.input}
-              />
-            </div>
-          )}
-
-          <div style={styles.urlIndicator}>
-            <Server size={12} color="#9ca3af" />
-            <span style={styles.urlIndicatorText}>Connecting to: {serverUrlDisplay}</span>
           </div>
 
           <button

@@ -29,12 +29,43 @@ function numToWords(amount) {
   return 'Rupees ' + convert(num) + ' Only';
 }
 
+// Helper for flexible company entity queries
+function buildCompanyFilter(companyEntity) {
+  if (!companyEntity) return {};
+  const ce = String(companyEntity).trim();
+  if (ce === 'Elite Edition') {
+    return {
+      $or: [
+        { companyEntity: 'Elite Edition' },
+        { invoiceNo: { $regex: '^EE', $options: 'i' } }
+      ]
+    };
+  } else if (ce === 'Elite Fabtex') {
+    return {
+      $or: [
+        { companyEntity: 'Elite Fabtex' },
+        { invoiceNo: { $regex: '^EF', $options: 'i' } }
+      ]
+    };
+  } else {
+    // Elite Digital Print / Digital Print / Default
+    return {
+      $or: [
+        { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints', 'Elite Online'] } },
+        { companyEntity: { $exists: false } },
+        { companyEntity: null },
+        { companyEntity: '' },
+        { invoiceNo: { $regex: '^EDP', $options: 'i' } }
+      ]
+    };
+  }
+}
+
 // ── 1. DASHBOARD STATS ────────────────────────────────────────────────────────
 const getBillingDashboardStats = async (req, res) => {
   try {
     const { companyEntity } = req.query;
-    const filter = {};
-    if (companyEntity) filter.companyEntity = companyEntity;
+    const filter = buildCompanyFilter(companyEntity);
 
     const totalInvoices = await BillingInvoice.countDocuments(filter);
     const invoices = await BillingInvoice.find(filter).lean();
@@ -85,10 +116,7 @@ const getInvoices = async (req, res) => {
   try {
     const { search, paymentStatus, page = 1, limit = 5000, dateStart, dateEnd, companyEntity } = req.query;
 
-    const filter = {};
-    if (companyEntity) {
-      filter.companyEntity = companyEntity;
-    }
+    const filter = buildCompanyFilter(companyEntity);
 
     if (paymentStatus && paymentStatus !== 'ALL') {
       filter.paymentStatus = paymentStatus;

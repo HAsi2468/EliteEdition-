@@ -961,10 +961,6 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
           >
             {sortOrder === 'asc' ? '▲ Asc' : '▼ Desc'}
           </button>
-
-          <button onClick={fetchDesigns} className="btn-icon" title="Refresh">
-            <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
-          </button>
         </div>
       </div>
 

@@ -734,17 +734,6 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
                 </optgroup>
               </select>
 
-              {/* Refresh Button */}
-              <button
-                type="button"
-                onClick={fetchExpenses}
-                className="glass-button"
-                style={{ padding: '0.25rem 0.65rem', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                title="Refresh Ledger"
-              >
-                <RefreshCw size={13} className={loading ? 'spin-loader' : ''} />
-              </button>
-
               {/* PDF Download Button (Icon with tooltip) */}
               <button
                 type="button"

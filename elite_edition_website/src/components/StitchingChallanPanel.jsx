@@ -278,12 +278,9 @@ export default function StitchingChallanPanel({ onNavigateToBilling }) {
 
           {/* Entry Buttons Top in Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button onClick={fetchChallans} className="btn-icon" title="Refresh">
-              <RefreshCw size={15} className={loading ? 'spin-loader' : ''} />
-            </button>
             <button
               onClick={openNew}
-              style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{ padding: '0.48rem 1.1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#4f46e5,#6366f1)', color: '#fff', fontSize: '0.84rem', fontWeight: 700, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 4px 14px rgba(79,70,229,0.3)' }}
             >
               <Plus size={16} /> New Stitching Challan
             </button>

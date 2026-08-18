@@ -92,11 +92,7 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
   };
 
   const getAccentColor = () => {
-    if (companyEntity === 'Elite Fabtex') return '#7c3aed'; // Deep Purple
-    if (companyEntity === 'Elite Stitching') return '#ec4899'; // Pink
-    if (companyEntity === 'Elite Online') return '#f59e0b'; // Amber
-    if (companyEntity === 'Elite Digital Print') return '#0284c7'; // Sky Blue
-    return '#2563eb'; // Royal Blue for Elite Edition
+    return '#4f46e5'; // Unified Professional Deep Indigo Theme for All Companies
   };
 
   const accentColor = getAccentColor();

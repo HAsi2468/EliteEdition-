@@ -936,9 +936,6 @@ export default function RawMaterialsPanel() {
         <button onClick={() => setIsPdfFilterOpen(true)} className="btn-secondary" title="Download Ledger PDF" style={{ gap: '0.4rem' }}>
           <FileDown size={16} /> PDF Report
         </button>
-        <button onClick={fetchData} className="btn-icon" title="Refresh Data">
-          <RefreshCw size={18} className={loading ? 'spin-loader' : ''} />
-        </button>
       </div>
 
       {error && <div style={{ color: 'red', padding: '1rem', background: '#ffebeb', borderRadius: '8px' }}>{error}</div>}

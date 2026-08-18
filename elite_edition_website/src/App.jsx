@@ -58,6 +58,7 @@ import {
   Bell,
   Scissors,
   Building,
+  Flame,
   Receipt,
   PanelLeftClose,
   PanelLeftOpen
@@ -225,15 +226,25 @@ export default function App() {
     return () => window.removeEventListener('elite-navigate-tab', handleNavTab);
   }, []);
 
+  const isCompanyAllowed = (companyName) => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'admin' || currentUser.isMainAdmin || currentUser.email === 'harshitsidapara2468@gmail.com') return true;
+    if (Array.isArray(currentUser.allowedCompanies) && currentUser.allowedCompanies.length > 0) {
+      return currentUser.allowedCompanies.includes(companyName);
+    }
+    return true;
+  };
+
   // Auto-switch department if user lacks permission for current activeDepartment
   useEffect(() => {
     if (!currentUser || currentUser.role === 'admin') return;
     if (currentUser.permissions && currentUser.permissions.length > 0) {
       const allowedDepts = [];
-      if (hasDigitalPrintAccess) allowedDepts.push('digital_print');
-      if (hasStitchingAccess) allowedDepts.push('stitching');
-      if (hasEliteEditionAccess) allowedDepts.push('elite_online');
-      allowedDepts.push('elite_edition', 'elite_fabtex');
+      if (isCompanyAllowed('Elite Online') && hasEliteEditionAccess) allowedDepts.push('elite_online');
+      if (isCompanyAllowed('Elite Digital Print') && hasDigitalPrintAccess) allowedDepts.push('digital_print');
+      if (isCompanyAllowed('Elite Stitching') && hasStitchingAccess) allowedDepts.push('stitching');
+      if (isCompanyAllowed('Elite Edition')) allowedDepts.push('elite_edition');
+      if (isCompanyAllowed('Elite Fabtex')) allowedDepts.push('elite_fabtex');
 
       if (allowedDepts.length > 0 && !allowedDepts.includes(activeDepartment)) {
         const targetDept = allowedDepts[0];
@@ -241,13 +252,13 @@ export default function App() {
         if (activeTab !== 'workspace') {
           if (targetDept === 'stitching') setActiveTab(getFirstStitchingTab());
           else if (targetDept === 'digital_print') setActiveTab(getFirstJobCardsTab());
-          else if (targetDept === 'elite_edition') setActiveTab('ee_invoices');
-          else if (targetDept === 'elite_fabtex') setActiveTab('ef_invoices');
+          else if (targetDept === 'elite_edition') setActiveTab('ee_dashboard');
+          else if (targetDept === 'elite_fabtex') setActiveTab('ef_dashboard');
           else if (targetDept === 'elite_online') setActiveTab(getFirstEETab());
         }
       }
     }
-  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), hasDigitalPrintAccess, hasStitchingAccess, hasEliteEditionAccess]);
+  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), JSON.stringify(currentUser?.allowedCompanies || []), hasDigitalPrintAccess, hasStitchingAccess, hasEliteEditionAccess]);
 
   const handleNavClick = (tab) => {
     setActiveTab(tab);
@@ -297,7 +308,7 @@ export default function App() {
       'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'eo_complaints', 'eo_expenses',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
-      'jobcards_printing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense'
+      'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense'
     ];
 
     if (currentUser.role === 'admin') {
@@ -662,6 +673,7 @@ export default function App() {
           <div className="dept-switcher-header">
             {COMPANIES.map(company => {
               // Permission check
+              if (!isCompanyAllowed(company.name)) return null;
               if (company.id === 'elite_online' && !hasEliteEditionAccess) return null;
               if (company.id === 'digital_print' && !hasDigitalPrintAccess) return null;
               if (company.id === 'stitching' && !hasStitchingAccess) return null;
@@ -696,51 +708,6 @@ export default function App() {
         </div>
 
         <div style={styles.headerRight} className="header-right-wrap">
-          {/* Server Config (Visible only to Hasi user) */}
-          {isHasiUser && (
-            <>
-              <div style={styles.serverConfigContainer}>
-                <button 
-                  onClick={() => setShowServerSettings(!showServerSettings)} 
-                  style={styles.serverBtn}
-                  title="Configure API Endpoint"
-                >
-                  <Server size={14} color="var(--primary)" />
-                  <span style={styles.serverText}>Server Config</span>
-                </button>
-                
-                {showServerSettings && (
-                  <div className="glass-panel" style={styles.serverDropdown}>
-                    <div style={styles.dropdownTitle}>API Target Settings</div>
-                    <input 
-                      type="text" 
-                      value={tempUrl} 
-                      onChange={(e) => setTempUrl(e.target.value)}
-                      style={styles.dropdownInput}
-                      placeholder="http://localhost:3001"
-                    />
-                    <div style={styles.dropdownActions}>
-                      <button 
-                        onClick={() => setShowServerSettings(false)} 
-                        className="btn-secondary" 
-                        style={styles.dropActionBtn}
-                      >
-                        Cancel
-                      </button>
-                      <button 
-                        onClick={applyServerEndpoint} 
-                        className="btn-primary" 
-                        style={styles.dropActionBtn}
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
           <button
             onClick={() => setShowNotificationDrawer(true)}
             className="btn-icon"
@@ -941,6 +908,12 @@ export default function App() {
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_printing_log')) && (
                     <button onClick={() => { setActiveTab('jobcards_printing_log'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_printing_log' ? styles.navItemActive : {}) }}>
                       <Printer size={18} /><span>Printing Department</span>
+                    </button>
+                  )}
+                  {/* Fusing Department */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fusing_log') || currentUser.permissions?.includes('jobcards')) && (
+                    <button onClick={() => { setActiveTab('jobcards_fusing_log'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_fusing_log' ? styles.navItemActive : {}) }}>
+                      <Flame size={18} /><span>Fusing Department</span>
                     </button>
                   )}
                   {/* 2. Fabric Management */}
@@ -1358,6 +1331,9 @@ export default function App() {
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_printing_log')) &&
                       renderNavItem('jobcards_printing_log', 'Printing Department', Printer, null, 'Printing')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fusing_log') || currentUser.permissions?.includes('jobcards')) &&
+                      renderNavItem('jobcards_fusing_log', 'Fusing Department', Flame, null, 'Fusing')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric')) &&
                       renderNavItem('jobcards_fabric', 'Fabric Management', Database, null, 'Fabric')

@@ -1349,35 +1349,87 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           </div>
 
           {/* Entry Buttons Top in Header */}
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
-              className="btn-primary"
               onClick={() => setShowLedgerModal(true)}
-              style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{
+                padding: '0.45rem 0.95rem',
+                borderRadius: '8px',
+                background: '#ffffff',
+                color: '#0f172a',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                border: '1px solid #cbd5e1',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                transition: 'all 0.15s ease'
+              }}
             >
-              <BookOpen size={15} /> Ledger Reports
+              <BookOpen size={15} color="#059669" /> Ledger Reports
             </button>
             <button
-              className="btn-primary"
               onClick={() => {
                 setActiveTab('expense');
                 setAutoOpenExpenseModal(true);
               }}
-              style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{
+                padding: '0.45rem 0.95rem',
+                borderRadius: '8px',
+                background: '#ffffff',
+                color: '#0f172a',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                border: '1px solid #cbd5e1',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                transition: 'all 0.15s ease'
+              }}
             >
-              <PlusCircle size={15} /> Expense Entry
+              <PlusCircle size={15} color="#d97706" /> Expense Entry
             </button>
             <button
-              className="btn-primary"
               onClick={() => handleOpenCreateTab()}
-              style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#7c3aed,#6366f1)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{
+                padding: '0.48rem 1.1rem',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+                color: '#ffffff',
+                fontSize: '0.84rem',
+                fontWeight: 700,
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 14px rgba(79, 70, 229, 0.3)',
+                transition: 'all 0.15s ease'
+              }}
             >
               <PlusCircle size={15} /> Create Invoice
             </button>
             <button
-              className="btn-primary"
               onClick={handleOpenCreateChallan}
-              style={{ padding: '0.45rem 1rem', borderRadius: '8px', background: 'linear-gradient(135deg,#0284c7,#2563eb)', color: '#fff', fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              style={{
+                padding: '0.48rem 1.1rem',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+                color: '#ffffff',
+                fontSize: '0.84rem',
+                fontWeight: 700,
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 14px rgba(2, 132, 199, 0.25)',
+                transition: 'all 0.15s ease'
+              }}
             >
               <Truck size={15} /> Create Challan
             </button>
@@ -1385,7 +1437,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         </div>
 
         {/* Sub-Tabs Bar */}
-        <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.85rem', borderTop: '1px solid var(--border-light, #e2e8f0)', paddingTop: '0.65rem', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.85rem', borderTop: '1px solid var(--border-light, #e2e8f0)', paddingTop: '0.65rem', overflowX: 'auto' }}>
           {[
             { id: 'challans', label: '🚚 Challan' },
             { id: 'invoices', label: '🧾 Invoices Directory', count: stats.totalInvoices },
@@ -1393,26 +1445,29 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             { id: 'customers', label: `👥 Customers (${customers.length})` },
             { id: 'items', label: `📦 Item (${itemsList.length})` },
             { id: 'expense', label: '💰 Expenses & Ledger' }
-          ].map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              style={{
-                padding: '0.42rem 0.9rem',
-                borderRadius: '8px',
-                fontWeight: 700,
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                border: '1px solid',
-                borderColor: activeTab === t.id ? '#7c3aed' : 'var(--border-light, #e2e8f0)',
-                background: activeTab === t.id ? '#f3e8ff' : '#ffffff',
-                color: activeTab === t.id ? '#6b21a8' : 'var(--text-muted, #64748b)',
-                transition: 'all 0.15s'
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
+          ].map(t => {
+            const isActive = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                style={{
+                  padding: '0.45rem 1rem',
+                  borderRadius: '8px',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  border: isActive ? '1px solid #4f46e5' : '1px solid #cbd5e1',
+                  background: isActive ? '#4f46e5' : '#ffffff',
+                  color: isActive ? '#ffffff' : '#334155',
+                  boxShadow: isActive ? '0 2px 8px rgba(79, 70, 229, 0.3)' : '0 1px 2px rgba(0,0,0,0.03)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1505,10 +1560,6 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 </button>
               ))}
             </div>
-
-            <button onClick={loadData} className="btn-icon" title="Refresh">
-              <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
-            </button>
           </div>
 
           {/* Bulk Invoices Selection Action Bar */}

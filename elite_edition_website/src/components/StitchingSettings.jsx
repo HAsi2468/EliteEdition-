@@ -182,9 +182,6 @@ export default function StitchingSettings() {
               </p>
             </div>
           </div>
-          <button onClick={fetchConfig} className="btn-icon" title="Refresh Settings">
-            <RefreshCw size={16} className={actionLoading ? 'spin-loader' : ''} />
-          </button>
         </div>
       </div>
 

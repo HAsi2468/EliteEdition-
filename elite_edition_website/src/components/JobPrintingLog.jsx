@@ -1444,10 +1444,6 @@ export default function JobPrintingLog() {
               setCustomDateEnd(e);
             }}
           />
-
-          <button onClick={fetchLogs} className="btn-icon" title="Refresh Logs">
-            <RefreshCw size={15} className={loading ? 'spin-loader' : ''} />
-          </button>
         </div>
 
         {/* Logs Table */}

@@ -15,6 +15,7 @@ import RawMaterialsPanel from './RawMaterialsPanel';
 import EliteBillingDepartment from './EliteBillingDepartment';
 import EliteDigitalPrintsSplitView from './EliteDigitalPrintsSplitView';
 import JobPrintingLog from './JobPrintingLog';
+import FusingDepartment from './FusingDepartment';
 import GarmentJobCardDashboard from './GarmentJobCardDashboard';
 import StitchingChallanPanel from './StitchingChallanPanel';
 import StitchingSettings from './StitchingSettings';
@@ -2002,6 +2003,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity="Elite Fabtex" />
       ) : effectiveSubTab === 'printing_log' || effectiveSubTab === 'print_entry' ? (
         <JobPrintingLog />
+      ) : effectiveSubTab === 'fusing_log' || effectiveSubTab === 'fusing' ? (
+        <FusingDepartment />
       ) : effectiveSubTab === 'engine' || effectiveSubTab === 'split_view' ? (
         <EliteDigitalPrintsSplitView />
       ) : effectiveSubTab === 'raw_materials' ? (
@@ -2145,12 +2148,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
               borderColor: sortBy==='urgency' ? '#fbbf24' : 'var(--border-light)',
               background: sortBy==='urgency' ? 'rgba(245,158,11,0.12)' : 'transparent',
               color: sortBy==='urgency' ? '#fbbf24' : 'var(--text-muted)',
-              display: 'flex', alignItems: 'center', gap: '0.45rem',
-              transition:'all 0.15s' }}>
+              display: 'flex', alignItems: 'center', gap: '0.45rem', transition: 'all 0.15s' }}>
             🔥 Urgency Priority
-          </button>
-          <button onClick={fetchCards} className="btn-icon" title="Refresh">
-            <RefreshCw size={14} className={loading ? 'spin-loader' : ''}/>
           </button>
           
           <div style={{ display: 'flex', gap: '0.2rem', marginLeft: 'auto', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '2px' }}>

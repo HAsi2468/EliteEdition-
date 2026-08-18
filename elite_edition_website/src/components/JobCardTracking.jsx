@@ -229,10 +229,6 @@ export default function JobCardTracking({ onPreview }) {
               setCustomDateEnd(e);
             }}
           />
-
-          <button onClick={fetchCards} className="btn-icon" title="Refresh">
-            <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
-          </button>
         </div>
       </div>
 

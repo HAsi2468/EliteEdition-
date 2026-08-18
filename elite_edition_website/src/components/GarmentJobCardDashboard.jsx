@@ -230,7 +230,7 @@ export default function GarmentJobCardDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{
               width: 38, height: 38, borderRadius: 10,
-              background: 'linear-gradient(135deg, #10b981, #059669)',
+              background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
             }}>
               <Scissors size={20} color="#fff" />
@@ -246,14 +246,15 @@ export default function GarmentJobCardDashboard() {
           </div>
 
           {/* Entry Buttons Top in Header */}
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               onClick={() => { setEditingCard(null); setShowForm(true); }}
               style={{
-                padding: '0.45rem 1rem', borderRadius: '8px',
-                background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff',
-                fontSize: '0.82rem', fontWeight: 800, border: 'none', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '6px'
+                padding: '0.48rem 1.1rem', borderRadius: '8px',
+                background: 'linear-gradient(135deg, #4f46e5, #6366f1)', color: '#fff',
+                fontSize: '0.84rem', fontWeight: 700, border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px',
+                boxShadow: '0 4px 14px rgba(79, 70, 229, 0.3)'
               }}
             >
               <Plus size={16} /> New Garment Job Card
@@ -261,10 +262,11 @@ export default function GarmentJobCardDashboard() {
             <button
               onClick={() => setShowPKDImportModal(true)}
               style={{
-                padding: '0.45rem 1rem', borderRadius: '8px',
-                border: '1px solid #cbd5e1', background: '#ffffff', color: '#0369a1',
-                fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '6px'
+                padding: '0.45rem 0.95rem', borderRadius: '8px',
+                border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a',
+                fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
               }}
             >
               📥 Import PKD Orders
@@ -272,10 +274,11 @@ export default function GarmentJobCardDashboard() {
             <button
               onClick={handleExportCSV}
               style={{
-                padding: '0.45rem 1rem', borderRadius: '8px',
-                border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155',
-                fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '6px'
+                padding: '0.45rem 0.95rem', borderRadius: '8px',
+                border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a',
+                fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
               }}
             >
               <Download size={15} /> Export CSV
@@ -299,7 +302,7 @@ export default function GarmentJobCardDashboard() {
         <div style={kpiCardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={kpiLabelStyle}>Total Jobs</span>
-            <Layers size={18} color="#60a5fa" />
+            <Layers size={18} color="#4f46e5" />
           </div>
           <span style={kpiValStyle}>{summary.totalJobs || 0}</span>
           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Active Production Lots</span>
@@ -308,46 +311,46 @@ export default function GarmentJobCardDashboard() {
         <div style={kpiCardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={kpiLabelStyle}>Total Garments</span>
-            <Calculator size={18} color="#34d399" />
+            <Calculator size={18} color="#4f46e5" />
           </div>
-          <span style={{ ...kpiValStyle, color: '#34d399' }}>{summary.totalPieces || 0} Pcs</span>
+          <span style={{ ...kpiValStyle, color: '#0f172a' }}>{summary.totalPieces || 0} Pcs</span>
           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Manufactured Volume</span>
         </div>
 
         <div style={kpiCardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={kpiLabelStyle}>Fabric Expense</span>
-            <DollarSign size={18} color="#34d399" />
+            <DollarSign size={18} color="#059669" />
           </div>
-          <span style={{ ...kpiValStyle, color: '#34d399' }}>₹{(summary.totalFabricCost || 0).toLocaleString('en-IN')}</span>
+          <span style={{ ...kpiValStyle, color: '#0f172a' }}>₹{(summary.totalFabricCost || 0).toLocaleString('en-IN')}</span>
           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Raw Material Cost</span>
         </div>
 
         <div style={kpiCardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={kpiLabelStyle}>Stitching & Labor</span>
-            <Scissors size={18} color="#c084fc" />
+            <Scissors size={18} color="#4f46e5" />
           </div>
-          <span style={{ ...kpiValStyle, color: '#c084fc' }}>₹{(summary.totalStitchingCost || 0).toLocaleString('en-IN')}</span>
+          <span style={{ ...kpiValStyle, color: '#0f172a' }}>₹{(summary.totalStitchingCost || 0).toLocaleString('en-IN')}</span>
           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Vendor Operations</span>
         </div>
 
-        <div style={{ ...kpiCardStyle, border: '1px solid rgba(245,158,11,0.3)', background: 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(0,0,0,0.2))' }}>
+        <div style={{ ...kpiCardStyle, border: '1px solid #cbd5e1', background: '#ffffff' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={kpiLabelStyle}>Avg Cost / Piece</span>
-            <TrendingUp size={18} color="#fbbf24" />
+            <TrendingUp size={18} color="#4f46e5" />
           </div>
-          <span style={{ ...kpiValStyle, color: '#fbbf24' }}>₹{(summary.avgCostPerPiece || 0).toFixed(2)}</span>
+          <span style={{ ...kpiValStyle, color: '#4f46e5' }}>₹{(summary.avgCostPerPiece || 0).toFixed(2)}</span>
           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Grand Total / Total Pcs</span>
         </div>
       </div>
 
       {/* 8-Stage Production Filter Pills */}
       <div style={{
-        background: 'var(--bg-card, #1f2937)',
+        background: '#ffffff',
         padding: '0.85rem 1rem',
         borderRadius: '10px',
-        border: '1px solid var(--border-light)',
+        border: '1px solid #cbd5e1',
         display: 'flex',
         flexDirection: 'column',
         gap: '0.5rem'
@@ -359,14 +362,15 @@ export default function GarmentJobCardDashboard() {
           <button
             onClick={() => setStageFilter('All')}
             style={{
-              padding: '0.35rem 0.75rem',
+              padding: '0.35rem 0.85rem',
               borderRadius: '20px',
-              border: stageFilter === 'All' ? '1px solid var(--primary)' : '1px solid var(--border-light)',
-              background: stageFilter === 'All' ? 'var(--primary)' : 'var(--bg-main, #111827)',
-              color: stageFilter === 'All' ? '#fff' : 'var(--text-muted)',
+              border: stageFilter === 'All' ? '1px solid #4f46e5' : '1px solid #cbd5e1',
+              background: stageFilter === 'All' ? '#4f46e5' : '#ffffff',
+              color: stageFilter === 'All' ? '#ffffff' : '#334155',
               fontSize: '0.78rem',
               fontWeight: 700,
               cursor: 'pointer',
+              boxShadow: stageFilter === 'All' ? '0 2px 8px rgba(79,70,229,0.3)' : 'none',
               transition: 'all 0.15s ease'
             }}
           >
@@ -377,11 +381,11 @@ export default function GarmentJobCardDashboard() {
               key={st.stage_number}
               onClick={() => setStageFilter(String(st.stage_number))}
               style={{
-                padding: '0.35rem 0.75rem',
+                padding: '0.35rem 0.85rem',
                 borderRadius: '20px',
-                border: stageFilter === String(st.stage_number) ? `1px solid ${st.color}` : '1px solid var(--border-light)',
-                background: stageFilter === String(st.stage_number) ? `${st.color}25` : 'var(--bg-main, #111827)',
-                color: stageFilter === String(st.stage_number) ? st.color : 'var(--text-muted)',
+                border: stageFilter === String(st.stage_number) ? '1px solid #4f46e5' : '1px solid #cbd5e1',
+                background: stageFilter === String(st.stage_number) ? 'rgba(79,70,229,0.1)' : '#ffffff',
+                color: stageFilter === String(st.stage_number) ? '#4f46e5' : '#334155',
                 fontSize: '0.78rem',
                 fontWeight: 700,
                 cursor: 'pointer',
