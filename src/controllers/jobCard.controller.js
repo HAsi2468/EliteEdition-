@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const db = require('../db/models');
 const logger = require('../config/logger');
 const PDFDocument = require('pdfkit');

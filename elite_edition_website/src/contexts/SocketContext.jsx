@@ -13,10 +13,13 @@ export const SocketProvider = ({ children }) => {
     // Get the base API URL and format it to target the socket server
     // (If API is http://3.7.174.180:3001/v1, socket server is on http://3.7.174.180:3001)
     const apiUrl = getBaseUrl();
-    const socketUrl = apiUrl.replace(/\/v1\/?$/, '');
+    let socketUrl = apiUrl.replace(/\/v1\/?$/, '');
+    if (!socketUrl || !socketUrl.startsWith('http')) {
+      socketUrl = window.location.origin;
+    }
 
     const newSocket = io(socketUrl, {
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       autoConnect: true,
     });
 
