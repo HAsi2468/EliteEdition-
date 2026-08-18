@@ -114,7 +114,14 @@ app.use(express.static(path.join(__dirname, '../../elite_edition_website_dist'))
 // Serve design images
 app.use('/designs', express.static(path.join(__dirname, '../../elite_edition_images')));
 
-app.get('*', (req, res) => {
+// Serve frontend website with no-cache headers to ensure users always receive the latest version
+app.get('*', (req, res, next) => {
+	if (req.path.startsWith('/v1') || req.path.startsWith('/uploads') || req.path.startsWith('/designs')) {
+		return next();
+	}
+	res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+	res.setHeader('Pragma', 'no-cache');
+	res.setHeader('Expires', '0');
 	res.sendFile(path.join(__dirname, '../../elite_edition_website_dist/index.html'));
 });
 
