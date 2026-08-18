@@ -267,6 +267,23 @@ const getAnalytics = async (req, res) => {
   }
 };
 
+// Clear All Expense Records
+const clearAll = async (req, res) => {
+  try {
+    const { companyEntity } = req.query;
+    const filter = companyEntity ? { companyEntity } : {};
+    const result = await db.Expense.deleteMany(filter);
+    res.json({
+      success: true,
+      message: `Cleared ${result.deletedCount} expense records.`,
+      deletedCount: result.deletedCount
+    });
+  } catch (err) {
+    logger.error('expense.clearAll error: %o', err);
+    res.status(500).json({ error: 'Failed to clear expense records' });
+  }
+};
+
 module.exports = {
   getAll,
   getNextVoucherNo,
@@ -274,5 +291,6 @@ module.exports = {
   create,
   update,
   remove,
+  clearAll,
   getAnalytics
 };
