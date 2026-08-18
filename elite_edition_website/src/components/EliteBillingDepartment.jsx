@@ -1631,87 +1631,118 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                         </td>
                       </tr>
                     ) : (
-                      displayedInvoices.map(inv => (
-                        <tr key={inv._id} style={{ borderBottom: '1px solid var(--border-light)', background: selectedInvoiceIds.includes(inv._id) ? 'rgba(124, 58, 237, 0.08)' : 'transparent' }}>
-                          <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
-                            <input
-                              type="checkbox"
-                              checked={selectedInvoiceIds.includes(inv._id)}
-                              onChange={() => handleToggleSelectInvoice(inv._id)}
-                              style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#7c3aed' }}
-                            />
-                          </td>
-                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: '#a78bfa' }}>
-                          <button
-                            onClick={() => setViewInvoiceModal(inv)}
-                            style={{ background: 'none', border: 'none', color: '#a78bfa', fontWeight: 800, cursor: 'pointer', padding: 0, textDecoration: 'underline', outline: 'none' }}
-                          >
-                            {inv.invoiceNo}
-                          </button>
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#60a5fa', fontWeight: 700 }}>
-                          {inv.ourChallanNo || (Array.isArray(inv.linkedChallanNos) && inv.linkedChallanNos.length > 0 ? inv.linkedChallanNos.join(', ') : '') || (inv.items && inv.items.map(i => i.ourChallanNo || i.partyChallan).filter(Boolean).join(', ')) || '—'}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>
-                          <div style={{ fontWeight: 700 }}>{inv.customer?.businessName || inv.customer?.name || '—'}</div>
-                          {inv.customer?.gstin && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>GSTIN: {inv.customer.gstin}</div>}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>
-                          {formatDateDDMMYYYY(inv.invoiceDate)}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                          {fmtINR(inv.grandTotal)}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#34d399', fontWeight: 700 }}>
-                          {fmtINR(inv.paidAmount)}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: inv.balanceDue > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700 }}>
-                          {fmtINR(inv.balanceDue)}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
-                          <span style={{
-                            padding: '0.2rem 0.6rem',
-                            borderRadius: 6,
-                            fontSize: '0.68rem',
-                            fontWeight: 800,
-                            background: inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.15)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
-                            color: inv.paymentStatus === 'PAID' ? '#34d399' : inv.paymentStatus === 'PARTIALLY_PAID' ? '#fbbf24' : '#f87171',
-                            border: `1px solid ${inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.3)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}`
-                          }}>
-                            {inv.paymentStatus}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem' }}>
-                          <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#a78bfa', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(124, 58, 237, 0.25)' }}>
-                            {inv.createdByName || inv.createdBy || 'HASI'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
-                            <button onClick={() => setViewInvoiceModal(inv)} className="btn-icon" title="View Tax Invoice Details">
-                              <Eye size={14} color="#38bdf8" />
-                            </button>
-                            <button onClick={() => setSelectedInvoiceHistory(inv)} className="btn-icon" title="View Audit History">
-                              <Clock size={14} color="#fbbf24" />
-                            </button>
-                            <button onClick={() => openPdfDialog(inv)} className="btn-icon" title="Download GST PDF">
-                              <Download size={14} color="#a78bfa" />
-                            </button>
-                            {inv.balanceDue > 0 && (
-                              <button onClick={() => { setPaymentModalInvoice(inv); setPayAmount(inv.balanceDue); }} className="btn-icon" title="Record Payment">
-                                <CreditCard size={14} color="#34d399" />
+                      displayedInvoices.map(inv => {
+                        const rawChallanStr = inv.ourChallanNo || (Array.isArray(inv.linkedChallanNos) && inv.linkedChallanNos.length > 0 ? inv.linkedChallanNos.join(', ') : '') || (inv.items && inv.items.map(i => i.ourChallanNo || i.partyChallan).filter(Boolean).join(', ')) || '';
+                        const challanList = rawChallanStr ? rawChallanStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+                        return (
+                          <tr key={inv._id} style={{ borderBottom: '1px solid var(--border-light)', background: selectedInvoiceIds.includes(inv._id) ? 'rgba(124, 58, 237, 0.08)' : 'transparent' }}>
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                              <input
+                                type="checkbox"
+                                checked={selectedInvoiceIds.includes(inv._id)}
+                                onChange={() => handleToggleSelectInvoice(inv._id)}
+                                style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#7c3aed' }}
+                              />
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: '#a78bfa', verticalAlign: 'middle' }}>
+                              <button
+                                onClick={() => setViewInvoiceModal(inv)}
+                                style={{ background: 'none', border: 'none', color: '#a78bfa', fontWeight: 800, cursor: 'pointer', padding: 0, textDecoration: 'underline', outline: 'none', whiteSpace: 'nowrap' }}
+                              >
+                                {inv.invoiceNo}
                               </button>
-                            )}
-                            <button onClick={() => handleOpenCreateTab(inv)} className="btn-icon" title="Edit Invoice">
-                              <Edit2 size={14} />
-                            </button>
-                            <button onClick={() => handleDeleteInvoice(inv._id, inv.invoiceNo)} className="btn-icon" title="Delete Invoice">
-                              <Trash2 size={14} color="#f87171" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', verticalAlign: 'middle', maxWidth: '220px' }}>
+                              {challanList.length === 0 ? (
+                                <span style={{ color: 'var(--text-muted)' }}>—</span>
+                              ) : challanList.length <= 2 ? (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                  {challanList.map((ch, idx) => (
+                                    <span key={idx} style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(96, 165, 250, 0.12)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.28)', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                      {ch}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                                  {challanList.slice(0, 2).map((ch, idx) => (
+                                    <span key={idx} style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(96, 165, 250, 0.12)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.28)', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                      {ch}
+                                    </span>
+                                  ))}
+                                  <span
+                                    title={challanList.join(', ')}
+                                    style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(124, 58, 237, 0.15)', color: '#c084fc', border: '1px solid rgba(124, 58, 237, 0.35)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                  >
+                                    +{challanList.length - 2} more
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)', verticalAlign: 'middle' }}>
+                              <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>{inv.customer?.businessName || inv.customer?.name || '—'}</div>
+                              {inv.customer?.gstin && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>GSTIN: {inv.customer.gstin}</div>}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              {formatDateDDMMYYYY(inv.invoiceDate)}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              {fmtINR(inv.grandTotal)}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#34d399', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              {fmtINR(inv.paidAmount)}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: inv.balanceDue > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              {fmtINR(inv.balanceDue)}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle' }}>
+                              <span style={{
+                                padding: '0.25rem 0.6rem',
+                                borderRadius: 6,
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                background: inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.15)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+                                color: inv.paymentStatus === 'PAID' ? '#34d399' : inv.paymentStatus === 'PARTIALLY_PAID' ? '#fbbf24' : '#f87171',
+                                border: `1px solid ${inv.paymentStatus === 'PAID' ? 'rgba(16,185,129,0.3)' : inv.paymentStatus === 'PARTIALLY_PAID' ? 'rgba(245,158,11,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                                whiteSpace: 'nowrap',
+                                display: 'inline-block'
+                              }}>
+                                {inv.paymentStatus}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', verticalAlign: 'middle' }}>
+                              <span style={{ padding: '0.25rem 0.65rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#a78bfa', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(124, 58, 237, 0.25)', whiteSpace: 'nowrap', display: 'inline-block' }}>
+                                {inv.createdByName || inv.createdBy || 'HASI'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.5rem 1rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                              <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                                <button onClick={() => setViewInvoiceModal(inv)} className="btn-icon" title="View Tax Invoice Details">
+                                  <Eye size={14} color="#38bdf8" />
+                                </button>
+                                <button onClick={() => setSelectedInvoiceHistory(inv)} className="btn-icon" title="View Audit History">
+                                  <Clock size={14} color="#fbbf24" />
+                                </button>
+                                <button onClick={() => openPdfDialog(inv)} className="btn-icon" title="Download GST PDF">
+                                  <Download size={14} color="#a78bfa" />
+                                </button>
+                                {inv.balanceDue > 0 && (
+                                  <button onClick={() => { setPaymentModalInvoice(inv); setPayAmount(inv.balanceDue); }} className="btn-icon" title="Record Payment">
+                                    <CreditCard size={14} color="#34d399" />
+                                  </button>
+                                )}
+                                <button onClick={() => handleOpenCreateTab(inv)} className="btn-icon" title="Edit Invoice">
+                                  <Edit2 size={14} />
+                                </button>
+                                <button onClick={() => handleDeleteInvoice(inv._id, inv.invoiceNo)} className="btn-icon" title="Delete Invoice">
+                                  <Trash2 size={14} color="#f87171" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                 )}
               </tbody>
             </table>

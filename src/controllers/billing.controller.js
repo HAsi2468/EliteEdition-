@@ -186,10 +186,10 @@ const getInvoiceById = async (req, res) => {
 // ── 4. GET NEXT INVOICE NUMBER ──────────────────────────────────────────────
 const getNextInvoiceNo = async (req, res) => {
   try {
-    const { companyEntity = 'Elite Online' } = req.query;
+    const { companyEntity = 'Elite Digital Print' } = req.query;
     const PrintConfig = require('../db/models/printConfig.model');
-    let defaultPrefix = 'EDP-INV-';
-    let defaultStartSeq = 1001;
+    let defaultPrefix = 'EDP/26-27/';
+    let defaultStartSeq = 223;
     if (companyEntity === 'Elite Edition') {
       defaultPrefix = 'EE-2627-';
       defaultStartSeq = 1;
@@ -198,13 +198,22 @@ const getNextInvoiceNo = async (req, res) => {
       defaultStartSeq = 1;
     }
 
-    const config = await PrintConfig.findOne({ companyEntity }).lean() || {};
+    const filter = buildCompanyFilter(companyEntity);
+    const config = await PrintConfig.findOne(filter).lean() || {};
     const START_SEQ = config.startingInvoiceNo != null ? Number(config.startingInvoiceNo) : defaultStartSeq;
     const prefix = config.invoicePrefix || defaultPrefix;
 
-    const lastInvoice = await BillingInvoice.findOne({ companyEntity }, 'invoiceSeq').sort({ invoiceSeq: -1 });
+    const lastInvoice = await BillingInvoice.findOne(filter, 'invoiceSeq').sort({ invoiceSeq: -1 });
     const nextSeq = lastInvoice && lastInvoice.invoiceSeq ? Math.max(lastInvoice.invoiceSeq + 1, START_SEQ) : START_SEQ;
-    const invoiceNo = `${prefix}${String(nextSeq).padStart(4, '0')}`;
+    
+    let invoiceNo;
+    if (prefix.endsWith('/')) {
+      invoiceNo = `${prefix}${nextSeq}`;
+    } else if (prefix.endsWith('-')) {
+      invoiceNo = `${prefix}${String(nextSeq).padStart(4, '0')}`;
+    } else {
+      invoiceNo = `${prefix}${nextSeq}`;
+    }
 
     res.json({ success: true, nextSeq, prefix, invoiceNo });
   } catch (error) {
@@ -216,12 +225,24 @@ const getNextInvoiceNo = async (req, res) => {
 const createInvoice = async (req, res) => {
   try {
     const invoiceData = req.body;
+    const entity = invoiceData.companyEntity || 'Elite Digital Print';
+    const filter = buildCompanyFilter(entity);
 
     if (!invoiceData.invoiceSeq || !invoiceData.invoiceNo) {
-      const lastInvoice = await BillingInvoice.findOne({}, 'invoiceSeq').sort({ invoiceSeq: -1 });
-      const nextSeq = lastInvoice && lastInvoice.invoiceSeq ? lastInvoice.invoiceSeq + 1 : 1001;
+      const PrintConfig = require('../db/models/printConfig.model');
+      const config = await PrintConfig.findOne(filter).lean() || {};
+      const prefix = config.invoicePrefix || 'EDP/26-27/';
+      const startSeq = config.startingInvoiceNo != null ? Number(config.startingInvoiceNo) : 223;
+
+      const lastInvoice = await BillingInvoice.findOne(filter, 'invoiceSeq').sort({ invoiceSeq: -1 });
+      const nextSeq = lastInvoice && lastInvoice.invoiceSeq ? Math.max(lastInvoice.invoiceSeq + 1, startSeq) : startSeq;
       invoiceData.invoiceSeq = nextSeq;
-      invoiceData.invoiceNo = `EDP-INV-${nextSeq}`;
+      
+      if (prefix.endsWith('/')) {
+        invoiceData.invoiceNo = `${prefix}${nextSeq}`;
+      } else {
+        invoiceData.invoiceNo = `${prefix}${String(nextSeq).padStart(4, '0')}`;
+      }
     }
 
     // Ensure customer object is present
@@ -2005,13 +2026,13 @@ const getCompanySettings = async (req, res) => {
       if (companyEntity === 'Elite Fabtex') {
         prefix = 'EF-2627-';
       } else if (companyEntity === 'Elite Online' || companyEntity === 'Elite Digital Print') {
-        prefix = 'EDP-INV-';
+        prefix = 'EDP/26-27/';
       }
       config = await PrintConfig.create({
         companyEntity,
         companyName: masterConfig.companyName || compName,
         invoicePrefix: prefix,
-        startingInvoiceNo: companyEntity === 'Elite Online' ? 1001 : 1,
+        startingInvoiceNo: 223,
         companyGstin: masterConfig.companyGstin || '',
         companyAddress: masterConfig.companyAddress || '',
         companyPhone: masterConfig.companyPhone || '',
