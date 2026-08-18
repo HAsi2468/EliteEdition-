@@ -747,33 +747,6 @@ export default function FusingDepartment() {
                   <option value="No">⏳ NO (Partial / In Progress)</option>
                 </select>
               </div>
-
-              {/* BUTTER PAPER CONSUMPTION IN WEIGHT (KG) */}
-              {topForm.useButterPaper === 'Yes' && (
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#6d28d9', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                    CONSUMPTION (KG)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="e.g. 12.50 kg"
-                    value={topForm.butterPaperWeightKg}
-                    onChange={e => setTopForm(f => ({ ...f, butterPaperWeightKg: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      borderRadius: '8px',
-                      border: '1px solid #c4b5fd',
-                      fontSize: '0.92rem',
-                      fontWeight: 800,
-                      background: '#ffffff',
-                      color: '#6d28d9'
-                    }}
-                  />
-                </div>
-              )}
             </div>
 
             {/* Secondary Parameters (Date, Shift, Fusing Machine, Panna, Operator, Meters Fused) */}

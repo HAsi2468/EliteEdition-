@@ -170,9 +170,18 @@ export default function App() {
     'jobcards_stitching_challan', 'jobcards_stitching_settings', 'stitching'
   ];
 
-  const hasEliteEditionAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => ELITE_ONLINE_PERMISSIONS.includes(p)));
-  const hasDigitalPrintAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => (EDP_PERMISSIONS.includes(p) || p.startsWith('jobcards')) && !p.startsWith('stitching_')));
-  const hasStitchingAccess = !currentUser || currentUser.role === 'admin' || (currentUser.permissions && currentUser.permissions.some(p => STITCHING_PERMISSIONS.includes(p) || p.startsWith('stitching_')));
+  const isCompanyAllowed = (companyName) => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'admin' || currentUser.isMainAdmin || currentUser.email === 'harshitsidapara2468@gmail.com') return true;
+    if (Array.isArray(currentUser.allowedCompanies) && currentUser.allowedCompanies.length > 0) {
+      return currentUser.allowedCompanies.includes(companyName);
+    }
+    return true;
+  };
+
+  const hasEliteEditionAccess = !currentUser || currentUser.role === 'admin' || isCompanyAllowed('Elite Online') || (currentUser.permissions && currentUser.permissions.some(p => ELITE_ONLINE_PERMISSIONS.includes(p)));
+  const hasDigitalPrintAccess = !currentUser || currentUser.role === 'admin' || isCompanyAllowed('Elite Digital Print') || (currentUser.permissions && currentUser.permissions.some(p => (EDP_PERMISSIONS.includes(p) || p.startsWith('jobcards')) && !p.startsWith('stitching_')));
+  const hasStitchingAccess = !currentUser || currentUser.role === 'admin' || isCompanyAllowed('Elite Stitching') || (currentUser.permissions && currentUser.permissions.some(p => STITCHING_PERMISSIONS.includes(p) || p.startsWith('stitching_')));
   const hasWorkspaceAccess = !currentUser || currentUser.role === 'admin' || !currentUser.permissions || currentUser.permissions.length === 0 || currentUser.permissions.includes('workspace');
 
   const getFirstJobCardsTab = () => {
@@ -226,39 +235,28 @@ export default function App() {
     return () => window.removeEventListener('elite-navigate-tab', handleNavTab);
   }, []);
 
-  const isCompanyAllowed = (companyName) => {
-    if (!currentUser) return false;
-    if (currentUser.role === 'admin' || currentUser.isMainAdmin || currentUser.email === 'harshitsidapara2468@gmail.com') return true;
-    if (Array.isArray(currentUser.allowedCompanies) && currentUser.allowedCompanies.length > 0) {
-      return currentUser.allowedCompanies.includes(companyName);
-    }
-    return true;
-  };
-
   // Auto-switch department if user lacks permission for current activeDepartment
   useEffect(() => {
     if (!currentUser || currentUser.role === 'admin') return;
-    if (currentUser.permissions && currentUser.permissions.length > 0) {
-      const allowedDepts = [];
-      if (isCompanyAllowed('Elite Online') && hasEliteEditionAccess) allowedDepts.push('elite_online');
-      if (isCompanyAllowed('Elite Digital Print') && hasDigitalPrintAccess) allowedDepts.push('digital_print');
-      if (isCompanyAllowed('Elite Stitching') && hasStitchingAccess) allowedDepts.push('stitching');
-      if (isCompanyAllowed('Elite Edition')) allowedDepts.push('elite_edition');
-      if (isCompanyAllowed('Elite Fabtex')) allowedDepts.push('elite_fabtex');
+    const allowedDepts = [];
+    if (isCompanyAllowed('Elite Online') && hasEliteEditionAccess) allowedDepts.push('elite_online');
+    if (isCompanyAllowed('Elite Digital Print') && hasDigitalPrintAccess) allowedDepts.push('digital_print');
+    if (isCompanyAllowed('Elite Stitching') && hasStitchingAccess) allowedDepts.push('stitching');
+    if (isCompanyAllowed('Elite Edition')) allowedDepts.push('elite_edition');
+    if (isCompanyAllowed('Elite Fabtex')) allowedDepts.push('elite_fabtex');
 
-      if (allowedDepts.length > 0 && !allowedDepts.includes(activeDepartment)) {
-        const targetDept = allowedDepts[0];
-        setActiveDepartment(targetDept);
-        if (activeTab !== 'workspace') {
-          if (targetDept === 'stitching') setActiveTab(getFirstStitchingTab());
-          else if (targetDept === 'digital_print') setActiveTab(getFirstJobCardsTab());
-          else if (targetDept === 'elite_edition') setActiveTab('ee_dashboard');
-          else if (targetDept === 'elite_fabtex') setActiveTab('ef_dashboard');
-          else if (targetDept === 'elite_online') setActiveTab(getFirstEETab());
-        }
+    if (allowedDepts.length > 0 && !allowedDepts.includes(activeDepartment)) {
+      const targetDept = allowedDepts[0];
+      setActiveDepartment(targetDept);
+      if (activeTab !== 'workspace') {
+        if (targetDept === 'stitching') setActiveTab(getFirstStitchingTab());
+        else if (targetDept === 'digital_print') setActiveTab(getFirstJobCardsTab());
+        else if (targetDept === 'elite_edition') setActiveTab('ee_dashboard');
+        else if (targetDept === 'elite_fabtex') setActiveTab('ef_dashboard');
+        else if (targetDept === 'elite_online') setActiveTab(getFirstEETab());
       }
     }
-  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), JSON.stringify(currentUser?.allowedCompanies || []), hasDigitalPrintAccess, hasStitchingAccess, hasEliteEditionAccess]);
+  }, [currentUser?.role, JSON.stringify(currentUser?.permissions || []), JSON.stringify(currentUser?.allowedCompanies || []), activeDepartment]);
 
   const handleNavClick = (tab) => {
     setActiveTab(tab);
