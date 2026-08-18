@@ -1247,7 +1247,10 @@ function JobCardForm({ card, onSave, onClose, department }) {
       }
       onSave();
     } catch (err) {
-      setError(err.message || 'Failed to save job card.');
+      console.error('Save Job Card error:', err);
+      const msg = err.message || 'Failed to save job card. Please check server logs or network.';
+      setError(msg);
+      triggerEliteAlert('Failed to Save Job Card', msg);
     } finally {
       setSaving(false);
     }

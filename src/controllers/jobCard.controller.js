@@ -268,7 +268,7 @@ const createJobCard = async (req, res) => {
     if (body.fusingDate) body.fusingDate = normalizeDateStr(body.fusingDate);
     if (body.deliveryDate) body.deliveryDate = normalizeDateStr(body.deliveryDate);
 
-    await syncDesignImage(body);
+    syncDesignImage(body).catch(e => logger.warn('syncDesignImage failed: %s', e.message));
 
     const creatorName = req.user?.name || body.userName || body.createdBy || 'Staff User';
     const creatorId = req.user?._id || body.userId || body.createdById;
@@ -334,7 +334,7 @@ const updateJobCard = async (req, res) => {
     const existingCard = await db.JobCard.findById(req.params.id);
     if (!existingCard) return res.status(404).json({ error: 'Job card not found' });
 
-    await syncDesignImage(body, existingCard);
+    syncDesignImage(body, existingCard).catch(e => logger.warn('syncDesignImage failed: %s', e.message));
 
     if (body.panna && body.pass && body.totalMtr && body.machineName)
       body.expTime = calcExpTime(body.panna, body.pass, body.totalMtr, body.machineName);
