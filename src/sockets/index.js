@@ -1,4 +1,5 @@
 const { setActivitySocketIo } = require('../utils/activityEvent');
+const { ChatMessage, User, Task, ChatRoom } = require('../db/models');
 
 const activeUsers = new Map(); // socket.id -> userId
 const getOnlineUserIds = () => {

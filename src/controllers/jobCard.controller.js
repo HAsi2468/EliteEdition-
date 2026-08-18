@@ -324,6 +324,7 @@ const updateJobCard = async (req, res) => {
     delete body.created_date_time;
     delete body.modified_date_time;
     delete body.__v;
+    if (!body.orderChatRoomId) delete body.orderChatRoomId;
 
     if (body.date) body.date = normalizeDateStr(body.date);
     if (body.printDate) body.printDate = normalizeDateStr(body.printDate);

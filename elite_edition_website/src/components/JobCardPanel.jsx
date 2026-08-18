@@ -1233,6 +1233,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
     delete payload.created_date_time;
     delete payload.modified_date_time;
     delete payload.__v;
+    if (!payload.orderChatRoomId) delete payload.orderChatRoomId;
 
     try {
       if (card?._id || card?.id) {
