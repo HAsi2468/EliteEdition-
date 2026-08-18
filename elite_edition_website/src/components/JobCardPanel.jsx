@@ -65,7 +65,7 @@ import ScreenGroupRoster from './ScreenGroupRoster';
 import { dispatchScreenGroupEvent } from '../services/screenGroupService';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import { COLOR_NAMES, getColorHex } from '../utils/colors';
-import { triggerPushNotification } from './NotificationToast';
+import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import JobCardTooltip from './JobCardTooltip';

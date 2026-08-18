@@ -53,7 +53,7 @@ import {
   PanelLeftOpen
 } from 'lucide-react';
 
-import NotificationToastContainer, { triggerPushNotification, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
+import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
 
 
 
