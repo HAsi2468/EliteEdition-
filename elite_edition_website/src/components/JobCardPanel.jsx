@@ -83,16 +83,27 @@ const SPEED_PRINTDOT = {
 };
 function calcExpTime(panna, passText, totalMtr, machineName) {
   const pannaMatch = String(panna || '').match(/\d+/);
-  const pannaNum = pannaMatch ? Number(pannaMatch[0]) : null;
+  let pannaNum = pannaMatch ? Number(pannaMatch[0]) : null;
   const passMatch = String(passText || '').match(/\d+/);
-  const pass = passMatch ? Number(passMatch[0]) : null;
-  if (!pannaNum || !pass || !totalMtr) return '';
+  let pass = passMatch ? Number(passMatch[0]) : null;
+  if (!totalMtr || Number(totalMtr) <= 0) return '';
 
   const mName = String(machineName || '').trim().toUpperCase();
-  const table = mName === 'GRANDO' ? SPEED_GRANDO : mName === 'PRINTDOT' ? SPEED_PRINTDOT : null;
-  if (!table || !table[pannaNum] || !table[pannaNum][pass]) return '';
+  const table = mName === 'GRANDO' ? SPEED_GRANDO : SPEED_PRINTDOT;
 
-  const speed = table[pannaNum][pass];
+  if (!pannaNum) pannaNum = 58;
+  const availablePannas = [36, 38, 42, 44, 46, 58];
+  let targetPanna = availablePannas.reduce((prev, curr) => 
+    Math.abs(curr - pannaNum) < Math.abs(prev - pannaNum) ? curr : prev
+  );
+
+  if (!pass) pass = 4;
+  const availablePasses = [1, 2, 4, 6, 8];
+  let targetPass = availablePasses.reduce((prev, curr) => 
+    Math.abs(curr - pass) < Math.abs(prev - pass) ? curr : prev
+  );
+
+  const speed = (table[targetPanna] && table[targetPanna][targetPass]) || 186;
   const time = Number(totalMtr) / speed;
   let hours = Math.floor(time);
   let minutes = Math.round((time - hours) * 60);
