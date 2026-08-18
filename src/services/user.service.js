@@ -84,8 +84,8 @@ async function updateUser(req) {
 	const { password, email } = req.body;
 	const userId = req.params.id || req.body.id;
 
-	if (password) {
-		const hashedPassword = await encryptData(password);
+	if (password && String(password).trim()) {
+		const hashedPassword = await encryptData(String(password).trim());
 
 		if (!hashedPassword) {
 			throw new ApiError(
@@ -95,6 +95,8 @@ async function updateUser(req) {
 		}
 
 		req.body.password = hashedPassword;
+	} else {
+		delete req.body.password;
 	}
 
 	if (email) {

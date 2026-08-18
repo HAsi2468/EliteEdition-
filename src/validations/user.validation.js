@@ -8,6 +8,8 @@ const createUser = {
 		name: Joi.string().required(),
 		role: Joi.string().valid('admin', 'user').required(),
 		permissions: Joi.array().items(Joi.string()).optional(),
+		isMainAdmin: Joi.boolean().optional(),
+		allowedCompanies: Joi.array().items(Joi.string()).optional(),
 	}),
 };
 
@@ -33,10 +35,12 @@ const updateUser = {
 	body: Joi.object()
 		.keys({
 			email: Joi.string().email(),
-			password: Joi.string().custom(password),
+			password: Joi.string().allow('').optional().custom(password),
 			name: Joi.string(),
 			role: Joi.string().valid('admin', 'user'),
 			permissions: Joi.array().items(Joi.string()),
+			isMainAdmin: Joi.boolean().optional(),
+			allowedCompanies: Joi.array().items(Joi.string()).optional(),
 		})
 		.min(1),
 };
