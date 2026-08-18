@@ -28,12 +28,13 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
     companyBankName: '',
     companyAccountNo: '',
     companyIfscCode: '',
-    invoicePrefix: companyEntity === 'Elite Fabtex' ? 'EF-2627-' : companyEntity === 'Elite Edition' ? 'EE-2627-' : 'EDP-INV-',
-    startingInvoiceNo: companyEntity === 'Elite Online' ? 1001 : 1,
+    invoicePrefix: companyEntity === 'Elite Fabtex' ? 'EF-2627-' : companyEntity === 'Elite Edition' ? 'EE-2627-' : companyEntity === 'Elite Stitching' ? 'ES-2627-' : 'EDP/26-27/',
+    startingInvoiceNo: (companyEntity === 'Elite Online' || companyEntity === 'Elite Digital Print') ? 223 : 1,
     companyTerms: 'Payment due within 30 days from invoice date. Subject to Surat jurisdiction.',
     categories: [],
     paperTypes: [],
     fabrics: [],
+    widths: ['36"', '44"', '58"', '64"'],
     passes: []
   });
 
@@ -188,7 +189,7 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
           categories: Array.isArray(res.data.categories) ? res.data.categories : [],
           paperTypes: Array.isArray(res.data.paperTypes) ? res.data.paperTypes : [],
           fabrics: Array.isArray(res.data.fabrics) ? res.data.fabrics : [],
-          widths: Array.isArray(res.data.widths) ? res.data.widths : [],
+          widths: (Array.isArray(res.data.widths) && res.data.widths.length > 0) ? res.data.widths : ['36"', '44"', '58"', '64"'],
           passes: Array.isArray(res.data.passes) ? res.data.passes : []
         }));
       }
@@ -856,11 +857,35 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
 
         {/* Dynamic Values & Dropdowns */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#ec4899', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#3b82f6', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
             <Sliders size={18} /> Dynamic Settings & Custom Dropdowns
           </h3>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+            {/* Panna Widths (Dynamic Dropdown) */}
+            <div>
+              <label className="form-label">Panna / Paper Widths (Dynamic Dropdown)</label>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={newTagInput.widths}
+                  onChange={(e) => setNewTagInput(t => ({ ...t, widths: e.target.value }))}
+                  placeholder='Add width e.g. 54" or 64"...'
+                  className="form-control"
+                />
+                <button type="button" onClick={() => handleAddTag('widths')} className="btn-secondary" style={{ padding: '0.4rem 0.85rem' }}>
+                  <Plus size={16} />
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {form.widths?.map(tag => (
+                  <span key={tag} style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)', padding: '3px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    {tag} <Trash2 size={12} style={{ cursor: 'pointer' }} onClick={() => handleRemoveTag('widths', tag)} />
+                  </span>
+                ))}
+              </div>
+            </div>
+
             {/* Product Categories */}
             <div>
               <label className="form-label">Product Categories</label>
@@ -878,14 +903,14 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
                 {form.categories?.map(tag => (
-                  <span key={tag} style={{ background: 'rgba(236,72,153,0.15)', color: '#ec4899', border: '1px solid rgba(236,72,153,0.3)', padding: '3px 10px', borderRadius: '6px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span key={tag} style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)', padding: '3px 10px', borderRadius: '6px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                     {tag} <Trash2 size={12} style={{ cursor: 'pointer' }} onClick={() => handleRemoveTag('categories', tag)} />
                   </span>
                 ))}
               </div>
             </div>
 
-            {/* Fabrics */}
+            {/* Fabric Types */}
             <div>
               <label className="form-label">Fabric Types</label>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
@@ -904,6 +929,30 @@ export default function CompanySettingsPanel({ companyEntity = 'Elite Edition' }
                 {form.fabrics?.map(tag => (
                   <span key={tag} style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)', padding: '3px 10px', borderRadius: '6px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                     {tag} <Trash2 size={12} style={{ cursor: 'pointer' }} onClick={() => handleRemoveTag('fabrics', tag)} />
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Paper Types */}
+            <div>
+              <label className="form-label">Paper Types (Butter / Sublimation)</label>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={newTagInput.paperTypes}
+                  onChange={(e) => setNewTagInput(t => ({ ...t, paperTypes: e.target.value }))}
+                  placeholder="Add paper type..."
+                  className="form-control"
+                />
+                <button type="button" onClick={() => handleAddTag('paperTypes')} className="btn-secondary" style={{ padding: '0.4rem 0.85rem' }}>
+                  <Plus size={16} />
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {form.paperTypes?.map(tag => (
+                  <span key={tag} style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)', padding: '3px 10px', borderRadius: '6px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    {tag} <Trash2 size={12} style={{ cursor: 'pointer' }} onClick={() => handleRemoveTag('paperTypes', tag)} />
                   </span>
                 ))}
               </div>

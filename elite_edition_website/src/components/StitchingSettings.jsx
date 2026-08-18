@@ -9,11 +9,11 @@ export default function StitchingSettings() {
   const [actionLoading, setActionLoading] = useState(false);
   const [isVendorManagerOpen, setIsVendorManagerOpen] = useState(false);
 
-  // Expanded card sections state
+  // Expanded card sections state (collapsed by default)
   const [expandedSections, setExpandedSections] = useState({
-    garment: true,
-    finishing: true,
-    party: true
+    garment: false,
+    finishing: false,
+    party: false
   });
 
   const toggleSection = (key) => {
@@ -158,8 +158,20 @@ export default function StitchingSettings() {
         <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <Settings size={18} color={iconColor} /> {title}
         </h3>
-        <div>
-          {isExpanded ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '4px 12px',
+          borderRadius: '20px',
+          background: isExpanded ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.06)',
+          border: `1px solid ${isExpanded ? 'rgba(124,58,237,0.3)' : 'rgba(255,255,255,0.1)'}`,
+          color: isExpanded ? '#a78bfa' : 'var(--text-muted)',
+          fontSize: '0.78rem',
+          fontWeight: 700
+        }}>
+          <span>{isExpanded ? 'Collapse' : 'Expand'}</span>
+          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </div>
       </div>
     );

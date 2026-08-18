@@ -4,7 +4,7 @@ import {
   Flame, PlusCircle, Search, RefreshCw, Trash2, Edit2, Edit, CheckCircle2,
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
   X, Download, Eye, Layers3, Activity, Tag, Sparkles, FileText, FileSpreadsheet,
-  AlertTriangle, Gauge, Thermometer, Zap, Scale
+  AlertTriangle, Gauge, Thermometer, Zap, Scale, Settings
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
@@ -53,27 +53,115 @@ export default function FusingDepartment() {
 
   const [printConfig, setPrintConfig] = useState(null);
 
-  // Dynamic Panna Options from PrintConfig or fallback
+  // Dynamic Panna Options from PrintConfig or fallback (36", 44", 58", 64")
   const pannaOptions = useMemo(() => {
     if (printConfig && Array.isArray(printConfig.widths) && printConfig.widths.length > 0) {
       return printConfig.widths.map(w => String(w).includes('"') ? String(w) : `${w}"`);
     }
-    return ['36"', '38"', '44"', '48"', '52"', '54"', '58"', '60"', '64"', '72"'];
+    return ['36"', '44"', '58"', '64"'];
   }, [printConfig]);
+
+  const [rawMatTxns, setRawMatTxns] = useState([]);
 
   // ── TOP FORM STATE (New Fusing Entry) ───────────────────────────────────
   const [topForm, setTopForm] = useState({
     date: toLocalYMD(),
     shift: getAutoShift(),
+    onTime: '09:00',
+    offTime: '19:00',
     jobCardId: '',
     jobNo: '',
     fusingMachine: DEFAULT_FUSING_MACHINES[0],
     panna: '58"',
+    useButterPaper: 'Yes',
     butterPaperWeightKg: '',
+    rollCompleted: 'Yes',
+    printedMtr: '',
     fusingMtr: '',
     fusingOperator: accountFullName,
     notes: ''
   });
+
+  // Dynamic Report Modal Table State (Panna, Roll Qty, Weight KG)
+  const [reportForm, setReportForm] = useState({
+    onTime: '09:00',
+    offTime: '19:00',
+    inwardRows: [
+      { id: 1, panna: '36"', rolls: '1', weightKg: '' }
+    ],
+    usageRows: [
+      { id: 1, panna: '36"', rolls: '1', weightKg: '' }
+    ]
+  });
+
+  // Row helper functions for Report Modal
+  const handleAddInwardRow = () => {
+    setReportForm(prev => ({
+      ...prev,
+      inwardRows: [...prev.inwardRows, { id: Date.now(), panna: pannaOptions[0] || '58"', rolls: '1', weightKg: '' }]
+    }));
+  };
+
+  const handleRemoveInwardRow = (id) => {
+    setReportForm(prev => ({
+      ...prev,
+      inwardRows: prev.inwardRows.filter(r => r.id !== id)
+    }));
+  };
+
+  const handleInwardRowChange = (id, field, value) => {
+    setReportForm(prev => ({
+      ...prev,
+      inwardRows: prev.inwardRows.map(r => r.id === id ? { ...r, [field]: value } : r)
+    }));
+  };
+
+  const handleAddUsageRow = () => {
+    setReportForm(prev => ({
+      ...prev,
+      usageRows: [...prev.usageRows, { id: Date.now(), panna: pannaOptions[0] || '58"', rolls: '1', weightKg: '' }]
+    }));
+  };
+
+  const handleRemoveUsageRow = (id) => {
+    setReportForm(prev => ({
+      ...prev,
+      usageRows: prev.usageRows.filter(r => r.id !== id)
+    }));
+  };
+
+  // Quick Inline Panna Dropdown Manager Modal State
+  const [showPannaManagerModal, setShowPannaManagerModal] = useState(false);
+  const [newPannaInput, setNewPannaInput] = useState('');
+
+  const handleAddPannaOption = async () => {
+    const val = newPannaInput.trim();
+    if (!val) return;
+    const formattedVal = val.includes('"') ? val : `${val}"`;
+    const currentWidths = pannaOptions;
+    if (currentWidths.includes(formattedVal)) return;
+
+    const newWidths = [...currentWidths, formattedVal];
+    try {
+      await api.updateCompanySettings({ companyEntity: 'Elite Digital Print', widths: newWidths });
+      setPrintConfig(prev => ({ ...prev, widths: newWidths }));
+      setNewPannaInput('');
+      triggerPushNotification('Panna Width Added', `Panna "${formattedVal}" added to dropdown options.`, 'success');
+    } catch (err) {
+      triggerEliteAlert('Error', err.message || 'Failed to add Panna width.', 'error');
+    }
+  };
+
+  const handleRemovePannaOption = async (pannaToRemove) => {
+    const newWidths = pannaOptions.filter(w => w !== pannaToRemove);
+    try {
+      await api.updateCompanySettings({ companyEntity: 'Elite Digital Print', widths: newWidths });
+      setPrintConfig(prev => ({ ...prev, widths: newWidths }));
+      triggerPushNotification('Panna Width Removed', `Panna "${pannaToRemove}" removed from dropdown options.`, 'info');
+    } catch (err) {
+      triggerEliteAlert('Error', err.message || 'Failed to remove Panna width.', 'error');
+    }
+  };
 
   // Edit Modal Form State
   const [form, setForm] = useState({
@@ -95,6 +183,7 @@ export default function FusingDepartment() {
     fusingMachine: DEFAULT_FUSING_MACHINES[0],
     fusingOperator: accountFullName,
     shift: getAutoShift(),
+    useButterPaper: 'Yes',
     butterPaperWeightKg: '',
     notes: ''
   });
@@ -113,6 +202,14 @@ export default function FusingDepartment() {
       const res = await api.getJobCards({ limit: 5000, department: 'digital_print' });
       const allCards = res?.data || (Array.isArray(res) ? res : []);
       setCards(allCards);
+
+      try {
+        const rawRes = await api.getRawMaterialTransactions();
+        const txns = rawRes?.transactions || (Array.isArray(rawRes) ? rawRes : []);
+        setRawMatTxns(txns);
+      } catch (rmErr) {
+        console.warn('Failed to load raw material transactions:', rmErr);
+      }
     } catch (err) {
       setError(err.message || 'Failed to load fusing job cards data.');
     } finally {
@@ -125,13 +222,15 @@ export default function FusingDepartment() {
     const jId = e.target.value;
     const card = cards.find(c => String(c._id) === String(jId) || String(c.id) === String(jId));
     if (card) {
-      const defaultMtr = card.printedMtr || card.freshMtr || card.fusingMtr || card.totalMtr || '';
+      const pMtr = card.printedMtr || card.freshMtr || card.fusingMtr || card.totalMtr || '';
+      const defaultMtr = card.fusingMtr || pMtr || '';
       const cardPanna = card.panna ? (String(card.panna).includes('"') ? card.panna : `${card.panna}"`) : '58"';
       setTopForm(prev => ({
         ...prev,
         jobCardId: card._id || card.id,
         jobNo: card.jobNo || '',
         panna: cardPanna,
+        printedMtr: pMtr,
         fusingMtr: defaultMtr,
         butterPaperWeightKg: card.butterPaperWeightKg || ''
       }));
@@ -140,6 +239,7 @@ export default function FusingDepartment() {
         ...prev,
         jobCardId: '',
         jobNo: '',
+        printedMtr: '',
         fusingMtr: '',
         butterPaperWeightKg: ''
       }));
@@ -153,10 +253,9 @@ export default function FusingDepartment() {
       triggerEliteAlert('Please select or type a valid Job Card No.');
       return;
     }
-    if (!topForm.fusingMtr || isNaN(topForm.fusingMtr) || Number(topForm.fusingMtr) <= 0) {
-      triggerEliteAlert('Please enter valid Meters Fused (positive number).');
-      return;
-    }
+
+    const fusingMtrVal = topForm.fusingMtr || topForm.printedMtr || '0';
+    const isRollDone = topForm.rollCompleted === 'Yes';
 
     setSubmitting(true);
     try {
@@ -165,22 +264,22 @@ export default function FusingDepartment() {
 
       if (targetId) {
         const payload = {
-          fusingStatus: 'Fusing Done',
+          fusingStatus: isRollDone ? 'Fusing Done' : 'Fusing In Progress',
           fusingDate: topForm.date,
           shift: topForm.shift,
           fusingMachine: topForm.fusingMachine,
           panna: topForm.panna,
           butterPaperWeightKg: String(topForm.butterPaperWeightKg || 0),
-          fusingMtr: String(topForm.fusingMtr),
-          freshMtr: String(topForm.fusingMtr),
+          fusingMtr: String(fusingMtrVal),
+          freshMtr: String(fusingMtrVal),
           fusingOperator: topForm.fusingOperator,
-          emergencyNotes: topForm.notes
+          emergencyNotes: `Roll Status: ${isRollDone ? 'Completed' : 'In Progress'}${topForm.notes ? ' | ' + topForm.notes : ''}`
         };
         await api.updateJobCard(targetId, payload);
       }
 
       // 2. Log Raw Material Consumption for Butter Paper (Weight in KG)
-      if (topForm.butterPaperWeightKg && Number(topForm.butterPaperWeightKg) > 0) {
+      if (topForm.useButterPaper === 'Yes' && topForm.butterPaperWeightKg && Number(topForm.butterPaperWeightKg) > 0) {
         try {
           await api.createRawMaterialTransaction({
             type: 'OUTWARD',
@@ -190,7 +289,7 @@ export default function FusingDepartment() {
             unit: 'Kg',
             panna: topForm.panna,
             jobNo: topForm.jobNo,
-            notes: `Fusing Entry — Machine: ${topForm.fusingMachine} | Operator: ${topForm.fusingOperator}`
+            notes: `Fusing Entry — Machine: ${topForm.fusingMachine} | Operator: ${topForm.fusingOperator} | Roll Status: ${topForm.rollCompleted}`
           });
         } catch (rmErr) {
           console.warn('Raw material log failed:', rmErr.message);
@@ -199,7 +298,7 @@ export default function FusingDepartment() {
 
       triggerPushNotification(
         '🔥 Fusing Entry Submitted',
-        `Job #${topForm.jobNo}: ${topForm.fusingMtr}m Fused | ${topForm.butterPaperWeightKg || 0}kg Butter Paper (${topForm.panna} Panna) logged successfully!`,
+        `Job #${topForm.jobNo}: ${fusingMtrVal}m Fused | Roll: ${isRollDone ? 'Completed' : 'In Progress'} | ${topForm.useButterPaper === 'Yes' ? (topForm.butterPaperWeightKg || 0) + 'kg Butter Paper' : 'No Butter Paper'} logged!`,
         'success'
       );
 
@@ -209,11 +308,16 @@ export default function FusingDepartment() {
       setTopForm({
         date: toLocalYMD(),
         shift: getAutoShift(),
+        onTime: '09:00',
+        offTime: '19:00',
         jobCardId: '',
         jobNo: '',
         fusingMachine: DEFAULT_FUSING_MACHINES[0],
         panna: '58"',
+        useButterPaper: 'Yes',
         butterPaperWeightKg: '',
+        rollCompleted: 'Yes',
+        printedMtr: '',
         fusingMtr: '',
         fusingOperator: accountFullName,
         notes: ''
@@ -337,6 +441,7 @@ export default function FusingDepartment() {
     let doneCount = 0;
     const todayStr = toLocalYMD();
     let todayFreshMtr = 0;
+    const pannaButterKgMap = {};
 
     cards.forEach(c => {
       const isDone = c.fusingStatus === 'Fusing Done';
@@ -348,6 +453,10 @@ export default function FusingDepartment() {
         totalFreshMtr += fresh;
         totalWastageMtr += waste;
         totalButterPaperKg += butterKg;
+
+        const cardPanna = c.panna ? (String(c.panna).includes('"') ? String(c.panna) : `${c.panna}"`) : 'General';
+        pannaButterKgMap[cardPanna] = (pannaButterKgMap[cardPanna] || 0) + butterKg;
+
         if (c.fusingDate === todayStr) {
           todayFreshMtr += fresh;
         }
@@ -356,8 +465,38 @@ export default function FusingDepartment() {
       }
     });
 
-    return { totalFreshMtr, totalWastageMtr, totalButterPaperKg, pendingCount, doneCount, todayFreshMtr };
-  }, [cards]);
+    // Calculate Raw Material Butter Paper INWARD vs OUTWARD
+    let butterPaperInwardKg = 0;
+    let butterPaperRawOutwardKg = 0;
+
+    rawMatTxns.forEach(t => {
+      const name = (t.materialName || '').toLowerCase();
+      if (name.includes('butter') || name.includes('paper')) {
+        const qty = parseFloat(t.qty) || 0;
+        if (t.type === 'INWARD') {
+          butterPaperInwardKg += qty;
+        } else if (t.type === 'OUTWARD') {
+          butterPaperRawOutwardKg += qty;
+        }
+      }
+    });
+
+    const butterPaperOutwardKg = Math.max(totalButterPaperKg, butterPaperRawOutwardKg);
+    const butterPaperBalanceKg = butterPaperInwardKg - butterPaperOutwardKg;
+
+    return {
+      totalFreshMtr,
+      totalWastageMtr,
+      totalButterPaperKg,
+      butterPaperInwardKg,
+      butterPaperOutwardKg,
+      butterPaperBalanceKg,
+      pannaButterKgMap,
+      pendingCount,
+      doneCount,
+      todayFreshMtr
+    };
+  }, [cards, rawMatTxns]);
 
   // Export CSV
   const handleExportCSV = () => {
@@ -458,8 +597,8 @@ export default function FusingDepartment() {
         {/* Entry Form Grid */}
         <form onSubmit={handleTopFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           
-          {/* Row 1: DATE, SHIFT, JOB TYPE / JOBCARD NO. */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+          {/* Row 1: DATE, SHIFT, ON TIME, OFF TIME */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
                 DATE *
@@ -490,93 +629,241 @@ export default function FusingDepartment() {
               </select>
             </div>
 
-            <div style={{ gridColumn: 'span 2 / span 2' }}>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                JOB TYPE / JOBCARD NO. *
-              </label>
-              <select
-                required
-                value={topForm.jobCardId}
-                onChange={handleTopJobCardSelect}
-                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a', cursor: 'pointer' }}
-              >
-                <option value="">Type or select Job Card No. (e.g. 1001)</option>
-                {cards.map(c => (
-                  <option key={c._id || c.id} value={c._id || c.id}>
-                    {c.jobNo || 'JOB'} — {c.party || 'Party'} | {c.designName || 'Design'} ({c.fabric || 'Fabric'} {c.panna ? `${c.panna}"` : ''}) {c.fusingStatus === 'Fusing Done' ? '✓ Done' : '⏳ Pending'}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Row 2: FUSING MACHINE, PANNA (DYNAMIC DROPDOWN), BUTTER PAPER CONSUMPTION (KG), METERS FUSED */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                FUSING MACHINE *
-              </label>
-              <select
-                required
-                value={topForm.fusingMachine}
-                onChange={e => setTopForm(f => ({ ...f, fusingMachine: e.target.value }))}
-                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a', cursor: 'pointer' }}
-              >
-                {DEFAULT_FUSING_MACHINES.map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* DYNAMIC DROPDOWN IN PANNA / PAPER WIDTH */}
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                <Gauge size={13} /> PANNA / PAPER WIDTH (DYNAMIC) *
-              </label>
-              <select
-                required
-                value={topForm.panna}
-                onChange={e => setTopForm(f => ({ ...f, panna: e.target.value }))}
-                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '2px solid #38bdf8', fontSize: '0.88rem', fontWeight: 800, background: '#f0f9ff', color: '#0369a1', cursor: 'pointer' }}
-              >
-                {pannaOptions.map(p => (
-                  <option key={p} value={p}>{p} Panna / Width</option>
-                ))}
-              </select>
-            </div>
-
-            {/* BUTTER PAPER CONSUMPTION IN WEIGHT (KG) */}
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                <Scale size={13} color="#6d28d9" /> BUTTER PAPER CONSUMPTION (KG) *
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, color: '#16a34a', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                <Clock size={12} color="#16a34a" /> ON TIME
               </label>
               <input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="e.g. 12.50 kg"
-                value={topForm.butterPaperWeightKg}
-                onChange={e => setTopForm(f => ({ ...f, butterPaperWeightKg: e.target.value }))}
+                type="time"
+                value={topForm.onTime}
+                onChange={e => setTopForm(f => ({ ...f, onTime: e.target.value }))}
                 style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a' }}
               />
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                METERS FUSED (MTR) *
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, color: '#dc2626', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                <Clock size={12} color="#dc2626" /> OFF TIME
               </label>
               <input
-                type="number"
-                step="0.01"
-                min="0"
-                required
-                placeholder="e.g. 150.50"
-                value={topForm.fusingMtr}
-                onChange={e => setTopForm(f => ({ ...f, fusingMtr: e.target.value }))}
+                type="time"
+                value={topForm.offTime}
+                onChange={e => setTopForm(f => ({ ...f, offTime: e.target.value }))}
                 style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a' }}
               />
             </div>
           </div>
+
+          {/* Primary Required Fields: JOB CARD NO, PRINTED METERS, BUTTER PAPER USED?, ROLL COMPLETED? */}
+            <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+              
+              {/* 1. JOB TYPE / JOBCARD NO. */}
+              <div style={{ gridColumn: 'span 2 / span 2' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                  JOB TYPE / JOBCARD NO. *
+                </label>
+                <select
+                  required
+                  value={topForm.jobCardId}
+                  onChange={handleTopJobCardSelect}
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '2px solid #38bdf8', fontSize: '0.92rem', fontWeight: 800, background: '#ffffff', color: '#0369a1', cursor: 'pointer' }}
+                >
+                  <option value="">Select Job Card No. (e.g. 1001)</option>
+                  {cards.map(c => (
+                    <option key={c._id || c.id} value={c._id || c.id}>
+                      {c.jobNo || 'JOB'} — {c.party || 'Party'} | {c.designName || 'Design'} ({c.fabric || 'Fabric'} {c.panna ? `${c.panna}"` : ''}) {c.printedMtr ? `| ${c.printedMtr}m Printed` : ''} {c.fusingStatus === 'Fusing Done' ? '✓ Done' : '⏳ Pending'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 2. PRINTED METERS (DISPLAYED) */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#059669', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                  🖨️ PRINTED METERS (MTR)
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  placeholder="Select Job Card to view"
+                  value={topForm.printedMtr ? `${topForm.printedMtr} mtr` : ''}
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #a7f3d0', fontSize: '0.92rem', fontWeight: 900, background: '#ecfdf5', color: '#047857' }}
+                />
+              </div>
+
+              {/* 3. IS BUTTER PAPER USED? */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                  <Scale size={14} color={topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#64748b'} /> BUTTER PAPER USED? *
+                </label>
+                <select
+                  value={topForm.useButterPaper}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setTopForm(f => ({
+                      ...f,
+                      useButterPaper: val,
+                      butterPaperWeightKg: val === 'No' ? '0' : f.butterPaperWeightKg
+                    }));
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '8px',
+                    border: `2px solid ${topForm.useButterPaper === 'Yes' ? '#8b5cf6' : '#cbd5e1'}`,
+                    fontSize: '0.92rem',
+                    fontWeight: 800,
+                    background: topForm.useButterPaper === 'Yes' ? '#f5f3ff' : '#ffffff',
+                    color: topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#475569',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="Yes">✓ YES (Used Butter Paper)</option>
+                  <option value="No">✕ NO (No Butter Paper)</option>
+                </select>
+              </div>
+
+              {/* 4. WAS ROLL COMPLETED? */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: topForm.rollCompleted === 'Yes' ? '#16a34a' : '#ea580c', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                  <CheckCircle2 size={14} color={topForm.rollCompleted === 'Yes' ? '#16a34a' : '#ea580c'} /> WAS ROLL COMPLETED? *
+                </label>
+                <select
+                  value={topForm.rollCompleted}
+                  onChange={e => setTopForm(f => ({ ...f, rollCompleted: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '8px',
+                    border: `2px solid ${topForm.rollCompleted === 'Yes' ? '#4ade80' : '#fb923c'}`,
+                    fontSize: '0.92rem',
+                    fontWeight: 800,
+                    background: topForm.rollCompleted === 'Yes' ? '#f0fdf4' : '#fff7ed',
+                    color: topForm.rollCompleted === 'Yes' ? '#15803d' : '#c2410c',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="Yes">✓ YES (Roll Completed)</option>
+                  <option value="No">⏳ NO (Partial / In Progress)</option>
+                </select>
+              </div>
+
+              {/* BUTTER PAPER CONSUMPTION IN WEIGHT (KG) */}
+              {topForm.useButterPaper === 'Yes' && (
+                <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#6d28d9', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                    CONSUMPTION (KG)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="e.g. 12.50 kg"
+                    value={topForm.butterPaperWeightKg}
+                    onChange={e => setTopForm(f => ({ ...f, butterPaperWeightKg: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem 0.85rem',
+                      borderRadius: '8px',
+                      border: '1px solid #c4b5fd',
+                      fontSize: '0.92rem',
+                      fontWeight: 800,
+                      background: '#ffffff',
+                      color: '#6d28d9'
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Secondary Parameters (Date, Shift, Fusing Machine, Panna, Operator, Meters Fused) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                  DATE *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={topForm.date}
+                  onChange={e => setTopForm(f => ({ ...f, date: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                  SHIFT *
+                </label>
+                <select
+                  required
+                  value={topForm.shift}
+                  onChange={e => setTopForm(f => ({ ...f, shift: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a', cursor: 'pointer' }}
+                >
+                  <option value="Morning">Morning</option>
+                  <option value="Night">Night</option>
+                  <option value="Shift 1">Shift 1</option>
+                  <option value="Shift 2">Shift 2</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                  FUSING MACHINE *
+                </label>
+                <select
+                  required
+                  value={topForm.fusingMachine}
+                  onChange={e => setTopForm(f => ({ ...f, fusingMachine: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a', cursor: 'pointer' }}
+                >
+                  {DEFAULT_FUSING_MACHINES.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', margin: 0, textTransform: 'uppercase' }}>
+                    <Gauge size={13} /> PANNA *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowPannaManagerModal(true)}
+                    style={{ background: 'none', border: 'none', color: '#0284c7', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.7rem', fontWeight: 800 }}
+                  >
+                    <Settings size={12} /> Edit
+                  </button>
+                </div>
+                <select
+                  required
+                  value={topForm.panna}
+                  onChange={e => setTopForm(f => ({ ...f, panna: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 800, background: '#ffffff', color: '#0369a1', cursor: 'pointer' }}
+                >
+                  {pannaOptions.map(p => (
+                    <option key={p} value={p}>{p} Panna</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                  METERS FUSED (MTR)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder={topForm.printedMtr ? `Auto (${topForm.printedMtr} mtr)` : 'e.g. 150.50'}
+                  value={topForm.fusingMtr}
+                  onChange={e => setTopForm(f => ({ ...f, fusingMtr: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a' }}
+                />
+              </div>
+            </div>
 
           {/* Row 3: OPERATOR NAME, REMARKS / NOTES */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem' }}>
@@ -1079,7 +1366,7 @@ export default function FusingDepartment() {
           zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
         }}>
           <div style={{
-            background: '#ffffff', width: '100%', maxWidth: '620px', maxHeight: '90vh',
+            background: '#ffffff', width: '100%', maxWidth: '840px', maxHeight: '90vh',
             borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
             border: '1px solid #cbd5e1', overflow: 'hidden', display: 'flex', flexDirection: 'column'
           }}>
@@ -1087,7 +1374,7 @@ export default function FusingDepartment() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Zap size={20} color="#059669" />
                 <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>
-                  Fusing Production &amp; Butter Paper Consumption Report
+                  Fusing Production &amp; Butter Paper Report
                 </h3>
               </div>
               <button type="button" onClick={() => setShowReportModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
@@ -1096,52 +1383,318 @@ export default function FusingDepartment() {
             </div>
 
             <div style={{ padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.85rem' }}>
-                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '1rem', borderRadius: '10px' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#047857', textTransform: 'uppercase' }}>Total Meters Fused</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#059669', marginTop: 4 }}>
-                    {stats.totalFreshMtr.toLocaleString('en-IN')} m
-                  </div>
+              
+              {/* Machine ON & OFF Timing Header Bar */}
+              <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', padding: '0.75rem 1rem', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, color: '#0369a1', fontSize: '0.85rem' }}>
+                  <Clock size={16} color="#0284c7" /> Machine Shift Running Time
                 </div>
-
-                <div style={{ background: '#f3e8ff', border: '1px solid #d8b4fe', padding: '1rem', borderRadius: '10px' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#6d28d9', textTransform: 'uppercase' }}>Total Butter Paper (KG)</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#7c3aed', marginTop: 4 }}>
-                    {stats.totalButterPaperKg.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#15803d' }}>🟢 ON TIME:</span>
+                    <input
+                      type="time"
+                      value={reportForm.onTime}
+                      onChange={e => setReportForm(rf => ({ ...rf, onTime: e.target.value }))}
+                      style={{ padding: '3px 8px', borderRadius: '6px', border: '1px solid #86efac', fontWeight: 800, fontSize: '0.82rem', background: '#ffffff', color: '#14532d' }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#b91c1c' }}>🔴 OFF TIME:</span>
+                    <input
+                      type="time"
+                      value={reportForm.offTime}
+                      onChange={e => setReportForm(rf => ({ ...rf, offTime: e.target.value }))}
+                      style={{ padding: '3px 8px', borderRadius: '6px', border: '1px solid #fca5a5', fontWeight: 800, fontSize: '0.82rem', background: '#ffffff', color: '#7f1d1d' }}
+                    />
                   </div>
                 </div>
               </div>
 
-              <div style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.82rem' }}>
-                <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem' }}>Production Summary Breakdown</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #e2e8f0' }}>
-                  <span>Completed Job Cards:</span>
-                  <b>{stats.doneCount} Cards</b>
+              {/* Row 1 KPI Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '0.85rem', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#047857', textTransform: 'uppercase' }}>Total Meters Fused</div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#059669', marginTop: 2 }}>
+                    {stats.totalFreshMtr.toLocaleString('en-IN')} m
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #e2e8f0' }}>
-                  <span>Pending Job Cards:</span>
-                  <b>{stats.pendingCount} Cards</b>
+
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '0.85rem', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase' }}>Butter Paper IN (Stock Inward)</div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#2563eb', marginTop: 2 }}>
+                    {stats.butterPaperInwardKg.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                  <span>Total Recorded Wastage (4 Faults):</span>
-                  <b style={{ color: '#dc2626' }}>{stats.totalWastageMtr} m</b>
+
+                <div style={{ background: '#f3e8ff', border: '1px solid #d8b4fe', padding: '0.85rem', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#6d28d9', textTransform: 'uppercase' }}>Butter Paper OUT (Fusing Consumed)</div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#7c3aed', marginTop: 2 }}>
+                    {stats.butterPaperOutwardKg.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg
+                  </div>
                 </div>
+
+                <div style={{ background: stats.butterPaperBalanceKg >= 0 ? '#f0fdf4' : '#fef2f2', border: `1px solid ${stats.butterPaperBalanceKg >= 0 ? '#bbf7d0' : '#fecaca'}`, padding: '0.85rem', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: stats.butterPaperBalanceKg >= 0 ? '#15803d' : '#b91c1c', textTransform: 'uppercase' }}>Butter Paper Stock Balance</div>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 900, color: stats.butterPaperBalanceKg >= 0 ? '#16a34a' : '#dc2626', marginTop: 2 }}>
+                    {stats.butterPaperBalanceKg.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg
+                  </div>
+                </div>
+              </div>
+
+              {/* ── SIDE-BY-SIDE BUTTER PAPER INWARD & USAGE TABLES ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1rem' }}>
+                
+                {/* Table 1: PAPER INWARD (STOCK IN) */}
+                <div style={{ background: '#ffffff', border: '2px solid #3b82f6', borderRadius: '12px', padding: '0.85rem', boxShadow: '0 4px 12px rgba(59,130,246,0.08)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', borderBottom: '1px solid #eff6ff', paddingBottom: '0.4rem' }}>
+                    <span style={{ fontWeight: 900, color: '#1d4ed8', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      📜 PAPER INWARD (STOCK IN)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddInwardRow}
+                      className="btn-secondary"
+                      style={{ padding: '0.25rem 0.65rem', fontSize: '0.74rem', color: '#2563eb', border: '1px solid #bfdbfe', background: '#eff6ff', borderRadius: '6px', fontWeight: 800 }}
+                    >
+                      + Add Row
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    {reportForm.inwardRows.map((row, idx) => (
+                      <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '26px 1fr 65px 75px 24px', gap: '0.4rem', alignItems: 'center', background: '#f8fafc', padding: '4px 6px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#3b82f6' }}>#{idx + 1}</span>
+                        
+                        {/* Panna Selector */}
+                        <select
+                          value={row.panna}
+                          onChange={e => handleInwardRowChange(row.id, 'panna', e.target.value)}
+                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 800, color: '#0369a1', background: '#ffffff' }}
+                        >
+                          {pannaOptions.map(p => <option key={p} value={p}>{p} Panna</option>)}
+                        </select>
+
+                        {/* Rolls Qty */}
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="Rolls"
+                          value={row.rolls}
+                          onChange={e => handleInwardRowChange(row.id, 'rolls', e.target.value)}
+                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 700, width: '100%', background: '#ffffff' }}
+                        />
+
+                        {/* Roll Weight (KG) */}
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Weight Kg"
+                          value={row.weightKg}
+                          onChange={e => handleInwardRowChange(row.id, 'weightKg', e.target.value)}
+                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 800, width: '100%', color: '#1d4ed8', background: '#ffffff' }}
+                        />
+
+                        {/* Remove Row Button */}
+                        {reportForm.inwardRows.length > 1 ? (
+                          <Trash2 size={13} style={{ cursor: 'pointer', color: '#ef4444' }} onClick={() => handleRemoveInwardRow(row.id)} />
+                        ) : <span />}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Table 2: PAPER USAGE (CONSUMPTION) */}
+                <div style={{ background: '#ffffff', border: '2px solid #8b5cf6', borderRadius: '12px', padding: '0.85rem', boxShadow: '0 4px 12px rgba(139,92,246,0.08)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', borderBottom: '1px solid #f5f3ff', paddingBottom: '0.4rem' }}>
+                    <span style={{ fontWeight: 900, color: '#6d28d9', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      📜 PAPER USAGE (CONSUMPTION)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddUsageRow}
+                      className="btn-secondary"
+                      style={{ padding: '0.25rem 0.65rem', fontSize: '0.74rem', color: '#7c3aed', border: '1px solid #ddd6fe', background: '#f5f3ff', borderRadius: '6px', fontWeight: 800 }}
+                    >
+                      + Add Row
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    {reportForm.usageRows.map((row, idx) => (
+                      <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '26px 1fr 65px 75px 24px', gap: '0.4rem', alignItems: 'center', background: '#fcfaff', padding: '4px 6px', borderRadius: '6px', border: '1px solid #ede9fe' }}>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#7c3aed' }}>#{idx + 1}</span>
+                        
+                        {/* Panna Selector */}
+                        <select
+                          value={row.panna}
+                          onChange={e => handleUsageRowChange(row.id, 'panna', e.target.value)}
+                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 800, color: '#5b21b6', background: '#ffffff' }}
+                        >
+                          {pannaOptions.map(p => <option key={p} value={p}>{p} Panna</option>)}
+                        </select>
+
+                        {/* Rolls Qty */}
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="Rolls"
+                          value={row.rolls}
+                          onChange={e => handleUsageRowChange(row.id, 'rolls', e.target.value)}
+                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 700, width: '100%', background: '#ffffff' }}
+                        />
+
+                        {/* Roll Weight (KG) */}
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Weight Kg"
+                          value={row.weightKg}
+                          onChange={e => handleUsageRowChange(row.id, 'weightKg', e.target.value)}
+                          style={{ padding: '0.35rem 0.4rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', fontWeight: 800, width: '100%', color: '#6d28d9', background: '#ffffff' }}
+                        />
+
+                        {/* Remove Row Button */}
+                        {reportForm.usageRows.length > 1 ? (
+                          <Trash2 size={13} style={{ cursor: 'pointer', color: '#ef4444' }} onClick={() => handleRemoveUsageRow(row.id)} />
+                        ) : <span />}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Butter Paper Panna-wise Consumption Summary */}
+              <div style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.82rem' }}>
+                <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>🧈 Butter Paper Consumption Summary by Panna</span>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Weight in KG</span>
+                </div>
+                {Object.keys(stats.pannaButterKgMap).length === 0 ? (
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>No Panna-wise Butter Paper consumption logged yet.</div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.5rem' }}>
+                    {Object.entries(stats.pannaButterKgMap).map(([pannaName, kgVal]) => (
+                      <div key={pannaName} style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '6px 10px', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 800, color: '#0284c7' }}>{pannaName}</span>
+                        <span style={{ fontWeight: 900, color: '#6d28d9' }}>{kgVal.toFixed(2)} kg</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
                 <button type="button" onClick={() => setShowReportModal(false)} className="btn-secondary">Close</button>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
+                    // Log raw material transactions for inward & usage rows
+                    try {
+                      for (const r of reportForm.inwardRows) {
+                        if (r.weightKg && Number(r.weightKg) > 0) {
+                          await api.createRawMaterialTransaction({
+                            type: 'INWARD',
+                            date: toLocalYMD(),
+                            materialName: 'Butter Paper',
+                            qty: Number(r.weightKg),
+                            unit: 'Kg',
+                            panna: r.panna,
+                            notes: `Inward ${r.rolls} Roll(s) | Shift Time: ${reportForm.onTime} to ${reportForm.offTime}`
+                          });
+                        }
+                      }
+                      for (const r of reportForm.usageRows) {
+                        if (r.weightKg && Number(r.weightKg) > 0) {
+                          await api.createRawMaterialTransaction({
+                            type: 'OUTWARD',
+                            date: toLocalYMD(),
+                            materialName: 'Butter Paper',
+                            qty: Number(r.weightKg),
+                            unit: 'Kg',
+                            panna: r.panna,
+                            notes: `Consumption ${r.rolls} Roll(s) | Shift Time: ${reportForm.onTime} to ${reportForm.offTime}`
+                          });
+                        }
+                      }
+                      triggerPushNotification('Report Transactions Saved', 'Butter paper inward & usage rows logged successfully.', 'success');
+                      fetchData();
+                    } catch (e) {
+                      console.warn('Raw material save failed:', e);
+                    }
                     handleExportCSV();
                     setShowReportModal(false);
                   }}
                   className="btn-primary"
                   style={{ background: '#059669' }}
                 >
-                  <Download size={15} /> Export Report CSV
+                  <Download size={15} /> Save &amp; Export Report CSV
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 3: INLINE QUICK PANNA DROPDOWN MANAGER ── */}
+      {showPannaManagerModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)',
+          zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }}>
+          <div style={{
+            background: '#ffffff', width: '100%', maxWidth: '480px',
+            borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid #cbd5e1', overflow: 'hidden', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0369a1', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Gauge size={18} color="#0284c7" /> Manage Panna / Paper Width Dropdown
+              </h3>
+              <button type="button" onClick={() => setShowPannaManagerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: '#475569', marginBottom: '0.35rem' }}>
+                Add New Panna Width (e.g. 72" or 38")
+              </label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  placeholder='e.g. 72"'
+                  value={newPannaInput}
+                  onChange={e => setNewPannaInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddPannaOption())}
+                  style={{ flex: 1, padding: '0.5rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700 }}
+                />
+                <button type="button" onClick={handleAddPannaOption} className="btn-primary" style={{ padding: '0.5rem 1rem', background: '#0284c7', borderColor: '#0284c7' }}>
+                  + Add Panna
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', marginBottom: '0.5rem' }}>
+                Currently Active Panna Width Options ({pannaOptions.length}):
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', maxHeight: '180px', overflowY: 'auto' }}>
+                {pannaOptions.map(p => (
+                  <span key={p} style={{ background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd', padding: '4px 12px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                    {p}
+                    <Trash2 size={13} style={{ cursor: 'pointer', color: '#ef4444' }} onClick={() => handleRemovePannaOption(p)} title={`Remove ${p} Panna`} />
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
+              <button type="button" onClick={() => setShowPannaManagerModal(false)} className="btn-primary" style={{ padding: '0.5rem 1.25rem' }}>
+                Done
+              </button>
             </div>
           </div>
         </div>

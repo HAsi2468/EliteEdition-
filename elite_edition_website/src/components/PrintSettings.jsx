@@ -4,7 +4,7 @@ import { Settings, Plus, Trash2, Tag, ArrowRightCircle, RefreshCw, ChevronDown, 
 import CatalogManagerModal from './CatalogManagerModal';
 import CompanySettingsPanel from './CompanySettingsPanel';
 
-export default function PrintSettings({ expenseOnly = false }) {
+export default function PrintSettings({ expenseOnly = false, companyEntity = 'Elite Digital Print' }) {
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -241,18 +241,21 @@ export default function PrintSettings({ expenseOnly = false }) {
         {list?.length === 0 ? (
           <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>No items added yet.</div>
         ) : (
-          list?.map(item => (
-            <div key={item} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: '4px' }}>
-              <span style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>{item}</span>
-              <button 
-                onClick={() => handleRemove(field, item)}
-                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.2rem' }}
-                disabled={actionLoading}
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))
+          list?.map((item, idx) => {
+            const itemLabel = (typeof item === 'object' && item !== null) ? (item.name || item.title || item.label || JSON.stringify(item)) : String(item);
+            return (
+              <div key={itemLabel + '_' + idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: '4px' }}>
+                <span style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>{itemLabel}</span>
+                <button 
+                  onClick={() => handleRemove(field, itemLabel)}
+                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.2rem' }}
+                  disabled={actionLoading}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            );
+          })
         )}
       </div>
     </div>
@@ -284,8 +287,20 @@ export default function PrintSettings({ expenseOnly = false }) {
         <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <Settings size={18} color={iconColor} /> {title}
         </h3>
-        <div>
-          {isExpanded ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '4px 12px',
+          borderRadius: '20px',
+          background: isExpanded ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.06)',
+          border: `1px solid ${isExpanded ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.1)'}`,
+          color: isExpanded ? '#3b82f6' : 'var(--text-muted)',
+          fontSize: '0.78rem',
+          fontWeight: 700
+        }}>
+          <span>{isExpanded ? 'Collapse' : 'Expand'}</span>
+          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </div>
       </div>
     );
@@ -310,7 +325,6 @@ export default function PrintSettings({ expenseOnly = false }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <CompanySettingsPanel companyEntity="Elite Digital Print" />
       <div className="glass-panel" style={{ padding: '1.5rem 2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <Settings size={24} color="#a855f7" />
@@ -325,159 +339,8 @@ export default function PrintSettings({ expenseOnly = false }) {
       <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
         {renderDepartmentHeader('🏢 Business Profile & GST Settings', 'profile', '#3b82f6')}
         {expandedDepts.profile && (
-          <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem', background: 'rgba(59,130,246,0.02)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
-              <div>
-                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Configure your Company Name, GSTIN Number, Billing Address, Phone, and Bank details for Tax Invoices.</p>
-              </div>
-              <button
-                className="btn-primary"
-                onClick={handleSaveCompanyProfile}
-                disabled={actionLoading}
-                style={{ background: 'linear-gradient(135deg,#3b82f6,#2563eb)' }}
-              >
-                {actionLoading ? 'Saving...' : 'Save Profile'}
-              </button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Company / Business Name *</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={companyProfile.companyName}
-                  onChange={e => setCompanyProfile(p => ({ ...p, companyName: e.target.value }))}
-                  placeholder="e.g. ELITE DIGITAL PRINTS"
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>GSTIN Number *</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={companyProfile.companyGstin}
-                  onChange={e => setCompanyProfile(p => ({ ...p, companyGstin: e.target.value }))}
-                  placeholder="e.g. 24AAAFE1234F1Z5"
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Phone Number</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={companyProfile.companyPhone}
-                  onChange={e => setCompanyProfile(p => ({ ...p, companyPhone: e.target.value }))}
-                  placeholder="e.g. +91 98790 00000"
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Email Address</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={companyProfile.companyEmail}
-                  onChange={e => setCompanyProfile(p => ({ ...p, companyEmail: e.target.value }))}
-                  placeholder="e.g. info@elitedigitalprints.com"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Company Registered Address</label>
-              <input
-                type="text"
-                style={styles.input}
-                value={companyProfile.companyAddress}
-                onChange={e => setCompanyProfile(p => ({ ...p, companyAddress: e.target.value }))}
-                placeholder="Plot / Street / City / Pincode"
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', borderTop: '1px dashed var(--border-light)', paddingTop: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Bank Name</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={companyProfile.companyBankName}
-                  onChange={e => setCompanyProfile(p => ({ ...p, companyBankName: e.target.value }))}
-                  placeholder="e.g. HDFC Bank"
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Bank Account Number</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={companyProfile.companyAccountNo}
-                  onChange={e => setCompanyProfile(p => ({ ...p, companyAccountNo: e.target.value }))}
-                  placeholder="e.g. 50200012345678"
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>IFSC Code</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={companyProfile.companyIfscCode}
-                  onChange={e => setCompanyProfile(p => ({ ...p, companyIfscCode: e.target.value }))}
-                  placeholder="e.g. HDFC0001234"
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', borderTop: '1px dashed var(--border-light)', paddingTop: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Default Payment Due Days</label>
-                <input
-                  type="number"
-                  min="1"
-                  style={styles.input}
-                  value={companyProfile.paymentDueDays}
-                  onChange={e => setCompanyProfile(p => ({ ...p, paymentDueDays: e.target.value }))}
-                  placeholder="e.g. 30"
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Invoice Prefix</label>
-                <input
-                  type="text"
-                  style={styles.input}
-                  value={companyProfile.invoicePrefix}
-                  onChange={e => setCompanyProfile(p => ({ ...p, invoicePrefix: e.target.value }))}
-                  placeholder="e.g. EDP-INV-"
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Starting Invoice Sequence No.</label>
-                <input
-                  type="number"
-                  min="1001"
-                  style={styles.input}
-                  value={companyProfile.startingInvoiceNo}
-                  onChange={e => setCompanyProfile(p => ({ ...p, startingInvoiceNo: e.target.value }))}
-                  placeholder="e.g. 1001"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.35rem' }}>Default Invoice Terms & Conditions</label>
-              <textarea
-                style={{ ...styles.input, width: '100%', minHeight: '60px', fontFamily: 'inherit' }}
-                value={companyProfile.companyTerms}
-                onChange={e => setCompanyProfile(p => ({ ...p, companyTerms: e.target.value }))}
-                placeholder="Terms printed at bottom of invoices..."
-              />
-            </div>
+          <div style={{ padding: '1rem', background: 'rgba(59,130,246,0.02)' }}>
+            <CompanySettingsPanel companyEntity={companyEntity || 'Elite Digital Print'} />
           </div>
         )}
       </div>
@@ -590,11 +453,15 @@ export default function PrintSettings({ expenseOnly = false }) {
 
       {/* Department: Fusing Machine */}
       <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
-        {renderDepartmentHeader('🔥 Fusing Machine Settings', 'fusing', '#f97316')}
+        {renderDepartmentHeader('🔥 Fusing Machine & Department Settings', 'fusing', '#f97316')}
         {expandedDepts.fusing && (
           <div style={{ padding: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
-            {renderSection('Temperatures', 'temperatures', newTemperature, setNewTemperature, config?.temperatures)}
-            {renderSection('Speeds', 'speeds', newSpeed, setNewSpeed, config?.speeds)}
+            {renderSection('Panna / Paper Widths (Dynamic Dropdown)', 'widths', newWidth, setNewWidth, (config?.widths && config.widths.length > 0) ? config.widths : ['36"', '44"', '58"', '64"'])}
+            {renderSection('Paper Types (Butter Paper / Sublimation)', 'paperTypes', newPaperType, setNewPaperType, config?.paperTypes)}
+            {renderSection('Fusing Machines', 'machines', newMachine, setNewMachine, config?.machines?.map(m => (typeof m === 'object' ? m.name : m)))}
+            {renderSection('Fusing Temperatures (°C)', 'temperatures', newTemperature, setNewTemperature, config?.temperatures)}
+            {renderSection('Fusing Speeds (m/min)', 'speeds', newSpeed, setNewSpeed, config?.speeds)}
+            {renderSection('Fusing Operators', 'operators', newOperator, setNewOperator, config?.operators)}
           </div>
         )}
       </div>

@@ -1,75 +1,104 @@
 const db = require('../db/models');
 const logger = require('../config/logger');
 
-// Get all complaints with filtering, search, pagination
-const getAll = async (req, res) => {
-  try {
-    const {
-      search = '',
-      status = 'All',
-      priority = 'All',
-      category = 'All',
-      assignedTo = '',
-      responsiblePerson = '',
-      dateStart = '',
-      dateEnd = '',
-      page = 1,
-      limit = 100,
-      companyEntity
-    } = req.query;
+// Helper to build robust MongoDB filter for complaints
+function buildComplaintFilter(params = {}) {
+  const {
+    search = '',
+    status = 'All',
+    priority = 'All',
+    category = 'All',
+    assignedTo = '',
+    responsiblePerson = '',
+    dateStart = '',
+    dateEnd = '',
+    companyEntity
+  } = params;
 
-    const filter = {};
-    if (companyEntity) {
-      filter.companyEntity = companyEntity;
+  const andConditions = [];
+
+  if (companyEntity) {
+    const cleanCo = String(companyEntity).trim();
+    if (cleanCo === 'Elite Digital Print') {
+      andConditions.push({
+        $or: [
+          { companyEntity: 'Elite Digital Print' },
+          { companyEntity: { $exists: false } },
+          { companyEntity: null },
+          { companyEntity: '' }
+        ]
+      });
+    } else {
+      andConditions.push({ companyEntity: cleanCo });
     }
+  }
 
-    if (assignedTo && assignedTo !== 'All') {
-      const cleanUser = assignedTo.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const userRegex = new RegExp(cleanUser, 'i');
-      filter.$or = [
+  if (assignedTo && assignedTo !== 'All') {
+    const cleanUser = assignedTo.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const userRegex = new RegExp(cleanUser, 'i');
+    andConditions.push({
+      $or: [
         { assignedTo: userRegex },
         { responsiblePerson: userRegex },
         { responsiblePersons: userRegex }
-      ];
-    }
-    if (responsiblePerson && responsiblePerson !== 'All') {
-      const cleanResp = responsiblePerson.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const rRegex = new RegExp(cleanResp, 'i');
-      filter.$or = [
+      ]
+    });
+  }
+
+  if (responsiblePerson && responsiblePerson !== 'All') {
+    const cleanResp = responsiblePerson.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const rRegex = new RegExp(cleanResp, 'i');
+    andConditions.push({
+      $or: [
         { responsiblePerson: rRegex },
         { responsiblePersons: rRegex }
-      ];
-    }
-    if (status && status !== 'All') {
-      filter.status = status;
-    }
-    if (priority && priority !== 'All') {
-      filter.priority = priority;
-    }
-    if (category && category !== 'All') {
-      filter.category = category;
+      ]
+    });
+  }
+
+  if (status && status !== 'All') {
+    andConditions.push({ status });
+  }
+  if (priority && priority !== 'All') {
+    andConditions.push({ priority });
+  }
+  if (category && category !== 'All') {
+    andConditions.push({ category });
+  }
+
+  if (dateStart || dateEnd) {
+    const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
+    const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
+    const minMs = dsStr ? Math.min(new Date(`${dsStr}T00:00:00.000Z`).getTime(), new Date(`${dsStr}T00:00:00.000`).getTime()) : null;
+    const maxMs = deStr ? Math.max(new Date(`${deStr}T23:59:59.999Z`).getTime(), new Date(`${deStr}T23:59:59.999`).getTime()) : null;
+
+    const dateQuery = {};
+    if (minMs) dateQuery.$gte = new Date(minMs);
+    if (maxMs) dateQuery.$lte = new Date(maxMs);
+
+    const dateConditions = [];
+    if (dsStr && deStr) {
+      dateConditions.push({ date: { $gte: dsStr, $lte: deStr } });
+    } else if (dsStr) {
+      dateConditions.push({ date: { $gte: dsStr } });
+    } else if (deStr) {
+      dateConditions.push({ date: { $lte: deStr } });
     }
 
-    if (dateStart || dateEnd) {
-      const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
-      const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
-      const minMs = dsStr ? Math.min(new Date(`${dsStr}T00:00:00.000Z`).getTime(), new Date(`${dsStr}T00:00:00.000`).getTime()) : null;
-      const maxMs = deStr ? Math.max(new Date(`${deStr}T23:59:59.999Z`).getTime(), new Date(`${deStr}T23:59:59.999`).getTime()) : null;
-
-      const dateQuery = {};
-      if (minMs) dateQuery.$gte = new Date(minMs);
-      if (maxMs) dateQuery.$lte = new Date(maxMs);
-
-      filter.$or = [
-        { date: dateQuery },
-        { date: { $gte: dsStr, $lte: deStr } },
-        { createdAt: dateQuery }
-      ];
+    if (minMs || maxMs) {
+      dateConditions.push({ date: dateQuery });
+      dateConditions.push({ createdAt: dateQuery });
     }
 
-    if (search && search.trim()) {
-      const regex = new RegExp(search.trim(), 'i');
-      filter.$or = [
+    if (dateConditions.length > 0) {
+      andConditions.push({ $or: dateConditions });
+    }
+  }
+
+  if (search && search.trim()) {
+    const regex = new RegExp(search.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i');
+    andConditions.push({
+      $or: [
         { complaintNo: regex },
         { partyName: regex },
         { jobCardNo: regex },
@@ -81,8 +110,22 @@ const getAll = async (req, res) => {
         { subCategory: regex },
         { assignedTo: regex },
         { responsiblePerson: regex }
-      ];
-    }
+      ]
+    });
+  }
+
+  return andConditions.length === 0
+    ? {}
+    : andConditions.length === 1
+    ? andConditions[0]
+    : { $and: andConditions };
+}
+
+// Get all complaints with filtering, search, pagination
+const getAll = async (req, res) => {
+  try {
+    const { page = 1, limit = 100 } = req.query;
+    const filter = buildComplaintFilter(req.query);
 
     const pageNum = parseInt(page, 10) || 1;
     const limitNum = parseInt(limit, 10) || 100;
@@ -317,25 +360,11 @@ const clearAll = async (req, res) => {
 // Analytics Endpoint
 const getAnalytics = async (req, res) => {
   try {
-    const { dateStart = '', dateEnd = '', assignedTo = '' } = req.query;
-    const filter = {};
+    const { dateStart = '', dateEnd = '' } = req.query;
+    const filter = buildComplaintFilter(req.query);
     const jcFilter = {};
 
-    if (assignedTo && assignedTo !== 'All') {
-      const cleanUser = assignedTo.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const userRegex = new RegExp(cleanUser, 'i');
-      filter.$or = [
-        { assignedTo: userRegex },
-        { responsiblePerson: userRegex },
-        { responsiblePersons: userRegex }
-      ];
-    }
-
     if (dateStart || dateEnd) {
-      filter.date = {};
-      if (dateStart) filter.date.$gte = dateStart;
-      if (dateEnd) filter.date.$lte = dateEnd;
-
       jcFilter.createdAt = {};
       if (dateStart) jcFilter.createdAt.$gte = new Date(dateStart);
       if (dateEnd) jcFilter.createdAt.$lte = new Date(`${dateEnd}T23:59:59.999Z`);
