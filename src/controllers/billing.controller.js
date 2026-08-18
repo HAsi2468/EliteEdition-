@@ -1918,8 +1918,7 @@ const downloadBulkInvoicesPdf = async (req, res) => {
 const getCustomers = async (req, res) => {
   try {
     const { companyEntity } = req.query;
-    const filter = {};
-    if (companyEntity) filter.companyEntity = companyEntity;
+    const filter = buildCompanyFilter(companyEntity);
     const customers = await BillingCustomer.find(filter).sort({ name: 1 }).lean();
     res.json({ success: true, data: customers });
   } catch (error) {
@@ -1958,8 +1957,7 @@ const deleteCustomer = async (req, res) => {
 const getItems = async (req, res) => {
   try {
     const { companyEntity } = req.query;
-    const filter = {};
-    if (companyEntity) filter.companyEntity = companyEntity;
+    const filter = buildCompanyFilter(companyEntity);
     const items = await BillingItem.find(filter).sort({ itemName: 1 }).lean();
     res.json({ success: true, data: items });
   } catch (error) {
