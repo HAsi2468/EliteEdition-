@@ -848,42 +848,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* Department Switcher Buttons inside Mobile Drawer */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-              {COMPANIES.map(company => {
-                if (!isCompanyAllowed(company.name)) return null;
-                if (company.id === 'elite_online' && !hasEliteEditionAccess) return null;
-                if (company.id === 'digital_print' && !hasDigitalPrintAccess) return null;
-                if (company.id === 'stitching' && !hasStitchingAccess) return null;
-
-                const IconComponent = company.iconName === 'Store' ? Store : company.iconName === 'Printer' ? Printer : company.iconName === 'Scissors' ? Scissors : Building;
-                const isActive = activeDepartment === company.id && activeTab !== 'workspace';
-
-                return (
-                  <button
-                    key={company.id}
-                    onClick={() => { handleSwitchDepartment(company.id); setMobileMenuOpen(false); }}
-                    className={`dept-switch-btn ${isActive ? 'active' : ''}`}
-                    style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
-                  >
-                    <IconComponent size={16} />
-                    <span>{company.name}</span>
-                  </button>
-                );
-              })}
-
-              {hasWorkspaceAccess && (
-                <button
-                  onClick={() => { setActiveTab('workspace'); setMobileMenuOpen(false); }}
-                  className={`dept-switch-btn ${activeTab === 'workspace' ? 'active' : ''}`}
-                  style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
-                >
-                  <MessageSquare size={16} />
-                  <span>Workspace / Chat</span>
-                </button>
-              )}
-            </div>
-
             {/* Modules List inside Mobile Drawer */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.75rem' }}>
               {activeTab === 'workspace' ? (
