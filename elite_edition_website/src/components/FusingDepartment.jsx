@@ -751,35 +751,7 @@ export default function FusingDepartment() {
 
             {/* Secondary Parameters (Date, Shift, Fusing Machine, Panna, Operator, Meters Fused) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                  DATE *
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={topForm.date}
-                  onChange={e => setTopForm(f => ({ ...f, date: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a' }}
-                />
-              </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                  SHIFT *
-                </label>
-                <select
-                  required
-                  value={topForm.shift}
-                  onChange={e => setTopForm(f => ({ ...f, shift: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a', cursor: 'pointer' }}
-                >
-                  <option value="Morning">Morning</option>
-                  <option value="Night">Night</option>
-                  <option value="Shift 1">Shift 1</option>
-                  <option value="Shift 2">Shift 2</option>
-                </select>
-              </div>
 
 
 
