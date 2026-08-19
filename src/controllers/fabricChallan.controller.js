@@ -797,10 +797,18 @@ const downloadChallanPdf = async (req, res) => {
     const tpSectionY = MR + 98 + 68 + 34 + 34 + 10;
     const tpTableStartY = tpSectionY + 16;
 
-    // Case-insensitive image path resolver
+    // Case-insensitive image path or base64 buffer resolver
     const resolveImagePath = (urlOrPath) => {
       if (!urlOrPath) return null;
-      let filename = urlOrPath.replace(/^.*\/designs\//, '').replace(/^\/designs\//, '').trim();
+      let str = String(urlOrPath).trim();
+      if (!str) return null;
+      if (str.startsWith('data:image/')) {
+        try {
+          const base64Data = str.split(',')[1];
+          if (base64Data) return Buffer.from(base64Data, 'base64');
+        } catch (e) {}
+      }
+      let filename = str.replace(/^.*\/designs\//, '').replace(/^\/designs\//, '').trim();
       try { filename = decodeURIComponent(filename); } catch (e) {}
 
       const possibleDirs = [
@@ -858,77 +866,75 @@ const downloadChallanPdf = async (req, res) => {
 
     let firstDesignImg = null;
 
-    // 1. Primary: Search by Design No (from Challan or Job Card) in Design model & image directories
-    let targetDesignStr = challan.designNo || '';
-    if (!targetDesignStr && challan.jobNo) {
-      const jobTokens = String(challan.jobNo).split(',').map(s => s.trim()).filter(Boolean);
-      for (const jNo of jobTokens) {
-        try {
-          const job = await JobCard.findOne({ jobNo: jNo });
-          if (job && job.designNo) {
-            targetDesignStr = job.designNo;
-            break;
-          }
-        } catch (e) {}
-      }
+    // Collect all design tokens from Challan and all attached Job Cards
+    const allDesignNames = new Set();
+    if (challan.designNo) {
+      String(challan.designNo).split(/[,\s&]+/).forEach(s => {
+        if (s.trim()) allDesignNames.add(s.trim());
+      });
     }
 
-    if (targetDesignStr) {
-      const designTokens = String(targetDesignStr)
-        .split(/[,\s&]+/)
-        .map(s => s.trim())
-        .filter(Boolean);
-
-      for (const dName of designTokens) {
-        const cleanName = dName.replace(/^ED-/i, '');
-        
-        // A. Try Design DB document
-        try {
-          const Design = require('../db/models/design.model');
-          const dDoc = await Design.findOne({
-            $or: [
-              { designName: { $regex: new RegExp(`^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
-              { designNo: { $regex: new RegExp(`^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
-            ]
-          });
-          if (dDoc) {
-            if (dDoc.imageUrl) {
-              const p = resolveImagePath(dDoc.imageUrl);
-              if (p) { firstDesignImg = { path: p, label: `Design: ${dDoc.designName || dName}` }; break; }
-            }
-            if (dDoc.imageUrl2) {
-              const p = resolveImagePath(dDoc.imageUrl2);
-              if (p) { firstDesignImg = { path: p, label: `Design: ${dDoc.designName || dName}` }; break; }
-            }
+    const jobTokens = String(challan.jobNo || '').split(',').map(s => s.trim()).filter(Boolean);
+    const foundJobCards = [];
+    for (const jNo of jobTokens) {
+      try {
+        const cleanNo = jNo.replace(/\D/g, '');
+        const job = await JobCard.findOne({
+          $or: [{ jobNo: jNo }, { jobNo: `JOB-${cleanNo}` }, { jobNo: `JOB NO.- ${cleanNo}` }]
+        }).lean();
+        if (job) {
+          foundJobCards.push(job);
+          if (job.designNo) {
+            String(job.designNo).split(/[,\s&]+/).forEach(s => { if (s.trim()) allDesignNames.add(s.trim()); });
           }
-        } catch (e) {}
-
-        // B. Try case-insensitive directory file match
-        const foundFile = findImageByDesignToken(dName);
-        if (foundFile) {
-          firstDesignImg = { path: foundFile, label: `Design: ${dName}` };
-          break;
+          if (job.designName) {
+            String(job.designName).split(/[,\s&]+/).forEach(s => { if (s.trim()) allDesignNames.add(s.trim()); });
+          }
         }
+      } catch (e) {}
+    }
+
+    // 1. Search Design DB for collected design names
+    for (const dName of Array.from(allDesignNames)) {
+      const cleanName = dName.replace(/^ED-/i, '');
+      try {
+        const Design = require('../db/models/design.model');
+        const dDoc = await Design.findOne({
+          $or: [
+            { designName: { $regex: new RegExp(`^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+            { designNo: { $regex: new RegExp(`^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+          ]
+        }).lean();
+        if (dDoc) {
+          if (dDoc.imageUrl) {
+            const p = resolveImagePath(dDoc.imageUrl);
+            if (p) { firstDesignImg = { path: p, label: `Design: ${dDoc.designName || dName}` }; break; }
+          }
+          if (dDoc.imageUrl2) {
+            const p = resolveImagePath(dDoc.imageUrl2);
+            if (p) { firstDesignImg = { path: p, label: `Design: ${dDoc.designName || dName}` }; break; }
+          }
+        }
+      } catch (e) {}
+
+      const foundFile = findImageByDesignToken(dName);
+      if (foundFile) {
+        firstDesignImg = { path: foundFile, label: `Design: ${dName}` };
+        break;
       }
     }
 
-    // 2. Secondary: Fallback to JobCard's stored imageUrl1 / imageUrl2
-    if (!firstDesignImg && challan.jobNo) {
-      const jobTokens = String(challan.jobNo).split(',').map(s => s.trim()).filter(Boolean);
-      for (const jNo of jobTokens) {
-        try {
-          const job = await JobCard.findOne({ jobNo: jNo });
-          if (job) {
-            if (job.imageUrl1) {
-              const p = resolveImagePath(job.imageUrl1);
-              if (p) { firstDesignImg = { path: p, label: `Design: ${job.designNo || challan.designNo || ''}` }; break; }
-            }
-            if (job.imageUrl2) {
-              const p = resolveImagePath(job.imageUrl2);
-              if (p) { firstDesignImg = { path: p, label: `Design: ${job.designNo || challan.designNo || ''}` }; break; }
-            }
-          }
-        } catch (e) {}
+    // 2. Secondary: Fallback to any attached JobCard's stored imageUrl1 / imageUrl2
+    if (!firstDesignImg) {
+      for (const job of foundJobCards) {
+        if (job.imageUrl1) {
+          const p = resolveImagePath(job.imageUrl1);
+          if (p) { firstDesignImg = { path: p, label: `Design: ${job.designNo || job.designName || ''}` }; break; }
+        }
+        if (job.imageUrl2) {
+          const p = resolveImagePath(job.imageUrl2);
+          if (p) { firstDesignImg = { path: p, label: `Design: ${job.designNo || job.designName || ''}` }; break; }
+        }
       }
     }
 
