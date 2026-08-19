@@ -902,7 +902,15 @@ function ImageField({ label, name, form, onChange, index }) {
                 src={previewUrl}
                 alt={`Selected preview ${index}`}
                 style={{ maxHeight: '100px', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px' }}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                }}
               />
+              <div style={{ display: 'none', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', padding: '0.4rem', color: '#ef4444', fontSize: '0.75rem', fontWeight: 600 }}>
+                <span>🔒 Image URL Restricted / Unavailable</span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Click Browse to re-upload image file</span>
+              </div>
               <button
                 type="button"
                 onClick={(e) => {
