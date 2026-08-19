@@ -1794,6 +1794,43 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           {/* Core Metadata */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
             <div>
+              <label style={{ ...labelStyle, color: '#60a5fa', fontWeight: 800 }}>🏢 ISSUING COMPANY (SELLER) *</label>
+              <select
+                value={invoiceForm.companyEntity || companyEntity || 'Elite Digital Print'}
+                onChange={e => {
+                  const selectedCompany = e.target.value;
+                  setInvoiceForm(f => {
+                    let prefix = 'EDP/26-27/';
+                    if (selectedCompany === 'Elite Edition') prefix = 'EE/26-27/';
+                    else if (selectedCompany === 'Elite Fabtex') prefix = 'EF/26-27/';
+                    else if (selectedCompany === 'Elite Stitching') prefix = 'ES/26-27/';
+                    else if (selectedCompany === 'Elite Online') prefix = 'EO/26-27/';
+
+                    const rawSeq = f.invoiceNo ? (f.invoiceNo.split('/').pop() || '101') : '101';
+                    return {
+                      ...f,
+                      companyEntity: selectedCompany,
+                      invoicePrefix: prefix,
+                      invoiceNo: `${prefix}${rawSeq}`
+                    };
+                  });
+                }}
+                style={{
+                  ...inputStyle,
+                  fontWeight: '800',
+                  color: '#60a5fa',
+                  background: 'rgba(96, 165, 250, 0.12)',
+                  border: '1px solid rgba(96, 165, 250, 0.4)'
+                }}
+              >
+                <option value="Elite Digital Print">🏢 Elite Digital Print</option>
+                <option value="Elite Edition">🏢 Elite Edition</option>
+                <option value="Elite Fabtex">🏢 Elite Fabtex</option>
+                <option value="Elite Stitching">🏢 Elite Stitching</option>
+                <option value="Elite Online">🏢 Elite Online</option>
+              </select>
+            </div>
+            <div>
               <label style={labelStyle}>Invoice No. *</label>
               <input
                 type="text"
@@ -1851,6 +1888,50 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
           {/* Customer Selection */}
           <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1rem' }}>
+            {/* Quick Sister Company Autofill Buttons */}
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>Quick Autofill Sister Company:</span>
+              {[
+                { name: 'Elite Edition', gstin: '24BSWPA7682P1ZS', state: 'Gujarat', stateCode: '24', address: '1095, SIDDHESWAR SOC, KALAPOOL, PUNAGAM, Surat, Gujarat, 395010' },
+                { name: 'Elite Fabtex', gstin: '24AABFE1234F1Z0', state: 'Gujarat', stateCode: '24', address: 'Plot B/37, Siddheshwar Soc, Punagam, Surat, Gujarat, 395010' },
+                { name: 'Elite Digital Print', gstin: '24AANFE0044M1ZG', state: 'Gujarat', stateCode: '24', address: 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, Surat, 395010' }
+              ].map(sc => (
+                <button
+                  key={sc.name}
+                  type="button"
+                  onClick={() => {
+                    setInvoiceForm(f => ({
+                      ...f,
+                      customer: {
+                        name: sc.name,
+                        businessName: sc.name,
+                        phone: f.customer?.phone || '',
+                        email: f.customer?.email || '',
+                        gstin: sc.gstin,
+                        billingAddress: sc.address,
+                        shippingAddress: sc.address,
+                        state: sc.state,
+                        stateCode: sc.stateCode
+                      }
+                    }));
+                    triggerPushNotification('🏢 Sister Company Selected', `Autofilled ${sc.name} billing details cleanly!`, 'info');
+                  }}
+                  style={{
+                    padding: '3px 10px',
+                    borderRadius: '6px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    background: 'rgba(124, 58, 237, 0.12)',
+                    color: '#c084fc',
+                    border: '1px solid rgba(192, 132, 252, 0.3)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  + Bill To: {sc.name}
+                </button>
+              ))}
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>🏢 Billed To (Customer Details)</div>
               <button type="button" onClick={() => setShowCustomerModal(true)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}>
