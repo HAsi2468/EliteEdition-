@@ -1888,50 +1888,6 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
           {/* Customer Selection */}
           <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-sm)', padding: '1rem' }}>
-            {/* Quick Sister Company Autofill Buttons */}
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>Quick Autofill Sister Company:</span>
-              {[
-                { name: 'Elite Edition', gstin: '24BSWPA7682P1ZS', state: 'Gujarat', stateCode: '24', address: '1095, SIDDHESWAR SOC, KALAPOOL, PUNAGAM, Surat, Gujarat, 395010' },
-                { name: 'Elite Fabtex', gstin: '24AABFE1234F1Z0', state: 'Gujarat', stateCode: '24', address: 'Plot B/37, Siddheshwar Soc, Punagam, Surat, Gujarat, 395010' },
-                { name: 'Elite Digital Print', gstin: '24AANFE0044M1ZG', state: 'Gujarat', stateCode: '24', address: 'G.F., PLOT NO-B/37, Siddheshwar Soc., Punagam Main Road, Surat, 395010' }
-              ].map(sc => (
-                <button
-                  key={sc.name}
-                  type="button"
-                  onClick={() => {
-                    setInvoiceForm(f => ({
-                      ...f,
-                      customer: {
-                        name: sc.name,
-                        businessName: sc.name,
-                        phone: f.customer?.phone || '',
-                        email: f.customer?.email || '',
-                        gstin: sc.gstin,
-                        billingAddress: sc.address,
-                        shippingAddress: sc.address,
-                        state: sc.state,
-                        stateCode: sc.stateCode
-                      }
-                    }));
-                    triggerPushNotification('🏢 Sister Company Selected', `Autofilled ${sc.name} billing details cleanly!`, 'info');
-                  }}
-                  style={{
-                    padding: '3px 10px',
-                    borderRadius: '6px',
-                    fontSize: '0.72rem',
-                    fontWeight: 700,
-                    background: 'rgba(124, 58, 237, 0.12)',
-                    color: '#c084fc',
-                    border: '1px solid rgba(192, 132, 252, 0.3)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  + Bill To: {sc.name}
-                </button>
-              ))}
-            </div>
-
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase' }}>🏢 Billed To (Customer Details)</div>
               <button type="button" onClick={() => setShowCustomerModal(true)} style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}>
