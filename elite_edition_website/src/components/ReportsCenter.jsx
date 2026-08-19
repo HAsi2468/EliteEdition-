@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { api, getBaseUrl } from '../services/api';
-import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { 
   BarChart2, 
   FileText, 
@@ -20,7 +19,6 @@ import {
   Send,
   X
 } from 'lucide-react';
-
 import DateRangePicker from './DateRangePicker';
 
 export default function ReportsCenter({ department }) {
@@ -32,12 +30,10 @@ export default function ReportsCenter({ department }) {
     if (department === 'elite-online') return 'sales';
     return 'smart-dashboard';
   }); 
-  const [datePreset, setDatePreset] = useState('this_month');
-  const [dateStart, setDateStart] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
-  });
-  const [dateEnd, setDateEnd] = useState(() => new Date().toISOString().split('T')[0]);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [datePreset, setDatePreset] = useState('today');
+  const [dateStart, setDateStart] = useState(todayStr);
+  const [dateEnd, setDateEnd] = useState(todayStr);
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
   const [timeStart, setTimeStart] = useState('00:00');
@@ -45,7 +41,6 @@ export default function ReportsCenter({ department }) {
   const [searchCode, setSearchCode] = useState('');
   
   const [reportData, setReportData] = useState(null);
-  const [mtdStats, setMtdStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
@@ -58,11 +53,6 @@ export default function ReportsCenter({ department }) {
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [sharingReport, setSharingReport] = useState(false);
   const [shareSearch, setShareSearch] = useState('');
-
-  // Combined Multi-Report Modal state
-  const [isCombinedModalOpen, setIsCombinedModalOpen] = useState(false);
-  const [selectedCombinedReports, setSelectedCombinedReports] = useState(['challan', 'inward', 'outward', 'lotwise', 'stock', 'machine']);
-  const [combinedLoading, setCombinedLoading] = useState(false);
 
   // Fetch rooms list for sharing
   useEffect(() => {
@@ -103,19 +93,7 @@ export default function ReportsCenter({ department }) {
       const combinedStart = `${dateStart}T${timeStart}:00`;
       const combinedEnd = `${dateEnd}T${timeEnd}:59`;
 
-      if (activeReportTab === 'fabric-inward') {
-        const res = await api.getFabricInwardReportData(combinedStart, combinedEnd);
-        data = res.data || [];
-      } else if (activeReportTab === 'fabric-outward') {
-        const res = await api.getFabricOutwardReportData(combinedStart, combinedEnd);
-        data = res.data || [];
-      } else if (activeReportTab === 'fabric-lotwise') {
-        const res = await api.getFabricLotWiseReportData(combinedStart, combinedEnd);
-        data = res.data || [];
-      } else if (activeReportTab === 'challan-report') {
-        const res = await api.getFabricChallans({ dateStart: combinedStart, dateEnd: combinedEnd });
-        data = res.data || [];
-      } else if (activeDepartment === 'elite-print') {
+      if (activeDepartment === 'elite-print') {
         const res = await api.getElitePrintReports(combinedStart, combinedEnd);
         data = res.data;
       } else if (activeReportTab === 'stock-value') {
@@ -133,42 +111,8 @@ export default function ReportsCenter({ department }) {
       } else if (activeReportTab === 'returns-analysis') {
         const res = await api.getReturnsBrandReport({ dateStart: combinedStart, dateEnd: combinedEnd });
         data = res;
-      } else if (activeReportTab === 'sales-returns-ratio') {
-        data = await api.getSalesReturnsRatioReport(combinedStart, combinedEnd);
       }
       setReportData(data);
-
-      // Fetch Month-Till-Date (MTD) Overall Performance Stats
-      try {
-        const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
-        const mtdStart = `${yyyy}-${mm}-01T00:00:00`;
-        const mtdEnd = `${yyyy}-${mm}-${dd}T23:59:59`;
-
-        const [inMtdRes, outMtdRes, chMtdRes] = await Promise.all([
-          api.getFabricInwardReportData(mtdStart, mtdEnd),
-          api.getFabricOutwardReportData(mtdStart, mtdEnd),
-          api.getFabricChallans({ dateStart: mtdStart, dateEnd: mtdEnd })
-        ]);
-
-        const inMtdList = inMtdRes.data || [];
-        const outMtdList = outMtdRes.data || [];
-        const chMtdList = chMtdRes.data || [];
-
-        setMtdStats({
-          inwardMtr: inMtdList.reduce((s, r) => s + (r.qty || 0), 0),
-          inwardCount: inMtdList.length,
-          outwardMtr: outMtdList.reduce((s, r) => s + (r.qty || 0), 0),
-          outwardCount: outMtdList.length,
-          challanMtr: chMtdList.reduce((s, c) => s + (c.totalMtr || 0), 0),
-          challanCount: chMtdList.length,
-          challanTp: chMtdList.reduce((s, c) => s + (c.totalTp || 0), 0)
-        });
-      } catch (mErr) {
-        console.error('Failed to fetch MTD stats:', mErr);
-      }
     } catch (err) {
       setError(err.message || 'Failed to fetch report data.');
     } finally {
@@ -197,61 +141,19 @@ export default function ReportsCenter({ department }) {
       const fullBase = apiBase.startsWith('http') ? apiBase : `${window.location.origin}${apiBase}`;
       
       let downloadLink = '';
-      if (activeReportTab === 'fabric-inward') {
-        downloadLink = `${fullBase}/fabric/report/inward-pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
-      } else if (activeReportTab === 'fabric-outward') {
-        downloadLink = `${fullBase}/fabric/report/outward-pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
-      } else if (activeReportTab === 'fabric-lotwise') {
-        downloadLink = `${fullBase}/fabric/report/lotwise-pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
-      } else if (activeReportTab === 'challan-report') {
-        downloadLink = `${fullBase}/fabric-challan/report/pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
-      } else if (activeDepartment === 'elite-print') {
-        downloadLink = `${fullBase}/department-reports/elite-print/pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
-      } else if (activeReportTab === 'brand-hourly') {
+      if (activeReportTab === 'brand-hourly') {
         downloadLink = `${fullBase}/salesList/report/pdf?type=brand-hourly&dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
       } else if (activeReportTab === 'brand') {
         downloadLink = `${fullBase}/salesList/report/pdf?type=brand&dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
       } else if (activeReportTab === 'returns-analysis') {
         downloadLink = `${fullBase}/salesList/report/pdf?type=returns-analysis&dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
-      } else if (activeReportTab === 'sales-returns-ratio') {
-        downloadLink = `${fullBase}/salesList/report/pdf?type=sales-returns-ratio&dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
       } else {
         downloadLink = `${fullBase}/salesList/report/pdf?dateStart=${combinedStart}&dateEnd=${combinedEnd}`;
       }
 
       let content = `📊 *SHARED REPORT: ${reportTitle.toUpperCase()}*\n📅 Period: ${dateText}\n\n`;
       
-      if (activeReportTab === 'fabric-inward') {
-        const list = Array.isArray(reportData) ? reportData : [];
-        const totalM = list.reduce((s, r) => s + (r.qty || 0), 0);
-        content += `📥 *Total Inward Lots:* ${list.length}\n`;
-        content += `🧵 *Total Inward Meters:* ${totalM.toLocaleString('en-IN')} m\n`;
-      } else if (activeReportTab === 'fabric-outward') {
-        const list = Array.isArray(reportData) ? reportData : [];
-        const totalM = list.reduce((s, r) => s + (r.qty || 0), 0);
-        content += `📤 *Total Outward Dispatches:* ${list.length}\n`;
-        content += `🧵 *Total Dispatched Meters:* ${totalM.toLocaleString('en-IN')} m\n`;
-      } else if (activeReportTab === 'fabric-lotwise') {
-        const list = Array.isArray(reportData) ? reportData : [];
-        const totalIn = list.reduce((s, r) => s + (r.totalInward || 0), 0);
-        const totalOut = list.reduce((s, r) => s + (r.totalOutward || 0), 0);
-        const netStock = list.reduce((s, r) => s + Math.max(0, r.currentStock || 0), 0);
-        content += `📦 *Total Lots Tracked:* ${list.length}\n`;
-        content += `📥 *Total Inward:* ${totalIn.toLocaleString('en-IN')} m\n`;
-        content += `📤 *Total Outward:* ${totalOut.toLocaleString('en-IN')} m\n`;
-        content += `🧵 *Net In-Stock Balance:* ${netStock.toLocaleString('en-IN')} m\n`;
-      } else if (activeReportTab === 'challan-report') {
-        const list = Array.isArray(reportData) ? reportData : [];
-        const totalM = list.reduce((s, c) => s + (c.totalMtr || 0), 0);
-        const totalT = list.reduce((s, c) => s + (c.totalTp || 0), 0);
-        content += `📋 *Total Challans:* ${list.length}\n`;
-        content += `🧵 *Total Dispatched:* ${totalM.toLocaleString('en-IN')} m (${totalT} rolls)\n`;
-      } else if (activeDepartment === 'elite-print') {
-        const topF = reportData.fabricTrends ? reportData.fabricTrends[0] : null;
-        content += `🖨️ *Avg Print to Delivery:* ${reportData.avgPrintToDelivery || 0} Days\n`;
-        if (topF) content += `🧵 *Top Fabric Demand:* ${topF._id} (${topF.totalMtr} m)\n`;
-        content += `⚠️ *Low Stock Alerts:* ${reportData.lowStockAlerts ? reportData.lowStockAlerts.length : 0} items\n`;
-      } else if (activeReportTab === 'brand-hourly') {
+      if (activeReportTab === 'brand-hourly') {
         const peak = [...(reportData.hourlyTotals || [])].sort((a,b) => b.quantity - a.quantity)[0];
         content += `📦 *Total Qty:* ${(reportData.totalOrderQuantity || 0).toLocaleString('en-IN')} pcs\n`;
         content += `💰 *Total Revenue:* ${formatPrice(reportData.totalSellableAmount || 0)}\n`;
@@ -274,11 +176,6 @@ export default function ReportsCenter({ department }) {
         if (Array.isArray(reportData) && reportData[0]) {
           content += `🏆 *Top Return Brand:* ${reportData[0].brand} (${reportData[0].returnsCount} returns)\n`;
         }
-      } else if (activeReportTab === 'sales-returns-ratio') {
-        content += `📦 *Total Gross Qty:* ${(reportData.summary?.totalGrossQty || 0).toLocaleString('en-IN')} pcs\n`;
-        content += `💰 *Total Gross Revenue:* ${formatPrice(reportData.summary?.totalGrossRevenue || 0)}\n`;
-        content += `🔄 *Total Returned Qty:* ${(reportData.summary?.totalReturnedQty || 0).toLocaleString('en-IN')} pcs (${reportData.summary?.overallReturnQtyPct || 0}%)\n`;
-        content += `💵 *Total Net Revenue:* ${formatPrice(reportData.summary?.totalNetRevenue || 0)}\n`;
       } else {
         content += `📦 *Orders/Items Count:* ${(reportData.count || reportData.total || 0).toLocaleString('en-IN')}\n`;
       }
@@ -308,17 +205,7 @@ export default function ReportsCenter({ department }) {
       const formattedDateStart = combinedStart.replace(/:/g, '-');
       const formattedDateEnd = combinedEnd.replace(/:/g, '-');
       
-      if (activeReportTab === 'fabric-inward') {
-        await api.downloadFabricInwardReportPdf(combinedStart, combinedEnd, `Fabric_Inward_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
-      } else if (activeReportTab === 'fabric-outward') {
-        await api.downloadFabricOutwardReportPdf(combinedStart, combinedEnd, `Fabric_Outward_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
-      } else if (activeReportTab === 'fabric-lotwise') {
-        await api.downloadFabricLotWiseReportPdf(combinedStart, combinedEnd, `LotWise_Fabric_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
-      } else if (activeReportTab === 'challan-report') {
-        await api.downloadChallanReportPdf(combinedStart, combinedEnd, searchCode, `Fabric_Challan_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
-      } else if (activeDepartment === 'elite-print') {
-        await api.downloadElitePrintReport(combinedStart, combinedEnd, `Elite_Print_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
-      } else if (activeReportTab === 'stock-value') {
+      if (activeReportTab === 'stock-value') {
         await api.downloadInventoryReport('stock-value', combinedStart, combinedEnd, `Stock_Value_Report_${formattedDateStart}.pdf`);
       } else if (activeReportTab === 'stock-inward') {
         await api.downloadInventoryReport('stock-inward', combinedStart, combinedEnd, `Stock_Inward_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
@@ -332,8 +219,6 @@ export default function ReportsCenter({ department }) {
         await api.downloadBrandReportHourWise(combinedStart, combinedEnd, searchCode, `Brand_Hourly_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
       } else if (activeReportTab === 'returns-analysis') {
         await api.downloadReturnsBrandReport(combinedStart, combinedEnd, returnsSubTab, `Returns_Brand_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
-      } else if (activeReportTab === 'sales-returns-ratio') {
-        await api.downloadSalesReturnsRatioReport(combinedStart, combinedEnd, `Sales_Returns_Ratio_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
       }
     } catch (err) {
       setError(err.message || 'Failed to generate and download PDF report.');
@@ -348,19 +233,7 @@ export default function ReportsCenter({ department }) {
 
   const getReportTitle = () => {
     switch (activeReportTab) {
-      case 'smart-dashboard': return 'Smart AI Analytics Overview';
-      case 'jobcard-reports': return '📋 Job Cards & Production Analytics Report';
-      case 'fabric-reports': return '📦 Fabric Inventory, Rolls & Challans Report';
-      case 'stitching-reports': return '🧵 Stitching, Fusing & Garment Production Report';
-      case 'billing-reports': return '🧾 Billing, GST Invoices & Revenue Report';
-      case 'design-reports': return '🎨 Design Master Catalog & Creative Output Report';
-      case 'rawmaterial-reports': return '🛠️ Raw Material (Paper & Ink) Inventory Report';
-      case 'expense-reports': return '💵 Operational Expenses & Petty Cash Report';
-      case 'complaint-reports': return '⚠️ Quality Defect & Complaint Resolution Report';
-      case 'challan-report': return 'Fabric Challan Report';
-      case 'fabric-inward': return 'Fabric Inward Report';
-      case 'fabric-outward': return 'Fabric Outward Report';
-      case 'fabric-lotwise': return 'Lot-Wise Fabric Stock Balance Report';
+      case 'smart-dashboard': return 'Smart AI Analytics Dashboard';
       case 'stock-value': return 'Stock Value Report';
       case 'stock-inward': return 'Inward Report';
       case 'stock-outward': return 'Outward Report';
@@ -368,41 +241,32 @@ export default function ReportsCenter({ department }) {
       case 'brand': return 'Brand Performance Report';
       case 'brand-hourly': return 'Hourly Brand Analysis Report';
       case 'returns-analysis': return 'Returns Brand Report';
-      case 'sales-returns-ratio': return 'Ratio of Sale and Return Report';
-      default: return 'Department Operations Report';
+      default: return 'Reports';
     }
   };
 
   const getReportDescription = () => {
     if (activeDepartment === 'elite-print') {
       switch (activeReportTab) {
-        case 'smart-dashboard': return 'Executive overview of print operations, bottlenecks, low stock warnings, top designs, and 30-day fabric forecasts.';
-        case 'jobcard-reports': return 'Analytics on Job Card creation, stage movements, pending vs completed cards, average print-to-delivery days, bottleneck analysis & delayed job cards (>7 days).';
-        case 'fabric-reports': return 'Comprehensive fabric stock reports including Inward Receipts, Outward Dispatches, Lot-Wise Stock Balances, and Issued Fabric Challans.';
-        case 'stitching-reports': return 'Production output metrics for garment stitching, daily completed fusing meters, and machine printing speeds.';
-        case 'billing-reports': return 'Summary of GST invoices generated, party billing totals, and customer ledger transactions.';
-        case 'design-reports': return 'Tracks unique design patterns completed per designer, color matching turnaround speeds, and top printed design rankings.';
-        case 'rawmaterial-reports': return 'Paper Roll Inward/Outward meterage, ink inventory usage, substrate consumption, and critical low stock warnings.';
-        case 'expense-reports': return 'Daily operational expense logs, petty cash receipts, machine maintenance payments, and vendor disbursements.';
-        case 'complaint-reports': return 'Defect logs for shade variations, digital printing faults, customer complaints, and resolution turnaround times.';
+        case 'smart-dashboard': return 'Displays real-time low stock warnings, production stage bottlenecks, top designs, and fabric demand forecasting.';
+        case 'creative-output': return 'Tracks the number of unique designs a designer completes over time to identify high-output creators.';
+        case 'color-matching': return 'Measures how quickly designers spin up color variants for single prints.';
+        case 'machine-speed': return 'Evaluates machine meterage output grouped by machine name, speed, and passes.';
+        case 'fusing-throughput': return 'Monitors daily completed fusing meters processed by the factory floor.';
+        case 'fabric-variance': return 'Compares theoretical fabric consumption against actual printed meters to highlight wastage.';
+        case 'deadline-adherence': return 'Tracks time variance between expected job delivery times and actual delivery dates.';
       }
     }
     switch (activeReportTab) {
-      case 'challan-report': return 'Consolidated summary of all fabric challans issued, total meterages, roll counts, and party dispatches.';
-      case 'fabric-inward': return 'Ledger of all fabric inward receipts from suppliers with Lot Numbers, Vendor names, and quantities.';
-      case 'fabric-outward': return 'Dispatch ledger of fabric issued for job cards and printing orders, with Lot allocations and party dispatches.';
-      case 'fabric-lotwise': return 'Consolidated lot-level inventory balance comparing total inward vs total outward meters with net remaining stock per Lot.';
       case 'stock-value': return 'Displays the current active stock levels, purchase prices, sales prices, and total valuation calculations.';
       case 'stock-inward': return 'Summarizes all items stocked in, including purchase prices, supplier details, and in-flow quantities.';
       case 'stock-outward': return 'Summarizes all items scanned out of stock, including customer details, out-flow quantities, and profit calculations.';
       case 'sales': return 'Shows sales performance details aggregated by product SKU code, including total orders and revenue.';
       case 'brand': return 'Renders sales performance details grouped by brand, showcasing size distributions, base SKU totals, and brand-level revenue metrics.';
       case 'returns-analysis': return 'Analyzes returned orders grouped by brand, based on reverse pickup created dates in Unicommerce.';
-      case 'sales-returns-ratio': return 'Brand-wise comparison of Gross Sales vs Returns, calculating Return Rate percentage and Risk Levels.';
       default: return '';
     }
   };
-
 
   return (
     <div style={styles.container}>
@@ -473,18 +337,16 @@ export default function ReportsCenter({ department }) {
       )}
 
       {/* Sub Tabs Header */}
-      <div style={{ ...styles.tabsContainer, marginTop: '0.5rem', background: 'transparent', padding: 0, flexWrap: 'wrap' }}>
+      <div style={{ ...styles.tabsContainer, marginTop: '0.5rem', background: 'transparent', padding: 0 }}>
         {activeDepartment === 'elite-print' && (
           <>
-            <button onClick={() => setActiveReportTab('smart-dashboard')} style={activeReportTab === 'smart-dashboard' ? styles.subTabActive : styles.subTab}>📊 Overview Dashboard</button>
-            <button onClick={() => setActiveReportTab('jobcard-reports')} style={activeReportTab === 'jobcard-reports' ? styles.subTabActive : styles.subTab}>📋 Job Cards &amp; Production</button>
-            <button onClick={() => setActiveReportTab('fabric-reports')} style={activeReportTab === 'fabric-reports' ? styles.subTabActive : styles.subTab}>📦 Fabric Inventory &amp; Rolls</button>
-            <button onClick={() => setActiveReportTab('stitching-reports')} style={activeReportTab === 'stitching-reports' ? styles.subTabActive : styles.subTab}>🧵 Stitching &amp; Fusing</button>
-            <button onClick={() => setActiveReportTab('billing-reports')} style={activeReportTab === 'billing-reports' ? styles.subTabActive : styles.subTab}>🧾 Billing &amp; Invoices</button>
-            <button onClick={() => setActiveReportTab('design-reports')} style={activeReportTab === 'design-reports' ? styles.subTabActive : styles.subTab}>🎨 Design Master Catalog</button>
-            <button onClick={() => setActiveReportTab('rawmaterial-reports')} style={activeReportTab === 'rawmaterial-reports' ? styles.subTabActive : styles.subTab}>🛠️ Raw Material (Paper/Ink)</button>
-            <button onClick={() => setActiveReportTab('expense-reports')} style={activeReportTab === 'expense-reports' ? styles.subTabActive : styles.subTab}>💵 Operational Expenses</button>
-            <button onClick={() => setActiveReportTab('complaint-reports')} style={activeReportTab === 'complaint-reports' ? styles.subTabActive : styles.subTab}>⚠️ Quality &amp; Complaints</button>
+            <button onClick={() => setActiveReportTab('smart-dashboard')} style={activeReportTab === 'smart-dashboard' ? styles.subTabActive : styles.subTab}>Smart Dashboard</button>
+            <button onClick={() => setActiveReportTab('creative-output')} style={activeReportTab === 'creative-output' ? styles.subTabActive : styles.subTab}>Creative Output</button>
+            <button onClick={() => setActiveReportTab('color-matching')} style={activeReportTab === 'color-matching' ? styles.subTabActive : styles.subTab}>Color Matching</button>
+            <button onClick={() => setActiveReportTab('machine-speed')} style={activeReportTab === 'machine-speed' ? styles.subTabActive : styles.subTab}>Machine Speed</button>
+            <button onClick={() => setActiveReportTab('fusing-throughput')} style={activeReportTab === 'fusing-throughput' ? styles.subTabActive : styles.subTab}>Fusing Throughput</button>
+            <button onClick={() => setActiveReportTab('fabric-variance')} style={activeReportTab === 'fabric-variance' ? styles.subTabActive : styles.subTab}>Fabric Variance</button>
+            <button onClick={() => setActiveReportTab('deadline-adherence')} style={activeReportTab === 'deadline-adherence' ? styles.subTabActive : styles.subTab}>Deadline Adherence</button>
           </>
         )}
         {activeDepartment === 'sales' && (
@@ -493,18 +355,13 @@ export default function ReportsCenter({ department }) {
             <button onClick={() => setActiveReportTab('brand')} style={activeReportTab === 'brand' ? styles.subTabActive : styles.subTab}>Brand Analytics</button>
             <button onClick={() => setActiveReportTab('brand-hourly')} style={activeReportTab === 'brand-hourly' ? styles.subTabActive : styles.subTab}>Hourly Brand Analysis</button>
             <button onClick={() => setActiveReportTab('returns-analysis')} style={activeReportTab === 'returns-analysis' ? styles.subTabActive : styles.subTab}>Returns Brand Analysis</button>
-            <button onClick={() => setActiveReportTab('sales-returns-ratio')} style={activeReportTab === 'sales-returns-ratio' ? styles.subTabActive : styles.subTab}>Sales to Return Ratio</button>
           </>
         )}
         {activeDepartment === 'inventory' && (
           <>
             <button onClick={() => setActiveReportTab('stock-value')} style={activeReportTab === 'stock-value' ? styles.subTabActive : styles.subTab}>Stock Value</button>
-            <button onClick={() => setActiveReportTab('fabric-inward')} style={activeReportTab === 'fabric-inward' ? styles.subTabActive : styles.subTab}>Fabric Inward</button>
-            <button onClick={() => setActiveReportTab('fabric-outward')} style={activeReportTab === 'fabric-outward' ? styles.subTabActive : styles.subTab}>Fabric Outward</button>
-            <button onClick={() => setActiveReportTab('fabric-lotwise')} style={activeReportTab === 'fabric-lotwise' ? styles.subTabActive : styles.subTab}>Lot-Wise Fabric</button>
-            <button onClick={() => setActiveReportTab('challan-report')} style={activeReportTab === 'challan-report' ? styles.subTabActive : styles.subTab}>Fabric Challans</button>
-            <button onClick={() => setActiveReportTab('stock-inward')} style={activeReportTab === 'stock-inward' ? styles.subTabActive : styles.subTab}>Item Inward</button>
-            <button onClick={() => setActiveReportTab('stock-outward')} style={activeReportTab === 'stock-outward' ? styles.subTabActive : styles.subTab}>Item Outward</button>
+            <button onClick={() => setActiveReportTab('stock-inward')} style={activeReportTab === 'stock-inward' ? styles.subTabActive : styles.subTab}>Inward</button>
+            <button onClick={() => setActiveReportTab('stock-outward')} style={activeReportTab === 'stock-outward' ? styles.subTabActive : styles.subTab}>Outward</button>
           </>
         )}
         {activeDepartment === 'returns' && (
@@ -524,8 +381,8 @@ export default function ReportsCenter({ department }) {
                 preset={datePreset}
                 onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
                   setDatePreset(p);
-                  setDateStart(ds);
-                  setDateEnd(de);
+                  if (ds) setDateStart(ds);
+                  if (de) setDateEnd(de);
                 }}
                 customStart={customDateStart}
                 customEnd={customDateEnd}
@@ -534,6 +391,37 @@ export default function ReportsCenter({ department }) {
                   setCustomDateEnd(e);
                 }}
               />
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <input 
+                    type="date" 
+                    value={dateStart} 
+                    onChange={(e) => setDateStart(e.target.value)} 
+                    style={styles.input} 
+                  />
+                  <input 
+                    type="time" 
+                    value={timeStart} 
+                    onChange={(e) => setTimeStart(e.target.value)} 
+                    style={{ ...styles.input, width: '85px' }} 
+                  />
+                </div>
+                <span style={{ color: '#475569', fontSize: '0.8rem', fontWeight: 800 }}>to</span>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <input 
+                    type="date" 
+                    value={dateEnd} 
+                    onChange={(e) => setDateEnd(e.target.value)} 
+                    style={styles.input} 
+                  />
+                  <input 
+                    type="time" 
+                    value={timeEnd} 
+                    onChange={(e) => setTimeEnd(e.target.value)} 
+                    style={{ ...styles.input, width: '85px' }} 
+                  />
+                </div>
+              </div>
             </div>
           )}
 
@@ -550,7 +438,7 @@ export default function ReportsCenter({ department }) {
             </div>
           )}
 
-          <div className="reports-action-group" style={styles.actionsGroup}>
+          <div style={styles.actionsGroup}>
             <button 
               onClick={fetchReportData} 
               disabled={loading || downloading} 
@@ -572,35 +460,12 @@ export default function ReportsCenter({ department }) {
             <button 
               onClick={() => setShowShareModal(true)} 
               disabled={loading || downloading || !reportData} 
-              className="btn-secondary share-to-chat-btn" 
-              style={{
-                ...styles.actionBtn,
-                background: 'rgba(56, 189, 248, 0.1)',
-                color: '#38bdf8',
-                borderColor: 'rgba(56, 189, 248, 0.3)',
-                boxShadow: '0 2px 8px rgba(56, 189, 248, 0.12)',
-              }}
+              className="btn-secondary" 
+              style={{ ...styles.actionBtn, background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.3)', marginLeft: '10px' }}
             >
               <Send size={14} />
               <span>Share to Chat</span>
             </button>
-            {activeDepartment === 'elite-print' && (
-              <button 
-                onClick={() => setIsCombinedModalOpen(true)} 
-                className="btn-primary" 
-                style={{
-                  ...styles.actionBtn,
-                  background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)',
-                }}
-                title="Multiple Reports (Elite Digital Prints)"
-              >
-                <FileText size={14} />
-                <span>Multiple Reports</span>
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -612,149 +477,10 @@ export default function ReportsCenter({ department }) {
         </div>
       )}
 
-      {/* 📅 Month-Till-Date (MTD) Overall Performance Banner */}
-      {mtdStats && ['fabric-inward', 'fabric-outward', 'fabric-lotwise', 'challan-report'].includes(activeReportTab) && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem' }}>
-          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            📅 Month Till Date (MTD) Performance Overview
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-            <div className="glass-panel" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid #7c3aed', background: 'rgba(124,58,237,0.03)' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>MTD CHALLAN DISPATCHES</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>{mtdStats.challanMtr.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} mtr</div>
-              <div style={{ fontSize: '0.72rem', color: '#a78bfa', marginTop: 2 }}>{mtdStats.challanCount} Challans ({mtdStats.challanTp} TP)</div>
-            </div>
-
-            <div className="glass-panel" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid #10b981', background: 'rgba(16,185,129,0.03)' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>MTD FABRIC INWARD</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>{mtdStats.inwardMtr.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} mtr</div>
-              <div style={{ fontSize: '0.72rem', color: '#34d399', marginTop: 2 }}>{mtdStats.inwardCount} Receipts</div>
-            </div>
-
-            <div className="glass-panel" style={{ padding: '1rem 1.25rem', borderLeft: '4px solid #ef4444', background: 'rgba(239,68,68,0.03)' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>MTD FABRIC CONSUMPTION</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: 2 }}>{mtdStats.outwardMtr.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} mtr</div>
-              <div style={{ fontSize: '0.72rem', color: '#f87171', marginTop: 2 }}>{mtdStats.outwardCount} Dispatches</div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Summary Cards */}
       {reportData && (
         <div style={styles.summaryGrid}>
-          {activeReportTab === 'fabric-inward' && Array.isArray(reportData) && (
-            <>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <Layers3 size={20} color="var(--primary)" />
-                <div>
-                  <div style={styles.summaryValue}>{reportData.length}</div>
-                  <div style={styles.summaryLabel}>Total Inward Transactions</div>
-                </div>
-              </div>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <TrendingUp size={20} color="var(--success)" />
-                <div>
-                  <div style={styles.summaryValue}>
-                    {reportData.reduce((s, r) => s + (r.qty || 0), 0).toLocaleString('en-IN')} m
-                  </div>
-                  <div style={styles.summaryLabel}>Total Inward Fabric (m)</div>
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeReportTab === 'fabric-outward' && Array.isArray(reportData) && (
-            <>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <Layers3 size={20} color="var(--primary)" />
-                <div>
-                  <div style={styles.summaryValue}>{reportData.length}</div>
-                  <div style={styles.summaryLabel}>Total Outward Dispatches</div>
-                </div>
-              </div>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <TrendingUp size={20} color="#f87171" />
-                <div>
-                  <div style={styles.summaryValue}>
-                    {reportData.reduce((s, r) => s + (r.qty || 0), 0).toLocaleString('en-IN')} m
-                  </div>
-                  <div style={styles.summaryLabel}>Total Dispatched Fabric (m)</div>
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeReportTab === 'fabric-lotwise' && Array.isArray(reportData) && (
-            <>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <Layers3 size={20} color="var(--primary)" />
-                <div>
-                  <div style={styles.summaryValue}>{reportData.length}</div>
-                  <div style={styles.summaryLabel}>Total Fabric Lots Tracked</div>
-                </div>
-              </div>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <ArrowUpRight size={20} color="var(--success)" />
-                <div>
-                  <div style={styles.summaryValue}>
-                    {reportData.reduce((s, r) => s + (r.totalInward || 0), 0).toLocaleString('en-IN')} m
-                  </div>
-                  <div style={styles.summaryLabel}>Total Inward (m)</div>
-                </div>
-              </div>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <Activity size={20} color="#f87171" />
-                <div>
-                  <div style={styles.summaryValue}>
-                    {reportData.reduce((s, r) => s + (r.totalOutward || 0), 0).toLocaleString('en-IN')} m
-                  </div>
-                  <div style={styles.summaryLabel}>Total Outward (m)</div>
-                </div>
-              </div>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <TrendingUp size={20} color="#38bdf8" />
-                <div>
-                  <div style={styles.summaryValue}>
-                    {reportData.reduce((s, r) => s + Math.max(0, r.currentStock || 0), 0).toLocaleString('en-IN')} m
-                  </div>
-                  <div style={styles.summaryLabel}>Net Stock Balance</div>
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeReportTab === 'challan-report' && Array.isArray(reportData) && (
-            <>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <Layers3 size={20} color="var(--primary)" />
-                <div>
-                  <div style={styles.summaryValue}>{reportData.length}</div>
-                  <div style={styles.summaryLabel}>Total Challans Issued</div>
-                </div>
-              </div>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <Activity size={20} color="var(--success)" />
-                <div>
-                  <div style={styles.summaryValue}>
-                    {reportData.reduce((s, c) => s + (c.totalTp || 0), 0)}
-                  </div>
-                  <div style={styles.summaryLabel}>Total Rolls / TPs</div>
-                </div>
-              </div>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <TrendingUp size={20} color="var(--primary)" />
-                <div>
-                  <div style={styles.summaryValue}>
-                    {reportData.reduce((s, c) => s + (c.totalMtr || 0), 0).toLocaleString('en-IN')} m
-                  </div>
-                  <div style={styles.summaryLabel}>Total Dispatched Meters</div>
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeDepartment === 'elite-print' && activeReportTab !== 'challan-report' && (
+          {activeDepartment === 'elite-print' && (
             <>
               {activeReportTab === 'smart-dashboard' && (
                 <>
@@ -919,39 +645,6 @@ export default function ReportsCenter({ department }) {
             </>
           )}
 
-          {activeReportTab === 'sales-returns-ratio' && reportData?.summary && (
-            <>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <Layers3 size={20} color="var(--primary)" />
-                <div>
-                  <div style={styles.summaryValue}>{reportData.summary.totalGrossQty?.toLocaleString('en-IN')}</div>
-                  <div style={styles.summaryLabel}>Gross Sales Qty</div>
-                </div>
-              </div>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <IndianRupee size={20} color="var(--success)" />
-                <div>
-                  <div style={styles.summaryValue}>{formatPrice(reportData.summary.totalGrossRevenue)}</div>
-                  <div style={styles.summaryLabel}>Gross Revenue</div>
-                </div>
-              </div>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <Activity size={20} color="#f87171" />
-                <div>
-                  <div style={styles.summaryValue}>{reportData.summary.totalReturnedQty?.toLocaleString('en-IN')} ({reportData.summary.overallReturnQtyPct}%)</div>
-                  <div style={styles.summaryLabel}>Returned Qty (% Rate)</div>
-                </div>
-              </div>
-              <div className="glass-panel" style={styles.summaryCard}>
-                <TrendingUp size={20} color="#38bdf8" />
-                <div>
-                  <div style={styles.summaryValue}>{formatPrice(reportData.summary.totalNetRevenue)}</div>
-                  <div style={styles.summaryLabel}>Net Revenue</div>
-                </div>
-              </div>
-            </>
-          )}
-
           {activeReportTab === 'brand' && (
             <>
               <div className="glass-panel" style={styles.summaryCard}>
@@ -1036,230 +729,6 @@ export default function ReportsCenter({ department }) {
           </div>
         ) : (
           <div style={{ width: '100%' }}>
-            {activeReportTab === 'fabric-inward' && Array.isArray(reportData) && (
-              <div style={{ width: '100%', overflowX: 'auto', padding: '0.5rem 0' }}>
-                <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#1e293b', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Date</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Lot #</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Vendor Name</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Vendor Challan No</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Fabric Quality & Panna</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Inward Quantity (m)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportData.map((t, idx) => (
-                      <tr key={t._id || idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
-                        <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
-                          {formatDateDDMMYYYY(t.date)}
-                        </td>
-                        <td style={{ padding: '12px 16px', fontWeight: '800', color: '#d97706' }}>
-                          {t.lotNo ? `#${t.lotNo}` : '—'}
-                        </td>
-                        <td style={{ padding: '12px 16px', fontWeight: '700', color: 'var(--text-primary, #0f172a)' }}>{t.vendorName || '—'}</td>
-                        <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>{t.challanNo || '—'}</td>
-                        <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>
-                          {t.fabricQuality || '—'}{t.panna ? ` (${t.panna}")` : ''}
-                        </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '800', color: '#16a34a' }}>
-                          +{(t.qty || 0).toLocaleString('en-IN')} m
-                        </td>
-                      </tr>
-                    ))}
-                    {reportData.length === 0 && (
-                      <tr>
-                        <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
-                          No fabric inward records found for selected date range.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {activeReportTab === 'fabric-outward' && Array.isArray(reportData) && (
-              <div style={{ width: '100%', overflowX: 'auto', padding: '0.5rem 0' }}>
-                <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#1e293b', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Date</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Lot #</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Party Name</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Bill To</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Challan No</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Fabric Quality & Panna</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Shortage</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Dispatched Qty (m)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportData.map((t, idx) => {
-                      let shortageVal = (t.shortagePct !== undefined && t.shortagePct !== null && t.shortagePct !== '') ? t.shortagePct : null;
-                      if (shortageVal === null && t.notes) {
-                        const m = String(t.notes).match(/(\d+(?:\.\d+)?)%\s*shortage/i);
-                        if (m) shortageVal = m[1];
-                      }
-                      if (shortageVal === null && t.fabricQuality && (t.fabricQuality.includes('CREPE') || t.fabricQuality.includes('CRAPE') || t.fabricQuality.includes('FRENCH'))) {
-                        shortageVal = 2;
-                      }
-                      const shortageStr = shortageVal != null ? `${shortageVal}%` : '—';
-                      return (
-                        <tr key={t._id || idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
-                          <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
-                            {formatDateDDMMYYYY(t.date)}
-                          </td>
-                          <td style={{ padding: '12px 16px', fontWeight: '800', color: '#d97706' }}>
-                            {t.lotNo ? `#${t.lotNo}` : '—'}
-                          </td>
-                          <td style={{ padding: '12px 16px', fontWeight: '700', color: 'var(--text-primary, #0f172a)' }}>{t.partyName || '—'}</td>
-                          <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>{t.billTo || t.partyName || '—'}</td>
-                          <td style={{ padding: '12px 16px', fontWeight: '800', color: '#0284c7' }}>{t.challanNo || '—'}</td>
-                          <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>
-                            {t.fabricQuality || '—'}{t.panna ? ` (${t.panna}")` : ''}
-                          </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'center', color: '#7c3aed', fontWeight: '700' }}>
-                            {shortageStr}
-                          </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '800', color: '#dc2626' }}>
-                            -{(t.qty || 0).toLocaleString('en-IN')} m
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {reportData.length === 0 && (
-                      <tr>
-                        <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
-                          No fabric outward records found for selected date range.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {activeReportTab === 'fabric-lotwise' && Array.isArray(reportData) && (
-              <div style={{ width: '100%', overflowX: 'auto', padding: '0.5rem 0' }}>
-                <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#1e293b', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Lot #</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Fabric Quality & Panna</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Vendor Name</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Total Inward (m)</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Total Outward (m)</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Current Lot Balance</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportData.map((l, idx) => {
-                      const stockVal = l.currentStock || 0;
-                      return (
-                        <tr key={l.lotNo || idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
-                          <td style={{ padding: '12px 16px', fontWeight: '800', color: '#d97706' }}>
-                            {l.lotNo ? `#${l.lotNo}` : '—'}
-                          </td>
-                          <td style={{ padding: '12px 16px', fontWeight: '700', color: 'var(--text-primary, #0f172a)' }}>
-                            {l.fabricQuality || '—'}{l.panna ? ` (${l.panna}")` : ''}
-                          </td>
-                          <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>{l.vendorName || '—'}</td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '800', color: '#16a34a' }}>
-                            +{(l.totalInward || 0).toLocaleString('en-IN')} m
-                          </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '800', color: '#dc2626' }}>
-                            -{(l.totalOutward || 0).toLocaleString('en-IN')} m
-                          </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '800', color: stockVal > 0 ? '#16a34a' : stockVal < 0 ? '#dc2626' : '#64748b' }}>
-                            {stockVal.toLocaleString('en-IN')} m
-                          </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                            <span style={{
-                              padding: '3px 10px',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
-                              fontWeight: '800',
-                              background: stockVal > 0 ? 'rgba(22, 163, 74, 0.15)' : 'rgba(100, 116, 139, 0.15)',
-                              color: stockVal > 0 ? '#16a34a' : '#475569'
-                            }}>
-                              {stockVal > 0 ? 'Active Stock' : 'Consumed'}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {reportData.length === 0 && (
-                      <tr>
-                        <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
-                          No lot-wise fabric balance records found for selected date range.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {activeReportTab === 'challan-report' && Array.isArray(reportData) && (
-              <div style={{ width: '100%', overflowX: 'auto', padding: '0.5rem 0' }}>
-                <table className="custom-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#1e293b', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Challan No</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Date</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Party Name</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Fabric & Panna</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Job & Design</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Lot No.</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Rolls (TPs)</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Total Dispatched Mtr</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.8rem', color: '#ffffff', fontWeight: '700' }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportData.map((c, idx) => (
-                      <tr key={c._id || idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
-                        <td style={{ padding: '12px 16px', fontWeight: '800', color: '#0284c7' }}>EDP-{c.challanNo}</td>
-                        <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
-                          {formatDateDDMMYYYY(c.date)}
-                        </td>
-                        <td style={{ padding: '12px 16px', fontWeight: '700', color: 'var(--text-primary, #0f172a)' }}>{c.partyName || '—'}</td>
-                        <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>
-                          {c.fabricName || '—'}{c.panna ? ` (${c.panna}")` : ''}
-                        </td>
-                        <td style={{ padding: '12px 16px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>
-                          {c.jobNo || '—'} {c.designNo ? `/ ED-${c.designNo.replace(/^ED-/i, '')}` : ''}
-                        </td>
-                        <td style={{ padding: '12px 16px', fontWeight: '800', color: '#d97706' }}>{c.lotNo ? `#${c.lotNo}` : '—'}</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: 'var(--text-primary, #0f172a)' }}>{c.totalTp || 0}</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: '800', color: '#16a34a' }}>
-                          {(c.totalMtr || 0).toLocaleString('en-IN')} m
-                        </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                          <button
-                            onClick={() => api.downloadFabricChallanPdf(c._id, c.challanNo)}
-                            className="btn-secondary"
-                            style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                          >
-                            <Download size={12} /> PDF
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {reportData.length === 0 && (
-                      <tr>
-                        <td colSpan="9" style={{ padding: '2rem', textAlign: 'center', fontWeight: '600', color: 'var(--text-primary, #0f172a)' }}>
-                          No fabric challans found for selected date range.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
             {activeReportTab === 'smart-dashboard' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%', padding: '0.5rem 0' }}>
                 {/* 1. Low Stock Warning Box */}
@@ -1489,239 +958,141 @@ export default function ReportsCenter({ department }) {
                             </tr>
                           ))
                         )}
-                        </tbody>
-                      </table>
-                    </div>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
             {activeReportTab !== 'smart-dashboard' && (
               <div className="table-container" style={styles.tableWrap}>
-                {/* 📋 Job Cards & Production */}
-                {activeReportTab === 'jobcard-reports' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
-                    <div>
-                      <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--text-primary, #0f172a)', fontWeight: 800 }}>📋 Delayed Job Cards (&gt; 7 Days)</h4>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr style={{ background: '#1e293b', color: '#ffffff' }}>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#ffffff', fontWeight: 700 }}>Job #</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#ffffff', fontWeight: 700 }}>Party Name</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#ffffff', fontWeight: 700 }}>Design</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#ffffff', fontWeight: 700 }}>Created Date</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#ffffff', fontWeight: 700 }}>Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(!reportData.delayedCards || reportData.delayedCards.length === 0) ? (
-                            <tr><td colSpan="5" style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-primary, #0f172a)', fontWeight: 600 }}>✓ No delayed job cards currently.</td></tr>
-                          ) : (
-                            reportData.delayedCards.map((item, idx) => (
-                              <tr key={idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
-                                <td style={{ padding: '10px 14px', fontWeight: '800', color: '#0284c7' }}>{item.jobNo}</td>
-                                <td style={{ padding: '10px 14px', fontWeight: '700', color: 'var(--text-primary, #0f172a)' }}>{item.party}</td>
-                                <td style={{ padding: '10px 14px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>{item.designName}</td>
-                                <td style={{ padding: '10px 14px', fontWeight: '600', color: 'var(--text-primary, #334155)' }}>{item.date}</td>
-                                <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                                  <span style={{ background: 'rgba(239,68,68,0.15)', color: '#dc2626', padding: '3px 10px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '800' }}>
-                                    {item.status}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                {activeReportTab === 'creative-output' && (
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Designer Name</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Total Designs Produced</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.designerCreativeOutput?.map((item, idx) => (
+                    <tr key={idx}>
+                      <td style={{ padding: '0.75rem' }}>{item._id || 'Unknown Designer'}</td>
+                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--primary)' }}>{item.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            
+            {activeReportTab === 'color-matching' && (
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Designer Name</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Total Color Variations</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.colorMatchingEfficiency?.map((item, idx) => (
+                    <tr key={idx}>
+                      <td style={{ padding: '0.75rem' }}>{item._id || 'Unknown Designer'}</td>
+                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--primary)' }}>{item.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
-                    <div>
-                      <h4 style={{ margin: '1rem 0 0.8rem 0', color: 'var(--text-primary, #0f172a)', fontWeight: 800 }}>📐 Fabric Consumption Variance</h4>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr style={{ background: '#1e293b', color: '#ffffff' }}>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#ffffff', fontWeight: 700 }}>Job Number</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#ffffff', fontWeight: 700 }}>Theoretical (m)</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#ffffff', fontWeight: 700 }}>Actual Printed (m)</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#ffffff', fontWeight: 700 }}>Variance</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {reportData.fabricConsumptionVariance?.slice(0, 30).map((item, idx) => (
-                            <tr key={idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
-                              <td style={{ padding: '10px 14px', fontWeight: 800, color: 'var(--text-primary, #0f172a)' }}>{item.jobNo}</td>
-                              <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, color: 'var(--text-primary, #475569)' }}>{item.theoreticalMtr?.toFixed(2)} m</td>
-                              <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>{item.actualMtr?.toFixed(2)} m</td>
-                              <td style={{ padding: '10px 14px', textAlign: 'right', color: item.variance > 0 ? '#dc2626' : '#16a34a', fontWeight: 800 }}>
-                                {item.variance > 0 ? `+${item.variance.toFixed(2)} m (Waste)` : `${item.variance.toFixed(2)} m (Saved)`}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
+            {activeReportTab === 'machine-speed' && (
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Machine Name</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Speed Profile</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Passes</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Total Meters Printed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.machineMeterage?.map((item, idx) => (
+                    <tr key={idx}>
+                      <td style={{ padding: '0.75rem' }}>{item._id?.machineName || 'N/A'}</td>
+                      <td style={{ padding: '0.75rem' }}>{item._id?.speed || 'N/A'}</td>
+                      <td style={{ padding: '0.75rem' }}>{item._id?.pass || 'N/A'}</td>
+                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--primary)' }}>{item.totalMtr?.toFixed(2)} Mtr</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
-                {/* 📦 Fabric Inventory & Rolls */}
-                {activeReportTab === 'fabric-reports' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
-                    <div>
-                      <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--text-primary, #0f172a)', fontWeight: 800 }}>🔮 Fabric Demand Forecasting (Next 7 &amp; 30 Days)</h4>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr style={{ background: '#1e293b', color: '#ffffff' }}>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#ffffff', fontWeight: 700 }}>Fabric Quality</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#ffffff', fontWeight: 700 }}>Current Stock</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#ffffff', fontWeight: 700 }}>7-Day Demand</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#ffffff', fontWeight: 700 }}>30-Day Demand</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#ffffff', fontWeight: 700 }}>Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {reportData.fabricForecasts?.map((item, idx) => (
-                            <tr key={idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
-                              <td style={{ padding: '10px 14px', fontWeight: '800', color: 'var(--text-primary, #0f172a)' }}>{item.fabricQuality}</td>
-                              <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '800', color: '#16a34a' }}>{item.currentStock} m</td>
-                              <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '800', color: '#0284c7' }}>{item.demand7Days} m</td>
-                              <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, color: 'var(--text-primary, #334155)' }}>{item.demand30Days} m</td>
-                              <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                                <span style={{ background: item.status === 'Safe' ? 'rgba(22,163,74,0.15)' : 'rgba(220,38,38,0.15)', color: item.status === 'Safe' ? '#16a34a' : '#dc2626', padding: '3px 10px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '800' }}>
-                                  {item.status}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
+            {activeReportTab === 'fabric-variance' && (
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Job Number</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Theoretical Consumption</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Actual Printed Meters</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Variance (Meters)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.fabricConsumptionVariance?.map((item, idx) => (
+                    <tr key={idx}>
+                      <td style={{ padding: '0.75rem', fontWeight: 600 }}>{item.jobNo}</td>
+                      <td style={{ padding: '0.75rem' }}>{item.theoreticalMtr?.toFixed(2)} Mtr</td>
+                      <td style={{ padding: '0.75rem' }}>{item.actualMtr?.toFixed(2)} Mtr</td>
+                      <td style={{ padding: '0.75rem', color: item.variance > 0 ? '#ef4444' : '#10b981', fontWeight: 600 }}>
+                        {item.variance > 0 ? `+${item.variance.toFixed(2)} (Waste)` : `${item.variance.toFixed(2)} (Saved)`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
-                {/* 🧵 Stitching & Fusing */}
-                {activeReportTab === 'stitching-reports' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
-                    <div>
-                      <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--text-primary, #0f172a)', fontWeight: 800 }}>⚡ Daily Fusing Throughput</h4>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr style={{ background: '#1e293b', color: '#ffffff' }}>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#ffffff', fontWeight: 700 }}>Fusing Date</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#ffffff', fontWeight: 700 }}>Completed Jobs</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#ffffff', fontWeight: 700 }}>Total Fusing Meters</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {reportData.fusingThroughput?.map((item, idx) => (
-                            <tr key={idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
-                              <td style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--text-primary, #0f172a)' }}>{item._id}</td>
-                              <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: 'var(--text-primary, #0f172a)' }}>{item.completedCount}</td>
-                              <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '800', color: '#0284c7' }}>{item.totalFusingMtr?.toFixed(2)} m</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
+            {activeReportTab === 'fusing-throughput' && (
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Fusing Date</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Completed Jobs</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Total Fusing Meters</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.fusingThroughput?.map((item, idx) => (
+                    <tr key={idx}>
+                      <td style={{ padding: '0.75rem' }}>{item._id}</td>
+                      <td style={{ padding: '0.75rem' }}>{item.completedCount}</td>
+                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--primary)' }}>{item.totalFusingMtr?.toFixed(2)} Mtr</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
-                {/* 🧾 Billing & Invoices */}
-                {activeReportTab === 'billing-reports' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
-                    <div>
-                      <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--text-primary, #0f172a)', fontWeight: 800 }}>🏢 Busiest Parties &amp; Billing Totals</h4>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr style={{ background: '#1e293b', color: '#ffffff' }}>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#ffffff', fontWeight: 700 }}>Party Name</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'center', color: '#ffffff', fontWeight: 700 }}>Jobs Count</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#ffffff', fontWeight: 700 }}>Total Meterage</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {reportData.busiestParties?.map((item, idx) => (
-                            <tr key={idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
-                              <td style={{ padding: '10px 14px', fontWeight: '800', color: 'var(--text-primary, #0f172a)' }}>{item._id}</td>
-                              <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: 'var(--text-primary, #0f172a)' }}>{item.count}</td>
-                              <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '800', color: '#16a34a' }}>{item.totalMtr?.toFixed(1)} m</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* 🎨 Design Master Catalog */}
-                {activeReportTab === 'design-reports' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
-                    <div>
-                      <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--text-primary, #0f172a)', fontWeight: 800 }}>🎨 Designer Creative Output</h4>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr style={{ background: '#1e293b', color: '#ffffff' }}>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#ffffff', fontWeight: 700 }}>Designer Name</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#ffffff', fontWeight: 700 }}>Designs Completed</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {reportData.designerCreativeOutput?.map((item, idx) => (
-                            <tr key={idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
-                              <td style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--text-primary, #0f172a)' }}>{item._id || 'Unknown Designer'}</td>
-                              <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '800', color: '#0284c7' }}>{item.count}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* 🛠️ Raw Material (Paper & Ink) */}
-                {activeReportTab === 'rawmaterial-reports' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
-                    <div>
-                      <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--text-primary, #0f172a)', fontWeight: 800 }}>⚠️ Low Stock Warnings (Substrates &amp; Inks)</h4>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr style={{ background: '#1e293b', color: '#ffffff' }}>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#ffffff', fontWeight: 700 }}>Material Item</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'left', color: '#ffffff', fontWeight: 700 }}>Category</th>
-                            <th style={{ padding: '10px 14px', textAlign: 'right', color: '#ffffff', fontWeight: 700 }}>Remaining Balance</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(!reportData.lowStockAlerts || reportData.lowStockAlerts.length === 0) ? (
-                            <tr><td colSpan="3" style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-primary, #0f172a)', fontWeight: 600 }}>✓ All raw materials in healthy stock levels.</td></tr>
-                          ) : (
-                            reportData.lowStockAlerts.map((item, idx) => (
-                              <tr key={idx} style={{ borderBottom: '1px solid var(--border-light, rgba(0,0,0,0.08))' }}>
-                                <td style={{ padding: '10px 14px', fontWeight: '800', color: 'var(--text-primary, #0f172a)' }}>{item.item}</td>
-                                <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-primary, #334155)' }}>{item.type}</td>
-                                <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '800', color: '#dc2626' }}>{item.qty} {item.unit}</td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* 💵 Operational Expenses */}
-                {activeReportTab === 'expense-reports' && (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: '#e2e8f0' }}>
-                    💵 Operational Expenses Ledger: Select Date Range above and click Fetch Data to load detailed petty cash transaction logs.
-                  </div>
-                )}
-
-                {/* ⚠️ Quality Complaints */}
-                {activeReportTab === 'complaint-reports' && (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: '#e2e8f0' }}>
-                    ⚠️ Quality Complaint Logs: Select Date Range above and click Fetch Data to load shade defect and printing fault logs.
-                  </div>
-                )}
-              </div>
+            {activeReportTab === 'deadline-adherence' && (
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Job Status</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Total Jobs</th>
+                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Avg Expected Delivery Time (Hours)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportData.deadlineAdherence?.map((item, idx) => (
+                    <tr key={idx}>
+                      <td style={{ padding: '0.75rem' }}>{item._id}</td>
+                      <td style={{ padding: '0.75rem' }}>{item.totalJobs}</td>
+                      <td style={{ padding: '0.75rem', fontWeight: 600, color: 'var(--primary)' }}>{item.avgExpectedTime?.toFixed(1)} hrs</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
 
             {activeReportTab === 'stock-value' && (
@@ -2370,123 +1741,76 @@ export default function ReportsCenter({ department }) {
                 </div>
               );
             })()}
-
-            {activeReportTab === 'sales-returns-ratio' && reportData && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
-                <div style={styles.brandContainer}>
-                  <div style={styles.brandSection}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 'var(--radius-sm)', marginBottom: '1rem' }}>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#93c5fd' }}>Brand-Wise Sales & Return Ratio Performance</span>
-                      <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        <span>Total Brands Tracked: <strong style={{ color: 'var(--text-primary)' }}>{reportData.brands?.length || 0}</strong></span>
-                      </div>
-                    </div>
-
-                    <div className="mobile-table-wrap">
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', minWidth: '700px' }}>
-                        <thead>
-                          <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
-                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Brand Name</th>
-                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Gross Qty</th>
-                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Gross Revenue</th>
-                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'center', color: '#f87171', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Returned Qty</th>
-                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right', color: '#f87171', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Returned Revenue</th>
-                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'center', color: 'var(--success)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Net Qty</th>
-                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right', color: 'var(--success)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Net Revenue</th>
-                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Return Qty %</th>
-                            <th style={{ padding: '0.6rem 0.8rem', textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Risk Level</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(reportData.brands || []).map((b, idx) => (
-                            <tr key={b.brand || idx} style={{ borderBottom: '1px solid var(--border-light)', background: idx % 2 === 1 ? 'rgba(255,255,255,0.015)' : 'transparent' }}>
-                              <td style={{ padding: '0.65rem 0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{b.brand || 'Unknown'}</td>
-                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', fontWeight: 600 }}>{b.grossQty?.toLocaleString('en-IN')}</td>
-                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'right', fontWeight: 600 }}>{formatPrice(b.grossRevenue)}</td>
-                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', fontWeight: 600, color: '#f87171' }}>{b.returnedQty?.toLocaleString('en-IN')}</td>
-                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'right', fontWeight: 600, color: '#f87171' }}>{formatPrice(b.returnedRevenue)}</td>
-                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', fontWeight: 700, color: 'var(--success)' }}>{b.netQty?.toLocaleString('en-IN')}</td>
-                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>{formatPrice(b.netRevenue)}</td>
-                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center', fontWeight: 700, color: b.returnQtyPct >= 20 ? '#ef4444' : b.returnQtyPct >= 10 ? '#f59e0b' : 'var(--text-primary)' }}>
-                                {b.returnQtyPct}%
-                              </td>
-                              <td style={{ padding: '0.65rem 0.8rem', textAlign: 'center' }}>
-                                <span style={{
-                                  padding: '0.2rem 0.5rem',
-                                  borderRadius: '4px',
-                                  fontSize: '0.72rem',
-                                  fontWeight: 700,
-                                  background: b.riskLevel === 'HIGH' ? 'rgba(239,68,68,0.2)' : b.riskLevel === 'MODERATE' ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)',
-                                  color: b.riskLevel === 'HIGH' ? '#f87171' : b.riskLevel === 'MODERATE' ? '#fbbf24' : '#34d399',
-                                  border: `1px solid ${b.riskLevel === 'HIGH' ? 'rgba(239,68,68,0.4)' : b.riskLevel === 'MODERATE' ? 'rgba(245,158,11,0.4)' : 'rgba(16,185,129,0.4)'}`
-                                }}>
-                                  {b.riskLevel}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
           </div>
         )}
       {/* Share Report Modal */}
       {showShareModal && (
-        <div className="share-modal-overlay">
-          <div className="share-modal-card">
-            {/* Mobile Top Drag Indicator */}
-            <div style={{ width: '36px', height: '4px', borderRadius: '2px', backgroundColor: 'rgba(255,255,255,0.2)', margin: '0 auto 14px auto' }} />
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Send size={18} color="var(--primary)" /> Share Report to Chat
-              </h3>
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'var(--bg-panel, #111827)',
+            border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '480px',
+            padding: '24px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4)',
+            color: 'var(--text-primary, #f3f4f6)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>Share Report to Chat</h3>
               <button 
-                type="button"
                 onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); }} 
-                style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted, #9ca3af)' }}
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleShareReport}>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Search Channel or Member</label>
+                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.85rem', color: 'var(--text-secondary, #d1d5db)' }}>Search Channel or Member</label>
                 <input 
                   type="text" 
                   value={shareSearch} 
                   onChange={e => setShareSearch(e.target.value)} 
-                  placeholder="Type name to filter..." 
+                  placeholder="Type name to search..." 
                   style={{
                     width: '100%',
-                    padding: '12px 16px',
-                    borderRadius: '24px',
-                    border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
-                    backgroundColor: 'var(--bg-input, #0b0f19)',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
+                    backgroundColor: 'rgba(255,255,255,0.03)',
                     color: 'var(--text-primary)',
                     outline: 'none',
-                    fontSize: '0.92rem'
+                    fontSize: '0.9rem'
                   }}
                 />
               </div>
 
-              <div style={{ marginBottom: '22px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Chat Destination</label>
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: 'var(--text-secondary, #d1d5db)' }}>Select Chat Destination</label>
                 <div style={{
-                  maxHeight: '230px',
+                  maxHeight: '200px',
                   overflowY: 'auto',
-                  border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
-                  borderRadius: '16px',
+                  border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
+                  borderRadius: '8px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '4px',
-                  padding: '6px',
-                  backgroundColor: 'rgba(0,0,0,0.2)'
+                  backgroundColor: 'rgba(255,255,255,0.01)'
                 }}>
                   {chatRooms
                     .filter(r => {
@@ -2509,35 +1833,22 @@ export default function ReportsCenter({ department }) {
                           onClick={() => setSelectedRoomId(r._id)}
                           style={{
                             padding: '10px 14px',
-                            borderRadius: '12px',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '12px',
+                            gap: '10px',
                             cursor: 'pointer',
-                            backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.16)' : 'rgba(255,255,255,0.02)',
-                            border: isSelected ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid transparent',
-                            color: isSelected ? '#38bdf8' : 'var(--text-primary)',
-                            transition: 'all 0.2s ease',
+                            backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                            borderBottom: '1px solid rgba(255,255,255,0.04)',
+                            transition: 'background-color 0.2s',
                           }}
                         >
                           <div style={{
-                            width: '28px',
-                            height: '28px',
+                            width: '8px',
+                            height: '8px',
                             borderRadius: '50%',
-                            background: isSelected
-                              ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)'
-                              : 'rgba(255,255,255,0.08)',
-                            color: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold'
-                          }}>
-                            {isDirect ? displayName.charAt(0).toUpperCase() : '#'}
-                          </div>
-                          <span style={{ fontSize: '0.92rem', fontWeight: isSelected ? '600' : 'normal', flex: 1 }}>{displayName}</span>
-                          {isSelected && <span style={{ fontSize: '0.8rem', color: '#38bdf8', fontWeight: 'bold' }}>✓</span>}
+                            backgroundColor: isDirect ? 'var(--success, #10b981)' : 'var(--primary, #3b82f6)'
+                          }} />
+                          <span style={{ fontSize: '0.9rem', fontWeight: isSelected ? '600' : 'normal', color: isSelected ? 'var(--primary)' : 'var(--text-primary)' }}>{displayName}</span>
                         </div>
                       );
                     })}
@@ -2549,19 +1860,18 @@ export default function ReportsCenter({ department }) {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                 <button 
                   type="button" 
                   onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); }} 
                   style={{
-                    padding: '12px 20px',
-                    borderRadius: '24px',
-                    border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
-                    backgroundColor: 'rgba(255,255,255,0.04)',
+                    padding: '10px 18px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
+                    backgroundColor: 'transparent',
                     color: 'var(--text-primary)',
                     cursor: 'pointer',
-                    fontSize: '0.88rem',
-                    fontWeight: 600
+                    fontSize: '0.85rem'
                   }}
                 >
                   Cancel
@@ -2570,118 +1880,23 @@ export default function ReportsCenter({ department }) {
                   type="submit" 
                   disabled={sharingReport || !selectedRoomId}
                   style={{
-                    padding: '12px 24px',
-                    borderRadius: '24px',
+                    padding: '10px 20px',
+                    borderRadius: '8px',
                     border: 'none',
-                    background: selectedRoomId ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'rgba(255,255,255,0.08)',
-                    color: 'white',
+                    backgroundColor: selectedRoomId ? 'var(--primary, #3b82f6)' : 'var(--border-light, #374151)',
+                    color: '#000',
                     cursor: selectedRoomId ? 'pointer' : 'not-allowed',
                     fontWeight: 'bold',
-                    fontSize: '0.88rem',
+                    fontSize: '0.85rem',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: selectedRoomId ? '0 4px 14px rgba(56,189,248,0.3)' : 'none',
-                    opacity: selectedRoomId ? 1 : 0.5
+                    gap: '6px'
                   }}
                 >
                   {sharingReport ? 'Sharing...' : 'Confirm Share'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* COMBINED MULTI-REPORT MODAL */}
-      {isCombinedModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
-          <div className="glass-panel" style={{ background: 'var(--panel-bg, #1e1b4b)', width: '100%', maxWidth: '520px', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-light, #4c1d95)', color: 'var(--text-primary, #ffffff)', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <FileText size={22} color="#a78bfa" />
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>Multiple Reports (Combined 1-Page)</h3>
-              </div>
-              <button onClick={() => setIsCombinedModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.2rem' }}><X size={20} /></button>
-            </div>
-
-            <p style={{ fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '1.2rem', lineHeight: '1.4' }}>
-              Select report period and choose which reports to combine into a single, beautifully organized 1-page PDF.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', marginBottom: '0.3rem' }}>Date Start</label>
-                  <input type="date" value={dateStart} onChange={e => setDateStart(e.target.value)} style={styles.input} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', marginBottom: '0.3rem' }}>Date End</label>
-                  <input type="date" value={dateEnd} onChange={e => setDateEnd(e.target.value)} style={styles.input} />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', marginBottom: '0.5rem' }}>Select Reports to Include (Fits in 1 Page):</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  {[
-                    { id: 'challan', label: 'Fabric Challans Dispatch Outwards', desc: 'Dispatched meters, party name, billing name & TP rolls' },
-                    { id: 'inward', label: 'Fabric Inwards Summary', desc: 'Supplier receipts, vendor details & inward meters' },
-                    { id: 'outward', label: 'Fabric Consumption Summary', desc: 'Fabric consumed, job dispatches & shortage %' },
-                    { id: 'machine', label: 'Printing Department', desc: 'Machine & pass-wise meterage, total printed meters & jobcard count' },
-                    { id: 'lotwise', label: 'Lot-Wise Fabric Stock Balance Summary', desc: 'Lot-level stock balance & net remaining meters' },
-                    { id: 'stock', label: 'Fabric Current Stock Summary', desc: 'Available fabric quality stock levels & status' }
-                  ].map(rep => (
-                    <label key={rep.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedCombinedReports.includes(rep.id)}
-                        onChange={e => {
-                          if (e.target.checked) {
-                            setSelectedCombinedReports([...selectedCombinedReports, rep.id]);
-                          } else {
-                            if (selectedCombinedReports.length <= 1) {
-                              alert('Please select at least 1 report.');
-                              return;
-                            }
-                            setSelectedCombinedReports(selectedCombinedReports.filter(r => r !== rep.id));
-                          }
-                        }}
-                        style={{ marginTop: '0.15rem', accentColor: '#7c3aed' }}
-                      />
-                      <div>
-                        <strong style={{ color: '#f8fafc' }}>{rep.label}</strong>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{rep.desc}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button onClick={() => setIsCombinedModalOpen(false)} className="btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>Cancel</button>
-              <button
-                onClick={async () => {
-                  setCombinedLoading(true);
-                  try {
-                    const combinedStart = `${dateStart}T${timeStart}:00`;
-                    const combinedEnd = `${dateEnd}T${timeEnd}:59`;
-                    await api.downloadFabricCombinedReportPdf(combinedStart, combinedEnd, selectedCombinedReports, `Elite_Digital_Prints_Combined_Report_${dateStart}_to_${dateEnd}.pdf`);
-                    setIsCombinedModalOpen(false);
-                  } catch (err) {
-                    alert(err.message);
-                  } finally {
-                    setCombinedLoading(false);
-                  }
-                }}
-                disabled={combinedLoading}
-                className="btn-primary"
-                style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', border: 'none', gap: '0.4rem' }}
-              >
-                <Download size={16} /> {combinedLoading ? 'Generating 1-Page PDF...' : 'Download Combined PDF'}
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -2713,7 +1928,7 @@ const styles = {
   },
   pageSubtitle: {
     fontSize: '0.8rem',
-    color: '#cbd5e1',
+    color: 'var(--text-muted)',
     marginTop: '2px',
   },
   tabsContainer: {
@@ -2726,7 +1941,7 @@ const styles = {
   tab: {
     background: 'none',
     border: 'none',
-    color: '#cbd5e1',
+    color: 'var(--text-muted)',
     padding: '0.6rem 1.1rem',
     fontSize: '0.85rem',
     fontWeight: '500',
@@ -2739,7 +1954,7 @@ const styles = {
   tabActive: {
     background: 'rgba(6, 182, 212, 0.1)',
     border: '1px solid rgba(6, 182, 212, 0.2)',
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     padding: '0.6rem 1.1rem',
     fontSize: '0.85rem',
     fontWeight: '600',
@@ -2749,24 +1964,23 @@ const styles = {
     gap: '0.4rem',
   },
   subTab: {
-    background: 'rgba(15, 23, 42, 0.04)',
-    color: 'var(--text-primary, #0f172a)',
-    padding: '0.45rem 0.85rem',
-    fontSize: '0.82rem',
-    fontWeight: '700',
+    background: 'none',
+    color: 'var(--text-muted)',
+    padding: '0.4rem 0.8rem',
+    fontSize: '0.8rem',
+    fontWeight: '500',
     borderRadius: '16px',
     transition: 'all var(--transition-fast)',
-    border: '1px solid rgba(15, 23, 42, 0.12)',
+    border: '1px solid transparent',
   },
   subTabActive: {
-    background: '#0284c7',
-    border: '1px solid #0284c7',
-    color: '#ffffff',
-    padding: '0.45rem 0.85rem',
-    fontSize: '0.82rem',
-    fontWeight: '800',
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid var(--border-light)',
+    color: 'var(--text-primary)',
+    padding: '0.4rem 0.8rem',
+    fontSize: '0.8rem',
+    fontWeight: '600',
     borderRadius: '16px',
-    boxShadow: '0 2px 8px rgba(2, 132, 199, 0.35)',
   },
   filterCard: {
     padding: '1.25rem',
@@ -2786,8 +2000,8 @@ const styles = {
   },
   label: {
     fontSize: '0.75rem',
-    fontWeight: '700',
-    color: '#e2e8f0',
+    fontWeight: '800',
+    color: '#334155',
     display: 'flex',
     alignItems: 'center',
     gap: '0.3rem',
@@ -2797,7 +2011,11 @@ const styles = {
     width: '100%',
     padding: '0.5rem 0.75rem',
     fontSize: '0.85rem',
-    color: '#f8fafc',
+    color: '#0f172a',
+    background: '#ffffff',
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    fontWeight: '700'
   },
   actionsGroup: {
     display: 'flex',
@@ -2815,7 +2033,7 @@ const styles = {
     border: '1px solid rgba(239, 68, 68, 0.2)',
     borderRadius: 'var(--radius-sm)',
     padding: '0.75rem 1rem',
-    color: '#fca5a5',
+    color: '#dc2626',
     fontSize: '0.8rem',
     display: 'flex',
     alignItems: 'center',
@@ -2831,18 +2049,22 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '1rem',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '12px',
+    boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)'
   },
   summaryValue: {
-    fontSize: '1.2rem',
-    fontWeight: '700',
-    color: '#ffffff',
+    fontSize: '1.3rem',
+    fontWeight: '800',
+    color: '#0f172a',
   },
   summaryLabel: {
-    fontSize: '0.7rem',
-    color: '#cbd5e1',
+    fontSize: '0.72rem',
+    color: '#475569',
     marginTop: '2px',
     textTransform: 'uppercase',
-    fontWeight: '600',
+    fontWeight: '800',
   },
   tableCard: {
     padding: '1.5rem',
@@ -2853,15 +2075,14 @@ const styles = {
     paddingBottom: '0.75rem',
   },
   reportTitle: {
-    fontSize: '1.15rem',
-    fontWeight: '800',
-    color: 'var(--text-primary, #0f172a)',
+    fontSize: '1.05rem',
+    fontWeight: '600',
+    color: 'var(--text-primary)',
   },
   reportSubtitle: {
-    fontSize: '0.82rem',
-    color: 'var(--text-secondary, #334155)',
-    fontWeight: '600',
-    marginTop: '4px',
+    fontSize: '0.8rem',
+    color: 'var(--text-muted)',
+    marginTop: '2px',
     lineHeight: '1.4',
   },
   tableWrap: {
