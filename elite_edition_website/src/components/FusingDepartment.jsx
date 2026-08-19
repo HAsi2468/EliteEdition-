@@ -781,21 +781,7 @@ export default function FusingDepartment() {
                 </select>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                  FUSING MACHINE *
-                </label>
-                <select
-                  required
-                  value={topForm.fusingMachine}
-                  onChange={e => setTopForm(f => ({ ...f, fusingMachine: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a', cursor: 'pointer' }}
-                >
-                  {DEFAULT_FUSING_MACHINES.map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
+
 
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
@@ -987,17 +973,7 @@ export default function FusingDepartment() {
             ))}
           </div>
 
-          {/* Machine Select Filter */}
-          <select
-            value={filterMachine}
-            onChange={e => setFilterMachine(e.target.value)}
-            style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem', height: '34px', borderRadius: '6px', border: '1px solid var(--border-light)' }}
-          >
-            <option value="">All Fusing Machines</option>
-            {DEFAULT_FUSING_MACHINES.map(m => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+
 
           <button
             type="button"
