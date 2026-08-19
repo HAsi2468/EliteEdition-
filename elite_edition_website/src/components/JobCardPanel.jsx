@@ -608,15 +608,16 @@ function JobCardPrintView({ card, onClose, onShare }) {
       let img2 = card.imageUrl2 || '';
 
       try {
-        // If no stored image 1, look up in catalog
-        if (!img1 && names[0]) {
+        // Look up in catalog if no image or if image is a Drive link
+        if ((!img1 || img1.includes('drive.google.com')) && names[0]) {
           const res1 = await api.getDesigns({ search: names[0], limit: 5 });
           if (res1 && res1.data && res1.data.length > 0) {
             const matched1 = res1.data.find(d =>
               d.designName?.toLowerCase() === names[0].toLowerCase() ||
               String(d.designNo || '').toLowerCase() === names[0].toLowerCase()
             ) || res1.data[0];
-            img1 = matched1.imageUrl || matched1.imageUrl2 || '';
+            const freshImg = matched1.imageUrl || matched1.imageUrl2 || '';
+            if (freshImg) img1 = freshImg;
             if (!img2 && matched1.imageUrl2 && matched1.imageUrl !== matched1.imageUrl2) {
               img2 = matched1.imageUrl2;
             }

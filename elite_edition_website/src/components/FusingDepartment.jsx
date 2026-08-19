@@ -995,7 +995,7 @@ export default function FusingDepartment() {
               <tbody>
                 {filteredCards.map((c) => {
                   const isDone = c.fusingStatus === 'Fusing Done';
-                  const fresh = parseFloat(c.freshMtr || c.fusingMtr || c.printedMtr || c.totalMtr) || 0;
+                  const fresh = parseFloat(c.freshMtr || c.fusingMtr) || 0;
                   const waste = parseFloat(c.totalWastageMtr) || 0;
                   const butterKg = parseFloat(c.butterPaperWeightKg) || 0;
 
