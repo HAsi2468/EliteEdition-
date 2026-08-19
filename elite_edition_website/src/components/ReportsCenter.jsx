@@ -909,12 +909,12 @@ export default function ReportsCenter({ department }) {
                   <div className="table-container" style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                       <thead>
-                        <tr style={{ borderBottom: '1px solid var(--border-light)', textAlign: 'left' }}>
-                          <th style={{ padding: '0.6rem 0.5rem', color: 'var(--text-muted)', fontWeight: 700 }}>Fabric Quality</th>
-                          <th style={{ padding: '0.6rem 0.5rem', color: 'var(--text-muted)', fontWeight: 700, textAlign: 'right' }}>Current Stock</th>
-                          <th style={{ padding: '0.6rem 0.5rem', color: 'var(--text-muted)', fontWeight: 700, textAlign: 'right' }}>7-Day Forecasted Demand</th>
-                          <th style={{ padding: '0.6rem 0.5rem', color: 'var(--text-muted)', fontWeight: 700, textAlign: 'right' }}>30-Day Forecasted Demand</th>
-                          <th style={{ padding: '0.6rem 0.5rem', color: 'var(--text-muted)', fontWeight: 700, textAlign: 'center' }}>Safety Status</th>
+                        <tr style={{ background: '#0f172a', borderBottom: '1px solid var(--border-light)', textAlign: 'left' }}>
+                          <th style={{ padding: '0.65rem 0.5rem', color: '#ffffff', fontWeight: 800 }}>Fabric Quality</th>
+                          <th style={{ padding: '0.65rem 0.5rem', color: '#ffffff', fontWeight: 800, textAlign: 'right' }}>Current Stock</th>
+                          <th style={{ padding: '0.65rem 0.5rem', color: '#ffffff', fontWeight: 800, textAlign: 'right' }}>7-Day Forecasted Demand</th>
+                          <th style={{ padding: '0.65rem 0.5rem', color: '#ffffff', fontWeight: 800, textAlign: 'right' }}>30-Day Forecasted Demand</th>
+                          <th style={{ padding: '0.65rem 0.5rem', color: '#ffffff', fontWeight: 800, textAlign: 'center' }}>Safety Status</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -925,27 +925,32 @@ export default function ReportsCenter({ department }) {
                             </td>
                           </tr>
                         ) : (
-                          reportData.fabricForecasts.map((forecast, i) => (
-                            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                              <td style={{ padding: '0.6rem 0.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>{forecast.fabricQuality}</td>
-                              <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontWeight: 700 }}>{forecast.currentStock} mtr</td>
-                              <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: 'var(--primary)' }}>{forecast.demand7Days} mtr</td>
-                              <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: 'var(--text-light)' }}>{forecast.demand30Days} mtr</td>
-                              <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
-                                <span style={{
-                                  background: forecast.status === 'Safe' ? 'rgba(52,211,153,0.12)' : 'rgba(239,68,68,0.12)',
-                                  color: forecast.status === 'Safe' ? '#34d399' : '#f87171',
-                                  padding: '0.15rem 0.55rem',
-                                  borderRadius: '999px',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 700,
-                                  textTransform: 'uppercase'
-                                }}>
-                                  {forecast.status}
-                                </span>
-                              </td>
-                            </tr>
-                          ))
+                          reportData.fabricForecasts.map((forecast, i) => {
+                            const isSafe = forecast.status === 'Safe' && Number(forecast.currentStock) > 0;
+                            const statusLabel = isSafe ? 'Safe' : (Number(forecast.currentStock) <= 0 ? 'Critical Shortage' : 'Shortage');
+                            return (
+                              <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase' }}>{forecast.fabricQuality}</td>
+                                <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontWeight: 800, color: Number(forecast.currentStock) <= 0 ? '#f87171' : 'inherit' }}>{forecast.currentStock} mtr</td>
+                                <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: 'var(--primary)', fontWeight: 700 }}>{forecast.demand7Days} mtr</td>
+                                <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', color: 'var(--text-light)', fontWeight: 700 }}>{forecast.demand30Days} mtr</td>
+                                <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
+                                  <span style={{
+                                    background: isSafe ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.2)',
+                                    color: isSafe ? '#34d399' : '#f87171',
+                                    border: isSafe ? '1px solid rgba(52,211,153,0.3)' : '1px solid rgba(239,68,68,0.4)',
+                                    padding: '0.2rem 0.65rem',
+                                    borderRadius: '999px',
+                                    fontSize: '0.68rem',
+                                    fontWeight: 800,
+                                    textTransform: 'uppercase'
+                                  }}>
+                                    {statusLabel}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
                         )}
                       </tbody>
                     </table>

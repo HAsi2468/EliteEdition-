@@ -56,3 +56,15 @@ export function toLocalYMD(dateVal = new Date()) {
   const dy = String(d.getDate()).padStart(2, '0');
   return `${yr}-${mo}-${dy}`;
 }
+
+export function formatForInputDate(val) {
+  if (!val) return '';
+  if (typeof val === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val.split('T')[0];
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(val)) {
+      const [d, m, y] = val.split('/');
+      return `${y}-${m}-${d}`;
+    }
+  }
+  return toLocalYMD(val);
+}

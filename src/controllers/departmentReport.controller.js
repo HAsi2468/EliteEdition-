@@ -344,7 +344,7 @@ const getElitePrintReports = async (req, res) => {
       const currentStock = fabricStockMap[fc._id] || 0;
       const demand7Days = dailyAvg * 7;
       const demand30Days = dailyAvg * 30;
-      const status = currentStock >= demand7Days ? 'Safe' : 'Shortage';
+      const status = (currentStock > 0 && currentStock >= demand7Days) ? 'Safe' : 'Shortage';
       return {
         fabricQuality: fc._id,
         currentStock: Number(currentStock.toFixed(1)),
@@ -362,7 +362,7 @@ const getElitePrintReports = async (req, res) => {
           currentStock: Number(s.currentStock.toFixed(1)),
           demand7Days: 0,
           demand30Days: 0,
-          status: 'Safe'
+          status: s.currentStock > 0 ? 'Safe' : 'Shortage'
         });
       }
     });

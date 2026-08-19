@@ -223,7 +223,7 @@ export default function GarmentJobCardDashboard() {
   const { summary, designAnalytics } = analytics;
 
   return (
-    <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ padding: '1.25rem', paddingTop: '1.5rem', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* Minimal White Card Header with Entry Button Top Right */}
       <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '14px', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.85rem' }}>
@@ -345,7 +345,7 @@ export default function GarmentJobCardDashboard() {
         </div>
       </div>
 
-      {/* 8-Stage Production Filter Pills */}
+      {/* 8-Stage Production Filter Pills (Horizontal Scrollable Container) */}
       <div style={{
         background: '#ffffff',
         padding: '0.85rem 1rem',
@@ -358,7 +358,7 @@ export default function GarmentJobCardDashboard() {
         <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           📌 Filter Production Stage (8 Steps):
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.35rem', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'thin' }}>
           <button
             onClick={() => setStageFilter('All')}
             style={{
@@ -370,6 +370,8 @@ export default function GarmentJobCardDashboard() {
               fontSize: '0.78rem',
               fontWeight: 700,
               cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
               boxShadow: stageFilter === 'All' ? '0 2px 8px rgba(79,70,229,0.3)' : 'none',
               transition: 'all 0.15s ease'
             }}
@@ -389,6 +391,8 @@ export default function GarmentJobCardDashboard() {
                 fontSize: '0.78rem',
                 fontWeight: 700,
                 cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.35rem',
@@ -519,8 +523,26 @@ export default function GarmentJobCardDashboard() {
           ) : error ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: '#f87171' }}>{error}</div>
           ) : cards.length === 0 ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              No Garment Job Cards found matching criteria. Click "+ New Garment Job Card" to create one.
+            <div style={{ padding: '3.5rem 1.5rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ width: 54, height: 54, borderRadius: '50%', background: 'rgba(79, 70, 229, 0.1)', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Scissors size={26} />
+              </div>
+              <div>
+                <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>No Garment Job Cards Found</h4>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Get started by creating your first 8-stage garment production job card.</p>
+              </div>
+              <button
+                onClick={() => { setEditingCard(null); setShowForm(true); }}
+                style={{
+                  padding: '0.55rem 1.25rem', borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #4f46e5, #6366f1)', color: '#fff',
+                  fontSize: '0.85rem', fontWeight: 700, border: 'none', cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  boxShadow: '0 4px 14px rgba(79, 70, 229, 0.3)'
+                }}
+              >
+                <Plus size={16} /> New Garment Job Card
+              </button>
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>

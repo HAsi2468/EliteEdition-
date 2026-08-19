@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
-import { formatDateDDMMYYYY } from '../utils/dateUtils';
+import { formatDateDDMMYYYY, formatForInputDate } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import StitchingChallanPanel from './StitchingChallanPanel';
 import FabricInventoryPanel from './FabricInventoryPanel';
@@ -1816,7 +1816,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               <label style={labelStyle}>Invoice Date *</label>
               <input
                 type="date"
-                value={invoiceForm.invoiceDate}
+                value={formatForInputDate(invoiceForm.invoiceDate)}
                 onChange={e => setInvoiceForm(f => ({ ...f, invoiceDate: e.target.value }))}
                 style={inputStyle}
               />
@@ -1825,7 +1825,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
               <label style={labelStyle}>Due Date</label>
               <input
                 type="date"
-                value={invoiceForm.dueDate}
+                value={formatForInputDate(invoiceForm.dueDate)}
                 onChange={e => setInvoiceForm(f => ({ ...f, dueDate: e.target.value }))}
                 style={inputStyle}
               />
