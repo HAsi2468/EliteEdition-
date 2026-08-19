@@ -15,14 +15,20 @@ export const SocketProvider = ({ children }) => {
     const apiUrl = getBaseUrl();
     let socketUrl = apiUrl.replace(/\/v1\/?$/, '');
     if (!socketUrl || !socketUrl.startsWith('http')) {
-      const hostname = window.location.hostname;
-      const protocol = window.location.protocol;
-      socketUrl = `${protocol}//${hostname}:5000`;
+      socketUrl = typeof window !== 'undefined' ? window.location.origin : '';
     }
 
     const newSocket = io(socketUrl, {
-      transports: ['polling', 'websocket'],
+      transports: ['websocket', 'polling'],
       autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 3000,
+      timeout: 10000
+    });
+
+    newSocket.on('connect_error', () => {
+      // Suppress noisy console error logs when socket is offline or reconnecting
     });
 
     newSocket.on('force-system-reload', (data) => {
