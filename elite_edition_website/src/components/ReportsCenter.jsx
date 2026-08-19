@@ -391,36 +391,25 @@ export default function ReportsCenter({ department }) {
                   setCustomDateEnd(e);
                 }}
               />
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                  <input 
-                    type="date" 
-                    value={dateStart} 
-                    onChange={(e) => setDateStart(e.target.value)} 
-                    style={styles.input} 
-                  />
-                  <input 
-                    type="time" 
-                    value={timeStart} 
-                    onChange={(e) => setTimeStart(e.target.value)} 
-                    style={{ ...styles.input, width: '85px' }} 
-                  />
-                </div>
-                <span style={{ color: '#475569', fontSize: '0.8rem', fontWeight: 800 }}>to</span>
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                  <input 
-                    type="date" 
-                    value={dateEnd} 
-                    onChange={(e) => setDateEnd(e.target.value)} 
-                    style={styles.input} 
-                  />
-                  <input 
-                    type="time" 
-                    value={timeEnd} 
-                    onChange={(e) => setTimeEnd(e.target.value)} 
-                    style={{ ...styles.input, width: '85px' }} 
-                  />
-                </div>
+              
+              {/* Clean Time Window Selector */}
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.45rem 0.75rem', boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)' }}>
+                <Clock size={14} color="#4f46e5" />
+                <input 
+                  type="time" 
+                  value={timeStart} 
+                  onChange={(e) => setTimeStart(e.target.value)} 
+                  style={{ border: 'none', background: 'transparent', fontSize: '0.82rem', fontWeight: '700', color: '#0f172a', width: '72px', outline: 'none' }} 
+                  title="Report Start Time"
+                />
+                <span style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: '800' }}>to</span>
+                <input 
+                  type="time" 
+                  value={timeEnd} 
+                  onChange={(e) => setTimeEnd(e.target.value)} 
+                  style={{ border: 'none', background: 'transparent', fontSize: '0.82rem', fontWeight: '700', color: '#0f172a', width: '72px', outline: 'none' }} 
+                  title="Report End Time"
+                />
               </div>
             </div>
           )}
