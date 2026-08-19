@@ -639,6 +639,37 @@ const downloadInvoicePdf = async (req, res) => {
       return `${String(dt.getDate()).padStart(2,'0')}-${String(dt.getMonth()+1).padStart(2,'0')}-${dt.getFullYear()}`;
     };
 
+    const findImageByDesignToken = (dName) => {
+      if (!dName) return null;
+      const clean = dName.trim().replace(/^ED-/i, '');
+      const pattern = new RegExp(`^(ED-)?${clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\([^)]+\\)|\\s.*)?\\.(jpg|jpeg|png|webp)$`, 'i');
+
+      const possibleDirs = [
+        path.join(__dirname, '../../elite_edition_images'),
+        path.join(__dirname, '../../../elite_edition_images'),
+        '/home/ubuntu/elite_edition_images',
+        path.join(__dirname, '../elite_edition_images'),
+        path.join(__dirname, '../../Digital print'),
+        path.join(__dirname, '../../../Digital print'),
+        '/home/ubuntu/Digital print',
+        '/home/ubuntu/Node projects/Elite_Edition/Digital print',
+        '/home/ubuntu/Node projects/Elite_Edition/elite_edition_images',
+        path.join(process.cwd(), 'Digital print'),
+        path.join(process.cwd(), 'elite_edition_images')
+      ];
+
+      for (const pDir of possibleDirs) {
+        if (fs.existsSync(pDir)) {
+          try {
+            const files = fs.readdirSync(pDir);
+            const matchedFile = files.find(f => pattern.test(f));
+            if (matchedFile) return path.join(pDir, matchedFile);
+          } catch (e) {}
+        }
+      }
+      return null;
+    };
+
     const resolveImagePath = (urlOrPath) => {
       if (!urlOrPath) return null;
       let str = String(urlOrPath).trim();
@@ -657,7 +688,12 @@ const downloadInvoicePdf = async (req, res) => {
         '/home/ubuntu/elite_edition_images',
         path.join(__dirname, '../elite_edition_images'),
         path.join(__dirname, '../../Digital print'),
-        '/home/ubuntu/Digital print'
+        path.join(__dirname, '../../../Digital print'),
+        '/home/ubuntu/Digital print',
+        '/home/ubuntu/Node projects/Elite_Edition/Digital print',
+        '/home/ubuntu/Node projects/Elite_Edition/elite_edition_images',
+        path.join(process.cwd(), 'Digital print'),
+        path.join(process.cwd(), 'elite_edition_images')
       ];
       for (const d of dirs) {
         if (!fs.existsSync(d)) continue;
@@ -668,6 +704,14 @@ const downloadInvoicePdf = async (req, res) => {
           if (f) return path.join(d, f);
         } catch(e) {}
       }
+
+      // Try filename matching by design token
+      const dNameMatch = filename.match(/ED-?\d+/i) || filename.match(/\d+/);
+      if (dNameMatch) {
+        const found = findImageByDesignToken(dNameMatch[0]);
+        if (found) return found;
+      }
+
       return null;
     };
 
@@ -690,10 +734,11 @@ const downloadInvoicePdf = async (req, res) => {
 
     const allJobNumsSet = new Set();
     items.forEach(it => {
-      if (it.jobNo) {
-        const matches = String(it.jobNo).match(/\d+/g) || [];
-        matches.forEach(n => allJobNumsSet.add(n));
-      }
+      const combinedText = `${it.jobNo || ''} ${it.description || ''} ${it.itemName || ''}`;
+      const matches = combinedText.match(/\d+/g) || [];
+      matches.forEach(n => {
+        if (n.length >= 3 && n.length <= 6) allJobNumsSet.add(n);
+      });
     });
     const jobNumArray = Array.from(allJobNumsSet);
 
@@ -702,7 +747,7 @@ const downloadInvoicePdf = async (req, res) => {
       try {
         const queryOr = [];
         jobNumArray.forEach(n => {
-          queryOr.push({ jobNo: n }, { jobNo: `JOB NO.- ${n}` }, { jobNo: `JOB NO.-${n}` });
+          queryOr.push({ jobNo: n }, { jobNo: `JOB-${n}` }, { jobNo: `JOB NO.- ${n}` }, { jobNo: `JOB NO.-${n}` });
         });
         const foundJobCards = await JobCard.find({ $or: queryOr }).select('jobNo designNo designName imageUrl1 imageUrl2 proofing.artworkUrl').lean();
         foundJobCards.forEach(jc => {
@@ -716,40 +761,71 @@ const downloadInvoicePdf = async (req, res) => {
 
     const itemImages = await Promise.all(items.map(async (item) => {
       let imgPath = resolveImagePath(item.imageUrl);
-      if (!imgPath && item.jobNo) {
-        const nums = String(item.jobNo).match(/\d+/g) || [];
-        for (const num of nums) {
-          const jd = jobCardMap[num];
-          if (jd) {
-            const url = jd.imageUrl1 || jd.imageUrl2 || jd.proofing?.artworkUrl;
-            if (url) {
-              imgPath = resolveImagePath(url);
-              if (imgPath) break;
-            }
-            // Check design catalog by job card design number
-            const desNo = jd.designNo || jd.designName;
-            if (desNo) {
-              const cleanName = desNo.replace(/^ED-/i, '');
-              try {
-                const dDoc = await Design.findOne({
-                  $or: [
-                    { designName: { $regex: new RegExp(`^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
-                    { designNo: { $regex: new RegExp(`^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
-                  ]
-                }).lean();
-                if (dDoc && (dDoc.imageUrl || dDoc.imageUrl2)) {
-                  imgPath = resolveImagePath(dDoc.imageUrl || dDoc.imageUrl2);
-                  if (imgPath) break;
-                }
-              } catch (e) {}
+
+      // 1. Check Job Cards collected from item.jobNo, item.description, item.ourChallanNo
+      const combinedText = `${item.jobNo || ''} ${item.description || ''} ${item.ourChallanNo || ''}`;
+      const nums = combinedText.match(/\d+/g) || [];
+
+      for (const num of nums) {
+        const jd = jobCardMap[num];
+        if (jd) {
+          const url = jd.imageUrl1 || jd.imageUrl2 || jd.proofing?.artworkUrl;
+          if (url) {
+            imgPath = resolveImagePath(url);
+            if (imgPath) break;
+          }
+          // Check design catalog by job card design number
+          const desNo = jd.designNo || jd.designName;
+          if (desNo) {
+            const cleanName = String(desNo).replace(/^ED-/i, '');
+            try {
+              const dDoc = await Design.findOne({
+                $or: [
+                  { designName: { $regex: new RegExp(`^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+                  { designNo: { $regex: new RegExp(`^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } }
+                ]
+              }).lean();
+              if (dDoc && (dDoc.imageUrl || dDoc.imageUrl2)) {
+                imgPath = resolveImagePath(dDoc.imageUrl || dDoc.imageUrl2);
+                if (imgPath) break;
+              }
+            } catch (e) {}
+
+            const fileByDesign = findImageByDesignToken(desNo);
+            if (fileByDesign) {
+              imgPath = fileByDesign;
+              break;
             }
           }
         }
       }
 
-      // If still no image, check Design Catalog by design token in description or itemName
+      // 2. Fallback: check FabricChallans linked to this invoice or item.ourChallanNo
       if (!imgPath) {
-        const dNameMatch = (item.description || item.itemName || '').match(/ED-?\d+/i);
+        const chNumMatch = combinedText.match(/EDP-(\d+)/i) || combinedText.match(/(\d{3,4})/);
+        if (chNumMatch) {
+          try {
+            const FabricChallan = require('../db/models/fabricChallan.model');
+            const chDoc = await FabricChallan.findOne({
+              $or: [{ challanNo: parseInt(chNumMatch[1], 10) }, { _id: item.challanId || undefined }]
+            }).lean();
+
+            if (chDoc) {
+              if (chDoc.designImage || chDoc.imageUrl) {
+                imgPath = resolveImagePath(chDoc.designImage || chDoc.imageUrl);
+              }
+              if (!imgPath && chDoc.designNo) {
+                const fileByDesign = findImageByDesignToken(chDoc.designNo);
+                if (fileByDesign) imgPath = fileByDesign;
+              }
+            }
+          } catch (e) {}
+        }
+      }
+
+      // 3. Fallback: check Design Catalog by any design token in description or itemName
+      if (!imgPath) {
+        const dNameMatch = (item.description || item.itemName || '').match(/ED-?\d+/i) || (item.description || '').match(/\b\d{3,4}\b/);
         if (dNameMatch) {
           try {
             const cleanName = dNameMatch[0].replace(/^ED-/i, '');
@@ -761,6 +837,9 @@ const downloadInvoicePdf = async (req, res) => {
             }).lean();
             if (dDoc && (dDoc.imageUrl || dDoc.imageUrl2)) {
               imgPath = resolveImagePath(dDoc.imageUrl || dDoc.imageUrl2);
+            }
+            if (!imgPath) {
+              imgPath = findImageByDesignToken(dNameMatch[0]);
             }
           } catch (e) {}
         }
