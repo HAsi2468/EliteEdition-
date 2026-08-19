@@ -107,7 +107,37 @@ export default function App() {
   // Department state (digital_print vs elite_edition vs stitching)
   const [activeDepartment, setActiveDepartment] = useState(initialNav.dept);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showCompanyQuickSheet, setShowCompanyQuickSheet] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  const longPressTimerRef = useRef(null);
+  const isLongPressRef = useRef(false);
+
+  const handleTouchStart = () => {
+    isLongPressRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      setShowCompanyQuickSheet(true);
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+    }, 350);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleMenuButtonClick = () => {
+    if (isLongPressRef.current) {
+      isLongPressRef.current = false;
+      return;
+    }
+    setMobileMenuOpen(!mobileMenuOpen);
+  };
 
   // Preserve activeTab and activeDepartment across hard refreshes and browser history
   useEffect(() => {
@@ -637,34 +667,55 @@ export default function App() {
       <header className="glass-panel app-header" style={styles.header}>
         <div style={styles.headerLeft} className="header-left-wrap">
           <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            onClick={handleMenuButtonClick}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            onMouseDown={handleTouchStart}
+            onMouseUp={handleTouchEnd}
             className="mobile-menu-toggle"
-            aria-label="Toggle Mobile Menu"
+            aria-label="Toggle Mobile Menu (Hold for Quick Company Switcher)"
+            title="Tap for Menu | Hold for Quick Company Switcher"
           >
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-            <div style={{
-              width: '32px',
-              height: '32px',
+          {/* Interactive Company Switcher Pill (Option 1 & Option 3 Combined) */}
+          <div 
+            onClick={() => setShowCompanyQuickSheet(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              cursor: 'pointer',
+              padding: '0.25rem 0.55rem',
               borderRadius: '8px',
+              border: '1px solid rgba(99, 102, 241, 0.3)',
+              background: 'rgba(99, 102, 241, 0.08)',
+              transition: 'all 0.15s ease'
+            }}
+            title="Tap to quick-switch company (or hold hamburger button)"
+          >
+            <div style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '6px',
               background: 'linear-gradient(135deg, var(--primary, #6366f1), #0891b2)',
               color: '#fff',
               fontWeight: 800,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '0.85rem',
+              fontSize: '0.78rem',
               letterSpacing: '0.02em',
               flexShrink: 0,
-              boxShadow: '0 2px 8px rgba(99,102,241,0.3)'
+              boxShadow: '0 2px 6px rgba(99,102,241,0.25)'
             }}>
               {activeTab === 'workspace' ? 'WS' : (getCompanyById(activeDepartment)?.code || 'EO')}
             </div>
-            <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
               {activeTab === 'workspace' ? 'Workspace' : (getCompanyById(activeDepartment)?.name || 'Elite Online')}
             </span>
+            <ChevronDown size={14} color="#6366f1" style={{ flexShrink: 0 }} />
           </div>
 
           {/* Master Company Switcher Buttons */}
@@ -1614,6 +1665,129 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* ── MOBILE QUICK COMPANY SWITCHER SHEET (Option 1 & 3 Combined) ── */}
+      {showCompanyQuickSheet && (
+        <div
+          onClick={() => setShowCompanyQuickSheet(false)}
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(6px)',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'flex-end'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderTopLeftRadius: '22px',
+              borderTopRightRadius: '22px',
+              padding: '1.25rem 1.25rem 2.25rem 1.25rem',
+              boxShadow: '0 -10px 40px rgba(0,0,0,0.3)',
+              borderTop: '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+              maxHeight: '85vh',
+              overflowY: 'auto'
+            }}
+          >
+            {/* Drag Handle Indicator */}
+            <div style={{ width: '42px', height: '4px', background: '#cbd5e1', borderRadius: '2px', alignSelf: 'center', marginBottom: '0.15rem' }} />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  🏢 Switch Active Company
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                  Tap any company to switch workspace instantly
+                </span>
+              </div>
+              <button
+                onClick={() => setShowCompanyQuickSheet(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b', padding: '0.2rem' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* List of Companies */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginTop: '0.25rem' }}>
+              {COMPANIES.map(company => {
+                if (!isCompanyAllowed(company.name)) return null;
+                if (company.id === 'elite_online' && !hasEliteEditionAccess) return null;
+                if (company.id === 'digital_print' && !hasDigitalPrintAccess) return null;
+                if (company.id === 'stitching' && !hasStitchingAccess) return null;
+
+                const isActive = activeDepartment === company.id && activeTab !== 'workspace';
+
+                return (
+                  <div
+                    key={company.id}
+                    onClick={() => {
+                      handleSwitchDepartment(company.id);
+                      setShowCompanyQuickSheet(false);
+                      setMobileMenuOpen(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.85rem 1rem',
+                      borderRadius: '14px',
+                      border: isActive ? '2px solid #6366f1' : '1px solid #e2e8f0',
+                      background: isActive ? 'rgba(99, 102, 241, 0.08)' : '#ffffff',
+                      cursor: 'pointer',
+                      boxShadow: isActive ? '0 4px 14px rgba(99, 102, 241, 0.2)' : '0 1px 3px rgba(0,0,0,0.03)',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{
+                        width: '38px',
+                        height: '38px',
+                        borderRadius: '10px',
+                        background: isActive ? 'linear-gradient(135deg, #4f46e5, #0891b2)' : '#f1f5f9',
+                        color: isActive ? '#ffffff' : '#475569',
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.88rem',
+                        flexShrink: 0
+                      }}>
+                        {company.code}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
+                          {company.name}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                          {company.type}
+                        </div>
+                      </div>
+                    </div>
+
+                    {isActive ? (
+                      <span style={{ padding: '0.25rem 0.65rem', borderRadius: '20px', background: '#6366f1', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800 }}>
+                        Active ✓
+                      </span>
+                    ) : (
+                      <ChevronRight size={18} color="#94a3b8" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Global Elite Glassmorphic Modal Dialog */}
       <EliteModalDialog />
     </div>
