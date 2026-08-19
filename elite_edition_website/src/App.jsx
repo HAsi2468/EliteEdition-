@@ -790,8 +790,7 @@ export default function App() {
           </button>
 
           <div style={styles.divider}></div>
-
-          {currentUser && (
+          {!isMobile && currentUser && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -820,12 +819,11 @@ export default function App() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.15)'
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 6px rgba(239,68,68,0.2)'
                 }}
-                className="logout-icon-btn"
               >
-                <LogOut size={15} />
+                <LogOut size={15} color="#ef4444" />
               </button>
             </div>
           )}

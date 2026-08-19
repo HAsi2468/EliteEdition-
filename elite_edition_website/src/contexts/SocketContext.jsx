@@ -15,7 +15,9 @@ export const SocketProvider = ({ children }) => {
     const apiUrl = getBaseUrl();
     let socketUrl = apiUrl.replace(/\/v1\/?$/, '');
     if (!socketUrl || !socketUrl.startsWith('http')) {
-      socketUrl = window.location.origin;
+      const hostname = window.location.hostname;
+      const protocol = window.location.protocol;
+      socketUrl = `${protocol}//${hostname}:5000`;
     }
 
     const newSocket = io(socketUrl, {
