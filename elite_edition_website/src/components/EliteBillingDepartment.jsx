@@ -1139,6 +1139,46 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     }));
   };
 
+  const handleResyncMetersFromChallans = async () => {
+    try {
+      const res = await api.getFabricChallans();
+      const allChallans = Array.isArray(res) ? res : (res?.data || []);
+
+      let updatedCount = 0;
+      setInvoiceForm(f => {
+        const updatedItems = f.items.map(it => {
+          const itemChallanNoStr = String(it.ourChallanNo || it.description || f.ourChallanNo || '').toUpperCase();
+          const matchChallan = allChallans.find(c => {
+            if (it.challanId && String(c._id) === String(it.challanId)) return true;
+            const cNo = `EDP-${c.challanNo}`.toUpperCase();
+            const rawNo = String(c.challanNo);
+            return itemChallanNoStr.includes(cNo) || itemChallanNoStr.includes(rawNo);
+          });
+
+          if (matchChallan && matchChallan.totalMtr !== undefined && matchChallan.totalMtr !== null) {
+            const newMtr = Number(matchChallan.totalMtr) || 0;
+            if (newMtr !== Number(it.qty)) {
+              updatedCount++;
+              return { ...it, qty: newMtr };
+            }
+          }
+          return it;
+        });
+
+        return { ...f, items: updatedItems };
+      });
+
+      if (updatedCount > 0) {
+        triggerPushNotification('🔄 Metres Re-synced!', `Updated ${updatedCount} line item(s) with the latest metres from Delivery Challan(s).`, 'success');
+      } else {
+        triggerPushNotification('ℹ️ Metres Up-to-Date', 'Line item metres are already up-to-date with Delivery Challans.', 'info');
+      }
+    } catch (e) {
+      console.error('Error re-syncing metres from challans:', e);
+      triggerEliteAlert('Sync Error', 'Failed to fetch latest Delivery Challans to re-sync metres.', 'error');
+    }
+  };
+
   const handleCustomerSelect = (custName) => {
     const matched = customers.find(c => c.name === custName || c.businessName === custName);
     if (matched) {
@@ -1965,9 +2005,30 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                   />
                   🧈 Butter Paper Used (+ ₹3/m Rate)
                 </label>
-                <button type="button" onClick={handleAddItemRow} className="btn-secondary" style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem' }}>
-                  <Plus size={13} /> Add Item Row
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={handleResyncMetersFromChallans}
+                    className="btn-secondary"
+                    style={{
+                      padding: '0.35rem 0.8rem',
+                      fontSize: '0.75rem',
+                      color: '#38bdf8',
+                      borderColor: 'rgba(56, 189, 248, 0.4)',
+                      background: 'rgba(56, 189, 248, 0.12)',
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
+                    }}
+                    title="Fetch latest metres from linked Delivery Challan(s)"
+                  >
+                    <RefreshCw size={13} /> 🔄 Re-sync Meters from Challan
+                  </button>
+                  <button type="button" onClick={handleAddItemRow} className="btn-secondary" style={{ padding: '0.35rem 0.8rem', fontSize: '0.75rem' }}>
+                    <Plus size={13} /> Add Item Row
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -2058,18 +2119,17 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                       <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                         <input
                           type="number"
+                          step="0.01"
                           value={it.qty}
-                          readOnly={it.isLocked}
                           onChange={e => handleItemChange(idx, 'qty', e.target.value)}
                           style={{
                             ...inputStyle,
-                            backgroundColor: it.isLocked ? 'rgba(255,255,255,0.06)' : undefined,
-                            cursor: it.isLocked ? 'not-allowed' : 'text',
-                            borderColor: it.isLocked ? 'rgba(251,191,36,0.35)' : undefined
+                            backgroundColor: it.isLocked ? 'rgba(251, 191, 36, 0.08)' : undefined,
+                            borderColor: it.isLocked ? 'rgba(251, 191, 36, 0.5)' : undefined
                           }}
                         />
                         {it.isLocked && (
-                          <Lock size={12} style={{ position: 'absolute', right: 6, color: '#fbbf24', pointerEvents: 'none' }} title="Metres / Qty locked from Delivery Challan" />
+                          <Lock size={12} style={{ position: 'absolute', right: 6, color: '#fbbf24', pointerEvents: 'none' }} title="Imported from Delivery Challan (editable anytime)" />
                         )}
                       </div>
                     </td>
