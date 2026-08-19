@@ -392,22 +392,22 @@ export default function ReportsCenter({ department }) {
                 }}
               />
               
-              {/* Clean Time Window Selector */}
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.45rem 0.75rem', boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)' }}>
-                <Clock size={14} color="#4f46e5" />
+              {/* Stable Time Window Selector */}
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.4rem 0.75rem', height: '38px', boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)' }}>
+                <Clock size={15} color="#4f46e5" style={{ flexShrink: 0 }} />
                 <input 
                   type="time" 
                   value={timeStart} 
                   onChange={(e) => setTimeStart(e.target.value)} 
-                  style={{ border: 'none', background: 'transparent', fontSize: '0.82rem', fontWeight: '700', color: '#0f172a', width: '72px', outline: 'none' }} 
+                  style={{ border: 'none', background: 'transparent', fontSize: '0.85rem', fontWeight: '700', color: '#0f172a', width: '105px', minWidth: '105px', outline: 'none', cursor: 'pointer' }} 
                   title="Report Start Time"
                 />
-                <span style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: '800' }}>to</span>
+                <span style={{ color: '#64748b', fontSize: '0.78rem', fontWeight: '800', flexShrink: 0 }}>to</span>
                 <input 
                   type="time" 
                   value={timeEnd} 
                   onChange={(e) => setTimeEnd(e.target.value)} 
-                  style={{ border: 'none', background: 'transparent', fontSize: '0.82rem', fontWeight: '700', color: '#0f172a', width: '72px', outline: 'none' }} 
+                  style={{ border: 'none', background: 'transparent', fontSize: '0.85rem', fontWeight: '700', color: '#0f172a', width: '105px', minWidth: '105px', outline: 'none', cursor: 'pointer' }} 
                   title="Report End Time"
                 />
               </div>
