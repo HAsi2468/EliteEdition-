@@ -2419,33 +2419,33 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         const printdotInwardTot = printdotInwardInk.C + printdotInwardInk.M + printdotInwardInk.Y + printdotInwardInk.K;
         const totInkInwardVol = grandoInwardTot + printdotInwardTot;
 
-        const leftX = ML;
-        const tableW = 260;
-        const gap = 15;
-        const rightX = ML + tableW + gap;
-        const inkCols = ['C', 'M', 'Y', 'K', 'TOTAL'];
-        const colW = tableW / 5;
+        const inwLeftX = ML;
+        const inwTableW = 260;
+        const inwGap = 15;
+        const inwRightX = ML + inwTableW + inwGap;
+        const inwInkCols = ['C', 'M', 'Y', 'K', 'TOTAL'];
+        const inwColW = inwTableW / 5;
 
         // GRANDO Table Header Row 1 (Light Blue)
-        doc.rect(leftX, currentY, tableW, 15).fill('#eff6ff').stroke('#bfdbfe');
+        doc.rect(inwLeftX, currentY, inwTableW, 15).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold')
-          .text('GRANDO INK INWARD', leftX, currentY + 3.5, { width: tableW, align: 'center' });
+          .text('GRANDO INK INWARD', inwLeftX, currentY + 3.5, { width: inwTableW, align: 'center' });
 
         // PRINTDOT Table Header Row 1 (Light Purple)
-        doc.rect(rightX, currentY, tableW, 15).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.rect(inwRightX, currentY, inwTableW, 15).fill('#f5f3ff').stroke('#ddd6fe');
         doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
-          .text('PRINTDOT INK INWARD', rightX, currentY + 3.5, { width: tableW, align: 'center' });
+          .text('PRINTDOT INK INWARD', inwRightX, currentY + 3.5, { width: inwTableW, align: 'center' });
         currentY += 15;
 
         // Header Row 2: C | M | Y | K | TOTAL
-        inkCols.forEach((col, i) => {
-          doc.rect(leftX + i * colW, currentY, colW, 14).fill('#f8fafc').stroke('#cbd5e1');
+        inwInkCols.forEach((col, i) => {
+          doc.rect(inwLeftX + i * inwColW, currentY, inwColW, 14).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-            .text(col, leftX + i * colW, currentY + 3, { width: colW, align: 'center' });
+            .text(col, inwLeftX + i * inwColW, currentY + 3, { width: inwColW, align: 'center' });
 
-          doc.rect(rightX + i * colW, currentY, colW, 14).fill('#f8fafc').stroke('#cbd5e1');
+          doc.rect(inwRightX + i * inwColW, currentY, inwColW, 14).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-            .text(col, rightX + i * colW, currentY + 3, { width: colW, align: 'center' });
+            .text(col, inwRightX + i * inwColW, currentY + 3, { width: inwColW, align: 'center' });
         });
         currentY += 14;
 
@@ -2470,9 +2470,9 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           const bg = isTot ? '#eff6ff' : '#ffffff';
           const stroke = isTot ? '#bfdbfe' : '#cbd5e1';
           const textColor = isTot ? '#1e40af' : '#0f172a';
-          doc.rect(leftX + i * colW, currentY, colW, 15).fill(bg).stroke(stroke);
+          doc.rect(inwLeftX + i * inwColW, currentY, inwColW, 15).fill(bg).stroke(stroke);
           doc.fillColor(textColor).fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
-            .text(val, leftX + i * colW, currentY + 3.5, { width: colW, align: 'center' });
+            .text(val, inwLeftX + i * inwColW, currentY + 3.5, { width: inwColW, align: 'center' });
         });
 
         printdotInwardVals.forEach((val, i) => {
@@ -2480,9 +2480,9 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           const bg = isTot ? '#f5f3ff' : '#ffffff';
           const stroke = isTot ? '#ddd6fe' : '#cbd5e1';
           const textColor = isTot ? '#5b21b6' : '#0f172a';
-          doc.rect(rightX + i * colW, currentY, colW, 15).fill(bg).stroke(stroke);
+          doc.rect(inwRightX + i * inwColW, currentY, inwColW, 15).fill(bg).stroke(stroke);
           doc.fillColor(textColor).fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
-            .text(val, rightX + i * colW, currentY + 3.5, { width: colW, align: 'center' });
+            .text(val, inwRightX + i * inwColW, currentY + 3.5, { width: inwColW, align: 'center' });
         });
         currentY += 15;
 
@@ -2520,24 +2520,24 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           paperInwardMetersMap[pType][pannaWidth] += mtrVal;
         });
 
-        const typeColW = 95;
-        const totalColW = 65;
-        const pannaColW = (contentWidth - typeColW - totalColW) / pannaCols.length;
+        const inwTypeColW = 95;
+        const inwTotalColW = 65;
+        const inwPannaColW = (contentWidth - inwTypeColW - inwTotalColW) / pannaCols.length;
 
-        doc.rect(ML, currentY, typeColW, 14).fill('#f8fafc').stroke('#cbd5e1');
+        doc.rect(ML, currentY, inwTypeColW, 14).fill('#f8fafc').stroke('#cbd5e1');
         doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-          .text('PAPER TYPE', ML, currentY + 3, { width: typeColW, align: 'center' });
+          .text('PAPER TYPE', ML, currentY + 3, { width: inwTypeColW, align: 'center' });
 
         pannaCols.forEach((panna, i) => {
-          const x = ML + typeColW + i * pannaColW;
-          doc.rect(x, currentY, pannaColW, 14).fill('#f8fafc').stroke('#cbd5e1');
+          const x = ML + inwTypeColW + i * inwPannaColW;
+          doc.rect(x, currentY, inwPannaColW, 14).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-            .text(panna, x, currentY + 3, { width: pannaColW, align: 'center' });
+            .text(panna, x, currentY + 3, { width: inwPannaColW, align: 'center' });
         });
 
-        doc.rect(ML + typeColW + pannaCols.length * pannaColW, currentY, totalColW, 14).fill('#f8fafc').stroke('#cbd5e1');
+        doc.rect(ML + inwTypeColW + pannaCols.length * inwPannaColW, currentY, inwTotalColW, 14).fill('#f8fafc').stroke('#cbd5e1');
         doc.fillColor('#1e293b').fontSize(7.5).font('Helvetica-Bold')
-          .text('TOTAL', ML + typeColW + pannaCols.length * pannaColW, currentY + 3, { width: totalColW, align: 'center' });
+          .text('TOTAL', ML + inwTypeColW + pannaCols.length * inwPannaColW, currentY + 3, { width: inwTotalColW, align: 'center' });
 
         currentY += 14;
 
@@ -2552,15 +2552,15 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
         inwPaperTypes.forEach((pType, pIdx) => {
           const bg = pIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
-          doc.rect(ML, currentY, typeColW, 14).fill(bg).stroke('#cbd5e1');
+          doc.rect(ML, currentY, inwTypeColW, 14).fill(bg).stroke('#cbd5e1');
           doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
-            .text(pType, ML, currentY + 3, { width: typeColW, align: 'center' });
+            .text(pType, ML, currentY + 3, { width: inwTypeColW, align: 'center' });
 
           let rowRollTotal = 0;
           let rowMetersTotal = 0;
 
           pannaCols.forEach((panna, i) => {
-            const x = ML + typeColW + i * pannaColW;
+            const x = ML + inwTypeColW + i * inwPannaColW;
             const qtyVal = (paperInwardTypeMap[pType] && paperInwardTypeMap[pType][panna]) ? paperInwardTypeMap[pType][panna] : 0;
             const mtrVal = (paperInwardMetersMap[pType] && paperInwardMetersMap[pType][panna]) ? paperInwardMetersMap[pType][panna] : 0;
 
@@ -2578,15 +2578,15 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
               valStr = `${mtrVal.toFixed(0)}m`;
             }
 
-            doc.rect(x, currentY, pannaColW, 14).fill(bg).stroke('#cbd5e1');
+            doc.rect(x, currentY, inwPannaColW, 14).fill(bg).stroke('#cbd5e1');
             doc.fillColor(qtyVal > 0 || mtrVal > 0 ? '#1e40af' : '#94a3b8').fontSize(6.5).font(qtyVal > 0 || mtrVal > 0 ? 'Helvetica-Bold' : 'Helvetica')
-              .text(valStr, x, currentY + 3.5, { width: pannaColW, align: 'center' });
+              .text(valStr, x, currentY + 3.5, { width: inwPannaColW, align: 'center' });
           });
 
           grandInwPaperRolls += rowRollTotal;
           grandInwPaperMeters += rowMetersTotal;
-          const totX = ML + typeColW + pannaCols.length * pannaColW;
-          doc.rect(totX, currentY, totalColW, 14).fill(bg).stroke('#cbd5e1');
+          const totX = ML + inwTypeColW + pannaCols.length * inwPannaColW;
+          doc.rect(totX, currentY, inwTotalColW, 14).fill(bg).stroke('#cbd5e1');
 
           let rowTotStr = '0';
           if (rowRollTotal > 0 && rowMetersTotal > 0) {
@@ -2596,48 +2596,48 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           }
 
           doc.fillColor('#1e40af').fontSize(6.5).font('Helvetica-Bold')
-            .text(rowTotStr, totX, currentY + 3.5, { width: totalColW, align: 'center' });
+            .text(rowTotStr, totX, currentY + 3.5, { width: inwTotalColW, align: 'center' });
 
           currentY += 14;
         });
 
         // INWARD PAPER TOTAL BOTTOM ROW 1: TOTAL ROLLS (Light Blue)
-        doc.rect(ML, currentY, typeColW, 14).fill('#eff6ff').stroke('#bfdbfe');
+        doc.rect(ML, currentY, inwTypeColW, 14).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-          .text('TOTAL ROLLS', ML, currentY + 3, { width: typeColW, align: 'center' });
+          .text('TOTAL ROLLS', ML, currentY + 3, { width: inwTypeColW, align: 'center' });
 
         pannaCols.forEach((panna, i) => {
-          const x = ML + typeColW + i * pannaColW;
+          const x = ML + inwTypeColW + i * inwPannaColW;
           const cTot = inwColTotals[panna] || 0;
-          doc.rect(x, currentY, pannaColW, 14).fill('#eff6ff').stroke('#bfdbfe');
+          doc.rect(x, currentY, inwPannaColW, 14).fill('#eff6ff').stroke('#bfdbfe');
           doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-            .text(cTot > 0 ? `${cTot} R` : '0', x, currentY + 3, { width: pannaColW, align: 'center' });
+            .text(cTot > 0 ? `${cTot} R` : '0', x, currentY + 3, { width: inwPannaColW, align: 'center' });
         });
 
-        const totX1 = ML + typeColW + pannaCols.length * pannaColW;
-        doc.rect(totX1, currentY, totalColW, 14).fill('#eff6ff').stroke('#bfdbfe');
+        const inwTotX1 = ML + inwTypeColW + pannaCols.length * inwPannaColW;
+        doc.rect(inwTotX1, currentY, inwTotalColW, 14).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-          .text(`${grandInwPaperRolls} Rolls`, totX1, currentY + 3, { width: totalColW, align: 'center' });
+          .text(`${grandInwPaperRolls} Rolls`, inwTotX1, currentY + 3, { width: inwTotalColW, align: 'center' });
 
         currentY += 14;
 
         // INWARD PAPER TOTAL BOTTOM ROW 2: TOTAL PAPER METERS (Light Purple)
-        doc.rect(ML, currentY, typeColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.rect(ML, currentY, inwTypeColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
         doc.fillColor('#5b21b6').fontSize(7.0).font('Helvetica-Bold')
-          .text('TOTAL PAPER METERS', ML, currentY + 3, { width: typeColW, align: 'center' });
+          .text('TOTAL PAPER METERS', ML, currentY + 3, { width: inwTypeColW, align: 'center' });
 
         pannaCols.forEach((panna, i) => {
-          const x = ML + typeColW + i * pannaColW;
+          const x = ML + inwTypeColW + i * inwPannaColW;
           const cMtrTot = inwColMetersTotals[panna] || 0;
-          doc.rect(x, currentY, pannaColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
+          doc.rect(x, currentY, inwPannaColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
           doc.fillColor('#5b21b6').fontSize(7.0).font('Helvetica-Bold')
-            .text(cMtrTot > 0 ? `${cMtrTot.toFixed(0)}m` : '0m', x, currentY + 3, { width: pannaColW, align: 'center' });
+            .text(cMtrTot > 0 ? `${cMtrTot.toFixed(0)}m` : '0m', x, currentY + 3, { width: inwPannaColW, align: 'center' });
         });
 
-        const totX2 = ML + typeColW + pannaCols.length * pannaColW;
-        doc.rect(totX2, currentY, totalColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
+        const inwTotX2 = ML + inwTypeColW + pannaCols.length * inwPannaColW;
+        doc.rect(inwTotX2, currentY, inwTotalColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
         doc.fillColor('#5b21b6').fontSize(7.2).font('Helvetica-Bold')
-          .text(`${grandInwPaperMeters.toFixed(0)} mtr`, totX2, currentY + 3, { width: totalColW, align: 'center' });
+          .text(`${grandInwPaperMeters.toFixed(0)} mtr`, inwTotX2, currentY + 3, { width: inwTotalColW, align: 'center' });
 
         currentY += 20;
 
