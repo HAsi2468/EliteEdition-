@@ -1998,7 +1998,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:'1.2rem' }}>
-      {department === 'stitching' && effectiveSubTab === 'dashboard' ? (
+      {department === 'stitching' && (effectiveSubTab === 'dashboard' || effectiveSubTab === 'list' || effectiveSubTab === 'jobcards' || !effectiveSubTab) ? (
         <GarmentJobCardDashboard />
       ) : department === 'stitching' && (effectiveSubTab === 'challan' || effectiveSubTab === 'fabric_challan' || effectiveSubTab === 'stitching_challan') ? (
         <StitchingChallanPanel onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); }} />
@@ -2007,7 +2007,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
       ) : effectiveSubTab === 'fabric' ? (
         <FabricInventoryPanel department={department} onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); }} />
       ) : effectiveSubTab === 'billing' || effectiveSubTab === 'billing_digital' || effectiveSubTab === 'billing_elite' ? (
-        <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity="Elite Digital Print" />
+        <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity={department === 'stitching' ? "Elite Stitching" : "Elite Digital Print"} />
       ) : effectiveSubTab === 'billing_fabtex' ? (
         <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity="Elite Fabtex" />
       ) : effectiveSubTab === 'printing_log' || effectiveSubTab === 'print_entry' ? (
@@ -2019,13 +2019,13 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
       ) : effectiveSubTab === 'raw_materials' ? (
         <RawMaterialsPanel />
       ) : effectiveSubTab === 'complain' || effectiveSubTab === 'complaint' || effectiveSubTab === 'complaints' ? (
-        <DigitalPrintComplainModule companyEntity="Elite Digital Print" />
+        <DigitalPrintComplainModule companyEntity={department === 'stitching' ? "Elite Stitching" : "Elite Digital Print"} />
       ) : effectiveSubTab === 'expense' || effectiveSubTab === 'expenses' ? (
-        <DigitalPrintExpenseModule companyEntity="Elite Digital Print" />
+        <DigitalPrintExpenseModule companyEntity={department === 'stitching' ? "Elite Stitching" : "Elite Digital Print"} />
       ) : effectiveSubTab === 'settings' || effectiveSubTab === 'stitching_settings' ? (
         department === 'stitching' ? <StitchingSettings /> : <PrintSettings />
       ) : effectiveSubTab === 'jobcards' ? (
-        <ReportsCenter department="elite-print" />
+        department === 'stitching' ? <GarmentJobCardDashboard /> : <ReportsCenter department="elite-print" />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
           {/* Header banner */}
