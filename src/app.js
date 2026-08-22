@@ -109,7 +109,12 @@ app.use('/v1', (req, res, next) => {
 });
 
 // Serve frontend website
-app.use(express.static(path.join(__dirname, '../../elite_edition_website_dist')));
+const fs = require('fs');
+const websiteDistPath = fs.existsSync(path.join(__dirname, '../../elite_edition_website/dist'))
+  ? path.join(__dirname, '../../elite_edition_website/dist')
+  : path.join(__dirname, '../../elite_edition_website_dist');
+
+app.use(express.static(websiteDistPath));
 
 // Serve design images
 app.use('/designs', express.static(path.join(__dirname, '../../elite_edition_images')));
@@ -122,7 +127,7 @@ app.get('*', (req, res, next) => {
 	res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 	res.setHeader('Pragma', 'no-cache');
 	res.setHeader('Expires', '0');
-	res.sendFile(path.join(__dirname, '../../elite_edition_website_dist/index.html'));
+	res.sendFile(path.join(websiteDistPath, 'index.html'));
 });
 
 // convert error to ApiError, if needed
