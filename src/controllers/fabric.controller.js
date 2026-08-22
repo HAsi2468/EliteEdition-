@@ -2760,6 +2760,99 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           .text(`TOTAL PRINTED METERS (BOTH MACHINES): ${totalBothMtr.toFixed(2)} mtr`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center' });
         currentY += 21;
 
+        // ── 3B. SHIFT WISE PRINTING USAGE REPORT TABLE ──
+        checkAddPage(90);
+
+        const shiftMap = {
+          'Morning': { grando: 0, printdot: 0 },
+          'Evening': { grando: 0, printdot: 0 },
+          'Night': { grando: 0, printdot: 0 },
+          'General': { grando: 0, printdot: 0 }
+        };
+
+        if (typeof detailedPrintLogsList !== 'undefined' && detailedPrintLogsList && detailedPrintLogsList.length > 0) {
+          detailedPrintLogsList.forEach(l => {
+            const mName = String(l.machineName || '').toUpperCase();
+            const sName = String(l.shift || 'General');
+            const normShift = sName.toLowerCase().includes('morn') ? 'Morning'
+              : sName.toLowerCase().includes('even') ? 'Evening'
+              : sName.toLowerCase().includes('night') ? 'Night'
+              : 'General';
+
+            const mtr = Number(l.meters) || 0;
+            if (!shiftMap[normShift]) {
+              shiftMap[normShift] = { grando: 0, printdot: 0 };
+            }
+            if (mName.includes('PRINTDOT')) {
+              shiftMap[normShift].printdot += mtr;
+            } else {
+              shiftMap[normShift].grando += mtr;
+            }
+          });
+        }
+
+        doc.rect(ML, currentY, contentWidth, 15).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
+          .text('SHIFT WISE PRINTING USAGE SUMMARY', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
+        currentY += 15;
+
+        const shiftColsW = [120, 110, 110, 110, 85];
+        const shiftHeaders = ['SHIFT NAME', 'GRANDO (MTR)', 'PRINTDOT (MTR)', 'TOTAL METERS (MTR)', 'USAGE %'];
+
+        doc.rect(ML, currentY, contentWidth, 14).fill('#f8fafc').stroke('#cbd5e1');
+        let curShiftX = ML;
+        shiftHeaders.forEach((h, idx) => {
+          const w = shiftColsW[idx];
+          doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
+            .text(h, curShiftX + 2, currentY + 3, { width: w - 4, align: idx === 0 ? 'left' : 'right' });
+          curShiftX += w;
+        });
+        currentY += 14;
+
+        const totalOverallMeters = (grandoTotal + printdotTotal) || 1;
+        const shiftsList = ['Morning', 'Evening', 'Night', 'General'];
+
+        let grandShiftGrando = 0;
+        let grandShiftPrintdot = 0;
+
+        shiftsList.forEach((sName, sIdx) => {
+          const data = shiftMap[sName] || { grando: 0, printdot: 0 };
+          const rowTot = data.grando + data.printdot;
+          grandShiftGrando += data.grando;
+          grandShiftPrintdot += data.printdot;
+
+          const rowPct = ((rowTot / totalOverallMeters) * 100).toFixed(1);
+          const bg = sIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
+
+          doc.rect(ML, currentY, contentWidth, 14).fill(bg).stroke('#cbd5e1');
+
+          let curX2 = ML;
+          const vals = [
+            `Shift: ${sName}`,
+            data.grando > 0 ? `${data.grando.toFixed(2)} m` : '0.00 m',
+            data.printdot > 0 ? `${data.printdot.toFixed(2)} m` : '0.00 m',
+            rowTot > 0 ? `${rowTot.toFixed(2)} m` : '0.00 m',
+            `${rowPct}%`
+          ];
+
+          vals.forEach((v, idx) => {
+            const w = shiftColsW[idx];
+            const isTot = idx === 3;
+            doc.fillColor(isTot ? '#5b21b6' : '#0f172a').fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
+              .text(v, curX2 + 2, currentY + 3, { width: w - 4, align: idx === 0 ? 'left' : 'right', lineBreak: false });
+            curX2 += w;
+          });
+
+          currentY += 14;
+        });
+
+        // SHIFT SUMMARY TOTAL BAR (Light Purple)
+        const grandShiftTotal = grandShiftGrando + grandShiftPrintdot;
+        doc.rect(ML, currentY, contentWidth, 15).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
+          .text(`TOTAL SHIFT PRINTING USAGE: ${grandShiftTotal.toFixed(2)} mtr (Grando: ${grandShiftGrando.toFixed(2)}m | Printdot: ${grandShiftPrintdot.toFixed(2)}m)`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center' });
+        currentY += 21;
+
         // ── 4. DETAILS OF PRINTING JOBCARD (FORMERLY COMPLETE DETAILED PRINTING RUN LOGS) ──
         if (typeof detailedPrintLogsList !== 'undefined' && detailedPrintLogsList && detailedPrintLogsList.length > 0) {
           checkAddPage(60);
