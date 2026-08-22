@@ -476,24 +476,31 @@ export default function ReportsCenter({ department }) {
               {activeReportTab === 'smart-dashboard' && (
                 <>
                   <div className="glass-panel" style={styles.summaryCard}>
-                    <Clock size={20} color="var(--primary)" />
+                    <IndianRupee size={20} color="var(--primary)" />
+                    <div>
+                      <div style={styles.summaryValue}>{formatPrice(reportData.stockValuation?.grandTotalStockValue || 0)}</div>
+                      <div style={styles.summaryLabel}>Total Printing Inventory Value</div>
+                    </div>
+                  </div>
+                  <div className="glass-panel" style={styles.summaryCard}>
+                    <Layers3 size={20} color="#38bdf8" />
+                    <div>
+                      <div style={styles.summaryValue}>{(reportData.stockValuation?.totalFabricMtr || 0).toLocaleString('en-IN')} m</div>
+                      <div style={styles.summaryLabel}>Fabric Stock Available</div>
+                    </div>
+                  </div>
+                  <div className="glass-panel" style={styles.summaryCard}>
+                    <IndianRupee size={20} color="var(--success)" />
+                    <div>
+                      <div style={styles.summaryValue}>{formatPrice(reportData.stockValuation?.totalFabricValue || 0)}</div>
+                      <div style={styles.summaryLabel}>Fabric Stock Value</div>
+                    </div>
+                  </div>
+                  <div className="glass-panel" style={styles.summaryCard}>
+                    <Clock size={20} color="#a78bfa" />
                     <div>
                       <div style={styles.summaryValue}>{reportData.avgPrintToDelivery || 0} Days</div>
                       <div style={styles.summaryLabel}>Avg Print-to-Delivery Time</div>
-                    </div>
-                  </div>
-                  <div className="glass-panel" style={styles.summaryCard}>
-                    <AlertCircle size={20} color={reportData.lowStockAlerts?.length > 0 ? '#ef4444' : 'var(--success)'} />
-                    <div>
-                      <div style={styles.summaryValue}>{reportData.lowStockAlerts?.length || 0} Items</div>
-                      <div style={styles.summaryLabel}>Low Stock Alerts</div>
-                    </div>
-                  </div>
-                  <div className="glass-panel" style={styles.summaryCard}>
-                    <Activity size={20} color={reportData.delayedCards?.length > 0 ? '#fbbf24' : 'var(--success)'} />
-                    <div>
-                      <div style={styles.summaryValue}>{reportData.delayedCards?.length || 0} Cards</div>
-                      <div style={styles.summaryLabel}>Delayed Job Cards (&gt;7 Days)</div>
                     </div>
                   </div>
                 </>
@@ -753,6 +760,57 @@ export default function ReportsCenter({ department }) {
                           <strong>{item.type}:</strong> {item.item} ({item.qty} {item.unit} left)
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 1.5. STOCK VALUATION IN VALUES (RUPEES ₹) */}
+                {reportData.stockValuation && (
+                  <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <IndianRupee size={18} color="var(--primary)" /> Printing Inventory Stock Valuation (Fabric in ₹ Values)
+                      </h4>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, background: 'rgba(16,185,129,0.15)', color: '#34d399', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', padding: '0.25rem 0.65rem' }}>
+                        Total Fabric Valuation: {formatPrice(reportData.stockValuation.totalFabricValue)}
+                      </span>
+                    </div>
+
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)', textAlign: 'left' }}>
+                            <th style={{ padding: '0.5rem' }}>#</th>
+                            <th style={{ padding: '0.5rem' }}>Fabric Quality</th>
+                            <th style={{ padding: '0.5rem', textAlign: 'right' }}>Available Stock</th>
+                            <th style={{ padding: '0.5rem', textAlign: 'right' }}>Est. Rate (₹/m)</th>
+                            <th style={{ padding: '0.5rem', textAlign: 'right' }}>Valuation Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(!reportData.stockValuation.fabricValuationDetails || reportData.stockValuation.fabricValuationDetails.length === 0) ? (
+                            <tr><td colSpan="5" style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)' }}>No active fabric stock recorded.</td></tr>
+                          ) : (
+                            reportData.stockValuation.fabricValuationDetails.map((f, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                <td style={{ padding: '0.5rem', color: 'var(--text-muted)' }}>{idx + 1}</td>
+                                <td style={{ padding: '0.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>{f.fabricQuality}</td>
+                                <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 700, color: '#38bdf8' }}>{f.currentStock.toFixed(2)} mtr</td>
+                                <td style={{ padding: '0.5rem', textAlign: 'right', color: 'var(--text-muted)' }}>₹{f.rate.toFixed(2)}</td>
+                                <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 800, color: '#34d399' }}>{formatPrice(f.totalValue)}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                        <tfoot>
+                          <tr style={{ borderTop: '2px solid var(--border-light)', fontWeight: 800 }}>
+                            <td colSpan="2" style={{ padding: '0.65rem 0.5rem', color: 'var(--text-primary)' }}>Total Fabric Inventory</td>
+                            <td style={{ padding: '0.65rem 0.5rem', textAlign: 'right', color: '#38bdf8' }}>{reportData.stockValuation.totalFabricMtr.toFixed(2)} mtr</td>
+                            <td style={{ padding: '0.65rem 0.5rem' }}></td>
+                            <td style={{ padding: '0.65rem 0.5rem', textAlign: 'right', color: '#34d399', fontSize: '0.95rem' }}>{formatPrice(reportData.stockValuation.totalFabricValue)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
                     </div>
                   </div>
                 )}

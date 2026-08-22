@@ -437,6 +437,78 @@ const getElitePrintReports = async (req, res) => {
 
     const lowStockAlerts = [...lowStockFabrics, ...lowStockRawMaterials];
 
+    // 14. Stock Valuation (Fabric & Raw Materials in ₹ Values)
+    const fabricRatesMap = {
+      'KOHINOOR LINEN': 150,
+      'LINEN': 140,
+      'CAMBRIC': 110,
+      'ARMANI': 135,
+      'FRENCH CREPE': 100,
+      'CREPE': 95,
+      'POLY REYON': 105,
+      'POLLY MAL': 90,
+      'GOLD SHIMAR': 130,
+      'SILK': 180,
+      'SATIN': 120,
+      'CHIFFON': 110
+    };
+
+    const getRawMaterialRate = (name) => {
+      const n = String(name || '').toLowerCase();
+      if (n.includes('ink')) return 1200;
+      if (n.includes('sublimation')) return 35;
+      if (n.includes('butter')) return 25;
+      if (n.includes('cleaning') || n.includes('solvent')) return 450;
+      if (n.includes('tape')) return 80;
+      return 150;
+    };
+
+    const fabricValuationDetails = fabricStockList
+      .filter(s => s.currentStock > 0)
+      .map(s => {
+        const upper = String(s.fabricQuality || '').toUpperCase();
+        let rate = 120;
+        for (const [k, r] of Object.entries(fabricRatesMap)) {
+          if (upper.includes(k)) { rate = r; break; }
+        }
+        const val = Number((s.currentStock * rate).toFixed(2));
+        return {
+          fabricQuality: s.fabricQuality,
+          currentStock: Number(s.currentStock.toFixed(2)),
+          rate,
+          totalValue: val
+        };
+      });
+
+    const totalFabricMtr = fabricValuationDetails.reduce((a, b) => a + b.currentStock, 0);
+    const totalFabricValue = fabricValuationDetails.reduce((a, b) => a + b.totalValue, 0);
+
+    const rawMaterialValuationDetails = rawMaterialStockList
+      .filter(s => s.currentStock > 0)
+      .map(s => {
+        const rate = getRawMaterialRate(s.materialName);
+        const val = Number((s.currentStock * rate).toFixed(2));
+        return {
+          materialName: s.materialName,
+          unit: s.unit || 'units',
+          currentStock: Number(s.currentStock.toFixed(2)),
+          rate,
+          totalValue: val
+        };
+      });
+
+    const totalRawMaterialValue = rawMaterialValuationDetails.reduce((a, b) => a + b.totalValue, 0);
+    const grandTotalStockValue = totalFabricValue + totalRawMaterialValue;
+
+    const stockValuation = {
+      totalFabricMtr: Number(totalFabricMtr.toFixed(2)),
+      totalFabricValue: Number(totalFabricValue.toFixed(2)),
+      totalRawMaterialValue: Number(totalRawMaterialValue.toFixed(2)),
+      grandTotalStockValue: Number(grandTotalStockValue.toFixed(2)),
+      fabricValuationDetails,
+      rawMaterialValuationDetails
+    };
+
     res.json({
       success: true,
       data: {
@@ -455,7 +527,8 @@ const getElitePrintReports = async (req, res) => {
         bottleneck,
         delayedCards,
         fabricForecasts,
-        lowStockAlerts
+        lowStockAlerts,
+        stockValuation
       }
     });
 
@@ -680,6 +753,85 @@ const downloadElitePrintPdf = async (req, res) => {
       doc.text(matchingFabric, 420, y + 5);
       y += 18;
     });
+
+    // 4. PRINTING INVENTORY & STOCK VALUATION (FABRIC & RAW MATERIALS)
+    y += 15;
+    if (y > 680) { doc.addPage(); y = 40; }
+
+    const fabricStockPipeline = [
+      {
+        $group: {
+          _id: '$fabricQuality',
+          totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
+          totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } }
+        }
+      },
+      {
+        $project: {
+          fabricQuality: '$_id',
+          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
+          _id: 0
+        }
+      }
+    ];
+    const pdfFabricStockList = await FabricTransaction.aggregate(fabricStockPipeline);
+    
+    const fabricRatesMapPdf = {
+      'KOHINOOR LINEN': 150, 'LINEN': 140, 'CAMBRIC': 110, 'ARMANI': 135,
+      'FRENCH CREPE': 100, 'CREPE': 95, 'POLY REYON': 105, 'POLLY MAL': 90,
+      'GOLD SHIMAR': 130, 'SILK': 180, 'SATIN': 120, 'CHIFFON': 110
+    };
+
+    const pdfValuationItems = pdfFabricStockList
+      .filter(s => s.currentStock > 0)
+      .map(s => {
+        const upper = String(s.fabricQuality || '').toUpperCase();
+        let rate = 120;
+        for (const [k, r] of Object.entries(fabricRatesMapPdf)) {
+          if (upper.includes(k)) { rate = r; break; }
+        }
+        return {
+          item: s.fabricQuality,
+          qty: Number(s.currentStock.toFixed(2)),
+          unit: 'mtr',
+          rate,
+          totalValue: Number((s.currentStock * rate).toFixed(2))
+        };
+      });
+
+    const pdfTotalStockVal = pdfValuationItems.reduce((sum, item) => sum + item.totalValue, 0);
+    const pdfTotalMtr = pdfValuationItems.reduce((sum, item) => sum + item.qty, 0);
+
+    doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text('4. PRINTING INVENTORY & STOCK VALUATION (FABRIC IN ₹ VALUES)', 30, y);
+    y += 15;
+
+    doc.rect(30, y, 535, 20).fill('#1e293b');
+    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+    doc.text('FABRIC QUALITY', 35, y + 6);
+    doc.text('AVAILABLE STOCK (m)', 230, y + 6);
+    doc.text('EST. RATE (₹/m)', 360, y + 6);
+    doc.text('TOTAL VALUE (₹)', 460, y + 6);
+    y += 20;
+
+    pdfValuationItems.forEach((row, i) => {
+      if (y > 750) { doc.addPage(); y = 40; }
+      doc.rect(30, y, 535, 18).fill(i % 2 === 0 ? '#f1f5f9' : '#ffffff');
+      doc.fillColor('#334155').fontSize(8).font('Helvetica');
+      doc.text(row.item, 35, y + 5);
+      doc.text(`${row.qty.toLocaleString('en-IN')} m`, 230, y + 5);
+      doc.text(`₹${row.rate.toFixed(2)}`, 360, y + 5);
+      doc.text(`₹${row.totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 460, y + 5);
+      y += 18;
+    });
+
+    // Summary banner for Stock Valuation
+    y += 6;
+    if (y > 750) { doc.addPage(); y = 40; }
+    doc.rect(30, y, 535, 24).fill('#e0f2fe').stroke('#0284c7');
+    doc.fillColor('#0369a1').fontSize(9).font('Helvetica-Bold');
+    doc.text(`TOTAL FABRIC STOCK: ${pdfTotalMtr.toLocaleString('en-IN')} m`, 40, y + 7);
+    doc.text(`VALUATION VALUE: ₹${pdfTotalStockVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 320, y + 7);
+    y += 30;
 
     const pages = doc.bufferedPageRange();
     for (let i = 0; i < pages.count; i++) {
