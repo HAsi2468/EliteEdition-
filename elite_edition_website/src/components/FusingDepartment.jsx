@@ -63,6 +63,56 @@ export default function FusingDepartment() {
 
   const [rawMatTxns, setRawMatTxns] = useState([]);
 
+  // Butter Paper Inward Entry Modal State
+  const [showButterPaperInwardModal, setShowButterPaperInwardModal] = useState(false);
+  const [inwardButterForm, setInwardButterForm] = useState({
+    date: toLocalYMD(),
+    vendorName: '',
+    panna: '58"',
+    rolls: '1',
+    weightKg: '',
+    notes: ''
+  });
+
+  const handleButterPaperInwardSubmit = async (e) => {
+    e.preventDefault();
+    if (!inwardButterForm.weightKg || Number(inwardButterForm.weightKg) <= 0) {
+      triggerEliteAlert('Validation Error', 'Please enter valid Butter Paper Inward Weight in Kg.', 'warning');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.createRawMaterialTransaction({
+        type: 'INWARD',
+        date: inwardButterForm.date,
+        materialName: 'Butter Paper',
+        panna: inwardButterForm.panna,
+        qty: Number(inwardButterForm.weightKg),
+        metersPerRoll: Number(inwardButterForm.rolls) || 1,
+        unit: 'Kg',
+        vendorName: inwardButterForm.vendorName || 'General Supplier',
+        notes: `Butter Paper Inward — Rolls: ${inwardButterForm.rolls || 1} | Weight: ${inwardButterForm.weightKg} Kg ${inwardButterForm.notes ? ' | ' + inwardButterForm.notes : ''}`
+      });
+
+      triggerPushNotification('📦 Butter Paper Inward Saved', `Logged Inward of ${inwardButterForm.weightKg} Kg Butter Paper!`, 'success');
+      setShowButterPaperInwardModal(false);
+      setInwardButterForm({
+        date: toLocalYMD(),
+        vendorName: '',
+        panna: '58"',
+        rolls: '1',
+        weightKg: '',
+        notes: ''
+      });
+      fetchData();
+    } catch (err) {
+      triggerEliteAlert('Inward Error', err.message || 'Failed to save Butter Paper Inward.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // ── TOP FORM STATE (New Fusing Entry) ───────────────────────────────────
   const [topForm, setTopForm] = useState({
     date: toLocalYMD(),
@@ -566,7 +616,19 @@ export default function FusingDepartment() {
             </h3>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.6rem' }}>
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setShowButterPaperInwardModal(true)}
+              style={{
+                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', color: '#ffffff', border: 'none',
+                padding: '0.5rem 1.1rem', borderRadius: '8px', fontWeight: 800,
+                fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
+                boxShadow: '0 3px 10px rgba(2, 132, 199, 0.25)'
+              }}
+            >
+              <PlusCircle size={15} /> 📦 INWARD BUTTER PAPER ROLL
+            </button>
             <button
               type="button"
               onClick={() => setShowReportModal(true)}
@@ -1618,6 +1680,114 @@ export default function FusingDepartment() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── MODAL 4: INWARD BUTTER PAPER ROLL ENTRY MODAL ── */}
+      {showButterPaperInwardModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)',
+          zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }}>
+          <form onSubmit={handleButterPaperInwardSubmit} style={{
+            background: '#ffffff', width: '100%', maxWidth: '500px',
+            borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid #cbd5e1', overflow: 'hidden', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0284c7', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <PlusCircle size={20} color="#0284c7" /> 📦 Butter Paper Roll Inward Entry
+              </h3>
+              <button type="button" onClick={() => setShowButterPaperInwardModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.3rem' }}>INWARD DATE *</label>
+                <input
+                  type="date"
+                  required
+                  value={inwardButterForm.date}
+                  onChange={e => setInwardButterForm(f => ({ ...f, date: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700 }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.3rem' }}>PANNA WIDTH *</label>
+                <select
+                  value={inwardButterForm.panna}
+                  onChange={e => setInwardButterForm(f => ({ ...f, panna: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 800, color: '#0369a1' }}
+                >
+                  {pannaOptions.map(p => <option key={p} value={p}>{p} Panna</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.3rem' }}>NO. OF ROLLS *</label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  placeholder="e.g. 2"
+                  value={inwardButterForm.rolls}
+                  onChange={e => setInwardButterForm(f => ({ ...f, rolls: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 800 }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#6d28d9', marginBottom: '0.3rem' }}>TOTAL WEIGHT (KG) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.1"
+                  required
+                  placeholder="e.g. 45.5"
+                  value={inwardButterForm.weightKg}
+                  onChange={e => setInwardButterForm(f => ({ ...f, weightKg: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '2px solid #8b5cf6', fontSize: '0.92rem', fontWeight: 900, color: '#6d28d9', background: '#f5f3ff' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.3rem' }}>SUPPLIER / VENDOR NAME</label>
+              <input
+                type="text"
+                placeholder="e.g. Paramount Papers / Self Purchase"
+                value={inwardButterForm.vendorName}
+                onChange={e => setInwardButterForm(f => ({ ...f, vendorName: e.target.value }))}
+                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 600 }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.3rem' }}>REMARKS / NOTES</label>
+              <input
+                type="text"
+                placeholder="Optional notes..."
+                value={inwardButterForm.notes}
+                onChange={e => setInwardButterForm(f => ({ ...f, notes: e.target.value }))}
+                style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 500 }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
+              <button type="button" onClick={() => setShowButterPaperInwardModal(false)} className="btn-secondary" style={{ padding: '0.55rem 1.25rem' }}>
+                Cancel
+              </button>
+              <button type="submit" disabled={submitting} className="btn-primary" style={{ padding: '0.55rem 1.5rem', background: '#0284c7', borderColor: '#0284c7' }}>
+                {submitting ? 'Saving...' : 'Submit Inward Entry'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
