@@ -98,7 +98,7 @@ function calcExpTime(panna, passText, totalMtr, machineName) {
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 const getAllJobCards = async (req, res) => {
   try {
-    const { status, printStatus, fusingStatus, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder, category, department } = req.query;
+    const { status, printStatus, fusingStatus, deliveryStatus, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder, category, department } = req.query;
     const filter = {};
     const andClauses = [];
 
@@ -118,6 +118,14 @@ const getAllJobCards = async (req, res) => {
         filter.fusingStatus = 'Fusing Done';
       } else if (fusingStatus === 'Fusing Pending') {
         andClauses.push({ fusingStatus: { $ne: 'Fusing Done' } });
+      }
+    }
+
+    if (deliveryStatus && deliveryStatus !== 'All') {
+      if (deliveryStatus === 'Delivery Done') {
+        filter.deliveryStatus = 'Delivery Done';
+      } else if (deliveryStatus === 'Delivery Pending') {
+        andClauses.push({ deliveryStatus: { $ne: 'Delivery Done' } });
       }
     }
 
