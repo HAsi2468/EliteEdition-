@@ -984,8 +984,12 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     }
 
     // Calculate total available stock across selected lots to default remaining meters to 0.00
-    const selectedLotObjs = lotsList.map(lStr => lotRecords.find(l => String(l.lotNo) === String(lStr))).filter(Boolean);
-    const totalSelectedStock = selectedLotObjs.reduce((s, l) => s + (l.currentStock || l.availableMtr || 0), 0);
+    const selectedLotObjs = lotsList.map(lStr => {
+      const foundInAvail = availableLots.find(l => String(l.lotNo) === String(lStr));
+      if (foundInAvail) return foundInAvail;
+      return lotRecords.find(l => String(l.lotNo) === String(lStr));
+    }).filter(Boolean);
+    const totalSelectedStock = selectedLotObjs.reduce((s, l) => s + (l.currentStock != null ? parseFloat(l.currentStock) : (l.availableMtr || 0)), 0);
 
     setChallanForm(prev => {
       const updatedTps = prev.tpDetails.map(tp => {
