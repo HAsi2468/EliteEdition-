@@ -110,9 +110,14 @@ app.use('/v1', (req, res, next) => {
 
 // Serve frontend website
 const fs = require('fs');
-const websiteDistPath = fs.existsSync(path.join(__dirname, '../../elite_edition_website/dist'))
-  ? path.join(__dirname, '../../elite_edition_website/dist')
-  : path.join(__dirname, '../../elite_edition_website_dist');
+let websiteDistPath = path.join(__dirname, '../elite_edition_website_dist');
+if (!fs.existsSync(path.join(websiteDistPath, 'index.html'))) {
+  if (fs.existsSync(path.join(__dirname, '../../elite_edition_website/dist'))) {
+    websiteDistPath = path.join(__dirname, '../../elite_edition_website/dist');
+  } else if (fs.existsSync(path.join(__dirname, '../../elite_edition_website_dist'))) {
+    websiteDistPath = path.join(__dirname, '../../elite_edition_website_dist');
+  }
+}
 
 app.use(express.static(websiteDistPath));
 
