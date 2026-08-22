@@ -31,9 +31,10 @@ async function syncJobCardPrintTotals(jobCardId) {
     }
     if (latestLog.date) {
       const dt = new Date(latestLog.date);
-      const day = String(dt.getDate()).padStart(2, '0');
-      const month = String(dt.getMonth() + 1).padStart(2, '0');
-      jobCard.printDate = `${day}/${month}/${dt.getFullYear()}`;
+      const yr = dt.getFullYear();
+      const mo = String(dt.getMonth() + 1).padStart(2, '0');
+      const dy = String(dt.getDate()).padStart(2, '0');
+      jobCard.printDate = `${yr}-${mo}-${dy}`;
     }
   }
 

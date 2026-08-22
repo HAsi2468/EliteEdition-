@@ -98,10 +98,28 @@ function calcExpTime(panna, passText, totalMtr, machineName) {
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 const getAllJobCards = async (req, res) => {
   try {
-    const { status, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder, category, department } = req.query;
+    const { status, printStatus, fusingStatus, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder, category, department } = req.query;
     const filter = {};
     if (status && status !== 'All') filter.status = status;
     if (category && category !== 'All') filter.category = category;
+
+    if (printStatus && printStatus !== 'All') {
+      if (printStatus === 'Printing Done') {
+        filter.printStatus = 'Printing Done';
+      } else if (printStatus === 'Printing Pending') {
+        filter.$and = filter.$and || [];
+        filter.$and.push({ printStatus: { $ne: 'Printing Done' } });
+      }
+    }
+
+    if (fusingStatus && fusingStatus !== 'All') {
+      if (fusingStatus === 'Fusing Done') {
+        filter.fusingStatus = 'Fusing Done';
+      } else if (fusingStatus === 'Fusing Pending') {
+        filter.$and = filter.$and || [];
+        filter.$and.push({ fusingStatus: { $ne: 'Fusing Done' } });
+      }
+    }
 
     let deptOr = null;
     if (department === 'stitching') {
