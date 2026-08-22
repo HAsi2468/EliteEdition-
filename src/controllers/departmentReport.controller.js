@@ -7,7 +7,18 @@ const FabricTransaction = require('../db/models/fabricTransaction.model');
  */
 const getElitePrintReports = async (req, res) => {
   try {
-    const { dateStart, dateEnd } = req.query;
+    let { dateStart, dateEnd } = req.query;
+
+    const isValidDateStr = (str) => {
+      if (!str || typeof str !== 'string') return false;
+      const clean = str.trim();
+      if (!clean || clean.startsWith('T') || clean.startsWith('undefined') || clean.startsWith('null')) return false;
+      const d = new Date(clean);
+      return !isNaN(d.getTime());
+    };
+
+    if (!isValidDateStr(dateStart)) dateStart = '';
+    if (!isValidDateStr(dateEnd)) dateEnd = '';
 
     const cleanDateStart = dateStart ? dateStart.split('T')[0] : '';
     const cleanDateEnd = dateEnd ? dateEnd.split('T')[0] : '';
@@ -457,7 +468,18 @@ const getElitePrintReports = async (req, res) => {
 const downloadElitePrintPdf = async (req, res) => {
   try {
     const PDFDocument = require('pdfkit');
-    const { dateStart, dateEnd } = req.query;
+    let { dateStart, dateEnd } = req.query;
+
+    const isValidDateStr = (str) => {
+      if (!str || typeof str !== 'string') return false;
+      const clean = str.trim();
+      if (!clean || clean.startsWith('T') || clean.startsWith('undefined') || clean.startsWith('null')) return false;
+      const d = new Date(clean);
+      return !isNaN(d.getTime());
+    };
+
+    if (!isValidDateStr(dateStart)) dateStart = '';
+    if (!isValidDateStr(dateEnd)) dateEnd = '';
 
     const cleanDateStart = dateStart ? dateStart.split('T')[0] : '';
     const cleanDateEnd = dateEnd ? dateEnd.split('T')[0] : '';

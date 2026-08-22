@@ -90,8 +90,8 @@ export default function ReportsCenter({ department }) {
     setError('');
     try {
       let data = null;
-      const combinedStart = `${dateStart}T${timeStart}:00`;
-      const combinedEnd = `${dateEnd}T${timeEnd}:59`;
+      const combinedStart = dateStart ? `${dateStart}T${timeStart || '00:00'}:00` : '';
+      const combinedEnd = dateEnd ? `${dateEnd}T${timeEnd || '23:59'}:59` : '';
 
       if (activeDepartment === 'elite-print') {
         const res = await api.getElitePrintReports(combinedStart, combinedEnd);
@@ -133,9 +133,9 @@ export default function ReportsCenter({ department }) {
         return;
       }
       
-      const combinedStart = `${dateStart}T${timeStart}:00`;
-      const combinedEnd = `${dateEnd}T${timeEnd}:59`;
-      const dateText = `${combinedStart} to ${combinedEnd}`;
+      const combinedStart = dateStart ? `${dateStart}T${timeStart || '00:00'}:00` : '';
+      const combinedEnd = dateEnd ? `${dateEnd}T${timeEnd || '23:59'}:59` : '';
+      const dateText = (dateStart || dateEnd) ? `${combinedStart || 'Start'} to ${combinedEnd || 'Today'}` : 'All Time';
       const reportTitle = getReportTitle();
       const apiBase = getBaseUrl();
       const fullBase = apiBase.startsWith('http') ? apiBase : `${window.location.origin}${apiBase}`;
@@ -199,13 +199,15 @@ export default function ReportsCenter({ department }) {
     setDownloading(true);
     setError('');
     try {
-      const combinedStart = `${dateStart}T${timeStart}:00`;
-      const combinedEnd = `${dateEnd}T${timeEnd}:59`;
+      const combinedStart = dateStart ? `${dateStart}T${timeStart || '00:00'}:00` : '';
+      const combinedEnd = dateEnd ? `${dateEnd}T${timeEnd || '23:59'}:59` : '';
       
-      const formattedDateStart = combinedStart.replace(/:/g, '-');
-      const formattedDateEnd = combinedEnd.replace(/:/g, '-');
+      const formattedDateStart = dateStart ? dateStart : 'all';
+      const formattedDateEnd = dateEnd ? dateEnd : 'all';
       
-      if (activeReportTab === 'stock-value') {
+      if (activeDepartment === 'elite-print') {
+        await api.downloadElitePrintReport(combinedStart, combinedEnd, `Elite_Print_Department_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
+      } else if (activeReportTab === 'stock-value') {
         await api.downloadInventoryReport('stock-value', combinedStart, combinedEnd, `Stock_Value_Report_${formattedDateStart}.pdf`);
       } else if (activeReportTab === 'stock-inward') {
         await api.downloadInventoryReport('stock-inward', combinedStart, combinedEnd, `Stock_Inward_Report_${formattedDateStart}_to_${formattedDateEnd}.pdf`);
@@ -439,7 +441,7 @@ export default function ReportsCenter({ department }) {
             </button>
             <button 
               onClick={handleDownloadPdf} 
-              disabled={loading || downloading || !reportData} 
+              disabled={loading || downloading} 
               className="btn-primary" 
               style={{ ...styles.actionBtn, background: 'var(--primary)', color: '#000' }}
             >
