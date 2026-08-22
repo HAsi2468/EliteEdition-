@@ -1,16 +1,11 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
+const db = require('../src/db/models');
 const RawMaterialTransaction = require('../src/db/models/rawMaterialTransaction.model');
 const FabricTransaction = require('../src/db/models/fabricTransaction.model');
 const FabricChallan = require('../src/db/models/fabricChallan.model');
 
 async function backfillCompanyEntity() {
   try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/elite_edition';
-    console.log('info: Mongoose connecting to MongoDB...');
-    await mongoose.connect(mongoUri);
-    console.log('info: Mongoose successfully connected to MongoDB');
-
     console.log('🔄 Backfilling companyEntity on RawMaterialTransaction documents...');
     const rawRes = await RawMaterialTransaction.updateMany(
       {
@@ -54,9 +49,8 @@ async function backfillCompanyEntity() {
     console.log('✅ BACKFILL RAW MATERIALS & FABRIC COMPANY ENTITY COMPLETE!');
     console.log('============================================');
   } catch (err) {
-    console.error('❌ Error backfilling companyEntity:', err);
+    console.error('❌ Error backfilling companyEntity:', err.message);
   } finally {
-    await mongoose.disconnect();
     process.exit(0);
   }
 }
