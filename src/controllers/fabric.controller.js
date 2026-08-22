@@ -246,7 +246,7 @@ const getStockOverview = async (req, res) => {
           totalInward: {
             $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] }
           },
-          freshOutward: {
+          totalOutward: {
             $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] }
           },
           totalShortage: {
@@ -260,7 +260,7 @@ const getStockOverview = async (req, res) => {
                     {
                       $cond: [
                         { $and: [{ $ne: ['$shortagePct', null] }, { $gt: ['$shortagePct', 0] }] },
-                        { $multiply: ['$qty', { $divide: ['$shortagePct', 100] }] },
+                        { $subtract: ['$qty', { $divide: ['$qty', { $add: [1, { $divide: ['$shortagePct', 100] }] }] }] },
                         0
                       ]
                     }
@@ -276,10 +276,10 @@ const getStockOverview = async (req, res) => {
         $project: {
           fabricQuality: '$_id',
           totalInward: 1,
-          freshOutward: 1,
+          totalOutward: 1,
           totalShortage: 1,
-          totalOutward: { $add: ['$freshOutward', '$totalShortage'] },
-          currentStock: { $subtract: ['$totalInward', { $add: ['$freshOutward', '$totalShortage'] }] },
+          freshOutward: { $subtract: ['$totalOutward', '$totalShortage'] },
+          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
           _id: 0
         }
       },
@@ -517,7 +517,7 @@ const getStockByPanna = async (req, res) => {
         $group: {
           _id: { fabricQuality: '$fabricQuality', panna: { $ifNull: ['$panna', 'Unknown'] } },
           totalInward: { $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] } },
-          freshOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } },
+          totalOutward: { $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] } },
           totalShortage: {
             $sum: {
               $cond: [
@@ -529,7 +529,7 @@ const getStockByPanna = async (req, res) => {
                     {
                       $cond: [
                         { $and: [{ $ne: ['$shortagePct', null] }, { $gt: ['$shortagePct', 0] }] },
-                        { $multiply: ['$qty', { $divide: ['$shortagePct', 100] }] },
+                        { $subtract: ['$qty', { $divide: ['$qty', { $add: [1, { $divide: ['$shortagePct', 100] }] }] }] },
                         0
                       ]
                     }
@@ -547,10 +547,10 @@ const getStockByPanna = async (req, res) => {
           fabricQuality: '$_id.fabricQuality',
           panna: '$_id.panna',
           totalInward: 1,
-          freshOutward: 1,
+          totalOutward: 1,
           totalShortage: 1,
-          totalOutward: { $add: ['$freshOutward', '$totalShortage'] },
-          currentStock: { $subtract: ['$totalInward', { $add: ['$freshOutward', '$totalShortage'] }] },
+          freshOutward: { $subtract: ['$totalOutward', '$totalShortage'] },
+          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
           lotCount: { $size: { $filter: { input: '$lotCount', cond: { $ne: ['$$this', null] } } } },
           _id: 0
         }
