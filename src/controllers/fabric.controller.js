@@ -1454,6 +1454,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     const JobPrintLog = require('../db/models/jobPrintLog.model');
     const JobCard = require('../db/models/jobCard.model');
     const RawMaterialTransaction = require('../db/models/rawMaterialTransaction.model');
+    const PrintConfig = require('../db/models/printConfig.model');
 
     const selectedReports = reports
       ? reports.split(',').map(s => s.trim().toLowerCase())
@@ -2243,7 +2244,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
         currentY += 14;
 
-        const printConfigDoc = await db.PrintConfig.findOne({ isConfig: true }).lean();
+        const printConfigDoc = await PrintConfig.findOne({ isConfig: true }).lean();
         const configuredPaperTypes = (printConfigDoc && Array.isArray(printConfigDoc.paperTypes) && printConfigDoc.paperTypes.length > 0)
           ? printConfigDoc.paperTypes
           : ['A++', 'A+', 'A'];
