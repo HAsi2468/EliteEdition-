@@ -58,8 +58,14 @@ const jobCardSchema = new mongoose.Schema(
     shift:            { type: String, default: '', trim: true },
     deliveryStatus:   { type: String, default: 'Delivery Pending', enum: ['Delivery Pending', 'Delivery Done'] },
     deliveryDate:     { type: String, default: '' },
-    billNo:           { type: String, default: '', trim: true },
     status:           { type: String, default: 'Pending', enum: ['Pending', 'In Progress', 'Done'] },
+
+    // ── QA & Quality Checking Fields ──
+    qaStatus:           { type: String, default: 'QA Pending', enum: ['QA Pending', 'QA Passed', 'QA Rejected'] },
+    qaDate:             { type: String, default: '', trim: true },
+    qaInspector:        { type: String, default: '', trim: true },
+    qaNotes:            { type: String, default: '', trim: true },
+    totalFabricUsedMtr: { type: String, default: '', trim: true },
 
     // ── Module 1 Enhancements: Print Specifications & Dynamic Costing ──
     operatorName:     { type: String, default: '', trim: true },

@@ -31,41 +31,51 @@ const getAll = async (req, res) => {
       dateStart = '',
       dateEnd = '',
       page = 1,
-      limit = 200,
+      limit = 500,
       companyEntity
     } = req.query;
 
-    const filter = buildExpenseCompFilter(companyEntity);
+    const conditions = [];
+
+    const compFilter = buildExpenseCompFilter(companyEntity);
+    if (compFilter) {
+      conditions.push(compFilter);
+    }
 
     if (type && type !== 'All') {
-      filter.type = type.toUpperCase();
+      conditions.push({ type: type.toUpperCase() });
     }
 
     if (category && category !== 'All') {
-      filter.category = category;
+      conditions.push({ category });
     }
 
     if (dateStart || dateEnd) {
-      filter.date = {};
-      if (dateStart) filter.date.$gte = dateStart;
-      if (dateEnd) filter.date.$lte = dateEnd;
+      const dateCond = {};
+      if (dateStart) dateCond.$gte = dateStart;
+      if (dateEnd) dateCond.$lte = dateEnd;
+      conditions.push({ date: dateCond });
     }
 
     if (search && search.trim()) {
       const s = search.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
       const regex = new RegExp(s, 'i');
-      filter.$or = [
-        { voucherNo: regex },
-        { title: regex },
-        { category: regex },
-        { paidToOrReceivedFrom: regex },
-        { billNo: regex },
-        { description: regex }
-      ];
+      conditions.push({
+        $or: [
+          { voucherNo: regex },
+          { title: regex },
+          { category: regex },
+          { paidToOrReceivedFrom: regex },
+          { billNo: regex },
+          { description: regex }
+        ]
+      });
     }
 
+    const filter = conditions.length > 0 ? { $and: conditions } : {};
+
     const pageNum = parseInt(page, 10) || 1;
-    const limitNum = parseInt(limit, 10) || 200;
+    const limitNum = parseInt(limit, 10) || 500;
     const skip = (pageNum - 1) * limitNum;
 
     const [data, total] = await Promise.all([
@@ -172,8 +182,12 @@ const create = async (req, res) => {
       return res.status(400).json({ error: 'Valid Amount (> 0) is required' });
     }
 
+    if (!payload.companyEntity) {
+      payload.companyEntity = 'Elite Digital Print';
+    }
+
     if (!payload.voucherNo || (await db.Expense.exists({ voucherNo: payload.voucherNo }))) {
-      payload.voucherNo = await generateUniqueVoucherNo(payload.companyEntity || 'Elite Digital Print');
+      payload.voucherNo = await generateUniqueVoucherNo(payload.companyEntity);
     }
 
     const activeUserName = req.headers['x-user-name'] || req.user?.name || payload.userName || payload.createdBy || 'Staff User';
@@ -215,6 +229,10 @@ const update = async (req, res) => {
     const { id } = req.params;
     const payload = req.body;
 
+    if (!payload.companyEntity) {
+      payload.companyEntity = 'Elite Digital Print';
+    }
+
     const editorName = req.headers['x-user-name'] || req.user?.name || payload.userName || payload.updatedBy || 'Staff User';
     payload.updatedBy = editorName;
     payload.updatedByName = editorName;
@@ -245,14 +263,19 @@ const remove = async (req, res) => {
 const getAnalytics = async (req, res) => {
   try {
     const { companyEntity, dateStart = '', dateEnd = '' } = req.query;
-    const filter = buildExpenseCompFilter(companyEntity);
+    const conditions = [];
+
+    const compFilter = buildExpenseCompFilter(companyEntity);
+    if (compFilter) conditions.push(compFilter);
 
     if (dateStart || dateEnd) {
-      filter.date = {};
-      if (dateStart) filter.date.$gte = dateStart;
-      if (dateEnd) filter.date.$lte = dateEnd;
+      const dateCond = {};
+      if (dateStart) dateCond.$gte = dateStart;
+      if (dateEnd) dateCond.$lte = dateEnd;
+      conditions.push({ date: dateCond });
     }
 
+    const filter = conditions.length > 0 ? { $and: conditions } : {};
     const expenses = await db.Expense.find(filter).lean();
 
     let totalIn = 0;
