@@ -45,14 +45,7 @@ async function syncAllJobCards() {
           }
         }
 
-        let printStatusStr = card.printStatus || 'Printing Pending';
-        if (totalPrintedMtr > 0) {
-          if (targetMtr > 0 && totalPrintedMtr >= targetMtr) {
-            printStatusStr = 'Printing Done';
-          } else {
-            printStatusStr = 'Printing Pending';
-          }
-        }
+        let printStatusStr = (totalPrintedMtr > 0 || logs.length > 0) ? 'Printing Done' : 'Printing Pending';
 
         const updateObj = {
           printMtr: `${totalPrintedMtr.toFixed(2)} mtr`,

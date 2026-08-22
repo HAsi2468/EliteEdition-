@@ -38,17 +38,10 @@ async function syncJobCardPrintTotals(jobCardId) {
     }
   }
 
-  if (totalPrintedMtr > 0) {
-    if (targetMtr > 0 && totalPrintedMtr >= targetMtr) {
-      jobCard.printStatus = 'Printing Done';
-      if (jobCard.status === 'Pending') {
-        jobCard.status = 'In Progress';
-      }
-    } else {
-      jobCard.printStatus = 'Printing Pending';
-      if (jobCard.status === 'Pending') {
-        jobCard.status = 'In Progress';
-      }
+  if (totalPrintedMtr > 0 || logs.length > 0) {
+    jobCard.printStatus = 'Printing Done';
+    if (jobCard.status === 'Pending') {
+      jobCard.status = 'In Progress';
     }
   } else {
     jobCard.printStatus = 'Printing Pending';
