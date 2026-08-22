@@ -1907,7 +1907,7 @@ export default function JobPrintingLog() {
                     if (reportShift === 'Morning') shiftTag = 'Morning_Shift';
                     else if (reportShift === 'Night') shiftTag = 'Night_Shift';
 
-                    const fileName = `Printing_Production_Report_${shiftTag}_${reportStartDate}_to_${reportEndDate}.pdf`;
+                    const fileName = `Printing_Production_Report_${shiftTag}_${reportStartDate || 'all'}_to_${reportEndDate || 'all'}.pdf`;
 
                     await api.downloadFabricCombinedReportPdf(
                       reportStartDate,
@@ -1915,17 +1915,17 @@ export default function JobPrintingLog() {
                       ['machine'],
                       fileName,
                       {
-                        startTime: rawStartTime,
-                        stopTime: rawStopTime,
-                        operator: rawOperator,
-                        shift: reportShift,
-                        machineName: reportMachine,
-                        pass: reportPass
+                        startTime: rawStartTime || '',
+                        stopTime: rawStopTime || '',
+                        operator: rawOperator || '',
+                        shift: reportShift || '',
+                        machineName: reportMachine || '',
+                        pass: reportPass || ''
                       }
                     );
                     setShowReportModal(false);
                   } catch (err) {
-                    alert(err.message || 'Please enter Start Time and Stop Time on this date in Generate Report first.');
+                    alert(err.message || 'Failed to download report.');
                   } finally {
                     setReportLoadingPdf(false);
                   }
@@ -1938,17 +1938,13 @@ export default function JobPrintingLog() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  background: ((!reportStartTime && !rawStartTime) || (!reportEndTime && !rawStopTime))
-                    ? 'rgba(255, 255, 255, 0.1)'
-                    : 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
+                  background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '6px',
-                  boxShadow: ((!reportStartTime && !rawStartTime) || (!reportEndTime && !rawStopTime))
-                    ? 'none'
-                    : '0 4px 14px rgba(124, 58, 237, 0.4)',
-                  cursor: ((!reportStartTime && !rawStartTime) || (!reportEndTime && !rawStopTime)) ? 'not-allowed' : 'pointer',
-                  opacity: ((!reportStartTime && !rawStartTime) || (!reportEndTime && !rawStopTime)) ? 0.5 : 1
+                  boxShadow: '0 4px 14px rgba(124, 58, 237, 0.4)',
+                  cursor: 'pointer',
+                  opacity: 1
                 }}
               >
                 <Download size={16} /> {reportLoadingPdf ? 'Generating PDF...' : 'Download Report'}
