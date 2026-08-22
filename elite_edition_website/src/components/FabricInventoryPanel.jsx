@@ -4080,7 +4080,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         const hasStock = selectedLotsTotalStock > 0;
                         const realPct = hasStock ? Math.round((effectiveTakenMtr / selectedLotsTotalStock) * 100) : (effectiveTakenMtr > 0 ? 999 : 0);
                         const fillWidth = Math.min(100, realPct);
-                        const isOver = effectiveTakenMtr > selectedLotsTotalStock;
+                        const isOver = effectiveTakenMtr > selectedLotsTotalStock + 0.01;
                         const isNearFull = realPct >= 85 && !isOver;
 
                         const barBg = isOver
@@ -4089,7 +4089,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           ? 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)'
                           : 'linear-gradient(90deg, #10b981 0%, #059669 100%)';
 
-                        const balance = selectedLotsTotalStock - effectiveTakenMtr;
+                        let balance = selectedLotsTotalStock - effectiveTakenMtr;
+                        if (Math.abs(balance) < 0.01) balance = 0;
 
                         return (
                           <>
@@ -4143,66 +4144,24 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             </div>
 
                             {/* Status Footer Metrics */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem', fontSize: '0.72rem', fontWeight: 700, flexWrap: 'wrap', gap: '6px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem', fontSize: '0.72rem', fontWeight: 700 }}>
                               <span style={{ color: isOver ? '#dc2626' : isNearFull ? '#d97706' : '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 {isOver ? (
-                                  <>⚠️ <span>{realPct}% Allocated (incl. Shortage) — EXCEEDED AVAILABLE STOCK!</span></>
+                                  <>⚠️ <span>{realPct}% Allocated — EXCEEDED AVAILABLE STOCK!</span></>
                                 ) : (
-                                  <>✅ <span>{realPct}% Stock Taken ({fillWidth}% of Lot Capacity incl. Shortage)</span></>
+                                  <>✅ <span>{realPct}% Stock Taken ({fillWidth}% of Lot Capacity)</span></>
                                 )}
                               </span>
 
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                {effectiveTakenMtr < selectedLotsTotalStock && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      let sPct = 0;
-                                      if (challanForm.shortageMode === 'pct' && challanForm.shortagePct) {
-                                        sPct = parseFloat(challanForm.shortagePct) || 0;
-                                      }
-                                      let targetFreshMtr = selectedLotsTotalStock;
-                                      if (sPct > 0) {
-                                        targetFreshMtr = selectedLotsTotalStock / (1 + sPct / 100);
-                                      } else if (challanForm.shortageMode === 'mtr' && challanForm.shortageMtr) {
-                                        targetFreshMtr = Math.max(0, selectedLotsTotalStock - (parseFloat(challanForm.shortageMtr) || 0));
-                                      }
-                                      targetFreshMtr = parseFloat(targetFreshMtr.toFixed(2));
-
-                                      const defaultLot = selectedLotsList[0] || '';
-                                      setChallanForm(prev => ({
-                                        ...prev,
-                                        tpDetails: [{ tpNo: 1, tpMeter: targetFreshMtr, lotNo: defaultLot }],
-                                        totalMtr: targetFreshMtr
-                                      }));
-                                      triggerPushNotification('⚡ Lot Allocated', `Filled ${targetFreshMtr}m to consume Lot Stock (Remaining: 0.00 mtr).`, 'success');
-                                    }}
-                                    style={{
-                                      padding: '2px 8px',
-                                      borderRadius: '6px',
-                                      background: 'rgba(56, 189, 248, 0.15)',
-                                      color: '#0284c7',
-                                      border: '1px solid rgba(56, 189, 248, 0.4)',
-                                      fontWeight: 800,
-                                      cursor: 'pointer',
-                                      fontSize: '0.68rem'
-                                    }}
-                                    title="Auto-fill TP meters to consume full lot capacity down to 0.00 mtr remaining"
-                                  >
-                                    ⚡ Allocate Full Lot (0.00m Remaining)
-                                  </button>
-                                )}
-
-                                <span style={{
-                                  padding: '2px 8px',
-                                  borderRadius: '6px',
-                                  background: isOver ? '#fee2e2' : '#dcfce7',
-                                  color: isOver ? '#991b1b' : '#166534',
-                                  border: isOver ? '1px solid #fca5a5' : '1px solid #86efac'
-                                }}>
-                                  {isOver ? `Deficit: ${Math.abs(balance).toFixed(2)} mtr` : `Remaining: ${Math.abs(balance) < 0.01 ? '0.00' : balance.toFixed(2)} mtr`}
-                                </span>
-                              </div>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                background: isOver ? '#fee2e2' : '#dcfce7',
+                                color: isOver ? '#991b1b' : '#166534',
+                                border: isOver ? '1px solid #fca5a5' : '1px solid #86efac'
+                              }}>
+                                {isOver ? `Deficit: ${Math.abs(balance).toFixed(2)} mtr` : `Remaining: ${Math.abs(balance) < 0.01 ? '0.00' : balance.toFixed(2)} mtr`}
+                              </span>
                             </div>
                           </>
                         );
