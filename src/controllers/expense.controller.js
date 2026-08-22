@@ -1,6 +1,26 @@
 const db = require('../db/models');
 const logger = require('../config/logger');
 
+const buildExpenseCompFilter = (companyEntity) => {
+  if (companyEntity === 'Elite Stitching') {
+    return { companyEntity: 'Elite Stitching' };
+  }
+  if (companyEntity === 'Elite Edition') {
+    return { companyEntity: 'Elite Edition' };
+  }
+  if (companyEntity === 'Elite Fabtex') {
+    return { companyEntity: 'Elite Fabtex' };
+  }
+  return {
+    $or: [
+      { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
+      { companyEntity: { $exists: false } },
+      { companyEntity: null },
+      { companyEntity: '' }
+    ]
+  };
+};
+
 // Get All Expense / Income Records (with filters)
 const getAll = async (req, res) => {
   try {
@@ -15,10 +35,7 @@ const getAll = async (req, res) => {
       companyEntity
     } = req.query;
 
-    const filter = {};
-    if (companyEntity) {
-      filter.companyEntity = companyEntity;
-    }
+    const filter = buildExpenseCompFilter(companyEntity);
 
     if (type && type !== 'All') {
       filter.type = type.toUpperCase();
@@ -227,8 +244,8 @@ const remove = async (req, res) => {
 // Analytics KPI Summary
 const getAnalytics = async (req, res) => {
   try {
-    const { dateStart = '', dateEnd = '' } = req.query;
-    const filter = { department: 'digital_print' };
+    const { companyEntity, dateStart = '', dateEnd = '' } = req.query;
+    const filter = buildExpenseCompFilter(companyEntity);
 
     if (dateStart || dateEnd) {
       filter.date = {};
