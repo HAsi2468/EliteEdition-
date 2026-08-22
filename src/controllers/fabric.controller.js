@@ -2095,13 +2095,66 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       // ── 4B. PRINTING DEPARTMENT CONSUMPTION TABLES & DETAILED RUN LOGS ──
       if (selectedReports.includes('machine') || selectedReports.includes('machine_print') || (typeof detailedPrintLogsList !== 'undefined' && detailedPrintLogsList && detailedPrintLogsList.length > 0)) {
 
-        // Calculate Ink & Paper Aggregations
         const grandoInk = { C: 0, M: 0, Y: 0, K: 0 };
         const printdotInk = { C: 0, M: 0, Y: 0, K: 0 };
         const pannaCols = ['36', '38', '44', '54', '58', '60'];
-        const paperTypeMap = {};
-        const paperMetersMap = {};
         const inwardRawMaterialList = [];
+
+        // 2 Shifts: Day Shift vs Night Shift
+        const paperDayTypeMap = {};
+        const paperDayMetersMap = {};
+        const paperNightTypeMap = {};
+        const paperNightMetersMap = {};
+
+        // Calculate Machine & Shift Wise Meterages
+        let grando1Pass = 0, grando2Pass = 0;
+        let printdot1Pass = 0, printdot2Pass = 0;
+
+        let grandoDayMtr = 0, grandoNightMtr = 0;
+        let printdotDayMtr = 0, printdotNightMtr = 0;
+
+        if (typeof detailedPrintLogsList !== 'undefined' && detailedPrintLogsList && detailedPrintLogsList.length > 0) {
+          detailedPrintLogsList.forEach(l => {
+            const mName = String(l.machineName || '').toUpperCase();
+            const passStr = String(l.pass || '').toLowerCase();
+            const sName = String(l.shift || '').toLowerCase();
+            const mtr = Number(l.meters) || 0;
+
+            const isNightShift = sName.includes('night') || sName.includes('even');
+            const is1Pass = passStr.includes('1') || passStr.includes('draft');
+
+            if (mName.includes('PRINTDOT')) {
+              if (is1Pass) printdot1Pass += mtr;
+              else printdot2Pass += mtr;
+
+              if (isNightShift) printdotNightMtr += mtr;
+              else printdotDayMtr += mtr;
+            } else {
+              if (is1Pass) grando1Pass += mtr;
+              else grando2Pass += mtr;
+
+              if (isNightShift) grandoNightMtr += mtr;
+              else grandoDayMtr += mtr;
+            }
+
+            // Record paper consumption from print logs into Day/Night shift
+            const pType = l.paperType || l.fabricQuality || 'A++';
+            let pannaWidth = String(l.panna || '').replace(/[^\d]/g, '');
+            if (!pannaWidth || !pannaCols.includes(pannaWidth)) pannaWidth = '58';
+
+            const targetTypeMap = isNightShift ? paperNightTypeMap : paperDayTypeMap;
+            const targetMetersMap = isNightShift ? paperNightMetersMap : paperDayMetersMap;
+
+            if (!targetTypeMap[pType]) {
+              targetTypeMap[pType] = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
+              targetMetersMap[pType] = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
+            }
+            targetMetersMap[pType][pannaWidth] += mtr;
+          });
+        }
+
+        const grandoTotal = grando1Pass + grando2Pass;
+        const printdotTotal = printdot1Pass + printdot2Pass;
 
         if (typeof rawMaterialLogs !== 'undefined' && rawMaterialLogs && rawMaterialLogs.length > 0) {
           rawMaterialLogs.forEach(t => {
@@ -2125,46 +2178,50 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
               } else if (mName.includes('paper') || t.panna) {
                 const pType = t.materialName || 'A++';
                 let pannaWidth = String(t.panna || '').replace(/[^\d]/g, '');
-                if (!pannaWidth || !pannaCols.includes(pannaWidth)) pannaWidth = '44';
-                if (!paperTypeMap[pType]) {
-                  paperTypeMap[pType] = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
-                  paperMetersMap[pType] = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
+                if (!pannaWidth || !pannaCols.includes(pannaWidth)) pannaWidth = '58';
+
+                const sName = (t.shift || '').toLowerCase();
+                const isNight = sName.includes('night') || sName.includes('even');
+                const targetTypeMap = isNight ? paperNightTypeMap : paperDayTypeMap;
+                const targetMetersMap = isNight ? paperNightMetersMap : paperDayMetersMap;
+
+                if (!targetTypeMap[pType]) {
+                  targetTypeMap[pType] = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
+                  targetMetersMap[pType] = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
                 }
-                paperTypeMap[pType][pannaWidth] += q;
+                targetTypeMap[pType][pannaWidth] += q;
 
                 const mtrVal = Number(t.meters) || Number(t.totalMeters) || (q * (Number(t.metersPerRoll) || 0)) || 0;
-                paperMetersMap[pType][pannaWidth] += mtrVal;
+                targetMetersMap[pType][pannaWidth] += mtrVal;
               }
             }
           });
         }
 
-        // Calculate Machine Wise Meterages (Grando vs Printdot, 1 Pass vs 2 Pass)
-        let grando1Pass = 0, grando2Pass = 0;
-        let printdot1Pass = 0, printdot2Pass = 0;
+        // Compute 2-Shift Ink Allocations (Day Shift vs Night Shift)
+        const grandoTotMtr = grandoDayMtr + grandoNightMtr;
+        const printdotTotMtr = printdotDayMtr + printdotNightMtr;
 
-        if (typeof detailedPrintLogsList !== 'undefined' && detailedPrintLogsList && detailedPrintLogsList.length > 0) {
-          detailedPrintLogsList.forEach(l => {
-            const mName = String(l.machineName || '').toUpperCase();
-            const passStr = String(l.pass || '').toLowerCase();
-            const mtr = Number(l.meters) || 0;
+        const grandoDayRatio = grandoTotMtr > 0 ? (grandoDayMtr / grandoTotMtr) : 0.5;
+        const grandoNightRatio = 1 - grandoDayRatio;
 
-            const is1Pass = passStr.includes('1') || passStr.includes('draft');
-            if (mName.includes('PRINTDOT')) {
-              if (is1Pass) printdot1Pass += mtr;
-              else printdot2Pass += mtr;
-            } else {
-              if (is1Pass) grando1Pass += mtr;
-              else grando2Pass += mtr;
-            }
-          });
-        }
+        const printdotDayRatio = printdotTotMtr > 0 ? (printdotDayMtr / printdotTotMtr) : 0.5;
+        const printdotNightRatio = 1 - printdotDayRatio;
 
-        const grandoTotal = grando1Pass + grando2Pass;
-        const printdotTotal = printdot1Pass + printdot2Pass;
+        const grandoDayInk = { C: grandoInk.C * grandoDayRatio, M: grandoInk.M * grandoDayRatio, Y: grandoInk.Y * grandoDayRatio, K: grandoInk.K * grandoDayRatio };
+        const grandoNightInk = { C: grandoInk.C * grandoNightRatio, M: grandoInk.M * grandoNightRatio, Y: grandoInk.Y * grandoNightRatio, K: grandoInk.K * grandoNightRatio };
 
-        // ── 1. INK CONSUMPTION TABLE (LIGHT BLUE & LIGHT PURPLE THEME) ──
-        checkAddPage(75);
+        const printdotDayInk = { C: printdotInk.C * printdotDayRatio, M: printdotInk.M * printdotDayRatio, Y: printdotInk.Y * printdotDayRatio, K: printdotInk.K * printdotDayRatio };
+        const printdotNightInk = { C: printdotInk.C * printdotNightRatio, M: printdotInk.M * printdotNightRatio, Y: printdotInk.Y * printdotNightRatio, K: printdotInk.K * printdotNightRatio };
+
+
+        // ── 1. SHIFT WISE INK CONSUMPTION TABLE (DAY SHIFT & NIGHT SHIFT) ──
+        checkAddPage(110);
+
+        doc.rect(ML, currentY, contentWidth, 15).fill('#eff6ff').stroke('#bfdbfe');
+        doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold')
+          .text('INK CONSUMPTION SUMMARY (DAY & NIGHT SHIFT)', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
+        currentY += 16;
 
         const leftX = ML;
         const tableW = 260;
@@ -2173,212 +2230,264 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         const inkCols = ['C', 'M', 'Y', 'K', 'TOTAL'];
         const colW = tableW / 5;
 
-        // GRANDO Table Header Row 1 (Light Blue)
-        doc.rect(leftX, currentY, tableW, 15).fill('#eff6ff').stroke('#bfdbfe');
-        doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold')
-          .text('GRANDO', leftX, currentY + 3.5, { width: tableW, align: 'center' });
+        // 1A. DAY SHIFT INK CONSUMPTION
+        doc.rect(ML, currentY, contentWidth, 13).fill('#f8fafc').stroke('#cbd5e1');
+        doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
+          .text('☀️ DAY SHIFT INK CONSUMPTION', ML + 6, currentY + 2.5, { width: contentWidth - 12, align: 'left' });
+        currentY += 13;
 
-        // PRINTDOT Table Header Row 1 (Light Purple)
-        doc.rect(rightX, currentY, tableW, 15).fill('#f5f3ff').stroke('#ddd6fe');
-        doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
-          .text('PRINTDOT', rightX, currentY + 3.5, { width: tableW, align: 'center' });
-        currentY += 15;
+        doc.rect(leftX, currentY, tableW, 14).fill('#eff6ff').stroke('#bfdbfe');
+        doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
+          .text('GRANDO (DAY SHIFT)', leftX, currentY + 3, { width: tableW, align: 'center' });
 
-        // Header Row 2: C | M | Y | K | TOTAL
-        inkCols.forEach((col, i) => {
-          doc.rect(leftX + i * colW, currentY, colW, 14).fill('#f8fafc').stroke('#cbd5e1');
-          doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-            .text(col, leftX + i * colW, currentY + 3, { width: colW, align: 'center' });
-
-          doc.rect(rightX + i * colW, currentY, colW, 14).fill('#f8fafc').stroke('#cbd5e1');
-          doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-            .text(col, rightX + i * colW, currentY + 3, { width: colW, align: 'center' });
-        });
+        doc.rect(rightX, currentY, tableW, 14).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
+          .text('PRINTDOT (DAY SHIFT)', rightX, currentY + 3, { width: tableW, align: 'center' });
         currentY += 14;
 
-        // Data Row: Values
-        const grandoTotInk = grandoInk.C + grandoInk.M + grandoInk.Y + grandoInk.K;
-        const printdotTotInk = printdotInk.C + printdotInk.M + printdotInk.Y + printdotInk.K;
-        const deptTotInk = grandoTotInk + printdotTotInk;
+        inkCols.forEach((col, i) => {
+          doc.rect(leftX + i * colW, currentY, colW, 13).fill('#f8fafc').stroke('#cbd5e1');
+          doc.fillColor('#334155').fontSize(7).font('Helvetica-Bold')
+            .text(col, leftX + i * colW, currentY + 2.5, { width: colW, align: 'center' });
 
-        const grandoVals = [
-          grandoInk.C > 0 ? grandoInk.C.toFixed(2) : '0.00',
-          grandoInk.M > 0 ? grandoInk.M.toFixed(2) : '0.00',
-          grandoInk.Y > 0 ? grandoInk.Y.toFixed(2) : '0.00',
-          grandoInk.K > 0 ? grandoInk.K.toFixed(2) : '0.00',
-          grandoTotInk.toFixed(2)
-        ];
-        const printdotVals = [
-          printdotInk.C > 0 ? printdotInk.C.toFixed(2) : '0.00',
-          printdotInk.M > 0 ? printdotInk.M.toFixed(2) : '0.00',
-          printdotInk.Y > 0 ? printdotInk.Y.toFixed(2) : '0.00',
-          printdotInk.K > 0 ? printdotInk.K.toFixed(2) : '0.00',
-          printdotTotInk.toFixed(2)
-        ];
-
-        grandoVals.forEach((val, i) => {
-          const isTot = i === 4;
-          const bg = isTot ? '#eff6ff' : '#ffffff';
-          const stroke = isTot ? '#bfdbfe' : '#cbd5e1';
-          const textColor = isTot ? '#1e40af' : '#0f172a';
-          doc.rect(leftX + i * colW, currentY, colW, 15).fill(bg).stroke(stroke);
-          doc.fillColor(textColor).fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
-            .text(val, leftX + i * colW, currentY + 3.5, { width: colW, align: 'center' });
+          doc.rect(rightX + i * colW, currentY, colW, 13).fill('#f8fafc').stroke('#cbd5e1');
+          doc.fillColor('#334155').fontSize(7).font('Helvetica-Bold')
+            .text(col, rightX + i * colW, currentY + 2.5, { width: colW, align: 'center' });
         });
+        currentY += 13;
 
-        printdotVals.forEach((val, i) => {
+        const gDayTot = grandoDayInk.C + grandoDayInk.M + grandoDayInk.Y + grandoDayInk.K;
+        const pDayTot = printdotDayInk.C + printdotDayInk.M + printdotDayInk.Y + printdotDayInk.K;
+        const dayTotInk = gDayTot + pDayTot;
+
+        const gDayVals = [grandoDayInk.C.toFixed(2), grandoDayInk.M.toFixed(2), grandoDayInk.Y.toFixed(2), grandoDayInk.K.toFixed(2), gDayTot.toFixed(2)];
+        const pDayVals = [printdotDayInk.C.toFixed(2), printdotDayInk.M.toFixed(2), printdotDayInk.Y.toFixed(2), printdotDayInk.K.toFixed(2), pDayTot.toFixed(2)];
+
+        gDayVals.forEach((val, i) => {
           const isTot = i === 4;
-          const bg = isTot ? '#f5f3ff' : '#ffffff';
-          const stroke = isTot ? '#ddd6fe' : '#cbd5e1';
-          const textColor = isTot ? '#5b21b6' : '#0f172a';
-          doc.rect(rightX + i * colW, currentY, colW, 15).fill(bg).stroke(stroke);
-          doc.fillColor(textColor).fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
-            .text(val, rightX + i * colW, currentY + 3.5, { width: colW, align: 'center' });
+          doc.rect(leftX + i * colW, currentY, colW, 14).fill(isTot ? '#eff6ff' : '#ffffff').stroke(isTot ? '#bfdbfe' : '#cbd5e1');
+          doc.fillColor(isTot ? '#1e40af' : '#0f172a').fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
+            .text(val, leftX + i * colW, currentY + 3, { width: colW, align: 'center' });
+        });
+        pDayVals.forEach((val, i) => {
+          const isTot = i === 4;
+          doc.rect(rightX + i * colW, currentY, colW, 14).fill(isTot ? '#f5f3ff' : '#ffffff').stroke(isTot ? '#ddd6fe' : '#cbd5e1');
+          doc.fillColor(isTot ? '#5b21b6' : '#0f172a').fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
+            .text(val, rightX + i * colW, currentY + 3, { width: colW, align: 'center' });
+        });
+        currentY += 18;
+
+        // 1B. NIGHT SHIFT INK CONSUMPTION
+        doc.rect(ML, currentY, contentWidth, 13).fill('#f8fafc').stroke('#cbd5e1');
+        doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
+          .text('🌙 NIGHT SHIFT INK CONSUMPTION', ML + 6, currentY + 2.5, { width: contentWidth - 12, align: 'left' });
+        currentY += 13;
+
+        doc.rect(leftX, currentY, tableW, 14).fill('#eff6ff').stroke('#bfdbfe');
+        doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
+          .text('GRANDO (NIGHT SHIFT)', leftX, currentY + 3, { width: tableW, align: 'center' });
+
+        doc.rect(rightX, currentY, tableW, 14).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
+          .text('PRINTDOT (NIGHT SHIFT)', rightX, currentY + 3, { width: tableW, align: 'center' });
+        currentY += 14;
+
+        inkCols.forEach((col, i) => {
+          doc.rect(leftX + i * colW, currentY, colW, 13).fill('#f8fafc').stroke('#cbd5e1');
+          doc.fillColor('#334155').fontSize(7).font('Helvetica-Bold')
+            .text(col, leftX + i * colW, currentY + 2.5, { width: colW, align: 'center' });
+
+          doc.rect(rightX + i * colW, currentY, colW, 13).fill('#f8fafc').stroke('#cbd5e1');
+          doc.fillColor('#334155').fontSize(7).font('Helvetica-Bold')
+            .text(col, rightX + i * colW, currentY + 2.5, { width: colW, align: 'center' });
+        });
+        currentY += 13;
+
+        const gNightTot = grandoNightInk.C + grandoNightInk.M + grandoNightInk.Y + grandoNightInk.K;
+        const pNightTot = printdotNightInk.C + printdotNightInk.M + printdotNightInk.Y + printdotNightInk.K;
+        const nightTotInk = gNightTot + pNightTot;
+
+        const gNightVals = [grandoNightInk.C.toFixed(2), grandoNightInk.M.toFixed(2), grandoNightInk.Y.toFixed(2), grandoNightInk.K.toFixed(2), gNightTot.toFixed(2)];
+        const pNightVals = [printdotNightInk.C.toFixed(2), printdotNightInk.M.toFixed(2), printdotNightInk.Y.toFixed(2), printdotNightInk.K.toFixed(2), pNightTot.toFixed(2)];
+
+        gNightVals.forEach((val, i) => {
+          const isTot = i === 4;
+          doc.rect(leftX + i * colW, currentY, colW, 14).fill(isTot ? '#eff6ff' : '#ffffff').stroke(isTot ? '#bfdbfe' : '#cbd5e1');
+          doc.fillColor(isTot ? '#1e40af' : '#0f172a').fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
+            .text(val, leftX + i * colW, currentY + 3, { width: colW, align: 'center' });
+        });
+        pNightVals.forEach((val, i) => {
+          const isTot = i === 4;
+          doc.rect(rightX + i * colW, currentY, colW, 14).fill(isTot ? '#f5f3ff' : '#ffffff').stroke(isTot ? '#ddd6fe' : '#cbd5e1');
+          doc.fillColor(isTot ? '#5b21b6' : '#0f172a').fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
+            .text(val, rightX + i * colW, currentY + 3, { width: colW, align: 'center' });
         });
         currentY += 15;
 
-        // INK TOTAL SUMMARY BAR Across Both Machines (Light Blue)
+        // INK TOTAL SUMMARY BAR Across Both Shifts (Light Blue)
+        const grandTotInkAll = dayTotInk + nightTotInk;
         doc.rect(ML, currentY, contentWidth, 15).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-          .text(`TOTAL INK USED BY PRINTING DEPARTMENT: ${deptTotInk.toFixed(2)} Ltr`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center' });
+          .text(`TOTAL INK CONSUMED (DAY + NIGHT SHIFT): ${grandTotInkAll.toFixed(2)} Ltr (Day: ${dayTotInk.toFixed(2)} Ltr | Night: ${nightTotInk.toFixed(2)} Ltr)`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center' });
         currentY += 21;
 
 
-        // ── 2. PAPER CONSUMPTION TABLE (LIGHT PURPLE & LIGHT BLUE THEME) ──
-        checkAddPage(90);
+        // ── 2. SHIFT WISE PAPER CONSUMPTION SUMMARY (DAY SHIFT & NIGHT SHIFT) ──
+        checkAddPage(120);
 
         doc.rect(ML, currentY, contentWidth, 15).fill('#f5f3ff').stroke('#ddd6fe');
         doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
-          .text('PAPER CONSUMPTION SUMMARY', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
-        currentY += 15;
+          .text('PAPER CONSUMPTION SUMMARY (DAY & NIGHT SHIFT)', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
+        currentY += 16;
 
         const typeColW = 95;
-        const totalColW = 60;
+        const totalColW = 65;
         const pannaColW = (contentWidth - typeColW - totalColW) / pannaCols.length;
-
-        doc.rect(ML, currentY, typeColW, 14).fill('#f8fafc').stroke('#cbd5e1');
-        doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-          .text('PAPER TYPE', ML, currentY + 3, { width: typeColW, align: 'center' });
-
-        pannaCols.forEach((panna, i) => {
-          const x = ML + typeColW + i * pannaColW;
-          doc.rect(x, currentY, pannaColW, 14).fill('#f8fafc').stroke('#cbd5e1');
-          doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-            .text(panna, x, currentY + 3, { width: pannaColW, align: 'center' });
-        });
-
-        doc.rect(ML + typeColW + pannaCols.length * pannaColW, currentY, totalColW, 14).fill('#f8fafc').stroke('#cbd5e1');
-        doc.fillColor('#1e293b').fontSize(7.5).font('Helvetica-Bold')
-          .text('TOTAL', ML + typeColW + pannaCols.length * pannaColW, currentY + 3, { width: totalColW, align: 'center' });
-
-        currentY += 14;
 
         const printConfigDoc = await PrintConfig.findOne({ isConfig: true }).lean();
         const configuredPaperTypes = (printConfigDoc && Array.isArray(printConfigDoc.paperTypes) && printConfigDoc.paperTypes.length > 0)
           ? printConfigDoc.paperTypes
           : ['A++', 'A+', 'A'];
 
-        const displayPaperTypes = Object.keys(paperTypeMap).length > 0
-          ? Array.from(new Set([...Object.keys(paperTypeMap), ...configuredPaperTypes]))
-          : configuredPaperTypes;
+        const allPaperKeys = Array.from(new Set([...Object.keys(paperDayTypeMap), ...Object.keys(paperNightTypeMap), ...configuredPaperTypes]));
 
-        const colTotals = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
-        const colMetersTotals = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
-        let grandTotalPaperRolls = 0;
-        let grandTotalPaperMeters = 0;
-
-        displayPaperTypes.forEach((pType, pIdx) => {
-          const bg = pIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
-          doc.rect(ML, currentY, typeColW, 14).fill(bg).stroke('#cbd5e1');
+        // Function helper to render Paper Consumption Matrix for a specific shift
+        const renderShiftPaperMatrix = (shiftTitle, typeMap, metersMap) => {
+          doc.rect(ML, currentY, contentWidth, 13).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
-            .text(pType, ML, currentY + 3, { width: typeColW, align: 'center' });
+            .text(shiftTitle, ML + 6, currentY + 2.5, { width: contentWidth - 12, align: 'left' });
+          currentY += 13;
 
-          let rowRollTotal = 0;
-          let rowMetersTotal = 0;
+          doc.rect(ML, currentY, typeColW, 14).fill('#f8fafc').stroke('#cbd5e1');
+          doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
+            .text('PAPER TYPE', ML, currentY + 3, { width: typeColW, align: 'center' });
 
           pannaCols.forEach((panna, i) => {
             const x = ML + typeColW + i * pannaColW;
-            const qtyVal = (paperTypeMap[pType] && paperTypeMap[pType][panna]) ? paperTypeMap[pType][panna] : 0;
-            const mtrVal = (paperMetersMap[pType] && paperMetersMap[pType][panna]) ? paperMetersMap[pType][panna] : 0;
-
-            rowRollTotal += qtyVal;
-            rowMetersTotal += mtrVal;
-            colTotals[panna] = (colTotals[panna] || 0) + qtyVal;
-            colMetersTotals[panna] = (colMetersTotals[panna] || 0) + mtrVal;
-
-            let valStr = '';
-            if (qtyVal > 0 && mtrVal > 0) {
-              valStr = `${qtyVal} R (${mtrVal.toFixed(0)}m)`;
-            } else if (qtyVal > 0) {
-              valStr = `${qtyVal} R`;
-            } else if (mtrVal > 0) {
-              valStr = `${mtrVal.toFixed(0)}m`;
-            }
-
-            doc.rect(x, currentY, pannaColW, 14).fill(bg).stroke('#cbd5e1');
-            doc.fillColor(qtyVal > 0 || mtrVal > 0 ? '#1e40af' : '#94a3b8').fontSize(6.5).font(qtyVal > 0 || mtrVal > 0 ? 'Helvetica-Bold' : 'Helvetica')
-              .text(valStr, x, currentY + 3.5, { width: pannaColW, align: 'center' });
+            doc.rect(x, currentY, pannaColW, 14).fill('#f8fafc').stroke('#cbd5e1');
+            doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
+              .text(panna, x, currentY + 3, { width: pannaColW, align: 'center' });
           });
 
-          grandTotalPaperRolls += rowRollTotal;
-          grandTotalPaperMeters += rowMetersTotal;
-          const totX = ML + typeColW + pannaCols.length * pannaColW;
-          doc.rect(totX, currentY, totalColW, 14).fill(bg).stroke('#cbd5e1');
-          
-          let rowTotStr = '0';
-          if (rowRollTotal > 0 && rowMetersTotal > 0) {
-            rowTotStr = `${rowRollTotal} R (${rowMetersTotal.toFixed(0)}m)`;
-          } else if (rowRollTotal > 0) {
-            rowTotStr = `${rowRollTotal} R`;
-          }
-
-          doc.fillColor('#1e40af').fontSize(6.5).font('Helvetica-Bold')
-            .text(rowTotStr, totX, currentY + 3.5, { width: totalColW, align: 'center' });
-
+          doc.rect(ML + typeColW + pannaCols.length * pannaColW, currentY, totalColW, 14).fill('#f8fafc').stroke('#cbd5e1');
+          doc.fillColor('#1e293b').fontSize(7.5).font('Helvetica-Bold')
+            .text('TOTAL', ML + typeColW + pannaCols.length * pannaColW, currentY + 3, { width: totalColW, align: 'center' });
           currentY += 14;
-        });
 
-        // PAPER TOTAL BOTTOM ROW 1: TOTAL ROLLS (Light Blue)
-        doc.rect(ML, currentY, typeColW, 14).fill('#eff6ff').stroke('#bfdbfe');
-        doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-          .text('TOTAL ROLLS', ML, currentY + 3, { width: typeColW, align: 'center' });
+          const colTotals = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
+          const colMetersTotals = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
+          let shiftTotRolls = 0;
+          let shiftTotMeters = 0;
 
-        pannaCols.forEach((panna, i) => {
-          const x = ML + typeColW + i * pannaColW;
-          const cTot = colTotals[panna] || 0;
-          doc.rect(x, currentY, pannaColW, 14).fill('#eff6ff').stroke('#bfdbfe');
+          allPaperKeys.forEach((pType, pIdx) => {
+            const bg = pIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
+            doc.rect(ML, currentY, typeColW, 14).fill(bg).stroke('#cbd5e1');
+            doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
+              .text(pType, ML, currentY + 3, { width: typeColW, align: 'center' });
+
+            let rowRollTotal = 0;
+            let rowMetersTotal = 0;
+
+            pannaCols.forEach((panna, i) => {
+              const x = ML + typeColW + i * pannaColW;
+              const qtyVal = (typeMap[pType] && typeMap[pType][panna]) ? typeMap[pType][panna] : 0;
+              const mtrVal = (metersMap[pType] && metersMap[pType][panna]) ? metersMap[pType][panna] : 0;
+
+              rowRollTotal += qtyVal;
+              rowMetersTotal += mtrVal;
+              colTotals[panna] = (colTotals[panna] || 0) + qtyVal;
+              colMetersTotals[panna] = (colMetersTotals[panna] || 0) + mtrVal;
+
+              let valStr = '';
+              if (qtyVal > 0 && mtrVal > 0) {
+                valStr = `${qtyVal} R (${mtrVal.toFixed(0)}m)`;
+              } else if (qtyVal > 0) {
+                valStr = `${qtyVal} R`;
+              } else if (mtrVal > 0) {
+                valStr = `${mtrVal.toFixed(0)}m`;
+              }
+
+              doc.rect(x, currentY, pannaColW, 14).fill(bg).stroke('#cbd5e1');
+              doc.fillColor(qtyVal > 0 || mtrVal > 0 ? '#1e40af' : '#94a3b8').fontSize(6.5).font(qtyVal > 0 || mtrVal > 0 ? 'Helvetica-Bold' : 'Helvetica')
+                .text(valStr, x, currentY + 3.5, { width: pannaColW, align: 'center' });
+            });
+
+            shiftTotRolls += rowRollTotal;
+            shiftTotMeters += rowMetersTotal;
+            const totX = ML + typeColW + pannaCols.length * pannaColW;
+            doc.rect(totX, currentY, totalColW, 14).fill(bg).stroke('#cbd5e1');
+
+            let rowTotStr = '0';
+            if (rowRollTotal > 0 && rowMetersTotal > 0) {
+              rowTotStr = `${rowRollTotal} R (${rowMetersTotal.toFixed(0)}m)`;
+            } else if (rowRollTotal > 0) {
+              rowTotStr = `${rowRollTotal} R`;
+            } else if (rowMetersTotal > 0) {
+              rowTotStr = `${rowMetersTotal.toFixed(0)}m`;
+            }
+
+            doc.fillColor('#1e40af').fontSize(6.5).font('Helvetica-Bold')
+              .text(rowTotStr, totX, currentY + 3.5, { width: totalColW, align: 'center' });
+
+            currentY += 14;
+          });
+
+          // TOTAL ROLLS ROW
+          doc.rect(ML, currentY, typeColW, 14).fill('#eff6ff').stroke('#bfdbfe');
           doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-            .text(cTot > 0 ? `${cTot} R` : '0', x, currentY + 3, { width: pannaColW, align: 'center' });
-        });
+            .text('TOTAL ROLLS', ML, currentY + 3, { width: typeColW, align: 'center' });
 
-        const totX1 = ML + typeColW + pannaCols.length * pannaColW;
-        doc.rect(totX1, currentY, totalColW, 14).fill('#eff6ff').stroke('#bfdbfe');
-        doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-          .text(`${grandTotalPaperRolls} Rolls`, totX1, currentY + 3, { width: totalColW, align: 'center' });
+          pannaCols.forEach((panna, i) => {
+            const x = ML + typeColW + i * pannaColW;
+            const cTot = colTotals[panna] || 0;
+            doc.rect(x, currentY, pannaColW, 14).fill('#eff6ff').stroke('#bfdbfe');
+            doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
+              .text(cTot > 0 ? `${cTot} R` : '0', x, currentY + 3, { width: pannaColW, align: 'center' });
+          });
 
-        currentY += 14;
+          const totX1 = ML + typeColW + pannaCols.length * pannaColW;
+          doc.rect(totX1, currentY, totalColW, 14).fill('#eff6ff').stroke('#bfdbfe');
+          doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
+            .text(`${shiftTotRolls} Rolls`, totX1, currentY + 3, { width: totalColW, align: 'center' });
+          currentY += 14;
 
-        // PAPER TOTAL BOTTOM ROW 2: TOTAL PAPER METERS (Light Purple)
-        doc.rect(ML, currentY, typeColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
-        doc.fillColor('#5b21b6').fontSize(7.0).font('Helvetica-Bold')
-          .text('TOTAL PAPER METERS', ML, currentY + 3, { width: typeColW, align: 'center' });
-
-        pannaCols.forEach((panna, i) => {
-          const x = ML + typeColW + i * pannaColW;
-          const cMtrTot = colMetersTotals[panna] || 0;
-          doc.rect(x, currentY, pannaColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
+          // TOTAL METERS ROW
+          doc.rect(ML, currentY, typeColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
           doc.fillColor('#5b21b6').fontSize(7.0).font('Helvetica-Bold')
-            .text(cMtrTot > 0 ? `${cMtrTot.toFixed(0)}m` : '0m', x, currentY + 3, { width: pannaColW, align: 'center' });
-        });
+            .text('TOTAL PAPER METERS', ML, currentY + 3, { width: typeColW, align: 'center' });
 
-        const totX2 = ML + typeColW + pannaCols.length * pannaColW;
-        doc.rect(totX2, currentY, totalColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
-        doc.fillColor('#5b21b6').fontSize(7.2).font('Helvetica-Bold')
-          .text(`${grandTotalPaperMeters.toFixed(0)} mtr`, totX2, currentY + 3, { width: totalColW, align: 'center' });
+          pannaCols.forEach((panna, i) => {
+            const x = ML + typeColW + i * pannaColW;
+            const cMtrTot = colMetersTotals[panna] || 0;
+            doc.rect(x, currentY, pannaColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
+            doc.fillColor('#5b21b6').fontSize(7.0).font('Helvetica-Bold')
+              .text(cMtrTot > 0 ? `${cMtrTot.toFixed(0)}m` : '0m', x, currentY + 3, { width: pannaColW, align: 'center' });
+          });
 
-        currentY += 20;
+          const totX2 = ML + typeColW + pannaCols.length * pannaColW;
+          doc.rect(totX2, currentY, totalColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
+          doc.fillColor('#5b21b6').fontSize(7.2).font('Helvetica-Bold')
+            .text(`${shiftTotMeters.toFixed(0)} mtr`, totX2, currentY + 3, { width: totalColW, align: 'center' });
 
-        // ── 2B. INK & PAPER INWARD SUMMARY TABLES ──
+          currentY += 18;
+          return shiftTotMeters;
+        };
+
+        // Render Day Shift Paper Consumption
+        const dayShiftMetersTot = renderShiftPaperMatrix('☀️ DAY SHIFT PAPER CONSUMPTION', paperDayTypeMap, paperDayMetersMap);
+
+        // Render Night Shift Paper Consumption
+        const nightShiftMetersTot = renderShiftPaperMatrix('🌙 NIGHT SHIFT PAPER CONSUMPTION', paperNightTypeMap, paperNightMetersMap);
+
+        // GRAND TOTAL PAPER SUMMARY BAR
+        const grandTotPaperAll = dayShiftMetersTot + nightShiftMetersTot;
+        doc.rect(ML, currentY, contentWidth, 15).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
+          .text(`TOTAL PAPER METERS PRINTED (DAY + NIGHT SHIFT): ${grandTotPaperAll.toFixed(0)} mtr (Day: ${dayShiftMetersTot.toFixed(0)}m | Night: ${nightShiftMetersTot.toFixed(0)}m)`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center' });
+        currentY += 21;
+
+
+        // ── 2B. INK & PAPER INWARD SUMMARY MATRIX TABLES ──
         const inkInwardList = (inwardRawMaterialList || []).filter(t => {
           const m = (t.materialName || '').toLowerCase();
           return m.includes('ink') || m.includes('grando') || m.includes('printdot');
