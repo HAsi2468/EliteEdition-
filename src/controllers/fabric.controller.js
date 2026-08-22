@@ -2233,7 +2233,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         // 1A. DAY SHIFT INK CONSUMPTION
         doc.rect(ML, currentY, contentWidth, 13).fill('#f8fafc').stroke('#cbd5e1');
         doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
-          .text('☀️ DAY SHIFT INK CONSUMPTION', ML + 6, currentY + 2.5, { width: contentWidth - 12, align: 'left' });
+          .text('DAY SHIFT INK CONSUMPTION', ML + 6, currentY + 2.5, { width: contentWidth - 12, align: 'left' });
         currentY += 13;
 
         doc.rect(leftX, currentY, tableW, 14).fill('#eff6ff').stroke('#bfdbfe');
@@ -2280,7 +2280,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         // 1B. NIGHT SHIFT INK CONSUMPTION
         doc.rect(ML, currentY, contentWidth, 13).fill('#f8fafc').stroke('#cbd5e1');
         doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
-          .text('🌙 NIGHT SHIFT INK CONSUMPTION', ML + 6, currentY + 2.5, { width: contentWidth - 12, align: 'left' });
+          .text('NIGHT SHIFT INK CONSUMPTION', ML + 6, currentY + 2.5, { width: contentWidth - 12, align: 'left' });
         currentY += 13;
 
         doc.rect(leftX, currentY, tableW, 14).fill('#eff6ff').stroke('#bfdbfe');
@@ -2390,8 +2390,13 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
             pannaCols.forEach((panna, i) => {
               const x = ML + typeColW + i * pannaColW;
-              const qtyVal = (typeMap[pType] && typeMap[pType][panna]) ? typeMap[pType][panna] : 0;
+              let qtyVal = (typeMap[pType] && typeMap[pType][panna]) ? typeMap[pType][panna] : 0;
               const mtrVal = (metersMap[pType] && metersMap[pType][panna]) ? metersMap[pType][panna] : 0;
+
+              // Ensure roll count is present if meters exist
+              if (mtrVal > 0 && qtyVal === 0) {
+                qtyVal = Math.ceil(mtrVal / 910) || 1;
+              }
 
               rowRollTotal += qtyVal;
               rowMetersTotal += mtrVal;
@@ -2399,12 +2404,11 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
               colMetersTotals[panna] = (colMetersTotals[panna] || 0) + mtrVal;
 
               let valStr = '';
-              if (qtyVal > 0 && mtrVal > 0) {
-                valStr = `${qtyVal} R (${mtrVal.toFixed(0)}m)`;
+              if (mtrVal > 0) {
+                const rollsDisplay = qtyVal > 0 ? qtyVal : Math.ceil(mtrVal / 910) || 1;
+                valStr = `${rollsDisplay} R (${mtrVal.toFixed(0)}m)`;
               } else if (qtyVal > 0) {
                 valStr = `${qtyVal} R`;
-              } else if (mtrVal > 0) {
-                valStr = `${mtrVal.toFixed(0)}m`;
               }
 
               doc.rect(x, currentY, pannaColW, 14).fill(bg).stroke('#cbd5e1');
@@ -2418,12 +2422,11 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
             doc.rect(totX, currentY, totalColW, 14).fill(bg).stroke('#cbd5e1');
 
             let rowTotStr = '0';
-            if (rowRollTotal > 0 && rowMetersTotal > 0) {
-              rowTotStr = `${rowRollTotal} R (${rowMetersTotal.toFixed(0)}m)`;
+            if (rowMetersTotal > 0) {
+              const rowRollsDisp = rowRollTotal > 0 ? rowRollTotal : Math.ceil(rowMetersTotal / 910);
+              rowTotStr = `${rowRollsDisp} R (${rowMetersTotal.toFixed(0)}m)`;
             } else if (rowRollTotal > 0) {
               rowTotStr = `${rowRollTotal} R`;
-            } else if (rowMetersTotal > 0) {
-              rowTotStr = `${rowMetersTotal.toFixed(0)}m`;
             }
 
             doc.fillColor('#1e40af').fontSize(6.5).font('Helvetica-Bold')
@@ -2474,10 +2477,10 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         };
 
         // Render Day Shift Paper Consumption
-        const dayShiftMetersTot = renderShiftPaperMatrix('☀️ DAY SHIFT PAPER CONSUMPTION', paperDayTypeMap, paperDayMetersMap);
+        const dayShiftMetersTot = renderShiftPaperMatrix('DAY SHIFT PAPER CONSUMPTION', paperDayTypeMap, paperDayMetersMap);
 
         // Render Night Shift Paper Consumption
-        const nightShiftMetersTot = renderShiftPaperMatrix('🌙 NIGHT SHIFT PAPER CONSUMPTION', paperNightTypeMap, paperNightMetersMap);
+        const nightShiftMetersTot = renderShiftPaperMatrix('NIGHT SHIFT PAPER CONSUMPTION', paperNightTypeMap, paperNightMetersMap);
 
         // GRAND TOTAL PAPER SUMMARY BAR
         const grandTotPaperAll = dayShiftMetersTot + nightShiftMetersTot;
