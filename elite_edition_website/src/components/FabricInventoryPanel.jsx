@@ -983,6 +983,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       }
     }
 
+    // Calculate total available stock across selected lots to default remaining meters to 0.00
+    const selectedLotObjs = lotsList.map(lStr => lotRecords.find(l => String(l.lotNo) === String(lStr))).filter(Boolean);
+    const totalSelectedStock = selectedLotObjs.reduce((s, l) => s + (l.currentStock || l.availableMtr || 0), 0);
+
     setChallanForm(prev => {
       const updatedTps = prev.tpDetails.map(tp => {
         if (!tp.lotNo || !lotsList.includes(tp.lotNo)) {
@@ -990,11 +994,30 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         }
         return tp;
       });
+
+      const curTpSum = updatedTps.reduce((s, tp) => s + (parseFloat(tp.tpMeter) || 0), 0);
+
+      // Auto-fill TP meter to consume full lot stock if current meters are empty/zero
+      let newTpDetails = updatedTps;
+      let newTotalMtr = prev.totalMtr;
+
+      if ((curTpSum === 0 || (updatedTps.length === 1 && (parseFloat(updatedTps[0].tpMeter) || 0) === 0)) && totalSelectedStock > 0) {
+        let sPct = prev.shortagePct !== '' && prev.shortagePct != null ? parseFloat(prev.shortagePct) || 0 : 0;
+        let targetMtr = totalSelectedStock;
+        if (sPct > 0) {
+          targetMtr = totalSelectedStock / (1 + sPct / 100);
+        }
+        targetMtr = parseFloat(targetMtr.toFixed(2));
+        newTpDetails = [{ tpNo: 1, tpMeter: targetMtr, lotNo: defaultLot }];
+        newTotalMtr = targetMtr;
+      }
+
       return {
         ...prev,
         lotNo: val,
         partyName: mappedParty || prev.partyName,
-        tpDetails: updatedTps
+        tpDetails: newTpDetails,
+        totalMtr: newTotalMtr
       };
     });
     if (!val) return;
@@ -1028,13 +1051,31 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         // Collect fabricName, shortage, panna from first valid response
         const first = validResults[0].data;
 
-        setChallanForm(prev => ({
-          ...prev,
-          vendorChallanNo: uniqueChallans || prev.vendorChallanNo,
-          fabricName: first.fabricName || prev.fabricName,
-          shortagePct: first.shortagePct != null ? String(first.shortagePct) : prev.shortagePct,
-          panna: prev.panna || first.panna || '',
-        }));
+        setChallanForm(prev => {
+          let sPct = first.shortagePct != null ? parseFloat(first.shortagePct) || 0 : (prev.shortagePct ? parseFloat(prev.shortagePct) || 0 : 0);
+          let updatedTpDetails = prev.tpDetails;
+          let updatedTotalMtr = prev.totalMtr;
+
+          // Re-calculate target meters if shortage was populated from lot info
+          if (totalSelectedStock > 0 && (prev.tpDetails.length === 1 && Math.abs(prev.totalMtr - totalSelectedStock) <= 0.05)) {
+            let targetMtr = totalSelectedStock;
+            if (sPct > 0) {
+              targetMtr = parseFloat((totalSelectedStock / (1 + sPct / 100)).toFixed(2));
+            }
+            updatedTpDetails = [{ tpNo: 1, tpMeter: targetMtr, lotNo: defaultLot }];
+            updatedTotalMtr = targetMtr;
+          }
+
+          return {
+            ...prev,
+            vendorChallanNo: uniqueChallans || prev.vendorChallanNo,
+            fabricName: first.fabricName || prev.fabricName,
+            shortagePct: first.shortagePct != null ? String(first.shortagePct) : prev.shortagePct,
+            panna: prev.panna || first.panna || '',
+            tpDetails: updatedTpDetails,
+            totalMtr: updatedTotalMtr
+          };
+        });
       }
     } catch (e) {
       console.warn('Failed to fetch multiple lot info', e);
