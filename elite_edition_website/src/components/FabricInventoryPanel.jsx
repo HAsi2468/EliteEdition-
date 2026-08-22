@@ -4065,39 +4065,22 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       borderRadius: '10px',
                       boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                     }}>
-                      {/* Top Header */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '1rem' }}>📊</span>
-                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
-                            Lot Stock Fulfillment ({selectedLotsList.length} {selectedLotsList.length === 1 ? 'Lot' : 'Lots'})
-                          </span>
-                          <span style={{
-                            fontSize: '0.66rem',
-                            fontWeight: 700,
-                            padding: '1px 6px',
-                            borderRadius: '10px',
-                            background: '#e2e8f0',
-                            color: '#334155'
-                          }}>
-                            {selectedLotsList.length <= 3 ? `#${selectedLotsList.join(', #')}` : `#${selectedLotsList.slice(0, 3).join(', #')} +${selectedLotsList.length - 3} more`}
-                          </span>
-                        </div>
-
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>
-                          <span style={{ color: challanTotalMtr > selectedLotsTotalStock ? '#dc2626' : '#0284c7' }}>
-                            {challanTotalMtr.toFixed(2)}m taken
-                          </span>
-                          <span style={{ color: '#64748b' }}> / {selectedLotsTotalStock.toFixed(2)}m stock</span>
-                        </div>
-                      </div>
-
-                      {/* Mathematical Progress Calculations */}
+                      {/* Mathematical Progress Calculations (Including Shortage) */}
                       {(() => {
+                        const rawMtr = parseFloat(challanForm.totalMtr) || 0;
+                        let shortageMtrVal = 0;
+                        if (challanForm.shortageMode === 'mtr') {
+                          shortageMtrVal = parseFloat(challanForm.shortageMtr) || 0;
+                        } else if (challanForm.shortagePct !== '' && challanForm.shortagePct != null) {
+                          const p = parseFloat(challanForm.shortagePct) || 0;
+                          shortageMtrVal = (rawMtr * p) / 100;
+                        }
+                        const effectiveTakenMtr = rawMtr + shortageMtrVal;
+
                         const hasStock = selectedLotsTotalStock > 0;
-                        const realPct = hasStock ? Math.round((challanTotalMtr / selectedLotsTotalStock) * 100) : (challanTotalMtr > 0 ? 999 : 0);
+                        const realPct = hasStock ? Math.round((effectiveTakenMtr / selectedLotsTotalStock) * 100) : (effectiveTakenMtr > 0 ? 999 : 0);
                         const fillWidth = Math.min(100, realPct);
-                        const isOver = challanTotalMtr > selectedLotsTotalStock;
+                        const isOver = effectiveTakenMtr > selectedLotsTotalStock;
                         const isNearFull = realPct >= 85 && !isOver;
 
                         const barBg = isOver
@@ -4106,10 +4089,40 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           ? 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)'
                           : 'linear-gradient(90deg, #10b981 0%, #059669 100%)';
 
-                        const balance = selectedLotsTotalStock - challanTotalMtr;
+                        const balance = selectedLotsTotalStock - effectiveTakenMtr;
 
                         return (
                           <>
+                            {/* Top Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '1rem' }}>📊</span>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
+                                  Lot Stock Fulfillment ({selectedLotsList.length} {selectedLotsList.length === 1 ? 'Lot' : 'Lots'})
+                                </span>
+                                <span style={{
+                                  fontSize: '0.66rem',
+                                  fontWeight: 700,
+                                  padding: '1px 6px',
+                                  borderRadius: '10px',
+                                  background: '#e2e8f0',
+                                  color: '#334155'
+                                }}>
+                                  {selectedLotsList.length <= 3 ? `#${selectedLotsList.join(', #')}` : `#${selectedLotsList.slice(0, 3).join(', #')} +${selectedLotsList.length - 3} more`}
+                                </span>
+                              </div>
+
+                              <div style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                                <span style={{ color: isOver ? '#dc2626' : '#0284c7' }}>
+                                  {effectiveTakenMtr.toFixed(2)}m taken
+                                </span>
+                                {shortageMtrVal > 0 && (
+                                  <span style={{ fontSize: '0.68rem', color: '#d97706', fontWeight: 600 }}> ({rawMtr.toFixed(2)}m + {shortageMtrVal.toFixed(2)}m short)</span>
+                                )}
+                                <span style={{ color: '#64748b' }}> / {selectedLotsTotalStock.toFixed(2)}m stock</span>
+                              </div>
+                            </div>
+
                             {/* Track Container */}
                             <div style={{
                               width: '100%',
@@ -4133,9 +4146,9 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem', fontSize: '0.72rem', fontWeight: 700 }}>
                               <span style={{ color: isOver ? '#dc2626' : isNearFull ? '#d97706' : '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 {isOver ? (
-                                  <>⚠️ <span>{realPct}% Allocated — EXCEEDED AVAILABLE STOCK!</span></>
+                                  <>⚠️ <span>{realPct}% Allocated (incl. Shortage) — EXCEEDED AVAILABLE STOCK!</span></>
                                 ) : (
-                                  <>✅ <span>{realPct}% Stock Taken ({fillWidth}% of Lot Capacity)</span></>
+                                  <>✅ <span>{realPct}% Stock Taken ({fillWidth}% of Lot Capacity incl. Shortage)</span></>
                                 )}
                               </span>
 
