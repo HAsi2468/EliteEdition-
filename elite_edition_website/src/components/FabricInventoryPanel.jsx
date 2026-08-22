@@ -4422,38 +4422,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 <input type="number" step="0.01" required min="0.1" value={inwardForm.qty} onChange={e => setInwardForm({ ...inwardForm, qty: e.target.value })} style={inputStyle} />
               </div>
 
-              <div>
-                <label style={labelStyle}>Shortage ({inwardForm.shortageMode === 'mtr' ? 'Meters' : 'Percentage %'})</label>
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={inwardForm.shortageMode === 'mtr' ? (inwardForm.shortageMtr || '') : (inwardForm.shortagePct || '')}
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (inwardForm.shortageMode === 'mtr') {
-                        setInwardForm({ ...inwardForm, shortageMtr: val, shortagePct: '' });
-                      } else {
-                        setInwardForm({ ...inwardForm, shortagePct: val, shortageMtr: '' });
-                      }
-                    }}
-                    style={{ ...inputStyle, flex: 1 }}
-                    placeholder={inwardForm.shortageMode === 'mtr' ? "e.g. 5 mtr" : "e.g. 3.5 %"}
-                  />
-                  <select
-                    value={inwardForm.shortageMode || 'pct'}
-                    onChange={e => {
-                      const newMode = e.target.value;
-                      setInwardForm(prev => ({ ...prev, shortageMode: newMode }));
-                    }}
-                    style={{ ...inputStyle, width: 'auto', fontWeight: 800, cursor: 'pointer' }}
-                  >
-                    <option value="pct">% (Pct)</option>
-                    <option value="mtr">mtr (Meters)</option>
-                  </select>
-                </div>
-              </div>
+
 
               <div>
                 <label style={labelStyle}>Notes</label>
