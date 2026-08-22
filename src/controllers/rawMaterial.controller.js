@@ -165,8 +165,17 @@ const buildRawCompFilter = (companyEntity) => {
 // Get all transactions
 const getTransactions = async (req, res) => {
   try {
-    const { companyEntity } = req.query;
+    const { companyEntity, dateStart, dateEnd } = req.query;
     const filter = buildRawCompFilter(companyEntity);
+    if (dateStart || dateEnd) {
+      filter.date = {};
+      if (dateStart) filter.date.$gte = new Date(dateStart);
+      if (dateEnd) {
+        const end = new Date(dateEnd);
+        end.setHours(23, 59, 59, 999);
+        filter.date.$lte = end;
+      }
+    }
     const transactions = await RawMaterialTransaction.find(filter).sort({ date: -1, createdAt: -1 });
     res.status(200).json({ success: true, data: transactions });
   } catch (error) {

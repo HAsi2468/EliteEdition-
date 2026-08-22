@@ -185,9 +185,15 @@ export default function JobPrintingLog() {
     outward: { grando: { C: 0, M: 0, Y: 0, K: 0 }, printdot: { C: 0, M: 0, Y: 0, K: 0 }, paper: [] }
   });
 
-  const fetchRawMaterialSummary = async () => {
+  const fetchRawMaterialSummary = async (overrideStart, overrideEnd) => {
     try {
-      const res = await api.getRawMaterialTransactions();
+      const activeStart = overrideStart !== undefined ? overrideStart : (dateStart || rawDate);
+      const activeEnd = overrideEnd !== undefined ? overrideEnd : (dateEnd || rawDate);
+      const params = {};
+      if (activeStart) params.dateStart = activeStart;
+      if (activeEnd) params.dateEnd = activeEnd;
+
+      const res = await api.getRawMaterialTransactions(params);
       if (res && res.data && Array.isArray(res.data)) {
         const inGrando = { C: 0, M: 0, Y: 0, K: 0 };
         const inPrintdot = { C: 0, M: 0, Y: 0, K: 0 };
@@ -204,8 +210,14 @@ export default function JobPrintingLog() {
 
         res.data.forEach(t => {
           if (!t.date) return;
-          const dStr = new Date(t.date).toISOString().split('T')[0];
-          if (rawDate && dStr !== rawDate) return;
+          const dObj = new Date(t.date);
+          const yyyy = dObj.getFullYear();
+          const mm = String(dObj.getMonth() + 1).padStart(2, '0');
+          const dd = String(dObj.getDate()).padStart(2, '0');
+          const dStr = `${yyyy}-${mm}-${dd}`;
+
+          if (activeStart && dStr < activeStart) return;
+          if (activeEnd && dStr > activeEnd) return;
 
           if (t.notes) {
             const tm = t.notes.match(/Time:\s*([^\s|]+(?:\s*[AP]M)?)\s*(?:to|-)\s*([^\s|]+(?:\s*[AP]M)?)/i) ||
@@ -719,7 +731,7 @@ export default function JobPrintingLog() {
         limit: 500
       });
       if (res && res.data) setLogs(res.data);
-      await fetchRawMaterialSummary();
+      await fetchRawMaterialSummary(ds, de);
     } catch (err) {
       setError(err.message || 'Failed to load printing logs.');
     } finally {
