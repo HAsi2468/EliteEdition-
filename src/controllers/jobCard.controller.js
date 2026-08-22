@@ -100,6 +100,8 @@ const getAllJobCards = async (req, res) => {
   try {
     const { status, printStatus, fusingStatus, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder, category, department } = req.query;
     const filter = {};
+    const andClauses = [];
+
     if (status && status !== 'All') filter.status = status;
     if (category && category !== 'All') filter.category = category;
 
@@ -107,8 +109,7 @@ const getAllJobCards = async (req, res) => {
       if (printStatus === 'Printing Done') {
         filter.printStatus = 'Printing Done';
       } else if (printStatus === 'Printing Pending') {
-        filter.$and = filter.$and || [];
-        filter.$and.push({ printStatus: { $ne: 'Printing Done' } });
+        andClauses.push({ printStatus: { $ne: 'Printing Done' } });
       }
     }
 
@@ -116,17 +117,17 @@ const getAllJobCards = async (req, res) => {
       if (fusingStatus === 'Fusing Done') {
         filter.fusingStatus = 'Fusing Done';
       } else if (fusingStatus === 'Fusing Pending') {
-        filter.$and = filter.$and || [];
-        filter.$and.push({ fusingStatus: { $ne: 'Fusing Done' } });
+        andClauses.push({ fusingStatus: { $ne: 'Fusing Done' } });
       }
     }
 
-    let deptOr = null;
     if (department === 'stitching') {
-      deptOr = [
-        { department: 'stitching' },
-        { category: { $regex: 'stitching', $options: 'i' } }
-      ];
+      andClauses.push({
+        $or: [
+          { department: 'stitching' },
+          { category: { $regex: 'stitching', $options: 'i' } }
+        ]
+      });
     } else {
       filter.department = { $ne: 'stitching' };
       filter.category = { $ne: 'Stitching' };
@@ -135,19 +136,48 @@ const getAllJobCards = async (req, res) => {
     if (dateStart || dateEnd) {
       const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
       const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
-      const minMs = dsStr ? Math.min(new Date(`${dsStr}T00:00:00.000Z`).getTime(), new Date(`${dsStr}T00:00:00.000`).getTime()) : null;
-      const maxMs = deStr ? Math.max(new Date(`${deStr}T23:59:59.999Z`).getTime(), new Date(`${deStr}T23:59:59.999`).getTime()) : null;
+      const minMs = dsStr ? Math.min(new Date(`${dsStr}T00:00:00.000Z`).getTime(), new Date(`${dsStr}T00:00:00.000+05:30`).getTime()) : null;
+      const maxMs = deStr ? Math.max(new Date(`${deStr}T23:59:59.999Z`).getTime(), new Date(`${deStr}T23:59:59.999+05:30`).getTime()) : null;
 
       const dateQuery = {};
-      if (minMs) dateQuery.$gte = new Date(minMs);
-      if (maxMs) dateQuery.$lte = new Date(maxMs);
+      if (minMs !== null) dateQuery.$gte = new Date(minMs);
+      if (maxMs !== null) dateQuery.$lte = new Date(maxMs);
 
-      filter.$or = [
+      // Find all Job Card IDs that have print logs in this date range
+      const printLogQuery = {};
+      if (minMs !== null) printLogQuery.$gte = new Date(minMs);
+      if (maxMs !== null) printLogQuery.$lte = new Date(maxMs);
+
+      let matchingLogIds = [];
+      try {
+        matchingLogIds = await db.JobPrintLog.distinct('jobCardId', {
+          $or: [
+            { date: printLogQuery },
+            { createdAt: printLogQuery }
+          ]
+        });
+      } catch (e) {
+        logger.warn('Failed to query JobPrintLog distinct IDs: %s', e.message);
+      }
+
+      const dateOr = [
         { date: dateQuery },
         { date: { $gte: dsStr, $lte: deStr } },
+        { printDate: { $gte: dsStr, $lte: deStr } },
+        { printDate: dateQuery },
+        { fusingDate: { $gte: dsStr, $lte: deStr } },
+        { fusingDate: dateQuery },
+        { deliveryDate: { $gte: dsStr, $lte: deStr } },
+        { deliveryDate: dateQuery },
         { createdAt: dateQuery },
         { created_date_time: dateQuery }
       ];
+
+      if (matchingLogIds && matchingLogIds.length > 0) {
+        dateOr.push({ _id: { $in: matchingLogIds } });
+      }
+
+      andClauses.push({ $or: dateOr });
     }
 
     if (search) {
@@ -177,13 +207,11 @@ const getAllJobCards = async (req, res) => {
         );
       }
 
-      if (deptOr) {
-        filter.$and = [{ $or: deptOr }, { $or: searchOr }];
-      } else {
-        filter.$or = searchOr;
-      }
-    } else if (deptOr) {
-      filter.$or = deptOr;
+      andClauses.push({ $or: searchOr });
+    }
+
+    if (andClauses.length > 0) {
+      filter.$and = andClauses;
     }
     const skip  = (Number(page)-1) * Number(limit);
     const total = await db.JobCard.countDocuments(filter);
