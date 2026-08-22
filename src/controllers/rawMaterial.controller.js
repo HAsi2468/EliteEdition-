@@ -148,12 +148,25 @@ const createOutward = async (req, res) => {
   }
 };
 
+const buildRawCompFilter = (companyEntity) => {
+  if (companyEntity === 'Elite Stitching') {
+    return { companyEntity: 'Elite Stitching' };
+  }
+  return {
+    $or: [
+      { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
+      { companyEntity: { $exists: false } },
+      { companyEntity: null },
+      { companyEntity: '' }
+    ]
+  };
+};
+
 // Get all transactions
 const getTransactions = async (req, res) => {
   try {
     const { companyEntity } = req.query;
-    const filter = {};
-    if (companyEntity) filter.companyEntity = companyEntity;
+    const filter = buildRawCompFilter(companyEntity);
     const transactions = await RawMaterialTransaction.find(filter).sort({ date: -1, createdAt: -1 });
     res.status(200).json({ success: true, data: transactions });
   } catch (error) {
@@ -166,8 +179,7 @@ const getTransactions = async (req, res) => {
 const getStockOverview = async (req, res) => {
   try {
     const { companyEntity } = req.query;
-    const matchStage = {};
-    if (companyEntity) matchStage.companyEntity = companyEntity;
+    const matchStage = buildRawCompFilter(companyEntity);
 
     const pipeline = [
       { $match: matchStage },
