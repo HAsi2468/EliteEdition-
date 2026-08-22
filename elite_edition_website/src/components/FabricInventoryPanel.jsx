@@ -4112,7 +4112,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     }}>
                       {/* Mathematical Progress Calculations (Including Shortage) */}
                       {(() => {
-                        const rawMtr = parseFloat(challanForm.totalMtr) || 0;
+                        const rawMtr = challanTotalMtr > 0 ? challanTotalMtr : (parseFloat(challanForm.totalMtr) || 0);
                         let shortageMtrVal = 0;
                         if (challanForm.shortageMode === 'mtr') {
                           shortageMtrVal = parseFloat(challanForm.shortageMtr) || 0;
