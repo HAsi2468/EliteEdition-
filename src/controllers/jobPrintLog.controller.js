@@ -214,7 +214,14 @@ const getJobCardPrintLogs = async (req, res) => {
       return res.status(404).json({ success: false, error: `Job Card #${jobNoOrId} not found.` });
     }
 
-    const logs = await JobPrintLog.find({ jobCardId: targetJob._id })
+    const cleanNo = targetJob.jobNo.replace(/^JOB\s*(NO\.?)?\s*-\s*/i, '').trim();
+    const logs = await JobPrintLog.find({
+      $or: [
+        { jobCardId: targetJob._id },
+        { jobNo: targetJob.jobNo },
+        { jobNo: new RegExp(cleanNo, 'i') }
+      ]
+    })
       .sort({ date: -1, created_date_time: -1 })
       .lean();
 
