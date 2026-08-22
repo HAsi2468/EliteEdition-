@@ -2358,38 +2358,132 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
         currentY += 20;
 
-        // ── RAW MATERIAL INWARD RECEIPTS TABLE (INK & PAPER INWARD) ──
-        checkAddPage(60);
+        // ── 2B. INK & PAPER INWARD SUMMARY TABLES ──
+        const inkInwardList = (inwardRawMaterialList || []).filter(t => {
+          const m = (t.materialName || '').toLowerCase();
+          return m.includes('ink') || m.includes('grando') || m.includes('printdot');
+        });
 
-        doc.rect(ML, currentY, contentWidth, 15).fill('#ecfdf5').stroke('#a7f3d0');
-        doc.fillColor('#047857').fontSize(8).font('Helvetica-Bold')
-          .text('RAW MATERIAL INWARD SUMMARY (INK & PAPER RECEIPTS)', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
+        const paperInwardList = (inwardRawMaterialList || []).filter(t => {
+          const m = (t.materialName || '').toLowerCase();
+          return m.includes('paper') || t.panna || m.includes('sublimation') || m.includes('butter');
+        });
+
+        const otherInwardList = (inwardRawMaterialList || []).filter(t => !inkInwardList.includes(t) && !paperInwardList.includes(t));
+
+        // 1. INK INWARD SUMMARY TABLE (Light Blue Theme)
+        checkAddPage(60);
+        doc.rect(ML, currentY, contentWidth, 15).fill('#eff6ff').stroke('#bfdbfe');
+        doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold')
+          .text('INK INWARD SUMMARY (GRANDO & PRINTDOT INK RECEIPTS)', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
         currentY += 15;
 
-        if (inwardRawMaterialList && inwardRawMaterialList.length > 0) {
-          const inColsW = [50, 115, 45, 60, 65, 115, 65];
-          const inHeaders = ['DATE', 'MATERIAL / ITEM', 'PANNA', 'QTY / ROLLS', 'METERS (MTR)', 'SUPPLIER / VENDOR', 'STATUS'];
+        if (inkInwardList.length > 0) {
+          const inkColsW = [55, 110, 60, 60, 65, 95, 60];
+          const inkHeaders = ['DATE', 'INK BRAND / NAME', 'COLOR', 'QTY (CANS)', 'VOLUME (LTR)', 'CHALLAN NO', 'SUPPLIER / VENDOR'];
 
           doc.rect(ML, currentY, contentWidth, 14).fill('#f8fafc').stroke('#cbd5e1');
           let curX = ML;
-          inHeaders.forEach((h, idx) => {
-            const w = inColsW[idx];
+          inkHeaders.forEach((h, idx) => {
+            const w = inkColsW[idx];
             doc.fillColor('#334155').fontSize(7).font('Helvetica-Bold')
               .text(h, curX + 2, currentY + 3, { width: w - 4, align: idx === 3 || idx === 4 ? 'right' : 'left' });
             curX += w;
           });
           currentY += 14;
 
-          inwardRawMaterialList.forEach((r, rIdx) => {
+          let totInkInwardVol = 0;
+
+          inkInwardList.forEach((r, rIdx) => {
             checkAddPage(14);
             const bg = rIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
             doc.rect(ML, currentY, contentWidth, 14).fill(bg).stroke('#cbd5e1');
 
             const rDate = r.date ? (String(r.date).includes('T') ? String(r.date).split('T')[0] : String(r.date)) : '—';
-            const rMat = r.materialName || 'Raw Material';
+            const rMat = r.materialName || 'Ink Receipt';
+            const rColor = r.color || '—';
+            const rQty = Number(r.qty) || 0;
+            const rCanSize = Number(r.canSize) || 1;
+            const rVol = rQty * rCanSize;
+            totInkInwardVol += rVol;
+
+            const rChallan = r.challanNo || '—';
+            const rVendor = r.vendorName || r.partyName || '—';
+
+            let curX2 = ML;
+            const vals = [
+              rDate,
+              rMat,
+              rColor,
+              `${rQty} ${r.unit || 'Cans'}`,
+              `${rVol.toFixed(2)} Ltr`,
+              rChallan,
+              rVendor
+            ];
+
+            vals.forEach((v, idx) => {
+              const w = inkColsW[idx];
+              const isNum = idx === 3 || idx === 4;
+              doc.fillColor(isNum ? '#1e40af' : '#0f172a').fontSize(7).font(isNum ? 'Helvetica-Bold' : 'Helvetica')
+                .text(v, curX2 + 2, currentY + 3, { width: w - 4, align: isNum ? 'right' : 'left', lineBreak: false });
+              curX2 += w;
+            });
+
+            currentY += 14;
+          });
+
+          // INK INWARD TOTAL BAR (Light Blue)
+          doc.rect(ML, currentY, contentWidth, 14).fill('#eff6ff').stroke('#bfdbfe');
+          doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
+            .text(`TOTAL INK INWARD RECEIVED: ${totInkInwardVol.toFixed(2)} Ltr (${inkInwardList.length} Receipts)`, ML + 6, currentY + 3, { width: contentWidth - 12, align: 'center' });
+          currentY += 18;
+        } else {
+          doc.rect(ML, currentY, contentWidth, 15).fill('#f8fafc').stroke('#cbd5e1');
+          doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Oblique')
+            .text('No Ink Inward Receipts recorded for the selected date range.', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
+          currentY += 20;
+        }
+
+        // 2. PAPER INWARD SUMMARY TABLE (Light Purple Theme)
+        checkAddPage(60);
+        doc.rect(ML, currentY, contentWidth, 15).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
+          .text('PAPER INWARD SUMMARY (TRANSFER PAPER RECEIPTS)', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
+        currentY += 15;
+
+        const combinedPaperAndOther = [...paperInwardList, ...otherInwardList];
+
+        if (combinedPaperAndOther.length > 0) {
+          const paperColsW = [55, 110, 45, 60, 65, 95, 75];
+          const paperHeaders = ['DATE', 'PAPER TYPE / BRAND', 'PANNA', 'QTY (ROLLS)', 'METERS (MTR)', 'CHALLAN NO', 'SUPPLIER / VENDOR'];
+
+          doc.rect(ML, currentY, contentWidth, 14).fill('#f8fafc').stroke('#cbd5e1');
+          let curX = ML;
+          paperHeaders.forEach((h, idx) => {
+            const w = paperColsW[idx];
+            doc.fillColor('#334155').fontSize(7).font('Helvetica-Bold')
+              .text(h, curX + 2, currentY + 3, { width: w - 4, align: idx === 3 || idx === 4 ? 'right' : 'left' });
+            curX += w;
+          });
+          currentY += 14;
+
+          let totPaperInwardRolls = 0;
+          let totPaperInwardMeters = 0;
+
+          combinedPaperAndOther.forEach((r, rIdx) => {
+            checkAddPage(14);
+            const bg = rIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
+            doc.rect(ML, currentY, contentWidth, 14).fill(bg).stroke('#cbd5e1');
+
+            const rDate = r.date ? (String(r.date).includes('T') ? String(r.date).split('T')[0] : String(r.date)) : '—';
+            const rMat = r.materialName || 'Transfer Paper';
             const rPanna = r.panna ? (String(r.panna).includes('"') ? r.panna : `${r.panna}"`) : '—';
             const rQty = Number(r.qty) || 0;
             const rMtr = Number(r.meters) || Number(r.totalMeters) || (rQty * (Number(r.metersPerRoll) || 0)) || 0;
+            totPaperInwardRolls += rQty;
+            totPaperInwardMeters += rMtr;
+
+            const rChallan = r.challanNo || '—';
             const rVendor = r.vendorName || r.partyName || '—';
             const rUnit = r.unit || 'Rolls';
 
@@ -2400,27 +2494,31 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
               rPanna,
               `${rQty} ${rUnit}`,
               rMtr > 0 ? `${rMtr.toFixed(2)} m` : '—',
-              rVendor,
-              'INWARD'
+              rChallan,
+              rVendor
             ];
 
             vals.forEach((v, idx) => {
-              const w = inColsW[idx];
+              const w = paperColsW[idx];
               const isNum = idx === 3 || idx === 4;
-              const isType = idx === 6;
-              doc.fillColor(isType ? '#047857' : isNum ? '#0369a1' : '#0f172a').fontSize(7).font(isType || isNum ? 'Helvetica-Bold' : 'Helvetica')
+              doc.fillColor(isNum ? '#5b21b6' : '#0f172a').fontSize(7).font(isNum ? 'Helvetica-Bold' : 'Helvetica')
                 .text(v, curX2 + 2, currentY + 3, { width: w - 4, align: isNum ? 'right' : 'left', lineBreak: false });
               curX2 += w;
             });
 
             currentY += 14;
           });
+
+          // PAPER INWARD TOTAL BAR (Light Purple)
+          doc.rect(ML, currentY, contentWidth, 14).fill('#f5f3ff').stroke('#ddd6fe');
+          doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
+            .text(`TOTAL PAPER INWARD RECEIVED: ${totPaperInwardRolls} Rolls (${totPaperInwardMeters.toFixed(2)} mtr)`, ML + 6, currentY + 3, { width: contentWidth - 12, align: 'center' });
           currentY += 18;
         } else {
           doc.rect(ML, currentY, contentWidth, 15).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Oblique')
-            .text('No Raw Material (Ink & Paper) Inward Receipts recorded for the selected date range.', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
-          currentY += 21;
+            .text('No Paper Inward Receipts recorded for the selected date range.', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
+          currentY += 20;
         }
 
 
