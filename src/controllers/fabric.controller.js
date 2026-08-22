@@ -2095,8 +2095,11 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       // ── 4B. PRINTING DEPARTMENT CONSUMPTION TABLES & DETAILED RUN LOGS ──
       if (selectedReports.includes('machine') || selectedReports.includes('machine_print') || (typeof detailedPrintLogsList !== 'undefined' && detailedPrintLogsList && detailedPrintLogsList.length > 0)) {
 
-        const grandoInk = { C: 0, M: 0, Y: 0, K: 0 };
-        const printdotInk = { C: 0, M: 0, Y: 0, K: 0 };
+        const grandoDayInk = { C: 0, M: 0, Y: 0, K: 0 };
+        const grandoNightInk = { C: 0, M: 0, Y: 0, K: 0 };
+        const printdotDayInk = { C: 0, M: 0, Y: 0, K: 0 };
+        const printdotNightInk = { C: 0, M: 0, Y: 0, K: 0 };
+
         const pannaCols = ['36', '38', '44', '54', '58', '60'];
         const inwardRawMaterialList = [];
 
@@ -2165,23 +2168,28 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
             if (isTypeInward) {
               inwardRawMaterialList.push(t);
             } else {
+              const sNotes = t.notes ? (t.notes.match(/Shift:\s*([^|\]]+)/i) || [])[1] : '';
+              const sName = (sNotes || t.shift || '').toLowerCase();
+              const isNight = sName.includes('night') || sName.includes('even');
+
+              const gTarget = isNight ? grandoNightInk : grandoDayInk;
+              const pTarget = isNight ? printdotNightInk : printdotDayInk;
+
               if (mName.includes('grando')) {
-                if (mName.includes('cyan') || t.color === 'Cyan') grandoInk.C += q;
-                else if (mName.includes('magenta') || t.color === 'Magenta') grandoInk.M += q;
-                else if (mName.includes('yellow') || t.color === 'Yellow') grandoInk.Y += q;
-                else if (mName.includes('black') || t.color === 'Black') grandoInk.K += q;
+                if (mName.includes('cyan') || t.color === 'Cyan') gTarget.C += q;
+                else if (mName.includes('magenta') || t.color === 'Magenta') gTarget.M += q;
+                else if (mName.includes('yellow') || t.color === 'Yellow') gTarget.Y += q;
+                else if (mName.includes('black') || t.color === 'Black') gTarget.K += q;
               } else if (mName.includes('printdot')) {
-                if (mName.includes('cyan') || t.color === 'Cyan') printdotInk.C += q;
-                else if (mName.includes('magenta') || t.color === 'Magenta') printdotInk.M += q;
-                else if (mName.includes('yellow') || t.color === 'Yellow') printdotInk.Y += q;
-                else if (mName.includes('black') || t.color === 'Black') printdotInk.K += q;
+                if (mName.includes('cyan') || t.color === 'Cyan') pTarget.C += q;
+                else if (mName.includes('magenta') || t.color === 'Magenta') pTarget.M += q;
+                else if (mName.includes('yellow') || t.color === 'Yellow') pTarget.Y += q;
+                else if (mName.includes('black') || t.color === 'Black') pTarget.K += q;
               } else if (mName.includes('paper') || t.panna) {
                 const pType = t.materialName || 'A++';
                 let pannaWidth = String(t.panna || '').replace(/[^\d]/g, '');
                 if (!pannaWidth || !pannaCols.includes(pannaWidth)) pannaWidth = '58';
 
-                const sName = (t.shift || '').toLowerCase();
-                const isNight = sName.includes('night') || sName.includes('even');
                 const targetTypeMap = isNight ? paperNightTypeMap : paperDayTypeMap;
                 const targetMetersMap = isNight ? paperNightMetersMap : paperDayMetersMap;
 
@@ -2197,22 +2205,6 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
             }
           });
         }
-
-        // Compute 2-Shift Ink Allocations (Day Shift vs Night Shift)
-        const grandoTotMtr = grandoDayMtr + grandoNightMtr;
-        const printdotTotMtr = printdotDayMtr + printdotNightMtr;
-
-        const grandoDayRatio = grandoTotMtr > 0 ? (grandoDayMtr / grandoTotMtr) : 0.5;
-        const grandoNightRatio = 1 - grandoDayRatio;
-
-        const printdotDayRatio = printdotTotMtr > 0 ? (printdotDayMtr / printdotTotMtr) : 0.5;
-        const printdotNightRatio = 1 - printdotDayRatio;
-
-        const grandoDayInk = { C: grandoInk.C * grandoDayRatio, M: grandoInk.M * grandoDayRatio, Y: grandoInk.Y * grandoDayRatio, K: grandoInk.K * grandoDayRatio };
-        const grandoNightInk = { C: grandoInk.C * grandoNightRatio, M: grandoInk.M * grandoNightRatio, Y: grandoInk.Y * grandoNightRatio, K: grandoInk.K * grandoNightRatio };
-
-        const printdotDayInk = { C: printdotInk.C * printdotDayRatio, M: printdotInk.M * printdotDayRatio, Y: printdotInk.Y * printdotDayRatio, K: printdotInk.K * printdotDayRatio };
-        const printdotNightInk = { C: printdotInk.C * printdotNightRatio, M: printdotInk.M * printdotNightRatio, Y: printdotInk.Y * printdotNightRatio, K: printdotInk.K * printdotNightRatio };
 
 
         // ── 1. SHIFT WISE INK CONSUMPTION TABLE (DAY SHIFT & NIGHT SHIFT) ──
