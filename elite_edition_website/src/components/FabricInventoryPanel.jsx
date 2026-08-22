@@ -1790,7 +1790,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   onClick={() => setStockSortOrder('highToLow')}
                   style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '8px' }}
                 >
-                   High to Low (Mtr)
+                  High to Low (Mtr)
                 </button>
                 <button
                   type="button"
@@ -1798,7 +1798,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   onClick={() => setStockSortOrder('lowToHigh')}
                   style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '8px' }}
                 >
-                   Low to High (Mtr)
+                  Low to High (Mtr)
                 </button>
                 <button
                   type="button"
@@ -1806,7 +1806,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   onClick={() => setStockSortOrder('nameAsc')}
                   style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '8px' }}
                 >
-                   Name (A-Z)
+                  Name (A-Z)
                 </button>
               </div>
             </div>
@@ -3427,7 +3427,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       {/* ── Challan Tab ── */}
       {activeTab === 'challan' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          
+
           {/* Header Banner & Metrics Summary Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem' }}>
             <div className="glass-panel" style={{ padding: '0.9rem 1.1rem', borderLeft: '4px solid #38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -3856,7 +3856,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       {isChallanOpen && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ width: '1020px', maxWidth: '98vw', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0, borderRadius: '14px', background: '#ffffff', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)' }}>
-            
+
             {/* Modal Header Bar - White Theme */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)', borderBottom: '1px solid #e2e8f0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -3881,10 +3881,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
             {/* Modal Form Body - 2 Columns */}
             <form onSubmit={handleChallanSubmit} style={{ display: 'flex', flex: 1, overflow: 'hidden', margin: 0 }}>
-              
+
               {/* LEFT COLUMN: Metadata, Job & Lot Details (White Theme) */}
               <div style={{ flex: '1 1 480px', minWidth: '420px', padding: '1.25rem 1.5rem', overflowY: 'auto', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.9rem', background: '#f8fafc' }}>
-                
+
                 {/* Section Header: Basic & Party */}
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                   <div style={{ flex: 1 }}>
@@ -4087,8 +4087,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         const barBg = isOver
                           ? 'linear-gradient(90deg, #ef4444 0%, #b91c1c 100%)'
                           : isNearFull
-                          ? 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)'
-                          : 'linear-gradient(90deg, #10b981 0%, #059669 100%)';
+                            ? 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)'
+                            : 'linear-gradient(90deg, #10b981 0%, #059669 100%)';
 
                         let balance = selectedLotsTotalStock - effectiveTakenMtr;
                         if (Math.abs(balance) < 0.01) balance = 0;
@@ -4269,7 +4269,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
               {/* RIGHT COLUMN: Dedicated TP Meters Entry & Immediate Action Bar (White Theme) */}
               <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column', background: '#ffffff' }}>
-                
+
                 {/* Right Top Header: TP Section Title & Summary Banner */}
                 <div style={{ padding: '1rem 1.25rem', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
@@ -4283,7 +4283,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
                 {/* TP Meters Entry Scrollable Area */}
                 <div style={{ flex: 1, padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: '#ffffff' }}>
-                  
+
                   {/* Table Column Headers */}
                   <div style={{ display: 'grid', gridTemplateColumns: '65px 120px 1fr 36px', gap: '0.5rem', fontSize: '0.75rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', paddingLeft: '0.25rem', marginBottom: '0.2rem' }}>
                     <span>TP No</span>
@@ -4328,7 +4328,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
                 {/* Right Bottom Footer: Live Total & STICKY SAVE / CANCEL BUTTONS (ALWAYS VISIBLE!) */}
                 <div style={{ padding: '1rem 1.25rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                  
+
                   {/* Total Summary Row */}
                   <div style={{ display: 'flex', gap: '1rem', padding: '0.6rem 1rem', background: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', alignItems: 'center' }}>
                     <div style={{ flex: 1 }}>
