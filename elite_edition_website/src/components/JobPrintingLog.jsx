@@ -650,7 +650,7 @@ export default function JobPrintingLog() {
       ...prev,
       {
         id: Date.now() + Math.random(),
-        paperType: paperTypesList[0] || 'Sublimation Paper',
+        paperType: paperTypesList[0] || 'A++',
         paperPanna: pannaOptionsList[0] || '44" Panna',
         paperCustomPanna: '',
         paperRollsQty: ''

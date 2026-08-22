@@ -2243,9 +2243,14 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
         currentY += 14;
 
+        const printConfigDoc = await db.PrintConfig.findOne({ isConfig: true }).lean();
+        const configuredPaperTypes = (printConfigDoc && Array.isArray(printConfigDoc.paperTypes) && printConfigDoc.paperTypes.length > 0)
+          ? printConfigDoc.paperTypes
+          : ['A++', 'A+', 'A'];
+
         const displayPaperTypes = Object.keys(paperTypeMap).length > 0
-          ? Object.keys(paperTypeMap)
-          : ['Sublimation Paper', 'Butter Paper', 'Tissue Paper'];
+          ? Array.from(new Set([...Object.keys(paperTypeMap), ...configuredPaperTypes]))
+          : configuredPaperTypes;
 
         const colTotals = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
         let grandTotalPaperRolls = 0;
