@@ -1481,20 +1481,27 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     }
 
     const lotTransferExclude = { notes: { $not: /Lot Transfer|Lot Rebalance|\[Ref:\s*LT-/i } };
+    const deptFilter = { department: 'digital_print' };
 
     let inwardData = [];
     if (selectedReports.includes('inward')) {
-      inwardData = await FabricTransaction.find({ type: 'INWARD', ...dateFilter, ...lotTransferExclude }).sort({ date: -1 }).lean();
+      inwardData = await FabricTransaction.find({ type: 'INWARD', ...deptFilter, ...dateFilter, ...lotTransferExclude }).sort({ date: -1 }).lean();
     }
 
     let outwardData = [];
     if (selectedReports.includes('outward')) {
-      outwardData = await FabricTransaction.find({ type: 'OUTWARD', ...dateFilter, ...lotTransferExclude }).sort({ date: -1 }).lean();
+      outwardData = await FabricTransaction.find({ type: 'OUTWARD', ...deptFilter, ...dateFilter, ...lotTransferExclude }).sort({ date: -1 }).lean();
     }
 
     let challanData = [];
     if (selectedReports.includes('challan')) {
       challanData = await FabricChallan.find({
+        $or: [
+          { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
+          { companyEntity: { $exists: false } },
+          { companyEntity: null },
+          { companyEntity: '' }
+        ],
         ...dateFilter
       }).sort({ date: -1 }).lean();
     }
@@ -1609,7 +1616,20 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           rawMaterialDateFilter = { $or: rawConditions };
         }
       }
-      rawMaterialLogs = await RawMaterialTransaction.find(rawMaterialDateFilter).sort({ date: -1, createdAt: -1 }).lean();
+
+      const rawCompFilter = {
+        $or: [
+          { companyEntity: { $in: ['Elite Digital Print', 'Elite Digital Prints'] } },
+          { companyEntity: { $exists: false } },
+          { companyEntity: null },
+          { companyEntity: '' }
+        ]
+      };
+      const finalRawFilter = Object.keys(rawMaterialDateFilter).length > 0
+        ? { $and: [rawCompFilter, rawMaterialDateFilter] }
+        : rawCompFilter;
+
+      rawMaterialLogs = await RawMaterialTransaction.find(finalRawFilter).sort({ date: -1, createdAt: -1 }).lean();
 
       // 2. Fetch all job cards to map client/party name and design name
       const allJobCardsList = await JobCard.find({}).select('jobNo party designName designNo').lean();

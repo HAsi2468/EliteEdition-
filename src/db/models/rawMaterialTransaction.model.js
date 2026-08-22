@@ -2,6 +2,12 @@ const mongoose = require('mongoose');
 
 const rawMaterialTransactionSchema = new mongoose.Schema(
   {
+    companyEntity: {
+      type: String,
+      trim: true,
+      default: 'Elite Digital Print',
+      index: true,
+    },
     type: {
       type: String,
       enum: ['INWARD', 'OUTWARD'],

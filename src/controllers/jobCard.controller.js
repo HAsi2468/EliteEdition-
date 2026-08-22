@@ -109,7 +109,7 @@ const getAllJobCards = async (req, res) => {
         { department: 'stitching' },
         { category: { $regex: 'stitching', $options: 'i' } }
       ];
-    } else if (department === 'digital_print') {
+    } else {
       filter.department = { $ne: 'stitching' };
       filter.category = { $ne: 'Stitching' };
     }

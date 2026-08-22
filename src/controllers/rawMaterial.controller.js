@@ -27,14 +27,16 @@ const formatMaterialDetails = (t) => {
 // Create a new INWARD transaction
 const createInward = async (req, res) => {
   try {
+    const compEntity = req.body.companyEntity || req.query.companyEntity || 'Elite Digital Print';
     if (Array.isArray(req.body)) {
       const docs = req.body.map(item => {
-        const { challanNo, vendorName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll } = item;
+        const { challanNo, vendorName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll, companyEntity } = item;
         if (!materialName || qty == null || qty < 0) {
           throw new Error('Material Name and a valid Quantity are required.');
         }
         return {
           type: 'INWARD',
+          companyEntity: companyEntity || compEntity,
           challanNo,
           vendorName,
           materialName,
@@ -53,7 +55,7 @@ const createInward = async (req, res) => {
       return res.status(201).json({ success: true, data: transactions });
     }
 
-    const { challanNo, vendorName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll } = req.body;
+    const { challanNo, vendorName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll, companyEntity } = req.body;
     
     if (!materialName || qty == null || qty < 0) {
       return res.status(400).json({ success: false, error: 'Material Name and a valid Quantity are required.' });
@@ -61,6 +63,7 @@ const createInward = async (req, res) => {
 
     const transaction = new RawMaterialTransaction({
       type: 'INWARD',
+      companyEntity: companyEntity || compEntity,
       challanNo,
       vendorName,
       materialName,
@@ -86,14 +89,16 @@ const createInward = async (req, res) => {
 // Create a new OUTWARD transaction
 const createOutward = async (req, res) => {
   try {
+    const compEntity = req.body.companyEntity || req.query.companyEntity || 'Elite Digital Print';
     if (Array.isArray(req.body)) {
       const docs = req.body.map(item => {
-        const { jobNo, partyName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll } = item;
+        const { jobNo, partyName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll, companyEntity } = item;
         if (!materialName || qty == null || qty <= 0) {
           throw new Error('Material Name and a valid Quantity (>0) are required.');
         }
         return {
           type: 'OUTWARD',
+          companyEntity: companyEntity || compEntity,
           jobNo,
           partyName,
           materialName,
@@ -112,7 +117,7 @@ const createOutward = async (req, res) => {
       return res.status(201).json({ success: true, data: transactions });
     }
 
-    const { jobNo, partyName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll } = req.body;
+    const { jobNo, partyName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll, companyEntity } = req.body;
     
     if (!materialName || qty == null || qty <= 0) {
       return res.status(400).json({ success: false, error: 'Material Name and a valid Quantity (>0) are required.' });
@@ -120,6 +125,7 @@ const createOutward = async (req, res) => {
 
     const transaction = new RawMaterialTransaction({
       type: 'OUTWARD',
+      companyEntity: companyEntity || compEntity,
       jobNo,
       partyName,
       materialName,
@@ -145,7 +151,10 @@ const createOutward = async (req, res) => {
 // Get all transactions
 const getTransactions = async (req, res) => {
   try {
-    const transactions = await RawMaterialTransaction.find().sort({ date: -1, createdAt: -1 });
+    const { companyEntity } = req.query;
+    const filter = {};
+    if (companyEntity) filter.companyEntity = companyEntity;
+    const transactions = await RawMaterialTransaction.find(filter).sort({ date: -1, createdAt: -1 });
     res.status(200).json({ success: true, data: transactions });
   } catch (error) {
     console.error('Error fetching raw material transactions:', error);
@@ -156,7 +165,12 @@ const getTransactions = async (req, res) => {
 // Get current stock overview grouped by material name
 const getStockOverview = async (req, res) => {
   try {
+    const { companyEntity } = req.query;
+    const matchStage = {};
+    if (companyEntity) matchStage.companyEntity = companyEntity;
+
     const pipeline = [
+      { $match: matchStage },
       {
         $group: {
           _id: {

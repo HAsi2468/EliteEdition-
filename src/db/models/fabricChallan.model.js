@@ -20,6 +20,12 @@ const fabricChallanSchema = new mongoose.Schema(
       required: true,
       default: Date.now,
     },
+    companyEntity: {
+      type: String,
+      trim: true,
+      default: 'Elite Digital Print',
+      index: true,
+    },
     partyName: {
       type: String,
       trim: true,

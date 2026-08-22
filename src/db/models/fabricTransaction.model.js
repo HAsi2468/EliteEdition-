@@ -71,6 +71,12 @@ const fabricTransactionSchema = new mongoose.Schema(
       enum: ['pct', 'mtr'],
       default: 'pct',
     },
+    companyEntity: {
+      type: String,
+      trim: true,
+      default: 'Elite Digital Print',
+      index: true,
+    },
     department: {
       type: String,
       default: 'digital_print',
