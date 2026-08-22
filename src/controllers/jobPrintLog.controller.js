@@ -152,20 +152,27 @@ const getPrintLogs = async (req, res) => {
       const dsStr = dateStart ? String(dateStart).split('T')[0] : '';
       const deStr = dateEnd ? String(dateEnd).split('T')[0] : '';
 
-      // Construct start and end dates covering IST (+05:30) and UTC boundaries
-      const startMs = dsStr ? new Date(`${dsStr}T00:00:00.000Z`).getTime() - (12 * 3600 * 1000) : null;
-      const endMs = deStr ? new Date(`${deStr}T23:59:59.999Z`).getTime() + (12 * 3600 * 1000) : null;
+      let minTime = null;
+      let maxTime = null;
 
-      const minDate = startMs ? new Date(startMs) : null;
-      const maxDate = endMs ? new Date(endMs) : null;
+      if (dsStr) {
+        const utcStart = new Date(`${dsStr}T00:00:00.000Z`).getTime();
+        const istStart = new Date(`${dsStr}T00:00:00.000+05:30`).getTime();
+        minTime = Math.min(utcStart, istStart);
+      }
+
+      if (deStr) {
+        const utcEnd = new Date(`${deStr}T23:59:59.999Z`).getTime();
+        const istEnd = new Date(`${deStr}T23:59:59.999+05:30`).getTime();
+        maxTime = Math.max(utcEnd, istEnd);
+      }
 
       const dateQuery = {};
-      if (minDate) dateQuery.$gte = minDate;
-      if (maxDate) dateQuery.$lte = maxDate;
+      if (minTime !== null) dateQuery.$gte = new Date(minTime);
+      if (maxTime !== null) dateQuery.$lte = new Date(maxTime);
 
       filter.$or = [
         { date: dateQuery },
-        { created_date_time: dateQuery },
         { createdAt: dateQuery }
       ];
     }
