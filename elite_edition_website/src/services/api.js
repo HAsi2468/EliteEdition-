@@ -336,6 +336,12 @@ export const api = {
     return request('/products/fetchMissingProduct');
   },
 
+  async resetAndSyncUniwareSkus() {
+    return request('/products/reset-and-sync-uniware-skus', {
+      method: 'POST',
+    });
+  },
+
   // Stock Out Logs
   async getStockOuts() {
     return request('/stockOut');

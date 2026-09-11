@@ -228,6 +228,24 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
     }
   };
 
+  const handleResetAndSyncUniwareSkus = async () => {
+    if (!window.confirm('WARNING: Are you sure you want to remove all existing mismatched SKUs and fetch fresh SKUs directly from Uniware?')) {
+      return;
+    }
+    setSyncing(true);
+    setError('');
+    setSuccess('');
+    try {
+      const res = await api.resetAndSyncUniwareSkus();
+      setSuccess(res.message || 'Successfully cleared mismatched SKUs and imported fresh SKUs from Uniware!');
+      loadTabData();
+    } catch (err) {
+      setError(err.message || 'Failed to reset and sync SKUs from Uniware.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="modal-overlay">
       <div className="modal-content" style={styles.content}>
@@ -519,15 +537,27 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                   <div style={styles.tabContent}>
                     {/* Catalog Control Header */}
                     <div style={styles.catalogCtrl}>
-                      <button
-                        onClick={handleSyncProducts}
-                        disabled={syncing}
-                        className="btn-primary"
-                        style={styles.syncBtn}
-                      >
-                        <RefreshCw size={14} className={syncing ? 'spin-loader' : ''} />
-                        <span>{syncing ? 'Syncing...' : 'Sync Missing Products'}</span>
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={handleSyncProducts}
+                          disabled={syncing}
+                          className="btn-primary"
+                          style={styles.syncBtn}
+                        >
+                          <RefreshCw size={14} className={syncing ? 'spin-loader' : ''} />
+                          <span>{syncing ? 'Syncing...' : 'Sync Missing Products'}</span>
+                        </button>
+                        <button
+                          onClick={handleResetAndSyncUniwareSkus}
+                          disabled={syncing}
+                          className="btn-primary"
+                          style={{ ...styles.syncBtn, background: '#e11d48', border: '1px solid #be123c', color: '#ffffff' }}
+                          title="Clear all mismatched local SKUs and fetch fresh active SKUs from Uniware"
+                        >
+                          <RefreshCw size={14} className={syncing ? 'spin-loader' : ''} />
+                          <span>Reset & Set New SKUs from Uniware</span>
+                        </button>
+                      </div>
                     </div>
 
                     <form onSubmit={handleProductSubmit} style={styles.inlineForm}>

@@ -72,7 +72,12 @@ export default function ReturnsManager() {
   // Add inventory list
   const [inventorySkus, setInventorySkus] = useState([]);
   const [partiesList, setPartiesList] = useState([]);
+  const [vendorsList, setVendorsList] = useState([]);
   const [stack, setStack] = useState([]);
+
+  // Bulk Multi-Inward Paste State
+  const [showBulkPasteModal, setShowBulkPasteModal] = useState(false);
+  const [bulkPasteText, setBulkPasteText] = useState('');
 
   const [displayOrderId, setDisplayOrderId] = useState('');
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -84,7 +89,7 @@ export default function ReturnsManager() {
       api.getPartyBySku(sku)
         .then(data => {
           if (data && data.party) {
-            setParty(data.party);
+            handlePartySelect(data.party);
           }
         })
         .catch(err => console.error('Failed to fetch party for SKU', err));
@@ -100,20 +105,72 @@ export default function ReturnsManager() {
         console.error('Failed to fetch SKUs', err);
       }
     };
-    const fetchParties = async () => {
+    const fetchPartiesAndVendors = async () => {
       try {
-        const data = await api.getParties();
-        setPartiesList(data || []);
-        if (data && data.length > 0) {
-          setParty(data[0].name);
+        const [partiesData, vendorsData] = await Promise.all([
+          api.getParties().catch(() => []),
+          api.getVendors().catch(() => [])
+        ]);
+        setPartiesList(partiesData || []);
+        setVendorsList(vendorsData || []);
+        if (partiesData && partiesData.length > 0) {
+          handlePartySelect(partiesData[0].name);
         }
       } catch (err) {
-        console.error('Failed to fetch parties', err);
+        console.error('Failed to fetch parties/vendors', err);
       }
     };
     fetchInventory();
-    fetchParties();
+    fetchPartiesAndVendors();
   }, []);
+
+  const handlePartySelect = (selectedVal) => {
+    if (!selectedVal) return;
+    const matchedVendor = vendorsList.find(v => 
+      (v.name && v.name.trim().toLowerCase() === selectedVal.trim().toLowerCase()) ||
+      (v.businessName && v.businessName.trim().toLowerCase() === selectedVal.trim().toLowerCase())
+    );
+    const finalPartyName = matchedVendor && matchedVendor.businessName ? matchedVendor.businessName : selectedVal;
+    setParty(finalPartyName);
+  };
+
+  const handleBulkPasteToStack = () => {
+    if (!bulkPasteText.trim()) {
+      setError('Please enter data to paste into stack.');
+      return;
+    }
+    const lines = bulkPasteText.split(/\r?\n/);
+    const newItems = [];
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      const parts = trimmed.includes('\t') ? trimmed.split('\t') : trimmed.split(',');
+      const refCode = parts[0] ? parts[0].trim() : '';
+      const skuCode = parts[1] ? parts[1].trim() : '';
+      const qtyNum = parts[2] ? parseInt(parts[2].trim(), 10) : 1;
+
+      if (refCode || skuCode) {
+        newItems.push({
+          sku: skuCode || sku || 'GENERAL-SKU',
+          displayOrderId: refCode,
+          referenceId: refCode,
+          quantity: isNaN(qtyNum) || qtyNum <= 0 ? 1 : qtyNum,
+          condition: returnType === 'RTO' ? 'INTACT' : condition,
+          notes
+        });
+      }
+    });
+
+    if (newItems.length > 0) {
+      setStack(prev => [...prev, ...newItems]);
+      setSuccess(`Added ${newItems.length} items to batch stack!`);
+      setBulkPasteText('');
+      setShowBulkPasteModal(false);
+      setTimeout(() => setSuccess(''), 3000);
+    } else {
+      setError('Could not parse any valid lines.');
+    }
+  };
 
   const handleReferenceChange = (e) => {
     const val = e.target.value;
@@ -237,36 +294,73 @@ export default function ReturnsManager() {
 
   const renderProcessForm = () => (
     <div className="glass-panel" style={{ padding: '2rem', maxWidth: '850px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-        <div style={{ padding: '1rem', background: 'rgba(225, 29, 72, 0.1)', borderRadius: 'var(--radius-md)' }}>
-          <Zap size={28} color="#e11d48" />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ padding: '1rem', background: 'rgba(225, 29, 72, 0.1)', borderRadius: 'var(--radius-md)' }}>
+            <Zap size={28} color="#e11d48" />
+          </div>
+          <div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--text-primary)' }}>Rapid Returns & Inward Processing</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Select party/vendor, scan AWB/barcode to auto-fetch Display Order ID & SKU from Uniware.</p>
+          </div>
         </div>
-        <div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--text-primary)' }}>Rapid Returns Processing</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Select party (e.g. Myntra), scan AWB/barcode to auto-fetch Display Order ID & SKU from Uniware.</p>
-        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowBulkPasteModal(true)}
+          style={{ padding: '0.6rem 1.1rem', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#60a5fa', borderRadius: 'var(--radius-sm)', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+        >
+          📋 Paste Multi-Inward
+        </button>
       </div>
+
+      {showBulkPasteModal && (
+        <div style={{ marginBottom: '1.5rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid var(--primary)', padding: '1.25rem', borderRadius: 'var(--radius-md)' }}>
+          <h4 style={{ color: 'var(--primary)', marginBottom: '0.5rem', fontSize: '0.95rem', fontWeight: 'bold' }}>⚡ Paste Multiple Inward Items at Once</h4>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+            Paste multi-line text (e.g. <code>AWB/OrderCode, SKU, Qty</code> or 1 AWB per line):
+          </p>
+          <textarea
+            value={bulkPasteText}
+            onChange={e => setBulkPasteText(e.target.value)}
+            rows={5}
+            placeholder="AWB12345, SKU-BLUE-M, 2&#10;AWB67890, SKU-RED-L, 1"
+            style={{ width: '100%', fontFamily: 'monospace', padding: '0.75rem', fontSize: '0.85rem', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-light)', borderRadius: '4px', color: '#fff' }}
+          />
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', justifyContent: 'flex-end' }}>
+            <button type="button" onClick={() => setShowBulkPasteModal(false)} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>Cancel</button>
+            <button type="button" onClick={handleBulkPasteToStack} className="btn-primary" style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', fontWeight: 'bold' }}>+ Batch Add to Stack</button>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleAddToStack} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         
         {/* Core Selectors */}
         <div style={{ display: 'flex', gap: '1rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius-sm)' }}>
           <div className="form-group" style={{ flex: 1 }}>
-            <label style={styles.label}>Party / Channel</label>
-            <select style={styles.input} value={party} onChange={e => setParty(e.target.value)}>
-              {partiesList.length > 0 ? (
-                partiesList.map(p => (
-                  <option key={p.id || p._id} value={p.name}>{p.name}</option>
-                ))
-              ) : (
-                <>
-                  <option value="Myntra">Myntra</option>
-                  <option value="Flipkart">Flipkart</option>
-                  <option value="Amazon">Amazon</option>
-                  <option value="Wholesale">Offline Wholesale</option>
-                </>
-              )}
-            </select>
+            <label style={styles.label}>Party / Vendor</label>
+            <input
+              list="party-vendor-list"
+              style={styles.input}
+              value={party}
+              onChange={e => handlePartySelect(e.target.value)}
+              placeholder="Select or type Party/Vendor..."
+            />
+            <datalist id="party-vendor-list">
+              <option value="Myntra">Myntra</option>
+              <option value="Flipkart">Flipkart</option>
+              <option value="Amazon">Amazon</option>
+              <option value="Wholesale">Offline Wholesale</option>
+              {partiesList.map(p => (
+                <option key={p.id || p._id} value={p.name}>{p.name}</option>
+              ))}
+              {vendorsList.map(v => (
+                <option key={v.id || v._id} value={v.businessName || v.name}>
+                  {v.businessName ? `${v.businessName} (Contact: ${v.name})` : v.name}
+                </option>
+              ))}
+            </datalist>
           </div>
           
           <div className="form-group" style={{ flex: 1 }}>

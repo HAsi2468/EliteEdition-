@@ -98,6 +98,17 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
         currentlyAvailableStock: numVal,
         qty: numVal
       }));
+    } else if (name === 'party') {
+      const selectedVal = value;
+      const matchedVendor = vendorsList.find(v => 
+        (v.name && v.name.trim().toLowerCase() === selectedVal.trim().toLowerCase()) ||
+        (v.businessName && v.businessName.trim().toLowerCase() === selectedVal.trim().toLowerCase())
+      );
+      const finalVendorName = matchedVendor && matchedVendor.businessName ? matchedVendor.businessName : selectedVal;
+      setFormData(prev => ({
+        ...prev,
+        party: finalVendorName,
+      }));
     } else {
       // Convert to number for specific fields
       const numericFields = ['purchasePrice', 'salePrice'];
@@ -169,7 +180,9 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
               />
               <datalist id="form-vendors">
                 {vendorsList.map((v, i) => (
-                  <option key={i} value={v.name} />
+                  <option key={i} value={v.businessName || v.name}>
+                    {v.businessName ? `${v.businessName} (Contact: ${v.name})` : v.name}
+                  </option>
                 ))}
               </datalist>
             </div>

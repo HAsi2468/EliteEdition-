@@ -150,9 +150,18 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
 
   // Quick set all parsed items
   const applyQuickSettings = () => {
+    let resolvedVendor = bulkVendor ? bulkVendor.trim() : '';
+    if (resolvedVendor) {
+      const match = vendorsList.find(v => 
+        (v.name && v.name.trim().toLowerCase() === resolvedVendor.toLowerCase()) ||
+        (v.businessName && v.businessName.trim().toLowerCase() === resolvedVendor.toLowerCase())
+      );
+      if (match && match.businessName) resolvedVendor = match.businessName;
+    }
+
     setParsedItems(prev => prev.map(item => ({
       ...item,
-      party: bulkVendor ? bulkVendor.trim() : item.party,
+      party: resolvedVendor || item.party,
       purchasePrice: bulkPurchasePrice ? parseFloat(bulkPurchasePrice) : item.purchasePrice,
       salePrice: bulkSalePrice ? parseFloat(bulkSalePrice) : item.salePrice
     })));
@@ -293,7 +302,9 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                 />
                 <datalist id="bulk-vendors">
                   {vendorsList.map((v, i) => (
-                    <option key={i} value={v.name} />
+                    <option key={i} value={v.businessName || v.name}>
+                      {v.businessName ? `${v.businessName} (Contact: ${v.name})` : v.name}
+                    </option>
                   ))}
                 </datalist>
 
@@ -409,7 +420,9 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                         />
                         <datalist id="modal-vendors">
                           {vendorsList.map((v, i) => (
-                            <option key={i} value={v.name} />
+                            <option key={i} value={v.businessName || v.name}>
+                              {v.businessName ? `${v.businessName} (Contact: ${v.name})` : v.name}
+                            </option>
                           ))}
                         </datalist>
                       </td>

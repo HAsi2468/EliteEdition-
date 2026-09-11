@@ -28,6 +28,10 @@ router.route('/instantSyncFromSaleOrders')
   .get(productsController.instantSyncFromSaleOrders)
   .post(productsController.instantSyncFromSaleOrders);
 
+router.route('/reset-and-sync-uniware-skus')
+  .get(productsController.resetAndSyncUniwareSkus)
+  .post(productsController.resetAndSyncUniwareSkus);
+
 router.route('/:id')
   .put(productsController.updateProduct)
   .delete(productsController.deleteProduct);

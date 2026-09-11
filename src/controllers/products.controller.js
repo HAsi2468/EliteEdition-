@@ -1545,6 +1545,113 @@ const instantSyncFromSaleOrders = async (req, res) => {
   }
 };
 
+const resetAndSyncUniwareSkus = async (req, res) => {
+  try {
+    logger.info('🧹 Clearing existing mismatched SKU catalog (db.Product & db.InventoryProduct)...');
+    await db.Product.deleteMany({});
+    await db.InventoryProduct.deleteMany({});
+
+    const accessToken = await getAccessToken();
+    let catalogElements = [];
+
+    if (accessToken) {
+      try {
+        catalogElements = await fetchEntireCatalog(accessToken);
+      } catch (catErr) {
+        logger.warn('fetchEntireCatalog failed or returned empty: %o', catErr.message);
+      }
+    }
+
+    let addedCount = 0;
+    const baseSkuSet = new Set();
+
+    if (catalogElements && catalogElements.length > 0) {
+      for (const item of catalogElements) {
+        const rawSku = item.skuCode || item.code || item.itemSKUCode;
+        if (!rawSku) continue;
+        const baseSku = extractBaseSku(rawSku);
+
+        await db.InventoryProduct.updateOne(
+          { skuCode: rawSku },
+          {
+            $set: {
+              skuCode: rawSku,
+              description: item.name || item.description || item.categoryName || 'Uniware SKU',
+              size: item.size ? [item.size] : [],
+              color: item.color ? [item.color] : [],
+              brand: item.brand || item.itemTypeBrand || 'Uniware',
+              imageUrl: item.imageUrl || '',
+              price: item.price || 0,
+            }
+          },
+          { upsert: true }
+        );
+
+        if (!baseSkuSet.has(baseSku)) {
+          baseSkuSet.add(baseSku);
+          await db.Product.updateOne(
+            { skuCode: baseSku },
+            {
+              $set: {
+                skuCode: baseSku,
+                description: item.name || item.description || item.categoryName || 'Uniware SKU',
+                imageUrl: item.imageUrl || '',
+              },
+              $addToSet: {
+                size: item.size || 'N/A'
+              }
+            },
+            { upsert: true }
+          );
+          addedCount++;
+        }
+      }
+    } else {
+      const orders = await db.SaleOrder.find({}, { itemSKUCode: 1, itemTypeName: 1 }).lean();
+      for (const o of orders) {
+        if (!o.itemSKUCode) continue;
+        const baseSku = extractBaseSku(o.itemSKUCode);
+
+        await db.InventoryProduct.updateOne(
+          { skuCode: o.itemSKUCode },
+          {
+            $set: {
+              skuCode: o.itemSKUCode,
+              description: o.itemTypeName || 'Uniware SKU',
+              brand: 'Uniware',
+            }
+          },
+          { upsert: true }
+        );
+
+        if (!baseSkuSet.has(baseSku)) {
+          baseSkuSet.add(baseSku);
+          await db.Product.updateOne(
+            { skuCode: baseSku },
+            {
+              $set: {
+                skuCode: baseSku,
+                description: o.itemTypeName || 'Uniware SKU',
+              }
+            },
+            { upsert: true }
+          );
+          addedCount++;
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Cleared old mismatched SKUs and synchronized ${baseSkuSet.size} fresh SKUs from Uniware.`,
+      count: baseSkuSet.size,
+    });
+  } catch (error) {
+    logger.error('Error in resetAndSyncUniwareSkus: %o', error);
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
+  }
+};
+
 module.exports = {
   getAllProductsList,
   readFile,
@@ -1578,6 +1685,8 @@ module.exports = {
   deleteProduct,
   updateProduct,
   instantSyncFromSaleOrders,
+  resetAndSyncUniwareSkus,
 };
+
 
 
