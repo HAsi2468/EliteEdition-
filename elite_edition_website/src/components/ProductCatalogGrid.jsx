@@ -356,9 +356,9 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
   return (
     <div className="glass-panel" style={styles.gridPanel}>
       {/* Control Header */}
-      <div style={styles.controlHeader}>
-        <div style={styles.leftControls}>
-          <div style={styles.searchBox}>
+      <div className="catalog-control-header" style={styles.controlHeader}>
+        <div className="catalog-left-controls" style={styles.leftControls}>
+          <div className="catalog-search-box" style={styles.searchBox}>
             <Search size={16} color="var(--text-muted)" style={styles.searchIcon} />
             <input
               type="text"
@@ -369,7 +369,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
             />
           </div>
 
-          <div style={styles.filterBox}>
+          <div className="catalog-filter-box" style={styles.filterBox}>
             <SlidersHorizontal size={14} color="var(--text-muted)" />
             <select
               value={sizeFilter}
@@ -382,7 +382,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
             </select>
           </div>
 
-          <div style={styles.filterBox}>
+          <div className="catalog-filter-box" style={styles.filterBox}>
             <Building2 size={14} color="var(--text-muted)" />
             <select
               value={brandFilter}
@@ -396,7 +396,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="catalog-action-group" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <button 
             onClick={() => setShowBrandManager(true)}
             className="btn-secondary" 
@@ -435,7 +435,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
       </div>
 
       {/* Table Container */}
-      <div className="table-container" style={styles.tableWrap}>
+      <div className="table-container data-table-container" style={styles.tableWrap}>
         {filteredItems.length === 0 ? (
           <div style={styles.emptyTable}>
             No products match your filters.
@@ -576,6 +576,57 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
       )}
     </div>
   );
+}
+
+// Inject Responsive Mobile CSS Styles
+if (typeof document !== 'undefined') {
+  const styleElId = 'product-catalog-grid-responsive-style';
+  if (!document.getElementById(styleElId)) {
+    const styleEl = document.createElement('style');
+    styleEl.id = styleElId;
+    styleEl.innerHTML = `
+      @media (max-width: 768px) {
+        .catalog-control-header {
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 0.75rem !important;
+        }
+        .catalog-left-controls {
+          flex-direction: column !important;
+          width: 100% !important;
+          gap: 0.5rem !important;
+        }
+        .catalog-search-box {
+          max-width: 100% !important;
+          width: 100% !important;
+        }
+        .catalog-filter-box {
+          width: 100% !important;
+          justify-content: space-between !important;
+        }
+        .catalog-filter-box select {
+          flex: 1 !important;
+          width: 100% !important;
+        }
+        .catalog-action-group {
+          width: 100% !important;
+          display: grid !important;
+          grid-template-columns: repeat(2, 1fr) !important;
+          gap: 0.5rem !important;
+        }
+        .catalog-action-group button {
+          justify-content: center !important;
+          font-size: 0.75rem !important;
+          padding: 0.55rem 0.4rem !important;
+        }
+        .data-table-container {
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+        }
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
 }
 
 const styles = {

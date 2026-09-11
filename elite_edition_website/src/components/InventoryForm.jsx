@@ -164,7 +164,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
 
   return (
     <div style={styles.overlay}>
-      <div style={styles.container}>
+      <div className="inventory-modal-container" style={styles.container}>
         {/* Modal Header */}
         <div style={styles.header}>
           <div style={styles.headerTitleGroup}>
@@ -192,9 +192,9 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
         )}
 
         <form onSubmit={handleSubmit} style={styles.formContent}>
-          <div style={styles.mainGrid}>
+          <div className="inventory-main-grid" style={styles.mainGrid}>
             {/* Left Card: Image Preview & Live Product Card */}
-            <div style={styles.summaryCard}>
+            <div className="inventory-summary-card" style={styles.summaryCard}>
               <div style={styles.imagePreviewContainer}>
                 {formData.imageUrl && !imageError ? (
                   <img
@@ -244,7 +244,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
             {/* Right Card: Product Form Fields */}
             <div style={styles.formFieldsGrid}>
               {/* Row 1: SKU & Product Name */}
-              <div style={styles.formRow2Col}>
+              <div className="inventory-form-row-2col" style={styles.formRow2Col}>
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
                     <Barcode size={14} color="#059669" />
@@ -280,7 +280,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
               </div>
 
               {/* Row 2: Brand & Category */}
-              <div style={styles.formRow2Col}>
+              <div className="inventory-form-row-2col" style={styles.formRow2Col}>
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
                     <Building2 size={14} color="#059669" />
@@ -330,7 +330,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
               </div>
 
               {/* Row 3: Size(s) & HSN Code */}
-              <div style={styles.formRow2Col}>
+              <div className="inventory-form-row-2col" style={styles.formRow2Col}>
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
                     Product Size(s) *
@@ -363,7 +363,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
               </div>
 
               {/* Row 4: Base Price & Sale Price */}
-              <div style={styles.formRow2Col}>
+              <div className="inventory-form-row-2col" style={styles.formRow2Col}>
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
                     <DollarSign size={14} color="#059669" />
@@ -418,7 +418,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
           </div>
 
           {/* Modal Footer */}
-          <div style={styles.footer}>
+          <div className="inventory-footer" style={styles.footer}>
             <button type="button" onClick={onClose} style={styles.cancelBtn}>
               Cancel
             </button>
@@ -431,6 +431,52 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
       </div>
     </div>
   );
+}
+
+// Inject Responsive Mobile CSS Styles
+if (typeof document !== 'undefined') {
+  const styleElId = 'inventory-form-responsive-style';
+  if (!document.getElementById(styleElId)) {
+    const styleEl = document.createElement('style');
+    styleEl.id = styleElId;
+    styleEl.innerHTML = `
+      @media (max-width: 768px) {
+        .inventory-modal-container {
+          max-height: 94vh !important;
+          width: 95% !important;
+          border-radius: 12px !important;
+        }
+        .inventory-main-grid {
+          grid-template-columns: 1fr !important;
+          gap: 1rem !important;
+        }
+        .inventory-summary-card {
+          flex-direction: row !important;
+          align-items: center !important;
+          gap: 0.75rem !important;
+          padding: 0.75rem !important;
+        }
+        .inventory-summary-card > div:first-child {
+          width: 90px !important;
+          height: 100px !important;
+          flex-shrink: 0 !important;
+        }
+        .inventory-form-row-2col {
+          grid-template-columns: 1fr !important;
+          gap: 0.75rem !important;
+        }
+        .inventory-footer {
+          flex-direction: column-reverse !important;
+          gap: 0.5rem !important;
+        }
+        .inventory-footer button {
+          width: 100% !important;
+          justify-content: center !important;
+        }
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
 }
 
 const styles = {
