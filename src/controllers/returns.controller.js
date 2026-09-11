@@ -2,23 +2,96 @@ const httpStatus = require('http-status').default;
 const db = require('../db/models');
 const logger = require('../config/logger');
 
+const lookupUniwareOrder = async (req, res) => {
+  try {
+    const code = req.body.code || req.query.code || req.body.referenceId;
+    if (!code) {
+      return res.status(400).json({ success: false, error: 'Reference ID or AWB code is required' });
+    }
+
+    const cleanCode = String(code).trim();
+
+    // 1. Search in local SaleOrder collection by displayOrderCode, saleOrderCode, saleOrderItemCode, reversePickupCode, shippingPackageCode
+    let foundOrder = await db.SaleOrder.findOne({
+      $or: [
+        { displayOrderCode: new RegExp(`^${cleanCode}$`, 'i') },
+        { saleOrderCode: new RegExp(`^${cleanCode}$`, 'i') },
+        { saleOrderItemCode: new RegExp(`^${cleanCode}$`, 'i') },
+        { reversePickupCode: new RegExp(`^${cleanCode}$`, 'i') },
+        { shippingPackageCode: new RegExp(`^${cleanCode}$`, 'i') }
+      ]
+    }).lean();
+
+    if (!foundOrder) {
+      // 2. Search in local SalesList collection
+      foundOrder = await db.SalesList.findOne({
+        $or: [
+          { displayorderCode: new RegExp(`^${cleanCode}$`, 'i') },
+          { saleOrderItemCode: new RegExp(`^${cleanCode}$`, 'i') },
+          { saleOrderCode: new RegExp(`^${cleanCode}$`, 'i') },
+          { trackingNumber: new RegExp(`^${cleanCode}$`, 'i') }
+        ]
+      }).lean();
+    }
+
+    let displayOrderId = foundOrder ? (foundOrder.displayOrderCode || foundOrder.displayorderCode || foundOrder.saleOrderCode) : '';
+    let sku = foundOrder ? (foundOrder.itemSKUCode || foundOrder.skuCode) : '';
+
+    // 3. If not found in local DB, query Uniware Live API using getAccessToken & getSaleOrderLive
+    if (!displayOrderId || !sku) {
+      try {
+        const { getAccessToken, getSaleOrderLive } = require('../services/api.service');
+        const token = await getAccessToken();
+        if (token) {
+          const uniResponse = await getSaleOrderLive(token, cleanCode);
+          if (uniResponse && uniResponse.successful && uniResponse.saleOrder) {
+            const order = uniResponse.saleOrder;
+            if (order.displayCode || order.code) {
+              displayOrderId = order.displayCode || order.code;
+            }
+            if (order.saleOrderItems && order.saleOrderItems.length > 0) {
+              sku = order.saleOrderItems[0].itemTypeSku || order.saleOrderItems[0].sku || sku;
+            }
+          }
+        }
+      } catch (uniErr) {
+        logger.warn('[lookupUniwareOrder] Uniware API lookup error: %s', uniErr.message);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        referenceId: cleanCode,
+        displayOrderId: displayOrderId || cleanCode,
+        sku: sku || ''
+      }
+    });
+  } catch (error) {
+    logger.error('Error looking up order from Uniware: %o', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 const processReturn = async (req, res) => {
   try {
-    const { returnType, referenceId, sku, quantity, condition, notes } = req.body;
-  // Retrieve party name from inventory based on SKU, fallback to product catalog
-  let party = '';
-  const inventoryRecord = await db.Inventory.findOne({ skuCode: sku });
-  if (inventoryRecord) {
-    party = inventoryRecord.party;
-  } else {
-    const catalogRecord = await db.InventoryProduct.findOne({ skuCode: sku });
-    if (catalogRecord) {
-      party = catalogRecord.brand || 'Uniware Channel Sync';
-    } else {
-      return res.status(httpStatus.BAD_REQUEST).send('Inventory or Catalog record not found for given SKU');
-    }
-  }
+    const { returnType, referenceId, displayOrderId, sku, quantity, condition, notes, party: requestParty } = req.body;
 
+    // Retrieve party name from request, inventory, or fallback catalog
+    let party = requestParty || '';
+    if (!party) {
+      const inventoryRecord = await db.Inventory.findOne({ skuCode: sku });
+      if (inventoryRecord) {
+        party = inventoryRecord.party;
+      } else {
+        const catalogRecord = await db.InventoryProduct.findOne({ skuCode: sku });
+        if (catalogRecord) {
+          party = catalogRecord.brand || 'Uniware Channel Sync';
+        } else {
+          party = 'Myntra';
+        }
+      }
+    }
 
     if (!party || !returnType || !referenceId || !sku || !quantity || !condition) {
       return res.status(httpStatus.BAD_REQUEST).send('Missing required fields');
@@ -40,6 +113,7 @@ const processReturn = async (req, res) => {
       party,
       returnType,
       referenceId,
+      displayOrderId: displayOrderId || referenceId,
       sku,
       quantity,
       condition,
@@ -48,7 +122,6 @@ const processReturn = async (req, res) => {
     });
 
     // 2. Increment stock if it is immediately STOCKED_IN (like RTO)
-    // Here we find the SKU inside the variations array of the InventoryProduct.
     if (status === 'STOCKED_IN') {
       await db.InventoryProduct.updateOne(
         { skuCode: sku },
@@ -126,6 +199,7 @@ const markRefinished = async (req, res) => {
 };
 
 module.exports = {
+  lookupUniwareOrder,
   processReturn,
   getReturns,
   markRefinished,

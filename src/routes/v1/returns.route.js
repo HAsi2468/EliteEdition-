@@ -3,6 +3,7 @@ const returnsController = require('../../controllers/returns.controller');
 
 const router = express.Router();
 
+router.post('/lookup-order', returnsController.lookupUniwareOrder);
 router.post('/process', returnsController.processReturn);
 router.get('/', returnsController.getReturns);
 router.post('/:id/refinish', returnsController.markRefinished);

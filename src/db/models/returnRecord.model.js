@@ -17,6 +17,11 @@ const returnRecordSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    displayOrderId: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     sku: {
       type: String,
       required: true,

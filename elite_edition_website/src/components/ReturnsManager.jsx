@@ -74,6 +74,10 @@ export default function ReturnsManager() {
   const [partiesList, setPartiesList] = useState([]);
   const [stack, setStack] = useState([]);
 
+  const [displayOrderId, setDisplayOrderId] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupStatus, setLookupStatus] = useState('');
+
   // Auto-fetch party based on selected SKU
   useEffect(() => {
     if (sku) {
@@ -111,9 +115,45 @@ export default function ReturnsManager() {
     fetchParties();
   }, []);
 
+  const handleReferenceChange = (e) => {
+    const val = e.target.value;
+    setReferenceId(val);
+    if (!val || val.trim().length < 3) {
+      setLookupStatus('');
+    }
+  };
+
+  const performUniwareLookup = async (codeToLookup) => {
+    const targetCode = (codeToLookup || referenceId).trim();
+    if (!targetCode) return;
+    setLookupLoading(true);
+    setLookupStatus('');
+    try {
+      const res = await api.lookupUniwareOrder({ code: targetCode, party });
+      if (res && res.data) {
+        if (res.data.displayOrderId) {
+          setDisplayOrderId(res.data.displayOrderId);
+        }
+        if (res.data.sku) {
+          setSku(res.data.sku);
+        }
+        if (res.data.displayOrderId || res.data.sku) {
+          setLookupStatus(`Uniware Matched: Order ${res.data.displayOrderId || targetCode}${res.data.sku ? ` | SKU: ${res.data.sku}` : ''}`);
+        }
+      }
+    } catch (err) {
+      console.warn('Uniware lookup error:', err.message);
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
   const handleAddToStack = (e) => {
     e.preventDefault();
-    if (!sku) return;
+    if (!sku) {
+      setError('Product SKU is required.');
+      return;
+    }
     
     const finalCondition = returnType === 'RTO' ? 'INTACT' : condition;
     if (returnType === 'CUSTOMER_RETURN' && (finalCondition === 'WRONG_ITEM' || finalCondition === 'DAMAGED') && !notes) {
@@ -121,7 +161,14 @@ export default function ReturnsManager() {
       return;
     }
 
-    setStack([...stack, { sku, quantity: parseInt(quantity, 10), condition: finalCondition, notes }]);
+    setStack([...stack, { 
+      sku, 
+      displayOrderId: displayOrderId || referenceId,
+      referenceId,
+      quantity: parseInt(quantity, 10), 
+      condition: finalCondition, 
+      notes 
+    }]);
     setSku('');
     setQuantity(1);
     setNotes('');
@@ -144,7 +191,8 @@ export default function ReturnsManager() {
         await api.processReturn({
           party,
           returnType,
-          referenceId,
+          referenceId: item.referenceId || referenceId,
+          displayOrderId: item.displayOrderId || displayOrderId || referenceId,
           sku: item.sku,
           quantity: item.quantity,
           condition: item.condition,
@@ -153,12 +201,14 @@ export default function ReturnsManager() {
         count++;
       }
 
-      setSuccess(`Successfully processed ${count} items for ${referenceId}`);
+      setSuccess(`Successfully processed ${count} items for ${party}`);
       setStack([]);
       setReferenceId('');
+      setDisplayOrderId('');
       setSku('');
       setQuantity(1);
       setNotes('');
+      setLookupStatus('');
       if (inputRef.current) {
         inputRef.current.focus();
       }
@@ -186,14 +236,14 @@ export default function ReturnsManager() {
   };
 
   const renderProcessForm = () => (
-    <div className="glass-panel" style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
+    <div className="glass-panel" style={{ padding: '2rem', maxWidth: '850px', margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
         <div style={{ padding: '1rem', background: 'rgba(225, 29, 72, 0.1)', borderRadius: 'var(--radius-md)' }}>
           <Zap size={28} color="#e11d48" />
         </div>
         <div>
           <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--text-primary)' }}>Rapid Returns Processing</h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Select the mode and scan barcodes to instantly log returns.</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Select party (e.g. Myntra), scan AWB/barcode to auto-fetch Display Order ID & SKU from Uniware.</p>
         </div>
       </div>
 
@@ -270,20 +320,37 @@ export default function ReturnsManager() {
           </div>
         )}
 
-        {/* Scanning Area */}
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <div className="form-group" style={{ flex: 2 }}>
-            <label style={styles.label}>AWB / Order ID (Reference)</label>
+        {/* Scanning & Order Information Area */}
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <div className="form-group" style={{ flex: 2, minWidth: '200px' }}>
+            <label style={styles.label}>AWB / Tracking Barcode</label>
+            <div style={{ position: 'relative' }}>
+              <input 
+                ref={inputRef}
+                style={styles.input} 
+                value={referenceId} 
+                onChange={handleReferenceChange} 
+                onBlur={() => performUniwareLookup(referenceId)}
+                placeholder="Scan AWB or enter tracking ID..." 
+                required 
+              />
+              {lookupLoading && (
+                <RefreshCw size={14} className="spin-loader" style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--primary)' }} />
+              )}
+            </div>
+          </div>
+
+          <div className="form-group" style={{ flex: 2, minWidth: '200px' }}>
+            <label style={styles.label}>Display Order ID (Uniware)</label>
             <input 
-              ref={inputRef}
-              style={styles.input} 
-              value={referenceId} 
-              onChange={e => setReferenceId(e.target.value)} 
-              placeholder="Scan tracking barcode..." 
-              required 
+              style={{ ...styles.input, fontWeight: 700, color: 'var(--primary)' }} 
+              value={displayOrderId} 
+              onChange={e => setDisplayOrderId(e.target.value)} 
+              placeholder="Display Order ID..." 
             />
           </div>
-          <div className="form-group" style={{ flex: 2 }}>
+
+          <div className="form-group" style={{ flex: 2, minWidth: '180px' }}>
             <label style={styles.label}>Product SKU</label>
             <input 
               list="inventory-skus"
@@ -297,7 +364,8 @@ export default function ReturnsManager() {
               {inventorySkus.map(s => <option key={s} value={s} />)}
             </datalist>
           </div>
-          <div className="form-group" style={{ flex: 1 }}>
+
+          <div className="form-group" style={{ flex: 1, minWidth: '80px' }}>
             <label style={styles.label}>Qty</label>
             <input 
               type="number" 
@@ -309,6 +377,12 @@ export default function ReturnsManager() {
             />
           </div>
         </div>
+
+        {lookupStatus && (
+          <div style={{ fontSize: '0.8rem', background: 'rgba(59,130,246,0.1)', color: '#60a5fa', padding: '0.4rem 0.8rem', borderRadius: '4px', border: '1px solid rgba(59,130,246,0.2)' }}>
+            ✓ {lookupStatus}
+          </div>
+        )}
 
         <button 
           type="submit" 
@@ -328,6 +402,8 @@ export default function ReturnsManager() {
           <table style={{ width: '100%', marginBottom: '1rem' }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                <th style={{ padding: '0.5rem' }}>AWB / Ref</th>
+                <th style={{ padding: '0.5rem' }}>Display Order ID</th>
                 <th style={{ padding: '0.5rem' }}>SKU</th>
                 <th style={{ padding: '0.5rem' }}>Qty</th>
                 <th style={{ padding: '0.5rem' }}>Condition</th>
@@ -337,6 +413,8 @@ export default function ReturnsManager() {
             <tbody>
               {stack.map((item, idx) => (
                 <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>{item.referenceId}</td>
+                  <td style={{ padding: '0.5rem', color: 'var(--primary)', fontWeight: 'bold' }}>{item.displayOrderId || '-'}</td>
                   <td style={{ padding: '0.5rem' }}>{item.sku}</td>
                   <td style={{ padding: '0.5rem' }}>{item.quantity}</td>
                   <td style={{ padding: '0.5rem' }}>
@@ -380,6 +458,7 @@ export default function ReturnsManager() {
             <tr>
               <th>Date</th>
               <th>Reference (AWB)</th>
+              <th>Display Order ID</th>
               <th>SKU</th>
               <th>Qty</th>
               <th>Party</th>
@@ -388,12 +467,13 @@ export default function ReturnsManager() {
           </thead>
           <tbody>
             {refinishQueue.length === 0 ? (
-              <tr><td colSpan="6" className="text-center" style={{ padding: '2rem', color: 'var(--text-muted)' }}>No items in the refinishing queue!</td></tr>
+              <tr><td colSpan="7" className="text-center" style={{ padding: '2rem', color: 'var(--text-muted)' }}>No items in the refinishing queue!</td></tr>
             ) : (
               refinishQueue.map(item => (
                 <tr key={item._id}>
                   <td>{formatDateDDMMYYYY(item.createdAt)}</td>
                   <td style={{ fontWeight: 'bold' }}>{item.referenceId}</td>
+                  <td style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{item.displayOrderId || '-'}</td>
                   <td>{item.sku}</td>
                   <td>{item.quantity}</td>
                   <td>{item.party}</td>
@@ -429,7 +509,8 @@ export default function ReturnsManager() {
           <thead>
             <tr>
               <th>Date</th>
-              <th>AWB / Order ID</th>
+              <th>AWB / Reference</th>
+              <th>Display Order ID</th>
               <th>SKU</th>
               <th>Type</th>
               <th>Condition</th>
@@ -439,12 +520,13 @@ export default function ReturnsManager() {
           </thead>
           <tbody>
             {history.length === 0 ? (
-              <tr><td colSpan="7" className="text-center" style={{ padding: '2rem', color: 'var(--text-muted)' }}>No returns history found.</td></tr>
+              <tr><td colSpan="8" className="text-center" style={{ padding: '2rem', color: 'var(--text-muted)' }}>No returns history found.</td></tr>
             ) : (
               history.map(item => (
                 <tr key={item._id}>
                   <td>{formatDateTimeDDMMYYYY(item.createdAt)}</td>
                   <td style={{ fontWeight: 'bold' }}>{item.referenceId}</td>
+                  <td style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{item.displayOrderId || '-'}</td>
                   <td>{item.sku}</td>
                   <td>
                     <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: item.returnType === 'RTO' ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)', color: item.returnType === 'RTO' ? '#60a5fa' : '#fcd34d' }}>

@@ -914,6 +914,13 @@ export const api = {
   },
 
   // --- Returns Engine ---
+  async lookupUniwareOrder(data) {
+    return request('/returns/lookup-order', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   async processReturn(data) {
     return request('/returns/process', {
       method: 'POST',
