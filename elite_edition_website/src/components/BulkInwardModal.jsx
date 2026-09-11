@@ -96,6 +96,20 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     setFormRows(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Resolve Effective Size from Catalog / Inventory / SKU code
+  const resolveEffectiveSize = (sourceObj, skuCode) => {
+    if (sourceObj) {
+      if (typeof sourceObj.size === 'string' && sourceObj.size.trim() && sourceObj.size.trim().toUpperCase() !== 'N/A') {
+        return sourceObj.size.trim().toUpperCase();
+      }
+      if (Array.isArray(sourceObj.size) && sourceObj.size.length > 0) {
+        const validFirst = sourceObj.size.find(s => typeof s === 'string' && s.trim() && s.trim().toUpperCase() !== 'N/A');
+        if (validFirst) return validFirst.trim().toUpperCase();
+      }
+    }
+    return extractSizeFromSku(skuCode) || 'N/A';
+  };
+
   // SKU Autocomplete Handler for a Row
   const handleSkuChange = (index, value) => {
     const skuRaw = value.trim();
@@ -112,7 +126,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
 
     if (matchedInventory) {
       updated[index].itemName = matchedInventory.itemName || updated[index].itemName || skuRaw;
-      updated[index].size = matchedInventory.size || updated[index].size || extractSizeFromSku(skuRaw) || 'N/A';
+      updated[index].size = resolveEffectiveSize(matchedInventory, skuRaw);
       updated[index].purchasePrice = updated[index].purchasePrice || matchedInventory.purchasePrice || 0;
       updated[index].salePrice = updated[index].salePrice || matchedInventory.salePrice || 0;
       updated[index].party = updated[index].party || resolveVendorName(matchedInventory.party) || '';
@@ -120,14 +134,14 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
       updated[index].status = 'UPDATE';
     } else if (matchedCatalog) {
       updated[index].itemName = matchedCatalog.description || updated[index].itemName || skuRaw;
-      updated[index].size = Array.isArray(matchedCatalog.size) ? matchedCatalog.size[0] || 'N/A' : (matchedCatalog.size || extractSizeFromSku(skuRaw) || 'N/A');
+      updated[index].size = resolveEffectiveSize(matchedCatalog, skuRaw);
       updated[index].purchasePrice = updated[index].purchasePrice || matchedCatalog.basePrice || 0;
       updated[index].salePrice = updated[index].salePrice || matchedCatalog.price || 0;
       updated[index].party = updated[index].party || resolveVendorName(matchedCatalog.brand) || '';
       updated[index].imageUrl = matchedCatalog.imageUrl || '';
       updated[index].status = 'CATALOG_MATCH';
     } else {
-      if (!updated[index].size) updated[index].size = extractSizeFromSku(skuRaw) || 'N/A';
+      updated[index].size = extractSizeFromSku(skuRaw) || 'N/A';
       if (!updated[index].itemName) updated[index].itemName = skuRaw;
       updated[index].status = 'NEW';
     }
@@ -168,7 +182,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
       const matchedCatalog = catalogItems.find(item => item.skuCode && item.skuCode.trim().toLowerCase() === skuRaw.toLowerCase());
 
       let itemName = skuRaw;
-      let size = extractSizeFromSku(skuRaw) || 'N/A';
+      let size = resolveEffectiveSize(matchedInventory || matchedCatalog, skuRaw);
       let purchasePrice = bulkPurchasePrice ? parseFloat(bulkPurchasePrice) : 0;
       let salePrice = bulkSalePrice ? parseFloat(bulkSalePrice) : 0;
       let party = resolveVendorName(bulkVendor) || (formRows[0]?.party || '');
@@ -176,14 +190,12 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
 
       if (matchedInventory) {
         itemName = matchedInventory.itemName || itemName;
-        size = matchedInventory.size || size;
         purchasePrice = purchasePrice || matchedInventory.purchasePrice || 0;
         salePrice = salePrice || matchedInventory.salePrice || 0;
         party = party || resolveVendorName(matchedInventory.party) || '';
         status = 'UPDATE';
       } else if (matchedCatalog) {
         itemName = matchedCatalog.description || itemName;
-        size = Array.isArray(matchedCatalog.size) ? matchedCatalog.size[0] || 'N/A' : (matchedCatalog.size || size);
         purchasePrice = purchasePrice || matchedCatalog.basePrice || 0;
         salePrice = salePrice || matchedCatalog.price || 0;
         party = party || resolveVendorName(matchedCatalog.brand) || '';

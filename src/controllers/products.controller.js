@@ -1570,6 +1570,7 @@ const resetAndSyncUniwareSkus = async (req, res) => {
         const rawSku = item.skuCode || item.code || item.itemSKUCode;
         if (!rawSku) continue;
         const baseSku = extractBaseSku(rawSku);
+        const derivedSize = (item.size && typeof item.size === 'string' && item.size.trim()) ? item.size.trim() : (extractSizeFromSku(rawSku) || 'N/A');
 
         await db.InventoryProduct.updateOne(
           { skuCode: rawSku },
@@ -1577,7 +1578,7 @@ const resetAndSyncUniwareSkus = async (req, res) => {
             $set: {
               skuCode: rawSku,
               description: item.name || item.description || item.categoryName || 'Uniware SKU',
-              size: item.size ? [item.size] : [],
+              size: [derivedSize],
               color: item.color ? [item.color] : [],
               brand: item.brand || item.itemTypeBrand || 'Uniware',
               imageUrl: item.imageUrl || '',
@@ -1598,7 +1599,7 @@ const resetAndSyncUniwareSkus = async (req, res) => {
                 imageUrl: item.imageUrl || '',
               },
               $addToSet: {
-                size: item.size || 'N/A'
+                size: derivedSize
               }
             },
             { upsert: true }
@@ -1611,6 +1612,7 @@ const resetAndSyncUniwareSkus = async (req, res) => {
       for (const o of orders) {
         if (!o.itemSKUCode) continue;
         const baseSku = extractBaseSku(o.itemSKUCode);
+        const derivedSize = extractSizeFromSku(o.itemSKUCode) || 'N/A';
 
         await db.InventoryProduct.updateOne(
           { skuCode: o.itemSKUCode },
@@ -1618,6 +1620,7 @@ const resetAndSyncUniwareSkus = async (req, res) => {
             $set: {
               skuCode: o.itemSKUCode,
               description: o.itemTypeName || 'Uniware SKU',
+              size: [derivedSize],
               brand: 'Uniware',
             }
           },
@@ -1632,6 +1635,9 @@ const resetAndSyncUniwareSkus = async (req, res) => {
               $set: {
                 skuCode: baseSku,
                 description: o.itemTypeName || 'Uniware SKU',
+              },
+              $addToSet: {
+                size: derivedSize
               }
             },
             { upsert: true }
