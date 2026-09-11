@@ -286,43 +286,43 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
         
         {/* Header */}
         <div style={styles.header}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <div style={{ padding: '0.5rem', background: 'rgba(16,185,129,0.1)', borderRadius: '8px' }}>
-              <Sparkles size={20} color="#10b981" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+            <div style={styles.headerBadge}>
+              <Sparkles size={22} color="#059669" />
             </div>
             <div>
               <h3 style={styles.title}>Multi-Item Inward Entry Form</h3>
-              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>Enter multiple SKUs, quantities, and vendor details in one easy interactive form.</p>
+              <p style={styles.subtitle}>Enter multiple SKUs, quantities, and vendor details in one easy interactive form.</p>
             </div>
           </div>
-          <button onClick={onClose} style={styles.closeBtn}>
-            <X size={20} />
+          <button onClick={onClose} style={styles.closeBtn} title="Close Modal">
+            <X size={18} />
           </button>
         </div>
 
         {error && (
           <div style={styles.errorBanner}>
-            <AlertCircle size={16} style={{ flexShrink: 0 }} />
+            <AlertCircle size={18} style={{ flexShrink: 0 }} />
             <span>{error}</span>
           </div>
         )}
 
-        {/* Top Control Bar: Tabs + Scanner + Quick Set */}
+        {/* Top Control Bar: Tabs + Scanner */}
         <div style={styles.topControlBar}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.6rem' }}>
             <button
               type="button"
               onClick={() => setActiveTab('form')}
-              style={{ ...styles.tabBtn, ...(activeTab === 'form' ? styles.tabBtnActive : {}) }}
+              style={{ ...styles.tabBtn, ...(activeTab === 'form' ? styles.tabBtnActive : styles.tabBtnInactive) }}
             >
-              <Layers size={14} /> Multi-Row Form
+              <Layers size={15} color={activeTab === 'form' ? '#059669' : '#64748b'} /> Multi-Row Form
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('csv')}
-              style={{ ...styles.tabBtn, ...(activeTab === 'csv' ? styles.tabBtnActive : {}) }}
+              style={{ ...styles.tabBtn, ...(activeTab === 'csv' ? styles.tabBtnActive : styles.tabBtnInactive) }}
             >
-              <FileSpreadsheet size={14} /> CSV / Paste Import
+              <FileSpreadsheet size={15} color={activeTab === 'csv' ? '#059669' : '#64748b'} /> CSV / Paste Import
             </button>
           </div>
 
@@ -330,16 +330,16 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
           {activeTab === 'form' && (
             <form onSubmit={handleScanSubmit} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, maxWidth: '340px' }}>
               <div style={{ position: 'relative', width: '100%' }}>
-                <Scan size={14} color="var(--primary)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                <Scan size={15} color="#475569" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
                   type="text"
                   value={scanSkuInput}
                   onChange={e => setScanSkuInput(e.target.value)}
                   placeholder="Scan SKU barcode to add row..."
-                  style={{ ...styles.quickInput, paddingLeft: '2rem', width: '100%', borderColor: 'rgba(6, 182, 212, 0.3)' }}
+                  style={styles.scannerInput}
                 />
               </div>
-              <button type="submit" className="btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>+ Scan</button>
+              <button type="submit" style={styles.scanBtn}>+ Scan</button>
             </form>
           )}
         </div>
@@ -350,8 +350,10 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
             
             {/* Quick Set Header Bar */}
             <div style={styles.quickSetPanel}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap' }}>⚡ Quick Set All:</span>
-              <div style={{ display: 'flex', gap: '0.5rem', flex: 1, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#d97706', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                ⚡ Quick Set All:
+              </span>
+              <div style={{ display: 'flex', gap: '0.6rem', flex: 1, flexWrap: 'wrap', alignItems: 'center' }}>
                 <input
                   type="text"
                   placeholder="Set Vendor / Company Name..."
@@ -373,7 +375,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                   placeholder="Set Buy Price..."
                   value={bulkPurchasePrice}
                   onChange={(e) => setBulkPurchasePrice(e.target.value)}
-                  style={{ ...styles.quickInput, maxWidth: '120px' }}
+                  style={{ ...styles.quickInput, maxWidth: '130px' }}
                   min="0"
                   step="0.01"
                 />
@@ -383,7 +385,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                   placeholder="Set Sell Price..."
                   value={bulkSalePrice}
                   onChange={(e) => setBulkSalePrice(e.target.value)}
-                  style={{ ...styles.quickInput, maxWidth: '120px' }}
+                  style={{ ...styles.quickInput, maxWidth: '130px' }}
                   min="0"
                   step="0.01"
                 />
@@ -391,8 +393,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                 <button
                   type="button"
                   onClick={applyQuickSettings}
-                  className="btn-secondary"
-                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem', fontWeight: 600 }}
+                  style={styles.applyAllBtn}
                 >
                   Apply to All Rows
                 </button>
@@ -403,23 +404,23 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
                 <thead>
-                  <tr style={{ background: '#1e293b', color: '#ffffff' }}>
-                    <th style={{ width: '22%', padding: '0.65rem 0.5rem' }}>SKU CODE *</th>
-                    <th style={{ width: '22%', padding: '0.65rem 0.5rem' }}>ITEM NAME / DETAILS</th>
-                    <th style={{ width: '10%', padding: '0.65rem 0.5rem', textAlign: 'center' }}>SIZE</th>
-                    <th style={{ width: '10%', padding: '0.65rem 0.5rem', textAlign: 'center' }}>QTY *</th>
-                    <th style={{ width: '12%', padding: '0.65rem 0.5rem', textAlign: 'right' }}>BUY PRICE</th>
-                    <th style={{ width: '12%', padding: '0.65rem 0.5rem', textAlign: 'right' }}>SELL PRICE</th>
-                    <th style={{ width: '18%', padding: '0.65rem 0.5rem' }}>VENDOR / COMPANY *</th>
-                    <th style={{ width: '4%', padding: '0.65rem 0.5rem', textAlign: 'center' }}></th>
+                  <tr>
+                    <th style={{ width: '22%', padding: '0.75rem 0.6rem' }}>SKU CODE *</th>
+                    <th style={{ width: '22%', padding: '0.75rem 0.6rem' }}>ITEM NAME / DETAILS</th>
+                    <th style={{ width: '10%', padding: '0.75rem 0.6rem', textAlign: 'center' }}>SIZE</th>
+                    <th style={{ width: '10%', padding: '0.75rem 0.6rem', textAlign: 'center' }}>QTY *</th>
+                    <th style={{ width: '12%', padding: '0.75rem 0.6rem', textAlign: 'right' }}>BUY PRICE</th>
+                    <th style={{ width: '12%', padding: '0.75rem 0.6rem', textAlign: 'right' }}>SELL PRICE</th>
+                    <th style={{ width: '18%', padding: '0.75rem 0.6rem' }}>VENDOR / COMPANY *</th>
+                    <th style={{ width: '4%', padding: '0.75rem 0.6rem', textAlign: 'center' }}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {formRows.map((row, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)', background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                    <tr key={idx} style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
                       
                       {/* SKU Code Input with Autocomplete */}
-                      <td style={{ padding: '0.4rem 0.5rem' }}>
+                      <td style={{ padding: '0.5rem 0.6rem' }}>
                         <input
                           type="text"
                           value={row.skuCode}
@@ -432,7 +433,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                       </td>
 
                       {/* Item Name */}
-                      <td style={{ padding: '0.4rem 0.5rem' }}>
+                      <td style={{ padding: '0.5rem 0.6rem' }}>
                         <input
                           type="text"
                           value={row.itemName}
@@ -443,7 +444,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                       </td>
 
                       {/* Size */}
-                      <td style={{ padding: '0.4rem 0.5rem' }}>
+                      <td style={{ padding: '0.5rem 0.6rem' }}>
                         <input
                           type="text"
                           value={row.size}
@@ -454,43 +455,43 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                       </td>
 
                       {/* Quantity */}
-                      <td style={{ padding: '0.4rem 0.5rem' }}>
+                      <td style={{ padding: '0.5rem 0.6rem' }}>
                         <input
                           type="number"
                           value={row.qty}
                           onChange={(e) => handleRowFieldChange(idx, 'qty', e.target.value)}
                           min="1"
-                          style={{ ...styles.cellInput, textAlign: 'center', fontWeight: 'bold', color: 'var(--primary)' }}
+                          style={{ ...styles.cellInput, textAlign: 'center', fontWeight: '800', color: '#1d4ed8', fontSize: '0.95rem' }}
                           required
                         />
                       </td>
 
                       {/* Buy Price */}
-                      <td style={{ padding: '0.4rem 0.5rem' }}>
+                      <td style={{ padding: '0.5rem 0.6rem' }}>
                         <input
                           type="number"
                           value={row.purchasePrice}
                           onChange={(e) => handleRowFieldChange(idx, 'purchasePrice', e.target.value)}
                           step="0.01"
                           min="0"
-                          style={{ ...styles.cellInput, textAlign: 'right' }}
+                          style={{ ...styles.cellInput, textAlign: 'right', color: '#0f172a' }}
                         />
                       </td>
 
                       {/* Sell Price */}
-                      <td style={{ padding: '0.4rem 0.5rem' }}>
+                      <td style={{ padding: '0.5rem 0.6rem' }}>
                         <input
                           type="number"
                           value={row.salePrice}
                           onChange={(e) => handleRowFieldChange(idx, 'salePrice', e.target.value)}
                           step="0.01"
                           min="0"
-                          style={{ ...styles.cellInput, textAlign: 'right' }}
+                          style={{ ...styles.cellInput, textAlign: 'right', color: '#0f172a' }}
                         />
                       </td>
 
                       {/* Vendor Business Name */}
-                      <td style={{ padding: '0.4rem 0.5rem' }}>
+                      <td style={{ padding: '0.5rem 0.6rem' }}>
                         <input
                           type="text"
                           value={row.party}
@@ -503,7 +504,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                       </td>
 
                       {/* Delete Row Button */}
-                      <td style={{ padding: '0.4rem 0.5rem', textAlign: 'center' }}>
+                      <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center' }}>
                         {formRows.length > 1 && (
                           <button
                             type="button"
@@ -550,7 +551,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
               onClick={handleAddRow}
               style={styles.addRowBtn}
             >
-              <Plus size={16} />
+              <Plus size={18} color="#0f172a" />
               <span>+ Add Another Item Row</span>
             </button>
 
@@ -558,7 +559,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
         ) : (
           /* OPTIONAL SECONDARY TAB: CSV / Paste Import */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, paddingTop: '0.5rem' }}>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+            <p style={{ fontSize: '0.85rem', color: '#64748b' }}>
               Optional: Copy columns from Excel (SKU, Qty, Buy Price, Sell Price, Vendor) and paste below:
             </p>
             <textarea
@@ -571,8 +572,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
             <button
               type="button"
               onClick={() => processCsvText(pasteText)}
-              className="btn-primary"
-              style={{ alignSelf: 'flex-start', padding: '0.6rem 1.2rem' }}
+              style={styles.submitBtn}
             >
               Parse Data into Form Rows
             </button>
@@ -582,17 +582,17 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
         {/* Footer */}
         <div style={styles.footer}>
           <div style={styles.statsSummary}>
-            <CheckCircle size={16} color="#34d399" />
-            <span style={{ fontSize: '0.85rem', color: '#e5e7eb' }}>
-              Ready to Inward: <strong>{activeRowsCount} SKUs</strong> ({totalInwardUnits} total units)
+            <CheckCircle size={18} color="#059669" />
+            <span style={{ fontSize: '0.88rem', color: '#059669', fontWeight: 600 }}>
+              Ready to Inward: <span style={{ color: '#0f172a', fontWeight: 800 }}>{activeRowsCount} SKUs</span> ({totalInwardUnits} total units)
             </span>
           </div>
           
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button type="button" onClick={onClose} className="btn-secondary">
+          <div style={{ display: 'flex', gap: '0.85rem' }}>
+            <button type="button" onClick={onClose} style={styles.cancelBtn}>
               Cancel
             </button>
-            <button onClick={handleFinalSubmit} className="btn-success" style={{ padding: '0.75rem 1.5rem', fontWeight: 'bold', fontSize: '0.95rem' }}>
+            <button onClick={handleFinalSubmit} style={styles.submitBtn}>
               <Sparkles size={16} style={{ marginRight: '0.4rem' }} /> Confirm & Submit All Inwards
             </button>
           </div>
@@ -606,73 +606,123 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
 const styles = {
   modalContent: {
     padding: '1.5rem',
-    maxWidth: '1100px',
+    maxWidth: '1120px',
     width: '96vw',
     display: 'flex',
     flexDirection: 'column',
-    maxHeight: '90vh',
+    maxHeight: '92vh',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '18px',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    color: '#0f172a',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '1rem',
-    borderBottom: '1px solid var(--border-light)',
-    paddingBottom: '0.75rem',
+    borderBottom: '1px solid #e2e8f0',
+    paddingBottom: '0.85rem',
+  },
+  headerBadge: {
+    padding: '0.65rem',
+    background: '#d1fae5',
+    border: '1px solid #a7f3d0',
+    borderRadius: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
-    fontSize: '1.25rem',
-    fontWeight: '700',
-    color: 'var(--text-primary)',
+    fontSize: '1.3rem',
+    fontWeight: '800',
+    color: '#0f172a',
     margin: 0,
+    letterSpacing: '-0.02em',
+  },
+  subtitle: {
+    margin: 0,
+    fontSize: '0.82rem',
+    color: '#64748b',
   },
   closeBtn: {
     background: 'none',
     border: 'none',
-    color: 'var(--text-muted)',
+    color: '#94a3b8',
     cursor: 'pointer',
-    padding: '0.25rem',
+    padding: '0.4rem',
+    borderRadius: '8px',
     display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
   },
   errorBanner: {
-    background: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid rgba(239, 68, 68, 0.2)',
-    color: '#fca5a5',
-    borderRadius: 'var(--radius-sm)',
-    padding: '0.6rem 0.8rem',
-    fontSize: '0.8rem',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    color: '#dc2626',
+    borderRadius: '8px',
+    padding: '0.65rem 0.9rem',
+    fontSize: '0.85rem',
     marginBottom: '1rem',
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem',
+    gap: '0.6rem',
   },
   topControlBar: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: '1rem',
-    borderBottom: '1px solid var(--border-light)',
-    paddingBottom: '0.75rem',
+    borderBottom: '1px solid #e2e8f0',
+    paddingBottom: '0.85rem',
     marginBottom: '1rem',
     flexWrap: 'wrap',
   },
   tabBtn: {
-    padding: '0.5rem 1rem',
-    background: 'none',
+    padding: '0.55rem 1.15rem',
     border: 'none',
-    borderRadius: '6px',
-    color: 'var(--text-muted)',
+    borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '0.82rem',
-    fontWeight: 500,
+    fontSize: '0.85rem',
+    fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
-    gap: '0.4rem',
+    gap: '0.45rem',
+    transition: 'all 0.2s ease',
   },
   tabBtnActive: {
-    background: 'rgba(16, 185, 129, 0.12)',
-    color: '#10b981',
+    background: '#d1fae5',
+    color: '#059669',
+    border: '1px solid #a7f3d0',
+  },
+  tabBtnInactive: {
+    background: 'transparent',
+    color: '#64748b',
+    border: 'none',
+  },
+  scannerInput: {
+    width: '100%',
+    padding: '0.45rem 0.7rem 0.45rem 2.2rem',
+    fontSize: '0.82rem',
+    borderRadius: '8px',
+    border: '1px solid #cbd5e1',
+    background: '#cbd5e1',
+    color: '#0f172a',
+    outline: 'none',
+    fontWeight: 500,
+  },
+  scanBtn: {
+    padding: '0.45rem 0.9rem',
+    fontSize: '0.82rem',
     fontWeight: 700,
+    background: '#f1f5f9',
+    color: '#0f172a',
+    border: '1px solid #cbd5e1',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
   },
   formContainer: {
     display: 'flex',
@@ -682,80 +732,97 @@ const styles = {
     overflow: 'hidden',
   },
   quickSetPanel: {
-    background: 'rgba(16, 185, 129, 0.05)',
-    border: '1px solid rgba(16, 185, 129, 0.15)',
-    borderRadius: '8px',
-    padding: '0.6rem 0.8rem',
+    background: '#f1f5f9',
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+    padding: '0.65rem 0.9rem',
     display: 'flex',
     alignItems: 'center',
-    gap: '0.75rem',
+    gap: '0.85rem',
     flexWrap: 'wrap',
   },
   quickInput: {
-    padding: '0.4rem 0.6.rem',
-    fontSize: '0.8rem',
+    padding: '0.45rem 0.7rem',
+    fontSize: '0.82rem',
     borderRadius: '6px',
-    border: '1px solid var(--border-light)',
-    background: 'rgba(0,0,0,0.3)',
-    color: '#f3f4f6',
+    border: '1px solid #cbd5e1',
+    background: '#cbd5e1',
+    color: '#0f172a',
     flex: 1,
-    minWidth: '130px',
+    minWidth: '140px',
+    outline: 'none',
+    fontWeight: 500,
+  },
+  applyAllBtn: {
+    padding: '0.45rem 1rem',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    background: '#e2e8f0',
+    color: '#0f172a',
+    border: '1px solid #cbd5e1',
+    borderRadius: '6px',
+    cursor: 'pointer',
   },
   tableWrapper: {
     overflowY: 'auto',
     maxHeight: '48vh',
-    border: '1px solid var(--border-light)',
-    borderRadius: '8px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+    background: '#ffffff',
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    fontSize: '0.82rem',
+    fontSize: '0.85rem',
   },
   cellInput: {
     width: '100%',
-    border: '1px solid var(--border-light)',
-    borderRadius: '4px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    padding: '0.45rem 0.5rem',
-    fontSize: '0.82rem',
-    color: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '6px',
+    background: '#ffffff',
+    padding: '0.5rem 0.65rem',
+    fontSize: '0.85rem',
+    color: '#0f172a',
     outline: 'none',
+    transition: 'border-color 0.15s ease',
   },
   deleteRowBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#fca5a5',
+    background: '#fee2e2',
+    border: '1px solid #fecaca',
+    color: '#ef4444',
     cursor: 'pointer',
-    padding: '0.25rem',
+    padding: '0.35rem',
+    borderRadius: '6px',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
+    transition: 'all 0.15s ease',
   },
   addRowBtn: {
-    background: 'rgba(255, 255, 255, 0.04)',
-    border: '1px dashed var(--border-light)',
-    color: 'var(--text-primary)',
-    padding: '0.65rem 1rem',
-    borderRadius: '8px',
-    fontWeight: 700,
-    fontSize: '0.85rem',
+    background: '#ffffff',
+    border: '1px dashed #cbd5e1',
+    color: '#0f172a',
+    padding: '0.75rem 1rem',
+    borderRadius: '10px',
+    fontWeight: 800,
+    fontSize: '0.88rem',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '0.4rem',
+    gap: '0.5rem',
     width: '100%',
+    transition: 'all 0.2s ease',
   },
   textarea: {
     width: '100%',
     fontFamily: 'monospace',
-    fontSize: '0.8rem',
-    padding: '0.75rem',
-    background: 'rgba(17, 24, 39, 0.4)',
-    border: '1px solid var(--border-light)',
-    borderRadius: '6px',
-    color: '#f3f4f6',
+    fontSize: '0.85rem',
+    padding: '0.85rem',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    color: '#0f172a',
     resize: 'vertical',
   },
   footer: {
@@ -763,12 +830,36 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: '1.25rem',
-    borderTop: '1px solid var(--border-light)',
+    borderTop: '1px solid #e2e8f0',
     paddingTop: '1rem',
   },
   statsSummary: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem',
+    gap: '0.6rem',
+  },
+  cancelBtn: {
+    background: '#f1f5f9',
+    color: '#0f172a',
+    border: '1px solid #cbd5e1',
+    padding: '0.65rem 1.25rem',
+    borderRadius: '8px',
+    fontWeight: 600,
+    fontSize: '0.88rem',
+    cursor: 'pointer',
+  },
+  submitBtn: {
+    background: 'linear-gradient(135deg, #059669, #10b981)',
+    color: '#ffffff',
+    border: 'none',
+    padding: '0.65rem 1.6rem',
+    borderRadius: '8px',
+    fontWeight: 700,
+    fontSize: '0.92rem',
+    cursor: 'pointer',
+    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+    display: 'flex',
+    alignItems: 'center',
   },
 };
+
