@@ -49,6 +49,11 @@ const inventorySchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    challanNo: {
+      type: String,
+      default: '',
+      trim: true,
+    },
   },
   {
     timestamps: {

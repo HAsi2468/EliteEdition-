@@ -8,7 +8,7 @@ const createInventory = async (req, res) => {
     if (Array.isArray(req.body)) {
       logger.info(`[INVENTORY] Bulk create request — ${req.body.length} items`);
       const itemsToCreate = req.body.map(item => {
-        const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode, date } = item;
+        const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode, date, challanNo } = item;
         if (!party || !itemName || !size) {
           throw new Error('Party, Item Name, and Size are required for all bulk items');
         }
@@ -22,6 +22,7 @@ const createInventory = async (req, res) => {
           qty: qty || 0,
           imageUrl: imageUrl || '',
           skuCode: skuCode || '',
+          challanNo: challanNo || '',
           date: date || new Date(),
         };
       });
@@ -29,13 +30,13 @@ const createInventory = async (req, res) => {
       const createdItems = await db.Inventory.insertMany(itemsToCreate);
       logger.info(`[INVENTORY] ✅ Bulk created ${createdItems.length} items successfully`);
       createdItems.forEach((item, i) => {
-        logger.info(`[INVENTORY]   [${i + 1}] Party: "${item.party}" | Item: "${item.itemName}" | Size: ${item.size} | Qty: ${item.qty} | Date: ${item.date ? new Date(item.date).toLocaleDateString('en-IN') : 'N/A'}`);
+        logger.info(`[INVENTORY]   [${i + 1}] Party: "${item.party}" | Item: "${item.itemName}" | Size: ${item.size} | Qty: ${item.qty} | Challan: ${item.challanNo || 'N/A'}`);
       });
       return res.status(201).json(createdItems);
     }
 
-    const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode, date } = req.body;
-    logger.info(`[INVENTORY] Create request — Party: "${party}" | Item: "${itemName}" | Size: ${size} | Qty: ${qty} | Date: ${date || 'now'}`);
+    const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode, date, challanNo } = req.body;
+    logger.info(`[INVENTORY] Create request — Party: "${party}" | Item: "${itemName}" | Size: ${size} | Qty: ${qty} | Challan: ${challanNo || 'N/A'}`);
 
     if (!party || !itemName || !size) {
       logger.warn(`[INVENTORY] Validation failed — Party, Item Name, Size required`);
@@ -52,6 +53,7 @@ const createInventory = async (req, res) => {
       qty: qty || 0,
       imageUrl: imageUrl || '',
       skuCode: skuCode || '',
+      challanNo: challanNo || '',
       date: date || new Date(),
     });
 
@@ -408,7 +410,7 @@ const bulkInward = async (req, res) => {
 
     for (const item of items) {
       try {
-        const { skuCode, qty, purchasePrice, salePrice, party, itemName, size, imageUrl } = item;
+        const { skuCode, qty, purchasePrice, salePrice, party, itemName, size, imageUrl, challanNo } = item;
         if (!skuCode) {
           throw new Error('SKU Code is required for all inward items');
         }
@@ -437,6 +439,9 @@ const bulkInward = async (req, res) => {
           }
           if (size) {
             inventoryItem.size = size.trim();
+          }
+          if (challanNo) {
+            inventoryItem.challanNo = challanNo.trim();
           }
           await inventoryItem.save();
           results.updated++;
@@ -473,6 +478,7 @@ const bulkInward = async (req, res) => {
             salePrice: Number(resolvedSalePrice) || 0.0,
             party: resolvedParty,
             imageUrl: resolvedImageUrl,
+            challanNo: challanNo ? challanNo.trim() : '',
             date: new Date()
           });
           results.created++;

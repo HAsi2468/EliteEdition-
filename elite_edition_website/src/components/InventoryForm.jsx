@@ -12,6 +12,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
     purchasePrice: 0.0,
     salePrice: 0.0,
     skuCode: '',
+    challanNo: '',
     imageUrl: '',
   });
   
@@ -56,6 +57,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
         purchasePrice: item.purchasePrice ?? 0.0,
         salePrice: item.salePrice ?? 0.0,
         skuCode: item.skuCode || '',
+        challanNo: item.challanNo || '',
         imageUrl: item.imageUrl || '',
       });
     }
@@ -220,17 +222,29 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
             </div>
           </div>
 
-          <div style={styles.colFull}>
-            <label style={styles.label}>Available Stock (Quantity) *</label>
-            <input
-              type="number"
-              name="currentlyAvailableStock"
-              value={formData.currentlyAvailableStock}
-              onChange={handleChange}
-              min="0"
-              placeholder="e.g., 10"
-              required
-            />
+          <div style={styles.row}>
+            <div style={styles.col}>
+              <label style={styles.label}>Available Stock (Quantity) *</label>
+              <input
+                type="number"
+                name="currentlyAvailableStock"
+                value={formData.currentlyAvailableStock}
+                onChange={handleChange}
+                min="0"
+                placeholder="e.g., 10"
+                required
+              />
+            </div>
+            <div style={styles.col}>
+              <label style={styles.label}>Challan No. / Inward Bill No.</label>
+              <input
+                type="text"
+                name="challanNo"
+                value={formData.challanNo}
+                onChange={handleChange}
+                placeholder="e.g., CH-2026-001"
+              />
+            </div>
           </div>
 
           <div style={styles.row}>
