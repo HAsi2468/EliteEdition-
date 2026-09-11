@@ -1042,9 +1042,37 @@ const getStockInwardData = async (req, res) => {
       query.created_date_time = { $gte: start, $lte: end };
     }
 
-    const raw = await db.Inventory.find(query).lean();
-    const { totalQty, items } = groupInventoryItems(raw, 'qty');
-    const totalPurchase = items.reduce((s, i) => s + i.totalPurchaseAmount, 0);
+    const raw = await db.Inventory.find(query).sort({ created_date_time: -1 }).lean();
+    let totalQty = 0;
+    let totalPurchase = 0;
+
+    const items = raw.map(item => {
+      const qty = Number(item.qty || item.currentlyAvailableStock || 0);
+      const buyPrice = Number(item.purchasePrice || 0);
+      const purchaseVal = qty * buyPrice;
+
+      totalQty += qty;
+      totalPurchase += purchaseVal;
+
+      return {
+        _id: item._id,
+        id: item._id,
+        created_date_time: item.created_date_time || item.createdAt,
+        skuCode: item.skuCode,
+        sku: item.skuCode,
+        itemName: item.itemName || item.skuCode,
+        party: item.party || 'N/A',
+        size: item.size || 'N/A',
+        sizes: [{ size: item.size || 'N/A', qty }],
+        qty: qty,
+        total: qty,
+        purchasePrice: buyPrice,
+        totalPurchaseAmount: purchaseVal,
+        salePrice: Number(item.salePrice || 0),
+        imageUrl: item.imageUrl || '',
+      };
+    });
+
     await enrichImages(items);
     res.json({ totalQty, totalPurchase, items });
   } catch (err) {
@@ -1065,24 +1093,45 @@ const getStockOutwardData = async (req, res) => {
       query.created_date_time = { $gte: start, $lte: end };
     }
 
-    const stockOutLogs = await db.StockOut.find(query).lean();
-    const raw = [];
+    const stockOutLogs = await db.StockOut.find(query).sort({ created_date_time: -1 }).lean();
+    let totalQty = 0;
+    let totalPurchase = 0;
+    let totalSell = 0;
+
+    const items = [];
     for (const log of stockOutLogs) {
       const inv = await db.Inventory.findOne({ skuCode: log.skuCode }).lean();
-      raw.push({
-        ...log,
-        itemName:     inv?.itemName     || log.skuCode || 'Unknown',
-        size:         inv?.size         || log.size    || 'N/A',
-        imageUrl:     inv?.imageUrl     || '',
-        salePrice:    inv?.salePrice    || 0,
-        purchasePrice:inv?.purchasePrice|| 0,
-        qty:          log.qtyOut        || 0,
+      const qty = Number(log.qtyOut || 1);
+      const buyPrice = Number(inv?.purchasePrice || 0);
+      const sellPrice = Number(inv?.salePrice || 0);
+      const buyVal = qty * buyPrice;
+      const sellVal = qty * sellPrice;
+
+      totalQty += qty;
+      totalPurchase += buyVal;
+      totalSell += sellVal;
+
+      items.push({
+        _id: log._id,
+        id: log._id,
+        created_date_time: log.created_date_time || log.createdAt,
+        skuCode: log.skuCode,
+        sku: log.skuCode,
+        itemName: inv?.itemName || log.skuCode || 'Unknown',
+        party: log.party || inv?.party || 'N/A',
+        size: inv?.size || log.size || 'N/A',
+        sizes: [{ size: inv?.size || log.size || 'N/A', qty }],
+        qty: qty,
+        total: qty,
+        purchasePrice: buyPrice,
+        totalPurchaseAmount: buyVal,
+        salePrice: sellPrice,
+        totalSellableAmount: sellVal,
+        imageUrl: inv?.imageUrl || '',
       });
     }
 
-    const { totalQty, totalSell, items } = groupInventoryItems(raw, 'qty');
-    const totalPurchase = items.reduce((s, i) => s + i.totalPurchaseAmount, 0);
-    const totalProfit   = totalSell - totalPurchase;
+    const totalProfit = totalSell - totalPurchase;
     await enrichImages(items);
 
     res.json({ totalQty, totalSell, totalPurchase, totalProfit, items });

@@ -1179,6 +1179,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                 <table style={{ width: '100%', borderCollapse: 'collapse', background: '#ffffff' }}>
                   <thead>
                     <tr style={{ background: '#7c2d12', color: '#ffffff' }}>
+                      <th style={styles.thStatic}>DATE & TIME</th>
                       <th style={styles.thStatic}>PHOTO</th>
                       <th style={styles.thStatic}>SKU CODE</th>
                       <th style={styles.thStatic}>PRODUCT NAME</th>
@@ -1194,6 +1195,12 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                   </thead>
                   <tbody>
                     {filteredOutwardItems.map((item, idx) => {
+                      const dtStr = (item.created_date_time || item.createdAt || item.date)
+                        ? new Date(item.created_date_time || item.createdAt || item.date).toLocaleString('en-IN', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit', hour12: true
+                          })
+                        : 'N/A';
                       const totalQty = item.total || item.qty || 0;
                       const buyPrice = Number(item.purchasePrice || 0);
                       const sellPrice = Number(item.salePrice || 0);
@@ -1203,6 +1210,9 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
 
                       return (
                         <tr key={item.sku || item.id || idx} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#fffbfb' }}>
+                          <td style={{ padding: '0.85rem 1rem', fontSize: '0.78rem', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            {dtStr}
+                          </td>
                           <td style={{ padding: '0.85rem 1rem' }}>
                             <div style={styles.itemImgWrapper}>
                               {item.imageUrl ? (
