@@ -1,26 +1,49 @@
 import React, { useState, useEffect } from 'react';
-import { X, Upload, Clipboard, Trash2, CheckCircle, Sparkles, AlertCircle } from 'lucide-react';
+import { X, Plus, Trash2, CheckCircle, Sparkles, AlertCircle, Scan, FileSpreadsheet, Layers } from 'lucide-react';
 import { api } from '../services/api';
 import { extractSizeFromSku } from '../utils/skuHelper';
 
 export default function BulkInwardModal({ onSubmit, onClose }) {
-  const [activeInputTab, setActiveInputTab] = useState('paste'); // 'paste' or 'upload'
-  const [pasteText, setPasteText] = useState('');
-  const [parsedItems, setParsedItems] = useState([]);
+  const [activeTab, setActiveTab] = useState('form'); // 'form' or 'csv'
   const [error, setError] = useState('');
   
-  // Lists for auto-matching and suggestions
+  // Master Reference Lists
   const [vendorsList, setVendorsList] = useState([]);
   const [catalogItems, setCatalogItems] = useState([]);
   const [storeInventory, setStoreInventory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Bulk quick-set values
+  // Quick Set Header Controls
   const [bulkVendor, setBulkVendor] = useState('');
   const [bulkPurchasePrice, setBulkPurchasePrice] = useState('');
   const [bulkSalePrice, setBulkSalePrice] = useState('');
 
-  // Fetch reference lists for auto-matching
+  // Barcode / SKU Scanner Input
+  const [scanSkuInput, setScanSkuInput] = useState('');
+
+  // CSV / Paste Tab State
+  const [pasteText, setPasteText] = useState('');
+
+  // Multi-Row Form Data State (Default 3 rows)
+  const createEmptyRow = (vendorName = '') => ({
+    skuCode: '',
+    itemName: '',
+    size: '',
+    qty: 1,
+    purchasePrice: 0,
+    salePrice: 0,
+    party: vendorName || '',
+    imageUrl: '',
+    status: 'NEW'
+  });
+
+  const [formRows, setFormRows] = useState([
+    createEmptyRow(),
+    createEmptyRow(),
+    createEmptyRow()
+  ]);
+
+  // Fetch reference lists for autocompletion
   useEffect(() => {
     const loadRefData = async () => {
       try {
@@ -42,124 +65,154 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     loadRefData();
   }, []);
 
-  // Parse pasted text or file contents
-  const processInputLines = (text) => {
-    if (!text.trim()) {
-      setError('Please enter some data to parse.');
+  // Resolve Vendor Name to Business Name
+  const resolveVendorName = (val) => {
+    if (!val) return '';
+    const match = vendorsList.find(v => 
+      (v.name && v.name.trim().toLowerCase() === val.trim().toLowerCase()) ||
+      (v.businessName && v.businessName.trim().toLowerCase() === val.trim().toLowerCase())
+    );
+    return match && match.businessName ? match.businessName : val;
+  };
+
+  // Add a new empty row
+  const handleAddRow = () => {
+    const defaultVendor = resolveVendorName(bulkVendor) || (formRows[0]?.party || '');
+    const defaultBuy = bulkPurchasePrice ? parseFloat(bulkPurchasePrice) : 0;
+    const defaultSell = bulkSalePrice ? parseFloat(bulkSalePrice) : 0;
+
+    setFormRows(prev => [
+      ...prev,
+      {
+        ...createEmptyRow(defaultVendor),
+        purchasePrice: defaultBuy,
+        salePrice: defaultSell,
+      }
+    ]);
+  };
+
+  // Remove a row
+  const handleRemoveRow = (index) => {
+    setFormRows(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // SKU Autocomplete Handler for a Row
+  const handleSkuChange = (index, value) => {
+    const skuRaw = value.trim();
+    const updated = [...formRows];
+    updated[index].skuCode = value;
+
+    if (!skuRaw) {
+      setFormRows(updated);
       return;
     }
-    
-    // Split by newlines
-    const lines = text.split(/\r?\n/);
-    const tempItems = [];
-    let lineErrorCount = 0;
 
-    lines.forEach((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) return;
+    const matchedInventory = storeInventory.find(item => item.skuCode && item.skuCode.trim().toLowerCase() === skuRaw.toLowerCase());
+    const matchedCatalog = catalogItems.find(item => item.skuCode && item.skuCode.trim().toLowerCase() === skuRaw.toLowerCase());
 
-      // Split by tab (Excel) or comma (CSV)
-      const parts = trimmed.includes('\t') ? trimmed.split('\t') : trimmed.split(',');
-      const skuRaw = parts[0] ? parts[0].trim() : '';
-      const qtyRaw = parts[1] ? parts[1].trim() : '';
+    if (matchedInventory) {
+      updated[index].itemName = matchedInventory.itemName || updated[index].itemName || skuRaw;
+      updated[index].size = matchedInventory.size || updated[index].size || extractSizeFromSku(skuRaw) || 'N/A';
+      updated[index].purchasePrice = updated[index].purchasePrice || matchedInventory.purchasePrice || 0;
+      updated[index].salePrice = updated[index].salePrice || matchedInventory.salePrice || 0;
+      updated[index].party = updated[index].party || resolveVendorName(matchedInventory.party) || '';
+      updated[index].imageUrl = matchedInventory.imageUrl || '';
+      updated[index].status = 'UPDATE';
+    } else if (matchedCatalog) {
+      updated[index].itemName = matchedCatalog.description || updated[index].itemName || skuRaw;
+      updated[index].size = Array.isArray(matchedCatalog.size) ? matchedCatalog.size[0] || 'N/A' : (matchedCatalog.size || extractSizeFromSku(skuRaw) || 'N/A');
+      updated[index].purchasePrice = updated[index].purchasePrice || matchedCatalog.basePrice || 0;
+      updated[index].salePrice = updated[index].salePrice || matchedCatalog.price || 0;
+      updated[index].party = updated[index].party || resolveVendorName(matchedCatalog.brand) || '';
+      updated[index].imageUrl = matchedCatalog.imageUrl || '';
+      updated[index].status = 'CATALOG_MATCH';
+    } else {
+      if (!updated[index].size) updated[index].size = extractSizeFromSku(skuRaw) || 'N/A';
+      if (!updated[index].itemName) updated[index].itemName = skuRaw;
+      updated[index].status = 'NEW';
+    }
 
-      if (!skuRaw) return;
+    setFormRows(updated);
+  };
 
-      const qty = parseInt(qtyRaw, 10);
-      if (isNaN(qty) || qty <= 0) {
-        lineErrorCount++;
-        return; // skip invalid quantities
-      }
+  // Field Edit Handler for a Row
+  const handleRowFieldChange = (index, field, value) => {
+    const updated = [...formRows];
+    if (field === 'qty') {
+      updated[index][field] = parseInt(value, 10) || 0;
+    } else if (field === 'purchasePrice' || field === 'salePrice') {
+      updated[index][field] = parseFloat(value) || 0.0;
+    } else if (field === 'party') {
+      updated[index][field] = resolveVendorName(value);
+    } else {
+      updated[index][field] = value;
+    }
+    setFormRows(updated);
+  };
 
-      // Check if SKU already parsed to aggregate/merge quantities in import preview
-      const existingIdx = tempItems.findIndex(i => i.skuCode.toLowerCase() === skuRaw.toLowerCase());
-      if (existingIdx !== -1) {
-        tempItems[existingIdx].qty += qty;
-        return;
-      }
+  // Barcode / SKU Scan Handler
+  const handleScanSubmit = (e) => {
+    e.preventDefault();
+    const skuRaw = scanSkuInput.trim();
+    if (!skuRaw) return;
 
-      // Match details against existing inventory & catalog
+    // Check if SKU already exists in form rows -> increment quantity
+    const existingIndex = formRows.findIndex(r => r.skuCode.toLowerCase() === skuRaw.toLowerCase());
+    if (existingIndex !== -1) {
+      const updated = [...formRows];
+      updated[existingIndex].qty += 1;
+      setFormRows(updated);
+    } else {
+      // Create new row with scanned SKU
       const matchedInventory = storeInventory.find(item => item.skuCode && item.skuCode.trim().toLowerCase() === skuRaw.toLowerCase());
       const matchedCatalog = catalogItems.find(item => item.skuCode && item.skuCode.trim().toLowerCase() === skuRaw.toLowerCase());
 
-      let status = 'NEW';
       let itemName = skuRaw;
       let size = extractSizeFromSku(skuRaw) || 'N/A';
-      let purchasePrice = parts[2] ? parseFloat(parts[2]) : 0;
-      let salePrice = parts[3] ? parseFloat(parts[3]) : 0;
-      let party = parts[4] ? parts[4].trim() : '';
-      let imageUrl = '';
+      let purchasePrice = bulkPurchasePrice ? parseFloat(bulkPurchasePrice) : 0;
+      let salePrice = bulkSalePrice ? parseFloat(bulkSalePrice) : 0;
+      let party = resolveVendorName(bulkVendor) || (formRows[0]?.party || '');
+      let status = 'NEW';
 
       if (matchedInventory) {
-        status = 'UPDATE';
         itemName = matchedInventory.itemName || itemName;
         size = matchedInventory.size || size;
         purchasePrice = purchasePrice || matchedInventory.purchasePrice || 0;
         salePrice = salePrice || matchedInventory.salePrice || 0;
-        party = party || matchedInventory.party || '';
-        imageUrl = matchedInventory.imageUrl || '';
+        party = party || resolveVendorName(matchedInventory.party) || '';
+        status = 'UPDATE';
       } else if (matchedCatalog) {
-        status = 'CATALOG_MATCH';
         itemName = matchedCatalog.description || itemName;
         size = Array.isArray(matchedCatalog.size) ? matchedCatalog.size[0] || 'N/A' : (matchedCatalog.size || size);
         purchasePrice = purchasePrice || matchedCatalog.basePrice || 0;
         salePrice = salePrice || matchedCatalog.price || 0;
-        party = party || matchedCatalog.brand || '';
-        imageUrl = matchedCatalog.imageUrl || '';
+        party = party || resolveVendorName(matchedCatalog.brand) || '';
+        status = 'CATALOG_MATCH';
       }
 
-      tempItems.push({
-        skuCode: skuRaw,
-        qty,
-        purchasePrice: purchasePrice || 0,
-        salePrice: salePrice || 0,
-        party: party || 'Bulk Inward',
-        itemName,
-        size,
-        imageUrl,
-        status
-      });
-    });
-
-    if (tempItems.length === 0) {
-      setError('No valid rows could be parsed. Make sure to use: SKU, Quantity format.');
-      return;
+      setFormRows(prev => [
+        ...prev.filter(r => r.skuCode.trim() !== ''),
+        {
+          skuCode: skuRaw,
+          itemName,
+          size,
+          qty: 1,
+          purchasePrice,
+          salePrice,
+          party,
+          imageUrl: '',
+          status
+        }
+      ]);
     }
 
-    if (lineErrorCount > 0) {
-      setError(`Parsed ${tempItems.length} rows. Ignored ${lineErrorCount} rows with invalid/missing quantities.`);
-    } else {
-      setError('');
-    }
-
-    setParsedItems(tempItems);
+    setScanSkuInput('');
   };
 
-  // CSV File Handler
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const csvText = event.target.result;
-      processInputLines(csvText);
-    };
-    reader.readAsText(file);
-  };
-
-  // Quick set all parsed items
+  // Quick Apply Settings to all rows
   const applyQuickSettings = () => {
-    let resolvedVendor = bulkVendor ? bulkVendor.trim() : '';
-    if (resolvedVendor) {
-      const match = vendorsList.find(v => 
-        (v.name && v.name.trim().toLowerCase() === resolvedVendor.toLowerCase()) ||
-        (v.businessName && v.businessName.trim().toLowerCase() === resolvedVendor.toLowerCase())
-      );
-      if (match && match.businessName) resolvedVendor = match.businessName;
-    }
-
-    setParsedItems(prev => prev.map(item => ({
+    const resolvedVendor = resolveVendorName(bulkVendor);
+    setFormRows(prev => prev.map(item => ({
       ...item,
       party: resolvedVendor || item.party,
       purchasePrice: bulkPurchasePrice ? parseFloat(bulkPurchasePrice) : item.purchasePrice,
@@ -167,42 +220,65 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     })));
   };
 
-  // Handle individual preview field edit
-  const handleItemEdit = (index, field, value) => {
-    const updated = [...parsedItems];
-    if (field === 'qty') {
-      updated[index][field] = parseInt(value, 10) || 0;
-    } else if (field === 'purchasePrice' || field === 'salePrice') {
-      updated[index][field] = parseFloat(value) || 0.0;
+  // Parse CSV/Pasted text fallback
+  const processCsvText = (text) => {
+    if (!text.trim()) return;
+    const lines = text.split(/\r?\n/);
+    const parsed = [];
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      const parts = trimmed.includes('\t') ? trimmed.split('\t') : trimmed.split(',');
+      const skuRaw = parts[0] ? parts[0].trim() : '';
+      const qty = parts[1] ? parseInt(parts[1].trim(), 10) : 1;
+      if (skuRaw && !isNaN(qty) && qty > 0) {
+        parsed.push({
+          skuCode: skuRaw,
+          itemName: skuRaw,
+          size: extractSizeFromSku(skuRaw) || 'N/A',
+          qty,
+          purchasePrice: parts[2] ? parseFloat(parts[2]) : 0,
+          salePrice: parts[3] ? parseFloat(parts[3]) : 0,
+          party: parts[4] ? resolveVendorName(parts[4].trim()) : resolveVendorName(bulkVendor),
+          status: 'NEW'
+        });
+      }
+    });
+
+    if (parsed.length > 0) {
+      setFormRows(parsed);
+      setActiveTab('form');
+      setError('');
     } else {
-      updated[index][field] = value;
+      setError('Could not parse valid SKU & Quantity from CSV.');
     }
-    setParsedItems(updated);
   };
 
-  // Remove individual row from import
-  const handleRemoveItem = (index) => {
-    setParsedItems(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleBulkSubmit = (e) => {
+  // Submit Handler
+  const handleFinalSubmit = (e) => {
     e.preventDefault();
-    if (parsedItems.length === 0) {
-      setError('Please import or paste items to inward first.');
+    setError('');
+
+    // Filter valid rows (non-empty SKU and qty > 0)
+    const validRows = formRows.filter(r => r.skuCode && r.skuCode.trim() && r.qty > 0);
+
+    if (validRows.length === 0) {
+      setError('Please add at least one valid item row with a SKU Code and Quantity.');
       return;
     }
 
-    // Validation
-    const invalidItems = parsedItems.filter(item => !item.skuCode.trim() || item.qty <= 0 || !item.party.trim());
-    if (invalidItems.length > 0) {
-      setError(`Please resolve invalid rows. SKU code, positive quantity, and Vendor are required.`);
+    // Ensure Vendor is set for all valid rows
+    const missingVendorRows = validRows.filter(r => !r.party || !r.party.trim());
+    if (missingVendorRows.length > 0) {
+      setError('Please select or specify Vendor / Business Name for all item rows.');
       return;
     }
 
-    onSubmit(parsedItems);
+    onSubmit(validRows);
   };
 
-  const totalInwardUnits = parsedItems.reduce((acc, curr) => acc + (curr.qty || 0), 0);
+  const totalInwardUnits = formRows.reduce((acc, curr) => acc + (curr.skuCode ? (curr.qty || 0) : 0), 0);
+  const activeRowsCount = formRows.filter(r => r.skuCode && r.skuCode.trim()).length;
 
   return (
     <div className="modal-overlay">
@@ -210,12 +286,17 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
         
         {/* Header */}
         <div style={styles.header}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Sparkles size={20} color="var(--primary)" />
-            <h3 style={styles.title}>Bulk Order Inward</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <div style={{ padding: '0.5rem', background: 'rgba(16,185,129,0.1)', borderRadius: '8px' }}>
+              <Sparkles size={20} color="#10b981" />
+            </div>
+            <div>
+              <h3 style={styles.title}>Multi-Item Inward Entry Form</h3>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>Enter multiple SKUs, quantities, and vendor details in one easy interactive form.</p>
+            </div>
           </div>
           <button onClick={onClose} style={styles.closeBtn}>
-            <X size={18} />
+            <X size={20} />
           </button>
         </div>
 
@@ -226,81 +307,60 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
           </div>
         )}
 
-        {/* Import Area */}
-        {parsedItems.length === 0 ? (
-          <div style={styles.importContainer}>
-            <div style={styles.tabBar}>
-              <button
-                type="button"
-                onClick={() => { setActiveInputTab('paste'); setError(''); }}
-                style={{ ...styles.tab, ...(activeInputTab === 'paste' ? styles.tabActive : {}) }}
-              >
-                <Clipboard size={14} /> Paste CSV / Excel Data
-              </button>
-              <button
-                type="button"
-                onClick={() => { setActiveInputTab('upload'); setError(''); }}
-                style={{ ...styles.tab, ...(activeInputTab === 'upload' ? styles.tabActive : {}) }}
-              >
-                <Upload size={14} /> Upload CSV File
-              </button>
-            </div>
-
-            {activeInputTab === 'paste' ? (
-              <div style={styles.tabContent}>
-                <p style={styles.instructions}>
-                  Copy columns from Excel/Google Sheets (SKU Code, Quantity, Purchase Price, Sale Price, Vendor) and paste them below:
-                </p>
-                <textarea
-                  value={pasteText}
-                  onChange={(e) => setPasteText(e.target.value)}
-                  placeholder="Example format:&#10;SKU-A, 10&#10;SKU-B, 25, 250, 499, Royal Brands&#10;SKU-C_M, 5, 120, 299"
-                  style={styles.textarea}
-                  rows={8}
-                />
-                <button
-                  type="button"
-                  onClick={() => processInputLines(pasteText)}
-                  className="btn-primary"
-                  style={{ marginTop: '0.75rem', alignSelf: 'flex-start' }}
-                  disabled={isLoading}
-                >
-                  Parse & Preview Data
-                </button>
-              </div>
-            ) : (
-              <div style={styles.tabContent}>
-                <div style={styles.uploadBox}>
-                  <Upload size={32} color="var(--primary)" style={{ marginBottom: '0.75rem' }} />
-                  <p style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>Select a CSV file containing SKU Code and Quantity</p>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Format: SKU, Quantity, PurchasePrice, SalePrice, Vendor</span>
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleFileUpload}
-                    style={styles.fileInput}
-                  />
-                </div>
-              </div>
-            )}
+        {/* Top Control Bar: Tabs + Scanner + Quick Set */}
+        <div style={styles.topControlBar}>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              type="button"
+              onClick={() => setActiveTab('form')}
+              style={{ ...styles.tabBtn, ...(activeTab === 'form' ? styles.tabBtnActive : {}) }}
+            >
+              <Layers size={14} /> Multi-Row Form
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('csv')}
+              style={{ ...styles.tabBtn, ...(activeTab === 'csv' ? styles.tabBtnActive : {}) }}
+            >
+              <FileSpreadsheet size={14} /> CSV / Paste Import
+            </button>
           </div>
-        ) : (
-          /* Preview and Edit Section */
-          <div style={styles.previewContainer}>
-            
-            {/* Quick Set Row */}
-            <div style={styles.quickSetPanel}>
-              <h5 style={{ margin: 0, color: 'var(--primary)', fontSize: '0.8rem', fontWeight: 600 }}>⚡ Quick Set All Items</h5>
-              <div style={styles.quickSetRow}>
+
+          {/* Quick Scanner Box */}
+          {activeTab === 'form' && (
+            <form onSubmit={handleScanSubmit} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, maxWidth: '340px' }}>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <Scan size={14} color="var(--primary)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
                   type="text"
-                  placeholder="Set Vendor..."
+                  value={scanSkuInput}
+                  onChange={e => setScanSkuInput(e.target.value)}
+                  placeholder="Scan SKU barcode to add row..."
+                  style={{ ...styles.quickInput, paddingLeft: '2rem', width: '100%', borderColor: 'rgba(6, 182, 212, 0.3)' }}
+                />
+              </div>
+              <button type="submit" className="btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>+ Scan</button>
+            </form>
+          )}
+        </div>
+
+        {/* MAIN FORM VIEW */}
+        {activeTab === 'form' ? (
+          <div style={styles.formContainer}>
+            
+            {/* Quick Set Header Bar */}
+            <div style={styles.quickSetPanel}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--primary)', whiteSpace: 'nowrap' }}>⚡ Quick Set All:</span>
+              <div style={{ display: 'flex', gap: '0.5rem', flex: 1, flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  placeholder="Set Vendor / Company Name..."
                   value={bulkVendor}
                   onChange={(e) => setBulkVendor(e.target.value)}
-                  list="bulk-vendors"
+                  list="bulk-vendors-list"
                   style={styles.quickInput}
                 />
-                <datalist id="bulk-vendors">
+                <datalist id="bulk-vendors-list">
                   {vendorsList.map((v, i) => (
                     <option key={i} value={v.businessName || v.name}>
                       {v.businessName ? `${v.businessName} (Contact: ${v.name})` : v.name}
@@ -313,7 +373,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                   placeholder="Set Buy Price..."
                   value={bulkPurchasePrice}
                   onChange={(e) => setBulkPurchasePrice(e.target.value)}
-                  style={styles.quickInput}
+                  style={{ ...styles.quickInput, maxWidth: '120px' }}
                   min="0"
                   step="0.01"
                 />
@@ -323,7 +383,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                   placeholder="Set Sell Price..."
                   value={bulkSalePrice}
                   onChange={(e) => setBulkSalePrice(e.target.value)}
-                  style={styles.quickInput}
+                  style={{ ...styles.quickInput, maxWidth: '120px' }}
                   min="0"
                   step="0.01"
                 />
@@ -332,123 +392,189 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                   type="button"
                   onClick={applyQuickSettings}
                   className="btn-secondary"
-                  style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}
+                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.78rem', fontWeight: 600 }}
                 >
-                  Apply Settings
+                  Apply to All Rows
                 </button>
               </div>
             </div>
 
-            {/* Preview Table */}
+            {/* Dynamic Form Table */}
             <div style={styles.tableWrapper}>
               <table style={styles.table}>
                 <thead>
-                  <tr>
-                    <th style={{ width: '15%' }}>SKU Code</th>
-                    <th style={{ width: '20%' }}>Item Details</th>
-                    <th style={{ width: '10%' }}>Size</th>
-                    <th style={{ width: '10%' }}>Qty</th>
-                    <th style={{ width: '12%' }}>Buy Price</th>
-                    <th style={{ width: '12%' }}>Sell Price</th>
-                    <th style={{ width: '15%' }}>Vendor</th>
-                    <th style={{ width: '6%' }}>Action</th>
+                  <tr style={{ background: '#1e293b', color: '#ffffff' }}>
+                    <th style={{ width: '22%', padding: '0.65rem 0.5rem' }}>SKU CODE *</th>
+                    <th style={{ width: '22%', padding: '0.65rem 0.5rem' }}>ITEM NAME / DETAILS</th>
+                    <th style={{ width: '10%', padding: '0.65rem 0.5rem', textAlign: 'center' }}>SIZE</th>
+                    <th style={{ width: '10%', padding: '0.65rem 0.5rem', textAlign: 'center' }}>QTY *</th>
+                    <th style={{ width: '12%', padding: '0.65rem 0.5rem', textAlign: 'right' }}>BUY PRICE</th>
+                    <th style={{ width: '12%', padding: '0.65rem 0.5rem', textAlign: 'right' }}>SELL PRICE</th>
+                    <th style={{ width: '18%', padding: '0.65rem 0.5rem' }}>VENDOR / COMPANY *</th>
+                    <th style={{ width: '4%', padding: '0.65rem 0.5rem', textAlign: 'center' }}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {parsedItems.map((item, idx) => (
-                    <tr key={idx} style={styles.tr}>
-                      <td>
-                        <span style={styles.skuBadge} title={item.status}>
-                          {item.skuCode}
-                        </span>
-                        <div style={{ fontSize: '0.65rem', marginTop: '2px', color: item.status === 'UPDATE' ? '#34d399' : item.status === 'CATALOG_MATCH' ? '#60a5fa' : '#fbbf24' }}>
-                          {item.status === 'UPDATE' ? '● Existing SKU' : item.status === 'CATALOG_MATCH' ? '● Synced Catalog' : '● New SKU'}
-                        </div>
-                      </td>
-                      <td>
+                  {formRows.map((row, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)', background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                      
+                      {/* SKU Code Input with Autocomplete */}
+                      <td style={{ padding: '0.4rem 0.5rem' }}>
                         <input
                           type="text"
-                          value={item.itemName}
-                          onChange={(e) => handleItemEdit(idx, 'itemName', e.target.value)}
+                          value={row.skuCode}
+                          onChange={(e) => handleSkuChange(idx, e.target.value)}
+                          list="master-catalog-skus"
+                          placeholder="Select/type SKU..."
+                          style={styles.cellInput}
+                          required
+                        />
+                      </td>
+
+                      {/* Item Name */}
+                      <td style={{ padding: '0.4rem 0.5rem' }}>
+                        <input
+                          type="text"
+                          value={row.itemName}
+                          onChange={(e) => handleRowFieldChange(idx, 'itemName', e.target.value)}
+                          placeholder="Item Description..."
                           style={styles.cellInput}
                         />
                       </td>
-                      <td>
+
+                      {/* Size */}
+                      <td style={{ padding: '0.4rem 0.5rem' }}>
                         <input
                           type="text"
-                          value={item.size}
-                          onChange={(e) => handleItemEdit(idx, 'size', e.target.value)}
+                          value={row.size}
+                          onChange={(e) => handleRowFieldChange(idx, 'size', e.target.value)}
+                          placeholder="M, L..."
                           style={{ ...styles.cellInput, textAlign: 'center' }}
                         />
                       </td>
-                      <td>
+
+                      {/* Quantity */}
+                      <td style={{ padding: '0.4rem 0.5rem' }}>
                         <input
                           type="number"
-                          value={item.qty}
-                          onChange={(e) => handleItemEdit(idx, 'qty', e.target.value)}
-                          style={{ ...styles.cellInput, textAlign: 'center' }}
+                          value={row.qty}
+                          onChange={(e) => handleRowFieldChange(idx, 'qty', e.target.value)}
                           min="1"
+                          style={{ ...styles.cellInput, textAlign: 'center', fontWeight: 'bold', color: 'var(--primary)' }}
+                          required
                         />
                       </td>
-                      <td>
+
+                      {/* Buy Price */}
+                      <td style={{ padding: '0.4rem 0.5rem' }}>
                         <input
                           type="number"
-                          value={item.purchasePrice}
-                          onChange={(e) => handleItemEdit(idx, 'purchasePrice', e.target.value)}
-                          style={styles.cellInput}
-                          min="0"
+                          value={row.purchasePrice}
+                          onChange={(e) => handleRowFieldChange(idx, 'purchasePrice', e.target.value)}
                           step="0.01"
+                          min="0"
+                          style={{ ...styles.cellInput, textAlign: 'right' }}
                         />
                       </td>
-                      <td>
+
+                      {/* Sell Price */}
+                      <td style={{ padding: '0.4rem 0.5rem' }}>
                         <input
                           type="number"
-                          value={item.salePrice}
-                          onChange={(e) => handleItemEdit(idx, 'salePrice', e.target.value)}
-                          style={styles.cellInput}
-                          min="0"
+                          value={row.salePrice}
+                          onChange={(e) => handleRowFieldChange(idx, 'salePrice', e.target.value)}
                           step="0.01"
+                          min="0"
+                          style={{ ...styles.cellInput, textAlign: 'right' }}
                         />
                       </td>
-                      <td>
+
+                      {/* Vendor Business Name */}
+                      <td style={{ padding: '0.4rem 0.5rem' }}>
                         <input
                           type="text"
-                          value={item.party}
-                          onChange={(e) => handleItemEdit(idx, 'party', e.target.value)}
-                          list="modal-vendors"
+                          value={row.party}
+                          onChange={(e) => handleRowFieldChange(idx, 'party', e.target.value)}
+                          list="master-vendors-list"
+                          placeholder="Select Vendor..."
                           style={styles.cellInput}
+                          required
                         />
-                        <datalist id="modal-vendors">
-                          {vendorsList.map((v, i) => (
-                            <option key={i} value={v.businessName || v.name}>
-                              {v.businessName ? `${v.businessName} (Contact: ${v.name})` : v.name}
-                            </option>
-                          ))}
-                        </datalist>
                       </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(idx)}
-                          style={styles.deleteRowBtn}
-                          title="Exclude Item"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+
+                      {/* Delete Row Button */}
+                      <td style={{ padding: '0.4rem 0.5rem', textAlign: 'center' }}>
+                        {formRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveRow(idx)}
+                            style={styles.deleteRowBtn}
+                            title="Remove Row"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </td>
+
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
 
-            {/* Back Button to Reset Import */}
+            {/* Datalists for autocompletion */}
+            <datalist id="master-catalog-skus">
+              {catalogItems.map((c, i) => (
+                <option key={i} value={c.skuCode}>
+                  {c.description ? `${c.description} (${c.brand || 'Uniware'})` : c.skuCode}
+                </option>
+              ))}
+              {storeInventory.map((inv, i) => (
+                <option key={`inv-${i}`} value={inv.skuCode}>
+                  {inv.itemName ? `${inv.itemName} (In Stock)` : inv.skuCode}
+                </option>
+              ))}
+            </datalist>
+
+            <datalist id="master-vendors-list">
+              {vendorsList.map((v, i) => (
+                <option key={i} value={v.businessName || v.name}>
+                  {v.businessName ? `${v.businessName} (Contact: ${v.name})` : v.name}
+                </option>
+              ))}
+            </datalist>
+
+            {/* Add Row Action Button */}
             <button
               type="button"
-              onClick={() => { setParsedItems([]); setError(''); }}
-              style={styles.resetBtn}
+              onClick={handleAddRow}
+              style={styles.addRowBtn}
             >
-              ← Back to Paste / Upload
+              <Plus size={16} />
+              <span>+ Add Another Item Row</span>
+            </button>
+
+          </div>
+        ) : (
+          /* OPTIONAL SECONDARY TAB: CSV / Paste Import */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1, paddingTop: '0.5rem' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              Optional: Copy columns from Excel (SKU, Qty, Buy Price, Sell Price, Vendor) and paste below:
+            </p>
+            <textarea
+              value={pasteText}
+              onChange={e => setPasteText(e.target.value)}
+              rows={8}
+              placeholder="SKU-001, 10, 250, 499, Vendor Company Ltd&#10;SKU-002, 5, 120, 299, ABC Traders"
+              style={styles.textarea}
+            />
+            <button
+              type="button"
+              onClick={() => processCsvText(pasteText)}
+              className="btn-primary"
+              style={{ alignSelf: 'flex-start', padding: '0.6rem 1.2rem' }}
+            >
+              Parse Data into Form Rows
             </button>
           </div>
         )}
@@ -456,24 +582,19 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
         {/* Footer */}
         <div style={styles.footer}>
           <div style={styles.statsSummary}>
-            {parsedItems.length > 0 && (
-              <>
-                <CheckCircle size={15} color="#34d399" />
-                <span style={{ fontSize: '0.8rem', color: '#e5e7eb' }}>
-                  Ready to Inward: <strong>{parsedItems.length} SKUs</strong> ({totalInwardUnits} total units)
-                </span>
-              </>
-            )}
+            <CheckCircle size={16} color="#34d399" />
+            <span style={{ fontSize: '0.85rem', color: '#e5e7eb' }}>
+              Ready to Inward: <strong>{activeRowsCount} SKUs</strong> ({totalInwardUnits} total units)
+            </span>
           </div>
+          
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button type="button" onClick={onClose} className="btn-secondary">
               Cancel
             </button>
-            {parsedItems.length > 0 && (
-              <button onClick={handleBulkSubmit} className="btn-success" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <Sparkles size={14} /> Confirm Inward
-              </button>
-            )}
+            <button onClick={handleFinalSubmit} className="btn-success" style={{ padding: '0.75rem 1.5rem', fontWeight: 'bold', fontSize: '0.95rem' }}>
+              <Sparkles size={16} style={{ marginRight: '0.4rem' }} /> Confirm & Submit All Inwards
+            </button>
           </div>
         </div>
 
@@ -485,11 +606,11 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
 const styles = {
   modalContent: {
     padding: '1.5rem',
-    maxWidth: '960px',
-    width: '95vw',
+    maxWidth: '1100px',
+    width: '96vw',
     display: 'flex',
     flexDirection: 'column',
-    maxHeight: '85vh',
+    maxHeight: '90vh',
   },
   header: {
     display: 'flex',
@@ -500,8 +621,8 @@ const styles = {
     paddingBottom: '0.75rem',
   },
   title: {
-    fontSize: '1.2rem',
-    fontWeight: '600',
+    fontSize: '1.25rem',
+    fontWeight: '700',
     color: 'var(--text-primary)',
     margin: 0,
   },
@@ -525,44 +646,106 @@ const styles = {
     alignItems: 'center',
     gap: '0.5rem',
   },
-  importContainer: {
+  topControlBar: {
     display: 'flex',
-    flexDirection: 'column',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: '1rem',
-    flex: 1,
-  },
-  tabBar: {
-    display: 'flex',
     borderBottom: '1px solid var(--border-light)',
-    gap: '0.5rem',
+    paddingBottom: '0.75rem',
+    marginBottom: '1rem',
+    flexWrap: 'wrap',
   },
-  tab: {
-    padding: '0.6rem 1.2rem',
+  tabBtn: {
+    padding: '0.5rem 1rem',
     background: 'none',
     border: 'none',
-    borderBottom: '2px solid transparent',
+    borderRadius: '6px',
     color: 'var(--text-muted)',
     cursor: 'pointer',
-    fontSize: '0.85rem',
+    fontSize: '0.82rem',
     fontWeight: 500,
     display: 'flex',
     alignItems: 'center',
     gap: '0.4rem',
   },
-  tabActive: {
-    borderBottom: '2px solid var(--primary)',
-    color: 'var(--primary)',
-    background: 'rgba(6, 182, 212, 0.05)',
+  tabBtnActive: {
+    background: 'rgba(16, 185, 129, 0.12)',
+    color: '#10b981',
+    fontWeight: 700,
   },
-  tabContent: {
+  formContainer: {
     display: 'flex',
     flexDirection: 'column',
-    padding: '0.5rem 0',
+    gap: '1rem',
+    flex: 1,
+    overflow: 'hidden',
   },
-  instructions: {
+  quickSetPanel: {
+    background: 'rgba(16, 185, 129, 0.05)',
+    border: '1px solid rgba(16, 185, 129, 0.15)',
+    borderRadius: '8px',
+    padding: '0.6rem 0.8rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    flexWrap: 'wrap',
+  },
+  quickInput: {
+    padding: '0.4rem 0.6.rem',
     fontSize: '0.8rem',
-    color: 'var(--text-muted)',
-    marginBottom: '0.5rem',
+    borderRadius: '6px',
+    border: '1px solid var(--border-light)',
+    background: 'rgba(0,0,0,0.3)',
+    color: '#f3f4f6',
+    flex: 1,
+    minWidth: '130px',
+  },
+  tableWrapper: {
+    overflowY: 'auto',
+    maxHeight: '48vh',
+    border: '1px solid var(--border-light)',
+    borderRadius: '8px',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: '0.82rem',
+  },
+  cellInput: {
+    width: '100%',
+    border: '1px solid var(--border-light)',
+    borderRadius: '4px',
+    background: 'rgba(255, 255, 255, 0.05)',
+    padding: '0.45rem 0.5rem',
+    fontSize: '0.82rem',
+    color: '#ffffff',
+    outline: 'none',
+  },
+  deleteRowBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#fca5a5',
+    cursor: 'pointer',
+    padding: '0.25rem',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addRowBtn: {
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: '1px dashed var(--border-light)',
+    color: 'var(--text-primary)',
+    padding: '0.65rem 1rem',
+    borderRadius: '8px',
+    fontWeight: 700,
+    fontSize: '0.85rem',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.4rem',
+    width: '100%',
   },
   textarea: {
     width: '100%',
@@ -571,111 +754,9 @@ const styles = {
     padding: '0.75rem',
     background: 'rgba(17, 24, 39, 0.4)',
     border: '1px solid var(--border-light)',
-    borderRadius: 'var(--radius-sm)',
+    borderRadius: '6px',
     color: '#f3f4f6',
     resize: 'vertical',
-  },
-  uploadBox: {
-    border: '2px dashed var(--border-light)',
-    borderRadius: 'var(--radius-md)',
-    padding: '2.5rem 1.5rem',
-    textAlign: 'center',
-    background: 'rgba(255, 255, 255, 0.01)',
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fileInput: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-    opacity: 0,
-    cursor: 'pointer',
-  },
-  previewContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1rem',
-    flex: 1,
-    overflow: 'hidden',
-  },
-  quickSetPanel: {
-    background: 'rgba(6, 182, 212, 0.04)',
-    border: '1px solid rgba(6, 182, 212, 0.1)',
-    borderRadius: 'var(--radius-md)',
-    padding: '0.75rem',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.5rem',
-  },
-  quickSetRow: {
-    display: 'flex',
-    gap: '0.5rem',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  quickInput: {
-    padding: '0.4rem 0.6rem',
-    fontSize: '0.8rem',
-    minWidth: '120px',
-    flex: 1,
-  },
-  tableWrapper: {
-    overflowY: 'auto',
-    maxHeight: '40vh',
-    border: '1px solid var(--border-light)',
-    borderRadius: 'var(--radius-sm)',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    fontSize: '0.8rem',
-  },
-  tr: {
-    borderBottom: '1px solid var(--border-light)',
-  },
-  cellInput: {
-    width: '100%',
-    border: 'none',
-    background: 'transparent',
-    padding: '0.4rem 0.2rem',
-    fontSize: '0.8rem',
-    color: '#f3f4f6',
-    outline: 'none',
-  },
-  skuBadge: {
-    fontFamily: 'monospace',
-    background: 'rgba(6, 182, 212, 0.08)',
-    border: '1px solid rgba(6, 182, 212, 0.15)',
-    padding: '0.1rem 0.35rem',
-    borderRadius: '4px',
-    color: 'var(--primary)',
-    fontWeight: 'bold',
-  },
-  deleteRowBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#fca5a5',
-    cursor: 'pointer',
-    padding: '0.25rem',
-    borderRadius: '4px',
-    display: 'inline-flex',
-  },
-  resetBtn: {
-    alignSelf: 'flex-start',
-    background: 'none',
-    border: 'none',
-    color: 'var(--primary)',
-    cursor: 'pointer',
-    fontSize: '0.8rem',
-    fontWeight: 500,
-    padding: '0.25rem 0',
   },
   footer: {
     display: 'flex',
@@ -688,6 +769,6 @@ const styles = {
   statsSummary: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.4rem',
+    gap: '0.5rem',
   },
 };
