@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Edit2, Trash2, Search, Plus, SlidersHorizontal, RefreshCw, Eye, Tag, MoreVertical } from 'lucide-react';
+import { Edit2, Trash2, Search, Plus, SlidersHorizontal, RefreshCw, Eye, Tag, Printer } from 'lucide-react';
 
 export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onSync }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -61,6 +61,261 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
     }
   };
 
+  // Thermal Barcode Label Printing with All Product Details & Images
+  const handlePrintBarcodes = (targetItems) => {
+    const printList = Array.isArray(targetItems) ? targetItems : [targetItems];
+    if (printList.length === 0) {
+      alert("No products available to print barcodes.");
+      return;
+    }
+
+    const countStr = window.prompt(
+      `Print Barcode Labels:\nHow many copies per product sticker?`,
+      "1"
+    );
+    if (countStr === null) return;
+
+    const count = parseInt(countStr, 10);
+    if (isNaN(count) || count <= 0) {
+      alert("Please enter a valid positive number.");
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=950,height=750');
+    let stickersHtml = '';
+    let barcodeScripts = '';
+    let barcodeCounter = 0;
+
+    printList.forEach((item) => {
+      const sku = item.skuCode || 'NO-SKU';
+      const name = item.description || 'Unnamed Product';
+      const category = item.categoryName || 'General';
+      const brand = item.brand || 'ANOUK';
+      const size = Array.isArray(item.size) ? (item.size[0] || 'N/A') : (item.size || 'N/A');
+      const price = item.price ? `Rs. ${item.price.toFixed(2)}` : (item.basePrice ? `Rs. ${item.basePrice.toFixed(2)}` : 'Rs. 0.00');
+      const imgUrl = item.imageUrl || '';
+
+      for (let c = 0; c < count; c++) {
+        const barcodeId = `barcode_${barcodeCounter}`;
+        barcodeCounter++;
+
+        stickersHtml += `
+          <div class="sticker-card">
+            <div class="sticker-header">
+              <span class="brand-title">${brand.toUpperCase()}</span>
+              <span class="price-tag">${price}</span>
+            </div>
+            <div class="sticker-body">
+              ${imgUrl ? `<img src="${imgUrl}" class="item-thumb" onError="this.style.display='none'" />` : '<div class="item-thumb-placeholder">NO IMG</div>'}
+              <div class="item-info">
+                <div class="item-name">${name}</div>
+                <div class="item-meta">Category: ${category}</div>
+                <div class="item-details">
+                  <span class="size-badge">SIZE: <b>${size}</b></span>
+                </div>
+              </div>
+            </div>
+            <div class="barcode-container">
+              <svg id="${barcodeId}"></svg>
+            </div>
+            <div class="sku-footer">${sku}</div>
+          </div>
+        `;
+
+        barcodeScripts += `
+          try {
+            JsBarcode("#${barcodeId}", "${sku}", {
+              format: "CODE128",
+              displayValue: false,
+              margin: 0,
+              background: "transparent",
+              lineColor: "#000",
+              width: 1.8,
+              height: 35
+            });
+          } catch(e) { console.error(e); }
+        `;
+      }
+    });
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Print Product Barcodes - Elite Online</title>
+        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+        <style>
+          @page { size: A4; margin: 8mm; }
+          body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #fff;
+            color: #0f172a;
+          }
+          .no-print {
+            padding: 12px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+          }
+          .print-btn {
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 700;
+            background: #059669;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+          }
+          .label-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6mm;
+            padding: 4mm;
+          }
+          .sticker-card {
+            border: 1.5px solid #0f172a;
+            border-radius: 8px;
+            padding: 8px 12px;
+            box-sizing: border-box;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            page-break-inside: avoid;
+            height: 50mm;
+          }
+          .sticker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+          }
+          .brand-title {
+            font-size: 9.5pt;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            color: #0f172a;
+          }
+          .price-tag {
+            font-size: 9.5pt;
+            font-weight: 800;
+            color: #059669;
+          }
+          .sticker-body {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 4px;
+          }
+          .item-thumb {
+            width: 42px;
+            height: 42px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            flex-shrink: 0;
+          }
+          .item-thumb-placeholder {
+            width: 42px;
+            height: 42px;
+            border-radius: 6px;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 7pt;
+            font-weight: bold;
+            color: #94a3b8;
+            flex-shrink: 0;
+          }
+          .item-info {
+            flex: 1;
+            min-width: 0;
+          }
+          .item-name {
+            font-size: 9pt;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #0f172a;
+          }
+          .item-meta {
+            font-size: 7.5pt;
+            color: #64748b;
+            margin-top: 1px;
+          }
+          .item-details {
+            font-size: 7.5pt;
+            color: #475569;
+            margin-top: 3px;
+          }
+          .size-badge {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 7.5pt;
+            color: #0f172a;
+          }
+          .barcode-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 12mm;
+            width: 100%;
+            margin-top: 2px;
+          }
+          .barcode-container svg {
+            max-width: 100%;
+            height: 11mm;
+          }
+          .sku-footer {
+            text-align: center;
+            font-family: monospace;
+            font-size: 9pt;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            color: #0f172a;
+            margin-top: 1px;
+          }
+          @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="no-print">
+          <button class="print-btn" onclick="window.print()">🖨️ Print All Labels Now</button>
+        </div>
+        <div class="label-grid">
+          ${stickersHtml}
+        </div>
+        <script>
+          setTimeout(function() {
+            ${barcodeScripts}
+          }, 150);
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   return (
     <div className="glass-panel" style={styles.gridPanel}>
       {/* Control Header */}
@@ -91,7 +346,17 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button 
+            onClick={() => handlePrintBarcodes(filteredItems)} 
+            className="btn-secondary" 
+            style={{ ...styles.addBtn, background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.3)', fontWeight: 700 }}
+            title="Print Barcode Labels for All Filtered Products"
+          >
+            <Printer size={16} />
+            <span>Print All Barcodes ({filteredItems.length})</span>
+          </button>
+
           <button 
             onClick={handleSyncTrigger} 
             disabled={syncing} 
@@ -101,6 +366,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
             <RefreshCw size={16} className={syncing ? 'spin-loader' : ''} />
             <span>Sync Catalog</span>
           </button>
+          
           <button onClick={onAdd} className="btn-success" style={styles.addBtn}>
             <Plus size={16} />
             Add Product
@@ -207,6 +473,14 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
                     </td>
                     <td>
                       <div style={styles.actionsCell}>
+                        <button
+                          onClick={() => handlePrintBarcodes(item)}
+                          className="btn-icon"
+                          style={{ color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.2)', background: 'rgba(16, 185, 129, 0.08)' }}
+                          title="Print Barcode Label for this Product"
+                        >
+                          <Printer size={15} />
+                        </button>
                         <button
                           onClick={() => onEdit(item)}
                           className="btn-icon"
