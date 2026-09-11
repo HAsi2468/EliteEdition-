@@ -15,8 +15,6 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   // Quick Set Header Controls
   const [bulkVendor, setBulkVendor] = useState('');
   const [bulkChallanNo, setBulkChallanNo] = useState('');
-  const [bulkPurchasePrice, setBulkPurchasePrice] = useState('');
-  const [bulkSalePrice, setBulkSalePrice] = useState('');
 
   // Barcode / SKU Scanner Input
   const [scanSkuInput, setScanSkuInput] = useState('');
@@ -77,16 +75,10 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   const handleAddRow = () => {
     const defaultVendor = resolveVendorName(bulkVendor) || (formRows[0]?.party || '');
     const defaultChallan = bulkChallanNo || (formRows[0]?.challanNo || '');
-    const defaultBuy = bulkPurchasePrice ? parseFloat(bulkPurchasePrice) : 0;
-    const defaultSell = bulkSalePrice ? parseFloat(bulkSalePrice) : 0;
 
     setFormRows(prev => [
       ...prev,
-      {
-        ...createEmptyRow(defaultVendor, defaultChallan),
-        purchasePrice: defaultBuy,
-        salePrice: defaultSell,
-      }
+      createEmptyRow(defaultVendor, defaultChallan)
     ]);
   };
 
@@ -232,8 +224,6 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
       ...item,
       party: resolvedVendor || item.party,
       challanNo: bulkChallanNo !== '' ? bulkChallanNo : item.challanNo,
-      purchasePrice: bulkPurchasePrice ? parseFloat(bulkPurchasePrice) : item.purchasePrice,
-      salePrice: bulkSalePrice ? parseFloat(bulkSalePrice) : item.salePrice
     })));
   };
 
@@ -338,27 +328,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                 placeholder="Set Challan No..."
                 value={bulkChallanNo}
                 onChange={(e) => setBulkChallanNo(e.target.value)}
-                style={{ ...styles.quickInput, maxWidth: '140px' }}
-              />
-
-              <input
-                type="number"
-                placeholder="Set Buy Price..."
-                value={bulkPurchasePrice}
-                onChange={(e) => setBulkPurchasePrice(e.target.value)}
-                style={{ ...styles.quickInput, maxWidth: '120px' }}
-                min="0"
-                step="0.01"
-              />
-
-              <input
-                type="number"
-                placeholder="Set Sell Price..."
-                value={bulkSalePrice}
-                onChange={(e) => setBulkSalePrice(e.target.value)}
-                style={{ ...styles.quickInput, maxWidth: '120px' }}
-                min="0"
-                step="0.01"
+                style={{ ...styles.quickInput, maxWidth: '160px' }}
               />
 
               <button
