@@ -676,16 +676,21 @@ const renderItems = (doc, items, imageCache, reportTitle, dateStr, startPageNum,
 // ─────────────────────────────────────────────────────────────
 const getInventoryReport = async (req, res) => {
   try {
-    const { dateStart, dateEnd } = req.query;
-    if (!dateStart || !dateEnd) return res.status(400).json({ error: 'dateStart and dateEnd are required' });
+    const { dateStart = '', dateEnd = '' } = req.query;
+    let inQuery = { party: { $ne: 'Uniware Channel Sync' } };
+    let outQuery = {};
 
-    const start = new Date(dateStart);
-    const end   = new Date(dateEnd);
-    end.setHours(23, 59, 59, 999);
+    if (dateStart && dateEnd) {
+      const start = new Date(dateStart);
+      const end   = new Date(dateEnd);
+      end.setHours(23, 59, 59, 999);
+      inQuery.created_date_time = { $gte: start, $lte: end };
+      outQuery.created_date_time = { $gte: start, $lte: end };
+    }
 
     const currentStockRaw = await db.Inventory.find({ party: { $ne: 'Uniware Channel Sync' } }).lean();
-    const stockInRaw  = await db.Inventory.find({ created_date_time: { $gte: start, $lte: end }, party: { $ne: 'Uniware Channel Sync' } }).lean();
-    const stockOutLogs = await db.StockOut.find({ created_date_time: { $gte: start, $lte: end } }).lean();
+    const stockInRaw  = await db.Inventory.find(inQuery).lean();
+    const stockOutLogs = await db.StockOut.find(outQuery).lean();
 
     const stockOutRaw = [];
     for (const log of stockOutLogs) {
@@ -748,16 +753,20 @@ const downloadStockValuePdf = async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 const downloadStockInwardPdf = async (req, res) => {
   try {
-    const { dateStart, dateEnd } = req.query;
-    if (!dateStart || !dateEnd) return res.status(400).json({ error: 'dateStart and dateEnd are required' });
+    const { dateStart = '', dateEnd = '' } = req.query;
+    let query = { party: { $ne: 'Uniware Channel Sync' } };
 
-    const start = new Date(dateStart);
-    const end   = new Date(dateEnd);
-    end.setHours(23, 59, 59, 999);
-    const dateStr = `${dateStart}  →  ${dateEnd}`;
-    logger.info('Generating Stock Inward PDF %s → %s', dateStart, dateEnd);
+    if (dateStart && dateEnd) {
+      const start = new Date(dateStart);
+      const end   = new Date(dateEnd);
+      end.setHours(23, 59, 59, 999);
+      query.created_date_time = { $gte: start, $lte: end };
+    }
 
-    const raw = await db.Inventory.find({ created_date_time: { $gte: start, $lte: end }, party: { $ne: 'Uniware Channel Sync' } }).lean();
+    const dateStr = dateStart && dateEnd ? `${dateStart}  →  ${dateEnd}` : `All Time Stock Inward`;
+    logger.info('Generating Stock Inward PDF %s', dateStr);
+
+    const raw = await db.Inventory.find(query).lean();
     const { totalQty, items } = groupInventoryItems(raw, 'qty');
     const totalPurchase = items.reduce((s, i) => s + i.totalPurchaseAmount, 0);
 
@@ -770,7 +779,7 @@ const downloadStockInwardPdf = async (req, res) => {
     doc.on('pageAdded', () => drawPunchGuide(doc));
     drawPunchGuide(doc);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Stock_Inward_Report_${dateStart}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="Stock_Inward_Report_${dateStart || 'AllTime'}.pdf"`);
     doc.pipe(res);
 
     drawPageHeader(doc, 'Stock Inward Report', dateStr, 1);
@@ -797,16 +806,20 @@ const downloadStockInwardPdf = async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 const downloadStockOutwardPdf = async (req, res) => {
   try {
-    const { dateStart, dateEnd } = req.query;
-    if (!dateStart || !dateEnd) return res.status(400).json({ error: 'dateStart and dateEnd are required' });
+    const { dateStart = '', dateEnd = '' } = req.query;
+    let query = {};
 
-    const start = new Date(dateStart);
-    const end   = new Date(dateEnd);
-    end.setHours(23, 59, 59, 999);
-    const dateStr = `${dateStart}  →  ${dateEnd}`;
-    logger.info('Generating Stock Outward PDF %s → %s', dateStart, dateEnd);
+    if (dateStart && dateEnd) {
+      const start = new Date(dateStart);
+      const end   = new Date(dateEnd);
+      end.setHours(23, 59, 59, 999);
+      query.created_date_time = { $gte: start, $lte: end };
+    }
 
-    const stockOutLogs = await db.StockOut.find({ created_date_time: { $gte: start, $lte: end } }).lean();
+    const dateStr = dateStart && dateEnd ? `${dateStart}  →  ${dateEnd}` : `All Time Stock Outward`;
+    logger.info('Generating Stock Outward PDF %s', dateStr);
+
+    const stockOutLogs = await db.StockOut.find(query).lean();
 
     // Join with Inventory for details
     const raw = [];
@@ -836,7 +849,7 @@ const downloadStockOutwardPdf = async (req, res) => {
     doc.on('pageAdded', () => drawPunchGuide(doc));
     drawPunchGuide(doc);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Stock_Outward_Report_${dateStart}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="Stock_Outward_Report_${dateStart || 'AllTime'}.pdf"`);
     doc.pipe(res);
 
     drawPageHeader(doc, 'Stock Outward Report', dateStr, 1);
@@ -1019,14 +1032,17 @@ const getStockValueData = async (req, res) => {
 
 const getStockInwardData = async (req, res) => {
   try {
-    const { dateStart, dateEnd } = req.query;
-    if (!dateStart || !dateEnd) return res.status(400).json({ error: 'dateStart and dateEnd are required' });
+    const { dateStart = '', dateEnd = '' } = req.query;
+    let query = { party: { $ne: 'Uniware Channel Sync' } };
 
-    const start = new Date(dateStart);
-    const end   = new Date(dateEnd);
-    end.setHours(23, 59, 59, 999);
+    if (dateStart && dateEnd) {
+      const start = new Date(dateStart);
+      const end   = new Date(dateEnd);
+      end.setHours(23, 59, 59, 999);
+      query.created_date_time = { $gte: start, $lte: end };
+    }
 
-    const raw = await db.Inventory.find({ created_date_time: { $gte: start, $lte: end }, party: { $ne: 'Uniware Channel Sync' } }).lean();
+    const raw = await db.Inventory.find(query).lean();
     const { totalQty, items } = groupInventoryItems(raw, 'qty');
     const totalPurchase = items.reduce((s, i) => s + i.totalPurchaseAmount, 0);
     await enrichImages(items);
@@ -1039,14 +1055,17 @@ const getStockInwardData = async (req, res) => {
 
 const getStockOutwardData = async (req, res) => {
   try {
-    const { dateStart, dateEnd } = req.query;
-    if (!dateStart || !dateEnd) return res.status(400).json({ error: 'dateStart and dateEnd are required' });
+    const { dateStart = '', dateEnd = '' } = req.query;
+    let query = {};
 
-    const start = new Date(dateStart);
-    const end   = new Date(dateEnd);
-    end.setHours(23, 59, 59, 999);
+    if (dateStart && dateEnd) {
+      const start = new Date(dateStart);
+      const end   = new Date(dateEnd);
+      end.setHours(23, 59, 59, 999);
+      query.created_date_time = { $gte: start, $lte: end };
+    }
 
-    const stockOutLogs = await db.StockOut.find({ created_date_time: { $gte: start, $lte: end } }).lean();
+    const stockOutLogs = await db.StockOut.find(query).lean();
     const raw = [];
     for (const log of stockOutLogs) {
       const inv = await db.Inventory.findOne({ skuCode: log.skuCode }).lean();
