@@ -1093,25 +1093,22 @@ export const api = {
 
   async downloadFabricLedgerPdf(params = {}) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
     const query = new URLSearchParams();
     if (params.dateStart) query.append('dateStart', params.dateStart);
     if (params.dateEnd) query.append('dateEnd', params.dateEnd);
-    if (params.fabricQuality) query.append('fabricQuality', params.fabricQuality);
+    if (params.fabricQuality && params.fabricQuality !== 'All') query.append('fabricQuality', params.fabricQuality);
     const qs = query.toString() ? `?${query.toString()}` : '';
-    const response = await fetch(`${baseUrl}/fabric/report/pdf${qs}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!response.ok) throw new Error('Failed to generate fabric ledger PDF');
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `fabric-ledger${params.dateStart ? '-' + params.dateStart : ''}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    const pdfUrl = `${baseUrl}/fabric/report/pdf${qs}`;
+    const win = window.open(pdfUrl, '_blank');
+    if (!win) {
+      const link = document.createElement('a');
+      link.href = pdfUrl;
+      link.target = '_blank';
+      link.setAttribute('download', `fabric-ledger${params.dateStart ? '-' + params.dateStart : ''}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   },
 
   // Raw Materials Inventory
@@ -1150,25 +1147,22 @@ export const api = {
 
   async downloadRawMaterialLedgerPdf(params = {}) {
     const baseUrl = getBaseUrl();
-    const token = localStorage.getItem('elite_auth_token');
     const query = new URLSearchParams();
     if (params.dateStart) query.append('dateStart', params.dateStart);
     if (params.dateEnd) query.append('dateEnd', params.dateEnd);
-    if (params.materialName) query.append('materialName', params.materialName);
+    if (params.materialName && params.materialName !== 'All') query.append('materialName', params.materialName);
     const qs = query.toString() ? `?${query.toString()}` : '';
-    const response = await fetch(`${baseUrl}/raw-materials/report/pdf${qs}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!response.ok) throw new Error('Failed to generate raw materials ledger PDF');
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `raw-materials-ledger${params.dateStart ? '-' + params.dateStart : ''}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    const pdfUrl = `${baseUrl}/raw-materials/report/pdf${qs}`;
+    const win = window.open(pdfUrl, '_blank');
+    if (!win) {
+      const link = document.createElement('a');
+      link.href = pdfUrl;
+      link.target = '_blank';
+      link.setAttribute('download', `raw-materials-ledger${params.dateStart ? '-' + params.dateStart : ''}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   },
 
   async importRawMaterialStock(rows) {

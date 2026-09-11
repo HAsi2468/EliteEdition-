@@ -2050,7 +2050,15 @@ export default function RawMaterialsPanel() {
                 <label style={labelStyle}>Material Item (Optional)</label>
                 <select style={inputStyle} value={pdfFilter.materialName} onChange={e => setPdfFilter(p => ({ ...p, materialName: e.target.value }))}>
                   <option value="">-- All Materials --</option>
-                  {materialsList.map(m => <option key={m} value={m}>{m}</option>)}
+                  <option value="Ink">All Inks (Grando / Printdot)</option>
+                  <option value="Paper">All Papers (Sublimation / Butter)</option>
+                  <option value="Sublimation Paper">Sublimation Paper</option>
+                  <option value="Butter Paper">Butter Paper</option>
+                  <option value="Grando Ink">Grando Ink</option>
+                  <option value="Printdot Ink">Printdot Ink</option>
+                  {materialsList.filter(m => !['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'].includes(m)).map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
                 </select>
               </div>
 
