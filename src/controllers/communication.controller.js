@@ -306,33 +306,45 @@ const createOrGetDirectRoom = async (req, res) => {
  */
 const createGroup = async (req, res) => {
   try {
-    const { name, description = '', department = 'General', permissionScope = 'general', subscribedModules = [], subscribedActions = [] } = req.body;
+    const { name, description = '', department = 'General', companyEntity = '', permissionScope = 'general', subscribedModules = [], subscribedActions = [] } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Group name is required' });
     }
 
-    // Find all users who match department or permissionScope
-    let matchingUsers = [];
-    if (permissionScope && permissionScope !== 'general') {
-      matchingUsers = await User.find({
-        $or: [
-          { role: 'admin' },
-          { permissions: permissionScope },
-          { department: { $regex: new RegExp(`^${department}$`, 'i') } }
-        ]
-      }).select('_id');
-    } else {
-      matchingUsers = await User.find().select('_id');
-    }
+    const allUsers = await User.find({}).lean();
+    const scope = (permissionScope || '').toLowerCase();
+    const targetComp = (companyEntity || '').trim().toLowerCase();
 
-    const memberIds = matchingUsers.map((u) => u._id);
+    const matchingUsers = allUsers.filter(u => {
+      if (u.role === 'admin') return true;
+
+      if (targetComp) {
+        const userCompanies = Array.isArray(u.allowedCompanies)
+          ? u.allowedCompanies.map(c => String(c).trim().toLowerCase())
+          : [];
+        if (userCompanies.length > 0 && !userCompanies.includes(targetComp) && !userCompanies.includes('all')) {
+          return false;
+        }
+      }
+
+      if (!u.permissions || !Array.isArray(u.permissions)) return false;
+      if (!scope || scope === 'general' || scope === 'direct_msg') return true;
+
+      return u.permissions.some(p => {
+        const perm = (p || '').toLowerCase();
+        return perm === scope || perm.startsWith(scope) || scope.startsWith(perm);
+      });
+    });
+
+    const memberIds = matchingUsers.map(u => u._id);
 
     const room = await ChatRoom.create({
       name: name.trim(),
       description: description.trim(),
       type: 'group',
       department: department.trim(),
+      companyEntity: companyEntity.trim(),
       permissionScope: permissionScope.trim(),
       isSystemGroup: true,
       subscribedModules: subscribedModules || [],
@@ -340,7 +352,7 @@ const createGroup = async (req, res) => {
       members: memberIds
     });
 
-    const populatedRoom = await ChatRoom.findById(room._id).populate('members', 'name email role permissions department');
+    const populatedRoom = await ChatRoom.findById(room._id).populate('members', 'name email role permissions department allowedCompanies');
 
     res.json({ success: true, data: populatedRoom });
   } catch (error) {

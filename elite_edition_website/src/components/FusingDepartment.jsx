@@ -4,7 +4,7 @@ import {
   Flame, PlusCircle, Search, RefreshCw, Trash2, Edit2, Edit, CheckCircle2,
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
   X, Download, Eye, Layers3, Activity, Tag, Sparkles, FileText, FileSpreadsheet,
-  AlertTriangle, Gauge, Thermometer, Zap, Scale, Settings
+  AlertTriangle, Gauge, Thermometer, Zap, Scale, Settings, XCircle
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
@@ -122,6 +122,8 @@ export default function FusingDepartment() {
     jobCardId: '',
     jobNo: '',
     fusingMachine: DEFAULT_FUSING_MACHINES[0],
+    fusingTemp: '210°C',
+    fusingSpeed: '18 m/min',
     panna: '58"',
     useButterPaper: 'Yes',
     butterPaperWeightKg: '',
@@ -234,9 +236,59 @@ export default function FusingDepartment() {
     fusingOperator: accountFullName,
     shift: getAutoShift(),
     useButterPaper: 'Yes',
-    butterPaperWeightKg: '',
     notes: ''
   });
+
+  // Quick Speed & Temp Modal State for Clicked Job Card
+  const [showSpeedTempModal, setShowSpeedTempModal] = useState(false);
+  const [speedTempCard, setSpeedTempCard] = useState(null);
+  const [speedTempForm, setSpeedTempForm] = useState({
+    fusingMachine: DEFAULT_FUSING_MACHINES[0],
+    fusingTemp: '210°C',
+    fusingSpeed: '18 m/min'
+  });
+
+  const openSpeedTempModal = (card) => {
+    setSpeedTempCard(card);
+    setSpeedTempForm({
+      fusingMachine: card.fusingMachine || DEFAULT_FUSING_MACHINES[0],
+      fusingTemp: card.fusingTemp || card.temperature || '210°C',
+      fusingSpeed: card.fusingSpeed || card.speed || '18 m/min'
+    });
+    setShowSpeedTempModal(true);
+  };
+
+  const handleSaveSpeedTemp = async (e) => {
+    e.preventDefault();
+    if (!speedTempCard) return;
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        fusingMachine: speedTempForm.fusingMachine,
+        fusingTemp: speedTempForm.fusingTemp,
+        temperature: speedTempForm.fusingTemp,
+        fusingSpeed: speedTempForm.fusingSpeed,
+        speed: speedTempForm.fusingSpeed
+      };
+
+      await api.updateJobCard(speedTempCard._id || speedTempCard.id, payload);
+      
+      triggerPushNotification(
+        '⚡ Fusing Specs Updated',
+        `Job #${speedTempCard.jobNo}: Machine = ${speedTempForm.fusingMachine} | Temp = ${speedTempForm.fusingTemp} | Speed = ${speedTempForm.fusingSpeed}`,
+        'success'
+      );
+      
+      triggerGlobalDataRefresh('fusing');
+      setShowSpeedTempModal(false);
+      fetchData();
+    } catch (err) {
+      triggerEliteAlert('Update Error', err.message || 'Failed to update fusing speed and temperature.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -282,6 +334,9 @@ export default function FusingDepartment() {
         panna: cardPanna,
         printedMtr: pMtr,
         fusingMtr: defaultMtr,
+        fusingTemp: card.fusingTemp || card.temperature || '210°C',
+        fusingSpeed: card.fusingSpeed || card.speed || '18 m/min',
+        fusingMachine: card.fusingMachine || prev.fusingMachine,
         butterPaperWeightKg: card.butterPaperWeightKg || ''
       }));
     } else {
@@ -318,6 +373,10 @@ export default function FusingDepartment() {
           fusingDate: topForm.date,
           shift: topForm.shift,
           fusingMachine: topForm.fusingMachine,
+          fusingTemp: topForm.fusingTemp,
+          temperature: topForm.fusingTemp,
+          fusingSpeed: topForm.fusingSpeed,
+          speed: topForm.fusingSpeed,
           panna: topForm.panna,
           butterPaperWeightKg: String(topForm.butterPaperWeightKg || 0),
           fusingMtr: String(fusingMtrVal),
@@ -390,16 +449,27 @@ export default function FusingDepartment() {
     return (fab + fus + prt + gen).toFixed(2);
   }, [form.fabricFaultMtr, form.fusingFaultMtr, form.printFaultMtr, form.genuineFaultMtr]);
 
+  // Compute fresh meters dynamically in Edit Modal (Printed Mtr - Wastage Mtr)
+  const computedModalFreshMtr = useMemo(() => {
+    const base = parseFloat(selectedCard?.printedMtr || selectedCard?.totalMtr || form.freshMtr) || 0;
+    const waste = parseFloat(calculatedWastageMtr) || 0;
+    return Math.max(0, base - waste).toFixed(2);
+  }, [selectedCard, form.freshMtr, calculatedWastageMtr]);
+
   // Open Edit Modal for a card
   const openFusingModal = (card) => {
     setSelectedCard(card);
     const defaultFresh = card.freshMtr || card.fusingMtr || card.printedMtr || card.totalMtr || '';
+    const cardPanna = card.panna ? (String(card.panna).includes('"') ? card.panna : `${card.panna}"`) : '58"';
+    const cardButterUsed = card.useButterPaper || (parseFloat(card.butterPaperWeightKg) > 0 ? 'Yes' : 'No');
 
     setForm({
-      jobCardId: card._id,
+      jobCardId: card._id || card.id,
       jobNo: card.jobNo || '',
       fusingStatus: card.fusingStatus || 'Fusing Done',
       fusingDate: card.fusingDate || toLocalYMD(),
+      panna: cardPanna,
+      useButterPaper: cardButterUsed,
       
       freshMtr: defaultFresh,
       fabricFaultMtr: card.fabricFaultMtr !== undefined && card.fabricFaultMtr !== '' ? String(card.fabricFaultMtr) : '0',
@@ -415,6 +485,28 @@ export default function FusingDepartment() {
       butterPaperWeightKg: card.butterPaperWeightKg || '',
       notes: card.emergencyNotes || card.note1 || ''
     });
+
+    // Populate top form so user can view and edit values directly in top form as well!
+    setTopForm({
+      date: card.fusingDate || toLocalYMD(),
+      shift: card.shift || getAutoShift(),
+      onTime: '09:00',
+      offTime: '19:00',
+      jobCardId: card._id || card.id,
+      jobNo: card.jobNo || '',
+      fusingMachine: card.fusingMachine || DEFAULT_FUSING_MACHINES[0],
+      fusingTemp: card.fusingTemp || card.temperature || '210°C',
+      fusingSpeed: card.fusingSpeed || card.speed || '18 m/min',
+      panna: cardPanna,
+      useButterPaper: cardButterUsed,
+      butterPaperWeightKg: card.butterPaperWeightKg || '',
+      rollCompleted: card.fusingStatus === 'Fusing Done' ? 'Yes' : 'No',
+      printedMtr: card.printedMtr || card.totalMtr || defaultFresh,
+      fusingMtr: defaultFresh,
+      fusingOperator: card.fusingOperator || accountFullName,
+      notes: card.emergencyNotes || card.note1 || ''
+    });
+
     setShowFormModal(true);
   };
 
@@ -424,10 +516,11 @@ export default function FusingDepartment() {
       triggerEliteAlert('Please select a valid Job Card.');
       return;
     }
-    if (form.freshMtr === '' || isNaN(form.freshMtr) || Number(form.freshMtr) < 0) {
-      triggerEliteAlert('Please enter valid Fresh Meters (0 or positive number).');
-      return;
-    }
+
+    const baseMtr = parseFloat(selectedCard?.printedMtr || selectedCard?.totalMtr || form.freshMtr) || 0;
+    const wasteMtr = parseFloat(calculatedWastageMtr) || 0;
+    const computedFreshMtr = Math.max(0, baseMtr - wasteMtr).toFixed(2);
+    const finalButterKg = form.useButterPaper === 'No' ? '0' : String(form.butterPaperWeightKg || 0);
 
     setSubmitting(true);
     try {
@@ -435,22 +528,27 @@ export default function FusingDepartment() {
         fusingStatus: form.fusingStatus,
         fusingDate: form.fusingDate,
         shift: form.shift,
-        freshMtr: String(form.freshMtr),
+        panna: form.panna,
+        useButterPaper: form.useButterPaper,
+        butterPaperWeightKg: finalButterKg,
+        freshMtr: String(computedFreshMtr),
         fabricFaultMtr: String(form.fabricFaultMtr || 0),
         fusingFaultMtr: String(form.fusingFaultMtr || 0),
         printFaultMtr: String(form.printFaultMtr || 0),
         genuineFaultMtr: String(form.genuineFaultMtr || 0),
         totalWastageMtr: String(calculatedWastageMtr),
-        fusingMtr: String(form.freshMtr),
+        fusingMtr: String(computedFreshMtr),
         fusingTemp: form.fusingTemp,
+        temperature: form.fusingTemp,
         fusingSpeed: form.fusingSpeed,
+        speed: form.fusingSpeed,
         fusingMachine: form.fusingMachine,
         fusingOperator: form.fusingOperator,
-        butterPaperWeightKg: String(form.butterPaperWeightKg || 0)
+        emergencyNotes: form.notes
       };
 
       await api.updateJobCard(form.jobCardId, payload);
-      triggerPushNotification('🔥 Fusing Record Updated', `Job #${form.jobNo}: ${form.freshMtr}m Fresh | ${calculatedWastageMtr}m Wastage updated.`, 'success');
+      triggerPushNotification('🔥 Fusing Record Updated', `Job #${form.jobNo}: ${computedFreshMtr}m Fresh | ${calculatedWastageMtr}m Wastage updated.`, 'success');
       triggerGlobalDataRefresh('fusing');
       setShowFormModal(false);
       fetchData();
@@ -716,7 +814,7 @@ export default function FusingDepartment() {
             </div>
           </div>
 
-          {/* Primary Required Fields: JOB CARD NO, PRINTED METERS, BUTTER PAPER USED?, ROLL COMPLETED? */}
+          {/* Primary Required Fields: JOB CARD NO, PRINTED METERS, FUSING TEMP, FUSING SPEED, BUTTER PAPER USED?, ROLL COMPLETED?, PANNA */}
             <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
               
               {/* 1. JOB TYPE / JOBCARD NO. */}
@@ -753,7 +851,37 @@ export default function FusingDepartment() {
                 />
               </div>
 
-              {/* 3. IS BUTTER PAPER USED? */}
+              {/* 3. FUSING TEMPERATURE */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#d97706', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                  <Thermometer size={14} color="#d97706" /> FUSING TEMP (°C) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 210°C"
+                  value={topForm.fusingTemp}
+                  onChange={e => setTopForm(f => ({ ...f, fusingTemp: e.target.value }))}
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '2px solid #fde68a', fontSize: '0.92rem', fontWeight: 900, background: '#fffbe6', color: '#92400e' }}
+                />
+              </div>
+
+              {/* 4. FUSING MACHINE SPEED */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                  <Gauge size={14} color="#2563eb" /> FUSING SPEED (m/min) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 18 m/min"
+                  value={topForm.fusingSpeed}
+                  onChange={e => setTopForm(f => ({ ...f, fusingSpeed: e.target.value }))}
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '2px solid #bfdbfe', fontSize: '0.92rem', fontWeight: 900, background: '#eff6ff', color: '#1e40af' }}
+                />
+              </div>
+
+              {/* 6. IS BUTTER PAPER USED? */}
               <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
                   <Scale size={14} color={topForm.useButterPaper === 'Yes' ? '#6d28d9' : '#64748b'} /> BUTTER PAPER USED? *
@@ -785,10 +913,10 @@ export default function FusingDepartment() {
                 </select>
               </div>
 
-              {/* 4. WAS ROLL COMPLETED? */}
+              {/* 7. ROLL COMPLETED? */}
               <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: topForm.rollCompleted === 'Yes' ? '#16a34a' : '#ea580c', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                  <CheckCircle2 size={14} color={topForm.rollCompleted === 'Yes' ? '#16a34a' : '#ea580c'} /> WAS ROLL COMPLETED? *
+                  <CheckCircle2 size={14} color={topForm.rollCompleted === 'Yes' ? '#16a34a' : '#ea580c'} /> ROLL COMPLETED? *
                 </label>
                 <select
                   value={topForm.rollCompleted}
@@ -809,18 +937,12 @@ export default function FusingDepartment() {
                   <option value="No">⏳ NO (Partial / In Progress)</option>
                 </select>
               </div>
-            </div>
 
-            {/* Secondary Parameters (Date, Shift, Fusing Machine, Panna, Operator, Meters Fused) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
-
-
-
-
+              {/* 8. PANNA */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, color: '#0284c7', margin: 0, textTransform: 'uppercase' }}>
-                    <Gauge size={13} /> PANNA *
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', margin: 0, textTransform: 'uppercase' }}>
+                    <Layers size={14} color="#0284c7" /> PANNA *
                   </label>
                   <button
                     type="button"
@@ -834,27 +956,12 @@ export default function FusingDepartment() {
                   required
                   value={topForm.panna}
                   onChange={e => setTopForm(f => ({ ...f, panna: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 800, background: '#ffffff', color: '#0369a1', cursor: 'pointer' }}
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.92rem', fontWeight: 800, background: '#ffffff', color: '#0369a1', cursor: 'pointer' }}
                 >
                   {pannaOptions.map(p => (
                     <option key={p} value={p}>{p} Panna</option>
                   ))}
                 </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                  METERS FUSED (MTR)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder={topForm.printedMtr ? `Auto (${topForm.printedMtr} mtr)` : 'e.g. 150.50'}
-                  value={topForm.fusingMtr}
-                  onChange={e => setTopForm(f => ({ ...f, fusingMtr: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700, background: '#ffffff', color: '#0f172a' }}
-                />
               </div>
             </div>
 
@@ -1064,19 +1171,38 @@ export default function FusingDepartment() {
                   return (
                     <tr key={c._id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}>
                       
-                      {/* Job Card No */}
+                      {/* Job Card No (Clickable to change speed & temp) */}
                       <td style={{ padding: '10px 12px', fontWeight: 800, color: '#1e293b' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>{c.jobNo || 'JOB'}</span>
-                          {c.pass && (
-                            <span style={{ fontSize: '0.65rem', background: '#eff6ff', color: '#2563eb', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
-                              {c.pass}
+                        <button
+                          type="button"
+                          onClick={() => openSpeedTempModal(c)}
+                          title="Click to view & update Fusing Machine Speed & Temperature"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            display: 'inline-flex',
+                            flexDirection: 'column',
+                            gap: '2px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0284c7', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
+                              {c.jobNo || 'JOB'}
                             </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500, marginTop: 2 }}>
-                          {c.fusingDate || c.date || '—'}
-                        </div>
+                            <Gauge size={12} color="#0284c7" />
+                            {c.pass && (
+                              <span style={{ fontSize: '0.65rem', background: '#eff6ff', color: '#2563eb', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
+                                {c.pass}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
+                            {c.fusingDate || c.date || '—'}
+                          </div>
+                        </button>
                       </td>
 
                       {/* Party Name */}
@@ -1092,29 +1218,45 @@ export default function FusingDepartment() {
                         </div>
                       </td>
 
-                      {/* Speed & Temp */}
+                      {/* Speed & Temp (Clickable to change) */}
                       <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                        <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.72rem', background: '#fef3c7', color: '#92400e', padding: '2px 7px', borderRadius: '4px', fontWeight: 800 }}>
+                        <button
+                          type="button"
+                          onClick={() => openSpeedTempModal(c)}
+                          title="Click to change Fusing Temperature & Speed"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            flexDirection: 'column',
+                            gap: '3px',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <span style={{ fontSize: '0.72rem', background: '#fef3c7', color: '#92400e', padding: '2px 7px', borderRadius: '4px', fontWeight: 800, border: '1px solid #fde68a' }}>
                             <Thermometer size={10} style={{ display: 'inline', marginRight: 2 }} />
                             {c.fusingTemp || c.temperature || '210°C'}
                           </span>
-                          <span style={{ fontSize: '0.72rem', background: '#f1f5f9', color: '#475569', padding: '2px 7px', borderRadius: '4px', fontWeight: 700 }}>
+                          <span style={{ fontSize: '0.72rem', background: '#eff6ff', color: '#1e40af', padding: '2px 7px', borderRadius: '4px', fontWeight: 800, border: '1px solid #bfdbfe' }}>
                             <Gauge size={10} style={{ display: 'inline', marginRight: 2 }} />
                             {c.fusingSpeed || c.speed || '18 m/min'}
                           </span>
-                        </div>
+                        </button>
                       </td>
 
-                      {/* Butter Paper Weight */}
+                      {/* Butter Paper (YES / NO ONLY) */}
                       <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                        {butterKg > 0 ? (
-                          <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#6d28d9', background: '#f3e8ff', padding: '3px 8px', borderRadius: '6px', border: '1px solid #d8b4fe' }}>
-                            <Scale size={11} style={{ display: 'inline', marginRight: 3 }} />
-                            {butterKg.toFixed(2)} kg
+                        {(c.useButterPaper === 'Yes' || butterKg > 0) ? (
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#15803d', background: '#f0fdf4', padding: '3px 10px', borderRadius: '6px', border: '1px solid #bbf7d0', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <CheckCircle2 size={12} color="#16a34a" />
+                            YES
                           </span>
                         ) : (
-                          <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>—</span>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', background: '#f1f5f9', padding: '3px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <XCircle size={12} color="#94a3b8" />
+                            NO
+                          </span>
                         )}
                       </td>
 
@@ -1203,7 +1345,7 @@ export default function FusingDepartment() {
                   <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
                     Edit Fusing Production Entry — Job #{form.jobNo}
                   </h3>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Enter Fresh Meters output, Butter Paper weight &amp; 4 Wastage fault breakdown</span>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Enter Butter Paper weight &amp; 4 Wastage fault breakdown</span>
                 </div>
               </div>
               <button type="button" onClick={() => setShowFormModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
@@ -1214,21 +1356,37 @@ export default function FusingDepartment() {
             {/* Modal Body */}
             <form onSubmit={handleFormSubmit} style={{ padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               
-              {/* Fresh Mtr & Butter Paper Weight */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              {/* Fresh Mtr & Butter Paper Used / Weight */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#059669', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                    Fresh Output (Net Usable MTR) *
+                    Fresh Output (Net Usable MTR)
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={form.freshMtr}
-                    onChange={e => setForm(f => ({ ...f, freshMtr: e.target.value }))}
-                    placeholder="e.g. 150.00"
-                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '2px solid #10b981', fontWeight: 800, fontSize: '0.95rem', background: '#ecfdf5', color: '#047857' }}
-                  />
+                  <div style={{
+                    width: '100%', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #a7f3d0',
+                    fontWeight: 900, fontSize: '0.95rem', background: '#ecfdf5', color: '#047857',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                  }}>
+                    <span>{computedModalFreshMtr} Mtr</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#059669', opacity: 0.85 }}>Auto-calculated</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#6d28d9', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                    Butter Paper Used?
+                  </label>
+                  <select
+                    value={form.useButterPaper}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setForm(f => ({ ...f, useButterPaper: val, butterPaperWeightKg: val === 'No' ? '0' : f.butterPaperWeightKg }));
+                    }}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #d8b4fe', fontWeight: 800, fontSize: '0.88rem', background: '#f5f3ff', color: '#6d28d9' }}
+                  >
+                    <option value="Yes">✓ YES (Used Butter Paper)</option>
+                    <option value="No">✕ NO (No Butter Paper)</option>
+                  </select>
                 </div>
 
                 <div>
@@ -1238,10 +1396,11 @@ export default function FusingDepartment() {
                   <input
                     type="number"
                     step="0.01"
+                    disabled={form.useButterPaper === 'No'}
                     value={form.butterPaperWeightKg}
                     onChange={e => setForm(f => ({ ...f, butterPaperWeightKg: e.target.value }))}
                     placeholder="e.g. 12.50 kg"
-                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '0.9rem', background: '#ffffff', color: '#0f172a' }}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '0.9rem', background: form.useButterPaper === 'No' ? '#f1f5f9' : '#ffffff', color: '#0f172a' }}
                   />
                 </div>
               </div>
@@ -1293,17 +1452,37 @@ export default function FusingDepartment() {
                 </div>
               </div>
 
-              {/* Machine & Specs */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
+              {/* Machine, Temperature, Speed & Specs */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.2rem' }}>Fusing Machine</label>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.2rem' }}>Panna</label>
                   <select
-                    value={form.fusingMachine}
-                    onChange={e => setForm(f => ({ ...f, fusingMachine: e.target.value }))}
+                    value={form.panna}
+                    onChange={e => setForm(f => ({ ...f, panna: e.target.value }))}
                     style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 700 }}
                   >
-                    {DEFAULT_FUSING_MACHINES.map(m => <option key={m} value={m}>{m}</option>)}
+                    {pannaOptions.map(p => <option key={p} value={p}>{p} Panna</option>)}
                   </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#d97706', marginBottom: '0.2rem' }}>Fusing Temp (°C)</label>
+                  <input
+                    type="text"
+                    value={form.fusingTemp}
+                    onChange={e => setForm(f => ({ ...f, fusingTemp: e.target.value }))}
+                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #fde68a', fontSize: '0.82rem', fontWeight: 800, background: '#fffbe6', color: '#92400e' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.2rem' }}>Fusing Speed (m/min)</label>
+                  <input
+                    type="text"
+                    value={form.fusingSpeed}
+                    onChange={e => setForm(f => ({ ...f, fusingSpeed: e.target.value }))}
+                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #bfdbfe', fontSize: '0.82rem', fontWeight: 800, background: '#eff6ff', color: '#1e40af' }}
+                  />
                 </div>
 
                 <div>
@@ -1791,6 +1970,174 @@ export default function FusingDepartment() {
         </div>
       )}
 
+      {/* ── MODAL: QUICK FUSING SPEED & TEMPERATURE UPDATE ── */}
+      {showSpeedTempModal && speedTempCard && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(6px)',
+          zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }}>
+          <div style={{
+            background: '#ffffff', width: '100%', maxWidth: '520px',
+            borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid #bae6fd', overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{ padding: '1.1rem 1.35rem', background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Gauge size={20} color="#ffffff" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff' }}>
+                    Job #{speedTempCard.jobNo || 'JOB'} — Fusing Specs
+                  </h3>
+                  <span style={{ fontSize: '0.74rem', color: '#e0f2fe', fontWeight: 600 }}>
+                    Change Fusing Machine Temperature &amp; Speed
+                  </span>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowSpeedTempModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ffffff' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Card Information Summary Badge */}
+            <div style={{ padding: '0.85rem 1.35rem', background: '#f0f9ff', borderBottom: '1px solid #e0f2fe', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem' }}>
+              <div>
+                <span style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 700, display: 'block' }}>PARTY</span>
+                <strong style={{ color: '#0f172a', fontWeight: 800 }}>{speedTempCard.party || '—'}</strong>
+              </div>
+              <div>
+                <span style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 700, display: 'block' }}>DESIGN</span>
+                <strong style={{ color: '#0284c7', fontWeight: 800 }}>{speedTempCard.designName || speedTempCard.designNo || '—'}</strong>
+              </div>
+              <div>
+                <span style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 700, display: 'block' }}>FABRIC &amp; PANNA</span>
+                <strong style={{ color: '#0f172a', fontWeight: 700 }}>{speedTempCard.fabric || 'Fabric'} {speedTempCard.panna ? `(${speedTempCard.panna}")` : ''}</strong>
+              </div>
+              <div>
+                <span style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 700, display: 'block' }}>PRINTED METERS</span>
+                <strong style={{ color: '#059669', fontWeight: 800 }}>{speedTempCard.printedMtr || speedTempCard.totalMtr || '0'} mtr</strong>
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveSpeedTemp} style={{ padding: '1.25rem 1.35rem', display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+              
+              {/* 1. Fusing Machine */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                  <Cpu size={14} /> FUSING MACHINE *
+                </label>
+                <select
+                  value={speedTempForm.fusingMachine}
+                  onChange={e => setSpeedTempForm(f => ({ ...f, fusingMachine: e.target.value }))}
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', fontWeight: 800, background: '#ffffff', color: '#0369a1', cursor: 'pointer' }}
+                >
+                  {DEFAULT_FUSING_MACHINES.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 2. Fusing Temperature */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', fontWeight: 800, color: '#d97706', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                  <Thermometer size={14} /> FUSING TEMPERATURE (°C) *
+                </label>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <input
+                    type="text"
+                    required
+                    value={speedTempForm.fusingTemp}
+                    onChange={e => setSpeedTempForm(f => ({ ...f, fusingTemp: e.target.value }))}
+                    placeholder="e.g. 210°C"
+                    style={{ flex: 1, padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1.5px solid #fde68a', fontSize: '0.92rem', fontWeight: 800, background: '#fffbe6', color: '#92400e' }}
+                  />
+                </div>
+                {/* Preset Chips */}
+                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                  {['180°C', '190°C', '200°C', '210°C', '215°C', '220°C', '225°C', '230°C'].map(temp => (
+                    <button
+                      key={temp}
+                      type="button"
+                      onClick={() => setSpeedTempForm(f => ({ ...f, fusingTemp: temp }))}
+                      style={{
+                        padding: '2px 8px', fontSize: '0.72rem', fontWeight: 800, borderRadius: '4px', cursor: 'pointer',
+                        background: speedTempForm.fusingTemp === temp ? '#d97706' : '#fef3c7',
+                        color: speedTempForm.fusingTemp === temp ? '#ffffff' : '#92400e',
+                        border: '1px solid #fde68a', transition: 'all 0.1s'
+                      }}
+                    >
+                      {temp}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Fusing Speed */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.35rem', textTransform: 'uppercase' }}>
+                  <Gauge size={14} /> FUSING MACHINE SPEED (m/min) *
+                </label>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <input
+                    type="text"
+                    required
+                    value={speedTempForm.fusingSpeed}
+                    onChange={e => setSpeedTempForm(f => ({ ...f, fusingSpeed: e.target.value }))}
+                    placeholder="e.g. 18 m/min"
+                    style={{ flex: 1, padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1.5px solid #bfdbfe', fontSize: '0.92rem', fontWeight: 800, background: '#eff6ff', color: '#1e40af' }}
+                  />
+                </div>
+                {/* Preset Chips */}
+                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                  {['10 m/min', '12 m/min', '15 m/min', '18 m/min', '20 m/min', '22 m/min', '25 m/min'].map(spd => (
+                    <button
+                      key={spd}
+                      type="button"
+                      onClick={() => setSpeedTempForm(f => ({ ...f, fusingSpeed: spd }))}
+                      style={{
+                        padding: '2px 8px', fontSize: '0.72rem', fontWeight: 800, borderRadius: '4px', cursor: 'pointer',
+                        background: speedTempForm.fusingSpeed === spd ? '#2563eb' : '#dbeafe',
+                        color: speedTempForm.fusingSpeed === spd ? '#ffffff' : '#1e40af',
+                        border: '1px solid #bfdbfe', transition: 'all 0.1s'
+                      }}
+                    >
+                      {spd}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowSpeedTempModal(false)}
+                  style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  style={{
+                    padding: '0.6rem 1.4rem', borderRadius: '8px', border: 'none',
+                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    color: '#ffffff', fontWeight: 900, fontSize: '0.88rem', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '0.4rem', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
+                  }}
+                >
+                  {submitting ? <RefreshCw size={16} className="spin-loader" /> : <Zap size={16} />}
+                  Save &amp; Update Speed &amp; Temp
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

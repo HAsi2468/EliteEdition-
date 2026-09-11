@@ -5,126 +5,137 @@ const { ChatRoom, user: User } = require('../db/models');
  */
 const SYSTEM_COMMUNICATION_GROUPS = [
   {
-    groupKey: 'production__job_card',
-    name: 'Production — Job Card Management',
+    groupKey: 'edp__job_card',
+    name: 'Elite Digital Print — Job Card Management',
     department: 'Production',
+    companyEntity: 'Elite Digital Print',
     permissionScope: 'jobcards',
     description: 'Automated authority group for Job Card creation, status updates & production logs.'
   },
   {
-    groupKey: 'production__printing_log',
-    name: 'Production — Printing Department Log',
+    groupKey: 'edp__printing_log',
+    name: 'Elite Digital Print — Printing Department Log',
     department: 'Production',
+    companyEntity: 'Elite Digital Print',
     permissionScope: 'jobcards_printing_log',
     description: 'Real-time group for machine print logs, shift records & raw material entries.'
   },
   {
-    groupKey: 'fabric__inventory',
-    name: 'Fabric — Inventory & Stock Management',
+    groupKey: 'edp__fabric_inventory',
+    name: 'Elite Digital Print — Fabric Inventory',
     department: 'Fabric',
+    companyEntity: 'Elite Digital Print',
     permissionScope: 'jobcards_fabric',
     description: 'Fabric inward, stock adjustments, vendor challans & roll tracking group.'
   },
   {
-    groupKey: 'billing__invoicing',
-    name: 'Billing — Invoices & Accounts',
+    groupKey: 'edp__billing_invoicing',
+    name: 'Elite Digital Print — Billing & Invoices',
     department: 'Billing',
+    companyEntity: 'Elite Digital Print',
     permissionScope: 'jobcards_billing',
     description: 'GST invoice generation, payment receipts & customer billing updates.'
   },
   {
-    groupKey: 'inventory__stock',
-    name: 'Inventory — Goods & Products',
-    department: 'Inventory',
-    permissionScope: 'inventory',
-    description: 'Warehouse inventory inward, outward, SKU catalog & stock tracking.'
-  },
-  {
-    groupKey: 'quality__complaints',
-    name: 'Quality & Support — Complaints',
-    department: 'Quality',
-    permissionScope: 'jobcards_complain',
-    description: 'Digital print defects, shade variations, shade complaints & resolution logs.'
-  },
-  {
     groupKey: 'stitching__department',
-    name: 'Stitching — Garment Production',
+    name: 'Elite Stitching — Stitching Department',
     department: 'Stitching',
+    companyEntity: 'Elite Stitching',
     permissionScope: 'stitching',
     description: 'Garment job cards, stitching challans, design patterns & finishing updates.'
   },
   {
-    groupKey: 'finance__expenses',
-    name: 'Finance — Expenses & Petty Cash',
-    department: 'Finance',
-    permissionScope: 'jobcards_expense',
-    description: 'Operational expenses, daily receipts, maintenance payments & petty cash.'
+    groupKey: 'eo__sales_orders',
+    name: 'Elite Online — Sales & Orders',
+    department: 'E-Commerce',
+    companyEntity: 'Elite Online',
+    permissionScope: 'sales',
+    description: 'Live order tracking, Unicommerce order syncs & e-commerce sales logs.'
   },
   {
-    groupKey: 'design__catalogue',
-    name: 'Design Room — Artwork & Patterns',
-    department: 'Design',
-    permissionScope: 'jobcards_catalogue',
-    description: 'Design master library, artwork approvals, PKD imports & pattern releases.'
+    groupKey: 'eo__returns_manager',
+    name: 'Elite Online — Returns Manager',
+    department: 'E-Commerce',
+    companyEntity: 'Elite Online',
+    permissionScope: 'returns',
+    description: 'RTO claims, customer returns, quality inspects & refund tracking.'
+  },
+  {
+    groupKey: 'eo__inventory_stock',
+    name: 'Elite Online — Warehouse Inventory',
+    department: 'Inventory',
+    companyEntity: 'Elite Online',
+    permissionScope: 'inventory',
+    description: 'Warehouse inventory inward, outward, SKU catalog & stock tracking.'
+  },
+  {
+    groupKey: 'fabtex__fabric_orders',
+    name: 'Elite Fabtex — Fabric & Orders',
+    department: 'Fabric',
+    companyEntity: 'Elite Fabtex',
+    permissionScope: 'jobcards_fabric',
+    description: 'Fabtex fabric orders, weaving logs & inward tracking.'
   },
   {
     groupKey: 'admin__all_access',
     name: 'Executive & Admin — Operations Desk',
     department: 'Admin',
+    companyEntity: '',
     permissionScope: 'admin',
     description: 'Cross-department executive overview, system alerts & administrative operations.'
   }
 ];
 
 /**
- * Synchronize system groups and member assignments based on user permissions
+ * Synchronize member assignments for existing groups based on user permissions & company access.
+ * Groups are created ONLY by Admin manually via the UI.
  */
 async function syncCommunicationGroups() {
   try {
     const allUsers = await User.find({});
-    const admins = allUsers.filter(u => u.role === 'admin');
-    const adminUserIds = admins.map(u => u._id);
 
-    for (const groupDef of SYSTEM_COMMUNICATION_GROUPS) {
-      let room = await ChatRoom.findOne({ groupKey: groupDef.groupKey });
+    // 2. Sync member access for ALL active chat rooms based on Company + Screen access
+    const allRooms = await ChatRoom.find({ isArchived: { $ne: true } });
+    for (const room of allRooms) {
+      if (room.type === 'direct') continue; // Don't modify 1-on-1 private DMs
 
-      // Determine members who possess matching permission OR are admins
+      const scope = (room.permissionScope || '').toLowerCase();
+      const roomCompany = (room.companyEntity || '').trim().toLowerCase();
+
       const matchingUsers = allUsers.filter(u => {
         if (u.role === 'admin') return true;
-        if (!u.permissions || !Array.isArray(u.permissions)) return false;
 
-        const scope = groupDef.permissionScope;
-        return u.permissions.some(p => p === scope || p.startsWith(scope) || scope.startsWith(p));
+        // Company Filter Check
+        if (roomCompany) {
+          const userCompanies = Array.isArray(u.allowedCompanies)
+            ? u.allowedCompanies.map(c => String(c).trim().toLowerCase())
+            : [];
+
+          const isStitchingGroup = roomCompany.includes('stitching') || scope.includes('stitching');
+          const hasCompanyMatch = userCompanies.length === 0 || userCompanies.includes('all') || userCompanies.includes(roomCompany) || (isStitchingGroup && (userCompanies.includes('elite stitching') || userCompanies.includes('elite digital print')));
+
+          if (!hasCompanyMatch) {
+            return false;
+          }
+        }
+
+        // Screen Permission Filter Check
+        if (!u.permissions || !Array.isArray(u.permissions)) return false;
+        if (!scope || scope === 'general' || scope === 'direct_msg') return true;
+
+        return u.permissions.some(p => {
+          const perm = (p || '').toLowerCase();
+          return perm === scope || perm.startsWith(scope) || scope.startsWith(perm);
+        });
       });
 
       const memberIds = Array.from(new Set(matchingUsers.map(u => String(u._id))));
-
-      if (room && room.isArchived) {
-        // User/Admin explicitly deleted this group. Do not resurrect it.
-        continue;
-      }
-
-      if (!room) {
-        room = await ChatRoom.create({
-          name: groupDef.name,
-          type: 'group',
-          department: groupDef.department,
-          permissionScope: groupDef.permissionScope,
-          groupKey: groupDef.groupKey,
-          isSystemGroup: true,
-          members: memberIds,
-        });
-      } else {
-        room.name = groupDef.name;
-        room.department = groupDef.department;
-        room.permissionScope = groupDef.permissionScope;
-        room.isSystemGroup = true;
-        room.members = memberIds;
-        await room.save();
-      }
+      room.members = memberIds;
+      await room.save();
     }
-    console.log('✅ Communication Authority Groups successfully synchronized.');
-    return { success: true, count: SYSTEM_COMMUNICATION_GROUPS.length };
+
+    console.log('✅ Communication Authority Groups successfully synchronized by Company & Screen.');
+    return { success: true };
   } catch (error) {
     console.error('❌ Error synchronizing communication groups:', error);
     return { success: false, error: error.message };

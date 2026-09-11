@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '../services/api';
 import { triggerPushNotification } from './NotificationToast';
 import { formatDateDDMMYYYY, formatForInputDate } from '../utils/dateUtils';
@@ -36,7 +36,8 @@ import {
   Receipt,
   Lock,
   BookOpen,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ShoppingBag
 } from 'lucide-react';
 
 // Helper for Indian Currency formatting
@@ -269,7 +270,111 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   const [ledgerPreset, setLedgerPreset] = useState('this_month');
   const [ledgerDateStart, setLedgerDateStart] = useState('');
   const [ledgerDateEnd, setLedgerDateEnd] = useState('');
-  const [ledgerFormat, setLedgerFormat] = useState('pdf'); // 'pdf', 'excel', 'csv', 'print'
+  const [ledgerFormat, setLedgerFormat] = useState('pdf'); // 'excel', 'pdf', 'csv', 'print'
+  // ── Purchase Module States ─────────────────────────────────────────────
+  const [purchases, setPurchases] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`elite_purchases_${companyEntity || 'edp'}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [purchaseSearch, setPurchaseSearch] = useState('');
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [purchaseForm, setPurchaseForm] = useState({
+    purchaseNo: 'PUR-2026-001',
+    date: new Date().toISOString().split('T')[0],
+    vendorName: '',
+    itemName: '',
+    quantity: '',
+    unit: 'Mtr',
+    rate: '',
+    totalAmount: '',
+    notes: ''
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(`elite_purchases_${companyEntity || 'edp'}`, JSON.stringify(purchases));
+    } catch (e) {}
+  }, [purchases, companyEntity]);
+
+  const handleCreatePurchase = (e) => {
+    e.preventDefault();
+    if (!purchaseForm.vendorName || !purchaseForm.itemName) {
+      alert('Please select Vendor Name and enter Item Name.');
+      return;
+    }
+    const qty = parseFloat(purchaseForm.quantity) || 0;
+    const r = parseFloat(purchaseForm.rate) || 0;
+    const calcTotal = parseFloat(purchaseForm.totalAmount) || (qty * r);
+
+    const newPur = {
+      id: `pur_${Date.now()}`,
+      purchaseNo: purchaseForm.purchaseNo || `PUR-${Date.now().toString().slice(-4)}`,
+      date: purchaseForm.date || new Date().toISOString().split('T')[0],
+      vendorName: purchaseForm.vendorName,
+      itemName: purchaseForm.itemName,
+      quantity: qty,
+      unit: purchaseForm.unit || 'Mtr',
+      rate: r,
+      totalAmount: calcTotal,
+      notes: purchaseForm.notes || ''
+    };
+
+    setPurchases(prev => [newPur, ...prev]);
+    setShowPurchaseModal(false);
+    setPurchaseForm({
+      purchaseNo: `PUR-2026-00${purchases.length + 2}`,
+      date: new Date().toISOString().split('T')[0],
+      vendorName: '',
+      itemName: '',
+      quantity: '',
+      unit: 'Mtr',
+      rate: '',
+      totalAmount: '',
+      notes: ''
+    });
+  };
+
+  const handleDeletePurchase = (id) => {
+    if (window.confirm('Are you sure you want to delete this purchase record?')) {
+      setPurchases(prev => prev.filter(p => p.id !== id));
+    }
+  };
+
+  const [fabricVendors, setFabricVendors] = useState([]);
+
+  useEffect(() => {
+    api.getFabricVendors()
+      .then(res => {
+        if (Array.isArray(res)) setFabricVendors(res);
+      })
+      .catch(err => console.warn('Could not load fabric vendors:', err));
+  }, []);
+
+  // Vendor options populated ONLY from Elite Digital Prints Vendor Master (Fabric Vendors)
+  const vendorOptions = useMemo(() => {
+    const list = new Set();
+
+    (fabricVendors || []).forEach(v => {
+      const vName = typeof v === 'object' ? (v.name || v.vendorName) : v;
+      if (vName) list.add(String(vName).trim());
+    });
+
+    return Array.from(list).filter(Boolean);
+  }, [fabricVendors]);
+
+  const filteredPurchases = purchases.filter(p => {
+    const q = purchaseSearch.toLowerCase();
+    return !q || (p.purchaseNo && p.purchaseNo.toLowerCase().includes(q)) || (p.vendorName && p.vendorName.toLowerCase().includes(q)) || (p.itemName && p.itemName.toLowerCase().includes(q));
+  });
+
+  const totalPurchaseValue = purchases.reduce((sum, p) => sum + (Number(p.totalAmount) || 0), 0);
+  const totalInwardQty = purchases.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
+  const uniqueVendorsCount = new Set(purchases.map(p => p.vendorName).filter(Boolean)).size;
 
   // Helper for Ledger dates
   const getLedgerDateRange = () => {
@@ -635,6 +740,28 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     });
   }, [invoices, activeRange]);
 
+  const getAmountWithoutGst = useCallback((inv) => {
+    if (!inv) return 0;
+    if (inv.subtotal !== undefined && inv.subtotal !== null && Number(inv.subtotal) > 0) {
+      return Number(inv.subtotal);
+    }
+    if (inv.netSubtotal !== undefined && inv.netSubtotal !== null && Number(inv.netSubtotal) > 0) {
+      return Number(inv.netSubtotal);
+    }
+    if (inv.taxableAmount !== undefined && inv.taxableAmount !== null && Number(inv.taxableAmount) > 0) {
+      return Number(inv.taxableAmount);
+    }
+    const gTotal = Number(inv.grandTotal || inv.totalAmount || 0);
+    const tax = Number(inv.totalTax || inv.gstAmount || (Number(inv.cgstAmount || 0) + Number(inv.sgstAmount || 0) + Number(inv.igstAmount || 0)) || 0);
+    if (gTotal > 0 && tax > 0) {
+      return Math.max(0, gTotal - tax);
+    }
+    if (gTotal > 0) {
+      return gTotal / 1.05;
+    }
+    return 0;
+  }, []);
+
   const periodStats = useMemo(() => {
     const totalInvoices = periodInvoices.length;
     let totalInvoiced = 0;
@@ -647,15 +774,16 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     const todayStr = new Date().toISOString().split('T')[0];
 
     periodInvoices.forEach(inv => {
-      const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
+      const amountExclGst = getAmountWithoutGst(inv);
       const paid = Number(inv.paidAmount || 0);
-      const balance = Math.max(0, grandTotal - paid);
+      const balance = Math.max(0, amountExclGst - paid);
 
-      totalInvoiced += grandTotal;
+      totalInvoiced += amountExclGst;
       totalPaid += paid;
       totalBalanceDue += balance;
 
-      if (inv.paymentStatus === 'PAID' || balance <= 0) {
+      const grandTotal = Number(inv.grandTotal || inv.totalAmount || 0);
+      if (inv.paymentStatus === 'PAID' || (grandTotal - paid) <= 0) {
         paidCount++;
       } else {
         unpaidCount++;
@@ -674,7 +802,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       unpaidCount,
       overdueCount
     };
-  }, [periodInvoices]);
+  }, [periodInvoices, getAmountWithoutGst]);
 
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [customerSearch, setCustomerSearch] = useState('');
@@ -1481,10 +1609,11 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           {[
             { id: 'challans', label: '🚚 Challan' },
             { id: 'invoices', label: '🧾 Invoices Directory', count: stats.totalInvoices },
+            { id: 'purchase', label: '🛒 Purchase Invoices' },
             ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? '✍️ Edit Invoice' : '✍️ New Invoice' }] : []),
+            { id: 'expense', label: '💰 Expenses & Ledger' },
             { id: 'customers', label: `👥 Customers (${customers.length})` },
-            { id: 'items', label: `📦 Item (${itemsList.length})` },
-            { id: 'expense', label: '💰 Expenses & Ledger' }
+            { id: 'items', label: `📦 Item (${itemsList.length})` }
           ].map(t => {
             const isActive = activeTab === t.id;
             return (
@@ -1728,13 +1857,13 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                               {formatDateDDMMYYYY(inv.invoiceDate)}
                             </td>
                             <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                              {fmtINR(inv.grandTotal)}
+                              {fmtINR(getAmountWithoutGst(inv))}
                             </td>
                             <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: '#34d399', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               {fmtINR(inv.paidAmount)}
                             </td>
-                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: inv.balanceDue > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                              {fmtINR(inv.balanceDue)}
+                            <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: Math.max(0, getAmountWithoutGst(inv) - (inv.paidAmount || 0)) > 0 ? '#f87171' : 'var(--text-muted)', fontWeight: 700, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              {fmtINR(Math.max(0, getAmountWithoutGst(inv) - (inv.paidAmount || 0)))}
                             </td>
                             <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle' }}>
                               <span style={{
@@ -1836,38 +1965,18 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             <div>
               <label style={{ ...labelStyle, color: '#60a5fa', fontWeight: 800 }}>🏢 ISSUING COMPANY (SELLER) *</label>
               <select
-                value={invoiceForm.companyEntity || companyEntity || 'Elite Digital Print'}
-                onChange={e => {
-                  const selectedCompany = e.target.value;
-                  setInvoiceForm(f => {
-                    let prefix = 'EDP/26-27/';
-                    if (selectedCompany === 'Elite Edition') prefix = 'EE/26-27/';
-                    else if (selectedCompany === 'Elite Fabtex') prefix = 'EF/26-27/';
-                    else if (selectedCompany === 'Elite Stitching') prefix = 'ES/26-27/';
-                    else if (selectedCompany === 'Elite Online') prefix = 'EO/26-27/';
-
-                    const rawSeq = f.invoiceNo ? (f.invoiceNo.split('/').pop() || '101') : '101';
-                    return {
-                      ...f,
-                      companyEntity: selectedCompany,
-                      invoicePrefix: prefix,
-                      invoiceNo: `${prefix}${rawSeq}`
-                    };
-                  });
-                }}
+                value="Elite Digital Print"
+                disabled
                 style={{
                   ...inputStyle,
                   fontWeight: '800',
                   color: '#60a5fa',
                   background: 'rgba(96, 165, 250, 0.12)',
-                  border: '1px solid rgba(96, 165, 250, 0.4)'
+                  border: '1px solid rgba(96, 165, 250, 0.4)',
+                  cursor: 'not-allowed'
                 }}
               >
                 <option value="Elite Digital Print">🏢 Elite Digital Print</option>
-                <option value="Elite Edition">🏢 Elite Edition</option>
-                <option value="Elite Fabtex">🏢 Elite Fabtex</option>
-                <option value="Elite Stitching">🏢 Elite Stitching</option>
-                <option value="Elite Online">🏢 Elite Online</option>
               </select>
             </div>
             <div>
@@ -2521,9 +2630,6 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                   filteredItems.map(item => (
                     <tr key={item._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.itemName}</td>
-                      <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{item.category || 'Printing Services'}</td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#a78bfa' }}>{item.hsnCode || '998821'}</td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: '#34d399' }}>₹ {item.unitPrice} / {item.unit || 'Meters'}</td>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>{item.taxRate != null ? item.taxRate : 5}%</td>
                       <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
@@ -2551,6 +2657,274 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           autoOpenCreate={autoOpenExpenseModal}
           onModalOpened={() => setAutoOpenExpenseModal(false)}
         />
+      )}
+      {activeTab === 'purchase' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginTop: '1rem' }}>
+          {/* Top Metrics Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '1rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', borderLeft: '4px solid #4f46e5', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Total Purchase Orders</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#4f46e5', marginTop: 4 }}>{purchases.length}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: 2 }}>Logged Inward Bills</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '1rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', borderLeft: '4px solid #0284c7', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Total Purchase Amount</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#0284c7', marginTop: 4 }}>₹{totalPurchaseValue.toLocaleString('en-IN')}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: 2 }}>Gross Material Cost</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '1rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', borderLeft: '4px solid #16a34a', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Total Inward Volume</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#16a34a', marginTop: 4 }}>{totalInwardQty.toLocaleString('en-IN')} Units</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: 2 }}>Accumulated Material</div>
+            </div>
+
+            <div style={{ background: 'var(--bg-card, #ffffff)', padding: '1rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', borderLeft: '4px solid #8b5cf6', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>Active Vendors</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#8b5cf6', marginTop: 4 }}>{uniqueVendorsCount}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', marginTop: 2 }}>Registered Suppliers</div>
+            </div>
+          </div>
+
+          {/* Filter Bar & Action Header */}
+          <div style={{ background: 'var(--bg-card, #ffffff)', padding: '0.9rem 1.2rem', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', minWidth: 280 }}>
+                <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  placeholder="Search Bill No, Vendor, Item..."
+                  value={purchaseSearch}
+                  onChange={e => setPurchaseSearch(e.target.value)}
+                  style={{ width: '100%', paddingLeft: 32, paddingRight: 10, paddingTop: 7, paddingBottom: 7, fontSize: '0.82rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setPurchaseForm({
+                  purchaseNo: `PUR-2026-00${purchases.length + 1}`,
+                  date: new Date().toISOString().split('T')[0],
+                  vendorName: '',
+                  itemName: '',
+                  quantity: '',
+                  unit: 'Mtr',
+                  rate: '',
+                  totalAmount: '',
+                  notes: ''
+                });
+                setShowPurchaseModal(true);
+              }}
+              style={{
+                padding: '0.55rem 1.1rem', fontSize: '0.82rem', fontWeight: 800, borderRadius: '8px',
+                border: 'none', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', boxShadow: '0 4px 12px rgba(79,70,229,0.3)'
+              }}
+            >
+              <Plus size={16} /> + New Purchase Inward Entry
+            </button>
+          </div>
+
+          {/* Purchase History Table */}
+          <div style={{ background: 'var(--bg-card, #ffffff)', borderRadius: '12px', border: '1px solid var(--border-light, #e2e8f0)', overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.72rem' }}>
+                  <th style={{ padding: '0.85rem 1rem' }}>Bill / Invoice No</th>
+                  <th style={{ padding: '0.85rem 1rem' }}>Date</th>
+                  <th style={{ padding: '0.85rem 1rem' }}>Vendor / Supplier</th>
+                  <th style={{ padding: '0.85rem 1rem' }}>Item Description</th>
+                  <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Qty / Mtr</th>
+                  <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Rate (₹)</th>
+                  <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Total Amount (₹)</th>
+                  <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPurchases.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                      🛒 No purchase invoices found. Click "+ New Purchase Inward Entry" to log vendor bills.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPurchases.map((p) => (
+                    <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#1e293b' }}>
+                      <td style={{ padding: '0.85rem 1rem', fontWeight: 800, color: '#4f46e5' }}>{p.purchaseNo}</td>
+                      <td style={{ padding: '0.85rem 1rem', color: '#64748b' }}>{p.date}</td>
+                      <td style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>{p.vendorName}</td>
+                      <td style={{ padding: '0.85rem 1rem' }}>
+                        <span style={{ fontWeight: 700 }}>{p.itemName}</span>
+                        {p.notes && <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{p.notes}</div>}
+                      </td>
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 700 }}>{p.quantity} {p.unit}</td>
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>₹{p.rate}</td>
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 900, color: '#0284c7' }}>₹{Number(p.totalAmount).toLocaleString('en-IN')}</td>
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
+                        <button
+                          onClick={() => handleDeletePurchase(p.id)}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                          title="Delete Purchase Entry"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── NEW PURCHASE ENTRY MODAL ────────────────────────────────────────── */}
+      {showPurchaseModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+          <div style={{ width: '100%', maxWidth: '600px', background: '#ffffff', borderRadius: '14px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ShoppingBag size={20} /> New Vendor Purchase Entry
+              </h3>
+              <button onClick={() => setShowPurchaseModal(false)} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <form onSubmit={handleCreatePurchase} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', color: '#1e293b' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Bill / Invoice No *</label>
+                  <input
+                    type="text"
+                    required
+                    value={purchaseForm.purchaseNo}
+                    onChange={e => setPurchaseForm({ ...purchaseForm, purchaseNo: e.target.value })}
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Inward Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={purchaseForm.date}
+                    onChange={e => setPurchaseForm({ ...purchaseForm, date: e.target.value })}
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Vendor / Supplier Name *</label>
+                <select
+                  required
+                  value={purchaseForm.vendorName}
+                  onChange={e => setPurchaseForm({ ...purchaseForm, vendorName: e.target.value })}
+                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', fontWeight: 700 }}
+                >
+                  <option value="">-- Select Vendor --</option>
+                  {vendorOptions.map((v, idx) => (
+                    <option key={idx} value={v}>{v}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Item / Fabric Description *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Cotton 60x60 / Cyan Sublimation Ink"
+                  value={purchaseForm.itemName}
+                  onChange={e => setPurchaseForm({ ...purchaseForm, itemName: e.target.value })}
+                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 1fr', gap: '0.85rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Quantity</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={purchaseForm.quantity}
+                    onChange={e => {
+                      const q = e.target.value;
+                      const r = purchaseForm.rate;
+                      const tot = q && r ? (parseFloat(q) * parseFloat(r)).toFixed(2) : purchaseForm.totalAmount;
+                      setPurchaseForm({ ...purchaseForm, quantity: q, totalAmount: tot });
+                    }}
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Unit</label>
+                  <select
+                    value={purchaseForm.unit}
+                    onChange={e => setPurchaseForm({ ...purchaseForm, unit: e.target.value })}
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  >
+                    <option value="Mtr">Mtr</option>
+                    <option value="Pcs">Pcs</option>
+                    <option value="Kg">Kg</option>
+                    <option value="Ltr">Ltr</option>
+                    <option value="Rolls">Rolls</option>
+                    <option value="Boxes">Boxes</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Rate (₹)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={purchaseForm.rate}
+                    onChange={e => {
+                      const r = e.target.value;
+                      const q = purchaseForm.quantity;
+                      const tot = q && r ? (parseFloat(q) * parseFloat(r)).toFixed(2) : purchaseForm.totalAmount;
+                      setPurchaseForm({ ...purchaseForm, rate: r, totalAmount: tot });
+                    }}
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', marginBottom: 4 }}>Total Amount (₹) *</label>
+                <input
+                  type="number"
+                  required
+                  step="any"
+                  value={purchaseForm.totalAmount}
+                  onChange={e => setPurchaseForm({ ...purchaseForm, totalAmount: e.target.value })}
+                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.9rem', fontWeight: 800, borderRadius: '6px', border: '1px solid #0284c7', color: '#0284c7' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Notes / Remarks</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Batch no, Delivery Challan reference, Transport details"
+                  value={purchaseForm.notes}
+                  onChange={e => setPurchaseForm({ ...purchaseForm, notes: e.target.value })}
+                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button type="button" onClick={() => setShowPurchaseModal(false)} style={{ padding: '0.5rem 1.1rem', background: 'none', border: '1px solid #cbd5e1', color: '#475569', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" style={{ padding: '0.5rem 1.3rem', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer' }}>
+                  Save Purchase Inward Entry
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* ── TAX INVOICE PREVIEW / VIEW MODAL ────────────────────────────────── */}

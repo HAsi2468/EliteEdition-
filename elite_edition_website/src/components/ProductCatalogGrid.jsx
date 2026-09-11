@@ -147,13 +147,13 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
                 const hasSnapshot = snapStock !== undefined && snapStock !== null;
                 
                 let stockClass = 'badge-success';
-                let stockLabel = hasSnapshot ? `${snapStock} in stock` : 'No Live Sync';
+                let stockLabel = hasSnapshot ? `${snapStock} Units` : 'No Live Sync';
                 if (hasSnapshot && snapStock === 0) {
                   stockClass = 'badge-danger';
-                  stockLabel = 'Out of Stock';
+                  stockLabel = '0 Units (Out of Stock)';
                 } else if (hasSnapshot && snapStock <= 5) {
                   stockClass = 'badge-warning';
-                  stockLabel = `Low (${snapStock})`;
+                  stockLabel = `${snapStock} Units (Low Stock)`;
                 }
 
                 return (

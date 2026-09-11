@@ -1,40 +1,62 @@
 const db = require('../db/models');
+const { extractBaseSku } = require('../utils/skuHelper');
 
 const getProducts = async (skuCodes) => {
   return await db.Product.find({ skuCode: { $in: skuCodes } }).lean();
 };
 
 const fetchProductImages = async (skuCodes) => {
-  const regexes = skuCodes.filter(Boolean).map(s => new RegExp('^' + s + '(_|$)', 'i'));
+  if (!Array.isArray(skuCodes) || skuCodes.length === 0) return {};
+
+  const cleanSkus = skuCodes.filter(Boolean);
+  const baseSkus = [...new Set(cleanSkus.map(s => extractBaseSku(s)))];
   
+  // Build regexes to match base SKUs with any variation suffix or exact match
+  const regexes = baseSkus.map(s => new RegExp('^' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([-_]|$)', 'i'));
+  
+  const acc = {};
+  
+  // Helper to store image for base SKU and any variation SKUs
+  const registerImage = (skuCode, imageUrl) => {
+    if (!skuCode || !imageUrl) return;
+    const base = extractBaseSku(skuCode);
+    if (base && !acc[base]) {
+      acc[base] = imageUrl;
+    }
+    if (!acc[skuCode]) {
+      acc[skuCode] = imageUrl;
+    }
+    // Also match any input SKU that shares this base SKU
+    cleanSkus.forEach(inputSku => {
+      if (extractBaseSku(inputSku) === base && !acc[inputSku]) {
+        acc[inputSku] = imageUrl;
+      }
+    });
+  };
+
   // 1. Query InventoryProduct for matching SKUs
   const invProducts = await db.InventoryProduct.find({
     skuCode: { $in: regexes },
     imageUrl: { $exists: true, $nin: [null, ''] }
   }).lean();
 
-  const acc = {};
-  
-  // 2. Map base SKU from InventoryProduct (e.g. 266_XL -> 266)
   invProducts.forEach(product => {
-    const baseSku = product.skuCode ? product.skuCode.split('_')[0] : '';
-    if (baseSku && !acc[baseSku]) {
-      acc[baseSku] = product.imageUrl;
-    }
+    registerImage(product.skuCode, product.imageUrl);
   });
 
-  // 3. Fallback to Product collection for any missing base SKUs
-  const products = await db.Product.find({
-    skuCode: { $in: skuCodes },
-    imageUrl: { $exists: true, $nin: [null, ''] }
-  }).lean();
+  // 2. Query Product collection for any missing base SKUs
+  const missingBaseSkus = baseSkus.filter(b => !acc[b]);
+  if (missingBaseSkus.length > 0) {
+    const missingRegexes = missingBaseSkus.map(s => new RegExp('^' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([-_]|$)', 'i'));
+    const products = await db.Product.find({
+      skuCode: { $in: [...missingBaseSkus, ...missingRegexes] },
+      imageUrl: { $exists: true, $nin: [null, ''] }
+    }).lean();
 
-  products.forEach(product => {
-    const baseSku = product.skuCode ? product.skuCode.split('_')[0] : '';
-    if (baseSku && !acc[baseSku]) {
-      acc[baseSku] = product.imageUrl;
-    }
-  });
+    products.forEach(product => {
+      registerImage(product.skuCode, product.imageUrl);
+    });
+  }
 
   return acc;
 };

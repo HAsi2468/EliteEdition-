@@ -1,5 +1,6 @@
 const db = require('../db/models');
 const logger = require('../config/logger');
+const { extractBaseSku, extractSizeFromSku } = require('../utils/skuHelper');
 
 // ─────────────────────────────────────────────────────────────
 // Helper: build date-range filter
@@ -605,35 +606,57 @@ const getReturnsBrandReport = async (req, res) => {
       }
     }
 
-    const buildPipeline = (matchStage) => [
-      { $match: matchStage },
-      { $group: {
-          _id: {
-            brand: { $cond: { if: { $or: [{ $eq: ['$itemTypeBrand', ''] }, { $eq: [{ $ifNull: ['$itemTypeBrand', null] }, null] }] }, then: 'Unknown', else: '$itemTypeBrand' } },
-            baseSku: { $arrayElemAt: [{ $split: ['$itemSKUCode', '_'] }, 0] },
-            size: { $cond: { if: { $or: [{ $eq: ['$itemTypeSize', ''] }, { $eq: [{ $ifNull: ['$itemTypeSize', null] }, null] }] }, then: 'N/A', else: '$itemTypeSize' } }
-          },
-          quantity: { $sum: { $ifNull: ['$saleCount', 1] } },
-          sellableAmount: { $sum: { $multiply: [{ $ifNull: ['$saleCount', 1] }, { $convert: { input: '$totalPrice', to: 'double', onError: 0, onNull: 0 } }] } }
-      }},
-      { $group: {
-          _id: { brand: '$_id.brand', baseSku: '$_id.baseSku' },
-          variations: { $push: { size: '$_id.size', quantity: '$quantity', sellableAmount: '$sellableAmount' } },
-          skuQty: { $sum: '$quantity' },
-          skuAmt: { $sum: '$sellableAmount' }
-      }},
-      { $group: {
-          _id: '$_id.brand',
-          products: { $push: { sku: '$_id.baseSku', total: '$skuQty', sellableAmount: '$skuAmt', variations: '$variations' } },
-          brandQty: { $sum: '$skuQty' },
-          brandAmt: { $sum: '$skuAmt' }
-      }},
-      { $sort: { brandQty: -1 } }
-    ];
+    const processReturns = async (matchStage) => {
+      const rawOrders = await db.SalesList.find(matchStage).lean();
+      const brandMap = new Map();
+
+      for (const item of rawOrders) {
+        const brand = (item.itemTypeBrand && item.itemTypeBrand.trim()) ? item.itemTypeBrand.trim() : 'Unknown';
+        const rawSku = item.itemSKUCode || '';
+        const baseSku = extractBaseSku(rawSku);
+        const size = (item.itemTypeSize && item.itemTypeSize.trim()) ? item.itemTypeSize.trim() : (extractSizeFromSku(rawSku) || 'N/A');
+        const qty = Number(item.saleCount || 1);
+        const price = parseFloat(item.totalPrice) || 0;
+        const amt = qty * price;
+
+        if (!brandMap.has(brand)) {
+          brandMap.set(brand, { brand, productsMap: new Map(), brandQty: 0, brandAmt: 0 });
+        }
+        const brandObj = brandMap.get(brand);
+        brandObj.brandQty += qty;
+        brandObj.brandAmt += amt;
+
+        if (!brandObj.productsMap.has(baseSku)) {
+          brandObj.productsMap.set(baseSku, { sku: baseSku, skuQty: 0, skuAmt: 0, variationsMap: new Map() });
+        }
+        const prodObj = brandObj.productsMap.get(baseSku);
+        prodObj.skuQty += qty;
+        prodObj.skuAmt += amt;
+
+        if (!prodObj.variationsMap.has(size)) {
+          prodObj.variationsMap.set(size, { size, quantity: 0, sellableAmount: 0 });
+        }
+        const varObj = prodObj.variationsMap.get(size);
+        varObj.quantity += qty;
+        varObj.sellableAmount += amt;
+      }
+
+      return Array.from(brandMap.values()).map(b => ({
+        _id: b.brand,
+        brandQty: b.brandQty,
+        brandAmt: b.brandAmt,
+        products: Array.from(b.productsMap.values()).map(p => ({
+          sku: p.sku,
+          total: p.skuQty,
+          sellableAmount: p.skuAmt,
+          variations: Array.from(p.variationsMap.values())
+        }))
+      })).sort((a, b) => b.brandQty - a.brandQty);
+    };
 
     const [resultsPickup, resultsPhysical] = await Promise.all([
-      db.SaleOrder.aggregate(buildPipeline(matchPickup)),
-      db.SaleOrder.aggregate(buildPipeline(matchPhysical))
+      processReturns(matchPickup),
+      processReturns(matchPhysical)
     ]);
 
     // Gather all SKUs to fetch images

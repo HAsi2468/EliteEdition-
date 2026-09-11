@@ -5,10 +5,19 @@ const vendorSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
+    businessName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     phone: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    gstin: {
       type: String,
       trim: true,
       default: '',

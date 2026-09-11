@@ -3,20 +3,17 @@ const logger = require('../config/logger');
 
 const createFabricVendor = async (req, res) => {
   try {
-    const { name, phone, address } = req.body;
+    const { name, businessName, phone, gstin, address } = req.body;
     
     if (!name) {
-      return res.status(400).json({ error: 'Fabric Vendor name is required' });
-    }
-
-    const existingVendor = await db.FabricVendor.findOne({ name: name.trim() });
-    if (existingVendor) {
-      return res.status(400).json({ error: 'Fabric Vendor with this name already exists' });
+      return res.status(400).json({ error: 'Vendor name is required' });
     }
 
     const newVendor = await db.FabricVendor.create({
       name: name.trim(),
+      businessName: businessName ? businessName.trim() : '',
       phone: phone || '',
+      gstin: gstin || '',
       address: address || '',
     });
 

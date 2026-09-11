@@ -18,6 +18,7 @@ import {
   Users,
   ShieldCheck
 } from 'lucide-react';
+import JobCardStatusDashboard from './JobCardStatusDashboard';
 
 const fmtINR = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -150,6 +151,9 @@ export default function CompanyDedicatedDashboard({ companyEntity = 'Elite Editi
           </button>
         </div>
       </div>
+
+      {/* 📊 Job Card Pending Status Overview */}
+      <JobCardStatusDashboard department="digital_print" />
 
       {/* 📊 5 Key Metric Cards Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem' }}>

@@ -19,7 +19,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
 
   // Form States
   const [editingId, setEditingId] = useState(null); // ID of item being edited
-  const [vendorForm, setVendorForm] = useState({ name: '', phone: '', address: '' });
+  const [vendorForm, setVendorForm] = useState({ name: '', businessName: '', phone: '', gstin: '', address: '' });
   const [partyForm, setPartyForm] = useState({ name: '', phone: '', address: '' });
   const [productForm, setProductForm] = useState({ skuCode: '', description: '', imageUrl: '', size: '' });
 
@@ -93,7 +93,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
         }
         setSuccess('Vendor created successfully.');
       }
-      setVendorForm({ name: '', phone: '', address: '' });
+      setVendorForm({ name: '', businessName: '', phone: '', gstin: '', address: '' });
       setEditingId(null);
       loadTabData();
     } catch (err) {
@@ -105,7 +105,9 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
     setEditingId(vendor._id);
     setVendorForm({
       name: vendor.name || '',
+      businessName: vendor.businessName || '',
       phone: vendor.phone || '',
+      gstin: vendor.gstin || '',
       address: vendor.address || '',
     });
   };
@@ -295,38 +297,73 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                   <div style={styles.tabContent}>
                     {/* Add / Edit Form */}
                     <form onSubmit={handleVendorSubmit} style={styles.inlineForm}>
-                      <h4 style={styles.formTitle}>{editingId ? 'Edit Vendor' : 'Add New Vendor'}</h4>
-                      <div style={styles.formGrid}>
-                        <input
-                          type="text"
-                          value={vendorForm.name}
-                          onChange={(e) => setVendorForm({ ...vendorForm, name: e.target.value })}
-                          placeholder="Vendor Name *"
-                          required
-                          style={styles.formInput}
-                        />
-                        <input
-                          type="text"
-                          value={vendorForm.phone}
-                          onChange={(e) => setVendorForm({ ...vendorForm, phone: e.target.value })}
-                          placeholder="Phone Number"
-                          style={styles.formInput}
-                        />
-                        <input
-                          type="text"
-                          value={vendorForm.address}
-                          onChange={(e) => setVendorForm({ ...vendorForm, address: e.target.value })}
-                          placeholder="Address"
-                          style={{ ...styles.formInput, gridColumn: 'span 2' }}
-                        />
+                      <h4 style={styles.formTitle}>{editingId ? 'EDIT VENDOR / SUPPLIER' : 'ADD NEW VENDOR / SUPPLIER'}</h4>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <div style={{ gridColumn: 'span 2' }}>
+                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>CONTACT PERSON NAME *</label>
+                          <input
+                            type="text"
+                            value={vendorForm.name}
+                            onChange={(e) => setVendorForm({ ...vendorForm, name: e.target.value })}
+                            placeholder="Enter contact person name"
+                            required
+                            style={styles.formInput}
+                          />
+                        </div>
+
+                        <div style={{ gridColumn: 'span 2' }}>
+                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>BUSINESS / COMPANY NAME</label>
+                          <input
+                            type="text"
+                            value={vendorForm.businessName}
+                            onChange={(e) => setVendorForm({ ...vendorForm, businessName: e.target.value })}
+                            placeholder="Enter business or company name"
+                            style={styles.formInput}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>PHONE NUMBER</label>
+                          <input
+                            type="text"
+                            value={vendorForm.phone}
+                            onChange={(e) => setVendorForm({ ...vendorForm, phone: e.target.value })}
+                            placeholder="Enter phone number"
+                            style={styles.formInput}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>GSTIN NUMBER</label>
+                          <input
+                            type="text"
+                            value={vendorForm.gstin}
+                            onChange={(e) => setVendorForm({ ...vendorForm, gstin: e.target.value })}
+                            placeholder="e.g. 24AAAAA0000A1Z5"
+                            style={styles.formInput}
+                          />
+                        </div>
+
+                        <div style={{ gridColumn: 'span 2' }}>
+                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>BILLING ADDRESS</label>
+                          <textarea
+                            rows="3"
+                            value={vendorForm.address}
+                            onChange={(e) => setVendorForm({ ...vendorForm, address: e.target.value })}
+                            placeholder="Enter complete billing address"
+                            style={{ ...styles.formInput, width: '100%', resize: 'vertical' }}
+                          />
+                        </div>
                       </div>
+
                       <div style={styles.formActions}>
                         {editingId && (
                           <button
                             type="button"
                             onClick={() => {
                               setEditingId(null);
-                              setVendorForm({ name: '', phone: '', address: '' });
+                              setVendorForm({ name: '', businessName: '', phone: '', gstin: '', address: '' });
                             }}
                             className="btn-secondary"
                             style={styles.formBtn}
@@ -334,42 +371,47 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                             Cancel
                           </button>
                         )}
-                        <button type="submit" className="btn-success" style={styles.formBtn}>
-                          <Save size={14} />
-                          <span>{editingId ? 'Save' : 'Create'}</span>
+                        <button type="submit" style={{ ...styles.formBtn, background: '#4f46e5', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, padding: '0.55rem 1.35rem', boxShadow: '0 4px 12px rgba(79,70,229,0.25)', cursor: 'pointer' }}>
+                          <Save size={15} />
+                          <span>{editingId ? 'Save Vendor' : 'Save Vendor'}</span>
                         </button>
                       </div>
                     </form>
 
                     {/* Table List */}
                     <div className="table-container" style={styles.tableWrap}>
-                      <table>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
-                          <tr>
-                            <th>Name</th>
-                            <th>Phone</th>
-                            <th>Address</th>
-                            <th className="text-center">Actions</th>
+                          <tr style={{ background: '#1e293b', color: '#ffffff' }}>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>CONTACT / COMPANY NAME</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>PHONE</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>GSTIN</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>ADDRESS</th>
+                            <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>ACTIONS</th>
                           </tr>
                         </thead>
                         <tbody>
                           {vendors.length === 0 ? (
                             <tr>
-                              <td colSpan="4" className="text-center" style={{ color: 'var(--text-muted)' }}>No vendors registered.</td>
+                              <td colSpan="5" style={{ padding: '1.5rem', color: 'var(--text-muted)', textAlign: 'center' }}>No vendors registered yet.</td>
                             </tr>
                           ) : (
                             vendors.map((v) => (
-                              <tr key={v._id}>
-                                <td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{v.name}</td>
-                                <td>{v.phone || '-'}</td>
-                                <td style={{ fontSize: '0.8rem', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.address || '-'}</td>
-                                <td>
+                              <tr key={v._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                <td style={{ padding: '0.75rem 1rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+                                  <div style={{ fontSize: '0.88rem' }}>{v.name}</div>
+                                  {v.businessName && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: 2 }}>{v.businessName}</div>}
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>{v.phone || '-'}</td>
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', fontFamily: 'monospace', fontWeight: 600, color: 'var(--primary)' }}>{v.gstin || '-'}</td>
+                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.address || '-'}</td>
+                                <td style={{ padding: '0.75rem 1rem' }}>
                                   <div style={styles.actionsCell}>
                                     <button onClick={() => handleEditVendor(v)} className="btn-icon" title="Edit">
-                                      <Edit2 size={13} />
+                                      <Edit2 size={14} />
                                     </button>
                                     <button onClick={() => handleDeleteVendor(v._id)} className="btn-icon" style={styles.trashBtn} title="Delete">
-                                      <Trash2 size={13} />
+                                      <Trash2 size={14} />
                                     </button>
                                   </div>
                                 </td>
@@ -645,13 +687,14 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
 // Styles configuration object remains exactly the same
 const styles = {
   content: {
-    width: '900px',
+    width: '940px',
     maxWidth: '95vw',
     padding: '1.5rem',
     display: 'flex',
     flexDirection: 'column',
     gap: '1rem',
-    height: '600px',
+    maxHeight: '92vh',
+    height: 'auto',
   },
   header: {
     display: 'flex',
@@ -678,14 +721,16 @@ const styles = {
     flex: 1,
     gap: '1.5rem',
     overflow: 'hidden',
+    minHeight: 0,
   },
   sidebar: {
-    width: '200px',
+    width: '190px',
     display: 'flex',
     flexDirection: 'column',
     gap: '0.4rem',
     borderRight: '1px solid var(--border-light)',
     paddingRight: '1rem',
+    flexShrink: 0,
   },
   tabBtn: {
     background: 'none',
@@ -715,65 +760,80 @@ const styles = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    overflow: 'hidden',
+    overflowY: 'auto',
+    maxHeight: 'calc(92vh - 80px)',
+    paddingRight: '4px',
   },
   tabContent: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '1rem',
-    height: '100%',
-    overflow: 'hidden',
+    gap: '1.25rem',
+    height: 'auto',
   },
   inlineForm: {
-    background: 'rgba(255, 255, 255, 0.02)',
+    background: 'rgba(255, 255, 255, 0.03)',
     border: '1px solid var(--border-light)',
-    borderRadius: '8px',
-    padding: '0.75rem',
+    borderRadius: '12px',
+    padding: '1.25rem',
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.6rem',
+    gap: '0.85rem',
     flexShrink: 0,
   },
   formTitle: {
     fontSize: '0.85rem',
-    fontWeight: '700',
-    color: 'var(--primary)',
+    fontWeight: '800',
+    color: '#4f46e5',
     margin: 0,
     textTransform: 'uppercase',
+    letterSpacing: '0.04em',
   },
   formGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '0.6rem',
+    gap: '0.75rem',
   },
   formInput: {
-    padding: '0.5rem',
-    fontSize: '0.8rem',
+    width: '100%',
+    padding: '0.55rem 0.8rem',
+    fontSize: '0.85rem',
+    fontFamily: 'inherit',
+    borderRadius: '6px',
+    border: '1px solid var(--border-light)',
+    background: 'rgba(255, 255, 255, 0.05)',
+    color: 'var(--text-primary)',
+    outline: 'none',
+    boxSizing: 'border-box',
   },
   formActions: {
     display: 'flex',
     justifyContent: 'flex-end',
-    gap: '0.5rem',
+    gap: '0.6rem',
+    marginTop: '0.25rem',
   },
   formBtn: {
-    padding: '0.4rem 1rem',
-    fontSize: '0.75rem',
+    padding: '0.55rem 1.25rem',
+    fontSize: '0.82rem',
+    fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
-    gap: '0.3rem',
+    gap: '0.4rem',
+    borderRadius: '6px',
+    cursor: 'pointer',
   },
   tableWrap: {
-    flex: 1,
     overflowY: 'auto',
+    borderRadius: '10px',
+    border: '1px solid var(--border-light)',
   },
   actionsCell: {
     display: 'flex',
-    gap: '0.3rem',
+    gap: '0.4rem',
     justifyContent: 'center',
   },
   trashBtn: {
-    color: '#fca5a5',
-    borderColor: 'rgba(239, 68, 68, 0.1)',
+    color: '#ef4444',
+    borderColor: 'rgba(239, 68, 68, 0.2)',
   },
   catalogCtrl: {
     display: 'flex',

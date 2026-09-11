@@ -8,6 +8,7 @@ import {
 import imageCompression from 'browser-image-compression';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import DateRangePicker from './DateRangePicker';
+import { triggerGlobalDataRefresh } from './NotificationToast';
 
 const DEFAULT_IN_CATEGORIES = [
   'Petty Cash Top-up',
@@ -184,6 +185,14 @@ function getDatePresetRange(preset, customStart = '', customEnd = '') {
   return { start, end, labelText };
 }
 
+function formatDateISO(d) {
+  if (!d) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onModalOpened = null, companyEntity = 'Elite Digital Print' }) {
   const [expenses, setExpenses] = useState([]);
   const [summary, setSummary] = useState({ totalIn: 0, totalOut: 0, netBalance: 0, totalVouchers: 0 });
@@ -225,14 +234,14 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('All'); // 'All', 'IN', 'OUT'
   const [categoryFilter, setCategoryFilter] = useState('All');
-  const [datePreset, setDatePreset] = useState('all');
+  const [datePreset, setDatePreset] = useState('this_month');
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
 
   const activeRange = getDatePresetRange(datePreset, customDateStart, customDateEnd);
-  const dateStart = activeRange.start ? activeRange.start.toISOString().split('T')[0] : '';
-  const dateEnd = activeRange.end ? activeRange.end.toISOString().split('T')[0] : '';
+  const dateStart = activeRange.start ? formatDateISO(activeRange.start) : '';
+  const dateEnd = activeRange.end ? formatDateISO(activeRange.end) : '';
 
   // Modals
   const [showModal, setShowModal] = useState(false);
@@ -244,7 +253,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
   const [formVal, setFormVal] = useState({
     companyEntity,
     voucherNo: '',
-    date: new Date().toISOString().split('T')[0],
+    date: formatDateISO(new Date()),
     type: 'OUT',
     category: 'Ink & Consumables',
     title: '',
@@ -260,6 +269,13 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
 
   useEffect(() => {
     fetchExpenses();
+    const handleDataRefresh = (e) => {
+      if (!e || !e.detail || e.detail === 'expenses') {
+        fetchExpenses();
+      }
+    };
+    window.addEventListener('elite-data-refresh', handleDataRefresh);
+    return () => window.removeEventListener('elite-data-refresh', handleDataRefresh);
   }, [search, typeFilter, categoryFilter, dateStart, dateEnd, companyEntity]);
 
   const fetchExpenses = async () => {
@@ -300,7 +316,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     setFormVal({
       companyEntity,
       voucherNo: 'EXP-...',
-      date: new Date().toISOString().split('T')[0],
+      date: formatDateISO(new Date()),
       type: defaultType,
       category: defaultCat,
       title: '',
@@ -333,8 +349,9 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       : (outCategories && outCategories[0] ? outCategories[0] : DEFAULT_OUT_CATEGORIES[0]);
 
     setFormVal({
+      companyEntity: item.companyEntity || companyEntity,
       voucherNo: item.voucherNo || '',
-      date: item.date || new Date().toISOString().split('T')[0],
+      date: item.date || formatDateISO(new Date()),
       type: item.type || 'OUT',
       category: item.category || defaultCat,
       title: item.title || '',
@@ -410,6 +427,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
       }
 
       setShowModal(false);
+      triggerGlobalDataRefresh('expenses');
       fetchExpenses();
     } catch (err) {
       console.error('Failed to save expense entry:', err);
@@ -428,6 +446,7 @@ export default function DigitalPrintExpenseModule({ autoOpenCreate = false, onMo
     try {
       await api.deleteExpense(id);
       triggerEliteAlert('Expense record deleted successfully.');
+      triggerGlobalDataRefresh('expenses');
       fetchExpenses();
     } catch (err) {
       console.error('Failed to delete expense record:', err);

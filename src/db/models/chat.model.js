@@ -32,6 +32,11 @@ const chatRoomSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    companyEntity: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     permissionScope: {
       type: String,
       default: '',

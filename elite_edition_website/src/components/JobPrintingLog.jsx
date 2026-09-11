@@ -221,7 +221,7 @@ export default function JobPrintingLog() {
 
           if (t.notes) {
             const tm = t.notes.match(/Time:\s*([^\s|]+(?:\s*[AP]M)?)\s*(?:to|-)\s*([^\s|]+(?:\s*[AP]M)?)/i) ||
-                       t.notes.match(/(\d{1,2}:\d{2}(?:\s*[AP]M)?)\s*(?:to|-)\s*(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i);
+              t.notes.match(/(\d{1,2}:\d{2}(?:\s*[AP]M)?)\s*(?:to|-)\s*(\d{1,2}:\d{2}(?:\s*[AP]M)?)/i);
             if (tm) {
               if (!foundStart) foundStart = tm[1];
               if (!foundStop) foundStop = tm[2];
@@ -527,28 +527,28 @@ export default function JobPrintingLog() {
           </thead>
           <tbody>
             ${(() => {
-              const outG = rawMaterialSummary?.outward?.grando || { C: 0, M: 0, Y: 0, K: 0 };
-              const outP = rawMaterialSummary?.outward?.printdot || { C: 0, M: 0, Y: 0, K: 0 };
-              const outPapers = rawMaterialSummary?.outward?.paper || [];
+        const outG = rawMaterialSummary?.outward?.grando || { C: 0, M: 0, Y: 0, K: 0 };
+        const outP = rawMaterialSummary?.outward?.printdot || { C: 0, M: 0, Y: 0, K: 0 };
+        const outPapers = rawMaterialSummary?.outward?.paper || [];
 
-              const grandoC = (Number(grandoOutC) > 0) ? Number(grandoOutC).toFixed(2) : (outG.C > 0 ? outG.C.toFixed(2) : '');
-              const grandoM = (Number(grandoOutM) > 0) ? Number(grandoOutM).toFixed(2) : (outG.M > 0 ? outG.M.toFixed(2) : '');
-              const grandoY = (Number(grandoOutY) > 0) ? Number(grandoOutY).toFixed(2) : (outG.Y > 0 ? outG.Y.toFixed(2) : '');
-              const grandoK = (Number(grandoOutK) > 0) ? Number(grandoOutK).toFixed(2) : (outG.K > 0 ? outG.K.toFixed(2) : '');
+        const grandoC = (Number(grandoOutC) > 0) ? Number(grandoOutC).toFixed(2) : (outG.C > 0 ? outG.C.toFixed(2) : '');
+        const grandoM = (Number(grandoOutM) > 0) ? Number(grandoOutM).toFixed(2) : (outG.M > 0 ? outG.M.toFixed(2) : '');
+        const grandoY = (Number(grandoOutY) > 0) ? Number(grandoOutY).toFixed(2) : (outG.Y > 0 ? outG.Y.toFixed(2) : '');
+        const grandoK = (Number(grandoOutK) > 0) ? Number(grandoOutK).toFixed(2) : (outG.K > 0 ? outG.K.toFixed(2) : '');
 
-              const printdotC = (Number(printdotOutC) > 0) ? Number(printdotOutC).toFixed(2) : (outP.C > 0 ? outP.C.toFixed(2) : '');
-              const printdotM = (Number(printdotOutM) > 0) ? Number(printdotOutM).toFixed(2) : (outP.M > 0 ? outP.M.toFixed(2) : '');
-              const printdotY = (Number(printdotOutY) > 0) ? Number(printdotOutY).toFixed(2) : (outP.Y > 0 ? outP.Y.toFixed(2) : '');
-              const printdotK = (Number(printdotOutK) > 0) ? Number(printdotOutK).toFixed(2) : (outP.K > 0 ? outP.K.toFixed(2) : '');
+        const printdotC = (Number(printdotOutC) > 0) ? Number(printdotOutC).toFixed(2) : (outP.C > 0 ? outP.C.toFixed(2) : '');
+        const printdotM = (Number(printdotOutM) > 0) ? Number(printdotOutM).toFixed(2) : (outP.M > 0 ? outP.M.toFixed(2) : '');
+        const printdotY = (Number(printdotOutY) > 0) ? Number(printdotOutY).toFixed(2) : (outP.Y > 0 ? outP.Y.toFixed(2) : '');
+        const printdotK = (Number(printdotOutK) > 0) ? Number(printdotOutK).toFixed(2) : (outP.K > 0 ? outP.K.toFixed(2) : '');
 
-              const row1Paper = outPapers[0] || {};
-              const row2Paper = outPapers[1] || {};
-              const extraPapers = outPapers.slice(2);
+        const row1Paper = outPapers[0] || {};
+        const row2Paper = outPapers[1] || {};
+        const extraPapers = outPapers.slice(2);
 
-              const row1Panno = row1Paper.paperPanna === 'Custom' ? (row1Paper.paperCustomPanna || '') : (row1Paper.paperPanna || '');
-              const row2Panno = row2Paper.paperPanna === 'Custom' ? (row2Paper.paperCustomPanna || '') : (row2Paper.paperPanna || '');
+        const row1Panno = row1Paper.paperPanna === 'Custom' ? (row1Paper.paperCustomPanna || '') : (row1Paper.paperPanna || '');
+        const row2Panno = row2Paper.paperPanna === 'Custom' ? (row2Paper.paperCustomPanna || '') : (row2Paper.paperPanna || '');
 
-              return `
+        return `
                 <tr>
                   <td class="bold">GRANDO</td>
                   <td class="text-right bold" style="color:#0284c7;">${grandoC}</td>
@@ -570,8 +570,8 @@ export default function JobPrintingLog() {
                   <td class="text-right bold">${row2Paper.paperRollsQty ? `${row2Paper.paperRollsQty} Rolls` : ''}</td>
                 </tr>
                 ${extraPapers.map(p => {
-                  const pPanno = p.paperPanna === 'Custom' ? (p.paperCustomPanna || '') : (p.paperPanna || '');
-                  return `
+          const pPanno = p.paperPanna === 'Custom' ? (p.paperCustomPanna || '') : (p.paperPanna || '');
+          return `
                     <tr>
                       <td class="bold"></td>
                       <td></td><td></td><td></td><td></td>
@@ -580,9 +580,9 @@ export default function JobPrintingLog() {
                       <td class="text-right bold">${p.paperRollsQty ? `${p.paperRollsQty} Rolls` : ''}</td>
                     </tr>
                   `;
-                }).join('')}
+        }).join('')}
               `;
-            })()}
+      })()}
           </tbody>
         </table>
 
@@ -602,17 +602,17 @@ export default function JobPrintingLog() {
           </thead>
           <tbody>
             ${repLogs.map(l => {
-              const matched = jobCards.find(c => c._id === l.jobCardId || c.jobNo === l.jobNo);
-              const cleanJobNo = String(l.jobNo || '').replace(/[^\d]/g, '') || l.jobNo || '—';
-              const shiftShort = String(l.shift || '').toLowerCase().includes('morn') ? 'M' :
-                                String(l.shift || '').toLowerCase().includes('night') ? 'N' :
-                                (l.shift ? l.shift.charAt(0).toUpperCase() : '—');
-              const machineShort = String(l.machineName || '').toUpperCase().includes('GRANDO') ? 'G' :
-                                   String(l.machineName || '').toUpperCase().includes('PRINTDOT') ? 'P' :
-                                   (l.machineName ? l.machineName.charAt(0).toUpperCase() : '—');
-              const passNum = (String(l.pass || '').match(/\d+/) || [l.pass || '1'])[0];
+        const matched = jobCards.find(c => c._id === l.jobCardId || c.jobNo === l.jobNo);
+        const cleanJobNo = String(l.jobNo || '').replace(/[^\d]/g, '') || l.jobNo || '—';
+        const shiftShort = String(l.shift || '').toLowerCase().includes('morn') ? 'M' :
+          String(l.shift || '').toLowerCase().includes('night') ? 'N' :
+            (l.shift ? l.shift.charAt(0).toUpperCase() : '—');
+        const machineShort = String(l.machineName || '').toUpperCase().includes('GRANDO') ? 'G' :
+          String(l.machineName || '').toUpperCase().includes('PRINTDOT') ? 'P' :
+            (l.machineName ? l.machineName.charAt(0).toUpperCase() : '—');
+        const passNum = (String(l.pass || '').match(/\d+/) || [l.pass || '1'])[0];
 
-              return `
+        return `
                 <tr>
                   <td style="text-align: center;" class="bold">
                     <span class="shift-badge ${l.shift === 'Morning' ? 'morning' : 'night'}">${shiftShort}</span>
@@ -626,7 +626,7 @@ export default function JobPrintingLog() {
                   <td>${l.operatorName || '—'}</td>
                 </tr>
               `;
-            }).join('')}
+      }).join('')}
             <tr class="total-row">
               <td colSpan="6" class="bold" style="font-size:10.5px;">GRAND TOTAL PRINTED METERS (${repLogs.length} LOG ENTRIES)</td>
               <td class="text-right bold" style="font-size:11px; color:#047857;">${totalMtr.toFixed(2)} mtr</td>
@@ -1042,7 +1042,7 @@ export default function JobPrintingLog() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '2rem' }}>
-      
+
       {/* ── 1. HEADER BANNER ── */}
       <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
@@ -1067,7 +1067,7 @@ export default function JobPrintingLog() {
 
       {/* ── 2. NEW PRINTING ENTRY FORM ── */}
       <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: selectedJob ? 'minmax(0, 1.4fr) minmax(0, 1fr)' : '1fr', gap: '1.25rem' }}>
-        
+
         {/* Entry Form */}
         <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: `4px solid ${editingLogId ? '#f59e0b' : '#38bdf8'}` }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -1131,10 +1131,10 @@ export default function JobPrintingLog() {
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            
+
             {/* ── LINE 1: DATE, SHIFT, JOB TYPE ── */}
             <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2.2fr', gap: '0.75rem' }}>
-              
+
               {/* Date */}
               <div>
                 <label style={labelStyle}>DATE <span style={{ color: '#ef4444' }}>*</span></label>
@@ -1419,7 +1419,7 @@ export default function JobPrintingLog() {
 
       {/* ── 3. PRINT RUNS AUDIT LOG TABLE & FILTERS ── */}
       <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        
+
         {/* Filter controls */}
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', flex: '1 1 200px' }}>
@@ -1485,56 +1485,56 @@ export default function JobPrintingLog() {
                 logs
                   .filter(log => matchSearchQuery(log, searchJob, ['jobNo', 'machineName', 'pass', 'operatorName', 'notes', 'shift']))
                   .map(log => (
-                  <tr key={log._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <td style={tdStyle}>{formatDateTimeDDMMYYYY(log.date || log.created_date_time)}</td>
-                    <td style={{ ...tdStyle, fontWeight: 800, color: 'var(--text-primary)' }}>
-                      <button
-                        onClick={() => loadJobCardHistory(log.jobNo)}
-                        style={{ background: 'none', border: 'none', color: '#38bdf8', fontWeight: 800, cursor: 'pointer', textDecoration: 'underline' }}
-                      >
-                        #{log.jobNo}
-                      </button>
-                    </td>
-                    <td style={{ ...tdStyle, fontWeight: 700 }}>{log.machineName}</td>
-                    <td style={tdStyle}>{log.pass}</td>
-                    <td style={{ ...tdStyle, fontWeight: 900, color: '#34d399' }}>{Number(log.meters).toFixed(2)} mtr</td>
-                    <td style={tdStyle}>{log.operatorName || '—'}</td>
-                    <td style={tdStyle}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: log.shift === 'Morning' ? 'rgba(56,189,248,0.1)' : 'rgba(167,139,250,0.1)', color: log.shift === 'Morning' ? '#38bdf8' : '#a78bfa' }}>
-                        {log.shift || 'Morning'}
-                      </span>
-                    </td>
-                    <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{log.notes || '—'}</td>
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                        {!isOlderThan36Hours(log.created_date_time || log.createdAt || log.date) && (
-                          <button
-                            onClick={() => handleStartEdit(log)}
-                            style={{ padding: '0.3rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.3)', color: '#38bdf8', borderRadius: 4, cursor: 'pointer' }}
-                            title="Edit Print Log Entry"
-                          >
-                            <Edit2 size={14} />
-                          </button>
-                        )}
+                    <tr key={log._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td style={tdStyle}>{formatDateTimeDDMMYYYY(log.date || log.created_date_time)}</td>
+                      <td style={{ ...tdStyle, fontWeight: 800, color: 'var(--text-primary)' }}>
                         <button
                           onClick={() => loadJobCardHistory(log.jobNo)}
-                          className="btn-icon"
-                          title="View Job Card Run History"
-                          style={{ padding: '0.3rem' }}
+                          style={{ background: 'none', border: 'none', color: '#38bdf8', fontWeight: 800, cursor: 'pointer', textDecoration: 'underline' }}
                         >
-                          <Eye size={14} />
+                          #{log.jobNo}
                         </button>
-                        <button
-                          onClick={() => handleDeleteLog(log._id, log.jobNo)}
-                          style={{ padding: '0.3rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', borderRadius: 4, cursor: 'pointer' }}
-                          title="Delete Log Entry"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td style={{ ...tdStyle, fontWeight: 700 }}>{log.machineName}</td>
+                      <td style={tdStyle}>{log.pass}</td>
+                      <td style={{ ...tdStyle, fontWeight: 900, color: '#34d399' }}>{Number(log.meters).toFixed(2)} mtr</td>
+                      <td style={tdStyle}>{log.operatorName || '—'}</td>
+                      <td style={tdStyle}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: log.shift === 'Morning' ? 'rgba(56,189,248,0.1)' : 'rgba(167,139,250,0.1)', color: log.shift === 'Morning' ? '#38bdf8' : '#a78bfa' }}>
+                          {log.shift || 'Morning'}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{log.notes || '—'}</td>
+                      <td style={{ ...tdStyle, textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                          {!isOlderThan36Hours(log.created_date_time || log.createdAt || log.date) && (
+                            <button
+                              onClick={() => handleStartEdit(log)}
+                              style={{ padding: '0.3rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.3)', color: '#38bdf8', borderRadius: 4, cursor: 'pointer' }}
+                              title="Edit Print Log Entry"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => loadJobCardHistory(log.jobNo)}
+                            className="btn-icon"
+                            title="View Job Card Run History"
+                            style={{ padding: '0.3rem' }}
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteLog(log._id, log.jobNo)}
+                            style={{ padding: '0.3rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', borderRadius: 4, cursor: 'pointer' }}
+                            title="Delete Log Entry"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
               )}
             </tbody>
           </table>
@@ -1613,104 +1613,115 @@ export default function JobPrintingLog() {
         </div>
 
         {(() => {
-          const curSummary = (rawEntryType === 'INWARD' ? rawMaterialSummary?.inward : rawMaterialSummary?.outward) || {
-            grando: { C: 0, M: 0, Y: 0, K: 0 },
-            printdot: { C: 0, M: 0, Y: 0, K: 0 },
-            paper: []
-          };
+          const curSummary = rawEntryType === 'INWARD' ? rawMaterialSummary.inward : rawMaterialSummary.outward;
+          const isOutward = rawEntryType === 'OUTWARD';
           const gInk = curSummary.grando || { C: 0, M: 0, Y: 0, K: 0 };
           const pInk = curSummary.printdot || { C: 0, M: 0, Y: 0, K: 0 };
+          const dayG = curSummary.dayGrando || gInk;
+          const dayP = curSummary.dayPrintdot || pInk;
+          const nightG = curSummary.nightGrando || { C: 0, M: 0, Y: 0, K: 0 };
+          const nightP = curSummary.nightPrintdot || { C: 0, M: 0, Y: 0, K: 0 };
           const paperList = curSummary.paper || [];
 
+          const inkRows = isOutward ? [
+            { label: 'GRANDO (DAY SHIFT)', color: '#38bdf8', data: dayG },
+            { label: 'PRINTDOT (DAY SHIFT)', color: '#f87171', data: dayP },
+            { label: 'GRANDO (NIGHT SHIFT)', color: '#818cf8', data: nightG },
+            { label: 'PRINTDOT (NIGHT SHIFT)', color: '#fb7185', data: nightP },
+          ] : [
+            { label: 'GRANDO (INWARD)', color: '#38bdf8', data: gInk },
+            { label: 'PRINTDOT (INWARD)', color: '#f87171', data: pInk },
+          ];
+
           return (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1.5px solid var(--border-light)' }}>
-                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800, width: 120 }}>MACHINE</th>
-                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#0284c7', width: 85 }}>C</th>
-                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#ec4899', width: 85 }}>M</th>
-                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#eab308', width: 85 }}>Y</th>
-                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#94a3b8', width: 85 }}>K</th>
-                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800 }}>PAPER TYPE</th>
-                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800 }}>PANNA</th>
-                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, width: 110 }}>QTY</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Row 1: GRANDO */}
-                  <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <td style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: '#38bdf8' }}>GRANDO</td>
-                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#38bdf8' }}>
-                      {Number(gInk.C) > 0 ? `${Number(gInk.C).toFixed(2)} L` : '—'}
-                    </td>
-                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#f472b6' }}>
-                      {Number(gInk.M) > 0 ? `${Number(gInk.M).toFixed(2)} L` : '—'}
-                    </td>
-                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#facc15' }}>
-                      {Number(gInk.Y) > 0 ? `${Number(gInk.Y).toFixed(2)} L` : '—'}
-                    </td>
-                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#94a3b8' }}>
-                      {Number(gInk.K) > 0 ? `${Number(gInk.K).toFixed(2)} L` : '—'}
-                    </td>
-                    <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
-                      {paperList[0]?.paperType || '—'}
-                    </td>
-                    <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
-                      {paperList[0]?.paperPanna === 'Custom' ? (paperList[0]?.paperCustomPanna || '—') : (paperList[0]?.paperPanna || '—')}
-                    </td>
-                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 800, color: rawEntryType === 'INWARD' ? '#10b981' : '#34d399' }}>
-                      {paperList[0]?.paperRollsQty ? `${paperList[0].paperRollsQty} Rolls` : '—'}
-                    </td>
-                  </tr>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-                  {/* Row 2: PRINTDOT */}
-                  <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <td style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: '#f87171' }}>PRINTDOT</td>
-                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#38bdf8' }}>
-                      {Number(pInk.C) > 0 ? `${Number(pInk.C).toFixed(2)} L` : '—'}
-                    </td>
-                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#f472b6' }}>
-                      {Number(pInk.M) > 0 ? `${Number(pInk.M).toFixed(2)} L` : '—'}
-                    </td>
-                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#facc15' }}>
-                      {Number(pInk.Y) > 0 ? `${Number(pInk.Y).toFixed(2)} L` : '—'}
-                    </td>
-                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#94a3b8' }}>
-                      {Number(pInk.K) > 0 ? `${Number(pInk.K).toFixed(2)} L` : '—'}
-                    </td>
-                    <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
-                      {paperList[1]?.paperType || '—'}
-                    </td>
-                    <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
-                      {paperList[1]?.paperPanna === 'Custom' ? (paperList[1]?.paperCustomPanna || '—') : (paperList[1]?.paperPanna || '—')}
-                    </td>
-                    <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 800, color: rawEntryType === 'INWARD' ? '#10b981' : '#34d399' }}>
-                      {paperList[1]?.paperRollsQty ? `${paperList[1].paperRollsQty} Rolls` : '—'}
-                    </td>
-                  </tr>
+              {/* ── Table 1: INK CONSUMPTION ── */}
+              <div>
+                <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#38bdf8', letterSpacing: '0.04em', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  💧 {isOutward ? 'INK CONSUMPTION SUMMARY (LITERS)' : 'INK INWARD STOCK RECEIVED (LITERS)'}
+                </div>
+                <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1.5px solid var(--border-light)' }}>
+                        <th style={{ padding: '0.55rem 0.75rem', textAlign: 'left', fontWeight: 800 }}>MACHINE / SHIFT</th>
+                        <th style={{ padding: '0.55rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#0284c7', width: 90 }}>C</th>
+                        <th style={{ padding: '0.55rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#ec4899', width: 90 }}>M</th>
+                        <th style={{ padding: '0.55rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#eab308', width: 90 }}>Y</th>
+                        <th style={{ padding: '0.55rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#94a3b8', width: 90 }}>K</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {inkRows.map((row, rIdx) => (
+                        <tr key={rIdx} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                          <td style={{ padding: '0.6rem 0.75rem', fontWeight: 800, color: row.color, fontSize: '0.78rem' }}>{row.label}</td>
+                          <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#38bdf8' }}>
+                            {Number(row.data.C) > 0 ? `${Number(row.data.C).toFixed(2)} L` : '—'}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#f472b6' }}>
+                            {Number(row.data.M) > 0 ? `${Number(row.data.M).toFixed(2)} L` : '—'}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#facc15' }}>
+                            {Number(row.data.Y) > 0 ? `${Number(row.data.Y).toFixed(2)} L` : '—'}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 700, color: '#94a3b8' }}>
+                            {Number(row.data.K) > 0 ? `${Number(row.data.K).toFixed(2)} L` : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-                  {/* Extra Paper Rows if any */}
-                  {paperList.slice(2).map((entry) => (
-                    <tr key={entry.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                      <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>—</td>
-                      <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
-                      <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
-                      <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
-                      <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', color: 'var(--text-muted)' }}>—</td>
-                      <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
-                        {entry.paperType || '—'}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', fontWeight: 600 }}>
-                        {entry.paperPanna === 'Custom' ? (entry.paperCustomPanna || '—') : (entry.paperPanna || '—')}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.75rem', textAlign: 'right', fontWeight: 800, color: rawEntryType === 'INWARD' ? '#10b981' : '#34d399' }}>
-                        {entry.paperRollsQty ? `${entry.paperRollsQty} Rolls` : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {/* ── Table 2: PAPER CONSUMPTION ── */}
+              <div>
+                <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#a78bfa', letterSpacing: '0.04em', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  📜 {isOutward ? 'PAPER CONSUMPTION SUMMARY (ROLLS & METERS)' : 'PAPER INWARD STOCK RECEIVED (ROLLS & METERS)'}
+                </div>
+                <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1.5px solid var(--border-light)' }}>
+                        <th style={{ padding: '0.55rem 0.75rem', textAlign: 'left', fontWeight: 800, width: 60 }}>#</th>
+                        <th style={{ padding: '0.55rem 0.75rem', textAlign: 'left', fontWeight: 800 }}>PAPER TYPE</th>
+                        <th style={{ padding: '0.55rem 0.75rem', textAlign: 'left', fontWeight: 800 }}>PANNA</th>
+                        <th style={{ padding: '0.55rem 0.75rem', textAlign: 'right', fontWeight: 800, width: 140 }}>ROLLS QTY</th>
+                        <th style={{ padding: '0.55rem 0.75rem', textAlign: 'right', fontWeight: 800, width: 140 }}>METERS (MTR)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paperList.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} style={{ padding: '0.8rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                            No paper entries recorded for this date range.
+                          </td>
+                        </tr>
+                      ) : (
+                        paperList.map((entry, idx) => (
+                          <tr key={entry.id || idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                            <td style={{ padding: '0.6rem 0.75rem', fontWeight: 800, color: '#a78bfa' }}>#{idx + 1}</td>
+                            <td style={{ padding: '0.6rem 0.75rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                              {entry.paperType || 'A++'}
+                            </td>
+                            <td style={{ padding: '0.6rem 0.75rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                              {entry.paperPanna === 'Custom' ? (entry.paperCustomPanna || '—') : (entry.paperPanna || '—')}
+                            </td>
+                            <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: isOutward ? '#34d399' : '#10b981' }}>
+                              {entry.paperRollsQty ? `${entry.paperRollsQty} Rolls` : '—'}
+                            </td>
+                            <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#38bdf8' }}>
+                              {entry.paperMtrQty ? `${entry.paperMtrQty} m` : '—'}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
             </div>
           );
         })()}
@@ -1817,7 +1828,7 @@ export default function JobPrintingLog() {
             flexDirection: 'column',
             gap: '1.25rem'
           }} onClick={e => e.stopPropagation()}>
-            
+
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -2114,7 +2125,7 @@ export default function JobPrintingLog() {
                     <div style={{ background: '#eff6ff', borderRadius: '7px', border: '1px solid #bfdbfe', padding: '0.4rem 0.5rem' }}>
                       <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1d4ed8', marginBottom: '5px' }}>🖨️ GRANDO INK</div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
-                        {[['C','#0284c7',grandoInC,setGrandoInC],['M','#db2777',grandoInM,setGrandoInM],['Y','#ca8a04',grandoInY,setGrandoInY],['K','#334155',grandoInK,setGrandoInK]].map(([ch,col,val,set]) => (
+                        {[['C', '#0284c7', grandoInC, setGrandoInC], ['M', '#db2777', grandoInM, setGrandoInM], ['Y', '#ca8a04', grandoInY, setGrandoInY], ['K', '#334155', grandoInK, setGrandoInK]].map(([ch, col, val, set]) => (
                           <div key={ch}>
                             <label style={{ fontSize: '0.6rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
                             <input type="number" step="0.01" placeholder="0.00" value={val} onChange={e => set(e.target.value)}
@@ -2128,7 +2139,7 @@ export default function JobPrintingLog() {
                     <div style={{ background: '#eff6ff', borderRadius: '7px', border: '1px solid #bfdbfe', padding: '0.4rem 0.5rem' }}>
                       <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1d4ed8', marginBottom: '5px' }}>🖨️ PRINTDOT INK</div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
-                        {[['C','#0284c7',printdotInC,setPrintdotInC],['M','#db2777',printdotInM,setPrintdotInM],['Y','#ca8a04',printdotInY,setPrintdotInY],['K','#334155',printdotInK,setPrintdotInK]].map(([ch,col,val,set]) => (
+                        {[['C', '#0284c7', printdotInC, setPrintdotInC], ['M', '#db2777', printdotInM, setPrintdotInM], ['Y', '#ca8a04', printdotInY, setPrintdotInY], ['K', '#334155', printdotInK, setPrintdotInK]].map(([ch, col, val, set]) => (
                           <div key={ch}>
                             <label style={{ fontSize: '0.6rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
                             <input type="number" step="0.01" placeholder="0.00" value={val} onChange={e => set(e.target.value)}
@@ -2152,15 +2163,45 @@ export default function JobPrintingLog() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                       {inwardPaperEntries.map((entry, index) => (
                         <div key={entry.id} style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', background: '#f8fafc', padding: '0.2rem 0.4rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                          <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#2563eb', minWidth: 18 }}>#{index+1}</span>
+                          <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#2563eb', minWidth: 18 }}>#{index + 1}</span>
                           <div style={{ flex: 1 }}>
-                            <select value={entry.paperType} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperType', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
-                              {(paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']).map((p, pIdx) => <option key={pIdx} value={p}>{p}</option>)}
+                            <select
+                              value={(() => {
+                                const currentType = entry.paperType || 'A++';
+                                const types = (paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']);
+                                return types.includes(currentType) ? currentType : currentType;
+                              })()}
+                              onChange={e => handleInwardPaperEntryChange(entry.id, 'paperType', e.target.value)}
+                              style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}
+                            >
+                              {(() => {
+                                const currentType = entry.paperType || 'A++';
+                                const types = (paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']);
+                                const list = types.includes(currentType) ? types : [currentType, ...types].filter(Boolean);
+                                return Array.from(new Set(list)).map((p, pIdx) => <option key={pIdx} value={p}>{p}</option>);
+                              })()}
                             </select>
                           </div>
                           <div style={{ flex: 1 }}>
-                            <select value={entry.paperPanna} onChange={e => handleInwardPaperEntryChange(entry.id, 'paperPanna', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
-                              {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>)}
+                            <select
+                              value={(() => {
+                                const currentPanna = entry.paperPanna || '';
+                                const baseOpts = (pannaOptionsList.length > 0 ? pannaOptionsList : ['36 Panna', '44" Panna', '54" Panna', '58 Panna', '60" Panna', '64" Panna', '72" Panna'])
+                                  .map(w => w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`);
+                                const matched = baseOpts.find(opt => opt === currentPanna || opt.replace(/["'\s]/g, '').toLowerCase() === currentPanna.replace(/["'\s]/g, '').toLowerCase());
+                                return matched || currentPanna;
+                              })()}
+                              onChange={e => handleInwardPaperEntryChange(entry.id, 'paperPanna', e.target.value)}
+                              style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #2563eb', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}
+                            >
+                              {(() => {
+                                const currentPanna = entry.paperPanna || '';
+                                const baseOpts = (pannaOptionsList.length > 0 ? pannaOptionsList : ['36 Panna', '44" Panna', '54" Panna', '58 Panna', '60" Panna', '64" Panna', '72" Panna'])
+                                  .map(w => w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`);
+                                const hasExact = baseOpts.includes(currentPanna);
+                                const list = hasExact ? baseOpts : [currentPanna, ...baseOpts].filter(Boolean);
+                                return Array.from(new Set(list)).map((w, wIdx) => <option key={wIdx} value={w}>{w}</option>);
+                              })()}
                             </select>
                           </div>
                           <div style={{ width: '54px' }}>
@@ -2201,7 +2242,7 @@ export default function JobPrintingLog() {
                     <div style={{ background: '#f0f7ff', borderRadius: '7px', border: '1px solid #93c5fd', padding: '0.4rem 0.5rem' }}>
                       <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1e3a8a', marginBottom: '5px' }}>🖨️ GRANDO INK</div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
-                        {[['C','#0284c7',grandoOutC,setGrandoOutC],['M','#db2777',grandoOutM,setGrandoOutM],['Y','#ca8a04',grandoOutY,setGrandoOutY],['K','#334155',grandoOutK,setGrandoOutK]].map(([ch,col,val,set]) => (
+                        {[['C', '#0284c7', grandoOutC, setGrandoOutC], ['M', '#db2777', grandoOutM, setGrandoOutM], ['Y', '#ca8a04', grandoOutY, setGrandoOutY], ['K', '#334155', grandoOutK, setGrandoOutK]].map(([ch, col, val, set]) => (
                           <div key={ch}>
                             <label style={{ fontSize: '0.6rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
                             <input type="number" step="0.01" placeholder="0.00" value={val} onChange={e => set(e.target.value)}
@@ -2215,7 +2256,7 @@ export default function JobPrintingLog() {
                     <div style={{ background: '#f0f7ff', borderRadius: '7px', border: '1px solid #93c5fd', padding: '0.4rem 0.5rem' }}>
                       <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#1e3a8a', marginBottom: '5px' }}>🖨️ PRINTDOT INK</div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.3rem' }}>
-                        {[['C','#0284c7',printdotOutC,setPrintdotOutC],['M','#db2777',printdotOutM,setPrintdotOutM],['Y','#ca8a04',printdotOutY,setPrintdotOutY],['K','#334155',printdotOutK,setPrintdotOutK]].map(([ch,col,val,set]) => (
+                        {[['C', '#0284c7', printdotOutC, setPrintdotOutC], ['M', '#db2777', printdotOutM, setPrintdotOutM], ['Y', '#ca8a04', printdotOutY, setPrintdotOutY], ['K', '#334155', printdotOutK, setPrintdotOutK]].map(([ch, col, val, set]) => (
                           <div key={ch}>
                             <label style={{ fontSize: '0.6rem', fontWeight: 900, color: col, display: 'block', textAlign: 'center', marginBottom: '2px' }}>{ch}</label>
                             <input type="number" step="0.01" placeholder="0.00" value={val} onChange={e => set(e.target.value)}
@@ -2239,15 +2280,45 @@ export default function JobPrintingLog() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                       {outwardPaperEntries.map((entry, index) => (
                         <div key={entry.id} style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', background: '#f8fafc', padding: '0.2rem 0.4rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                          <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#1e40af', minWidth: 18 }}>#{index+1}</span>
+                          <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#1e40af', minWidth: 18 }}>#{index + 1}</span>
                           <div style={{ flex: 1 }}>
-                            <select value={entry.paperType} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperType', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
-                              {(paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']).map((p, pIdx) => <option key={pIdx} value={p}>{p}</option>)}
+                            <select
+                              value={(() => {
+                                const currentType = entry.paperType || 'A++';
+                                const types = (paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']);
+                                return types.includes(currentType) ? currentType : currentType;
+                              })()}
+                              onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperType', e.target.value)}
+                              style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}
+                            >
+                              {(() => {
+                                const currentType = entry.paperType || 'A++';
+                                const types = (paperTypesList.length > 0 ? paperTypesList : ['A++', 'A+', 'A']);
+                                const list = types.includes(currentType) ? types : [currentType, ...types].filter(Boolean);
+                                return Array.from(new Set(list)).map((p, pIdx) => <option key={pIdx} value={p}>{p}</option>);
+                              })()}
                             </select>
                           </div>
                           <div style={{ flex: 1 }}>
-                            <select value={entry.paperPanna} onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperPanna', e.target.value)} style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}>
-                              {(pannaOptionsList.length > 0 ? pannaOptionsList : ['44" Panna', '54" Panna', '60" Panna', '64" Panna', '72" Panna']).map((w, wIdx) => <option key={wIdx} value={w}>{w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`}</option>)}
+                            <select
+                              value={(() => {
+                                const currentPanna = entry.paperPanna || '';
+                                const baseOpts = (pannaOptionsList.length > 0 ? pannaOptionsList : ['36 Panna', '44" Panna', '54" Panna', '58 Panna', '60" Panna', '64" Panna', '72" Panna'])
+                                  .map(w => w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`);
+                                const matched = baseOpts.find(opt => opt === currentPanna || opt.replace(/["'\s]/g, '').toLowerCase() === currentPanna.replace(/["'\s]/g, '').toLowerCase());
+                                return matched || currentPanna;
+                              })()}
+                              onChange={e => handleOutwardPaperEntryChange(entry.id, 'paperPanna', e.target.value)}
+                              style={{ width: '100%', padding: '0.15rem 0.3rem', fontSize: '0.74rem', height: '26px', background: '#fff', border: '1px solid #1e40af', borderRadius: '4px', color: '#0f172a', fontWeight: 700 }}
+                            >
+                              {(() => {
+                                const currentPanna = entry.paperPanna || '';
+                                const baseOpts = (pannaOptionsList.length > 0 ? pannaOptionsList : ['36 Panna', '44" Panna', '54" Panna', '58 Panna', '60" Panna', '64" Panna', '72" Panna'])
+                                  .map(w => w.toLowerCase().includes('panna') || w.includes('"') ? w : `${w} Panna`);
+                                const hasExact = baseOpts.includes(currentPanna);
+                                const list = hasExact ? baseOpts : [currentPanna, ...baseOpts].filter(Boolean);
+                                return Array.from(new Set(list)).map((w, wIdx) => <option key={wIdx} value={w}>{w}</option>);
+                              })()}
                             </select>
                           </div>
                           <div style={{ width: '54px' }}>

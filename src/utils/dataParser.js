@@ -156,11 +156,13 @@ function convertKeysToModelFields(jsonData) {
     itemDetails: item['Item Details'],
   }));
 }
+const { extractBaseSku } = require('./skuHelper');
+
 function convertKeysV2(jsonData) {
   return jsonData.map((item) => {
     return {
       saleOrderItemCode: item.saleOrderItemCode,
-      itemSKUCode: item.itemSKUCode.split('_')[0],
+      itemSKUCode: extractBaseSku(item.itemSKUCode),
       facility: item.facility,
       category: item.category,
       itemTypeColor: item.itemTypeColor,
@@ -184,7 +186,7 @@ const transformProducts = (products) => {
   return products.map(({ skuCode, color, size, ...product }) => {
     return {
       ...product,
-      skuCode: skuCode,
+      skuCode: extractBaseSku(skuCode) || skuCode,
       size: size ? [size] : [],
       color: color ? [color] : [],
     };

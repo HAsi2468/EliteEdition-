@@ -1619,19 +1619,19 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                 {/* Comments List */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '200px', overflowY: 'auto', marginBottom: '0.75rem', paddingRight: '0.25rem' }}>
                   {!showViewModal.comments || showViewModal.comments.length === 0 ? (
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: '6px' }}>No remarks or activity comments yet. Add the first comment below.</div>
+                    <div style={{ fontSize: '0.75rem', color: '#475569', fontStyle: 'italic', padding: '0.5rem', background: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>No remarks or activity comments yet. Add the first comment below.</div>
                   ) : (
                     showViewModal.comments.map((cm, idx) => (
-                      <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)', fontSize: '0.78rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                          <span style={{ fontWeight: 800, color: cm.userName === 'System' ? '#f59e0b' : '#60a5fa' }}>
+                      <div key={idx} style={{ background: '#ffffff', color: '#000000', padding: '0.6rem 0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <span style={{ fontWeight: 800, color: cm.userName === 'System' ? '#d97706' : '#1e40af' }}>
                             👤 {cm.userName}
                           </span>
-                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                          <span style={{ fontSize: '0.68rem', color: '#475569', fontWeight: 600 }}>
                             📅 {cm.createdAt ? new Date(cm.createdAt).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now'}
                           </span>
                         </div>
-                        <div style={{ color: 'var(--text-primary)', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{cm.text}</div>
+                        <div style={{ color: '#000000', fontWeight: 500, wordBreak: 'break-word', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{cm.text}</div>
                       </div>
                     ))
                   )}
@@ -1645,15 +1645,15 @@ export default function DigitalPrintComplainModule({ companyEntity = 'Elite Digi
                     value={newCommentText}
                     onChange={e => setNewCommentText(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleAddComment(showViewModal._id); }}
-                    style={{ flex: 1, padding: '0.45rem 0.75rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'rgba(0,0,0,0.2)', color: '#fff' }}
+                    style={{ flex: 1, padding: '0.55rem 0.85rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#000000', fontWeight: 500 }}
                   />
                   <button
                     type="button"
                     onClick={() => handleAddComment(showViewModal._id)}
                     disabled={postingComment || !newCommentText.trim()}
                     style={{
-                      padding: '0.45rem 1rem', fontSize: '0.75rem', fontWeight: 800, borderRadius: '6px',
-                      background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', color: '#fff', border: 'none',
+                      padding: '0.55rem 1.1rem', fontSize: '0.78rem', fontWeight: 800, borderRadius: '6px',
+                      background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', border: 'none',
                       cursor: postingComment || !newCommentText.trim() ? 'not-allowed' : 'pointer', opacity: postingComment || !newCommentText.trim() ? 0.5 : 1
                     }}
                   >

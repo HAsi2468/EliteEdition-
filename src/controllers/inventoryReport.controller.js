@@ -3,6 +3,7 @@ const logger = require('../config/logger');
 const PDFDocument = require('pdfkit');
 const axios = require('axios');
 const sharp = require('sharp');
+const { extractBaseSku } = require('../utils/skuHelper');
 
 // ─────────────────────────────────────────────────────────────
 // Image helper — fetches & converts any image to JPEG buffer
@@ -540,7 +541,7 @@ const groupInventoryItems = (rawItems, qtyField = 'currentlyAvailableStock') => 
   let totalSell = 0;
 
   rawItems.forEach(item => {
-    const baseSku = item.skuCode ? item.skuCode.split('_')[0] : item.itemName;
+    const baseSku = item.skuCode ? extractBaseSku(item.skuCode) : item.itemName;
     if (!grouped[baseSku]) {
       grouped[baseSku] = {
         imageUrl: item.imageUrl || '',
@@ -584,19 +585,31 @@ const groupInventoryItems = (rawItems, qtyField = 'currentlyAvailableStock') => 
 // Shared: enrich missing images from InventoryProduct
 // ─────────────────────────────────────────────────────────────
 const enrichImages = async (items) => {
-  const needImage = items.filter(i => !i.imageUrl).map(i => i.sku);
-  if (needImage.length === 0) return;
+  const needImageSkus = items.filter(i => !i.imageUrl).map(i => i.sku);
+  if (needImageSkus.length === 0) return;
 
-  const productDocs = await db.InventoryProduct.find({ imageUrl: { $exists: true, $nin: [null, ''] } }).lean();
+  const baseSkus = [...new Set(needImageSkus.map(s => extractBaseSku(s)))];
+  const regexes = baseSkus.map(s => new RegExp('^' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([-_]|$)', 'i'));
+
+  const productDocs = await db.InventoryProduct.find({
+    skuCode: { $in: regexes },
+    imageUrl: { $exists: true, $nin: [null, ''] }
+  }).lean();
+
   const imageMap = {};
   productDocs.forEach(p => {
-    const base = p.skuCode ? p.skuCode.split('_')[0] : null;
-    if (base && needImage.includes(base) && p.imageUrl && !imageMap[base]) {
-      imageMap[base] = p.imageUrl;
+    const base = p.skuCode ? extractBaseSku(p.skuCode) : null;
+    if (base && p.imageUrl) {
+      if (!imageMap[base]) imageMap[base] = p.imageUrl;
+      if (!imageMap[p.skuCode]) imageMap[p.skuCode] = p.imageUrl;
     }
   });
+
   items.forEach(item => {
-    if (!item.imageUrl && imageMap[item.sku]) item.imageUrl = imageMap[item.sku];
+    if (!item.imageUrl) {
+      const base = extractBaseSku(item.sku);
+      item.imageUrl = imageMap[item.sku] || imageMap[base] || '';
+    }
   });
 };
 

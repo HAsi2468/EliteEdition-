@@ -1,6 +1,7 @@
 const db = require('../db/models');
 const logger = require('../config/logger');
 const { getAccessToken, getInventorySnapshot: fetchSnapshot } = require('../services/api.service');
+const { extractBaseSku, extractSizeFromSku } = require('../utils/skuHelper');
 
 const createInventory = async (req, res) => {
   try {
@@ -233,7 +234,7 @@ const getInventorySnapshot = async (req, res) => {
         compMap[normalizedSku] = {
           skuCode: normalizedSku,
           itemName: name,
-          size: size || (normalizedSku.includes('_') ? normalizedSku.split('_')[1] : 'N/A'),
+          size: size || extractSizeFromSku(normalizedSku) || 'N/A',
           dbStock: 0,
           uniwareStock: 0,
           discrepancy: 0,
@@ -256,8 +257,8 @@ const getInventorySnapshot = async (req, res) => {
         size = (catalogMap[sku].size && catalogMap[sku].size[0]) || size;
       }
       
-      if (sku.includes('_') && size === 'N/A') {
-        size = sku.split('_')[1];
+      if (size === 'N/A') {
+        size = extractSizeFromSku(sku) || 'N/A';
       }
 
       if (!compMap[sku]) {
@@ -459,7 +460,7 @@ const bulkInward = async (req, res) => {
             resolvedParty = resolvedParty || catalogProduct.brand || 'Uniware';
           } else {
             resolvedItemName = resolvedItemName || skuCode;
-            resolvedSize = resolvedSize || (skuCode.includes('_') ? skuCode.split('_')[1] : 'N/A');
+            resolvedSize = resolvedSize || extractSizeFromSku(skuCode) || 'N/A';
           }
 
           await db.Inventory.create({

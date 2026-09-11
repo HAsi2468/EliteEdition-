@@ -19,6 +19,8 @@ import FusingDepartment from './FusingDepartment';
 import GarmentJobCardDashboard from './GarmentJobCardDashboard';
 import StitchingChallanPanel from './StitchingChallanPanel';
 import StitchingSettings from './StitchingSettings';
+import QADepartment from './QADepartment';
+import JobCardStatusDashboard from './JobCardStatusDashboard';
 import { areDesignsEquivalent, cleanDesignNameString, extractDesignNames } from '../utils/designUtils';
 
 const normalizeFabricName = (val, pannaVal = '') => {
@@ -2014,6 +2016,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         <JobPrintingLog />
       ) : effectiveSubTab === 'fusing_log' || effectiveSubTab === 'fusing' ? (
         <FusingDepartment />
+      ) : effectiveSubTab === 'qa' || effectiveSubTab === 'quality' || effectiveSubTab === 'quality_checking' ? (
+        <QADepartment department={department} />
       ) : effectiveSubTab === 'engine' || effectiveSubTab === 'split_view' ? (
         <EliteDigitalPrintsSplitView />
       ) : effectiveSubTab === 'raw_materials' ? (
@@ -2024,6 +2028,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         <DigitalPrintExpenseModule companyEntity={department === 'stitching' ? "Elite Stitching" : "Elite Digital Print"} />
       ) : effectiveSubTab === 'settings' || effectiveSubTab === 'stitching_settings' ? (
         department === 'stitching' ? <StitchingSettings /> : <PrintSettings />
+      ) : effectiveSubTab === 'status_dashboard' || effectiveSubTab === 'jobcards_status' || effectiveSubTab === 'pending_summary' || effectiveSubTab === 'status_overview' ? (
+        <JobCardStatusDashboard onSelectCard={c => openEdit(c)} department={department} />
       ) : effectiveSubTab === 'jobcards' ? (
         department === 'stitching' ? <GarmentJobCardDashboard /> : <ReportsCenter department="elite-print" />
       ) : (
@@ -2073,9 +2079,9 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                   fontSize: '0.8rem',
                   fontWeight: 800,
                   borderRadius: '8px',
-                  border: (effectiveSubTab === 'list' || effectiveSubTab === 'jobcards') ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
-                  background: (effectiveSubTab === 'list' || effectiveSubTab === 'jobcards') ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card, #ffffff)',
-                  color: (effectiveSubTab === 'list' || effectiveSubTab === 'jobcards') ? '#1d4ed8' : 'var(--text-muted)',
+                  border: (effectiveSubTab === 'list' || (effectiveSubTab !== 'tracking' && effectiveSubTab !== 'status_dashboard' && effectiveSubTab !== 'pending_summary' && effectiveSubTab !== 'status_overview')) ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
+                  background: (effectiveSubTab === 'list' || (effectiveSubTab !== 'tracking' && effectiveSubTab !== 'status_dashboard' && effectiveSubTab !== 'pending_summary' && effectiveSubTab !== 'status_overview')) ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-card, #ffffff)',
+                  color: (effectiveSubTab === 'list' || (effectiveSubTab !== 'tracking' && effectiveSubTab !== 'status_dashboard' && effectiveSubTab !== 'pending_summary' && effectiveSubTab !== 'status_overview')) ? '#1d4ed8' : 'var(--text-muted)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -2113,6 +2119,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
 
           {effectiveSubTab === 'tracking' ? (
             <JobCardTracking onPreview={setPreviewCard} />
+          ) : (effectiveSubTab === 'status_dashboard' || effectiveSubTab === 'pending_summary' || effectiveSubTab === 'status_overview') ? (
+            <JobCardStatusDashboard onSelectCard={c => openEdit(c)} department={department} />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
 

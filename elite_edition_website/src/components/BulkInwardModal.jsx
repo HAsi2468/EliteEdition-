@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Upload, Clipboard, Trash2, CheckCircle, Sparkles, AlertCircle } from 'lucide-react';
 import { api } from '../services/api';
+import { extractSizeFromSku } from '../utils/skuHelper';
 
 export default function BulkInwardModal({ onSubmit, onClose }) {
   const [activeInputTab, setActiveInputTab] = useState('paste'); // 'paste' or 'upload'
@@ -83,7 +84,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
 
       let status = 'NEW';
       let itemName = skuRaw;
-      let size = skuRaw.includes('_') ? skuRaw.split('_')[1] : 'N/A';
+      let size = extractSizeFromSku(skuRaw) || 'N/A';
       let purchasePrice = parts[2] ? parseFloat(parts[2]) : 0;
       let salePrice = parts[3] ? parseFloat(parts[3]) : 0;
       let party = parts[4] ? parts[4].trim() : '';

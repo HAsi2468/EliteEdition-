@@ -61,6 +61,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupDesc, setNewGroupDesc] = useState('');
   const [newGroupDept, setNewGroupDept] = useState('Production');
+  const [newGroupCompany, setNewGroupCompany] = useState('Elite Digital Print');
   const [newGroupScope, setNewGroupScope] = useState('jobcards_list');
   const [selectedModules, setSelectedModules] = useState(['Job Card']);
   const [selectedActions, setSelectedActions] = useState(['CREATE', 'UPDATE', 'DELETE', 'STAGE_CHANGE']);
@@ -283,6 +284,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
         name: newGroupName.trim(),
         description: newGroupDesc.trim(),
         department: newGroupDept,
+        companyEntity: newGroupCompany,
         permissionScope: newGroupScope,
         subscribedModules: selectedModules,
         subscribedActions: selectedActions
@@ -1265,7 +1267,24 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
                   <span>2. Department Category &amp; Access Authority Scope</span>
                 </h4>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.85rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                      Target Company Scope
+                    </label>
+                    <select
+                      value={newGroupCompany}
+                      onChange={(e) => setNewGroupCompany(e.target.value)}
+                      style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'var(--bg-card)', color: 'var(--text-primary)' }}
+                    >
+                      <option value="Elite Digital Print">Elite Digital Print</option>
+                      <option value="Elite Online">Elite Online</option>
+                      <option value="Elite Fabtex">Elite Fabtex</option>
+                      <option value="Elite Stitching">Elite Stitching</option>
+                      <option value="">All Authorized Companies</option>
+                    </select>
+                  </div>
+
                   <div>
                     <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
                       Department Category
@@ -1279,6 +1298,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
                       <option value="Stitching">Stitching</option>
                       <option value="Billing">Billing</option>
                       <option value="Fabric">Fabric</option>
+                      <option value="E-Commerce">E-Commerce</option>
                       <option value="Design">Design</option>
                       <option value="Inventory">Inventory</option>
                       <option value="Quality">Quality</option>
@@ -1299,7 +1319,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
                       <option value="jobcards_list">Job Cards Access (jobcards_list)</option>
                       <option value="jobcards_fabric">Fabric Store Access (jobcards_fabric)</option>
                       <option value="jobcards_billing">Billing Access (jobcards_billing)</option>
-                      <option value="jobcards_stitching_challan">Stitching Access (jobcards_stitching_challan)</option>
+                      <option value="stitching">Stitching Access (stitching)</option>
+                      <option value="sales">Sales & Orders Access (sales)</option>
+                      <option value="returns">Returns Access (returns)</option>
+                      <option value="inventory">Warehouse Inventory (inventory)</option>
                       <option value="jobcards_catalogue">Design Catalog Access (jobcards_catalogue)</option>
                       <option value="jobcards_expense">Expense Log Access (jobcards_expense)</option>
                       <option value="jobcards_complain">Quality Complaints (jobcards_complain)</option>

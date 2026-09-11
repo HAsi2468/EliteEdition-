@@ -46,12 +46,13 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
 
   useEffect(() => {
     if (item) {
+      const stockVal = item.currentlyAvailableStock ?? item.qty ?? 0;
       setFormData({
         party: item.party || '',
         itemName: item.itemName || '',
         size: item.size || '',
-        currentlyAvailableStock: item.currentlyAvailableStock ?? 0,
-        qty: item.qty ?? 0,
+        currentlyAvailableStock: stockVal,
+        qty: stockVal,
         purchasePrice: item.purchasePrice ?? 0.0,
         salePrice: item.salePrice ?? 0.0,
         skuCode: item.skuCode || '',
@@ -80,17 +81,26 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
           salePrice: matchedCatalog.price ?? prev.salePrice,
           imageUrl: matchedCatalog.imageUrl || prev.imageUrl,
           currentlyAvailableStock: currentStock,
+          qty: currentStock,
         }));
       } else {
         setFormData(prev => ({
           ...prev,
           skuCode: sku,
           currentlyAvailableStock: currentStock,
+          qty: currentStock,
         }));
       }
+    } else if (name === 'currentlyAvailableStock' || name === 'qty') {
+      const numVal = value === '' ? '' : parseFloat(value);
+      setFormData(prev => ({
+        ...prev,
+        currentlyAvailableStock: numVal,
+        qty: numVal
+      }));
     } else {
       // Convert to number for specific fields
-      const numericFields = ['currentlyAvailableStock', 'qty', 'purchasePrice', 'salePrice'];
+      const numericFields = ['purchasePrice', 'salePrice'];
       setFormData(prev => ({
         ...prev,
         [name]: numericFields.includes(name) ? (value === '' ? '' : parseFloat(value)) : value,
@@ -108,10 +118,12 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
       return;
     }
 
+    const stockVal = Number(formData.currentlyAvailableStock) || 0;
+
     const payload = {
       ...formData,
-      currentlyAvailableStock: Number(formData.currentlyAvailableStock) || 0,
-      qty: Number(formData.qty) || 0,
+      currentlyAvailableStock: stockVal,
+      qty: stockVal,
       purchasePrice: Number(formData.purchasePrice) || 0.0,
       salePrice: Number(formData.salePrice) || 0.0,
     };
@@ -195,29 +207,17 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
             </div>
           </div>
 
-          <div style={styles.row}>
-            <div style={styles.col}>
-              <label style={styles.label}>Starting Quantity (Qty)</label>
-              <input
-                type="number"
-                name="qty"
-                value={formData.qty}
-                onChange={handleChange}
-                min="0"
-              />
-            </div>
-            <div style={styles.col}>
-              <label style={styles.label}>Available Stock</label>
-              <input
-                type="number"
-                name="currentlyAvailableStock"
-                value={formData.currentlyAvailableStock}
-                onChange={handleChange}
-                min="0"
-                readOnly
-                style={{ background: 'rgba(56, 189, 248, 0.04)', color: '#9ca3af', cursor: 'not-allowed' }}
-              />
-            </div>
+          <div style={styles.colFull}>
+            <label style={styles.label}>Available Stock (Quantity) *</label>
+            <input
+              type="number"
+              name="currentlyAvailableStock"
+              value={formData.currentlyAvailableStock}
+              onChange={handleChange}
+              min="0"
+              placeholder="e.g., 10"
+              required
+            />
           </div>
 
           <div style={styles.row}>

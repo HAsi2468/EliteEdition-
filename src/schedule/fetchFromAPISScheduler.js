@@ -5,23 +5,33 @@
 const cron = require('node-cron');
 const { fetchFromAPIS } = require('../controllers/products.controller');
 
-// 1. Hourly Sync for TODAY (Every hour at the 55th minute)
-cron.schedule('55 * * * *', async () => {
+async function syncTodayData() {
   try {
-    console.log('[🕛] Running HOURLY fetchFromAPIS job for TODAY data (At 55th minute)');
+    console.log('[🕛] Running fetchFromAPIS job for TODAY data...');
     const fakeReq = { query: { dateRangeText: 'TODAY' } };
     const fakeRes = {
       status: (code) => ({
-        json: (payload) => console.log('[✅] HOURLY fetchFromAPIS responded', code, payload),
-        send: (payload) => console.log('[✅] HOURLY fetchFromAPIS responded', code, payload)
+        json: (payload) => console.log('[✅] TODAY fetchFromAPIS responded', code, payload?.jobCode || payload),
+        send: (payload) => console.log('[✅] TODAY fetchFromAPIS responded', code, payload?.jobCode || payload)
       }),
-      json: (payload) => console.log('[✅] HOURLY fetchFromAPIS responded', payload),
-      send: (payload) => console.log('[✅] HOURLY fetchFromAPIS responded', payload)
+      json: (payload) => console.log('[✅] TODAY fetchFromAPIS responded', payload?.jobCode || payload),
+      send: (payload) => console.log('[✅] TODAY fetchFromAPIS responded', payload?.jobCode || payload)
     };
     await fetchFromAPIS(fakeReq, fakeRes);
   } catch (err) {
-    console.error('[❌] HOURLY fetchFromAPIS failed:', err);
+    console.error('[❌] TODAY fetchFromAPIS failed:', err.message);
   }
+}
+
+// 1. Run sync for TODAY on server startup (after 5s delay)
+setTimeout(() => {
+  console.log('[🚀] Triggering initial startup sync for TODAY sales orders...');
+  syncTodayData();
+}, 5000);
+
+// 2. Periodic Sync for TODAY (Every 15 minutes)
+cron.schedule('*/15 * * * *', async () => {
+  await syncTodayData();
 });
 
 // 2. 2-Hourly Sync for LAST_90_DAYS (Every 2 hours at the 10th minute)

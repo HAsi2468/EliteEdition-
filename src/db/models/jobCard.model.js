@@ -52,6 +52,7 @@ const jobCardSchema = new mongoose.Schema(
     genuineFaultMtr:  { type: String, default: '', trim: true },
     totalWastageMtr:  { type: String, default: '', trim: true },
     fusingSpeed:      { type: String, default: '', trim: true },
+    fusingTemp:       { type: String, default: '', trim: true },
     fusingMachine:    { type: String, default: '', trim: true },
     fusingOperator:   { type: String, default: '', trim: true },
     butterPaperWeightKg: { type: String, default: '', trim: true },

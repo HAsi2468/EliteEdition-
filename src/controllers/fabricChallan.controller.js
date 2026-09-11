@@ -864,7 +864,22 @@ const downloadChallanPdf = async (req, res) => {
       return null;
     };
 
-    let firstDesignImg = null;
+    const allDesignImages = [];
+    const addedKeys = new Set();
+
+    const addImageItem = (p, designNameOrNo, jobNoStr, colorStr) => {
+      if (!p) return;
+      const key = typeof p === 'string' ? p : p.toString('base64').substring(0, 80);
+      if (!addedKeys.has(key)) {
+        addedKeys.add(key);
+        allDesignImages.push({
+          path: p,
+          designNo: designNameOrNo || challan.designNo || '—',
+          jobNo: jobNoStr || challan.jobNo || '—',
+          color: colorStr || challan.colour || '—'
+        });
+      }
+    };
 
     // Collect all design tokens from Challan and all attached Job Cards
     const allDesignNames = new Set();
@@ -894,9 +909,60 @@ const downloadChallanPdf = async (req, res) => {
       } catch (e) {}
     }
 
-    // 1. Search Design DB for collected design names
+    // Build lookup maps for attached JobCards so each design gets its specific JobNo & Color
+    const jobByDesignMap = new Map();
+    foundJobCards.forEach(job => {
+      const jNoStr = job.jobNo || '—';
+      const cStr = job.colors || job.colourMatching || '—';
+      const dNoStr = job.designNo || job.designName || '';
+
+      if (dNoStr) {
+        const cleanD = dNoStr.trim().toLowerCase();
+        jobByDesignMap.set(cleanD, { jobNo: jNoStr, color: cStr, designNo: dNoStr });
+        jobByDesignMap.set(cleanD.replace(/^ed-/i, ''), { jobNo: jNoStr, color: cStr, designNo: dNoStr });
+      }
+    });
+
+    // Helper to get specific JobNo and Color for a given design token
+    const getJobAndColorForDesign = (dName) => {
+      if (!dName) return { jobNo: '—', color: '—' };
+      const clean = dName.trim().toLowerCase();
+      if (jobByDesignMap.has(clean)) return jobByDesignMap.get(clean);
+      const cleanNoPrefix = clean.replace(/^ed-/i, '');
+      if (jobByDesignMap.has(cleanNoPrefix)) return jobByDesignMap.get(cleanNoPrefix);
+
+      // If only 1 Job Card is attached to the challan, use it!
+      if (foundJobCards.length === 1) {
+        return {
+          jobNo: foundJobCards[0].jobNo || '—',
+          color: foundJobCards[0].colors || foundJobCards[0].colourMatching || '—'
+        };
+      }
+
+      return { jobNo: '—', color: '—' };
+    };
+
+    // 1. Process attached JobCards directly (if they have images)
+    for (const job of foundJobCards) {
+      const jNoStr = job.jobNo || '—';
+      const cStr = job.colors || job.colourMatching || '—';
+      const dNoStr = job.designNo || job.designName || 'Design';
+
+      if (job.imageUrl1) {
+        const p = resolveImagePath(job.imageUrl1);
+        if (p) addImageItem(p, dNoStr, jNoStr, cStr);
+      }
+      if (job.imageUrl2) {
+        const p = resolveImagePath(job.imageUrl2);
+        if (p) addImageItem(p, `${dNoStr} (Alt)`, jNoStr, cStr);
+      }
+    }
+
+    // 2. Search Design DB & physical images for all collected design tokens
     for (const dName of Array.from(allDesignNames)) {
       const cleanName = dName.replace(/^ED-/i, '');
+      const { jobNo: specificJobNo, color: specificColor } = getJobAndColorForDesign(dName);
+
       try {
         const Design = require('../db/models/design.model');
         const dDoc = await Design.findOne({
@@ -906,37 +972,25 @@ const downloadChallanPdf = async (req, res) => {
           ]
         }).lean();
         if (dDoc) {
+          const finalColor = specificColor !== '—' ? specificColor : (dDoc.colors || dDoc.colourMatching || '—');
           if (dDoc.imageUrl) {
             const p = resolveImagePath(dDoc.imageUrl);
-            if (p) { firstDesignImg = { path: p, label: `Design: ${dDoc.designName || dName}` }; break; }
+            if (p) addImageItem(p, dDoc.designName || dDoc.designNo || dName, specificJobNo, finalColor);
           }
           if (dDoc.imageUrl2) {
             const p = resolveImagePath(dDoc.imageUrl2);
-            if (p) { firstDesignImg = { path: p, label: `Design: ${dDoc.designName || dName}` }; break; }
+            if (p) addImageItem(p, `${dDoc.designName || dDoc.designNo || dName} (Alt)`, specificJobNo, finalColor);
           }
         }
       } catch (e) {}
 
       const foundFile = findImageByDesignToken(dName);
       if (foundFile) {
-        firstDesignImg = { path: foundFile, label: `Design: ${dName}` };
-        break;
+        addImageItem(foundFile, dName, specificJobNo, specificColor);
       }
     }
 
-    // 2. Secondary: Fallback to any attached JobCard's stored imageUrl1 / imageUrl2
-    if (!firstDesignImg) {
-      for (const job of foundJobCards) {
-        if (job.imageUrl1) {
-          const p = resolveImagePath(job.imageUrl1);
-          if (p) { firstDesignImg = { path: p, label: `Design: ${job.designNo || job.designName || ''}` }; break; }
-        }
-        if (job.imageUrl2) {
-          const p = resolveImagePath(job.imageUrl2);
-          if (p) { firstDesignImg = { path: p, label: `Design: ${job.designNo || job.designName || ''}` }; break; }
-        }
-      }
-    }
+    const firstDesignImg = allDesignImages.length > 0 ? { path: allDesignImages[0].path, label: `Design: ${allDesignImages[0].designNo}` } : null;
 
     const hasNotes = !!(challan.notes && challan.notes.trim());
     const hasPcs = !!(challan.pcs);
@@ -1183,6 +1237,100 @@ const downloadChallanPdf = async (req, res) => {
     renderPage(true);  // Page 1: Color
     doc.addPage();
     renderPage(false); // Page 2: Black & White (Challan No in red)
+
+    // ── PAGE 3+ : DESIGN IMAGES ANNEXURE (IF MULTIPLE IMAGES EXIST) ──
+    if (allDesignImages.length > 1) {
+      const itemsPerPage = 12; // 3 columns x 4 rows = 12 images per page
+      const totalAnnexurePages = Math.ceil(allDesignImages.length / itemsPerPage);
+
+      for (let pIdx = 0; pIdx < totalAnnexurePages; pIdx++) {
+        doc.addPage();
+        
+        // Draw Outer Border
+        doc.strokeColor('#0000ff').lineWidth(1)
+           .rect(ML, MR, contentWidth, PH - 2 * MR).stroke();
+
+        // Top Header
+        doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
+           .text('GST : 24AANFE0044M1ZG', ML + 12, MR + 4, { lineBreak: false });
+        doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica-Bold')
+           .text('|| Shree Ganeshay Namah ||', ML, MR + 4, { width: contentWidth, align: 'center', lineBreak: false });
+        doc.fillColor('#0000ff').fontSize(10.5).font('Helvetica')
+           .text('Mo. +91 99098 66667', ML, MR + 4, { width: contentWidth - 12, align: 'right', lineBreak: false });
+
+        doc.strokeColor('#0000ff').lineWidth(0.5)
+           .moveTo(ML, MR + 14).lineTo(PW - MR, MR + 14).stroke();
+
+        // Annexure Title Banner
+        doc.fillColor('#0000ff').fontSize(13).font('Helvetica-Bold')
+           .text('ELITE DIGITAL PRINT — DESIGN IMAGES ANNEXURE', ML, MR + 20, { width: contentWidth, align: 'center' });
+
+        // Metadata Strip
+        const metaY = MR + 38;
+        doc.rect(ML + 8, metaY, contentWidth - 16, 22).fill('#f8fafc');
+        doc.strokeColor('#0000ff').lineWidth(0.5).rect(ML + 8, metaY, contentWidth - 16, 22).stroke();
+
+        doc.fillColor('#0000ff').fontSize(9.5).font('Helvetica-Bold')
+           .text(`CHALLAN #: EDP-${challan.challanNo}`, ML + 14, metaY + 6);
+        doc.text(`DATE: ${formattedDate}`, ML + 150, metaY + 6);
+        doc.text(`PARTY: ${challan.partyName || '—'}`, ML + 270, metaY + 6, { width: 150, lineBreak: false });
+        doc.text(`PAGE: ${3 + pIdx}`, PW - MR - 75, metaY + 6, { width: 60, align: 'right' });
+
+        // 3 columns x 4 rows = 12 images grid
+        const gridStartY = metaY + 28;
+        const pageImages = allDesignImages.slice(pIdx * itemsPerPage, (pIdx + 1) * itemsPerPage);
+
+        const gridCols = 3;
+        const colGap = 8;
+        const rowGap = 7;
+        const cardW = (contentWidth - 16 - (gridCols - 1) * colGap) / gridCols; // ~164px
+        const cardH = 164; // 164px height per card
+
+        pageImages.forEach((img, idx) => {
+          const col = idx % gridCols;
+          const row = Math.floor(idx / gridCols);
+
+          const cardX = ML + 8 + col * (cardW + colGap);
+          const cardY = gridStartY + row * (cardH + rowGap);
+
+          // Card Outer Border
+          doc.strokeColor('#0000ff').lineWidth(0.6)
+             .rect(cardX, cardY, cardW, cardH).stroke();
+
+          // Image Box Container (128px high)
+          const imgContainerH = 128;
+          doc.strokeColor('#cbd5e1').lineWidth(0.4)
+             .rect(cardX + 4, cardY + 4, cardW - 8, imgContainerH).stroke();
+
+          try {
+            doc.image(img.path, cardX + 6, cardY + 6, {
+              fit: [cardW - 12, imgContainerH - 4],
+              align: 'center',
+              valign: 'center'
+            });
+          } catch (e) {
+            console.warn('Failed to embed annexure design image:', e.message);
+            doc.fillColor('#64748b').fontSize(8.5).font('Helvetica')
+               .text('Preview N/A', cardX, cardY + 55, { width: cardW, align: 'center' });
+          }
+
+          // Footer Label Area below image container
+          const labelY = cardY + imgContainerH + 5;
+
+          // Line 1: Design Name / Number in Bold Red
+          doc.fillColor('#dc2626').fontSize(8.5).font('Helvetica-Bold')
+             .text(`Design: ${img.designNo}`, cardX + 5, labelY, { width: cardW - 10, lineBreak: false });
+
+          // Line 2: Job No & Color Info
+          doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
+             .text(`${img.jobNo} | ${img.color}`, cardX + 5, labelY + 12, { width: cardW - 10, lineBreak: false });
+        });
+
+        // Bottom Footer Notice
+        doc.fillColor('#0000ff').fontSize(8.5).font('Helvetica-Bold')
+           .text(`Delivery Challan Annexure — Page ${3 + pIdx} of ${2 + totalAnnexurePages}`, ML, PH - MR - 16, { width: contentWidth, align: 'center' });
+      }
+    }
 
     doc.end();
   } catch (err) {

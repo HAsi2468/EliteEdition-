@@ -53,15 +53,18 @@ import {
   Settings,
   FileText,
   Wallet,
+  ShieldCheck,
+  Flame,
   Menu,
   X,
   Bell,
+  Users,
   Scissors,
   Building,
-  Flame,
   Receipt,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Clock
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
@@ -194,7 +197,7 @@ export default function App() {
   // Department permission helpers
   // Department permission helpers
   const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
-  const EDP_PERMISSIONS = ['jobcards', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create'];
+  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm'];
   const STITCHING_PERMISSIONS = [
     'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
     'jobcards_stitching_challan', 'jobcards_stitching_settings', 'stitching'
@@ -336,7 +339,8 @@ export default function App() {
       'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'eo_complaints', 'eo_expenses',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
-      'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense'
+      'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense',
+      'jobcards_expenses', 'expense_dashboard', 'expense_create', 'expenses', 'jobcards_qa', 'qa', 'qa_dashboard'
     ];
 
     if (currentUser.role === 'admin') {
@@ -581,6 +585,17 @@ export default function App() {
       } finally {
         setLoading(false);
       }
+    }
+  };
+
+  const handleQuickStockUpdate = async (id, newStock) => {
+    try {
+      await api.updateInventory(id, { currentlyAvailableStock: newStock, qty: newStock });
+      setItems(prev => prev.map(item => item._id === id ? { ...item, currentlyAvailableStock: newStock, qty: newStock } : item));
+      triggerGlobalDataRefresh();
+    } catch (err) {
+      console.error('Failed to update stock:', err);
+      alert(err.message || 'Failed to update stock level.');
     }
   };
 
@@ -907,6 +922,12 @@ export default function App() {
                       <BarChart3 size={18} /><span>Prints Dashboard</span>
                     </button>
                   )}
+                  {/* 1.5. Pending Status Overview (New Dedicated Tab) */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards') || currentUser.permissions?.includes('jobcards_status_dashboard')) && (
+                    <button onClick={() => { setActiveTab('jobcards_status_dashboard'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...((activeTab === 'jobcards_status_dashboard' || activeTab === 'jobcards_status') ? styles.navItemActive : {}) }}>
+                      <Clock size={18} /><span>Pending Status Overview</span>
+                    </button>
+                  )}
                   {/* 2. Printing Department */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_printing_log')) && (
                     <button onClick={() => { setActiveTab('jobcards_printing_log'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_printing_log' ? styles.navItemActive : {}) }}>
@@ -925,10 +946,17 @@ export default function App() {
                       <Database size={18} /><span>Fabric Management</span>
                     </button>
                   )}
-                  {/* 3. Billing & Invoicing */}
+                  {/* 3. Finance */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) && (
                     <button onClick={() => { setActiveTab('jobcards_billing'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_billing' ? styles.navItemActive : {}) }}>
-                      <Receipt size={18} /><span>Billing & Invoicing</span>
+                      <Receipt size={18} /><span>Finance</span>
+                    </button>
+                  )}
+
+                  {/* CRM Department */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_crm') || currentUser.permissions?.includes('crm_department') || currentUser.permissions?.includes('crm')) && (
+                    <button onClick={() => { setActiveTab('jobcards_crm'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_crm' ? styles.navItemActive : {}) }}>
+                      <Users size={18} color="#ec4899" /><span>CRM Department</span>
                     </button>
                   )}
 
@@ -1284,8 +1312,8 @@ export default function App() {
                   <>
                     {renderSectionHeader('Elite Edition Modules', Building)}
                     {renderNavItem('ee_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')}
-                    {renderNavItem('ee_invoices', 'Billing', Receipt, null, 'Billing')}
-                    {renderNavItem('ee_complaints', 'Complaints', AlertTriangle, '#f43f5e', 'Complaints')}
+                    {renderNavItem('ee_invoices', 'Finance', Receipt, null, 'Finance')}
+                    {renderNavItem('ee_complaints', 'Complaints', AlertTriangle, null, 'Complaints')}
                     {renderNavItem('ee_settings', 'Settings', Settings, null, 'Settings')}
                   </>
                 );
@@ -1296,8 +1324,8 @@ export default function App() {
                   <>
                     {renderSectionHeader('Elite Fabtex Modules', Building)}
                     {renderNavItem('ef_dashboard', 'Dashboard', LayoutDashboard, null, 'Dashboard')}
-                    {renderNavItem('ef_invoices', 'Billing', Receipt, null, 'Billing')}
-                    {renderNavItem('ef_complaints', 'Complaints', AlertTriangle, '#f43f5e', 'Complaints')}
+                    {renderNavItem('ef_invoices', 'Finance', Receipt, null, 'Finance')}
+                    {renderNavItem('ef_complaints', 'Complaints', AlertTriangle, null, 'Complaints')}
                     {renderNavItem('ef_settings', 'Settings', Settings, null, 'Settings')}
                   </>
                 );
@@ -1317,7 +1345,7 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_fabric') || currentUser.permissions?.includes('jobcards_stitching_challan') || currentUser.permissions?.includes('stitching_fabric')) &&
                       renderNavItem('jobcards_stitching_challan', 'Challan', Database, null, 'Challan')
                     }
-                    {renderNavItem('es_complaints', 'Complaints', AlertTriangle, '#f43f5e', 'Complaints')}
+                    {renderNavItem('es_complaints', 'Complaints', AlertTriangle, null, 'Complaints')}
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_stitching_settings') || currentUser.permissions?.includes('stitching_settings') || currentUser.permissions?.includes('es_settings')) &&
                       renderNavItem('es_settings', 'Settings', Settings, null, 'Settings')
                     }
@@ -1342,7 +1370,10 @@ export default function App() {
                       renderNavItem('jobcards_fabric', 'Fabric Management', Database, null, 'Fabric')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) &&
-                      renderNavItem('jobcards_billing', 'Billing & Invoicing', Receipt, null, 'Billing')
+                      renderNavItem('jobcards_billing', 'Finance', Receipt, null, 'Finance')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_crm') || currentUser.permissions?.includes('crm_department') || currentUser.permissions?.includes('crm')) &&
+                      renderNavItem('jobcards_crm', 'CRM Department', Users, null, 'CRM')
                     }
 
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) &&
@@ -1358,7 +1389,10 @@ export default function App() {
                       renderNavItem('jobcards_raw_materials', 'Raw Materials', ShoppingBag, null, 'Materials')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_complain') || currentUser.permissions?.includes('jobcards_complaints') || currentUser.permissions?.includes('complaint_dashboard') || currentUser.permissions?.includes('complaint_create')) &&
-                      renderNavItem('jobcards_complain', 'Complain Module', AlertTriangle, '#f43f5e', 'Complain')
+                      renderNavItem('jobcards_complain', 'Complain Module', AlertTriangle, null, 'Complain')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_qa') || currentUser.permissions?.includes('qa') || currentUser.permissions?.includes('jobcards')) &&
+                      renderNavItem('jobcards_qa', 'QA & Quality Checking', ShieldCheck, null, 'QA Check')
                     }
                   </>
                 );
@@ -1382,7 +1416,7 @@ export default function App() {
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('sales')) &&
                     renderNavItem('sales', 'Sales Orders', ShoppingBag, null, 'Sales')
                   }
-                  {renderNavItem('eo_complaints', 'Complaints', AlertTriangle, '#f43f5e', 'Complaints')}
+                  {renderNavItem('eo_complaints', 'Complaints', AlertTriangle, null, 'Complaints')}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('reports')) &&
                     renderNavItem('reports', 'Reports Center', BarChart3, null, 'Reports')
                   }
@@ -1490,6 +1524,7 @@ export default function App() {
               onStockOut={triggerStockOutModal}
               onOpenManager={() => triggerManagerModal('vendors')}
               onBulkInward={() => setIsBulkInwardOpen(true)}
+              onQuickStockUpdate={handleQuickStockUpdate}
             />
           ) : activeTab === 'catalog' ? (
             <ProductCatalogGrid
@@ -1504,7 +1539,22 @@ export default function App() {
           ) : activeTab === 'sales' ? (
             <SalesGrid />
           ) : activeTab === 'reports' ? (
-            <ReportsCenter />
+            <ReportsCenter department={activeDepartment === 'elite_online' ? 'elite-online' : 'elite-print'} />
+          ) : activeTab === 'jobcards_crm' || activeTab === 'crm_department' || activeTab === 'crm' ? (
+            <div className="glass-panel" style={{ padding: '5rem 2rem', textAlign: 'center', maxWidth: 750, margin: '3rem auto', borderRadius: '18px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.25rem' }}>
+              <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(236,72,153,0.2), rgba(244,63,94,0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid rgba(236,72,153,0.4)', color: '#ec4899', boxShadow: '0 8px 24px rgba(236,72,153,0.2)' }}>
+                <Users size={40} />
+              </div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '5px 16px', borderRadius: '20px', background: 'rgba(236,72,153,0.15)', color: '#ec4899', border: '1px solid rgba(236,72,153,0.3)' }}>
+                Elite Digital Print — CRM Department
+              </div>
+              <h1 style={{ fontSize: '2.8rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #ec4899, #f43f5e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                WORKING ON BY ❤️HASI❤️
+              </h1>
+              <p style={{ fontSize: '0.92rem', color: 'var(--text-muted)', margin: 0, maxWidth: 500, lineHeight: 1.6 }}>
+                This CRM module is currently under active development.
+              </p>
+            </div>
           ) : activeTab.startsWith('jobcards') ? (
             <JobCardPanel currentUser={currentUser} activeSubTab={activeTab === 'jobcards' ? 'jobcards' : activeTab.replace('jobcards_', '')} department={activeDepartment} />
           ) : activeTab === 'ee_dashboard' ? (
@@ -1513,6 +1563,8 @@ export default function App() {
             <CompanySettingsPanel companyEntity="Elite Edition" />
           ) : activeTab === 'ee_complaints' ? (
             <DigitalPrintComplainModule companyEntity="Elite Edition" />
+          ) : activeTab === 'ee_expenses' ? (
+            <DigitalPrintExpenseModule companyEntity="Elite Edition" />
           ) : activeTab === 'ee_invoices' ? (
             <EliteBillingDepartment companyEntity="Elite Edition" />
           ) : activeTab === 'ef_dashboard' ? (
@@ -1521,6 +1573,8 @@ export default function App() {
             <CompanySettingsPanel companyEntity="Elite Fabtex" />
           ) : activeTab === 'ef_complaints' ? (
             <DigitalPrintComplainModule companyEntity="Elite Fabtex" />
+          ) : activeTab === 'ef_expenses' ? (
+            <DigitalPrintExpenseModule companyEntity="Elite Fabtex" />
           ) : activeTab === 'ef_invoices' ? (
             <EliteBillingDepartment companyEntity="Elite Fabtex" />
           ) : activeTab === 'es_dashboard' ? (
@@ -1532,8 +1586,14 @@ export default function App() {
             </div>
           ) : activeTab === 'es_complaints' ? (
             <DigitalPrintComplainModule companyEntity="Elite Stitching" />
+          ) : activeTab === 'es_expenses' ? (
+            <DigitalPrintExpenseModule companyEntity="Elite Stitching" />
           ) : activeTab === 'eo_complaints' ? (
             <DigitalPrintComplainModule companyEntity="Elite Online" />
+          ) : activeTab === 'eo_expenses' ? (
+            <DigitalPrintExpenseModule companyEntity="Elite Online" />
+          ) : activeTab === 'expense_dashboard' || activeTab === 'expense_create' || activeTab === 'expenses' ? (
+            <DigitalPrintExpenseModule companyEntity="Elite Digital Print" autoOpenCreate={activeTab === 'expense_create'} />
           ) : activeDepartment === 'elite_edition' ? (
             <CompanyDedicatedDashboard companyEntity="Elite Edition" onNavigate={(tab) => setActiveTab(tab)} />
           ) : activeDepartment === 'elite_fabtex' ? (

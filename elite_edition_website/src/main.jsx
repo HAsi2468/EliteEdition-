@@ -27,3 +27,18 @@ if ('serviceWorker' in navigator) {
       });
   });
 }
+
+// Auto-heal dynamic import chunk errors after new deployments
+window.addEventListener('unhandledrejection', (event) => {
+  const msg = event?.reason?.message || '';
+  if (msg.includes('dynamically imported module') || msg.includes('Importing a module script failed') || msg.includes('Failed to fetch')) {
+    const storageKey = 'last_chunk_reload_time';
+    const now = Date.now();
+    const lastReload = Number(sessionStorage.getItem(storageKey) || 0);
+    if (now - lastReload > 8000) {
+      sessionStorage.setItem(storageKey, String(now));
+      window.location.reload();
+    }
+  }
+});
+

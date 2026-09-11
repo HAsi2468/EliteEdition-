@@ -12,21 +12,34 @@ function setActivitySocketIo(io) {
 /**
  * Map generic module name/permission to corresponding groupKey
  */
-function resolveGroupKey(permissionScope, department) {
+function resolveGroupKey(permissionScope, department, companyEntity = '') {
   const scope = (permissionScope || '').toLowerCase();
   const dept = (department || '').toLowerCase();
+  const company = (companyEntity || '').toLowerCase();
 
-  if (scope.includes('jobcard') && (scope.includes('log') || scope.includes('print'))) return 'production__printing_log';
-  if (scope.includes('jobcard') || dept.includes('production')) return 'production__job_card';
-  if (scope.includes('fabric') || dept.includes('fabric')) return 'fabric__inventory';
-  if (scope.includes('bill') || dept.includes('billing')) return 'billing__invoicing';
-  if (scope.includes('inventory') || dept.includes('inventory')) return 'inventory__stock';
-  if (scope.includes('complain') || dept.includes('quality')) return 'quality__complaints';
-  if (scope.includes('stitch') || dept.includes('stitching')) return 'stitching__department';
-  if (scope.includes('expense') || dept.includes('finance')) return 'finance__expenses';
-  if (scope.includes('design') || dept.includes('design')) return 'design__catalogue';
+  const isEDP = company.includes('digital') || company.includes('edp') || scope.includes('edp') || scope.includes('jobcards') || dept.includes('production') || dept.includes('fabric') || dept.includes('stitching');
+  const isEO = company.includes('online') || scope.includes('sales') || scope.includes('returns') || scope.includes('unicommerce');
 
-  return 'production__job_card'; // default fallback
+  if (isEDP) {
+    if (scope.includes('bill') || scope.includes('invoice') || dept.includes('bill')) return 'edp__billing_invoicing';
+    if (scope.includes('fabric') || dept.includes('fabric')) return 'edp__fabric_inventory';
+    if (scope.includes('stitch') || dept.includes('stitch')) return 'edp__stitching';
+    if (scope.includes('print') && (scope.includes('log') || dept.includes('print'))) return 'edp__printing_log';
+    if (scope.includes('jobcard') || dept.includes('production')) return 'edp__job_card';
+  }
+
+  if (isEO) {
+    if (scope.includes('return')) return 'eo__returns_manager';
+    if (scope.includes('sale') || scope.includes('order')) return 'eo__sales_orders';
+    if (scope.includes('inventory')) return 'eo__inventory_stock';
+  }
+
+  if (scope.includes('bill') || scope.includes('invoice')) return 'edp__billing_invoicing';
+  if (scope.includes('fabric')) return 'edp__fabric_inventory';
+  if (scope.includes('stitch')) return 'edp__stitching';
+  if (scope.includes('return')) return 'eo__returns_manager';
+
+  return 'edp__job_card'; // default fallback
 }
 
 /**
@@ -41,6 +54,7 @@ function resolveGroupKey(permissionScope, department) {
  * @param {string} [options.recordId] - MongoDB _id
  * @param {string} options.permissionScope - e.g. 'jobcards', 'jobcards_fabric', 'billing'
  * @param {string} [options.department] - e.g. 'Production', 'Billing'
+ * @param {string} [options.companyEntity] - e.g. 'Elite Digital Print', 'Elite Online'
  * @param {string} options.description - Human readable event summary message
  */
 async function publishActivity({
@@ -52,6 +66,7 @@ async function publishActivity({
   recordId = '',
   permissionScope,
   department = '',
+  companyEntity = '',
   description
 }) {
   try {
@@ -78,20 +93,38 @@ async function publishActivity({
     let finalDescription = description || `[System Activity] ${action} on ${module} #${recordRef}`;
     finalDescription = finalDescription.replace(/by \*{0,2}(Admin|Operator|System Bot|Staff User)\*{0,2}\.?$/i, `by **${realUserName}**.`);
 
-    const groupKey = resolveGroupKey(permissionScope, department);
+    const groupKey = resolveGroupKey(permissionScope, department, companyEntity);
     
-    // Find primary default room + any custom subscribed groups
-    const matchingRooms = await ChatRoom.find({
+    // Find primary default room matching the resolved department groupKey or Company + Scope
+    let targetRooms = await ChatRoom.find({
       isSystemGroup: true,
       $or: [
         { groupKey: groupKey },
-        { permissionScope: permissionScope },
-        { subscribedModules: module },
-        { subscribedActions: action }
+        { permissionScope: permissionScope }
       ]
     });
 
-    let targetRooms = matchingRooms;
+    if (companyEntity && companyEntity.trim()) {
+      const companyRooms = await ChatRoom.find({
+        isSystemGroup: true,
+        companyEntity: new RegExp(companyEntity.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+        permissionScope: permissionScope
+      });
+      if (companyRooms.length > 0) {
+        targetRooms = Array.from(new Set([...targetRooms, ...companyRooms]));
+      }
+    }
+
+    if (targetRooms.length === 0) {
+      // Fallback: search by subscribed modules or actions
+      targetRooms = await ChatRoom.find({
+        isSystemGroup: true,
+        $or: [
+          { subscribedModules: module },
+          { subscribedActions: action }
+        ]
+      });
+    }
     if (targetRooms.length === 0) {
       // Fallback: search by any system room
       const fallbackRoom = await ChatRoom.findOne({ isSystemGroup: true });

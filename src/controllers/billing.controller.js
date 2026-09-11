@@ -298,21 +298,67 @@ const createInvoice = async (req, res) => {
       console.warn('Failed to publish activity for invoice:', e.message);
     }
 
-    // Lock linked Challans to INVOICED if status is FINAL (or default save)
-    if (invoice.linkedChallanIds && invoice.linkedChallanIds.length > 0) {
-      await FabricChallan.updateMany(
-        { _id: { $in: invoice.linkedChallanIds } },
-        { $set: { status: 'INVOICED', invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
-      );
-      await StitchingChallan.updateMany(
-        { _id: { $in: invoice.linkedChallanIds } },
-        { $set: { status: 'INVOICED', invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
-      );
-    }
+    // Sync linked Challans to INVOICED
+    await syncChallanStatusForInvoice(invoice);
 
     res.status(201).json({ success: true, data: invoice });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Helper function to keep Challan statuses strictly synced with Invoice items
+const syncChallanStatusForInvoice = async (invoice) => {
+  if (!invoice) return;
+
+  const activeIdsSet = new Set();
+  if (Array.isArray(invoice.items) && invoice.items.length > 0) {
+    invoice.items.forEach(it => {
+      if (it.challanId) activeIdsSet.add(String(it.challanId));
+    });
+  } else if (Array.isArray(invoice.linkedChallanIds)) {
+    invoice.linkedChallanIds.forEach(id => {
+      if (id) activeIdsSet.add(String(id));
+    });
+  }
+
+  const activeIds = Array.from(activeIdsSet);
+
+  const queryInv = {
+    $or: [
+      { invoiceId: invoice._id },
+      { invoiceNo: invoice.invoiceNo }
+    ]
+  };
+
+  const existingFabric = await FabricChallan.find(queryInv).lean();
+  const existingStitching = await StitchingChallan.find(queryInv).lean();
+
+  const toUnlinkFabric = existingFabric.filter(c => !activeIdsSet.has(String(c._id))).map(c => c._id);
+  const toUnlinkStitching = existingStitching.filter(c => !activeIdsSet.has(String(c._id))).map(c => c._id);
+
+  if (toUnlinkFabric.length > 0) {
+    await FabricChallan.updateMany(
+      { _id: { $in: toUnlinkFabric } },
+      { $set: { status: 'PENDING' }, $unset: { invoiceId: 1, invoiceNo: 1 } }
+    );
+  }
+  if (toUnlinkStitching.length > 0) {
+    await StitchingChallan.updateMany(
+      { _id: { $in: toUnlinkStitching } },
+      { $set: { status: 'PENDING' }, $unset: { invoiceId: 1, invoiceNo: 1 } }
+    );
+  }
+
+  if (activeIds.length > 0) {
+    await FabricChallan.updateMany(
+      { _id: { $in: activeIds } },
+      { $set: { status: 'INVOICED', invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
+    );
+    await StitchingChallan.updateMany(
+      { _id: { $in: activeIds } },
+      { $set: { status: 'INVOICED', invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
+    );
   }
 };
 
@@ -323,6 +369,14 @@ const updateInvoice = async (req, res) => {
     const editorName = req.headers['x-user-name'] || req.user?.name || invoiceData.updatedBy || 'Staff User';
     invoiceData.updatedBy = editorName;
     invoiceData.updatedByName = editorName;
+
+    if (Array.isArray(invoiceData.items)) {
+      const validChallanIds = invoiceData.items.map(i => i.challanId).filter(Boolean);
+      const validChallanNos = invoiceData.items.map(i => i.ourChallanNo).filter(Boolean);
+      invoiceData.linkedChallanIds = validChallanIds;
+      invoiceData.linkedChallanNos = validChallanNos;
+      invoiceData.ourChallanNo = validChallanNos.join(', ');
+    }
 
     const grandTotal = parseFloat(invoiceData.grandTotal) || 0;
     const paidAmount = parseFloat(invoiceData.paidAmount) || 0;
@@ -343,17 +397,8 @@ const updateInvoice = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Invoice not found' });
     }
 
-    // Lock linked Challans to INVOICED
-    if (invoice.linkedChallanIds && invoice.linkedChallanIds.length > 0) {
-      await FabricChallan.updateMany(
-        { _id: { $in: invoice.linkedChallanIds } },
-        { $set: { status: 'INVOICED', invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
-      );
-      await StitchingChallan.updateMany(
-        { _id: { $in: invoice.linkedChallanIds } },
-        { $set: { status: 'INVOICED', invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
-      );
-    }
+    // Sync linked Challans to INVOICED and revert unlinked ones to PENDING
+    await syncChallanStatusForInvoice(invoice);
 
     res.json({ success: true, data: invoice });
   } catch (error) {
@@ -536,6 +581,16 @@ const deleteInvoice = async (req, res) => {
     if (!invoice) {
       return res.status(404).json({ success: false, error: 'Invoice not found' });
     }
+
+    const queryInv = {
+      $or: [
+        { invoiceId: invoice._id },
+        { invoiceNo: invoice.invoiceNo }
+      ]
+    };
+    await FabricChallan.updateMany(queryInv, { $set: { status: 'PENDING' }, $unset: { invoiceId: 1, invoiceNo: 1 } });
+    await StitchingChallan.updateMany(queryInv, { $set: { status: 'PENDING' }, $unset: { invoiceId: 1, invoiceNo: 1 } });
+
     res.json({ success: true, message: 'Invoice deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

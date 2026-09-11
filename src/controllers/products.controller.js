@@ -13,6 +13,7 @@ const {
   fetchProductImages,
   fetchSalesReportData,
 } = require('../services/product.service');
+const { extractBaseSku } = require('../utils/skuHelper');
 
 const getOrders = async (
   page = 1,
@@ -258,7 +259,7 @@ const readFile = async (url, accesstoken) => {
 
     // 2. Sync grouped base SKUs to Product
     const productOperations = chunk.map((item) => {
-      const baseSku = item.skuCode.split('_')[0];
+      const baseSku = extractBaseSku(item.skuCode);
       const sizeToPush = item.size && item.size.length > 0 ? item.size[0] : null;
       
       const { size, ...itemWithoutSize } = item;
@@ -551,18 +552,28 @@ const getProductsSales = async (req, res) => {
   }
 };
 
-// Sales report
+const parseDateStart = (str) => {
+  if (!str) return new Date();
+  const cleanStr = String(str).trim();
+  const datePart = cleanStr.includes('T') ? cleanStr.split('T')[0] : cleanStr.split(' ')[0];
+  return new Date(`${datePart}T00:00:00+05:30`);
+};
+
+const parseDateEnd = (str) => {
+  if (!str) return new Date();
+  const cleanStr = String(str).trim();
+  const datePart = cleanStr.includes('T') ? cleanStr.split('T')[0] : cleanStr.split(' ')[0];
+  return new Date(`${datePart}T23:59:59.999+05:30`);
+};
+
 const buildWhereClause = (query) => {
   const { dateStart, dateEnd, searchCode } = query;
   const whereClause = { saleOrderStatus: { $ne: 'CANCELLED' } };
 
   if (dateStart) {
-    const hasTime = (str) => /T|\s|:/.test(str);
-    const startOfDay = hasTime(dateStart) ? new Date(dateStart) : new Date(dateStart + "T00:00:00");
-    const endOfDay = hasTime(dateEnd || dateStart) ? new Date(dateEnd || dateStart) : new Date((dateEnd || dateStart) + "T23:59:59.999");
     whereClause.orderDate = {
-      $gte: startOfDay,
-      $lte: endOfDay,
+      $gte: parseDateStart(dateStart),
+      $lte: parseDateEnd(dateEnd || dateStart),
     };
   }
   if (searchCode) {
@@ -576,7 +587,7 @@ const enhanceSalesDataWithImages = (salesData, productMap) => {
     const plainOrder = { ...order };
     const field = (plainOrder && plainOrder.itemSKUCode) ? 'itemSKUCode' : 'skuName';
     plainOrder.productImage =
-      productMap[plainOrder[field].split('_')[0]] || null;
+      productMap[extractBaseSku(plainOrder[field])] || null;
     return plainOrder;
   });
 };
@@ -587,11 +598,35 @@ const fetchSalesReport = async (req, res) => {
     const salesReport = await fetchSalesReportData(whereClause);
     const modeSku = !!whereClause.itemSKUCode;
     const field = modeSku ? 'skuName' : 'itemSKUCode';
+
+    // Group variation SKUs (e.g. S-4_344-M, S-4_344_L) into Base SKU (S-4_344)
+    const map = new Map();
+    for (const item of salesReport) {
+      const rawSku = item[field] || '';
+      const baseSku = extractBaseSku(rawSku);
+      if (!map.has(baseSku)) {
+        map.set(baseSku, {
+          ...item,
+          [field]: baseSku,
+          salesCount: Number(item.salesCount || 0),
+          sellableAmount: Number(item.sellableAmount || 0),
+        });
+      } else {
+        const existing = map.get(baseSku);
+        existing.salesCount += Number(item.salesCount || 0);
+        existing.sellableAmount += Number(item.sellableAmount || 0);
+        if (item.orderDate && (!existing.orderDate || item.orderDate > existing.orderDate)) {
+          existing.orderDate = item.orderDate;
+        }
+      }
+    }
+    const aggregatedReport = Array.from(map.values());
+
     const productMap = await fetchProductImages(
-      salesReport.map((order) => order[field].split('_')[0])
+      aggregatedReport.map((order) => order[field])
     );
     const enhancedSalesData = enhanceSalesDataWithImages(
-      salesReport,
+      aggregatedReport,
       productMap
     ).sort((a, b) => {
       return b.salesCount - a.salesCount;
@@ -785,7 +820,7 @@ const runBackgroundImport = async (missingSKUs, accessToken) => {
 
     // 2. Sync grouped base SKUs to Product
     const operations = chunk.map((item) => {
-      const baseSku = item.skuCode.split('_')[0];
+      const baseSku = extractBaseSku(item.skuCode);
       const { size, color, ...rest } = item;
       
       const cleanRest = {};
@@ -1015,92 +1050,52 @@ const normalizeAndMergeBrands = (rawBrands) => {
 async function fetchBrandReport(req, res) {
   try {
     const whereClause = buildWhereClause(req.query);
-    
-    // Multi-stage aggregation pipeline
-    const pipeline = [
-      { $match: whereClause },
-      // Step 1: Group by brand, base SKU, and size variation
-      {
-        $group: {
-          _id: {
-            brand: {
-              $cond: {
-                if: { $or: [ { $eq: ["$itemTypeBrand", ""] }, { $eq: [{ $ifNull: ["$itemTypeBrand", null] }, null] } ] },
-                then: "Unknown",
-                else: "$itemTypeBrand"
-              }
-            },
-            baseSku: {
-              $arrayElemAt: [
-                { $split: ["$itemSKUCode", "_"] },
-                0
-              ]
-            },
-            size: {
-              $cond: {
-                if: { $or: [ { $eq: ["$itemTypeSize", ""] }, { $eq: [{ $ifNull: ["$itemTypeSize", null] }, null] } ] },
-                then: "Unknown",
-                else: "$itemTypeSize"
-              }
-            }
-          },
-          quantity: { $sum: { $ifNull: ["$saleCount", 1] } },
-          sellableAmount: {
-            $sum: {
-              $multiply: [
-                { $ifNull: ["$saleCount", 1] },
-                {
-                  $convert: {
-                    input: "$totalPrice",
-                    to: "double",
-                    onError: 0.0,
-                    onNull: 0.0
-                  }
-                }
-              ]
-            }
-          }
-        }
-      },
-      // Step 2: Group by brand and base SKU to collect size variations
-      {
-        $group: {
-          _id: {
-            brand: "$_id.brand",
-            baseSku: "$_id.baseSku"
-          },
-          variations: {
-            $push: {
-              size: "$_id.size",
-              quantity: "$quantity",
-              sellableAmount: "$sellableAmount"
-            }
-          },
-          skuQuantity: { $sum: "$quantity" },
-          skuSellableAmount: { $sum: "$sellableAmount" }
-        }
-      },
-      // Step 3: Group by brand to collect all products/SKUs
-      {
-        $group: {
-          _id: "$_id.brand",
-          products: {
-            $push: {
-              sku: "$_id.baseSku",
-              total: "$skuQuantity",
-              sellableAmount: "$skuSellableAmount",
-              variations: "$variations"
-            }
-          },
-          brandQuantity: { $sum: "$skuQuantity" },
-          brandSellableAmount: { $sum: "$skuSellableAmount" }
-        }
-      },
-      // Step 4: Sort brands alphabetically
-      { $sort: { _id: 1 } }
-    ];
-    
-    const rawBrands = await db.SalesList.aggregate(pipeline);
+    const rawOrders = await db.SalesList.find(whereClause).lean();
+
+    const brandMap = new Map();
+    for (const item of rawOrders) {
+      const brand = (item.itemTypeBrand && item.itemTypeBrand.trim()) ? item.itemTypeBrand.trim() : "Unknown";
+      const rawSku = item.itemSKUCode || "";
+      const baseSku = extractBaseSku(rawSku);
+      const size = (item.itemTypeSize && item.itemTypeSize.trim()) ? item.itemTypeSize.trim() : (extractSizeFromSku(rawSku) || "Unknown");
+      const qty = Number(item.saleCount || 1);
+      const price = parseFloat(item.totalPrice) || 0;
+      const amt = qty * price;
+
+      if (!brandMap.has(brand)) {
+        brandMap.set(brand, { brand, productsMap: new Map(), brandQuantity: 0, brandSellableAmount: 0 });
+      }
+      const brandObj = brandMap.get(brand);
+      brandObj.brandQuantity += qty;
+      brandObj.brandSellableAmount += amt;
+
+      if (!brandObj.productsMap.has(baseSku)) {
+        brandObj.productsMap.set(baseSku, { sku: baseSku, total: 0, sellableAmount: 0, variationsMap: new Map() });
+      }
+      const prodObj = brandObj.productsMap.get(baseSku);
+      prodObj.total += qty;
+      prodObj.sellableAmount += amt;
+
+      if (!prodObj.variationsMap.has(size)) {
+        prodObj.variationsMap.set(size, { size, quantity: 0, sellableAmount: 0 });
+      }
+      const varObj = prodObj.variationsMap.get(size);
+      varObj.quantity += qty;
+      varObj.sellableAmount += amt;
+    }
+
+    const rawBrands = Array.from(brandMap.values()).map(b => ({
+      _id: b.brand,
+      brandQuantity: b.brandQuantity,
+      brandSellableAmount: b.brandSellableAmount,
+      products: Array.from(b.productsMap.values()).map(p => ({
+        sku: p.sku,
+        total: p.total,
+        sellableAmount: p.sellableAmount,
+        variations: Array.from(p.variationsMap.values())
+      }))
+    })).sort((a, b) => a._id.localeCompare(b._id));
+
     const aggregatedBrands = normalizeAndMergeBrands(rawBrands);
     
     // Gather all base SKUs to fetch product images
@@ -1126,7 +1121,6 @@ async function fetchBrandReport(req, res) {
         totalOrderQuantity: b.brandQuantity,
         totalSellableAmount: Number(b.brandSellableAmount.toFixed(2)),
         products: b.products.map(p => {
-          // Sort variations by size code for cleaner presentation
           p.variations.sort((v1, v2) => v1.size.localeCompare(v2.size));
           
           return {
@@ -1166,115 +1160,95 @@ async function fetchBrandReport(req, res) {
 async function fetchBrandReportHourWise(req, res) {
   try {
     const whereClause = buildWhereClause(req.query);
+    const rawOrders = await db.SalesList.find(whereClause).lean();
 
-    const pipeline = [
-      { $match: whereClause },
-      {
-        $group: {
-          _id: {
-            hour: {
-              $hour: {
-                date: "$orderDate",
-                timezone: "Asia/Kolkata"
-              }
-            },
-            brand: {
-              $cond: {
-                if: { $or: [ { $eq: ["$itemTypeBrand", ""] }, { $eq: [{ $ifNull: ["$itemTypeBrand", null] }, null] } ] },
-                then: "Unknown",
-                else: "$itemTypeBrand"
-              }
-            },
-            baseSku: {
-              $arrayElemAt: [
-                { $split: ["$itemSKUCode", "_"] },
-                0
-              ]
-            },
-            size: {
-              $cond: {
-                if: { $or: [ { $eq: ["$itemTypeSize", ""] }, { $eq: [{ $ifNull: ["$itemTypeSize", null] }, null] } ] },
-                then: "Unknown",
-                else: "$itemTypeSize"
-              }
-            }
-          },
-          quantity: { $sum: { $ifNull: ["$saleCount", 1] } },
-          sellableAmount: {
-            $sum: {
-              $multiply: [
-                { $ifNull: ["$saleCount", 1] },
-                {
-                  $convert: {
-                    input: "$totalPrice",
-                    to: "double",
-                    onError: 0.0,
-                    onNull: 0.0
-                  }
-                }
-              ]
-            }
-          }
-        }
-      },
-      // Group by hour, brand, and baseSku to collect variations
-      {
-        $group: {
-          _id: {
-            hour: "$_id.hour",
-            brand: "$_id.brand",
-            baseSku: "$_id.baseSku"
-          },
-          variations: {
-            $push: {
-              size: "$_id.size",
-              quantity: "$quantity",
-              sellableAmount: "$sellableAmount"
-            }
-          },
-          productQty: { $sum: "$quantity" },
-          productAmt: { $sum: "$sellableAmount" }
-        }
-      },
-      // Group by hour and brand to collect products
-      {
-        $group: {
-          _id: {
-            hour: "$_id.hour",
-            brand: "$_id.brand"
-          },
-          products: {
-            $push: {
-              sku: "$_id.baseSku",
-              total: "$productQty",
-              sellableAmount: "$productAmt",
-              variations: "$variations"
-            }
-          },
-          brandQty: { $sum: "$productQty" },
-          brandAmt: { $sum: "$productAmt" }
-        }
-      },
-      // Group by hour to collect brands
-      {
-        $group: {
-          _id: "$_id.hour",
-          brands: {
-            $push: {
-              brandName: "$_id.brand",
-              brandQuantity: "$brandQty",
-              brandSellableAmount: "$brandAmt",
-              products: "$products"
-            }
-          },
-          hourQuantity: { $sum: "$brandQty" },
-          hourSellableAmount: { $sum: "$brandAmt" }
-        }
-      },
-      { $sort: { _id: 1 } }
-    ];
+    const hourMap = new Map();
+    for (const item of rawOrders) {
+      if (!item.orderDate) continue;
+      const dateIST = new Date(new Date(item.orderDate).getTime() + (5.5 * 60 * 60 * 1000));
+      const hour = dateIST.getUTCHours();
+      const brand = (item.itemTypeBrand && item.itemTypeBrand.trim()) ? item.itemTypeBrand.trim() : "Unknown";
+      const rawSku = item.itemSKUCode || "";
+      const baseSku = extractBaseSku(rawSku);
+      const size = (item.itemTypeSize && item.itemTypeSize.trim()) ? item.itemTypeSize.trim() : (extractSizeFromSku(rawSku) || "Unknown");
+      const qty = Number(item.saleCount || 1);
+      const price = parseFloat(item.totalPrice) || 0;
+      const amt = qty * price;
 
-    const aggregatedHours = await db.SalesList.aggregate(pipeline);
+      const key = `${hour}_${brand}_${baseSku}`;
+      if (!hourMap.has(key)) {
+        hourMap.set(key, {
+          hour,
+          brand,
+          baseSku,
+          variationsMap: new Map(),
+          skuQuantity: 0,
+          skuSellableAmount: 0
+        });
+      }
+      const entry = hourMap.get(key);
+      entry.skuQuantity += qty;
+      entry.skuSellableAmount += amt;
+
+      if (!entry.variationsMap.has(size)) {
+        entry.variationsMap.set(size, { size, quantity: 0, sellableAmount: 0 });
+      }
+      const varObj = entry.variationsMap.get(size);
+      varObj.quantity += qty;
+      varObj.sellableAmount += amt;
+    }
+
+    const hoursGroupMap = new Map();
+    for (const entry of hourMap.values()) {
+      const { hour, brand, baseSku, skuQuantity, skuSellableAmount, variationsMap } = entry;
+      const productObj = {
+        sku: baseSku,
+        total: skuQuantity,
+        sellableAmount: skuSellableAmount,
+        variations: Array.from(variationsMap.values())
+      };
+
+      const hourBrandKey = `${hour}_${brand}`;
+      if (!hoursGroupMap.has(hourBrandKey)) {
+        hoursGroupMap.set(hourBrandKey, {
+          hour,
+          brandName: brand,
+          products: [],
+          brandQuantity: 0,
+          brandSellableAmount: 0
+        });
+      }
+      const hb = hoursGroupMap.get(hourBrandKey);
+      hb.products.push(productObj);
+      hb.brandQuantity += skuQuantity;
+      hb.brandSellableAmount += skuSellableAmount;
+    }
+
+    const finalHoursMap = new Map();
+    for (const hb of hoursGroupMap.values()) {
+      const { hour, brandName, products, brandQuantity, brandSellableAmount } = hb;
+      const brandObj = {
+        brandName,
+        products,
+        brandQuantity,
+        brandSellableAmount
+      };
+
+      if (!finalHoursMap.has(hour)) {
+        finalHoursMap.set(hour, {
+          _id: hour,
+          brands: [],
+          hourQuantity: 0,
+          hourSellableAmount: 0
+        });
+      }
+      const hObj = finalHoursMap.get(hour);
+      hObj.brands.push(brandObj);
+      hObj.hourQuantity += brandQuantity;
+      hObj.hourSellableAmount += brandSellableAmount;
+    }
+
+    const aggregatedHours = Array.from(finalHoursMap.values()).sort((a, b) => a._id - b._id);
 
     // Gather all base SKUs to fetch product images
     const baseSkus = [];
@@ -1289,28 +1263,17 @@ async function fetchBrandReportHourWise(req, res) {
     const productImagesMap = await fetchProductImages(baseSkus);
 
     // Pre-fill 24 hours
-    const hourMap = new Map();
+    const hourLookupMap = new Map();
     aggregatedHours.forEach(h => {
-      hourMap.set(h._id, h);
+      hourLookupMap.set(h._id, h);
     });
 
     let totalOrderQuantity = 0;
     let totalSellableAmount = 0;
 
-    const hourlyTotals = [];
-    const brandsSet = new Set();
-    
-    // Pass 1: Find all brand names seen
-    aggregatedHours.forEach(h => {
-      h.brands.forEach(b => {
-        brandsSet.add(b.brandName);
-      });
-    });
-
-    // Populate every hour block (0 to 23)
     const formattedHours = [];
     for (let h = 0; h < 24; h++) {
-      const match = hourMap.get(h);
+      const match = hourLookupMap.get(h);
       const hourLabel = `${h.toString().padStart(2, '0')}:00 - ${(h + 1).toString().padStart(2, '0')}:00`;
       
       let hourQuantity = 0;
@@ -1323,80 +1286,37 @@ async function fetchBrandReportHourWise(req, res) {
         totalOrderQuantity += hourQuantity;
         totalSellableAmount += hourSellableAmount;
 
-        formattedBrands = match.brands.map(b => {
-          return {
-            brand: b.brandName,
-            totalQuantity: b.brandQuantity,
-            totalSellableAmount: Number(b.brandSellableAmount.toFixed(2)),
-            products: b.products.map(p => {
-              p.variations.sort((v1, v2) => v1.size.localeCompare(v2.size));
-              return {
-                sku: p.sku,
-                imageUrl: productImagesMap[p.sku] || null,
-                total: p.total,
-                averagePrice: p.total > 0 ? Number((p.sellableAmount / p.total).toFixed(2)) : 0,
-                sellableAmount: Number(p.sellableAmount.toFixed(2)),
-                variations: p.variations.map(v => ({
-                  size: v.size,
-                  quantity: v.quantity,
-                  sellableAmount: Number(v.sellableAmount.toFixed(2))
-                }))
-              };
-            })
-          };
-        });
+        formattedBrands = match.brands.map(b => ({
+          brand: b.brandName,
+          brandQuantity: b.brandQuantity,
+          brandSellableAmount: Number(b.brandSellableAmount.toFixed(2)),
+          products: b.products.map(p => {
+            p.variations.sort((v1, v2) => v1.size.localeCompare(v2.size));
+            return {
+              sku: p.sku,
+              imageUrl: productImagesMap[p.sku] || null,
+              total: p.total,
+              sellableAmount: Number(p.sellableAmount.toFixed(2)),
+              variations: p.variations.map(v => ({
+                size: v.size,
+                quantity: v.quantity,
+                sellableAmount: Number(v.sellableAmount.toFixed(2))
+              }))
+            };
+          })
+        }));
       }
-
-      hourlyTotals.push({
-        hour: h,
-        hourLabel,
-        quantity: hourQuantity,
-        sellableAmount: Number(hourSellableAmount.toFixed(2))
-      });
 
       formattedHours.push({
         hour: h,
         hourLabel,
-        totalQuantity: hourQuantity,
-        totalSellableAmount: Number(hourSellableAmount.toFixed(2)),
+        hourQuantity,
+        hourSellableAmount: Number(hourSellableAmount.toFixed(2)),
         brands: formattedBrands
       });
     }
 
-    // Generate brand performance profile across all hours
-    const brandProfileMap = new Map();
-    brandsSet.forEach(brandName => {
-      brandProfileMap.set(brandName, {
-        brand: brandName,
-        totalQuantity: 0,
-        totalSellableAmount: 0,
-        hourlySales: Array.from({ length: 24 }, (_, h) => ({
-          hour: h,
-          hourLabel: `${h.toString().padStart(2, '0')}:00 - ${(h + 1).toString().padStart(2, '0')}:00`,
-          quantity: 0,
-          sellableAmount: 0
-        }))
-      });
-    });
-
-    formattedHours.forEach(fh => {
-      fh.brands.forEach(b => {
-        const profile = brandProfileMap.get(b.brand);
-        if (profile) {
-          profile.totalQuantity += b.totalQuantity;
-          profile.totalSellableAmount += b.totalSellableAmount;
-          profile.hourlySales[fh.hour].quantity = b.totalQuantity;
-          profile.hourlySales[fh.hour].sellableAmount = b.totalSellableAmount;
-        }
-      });
-    });
-
-    const formattedBrands = Array.from(brandProfileMap.values()).map(p => {
-      p.totalSellableAmount = Number(p.totalSellableAmount.toFixed(2));
-      return p;
-    });
-
-    const reportDate = req.query.dateStart
+    const reportDate = req.query.dateStart 
       ? (req.query.dateEnd ? `${req.query.dateStart} to ${req.query.dateEnd}` : req.query.dateStart)
       : new Date().toISOString().split('T')[0];
 
@@ -1404,9 +1324,7 @@ async function fetchBrandReportHourWise(req, res) {
       reportDate,
       totalOrderQuantity,
       totalSellableAmount: Number(totalSellableAmount.toFixed(2)),
-      hourlyTotals,
-      brands: formattedBrands,
-      hourlyDetails: formattedHours
+      hours: formattedHours
     });
 
   } catch (error) {
@@ -1414,6 +1332,7 @@ async function fetchBrandReportHourWise(req, res) {
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 }
+
 
 const createProduct = async (req, res) => {
   try {
@@ -1588,7 +1507,7 @@ const instantSyncFromSaleOrders = async (req, res) => {
       }
 
       // 2. Sync to Product (Grouped base SKU)
-      const baseSku = skuCode.split('_')[0];
+      const baseSku = extractBaseSku(skuCode);
       const existingProduct = await db.Product.findOne({ skuCode: baseSku });
       if (existingProduct) {
         let changed = false;

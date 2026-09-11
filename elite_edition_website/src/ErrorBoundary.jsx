@@ -14,6 +14,26 @@ export class ErrorBoundary extends React.Component {
   }
 
   static getDerivedStateFromError(error) {
+    const isChunkError = error && error.message && (
+      error.message.includes('dynamically imported module') ||
+      error.message.includes('Importing a module script failed') ||
+      error.message.includes('Loading chunk') ||
+      error.message.includes('Failed to fetch dynamically imported')
+    );
+
+    if (isChunkError) {
+      const storageKey = 'last_chunk_reload_time';
+      const now = Date.now();
+      const lastReload = Number(sessionStorage.getItem(storageKey) || 0);
+
+      // Auto refresh browser to load newly deployed bundle chunks seamlessly
+      if (now - lastReload > 8000) {
+        sessionStorage.setItem(storageKey, String(now));
+        window.location.reload();
+        return { hasError: false };
+      }
+    }
+
     return { hasError: true, error };
   }
 

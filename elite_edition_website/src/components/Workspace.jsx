@@ -2059,8 +2059,8 @@ const Workspace = ({ currentUser }) => {
   const groupRooms = rooms.filter(r => r.type !== 'direct').filter((r, idx, arr) => arr.findIndex(t => t.name?.toLowerCase() === r.name?.toLowerCase() || t._id === r._id) === idx);
   const otherUsers = allUsers.filter(u => u._id !== currentUser._id);
   
-  // Message content formatter for Markdown & Download Links
-  const renderMessageContent = (content) => {
+  // Message content formatter for Markdown, PDF Previews & Download Links
+  const renderMessageContent = (content, msg = null) => {
     if (!content) return null;
 
     const highlightText = (text) => {
@@ -2231,6 +2231,106 @@ const Workspace = ({ currentUser }) => {
     };
 
     const lines = content.split('\n');
+
+    // Check if this message is a system notification or document record that should display as a PDF card
+    const isPdfFormat = (msg && msg.msgType === 'system_activity') ||
+      content.includes('[System Activity]') ||
+      content.toLowerCase().includes('job card') ||
+      content.toLowerCase().includes('fabric inward') ||
+      content.toLowerCase().includes('fabric outward') ||
+      content.toLowerCase().includes('challan #') ||
+      content.toLowerCase().includes('invoice #');
+
+    if (isPdfFormat) {
+      return (
+        <div style={{
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          color: '#0f172a',
+          border: '1px solid #cbd5e1',
+          borderRadius: '10px',
+          padding: '0.85rem 1.1rem',
+          marginTop: '6px',
+          marginBottom: '6px',
+          minWidth: '280px',
+          maxWidth: '480px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          fontFamily: 'Inter, system-ui, sans-serif'
+        }}>
+          {/* PDF Document Header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: '2px solid #e2e8f0',
+            paddingBottom: '0.4rem',
+            marginBottom: '0.6rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{
+                background: '#ef4444',
+                color: '#ffffff',
+                fontSize: '0.62rem',
+                fontWeight: 900,
+                padding: '2px 5px',
+                borderRadius: '4px',
+                letterSpacing: '0.05em'
+              }}>
+                PDF
+              </span>
+              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1e293b', letterSpacing: '0.03em' }}>
+                ELITE DIGITAL PRINTS — RECORD
+              </span>
+            </div>
+            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
+              {msg?.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'OFFICIAL'}
+            </span>
+          </div>
+
+          {/* PDF Body / Content Lines */}
+          <div style={{ fontSize: '0.84rem', color: '#334155', lineHeight: 1.5 }}>
+            {lines.map((line, idx) => (
+              <div key={idx} style={{ minHeight: '1.2em' }}>
+                {formatLine(line)}
+              </div>
+            ))}
+          </div>
+
+          {/* PDF Footer Actions */}
+          <div style={{
+            marginTop: '0.75rem',
+            paddingTop: '0.4rem',
+            borderTop: '1px solid #e2e8f0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
+              ✓ Verified System Entry
+            </span>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#dc2626',
+                borderRadius: '6px',
+                padding: '3px 10px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              📄 PDF View / Print
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: '#e5e7eb' }}>
         {lines.map((line, idx) => (
@@ -2757,7 +2857,7 @@ const Workspace = ({ currentUser }) => {
                                       ) : msg.content.startsWith('http') && (msg.content.includes('.s3.') || msg.content.includes('/uploads/')) && (msg.content.endsWith('.png') || msg.content.endsWith('.jpg') || msg.content.endsWith('.jpeg') || msg.content.endsWith('.gif') || msg.content.includes('image')) ? (
                                         <img src={msg.content} alt="Attachment" style={{ maxWidth: '100%', borderRadius: '8px' }} />
                                       ) : (
-                                        renderMessageContent(msg.content)
+                                        renderMessageContent(msg.content, msg)
                                       )}
                                       
                                       {msg.isEdited && (

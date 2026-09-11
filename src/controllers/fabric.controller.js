@@ -2115,8 +2115,9 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
         let grandoDayMtr = 0, grandoNightMtr = 0;
         let printdotDayMtr = 0, printdotNightMtr = 0;
+        const hasRawPaperEntries = typeof rawMaterialLogs !== 'undefined' && Array.isArray(rawMaterialLogs) && rawMaterialLogs.some(t => t.type === 'OUTWARD' && (t.materialName?.toLowerCase().includes('paper') || t.panna));
 
-        if (typeof detailedPrintLogsList !== 'undefined' && detailedPrintLogsList && detailedPrintLogsList.length > 0) {
+        if (detailedPrintLogsList.length > 0) {
           detailedPrintLogsList.forEach(l => {
             const mName = String(l.machineName || '').toUpperCase();
             const passStr = String(l.pass || '').toLowerCase();
@@ -2140,19 +2141,21 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
               else grandoDayMtr += mtr;
             }
 
-            // Record paper consumption from print logs into Day/Night shift
-            const pType = l.paperType || l.fabricQuality || 'A++';
-            let pannaWidth = String(l.panna || '').replace(/[^\d]/g, '');
-            if (!pannaWidth || !pannaCols.includes(pannaWidth)) pannaWidth = '58';
+            // Record paper consumption from print logs into Day/Night shift ONLY if no explicit raw material paper entries were logged
+            if (!hasRawPaperEntries) {
+              const pType = l.paperType || l.fabricQuality || 'A++';
+              let pannaWidth = String(l.panna || '').replace(/[^\d]/g, '');
+              if (!pannaWidth || !pannaCols.includes(pannaWidth)) pannaWidth = '58';
 
-            const targetTypeMap = isNightShift ? paperNightTypeMap : paperDayTypeMap;
-            const targetMetersMap = isNightShift ? paperNightMetersMap : paperDayMetersMap;
+              const targetTypeMap = isNightShift ? paperNightTypeMap : paperDayTypeMap;
+              const targetMetersMap = isNightShift ? paperNightMetersMap : paperDayMetersMap;
 
-            if (!targetTypeMap[pType]) {
-              targetTypeMap[pType] = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
-              targetMetersMap[pType] = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
+              if (!targetTypeMap[pType]) {
+                targetTypeMap[pType] = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
+                targetMetersMap[pType] = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
+              }
+              targetMetersMap[pType][pannaWidth] += mtr;
             }
-            targetMetersMap[pType][pannaWidth] += mtr;
           });
         }
 
@@ -2223,11 +2226,6 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         const colW = tableW / 5;
 
         // 1A. DAY SHIFT INK CONSUMPTION
-        doc.rect(ML, currentY, contentWidth, 13).fill('#f8fafc').stroke('#cbd5e1');
-        doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
-          .text('DAY SHIFT INK CONSUMPTION', ML + 6, currentY + 2.5, { width: contentWidth - 12, align: 'left' });
-        currentY += 13;
-
         doc.rect(leftX, currentY, tableW, 14).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
           .text('GRANDO (DAY SHIFT)', leftX, currentY + 3, { width: tableW, align: 'center' });
@@ -2270,11 +2268,6 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         currentY += 18;
 
         // 1B. NIGHT SHIFT INK CONSUMPTION
-        doc.rect(ML, currentY, contentWidth, 13).fill('#f8fafc').stroke('#cbd5e1');
-        doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
-          .text('NIGHT SHIFT INK CONSUMPTION', ML + 6, currentY + 2.5, { width: contentWidth - 12, align: 'left' });
-        currentY += 13;
-
         doc.rect(leftX, currentY, tableW, 14).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
           .text('GRANDO (NIGHT SHIFT)', leftX, currentY + 3, { width: tableW, align: 'center' });

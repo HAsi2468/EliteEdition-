@@ -4,6 +4,7 @@ const PDFDocument = require('pdfkit');
 const axios = require('axios');
 const sharp = require('sharp');
 const { fetchSalesReportData } = require('../services/product.service');
+const { extractBaseSku } = require('../utils/skuHelper');
 
 // ─────────────────────────────────────────────────────────────
 // Fetch & convert image to JPEG buffer (handles WebP from CDN)
@@ -197,6 +198,22 @@ const SALES_COLS = [
   { label: 'Total',  w: 56  },
 ];
 
+const parseDateStart = (str) => {
+  if (!str) return new Date();
+  const cleanStr = String(str).trim();
+  const datePart = cleanStr.includes('T') ? cleanStr.split('T')[0] : cleanStr.split(' ')[0];
+  const parsed = new Date(`${datePart}T00:00:00+05:30`);
+  return isNaN(parsed.getTime()) ? new Date(str) : parsed;
+};
+
+const parseDateEnd = (str) => {
+  if (!str) return new Date();
+  const cleanStr = String(str).trim();
+  const datePart = cleanStr.includes('T') ? cleanStr.split('T')[0] : cleanStr.split(' ')[0];
+  const parsed = new Date(`${datePart}T23:59:59.999+05:30`);
+  return isNaN(parsed.getTime()) ? new Date(str) : parsed;
+};
+
 const downloadSalesReportPdf = async (req, res) => {
   try {
     const { dateStart, dateEnd } = req.query;
@@ -204,9 +221,8 @@ const downloadSalesReportPdf = async (req, res) => {
       return res.status(400).json({ error: 'dateStart and dateEnd are required' });
     }
 
-    const hasTime = (str) => /T|\s|:/.test(str);
-    const dateStartObj = hasTime(dateStart) ? new Date(dateStart) : new Date(dateStart + "T00:00:00");
-    const dateEndObj   = hasTime(dateEnd) ? new Date(dateEnd) : new Date(dateEnd + "T23:59:59.999");
+    const dateStartObj = parseDateStart(dateStart);
+    const dateEndObj   = parseDateEnd(dateEnd);
 
     const { searchCode } = req.query;
     const whereClause = { orderDate: { $gte: dateStartObj, $lte: dateEndObj }, saleOrderStatus: { $ne: 'CANCELLED' } };
@@ -215,24 +231,44 @@ const downloadSalesReportPdf = async (req, res) => {
     }
     logger.info('Generating Sales PDF report %s → %s', dateStart, dateEnd);
 
-    // Aggregation pipeline for Sales Report
-    const pipeline = [
-      { $match: whereClause },
-      { $group: {
-          _id: { baseSku: { $arrayElemAt: [{ $split: ['$itemSKUCode', '_'] }, 0] }, size: { $cond: { if: { $or: [{ $eq: ['$itemTypeSize', ''] }, { $eq: [{ $ifNull: ['$itemTypeSize', null] }, null] }] }, then: 'N/A', else: '$itemTypeSize' } } },
-          quantity: { $sum: { $ifNull: ['$saleCount', 1] } },
-          sellableAmount: { $sum: { $multiply: [{ $ifNull: ['$saleCount', 1] }, { $convert: { input: '$totalPrice', to: 'double', onError: 0, onNull: 0 } }] } }
-      }},
-      { $group: {
-          _id: '$_id.baseSku',
-          variations: { $push: { size: '$_id.size', quantity: '$quantity', sellableAmount: '$sellableAmount' } },
-          qty: { $sum: '$quantity' },
-          amt: { $sum: '$sellableAmount' }
-      }},
-      { $sort: { qty: -1 } } // "HIGH ORDER PUT ON FIRST"
-    ];
+    const rawOrders = await db.SalesList.find(whereClause).lean();
+    const baseSkuMap = new Map();
 
-    const products = await db.SaleOrder.aggregate(pipeline);
+    for (const item of rawOrders) {
+      const rawSku = item.itemSKUCode || '';
+      const baseSku = extractBaseSku(rawSku);
+      const size = (item.itemTypeSize && item.itemTypeSize.trim()) ? item.itemTypeSize.trim() : (extractSizeFromSku(rawSku) || 'N/A');
+      const qty = Number(item.saleCount || 1);
+      const price = parseFloat(item.totalPrice) || 0;
+      const amt = qty * price;
+
+      if (!baseSkuMap.has(baseSku)) {
+        baseSkuMap.set(baseSku, {
+          _id: baseSku,
+          qty: 0,
+          amt: 0,
+          variationsMap: new Map()
+        });
+      }
+
+      const baseObj = baseSkuMap.get(baseSku);
+      baseObj.qty += qty;
+      baseObj.amt += amt;
+
+      if (!baseObj.variationsMap.has(size)) {
+        baseObj.variationsMap.set(size, { size, quantity: 0, sellableAmount: 0 });
+      }
+      const varObj = baseObj.variationsMap.get(size);
+      varObj.quantity += qty;
+      varObj.sellableAmount += amt;
+    }
+
+    const products = Array.from(baseSkuMap.values()).map(b => ({
+      _id: b._id,
+      qty: b.qty,
+      amt: b.amt,
+      variations: Array.from(b.variationsMap.values())
+    })).sort((a, b) => b.qty - a.qty);
 
     // Fetch images
     const baseSkus = products.map(p => p._id).filter(Boolean);
@@ -244,7 +280,7 @@ const downloadSalesReportPdf = async (req, res) => {
 
     const skuImageMap = {};
     productDocs.forEach(p => {
-      const base = (p.skuCode || '').split('_')[0];
+      const base = extractBaseSku(p.skuCode);
       if (base && !skuImageMap[base] && p.imageUrl) skuImageMap[base] = p.imageUrl;
     });
 
@@ -555,9 +591,8 @@ const downloadBrandReportPdf = async (req, res) => {
       return res.status(400).json({ error: 'dateStart and dateEnd are required' });
     }
 
-    const hasTime = (str) => /T|\s|:/.test(str);
-    const dateStartObj = hasTime(dateStart) ? new Date(dateStart) : new Date(dateStart + "T00:00:00");
-    const dateEndObj   = hasTime(dateEnd) ? new Date(dateEnd) : new Date(dateEnd + "T23:59:59.999");
+    const dateStartObj = parseDateStart(dateStart);
+    const dateEndObj   = parseDateEnd(dateEnd);
     const dateStr = formatReportDateStr(dateStart, dateEnd);
 
     logger.info('Generating Brand PDF report %s → %s', dateStart, dateEnd);
@@ -569,28 +604,52 @@ const downloadBrandReportPdf = async (req, res) => {
       whereClause.itemSKUCode = new RegExp(`^${searchCode}`, 'i');
     }
 
-    const pipeline = [
-      { $match: whereClause },
-      { $group: {
-          _id: { brand: { $cond: { if: { $or: [{ $eq: ['$itemTypeBrand', ''] }, { $eq: [{ $ifNull: ['$itemTypeBrand', null] }, null] }] }, then: 'Unknown', else: '$itemTypeBrand' } }, baseSku: { $arrayElemAt: [{ $split: ['$itemSKUCode', '_'] }, 0] }, size: { $cond: { if: { $or: [{ $eq: ['$itemTypeSize', ''] }, { $eq: [{ $ifNull: ['$itemTypeSize', null] }, null] }] }, then: 'N/A', else: '$itemTypeSize' } } },
-          quantity: { $sum: { $ifNull: ['$saleCount', 1] } },
-          sellableAmount: { $sum: { $multiply: [{ $ifNull: ['$saleCount', 1] }, { $convert: { input: '$totalPrice', to: 'double', onError: 0, onNull: 0 } }] } }
-      }},
-      { $group: {
-          _id: { brand: '$_id.brand', baseSku: '$_id.baseSku' },
-          variations: { $push: { size: '$_id.size', quantity: '$quantity', sellableAmount: '$sellableAmount' } },
-          skuQty: { $sum: '$quantity' },
-          skuAmt: { $sum: '$sellableAmount' }
-      }},
-      { $group: {
-          _id: '$_id.brand',
-          products: { $push: { sku: '$_id.baseSku', qty: '$skuQty', amt: '$skuAmt', variations: '$variations' } },
-          brandQty: { $sum: '$skuQty' },
-          brandAmt: { $sum: '$skuAmt' }
-      }}
-    ];
+    const rawOrders = await db.SalesList.find(whereClause).lean();
+    const brandMap = new Map();
 
-    const rawBrands = await db.SaleOrder.aggregate(pipeline);
+    for (const item of rawOrders) {
+      const brand = (item.itemTypeBrand && item.itemTypeBrand.trim()) ? item.itemTypeBrand.trim() : 'Unknown';
+      const rawSku = item.itemSKUCode || '';
+      const baseSku = extractBaseSku(rawSku);
+      const size = (item.itemTypeSize && item.itemTypeSize.trim()) ? item.itemTypeSize.trim() : (extractSizeFromSku(rawSku) || 'N/A');
+      const qty = Number(item.saleCount || 1);
+      const price = parseFloat(item.totalPrice) || 0;
+      const amt = qty * price;
+
+      if (!brandMap.has(brand)) {
+        brandMap.set(brand, { brand, productsMap: new Map(), brandQty: 0, brandAmt: 0 });
+      }
+      const brandObj = brandMap.get(brand);
+      brandObj.brandQty += qty;
+      brandObj.brandAmt += amt;
+
+      if (!brandObj.productsMap.has(baseSku)) {
+        brandObj.productsMap.set(baseSku, { sku: baseSku, skuQty: 0, skuAmt: 0, variationsMap: new Map() });
+      }
+      const prodObj = brandObj.productsMap.get(baseSku);
+      prodObj.skuQty += qty;
+      prodObj.skuAmt += amt;
+
+      if (!prodObj.variationsMap.has(size)) {
+        prodObj.variationsMap.set(size, { size, quantity: 0, sellableAmount: 0 });
+      }
+      const varObj = prodObj.variationsMap.get(size);
+      varObj.quantity += qty;
+      varObj.sellableAmount += amt;
+    }
+
+    const rawBrands = Array.from(brandMap.values()).map(b => ({
+      _id: b.brand,
+      brandQty: b.brandQty,
+      brandAmt: b.brandAmt,
+      products: Array.from(b.productsMap.values()).map(p => ({
+        sku: p.sku,
+        qty: p.skuQty,
+        amt: p.skuAmt,
+        variations: Array.from(p.variationsMap.values())
+      }))
+    }));
+
     const brands = normalizeAndMergeBrands(rawBrands);
 
     // Fetch images
@@ -602,7 +661,7 @@ const downloadBrandReportPdf = async (req, res) => {
     }).lean();
     const skuImageMap = {};
     productDocs.forEach(p => {
-      const base = (p.skuCode || '').split('_')[0];
+      const base = extractBaseSku(p.skuCode);
       if (base && !skuImageMap[base] && p.imageUrl) skuImageMap[base] = p.imageUrl;
     });
     const productDocs2 = await db.Product.find({ skuCode: { $in: allBaseSkus }, imageUrl: { $nin: [null, ''] } }).lean();
@@ -796,9 +855,8 @@ const downloadBrandReportHourWisePdf = async (req, res) => {
       return res.status(400).json({ error: 'dateStart and dateEnd are required' });
     }
 
-    const hasTime = (str) => /T|\s|:/.test(str);
-    const dateStartObj = hasTime(dateStart) ? new Date(dateStart) : new Date(dateStart + "T00:00:00");
-    const dateEndObj   = hasTime(dateEnd) ? new Date(dateEnd) : new Date(dateEnd + "T23:59:59.999");
+    const dateStartObj = parseDateStart(dateStart);
+    const dateEndObj   = parseDateEnd(dateEnd);
     const dateStr = formatReportDateStr(dateStart, dateEnd);
 
     logger.info('Generating Brand Hourly PDF report %s → %s', dateStart, dateEnd);
@@ -810,114 +868,95 @@ const downloadBrandReportHourWisePdf = async (req, res) => {
       whereClause.itemSKUCode = new RegExp(`^${searchCode}`, 'i');
     }
 
-    const pipeline = [
-      { $match: whereClause },
-      {
-        $group: {
-          _id: {
-            hour: {
-              $hour: {
-                date: "$orderDate",
-                timezone: "Asia/Kolkata"
-              }
-            },
-            brand: {
-              $cond: {
-                if: { $or: [ { $eq: ["$itemTypeBrand", ""] }, { $eq: [{ $ifNull: ["$itemTypeBrand", null] }, null] } ] },
-                then: "Unknown",
-                else: "$itemTypeBrand"
-              }
-            },
-            baseSku: {
-              $arrayElemAt: [
-                { $split: ["$itemSKUCode", "_"] },
-                0
-              ]
-            },
-            size: {
-              $cond: {
-                if: { $or: [ { $eq: ["$itemTypeSize", ""] }, { $eq: [{ $ifNull: ["$itemTypeSize", null] }, null] } ] },
-                then: "Unknown",
-                else: "$itemTypeSize"
-              }
-            }
-          },
-          quantity: { $sum: { $ifNull: ["$saleCount", 1] } },
-          sellableAmount: {
-            $sum: {
-              $multiply: [
-                { $ifNull: ["$saleCount", 1] },
-                {
-                  $convert: {
-                    input: "$totalPrice",
-                    to: "double",
-                    onError: 0.0,
-                    onNull: 0.0
-                  }
-                }
-              ]
-            }
-          }
-        }
-      },
-      // Group by hour, brand, and baseSku to collect variations
-      {
-        $group: {
-          _id: {
-            hour: "$_id.hour",
-            brand: "$_id.brand",
-            baseSku: "$_id.baseSku"
-          },
-          variations: {
-            $push: {
-              size: "$_id.size",
-              quantity: "$quantity",
-              sellableAmount: "$sellableAmount"
-            }
-          },
-          productQty: { $sum: "$quantity" },
-          productAmt: { $sum: "$sellableAmount" }
-        }
-      },
-      // Group by hour and brand to collect products
-      {
-        $group: {
-          _id: {
-            hour: "$_id.hour",
-            brand: "$_id.brand"
-          },
-          products: {
-            $push: {
-              sku: "$_id.baseSku",
-              qty: "$productQty",
-              amt: "$productAmt",
-              variations: "$variations"
-            }
-          },
-          brandQty: { $sum: "$productQty" },
-          brandAmt: { $sum: "$productAmt" }
-        }
-      },
-      // Group by hour to collect brands
-      {
-        $group: {
-          _id: "$_id.hour",
-          brands: {
-            $push: {
-              brandName: "$_id.brand",
-              brandQuantity: "$brandQty",
-              brandSellableAmount: "$brandAmt",
-              products: "$products"
-            }
-          },
-          hourQuantity: { $sum: "$brandQty" },
-          hourSellableAmount: { $sum: "$brandAmt" }
-        }
-      },
-      { $sort: { _id: 1 } }
-    ];
+    const rawOrders = await db.SalesList.find(whereClause).lean();
 
-    const aggregatedHours = await db.SaleOrder.aggregate(pipeline);
+    const hourMap = new Map();
+    for (const item of rawOrders) {
+      if (!item.orderDate) continue;
+      const dateIST = new Date(new Date(item.orderDate).getTime() + (5.5 * 60 * 60 * 1000));
+      const hour = dateIST.getUTCHours();
+      const brand = (item.itemTypeBrand && item.itemTypeBrand.trim()) ? item.itemTypeBrand.trim() : "Unknown";
+      const rawSku = item.itemSKUCode || "";
+      const baseSku = extractBaseSku(rawSku);
+      const size = (item.itemTypeSize && item.itemTypeSize.trim()) ? item.itemTypeSize.trim() : (extractSizeFromSku(rawSku) || "N/A");
+      const qty = Number(item.saleCount || 1);
+      const price = parseFloat(item.totalPrice) || 0;
+      const amt = qty * price;
+
+      const key = `${hour}_${brand}_${baseSku}`;
+      if (!hourMap.has(key)) {
+        hourMap.set(key, {
+          hour,
+          brand,
+          baseSku,
+          variationsMap: new Map(),
+          skuQuantity: 0,
+          skuSellableAmount: 0
+        });
+      }
+      const entry = hourMap.get(key);
+      entry.skuQuantity += qty;
+      entry.skuSellableAmount += amt;
+
+      if (!entry.variationsMap.has(size)) {
+        entry.variationsMap.set(size, { size, quantity: 0, sellableAmount: 0 });
+      }
+      const varObj = entry.variationsMap.get(size);
+      varObj.quantity += qty;
+      varObj.sellableAmount += amt;
+    }
+
+    const hoursGroupMap = new Map();
+    for (const entry of hourMap.values()) {
+      const { hour, brand, baseSku, skuQuantity, skuSellableAmount, variationsMap } = entry;
+      const productObj = {
+        sku: baseSku,
+        qty: skuQuantity,
+        amt: skuSellableAmount,
+        variations: Array.from(variationsMap.values())
+      };
+
+      const hourBrandKey = `${hour}_${brand}`;
+      if (!hoursGroupMap.has(hourBrandKey)) {
+        hoursGroupMap.set(hourBrandKey, {
+          hour,
+          brandName: brand,
+          products: [],
+          brandQuantity: 0,
+          brandSellableAmount: 0
+        });
+      }
+      const hb = hoursGroupMap.get(hourBrandKey);
+      hb.products.push(productObj);
+      hb.brandQuantity += skuQuantity;
+      hb.brandSellableAmount += skuSellableAmount;
+    }
+
+    const finalHoursMap = new Map();
+    for (const hb of hoursGroupMap.values()) {
+      const { hour, brandName, products, brandQuantity, brandSellableAmount } = hb;
+      const brandObj = {
+        brandName,
+        products,
+        brandQuantity,
+        brandSellableAmount
+      };
+
+      if (!finalHoursMap.has(hour)) {
+        finalHoursMap.set(hour, {
+          _id: hour,
+          brands: [],
+          hourQuantity: 0,
+          hourSellableAmount: 0
+        });
+      }
+      const hObj = finalHoursMap.get(hour);
+      hObj.brands.push(brandObj);
+      hObj.hourQuantity += brandQuantity;
+      hObj.hourSellableAmount += brandSellableAmount;
+    }
+
+    const aggregatedHours = Array.from(finalHoursMap.values()).sort((a, b) => a._id - b._id);
 
     // Fetch images
     const allBaseSkus = [];
@@ -936,7 +975,7 @@ const downloadBrandReportHourWisePdf = async (req, res) => {
     }).lean();
     const skuImageMap = {};
     productDocs.forEach(p => {
-      const base = (p.skuCode || '').split('_')[0];
+      const base = extractBaseSku(p.skuCode);
       if (base && !skuImageMap[base] && p.imageUrl) skuImageMap[base] = p.imageUrl;
     });
     const productDocs2 = await db.Product.find({ skuCode: { $in: allBaseSkus }, imageUrl: { $nin: [null, ''] } }).lean();
@@ -1233,28 +1272,52 @@ const downloadReturnsBrandReportPdf = async (req, res) => {
       if (dateEnd) match.reversePickupCreatedDate.$lte = getCleanEndStr(dateEnd);
     }
 
-    const pipeline = [
-      { $match: match },
-      { $group: {
-          _id: { brand: { $cond: { if: { $or: [{ $eq: ['$itemTypeBrand', ''] }, { $eq: [{ $ifNull: ['$itemTypeBrand', null] }, null] }] }, then: 'Unknown', else: '$itemTypeBrand' } }, baseSku: { $arrayElemAt: [{ $split: ['$itemSKUCode', '_'] }, 0] }, size: { $cond: { if: { $or: [{ $eq: ['$itemTypeSize', ''] }, { $eq: [{ $ifNull: ['$itemTypeSize', null] }, null] }] }, then: 'N/A', else: '$itemTypeSize' } } },
-          quantity: { $sum: { $ifNull: ['$saleCount', 1] } },
-          sellableAmount: { $sum: { $multiply: [{ $ifNull: ['$saleCount', 1] }, { $convert: { input: '$totalPrice', to: 'double', onError: 0, onNull: 0 } }] } }
-      }},
-      { $group: {
-          _id: { brand: '$_id.brand', baseSku: '$_id.baseSku' },
-          variations: { $push: { size: '$_id.size', quantity: '$quantity', sellableAmount: '$sellableAmount' } },
-          skuQty: { $sum: '$quantity' },
-          skuAmt: { $sum: '$sellableAmount' }
-      }},
-      { $group: {
-          _id: '$_id.brand',
-          products: { $push: { sku: '$_id.baseSku', qty: '$skuQty', amt: '$skuAmt', variations: '$variations' } },
-          brandQty: { $sum: '$skuQty' },
-          brandAmt: { $sum: '$skuAmt' }
-      }}
-    ];
+    const rawOrders = await db.SalesList.find(match).lean();
+    const brandMap = new Map();
 
-    const rawBrands = await db.SaleOrder.aggregate(pipeline);
+    for (const item of rawOrders) {
+      const brand = (item.itemTypeBrand && item.itemTypeBrand.trim()) ? item.itemTypeBrand.trim() : 'Unknown';
+      const rawSku = item.itemSKUCode || '';
+      const baseSku = extractBaseSku(rawSku);
+      const size = (item.itemTypeSize && item.itemTypeSize.trim()) ? item.itemTypeSize.trim() : (extractSizeFromSku(rawSku) || 'N/A');
+      const qty = Number(item.saleCount || 1);
+      const price = parseFloat(item.totalPrice) || 0;
+      const amt = qty * price;
+
+      if (!brandMap.has(brand)) {
+        brandMap.set(brand, { brand, productsMap: new Map(), brandQty: 0, brandAmt: 0 });
+      }
+      const brandObj = brandMap.get(brand);
+      brandObj.brandQty += qty;
+      brandObj.brandAmt += amt;
+
+      if (!brandObj.productsMap.has(baseSku)) {
+        brandObj.productsMap.set(baseSku, { sku: baseSku, skuQty: 0, skuAmt: 0, variationsMap: new Map() });
+      }
+      const prodObj = brandObj.productsMap.get(baseSku);
+      prodObj.skuQty += qty;
+      prodObj.skuAmt += amt;
+
+      if (!prodObj.variationsMap.has(size)) {
+        prodObj.variationsMap.set(size, { size, quantity: 0, sellableAmount: 0 });
+      }
+      const varObj = prodObj.variationsMap.get(size);
+      varObj.quantity += qty;
+      varObj.sellableAmount += amt;
+    }
+
+    const rawBrands = Array.from(brandMap.values()).map(b => ({
+      _id: b.brand,
+      brandQty: b.brandQty,
+      brandAmt: b.brandAmt,
+      products: Array.from(b.productsMap.values()).map(p => ({
+        sku: p.sku,
+        qty: p.skuQty,
+        amt: p.skuAmt,
+        variations: Array.from(p.variationsMap.values())
+      }))
+    }));
+
     const brands = normalizeAndMergeBrands(rawBrands);
 
     // Fetch images
@@ -1266,7 +1329,7 @@ const downloadReturnsBrandReportPdf = async (req, res) => {
     }).lean();
     const skuImageMap = {};
     productDocs.forEach(p => {
-      const base = (p.skuCode || '').split('_')[0];
+      const base = extractBaseSku(p.skuCode);
       if (base && !skuImageMap[base] && p.imageUrl) skuImageMap[base] = p.imageUrl;
     });
     const productDocs2 = await db.Product.find({ skuCode: { $in: allBaseSkus }, imageUrl: { $nin: [null, ''] } }).lean();

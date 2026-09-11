@@ -8,7 +8,7 @@ import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { cleanDesignNameString } from '../utils/designUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
-import DateRangePicker from './DateRangePicker';
+import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import {
   RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
   Layers, Database, Settings, Trash2, FileDown, Search, X,
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 
 export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard', onlyChallan = false }) {
+  const defaultThisMonth = getDatePresetRange('this_month');
   const [activeTab, setActiveTab] = useState(onlyChallan ? 'challan' : initialTab);
   const currentUser = api.getCurrentUser();
 
@@ -155,10 +156,10 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [challanSearch, setChallanSearch] = useState('');
   const [challanStatusFilter, setChallanStatusFilter] = useState('All');
   // Ref to always hold latest challan filter values — prevents stale closure in setInterval
-  const challanFiltersRef = useRef({ search: '', dateStart: '', dateEnd: '', status: 'All' });
-  const [challanDatePreset, setChallanDatePreset] = useState('all');
-  const [challanDateStart, setChallanDateStart] = useState('');
-  const [challanDateEnd, setChallanDateEnd] = useState('');
+  const challanFiltersRef = useRef({ search: '', dateStart: defaultThisMonth.dateStart, dateEnd: defaultThisMonth.dateEnd, status: 'All' });
+  const [challanDatePreset, setChallanDatePreset] = useState('this_month');
+  const [challanDateStart, setChallanDateStart] = useState(defaultThisMonth.dateStart);
+  const [challanDateEnd, setChallanDateEnd] = useState(defaultThisMonth.dateEnd);
   const [customChallanDateStart, setCustomChallanDateStart] = useState('');
   const [customChallanDateEnd, setCustomChallanDateEnd] = useState('');
   const [isChallanOpen, setIsChallanOpen] = useState(false);
@@ -233,6 +234,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     notes: '',
   });
 
+  // Stock Dashboard Date Range & Filtered Stock state
+  const [stockDatePreset, setStockDatePreset] = useState('this_month');
+  const [stockDateStart, setStockDateStart] = useState(defaultThisMonth.dateStart);
+  const [stockDateEnd, setStockDateEnd] = useState(defaultThisMonth.dateEnd);
+  const [customStockDateStart, setCustomStockDateStart] = useState('');
+  const [customStockDateEnd, setCustomStockDateEnd] = useState('');
+
   const openQuickTransfer = (targetLot) => {
     const rawDeficit = Math.abs(targetLot.currentStock || 0);
     setTransferForm({
@@ -246,6 +254,158 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     });
     setIsTransferFormOpen(true);
     setActiveTab('lotTransfer');
+  };
+
+  // Compute date-filtered stock dynamically when date range is selected
+  const displayStock = React.useMemo(() => {
+    if (!stockDateStart && !stockDateEnd) return stock;
+
+    const map = new Map();
+    transactions.forEach(t => {
+      if (!t.date) return;
+      const tDate = t.date.slice(0, 10);
+      if (stockDateStart && tDate < stockDateStart) return;
+      if (stockDateEnd && tDate > stockDateEnd) return;
+
+      const fName = String(t.fabricQuality || '').trim().toUpperCase();
+      if (!fName) return;
+
+      if (!map.has(fName)) {
+        map.set(fName, { fabricQuality: fName, totalInward: 0, totalOutward: 0, currentStock: 0 });
+      }
+      const item = map.get(fName);
+      const qty = Number(t.qty || 0);
+      if (t.type === 'INWARD') {
+        item.totalInward += qty;
+      } else {
+        item.totalOutward += qty;
+      }
+    });
+
+    map.forEach(item => {
+      item.currentStock = item.totalInward - item.totalOutward;
+    });
+
+    const result = Array.from(map.values());
+    return result.length > 0 ? result : stock;
+  }, [stock, transactions, stockDateStart, stockDateEnd]);
+
+  // Download PDF Report for Stock & Fabric Consumption
+  const handleDownloadStockPDF = () => {
+    const listToExport = displayStock && displayStock.length > 0 ? displayStock : stock;
+    if (!listToExport || listToExport.length === 0) {
+      triggerEliteAlert('No stock data available to export.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=1000,height=800');
+    if (!printWindow) {
+      triggerEliteAlert('Pop-up blocked. Please allow pop-ups in your browser settings.');
+      return;
+    }
+
+    const totRec = listToExport.reduce((a, i) => a + (i.totalInward || 0), 0);
+    const totUsed = listToExport.reduce((a, i) => a + (i.totalOutward || 0), 0);
+    const totNet = listToExport.reduce((a, i) => a + (i.currentStock || 0), 0);
+
+    const dateRangeStr = stockDateStart && stockDateEnd
+      ? `${stockDateStart} to ${stockDateEnd}`
+      : stockDateStart
+      ? `From ${stockDateStart}`
+      : 'All Time';
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Fabric Stock & Consumption Report - Elite Digital Prints</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 24px; color: #1e293b; background: #ffffff; }
+          .header { text-align: center; border-bottom: 3px solid #4f46e5; padding-bottom: 14px; margin-bottom: 20px; }
+          .company { font-size: 24px; font-weight: 900; color: #1e1b4b; text-transform: uppercase; letter-spacing: 1px; }
+          .subtitle { font-size: 15px; font-weight: 800; color: #4f46e5; margin-top: 4px; }
+          .meta { font-size: 11px; color: #64748b; margin-top: 6px; font-weight: 600; }
+          .summary-bar { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 24px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 14px 18px; }
+          .kpi { flex: 1; text-align: center; }
+          .kpi-title { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 800; letter-spacing: 0.5px; }
+          .kpi-value { font-size: 18px; font-weight: 900; margin-top: 4px; }
+          .green { color: #047857; }
+          .red { color: #b91c1c; }
+          .blue { color: #0369a1; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; }
+          th { background: #1e293b; color: #ffffff; text-align: left; padding: 10px 14px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 800; }
+          td { padding: 10px 14px; border-bottom: 1px solid #e2e8f0; }
+          tr:nth-child(even) { background: #f8fafc; }
+          .status-badge { padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 800; display: inline-block; }
+          .badge-ok { background: #d1fae5; color: #047857; border: 1px solid #a7f3d0; }
+          .badge-low { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+          .badge-empty { background: #ffe4e6; color: #be123c; border: 1px solid #fecdd3; }
+          .footer { margin-top: 36px; font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; font-weight: 600; }
+          @media print {
+            body { margin: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company">Elite Digital Prints</div>
+          <div class="subtitle">Fabric Stock & Consumption Report</div>
+          <div class="meta">Generated: ${new Date().toLocaleString('en-IN')} | Date Filter: ${dateRangeStr}</div>
+        </div>
+
+        <div class="summary-bar">
+          <div class="kpi"><div class="kpi-title">Total Fabrics</div><div class="kpi-value">${listToExport.length}</div></div>
+          <div class="kpi"><div class="kpi-title">Total Received</div><div class="kpi-value green">${totRec.toFixed(2)} mtr</div></div>
+          <div class="kpi"><div class="kpi-title">Total Used</div><div class="kpi-value red">${totUsed.toFixed(2)} mtr</div></div>
+          <div class="kpi"><div class="kpi-title">Net Available Stock</div><div class="kpi-value blue">${totNet.toFixed(2)} mtr</div></div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Fabric Quality</th>
+              <th style="text-align: right;">Total Received (Inward)</th>
+              <th style="text-align: right;">Total Used (Outward)</th>
+              <th style="text-align: right;">Net Available Stock</th>
+              <th style="text-align: center;">Stock Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${listToExport.map((item, index) => {
+              const cur = Number(item.currentStock || 0);
+              const statusClass = cur <= 0 ? 'badge-empty' : cur <= 50 ? 'badge-low' : 'badge-ok';
+              const statusText = cur <= 0 ? 'Out of Stock' : cur <= 50 ? 'Low Stock' : 'In Stock';
+              return `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td style="font-weight: 800; color: #0f172a;">${item.fabricQuality}</td>
+                  <td style="text-align: right; font-weight: 700; color: #047857;">${Number(item.totalInward || 0).toFixed(2)} m</td>
+                  <td style="text-align: right; font-weight: 700; color: #b91c1c;">${Number(item.totalOutward || 0).toFixed(2)} m</td>
+                  <td style="text-align: right; font-weight: 900; color: #0369a1; background: #f0f9ff;">${cur.toFixed(2)} m</td>
+                  <td style="text-align: center;"><span class="status-badge ${statusClass}">${statusText}</span></td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          This is a computer-generated report from Elite Digital Prints ERP System.
+        </div>
+
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   const fileInputRef = useRef(null);
@@ -1782,8 +1942,38 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 <Layers size={20} color="var(--primary)" /> Current Fabric Stock
               </h2>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Sort Stock:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <DateRangePicker
+                  preset={stockDatePreset}
+                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                    setStockDatePreset(p);
+                    setStockDateStart(ds || '');
+                    setStockDateEnd(de || '');
+                  }}
+                  customStart={customStockDateStart}
+                  customEnd={customStockDateEnd}
+                  onCustomChange={(s, e) => {
+                    setCustomStockDateStart(s);
+                    setCustomStockDateEnd(e);
+                    setStockDateStart(s);
+                    setStockDateEnd(e);
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={handleDownloadStockPDF}
+                  style={{
+                    background: '#059669', color: '#ffffff', border: 'none',
+                    padding: '0.45rem 1rem', borderRadius: '8px', fontWeight: 800,
+                    fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    boxShadow: '0 3px 10px rgba(5, 150, 105, 0.25)'
+                  }}
+                >
+                  <Download size={15} /> Download PDF
+                </button>
+
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, marginLeft: '0.5rem' }}>Sort Stock:</span>
                 <button
                   type="button"
                   className={stockSortOrder === 'highToLow' ? 'btn-primary' : 'btn-secondary'}
@@ -1812,20 +2002,20 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
             </div>
 
             {/* Summary Bar */}
-            {stock.length > 0 && (
+            {displayStock.length > 0 && (
               <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Fabrics</span><br /><strong>{stock.length}</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Received</span><br /><strong style={{ color: 'var(--success)' }}>{Number(stock.reduce((a, i) => a + (i.totalInward || 0), 0)).toFixed(2)} mtr</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Used</span><br /><strong style={{ color: 'var(--danger)' }}>{Number(stock.reduce((a, i) => a + (i.totalOutward || 0), 0)).toFixed(2)} mtr</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Net Available</span><br /><strong style={{ color: 'var(--primary)' }}>{Number(stock.reduce((a, i) => a + (i.currentStock || 0), 0)).toFixed(2)} mtr</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Low Stock</span><br /><strong style={{ color: '#f59e0b' }}>{stock.filter(i => i.currentStock > 0 && i.currentStock <= 50).length}</strong></div>
+                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Fabrics</span><br /><strong>{displayStock.length}</strong></div>
+                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Received</span><br /><strong style={{ color: 'var(--success)' }}>{Number(displayStock.reduce((a, i) => a + (i.totalInward || 0), 0)).toFixed(2)} mtr</strong></div>
+                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Used</span><br /><strong style={{ color: 'var(--danger)' }}>{Number(displayStock.reduce((a, i) => a + (i.totalOutward || 0), 0)).toFixed(2)} mtr</strong></div>
+                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Net Available</span><br /><strong style={{ color: 'var(--primary)' }}>{Number(displayStock.reduce((a, i) => a + (i.currentStock || 0), 0)).toFixed(2)} mtr</strong></div>
+                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Low Stock</span><br /><strong style={{ color: '#f59e0b' }}>{displayStock.filter(i => i.currentStock > 0 && i.currentStock <= 50).length}</strong></div>
               </div>
             )}
 
             {/* Fabric Quality Cards with Panna breakdown */}
-            {stock.length === 0 && !loading && <p>No stock data found.</p>}
+            {displayStock.length === 0 && !loading && <p>No stock data found.</p>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {[...stock].sort((a, b) => {
+              {[...displayStock].sort((a, b) => {
                 const stockA = Number(a.currentStock || 0);
                 const stockB = Number(b.currentStock || 0);
                 if (stockSortOrder === 'highToLow') return stockB - stockA;
@@ -3660,8 +3850,23 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       </td>
                       <td style={{ padding: '0.6rem 0.5rem' }}>
                         {ch.status === 'INVOICED' ? (
-                          <span style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(52,211,153,0.3)' }}>
-                            INVOICED
+                          <span
+                            title={ch.invoiceNo ? `Tax Invoice #${ch.invoiceNo}` : 'Invoiced'}
+                            style={{
+                              background: 'rgba(52,211,153,0.15)',
+                              color: '#34d399',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(52,211,153,0.3)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            INVOICED {ch.invoiceNo ? `(${ch.invoiceNo})` : ''}
                           </span>
                         ) : (
                           <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(251,191,36,0.3)' }}>

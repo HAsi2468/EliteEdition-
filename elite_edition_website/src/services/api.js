@@ -2,14 +2,7 @@
 const DEFAULT_URL = '/v1';
 
 export const getBaseUrl = () => {
-  const stored = localStorage.getItem('elite_api_base_url');
-  if (stored) {
-    if (stored.includes('3.7.174.180')) {
-      localStorage.removeItem('elite_api_base_url');
-      return DEFAULT_URL;
-    }
-    return stored;
-  }
+  localStorage.removeItem('elite_api_base_url');
   return DEFAULT_URL;
 };
 
@@ -49,7 +42,7 @@ const request = async (path, options = {}) => {
     ...options.headers,
   };
   
-  const timeoutMs = options.timeout || 30000;
+  const timeoutMs = options.timeout || 120000;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 

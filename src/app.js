@@ -110,12 +110,12 @@ app.use('/v1', (req, res, next) => {
 
 // Serve frontend website
 const fs = require('fs');
-let websiteDistPath = path.join(__dirname, '../elite_edition_website_dist');
+let websiteDistPath = path.join(__dirname, '../../elite_edition_website_dist');
 if (!fs.existsSync(path.join(websiteDistPath, 'index.html'))) {
-  if (fs.existsSync(path.join(__dirname, '../../elite_edition_website/dist'))) {
+  if (fs.existsSync(path.join(__dirname, '../elite_edition_website_dist/index.html'))) {
+    websiteDistPath = path.join(__dirname, '../elite_edition_website_dist');
+  } else if (fs.existsSync(path.join(__dirname, '../../elite_edition_website/dist/index.html'))) {
     websiteDistPath = path.join(__dirname, '../../elite_edition_website/dist');
-  } else if (fs.existsSync(path.join(__dirname, '../../elite_edition_website_dist'))) {
-    websiteDistPath = path.join(__dirname, '../../elite_edition_website_dist');
   }
 }
 

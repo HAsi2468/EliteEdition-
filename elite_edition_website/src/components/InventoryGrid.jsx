@@ -1,18 +1,132 @@
-import React, { useState } from 'react';
-import { Edit2, Trash2, Printer, Search, Plus, SlidersHorizontal, Eye, TrendingDown, MoreVertical, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  Edit2, Trash2, Printer, Search, Plus, Minus, SlidersHorizontal, 
+  TrendingDown, MoreVertical, Sparkles, Package, AlertTriangle, 
+  CheckCircle2, XCircle, DollarSign, Download, Filter, Calendar,
+  RefreshCw, FileText, TrendingUp, Layers3, IndianRupee, ArrowDownRight, ArrowUpRight
+} from 'lucide-react';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
+import { api } from '../services/api';
 
-export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockOut, onOpenManager, onBulkInward }) {
+export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockOut, onOpenManager, onBulkInward, onQuickStockUpdate }) {
+  // 3 Primary Sub-Screens: 'overview' (Stock Overview), 'inward' (Inward Stock), 'outward' (Outward Stock)
+  const [activeSubTab, setActiveSubTab] = useState('overview');
+
+  // --- Sub-Screen 1: Stock Overview State ---
   const [searchTerm, setSearchTerm] = useState('');
   const [sizeFilter, setSizeFilter] = useState('All');
+  const [vendorFilter, setVendorFilter] = useState('All');
+  const [stockStatusFilter, setStockStatusFilter] = useState('all'); // 'all', 'instock', 'lowstock', 'outofstock'
   const [sortField, setSortField] = useState('itemName');
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
+  const [updatingStockId, setUpdatingStockId] = useState(null);
 
-  // Get unique sizes for the filter dropdown
+  // --- Sub-Screen 2: Inward Stock State ---
+  const [inwardDateStart, setInwardDateStart] = useState('');
+  const [inwardDateEnd, setInwardDateEnd] = useState('');
+  const [inwardSearchTerm, setInwardSearchTerm] = useState('');
+  const [inwardData, setInwardData] = useState({ items: [], totalQty: 0, totalPurchase: 0 });
+  const [inwardLoading, setInwardLoading] = useState(false);
+  const [inwardError, setInwardError] = useState('');
+  const [downloadingInwardPdf, setDownloadingInwardPdf] = useState(false);
+
+  // --- Sub-Screen 3: Outward Stock State ---
+  const [outwardDateStart, setOutwardDateStart] = useState('');
+  const [outwardDateEnd, setOutwardDateEnd] = useState('');
+  const [outwardSearchTerm, setOutwardSearchTerm] = useState('');
+  const [outwardData, setOutwardData] = useState({ items: [], totalQty: 0, totalPurchase: 0, totalSell: 0, totalProfit: 0 });
+  const [outwardLoading, setOutwardLoading] = useState(false);
+  const [outwardError, setOutwardError] = useState('');
+  const [downloadingOutwardPdf, setDownloadingOutwardPdf] = useState(false);
+
+  // Unique sizes & vendors for Overview dropdowns
   const sizes = ['All', ...new Set(items.map(item => item.size).filter(Boolean))];
+  const vendors = ['All', ...new Set(items.map(item => item.party).filter(Boolean))];
 
-  // Handle Sort
+  // Overview Metrics
+  const totalSkus = items.length;
+  const totalAvailableStock = items.reduce((acc, item) => acc + (Number(item.currentlyAvailableStock) || 0), 0);
+  const lowStockCount = items.filter(item => (Number(item.currentlyAvailableStock) || 0) > 0 && (Number(item.currentlyAvailableStock) || 0) <= 5).length;
+  const outOfStockCount = items.filter(item => (Number(item.currentlyAvailableStock) || 0) === 0).length;
+  const totalBuyValuation = items.reduce((acc, item) => acc + ((Number(item.purchasePrice) || 0) * (Number(item.currentlyAvailableStock) || 0)), 0);
+
+  // --- Data Fetching for Inward & Outward Screens ---
+  const fetchInwardData = useCallback(async (start = inwardDateStart, end = inwardDateEnd) => {
+    setInwardLoading(true);
+    setInwardError('');
+    try {
+      const combinedStart = start ? `${start}T00:00:00` : '';
+      const combinedEnd = end ? `${end}T23:59:59` : '';
+      const res = await api.getStockInwardReportData(combinedStart, combinedEnd);
+      setInwardData(res || { items: [], totalQty: 0, totalPurchase: 0 });
+    } catch (err) {
+      console.error('Failed to fetch inward stock data:', err);
+      setInwardError(err.message || 'Failed to load inward stock records.');
+    } finally {
+      setInwardLoading(false);
+    }
+  }, [inwardDateStart, inwardDateEnd]);
+
+  const fetchOutwardData = useCallback(async (start = outwardDateStart, end = outwardDateEnd) => {
+    setOutwardLoading(true);
+    setOutwardError('');
+    try {
+      const combinedStart = start ? `${start}T00:00:00` : '';
+      const combinedEnd = end ? `${end}T23:59:59` : '';
+      const res = await api.getStockOutwardReportData(combinedStart, combinedEnd);
+      setOutwardData(res || { items: [], totalQty: 0, totalPurchase: 0, totalSell: 0, totalProfit: 0 });
+    } catch (err) {
+      console.error('Failed to fetch outward stock data:', err);
+      setOutwardError(err.message || 'Failed to load outward stock records.');
+    } finally {
+      setOutwardLoading(false);
+    }
+  }, [outwardDateStart, outwardDateEnd]);
+
+  // Trigger data fetch when switching tabs
+  useEffect(() => {
+    if (activeSubTab === 'inward') {
+      fetchInwardData();
+    } else if (activeSubTab === 'outward') {
+      fetchOutwardData();
+    }
+  }, [activeSubTab, fetchInwardData, fetchOutwardData]);
+
+  // Quick Date Preset Handler
+  const handleQuickDatePreset = (tab, preset) => {
+    const today = new Date();
+    const formatDate = (d) => d.toISOString().split('T')[0];
+
+    let start = '';
+    let end = formatDate(today);
+
+    if (preset === 'today') {
+      start = formatDate(today);
+    } else if (preset === '7days') {
+      const past = new Date();
+      past.setDate(today.getDate() - 7);
+      start = formatDate(past);
+    } else if (preset === 'thisMonth') {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      start = formatDate(firstDay);
+    } else if (preset === 'all') {
+      start = '';
+      end = '';
+    }
+
+    if (tab === 'inward') {
+      setInwardDateStart(start);
+      setInwardDateEnd(end);
+      fetchInwardData(start, end);
+    } else if (tab === 'outward') {
+      setOutwardDateStart(start);
+      setOutwardDateEnd(end);
+      fetchOutwardData(start, end);
+    }
+  };
+
+  // --- Sort Handler for Overview ---
   const handleSort = (field) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -22,19 +136,25 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
     }
   };
 
-  // Filter & Search Logic
-  const filteredItems = items
+  // Overview Filtered Items
+  const filteredOverviewItems = items
     .filter(item => {
+      const stock = Number(item.currentlyAvailableStock) || 0;
       const matchSearch = matchSearchQuery(item, searchTerm, ['itemName', 'party', 'skuCode', 'category', 'notes']);
       const matchSize = sizeFilter === 'All' || item.size === sizeFilter;
+      const matchVendor = vendorFilter === 'All' || item.party === vendorFilter;
       
-      return matchSearch && matchSize;
+      let matchStatus = true;
+      if (stockStatusFilter === 'instock') matchStatus = stock > 0;
+      else if (stockStatusFilter === 'lowstock') matchStatus = stock > 0 && stock <= 5;
+      else if (stockStatusFilter === 'outofstock') matchStatus = stock === 0;
+
+      return matchSearch && matchSize && matchVendor && matchStatus;
     })
     .sort((a, b) => {
       let aVal = a[sortField];
       let bVal = b[sortField];
       
-      // Default nulls
       if (aVal === undefined || aVal === null) aVal = '';
       if (bVal === undefined || bVal === null) bVal = '';
 
@@ -48,14 +168,25 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
       return 0;
     });
 
-  // Client-side Thermal Barcode Printing (100mm x 25mm page size, 2-up stickers)
+  // Filtered Inward Log Items
+  const filteredInwardItems = (inwardData.items || []).filter(item => {
+    if (!inwardSearchTerm.trim()) return true;
+    return matchSearchQuery(item, inwardSearchTerm, ['itemName', 'party', 'skuCode', 'sku']);
+  });
+
+  // Filtered Outward Log Items
+  const filteredOutwardItems = (outwardData.items || []).filter(item => {
+    if (!outwardSearchTerm.trim()) return true;
+    return matchSearchQuery(item, outwardSearchTerm, ['itemName', 'party', 'skuCode', 'sku']);
+  });
+
+  // Thermal Barcode Printing
   const printBarcode = (item) => {
     const sku = item.skuCode || 'NO-SKU';
     const size = item.size || 'N/A';
-    const itemName = item.itemName || 'Elite Item';
 
-    const countStr = window.prompt(`How many barcodes do you want to print for SKU "${sku}"?`, "1");
-    if (countStr === null) return; // Cancelled by user
+    const countStr = window.prompt(`How many barcode stickers to print for SKU "${sku}"?`, "1");
+    if (countStr === null) return;
 
     const count = parseInt(countStr, 10);
     if (isNaN(count) || count <= 0) {
@@ -63,10 +194,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
       return;
     }
 
-    // Open a new tab/window for printing
     const printWindow = window.open('', '_blank', 'width=800,height=600');
-    
-    // Generate sheets HTML dynamically
     const totalSheets = Math.ceil(count / 2);
     let sheetsHtml = '';
     
@@ -76,7 +204,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
       
       const sticker1Html = `
         <div class="sticker">
-          <div class="title">ELITE EDITION</div>
+          <div class="title">ELITE ONLINE</div>
           <div class="barcode-container">
             <svg class="barcode-img" id="barcode_${idx1}"></svg>
           </div>
@@ -87,11 +215,10 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
         </div>
       `;
       
-      // If second sticker is within count, print barcode; otherwise, empty sticker (visibility hidden)
       const sticker2Html = idx2 < count 
         ? `
           <div class="sticker">
-            <div class="title">ELITE EDITION</div>
+            <div class="title">ELITE ONLINE</div>
             <div class="barcode-container">
               <svg class="barcode-img" id="barcode_${idx2}"></svg>
             </div>
@@ -101,9 +228,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
             </div>
           </div>
         `
-        : `
-          <div class="sticker" style="visibility: hidden;"></div>
-        `;
+        : `<div class="sticker" style="visibility: hidden;"></div>`;
         
       sheetsHtml += `
         <div class="sheet">
@@ -113,7 +238,6 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
       `;
     }
 
-    // Script to render barcodes dynamically
     let barcodeScripts = '';
     for (let j = 0; j < count; j++) {
       barcodeScripts += `
@@ -129,7 +253,6 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
       `;
     }
 
-    // HTML content for printing
     const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -137,109 +260,25 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
         <title>Print Barcodes - ${sku}</title>
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
         <style>
-          @page {
-            size: 100mm 25mm;
-            margin: 0;
-          }
-          body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: white;
-            color: black;
-            -webkit-print-color-adjust: exact;
-          }
-          /* 100mm x 25mm printable sheet container */
-          .sheet {
-            display: flex;
-            width: 100mm;
-            height: 25mm;
-            box-sizing: border-box;
-            overflow: hidden;
-            page-break-after: always;
-          }
-          .sheet:last-child {
-            page-break-after: avoid;
-          }
-          /* Individual sticker: 50mm x 25mm */
-          .sticker {
-            flex: 1;
-            width: 50mm;
-            height: 25mm;
-            box-sizing: border-box;
-            padding: 2.2mm 3.5mm 1.5mm 3.5mm;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-            overflow: hidden;
-            border-right: 0.5px dashed #ccc; /* Cut guideline for screen, hidden in print */
-          }
-          .sticker:last-child {
-            border-right: none;
-          }
-          .title {
-            font-size: 8.5pt;
-            font-weight: bold;
-            text-align: center;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            width: 100%;
-            line-height: 1.1;
-            letter-spacing: 0.2px;
-          }
-          .barcode-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 12.5mm;
-            width: 100%;
-            overflow: hidden;
-          }
-          .barcode-img {
-            max-width: 44mm;
-            height: 11mm;
-          }
-          .footer-row {
-            display: flex;
-            justify-content: space-between;
-            width: 100%;
-            font-size: 7.5pt;
-            font-weight: 500;
-            line-height: 1.1;
-          }
-          .sku-text {
-            font-family: monospace;
-            font-weight: bold;
-          }
-          .size-text {
-            font-weight: bold;
-          }
-          @media print {
-            .sticker {
-              border-right: none;
-            }
-          }
+          @page { size: 100mm 25mm; margin: 0; }
+          body { margin: 0; padding: 0; font-family: sans-serif; background: white; color: black; }
+          .sheet { display: flex; width: 100mm; height: 25mm; box-sizing: border-box; overflow: hidden; page-break-after: always; }
+          .sheet:last-child { page-break-after: avoid; }
+          .sticker { flex: 1; width: 50mm; height: 25mm; box-sizing: border-box; padding: 2.2mm 3.5mm 1.5mm 3.5mm; display: flex; flex-direction: column; align-items: center; justify-content: space-between; overflow: hidden; }
+          .title { font-size: 8.5pt; font-weight: bold; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+          .barcode-container { display: flex; align-items: center; justify-content: center; height: 12.5mm; width: 100%; }
+          .barcode-img { max-width: 44mm; height: 11mm; }
+          .footer-row { display: flex; justify-content: space-between; width: 100%; font-size: 7.5pt; font-weight: 500; }
+          .sku-text { font-family: monospace; font-weight: bold; }
+          .size-text { font-weight: bold; }
         </style>
       </head>
       <body>
         ${sheetsHtml}
-
         <script>
-          // Render barcode SVGs using JsBarcode
-          try {
-            ${barcodeScripts}
-          } catch (e) {
-            console.error('Failed to generate barcode', e);
-          }
-
-          // Trigger Print automatically
+          try { ${barcodeScripts} } catch(e) { console.error(e); }
           window.onload = function() {
-            setTimeout(function() {
-              window.print();
-              window.close();
-            }, 300);
+            setTimeout(function() { window.print(); window.close(); }, 300);
           }
         </script>
       </body>
@@ -251,260 +290,1443 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
     printWindow.document.close();
   };
 
+  // CSV Exports
+  const handleExportOverviewCSV = () => {
+    if (filteredOverviewItems.length === 0) {
+      alert("No inventory records available to export.");
+      return;
+    }
+
+    let csv = `ELITE ONLINE — STORE INVENTORY OVERVIEW STATEMENT\n`;
+    csv += `Generated: ${new Date().toLocaleDateString()}\n\n`;
+    csv += `SKU Code,Item Name,Vendor,Size,Available Stock,Purchase Price (INR),Sale Price (INR),Total Buy Value (INR),Total Sell Value (INR)\n`;
+
+    filteredOverviewItems.forEach(i => {
+      const stock = Number(i.currentlyAvailableStock) || 0;
+      const buyPrice = Number(i.purchasePrice) || 0;
+      const sellPrice = Number(i.salePrice) || 0;
+      csv += `"${i.skuCode || ''}","${(i.itemName || '').replace(/"/g, '""')}","${(i.party || '').replace(/"/g, '""')}","${i.size || ''}",${stock},${buyPrice.toFixed(2)},${sellPrice.toFixed(2)},${(buyPrice * stock).toFixed(2)},${(sellPrice * stock).toFixed(2)}\n`;
+    });
+
+    downloadCsvBlob(csv, `EliteOnline_Stock_Overview_${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const handleExportInwardCSV = () => {
+    if (filteredInwardItems.length === 0) {
+      alert("No inward records to export.");
+      return;
+    }
+    let csv = `ELITE ONLINE — INWARD STOCK TRANSACTION LOG\n`;
+    csv += `Date Range: ${inwardDateStart || 'All'} to ${inwardDateEnd || 'Today'}\n\n`;
+    csv += `Date & Time,SKU Code,Item Name,Vendor,Total Qty Received,Unit Purchase Price (INR),Total Purchase Amount (INR)\n`;
+
+    filteredInwardItems.forEach(item => {
+      const dt = (item.created_date_time || item.date) ? new Date(item.created_date_time || item.date).toLocaleString('en-IN') : 'N/A';
+      csv += `"${dt}","${item.skuCode || item.sku || ''}","${(item.itemName || '').replace(/"/g, '""')}","${(item.party || '').replace(/"/g, '""')}",${item.qty || item.total || 0},${Number(item.purchasePrice || 0).toFixed(2)},${Number(item.totalPurchaseAmount || 0).toFixed(2)}\n`;
+    });
+
+    downloadCsvBlob(csv, `EliteOnline_Inward_Stock_Log_${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const handleExportOutwardCSV = () => {
+    if (filteredOutwardItems.length === 0) {
+      alert("No outward records to export.");
+      return;
+    }
+    let csv = `ELITE ONLINE — OUTWARD STOCK TRANSACTION LOG\n`;
+    csv += `Date Range: ${outwardDateStart || 'All'} to ${outwardDateEnd || 'Today'}\n\n`;
+    csv += `SKU Code,Item Name,Vendor,Total Qty Dispatched,Unit Buy Price (INR),Total Buy Cost (INR),Unit Sell Price (INR),Total Sale Revenue (INR),Gross Profit (INR)\n`;
+
+    filteredOutwardItems.forEach(item => {
+      const profit = (item.totalSellableAmount || 0) - (item.totalPurchaseAmount || 0);
+      csv += `"${item.sku || item.skuCode || ''}","${(item.itemName || '').replace(/"/g, '""')}","${(item.party || '').replace(/"/g, '""')}",${item.total || 0},${Number(item.purchasePrice || 0).toFixed(2)},${Number(item.totalPurchaseAmount || 0).toFixed(2)},${Number(item.salePrice || 0).toFixed(2)},${Number(item.totalSellableAmount || 0).toFixed(2)},${profit.toFixed(2)}\n`;
+    });
+
+    downloadCsvBlob(csv, `EliteOnline_Outward_Stock_Log_${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const downloadCsvBlob = (content, fileName) => {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // PDF Exports via Backend API
+  const handleDownloadInwardPdf = async () => {
+    setDownloadingInwardPdf(true);
+    try {
+      const combinedStart = inwardDateStart ? `${inwardDateStart}T00:00:00` : '';
+      const combinedEnd = inwardDateEnd ? `${inwardDateEnd}T23:59:59` : '';
+      await api.downloadInventoryReport('stock-inward', combinedStart, combinedEnd, `Stock_Inward_Report_${inwardDateStart || 'All'}_to_${inwardDateEnd || 'Today'}.pdf`);
+    } catch (err) {
+      console.error('Failed to download Inward PDF:', err);
+      alert(err.message || 'Failed to download Inward PDF report.');
+    } finally {
+      setDownloadingInwardPdf(false);
+    }
+  };
+
+  const handleDownloadOutwardPdf = async () => {
+    setDownloadingOutwardPdf(true);
+    try {
+      const combinedStart = outwardDateStart ? `${outwardDateStart}T00:00:00` : '';
+      const combinedEnd = outwardDateEnd ? `${outwardDateEnd}T23:59:59` : '';
+      await api.downloadInventoryReport('stock-outward', combinedStart, combinedEnd, `Stock_Outward_Report_${outwardDateStart || 'All'}_to_${outwardDateEnd || 'Today'}.pdf`);
+    } catch (err) {
+      console.error('Failed to download Outward PDF:', err);
+      alert(err.message || 'Failed to download Outward PDF report.');
+    } finally {
+      setDownloadingOutwardPdf(false);
+    }
+  };
+
   return (
-    <div className="glass-panel" style={styles.gridPanel}>
-      {/* Control Header */}
-      <div style={styles.controlHeader}>
-        <div style={styles.leftControls}>
-          <div style={styles.searchBox}>
-            <Search size={16} color="var(--text-muted)" style={styles.searchIcon} />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by SKU, item, or vendor..."
-              style={styles.searchInput}
-            />
-          </div>
+    <div style={styles.container}>
+      
+      {/* ========================================================================= */}
+      {/* MAIN TOP NAVIGATION SUB-TAB BAR (3 SCREENS)                               */}
+      {/* ========================================================================= */}
+      <div style={styles.subTabBarContainer}>
+        <div style={styles.subTabBar}>
+          {/* Tab 1: Stock Overview */}
+          <button
+            onClick={() => setActiveSubTab('overview')}
+            style={styles.subTabButton(activeSubTab === 'overview', 'overview')}
+          >
+            <Package size={18} />
+            <span>Stock Overview</span>
+            <span style={styles.tabBadge(activeSubTab === 'overview', '#0284c7')}>
+              {totalSkus}
+            </span>
+          </button>
 
-          <div style={styles.filterBox}>
-            <SlidersHorizontal size={14} color="var(--text-muted)" />
-            <select
-              value={sizeFilter}
-              onChange={(e) => setSizeFilter(e.target.value)}
-              style={styles.selectInput}
+          {/* Tab 2: Inward Stock */}
+          <button
+            onClick={() => setActiveSubTab('inward')}
+            style={styles.subTabButton(activeSubTab === 'inward', 'inward')}
+          >
+            <ArrowDownRight size={18} />
+            <span>Inward Stock</span>
+            <span style={styles.tabBadge(activeSubTab === 'inward', '#059669')}>
+              Log
+            </span>
+          </button>
+
+          {/* Tab 3: Outward Stock */}
+          <button
+            onClick={() => setActiveSubTab('outward')}
+            style={styles.subTabButton(activeSubTab === 'outward', 'outward')}
+          >
+            <ArrowUpRight size={18} />
+            <span>Outward Stock</span>
+            <span style={styles.tabBadge(activeSubTab === 'outward', '#d97706')}>
+              Dispatch
+            </span>
+          </button>
+        </div>
+
+        {/* Global Quick Action Shortcut */}
+        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+          {activeSubTab === 'overview' && (
+            <>
+              <button onClick={onBulkInward} style={styles.bulkInwardHeaderBtn}>
+                <Sparkles size={15} />
+                <span>Bulk Inward</span>
+              </button>
+              <button onClick={onAdd} style={styles.addSkuHeaderBtn}>
+                <Plus size={15} />
+                <span>Add SKU</span>
+              </button>
+            </>
+          )}
+          {activeSubTab === 'inward' && (
+            <button onClick={onBulkInward} style={styles.bulkInwardHeaderBtn}>
+              <Sparkles size={15} />
+              <span>+ Add Inward Stock</span>
+            </button>
+          )}
+          {activeSubTab === 'outward' && (
+            <button onClick={() => onStockOut(null)} style={styles.outwardHeaderBtn}>
+              <TrendingDown size={15} />
+              <span>+ Dispatch Stock Out</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+
+      {/* ========================================================================= */}
+      {/* SCREEN 1: STOCK OVERVIEW                                                   */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'overview' && (
+        <>
+          {/* Summary Metric Cards */}
+          <div style={styles.statsGrid}>
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #0284c7' }}>
+              <div style={styles.statIconWrap('#0284c7', '#f0f9ff')}>
+                <Package size={22} color="#0284c7" />
+              </div>
+              <div>
+                <div style={styles.statLabel}>TOTAL SKUS / ITEMS</div>
+                <div style={{ ...styles.statVal, color: '#0284c7' }}>
+                  {totalSkus} <span style={styles.statSubText}>products</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #4f46e5' }}>
+              <div style={styles.statIconWrap('#4f46e5', '#eef2ff')}>
+                <CheckCircle2 size={22} color="#4f46e5" />
+              </div>
+              <div>
+                <div style={styles.statLabel}>TOTAL AVAILABLE STOCK</div>
+                <div style={{ ...styles.statVal, color: '#4f46e5' }}>
+                  {totalAvailableStock.toLocaleString()} <span style={styles.statSubText}>units</span>
+                </div>
+              </div>
+            </div>
+
+            <div 
+              onClick={() => setStockStatusFilter('lowstock')}
+              style={{ ...styles.statCard, borderLeft: '4px solid #d97706', cursor: 'pointer' }}
+              title="Click to filter Low Stock items"
             >
-              {sizes.map((s, idx) => (
-                <option key={idx} value={s}>{s === 'All' ? 'All Sizes' : `Size ${s}`}</option>
-              ))}
-            </select>
+              <div style={styles.statIconWrap('#d97706', '#fffbeb')}>
+                <AlertTriangle size={22} color="#d97706" />
+              </div>
+              <div>
+                <div style={styles.statLabel}>LOW STOCK ALERT (≤ 5)</div>
+                <div style={{ ...styles.statVal, color: '#d97706' }}>
+                  {lowStockCount} <span style={styles.statSubText}>SKUs</span>
+                </div>
+              </div>
+            </div>
+
+            <div 
+              onClick={() => setStockStatusFilter('outofstock')}
+              style={{ ...styles.statCard, borderLeft: '4px solid #dc2626', cursor: 'pointer' }}
+              title="Click to filter Out of Stock items"
+            >
+              <div style={styles.statIconWrap('#dc2626', '#fef2f2')}>
+                <XCircle size={22} color="#dc2626" />
+              </div>
+              <div>
+                <div style={styles.statLabel}>OUT OF STOCK</div>
+                <div style={{ ...styles.statVal, color: '#dc2626' }}>
+                  {outOfStockCount} <span style={styles.statSubText}>SKUs</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #059669' }}>
+              <div style={styles.statIconWrap('#059669', '#ecfdf5')}>
+                <DollarSign size={22} color="#059669" />
+              </div>
+              <div>
+                <div style={styles.statLabel}>TOTAL BUY VALUATION</div>
+                <div style={{ ...styles.statVal, color: '#059669' }}>
+                  ₹ {totalBuyValuation.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button onClick={() => onStockOut(null)} className="btn-secondary" style={{ ...styles.addBtn, background: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
-            <TrendingDown size={16} />
-            Outward
-          </button>
-          <button onClick={onBulkInward} className="btn-primary" style={styles.addBtn}>
-            <Sparkles size={16} />
-            Bulk Inward
-          </button>
-          <button onClick={onAdd} className="btn-success" style={styles.addBtn}>
-            <Plus size={16} />
-            Add Item
-          </button>
-          <button onClick={() => onOpenManager('vendors')} className="btn-icon" style={{ ...styles.addBtn, padding: '0.6rem 0.8rem' }} title="Control Panel (More)">
-            <MoreVertical size={16} />
-          </button>
-        </div>
-      </div>
+          {/* Search, Filters & Action Toolbar */}
+          <div style={styles.controlHeader}>
+            <div style={styles.rowOne}>
+              <div style={styles.searchBox}>
+                <Search size={16} color="#64748b" style={{ flexShrink: 0 }} />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search SKU, item name, vendor..."
+                  style={styles.searchInput}
+                />
+              </div>
 
-      {/* Table Container */}
-      <div className="table-container" style={styles.tableWrap}>
-        {filteredItems.length === 0 ? (
-          <div style={styles.emptyTable}>
-            <span style={{ fontSize: '2.5rem' }}>🔍</span>
-            <h4 style={{ marginTop: '0.8rem', color: 'var(--text-primary)' }}>No inventory items found</h4>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Try adjusting your search terms or filters.</p>
+              <div style={styles.pillContainer}>
+                {[
+                  { id: 'all', label: `All (${items.length})` },
+                  { id: 'instock', label: `In Stock (${items.length - outOfStockCount})` },
+                  { id: 'lowstock', label: `Low Stock (${lowStockCount})` },
+                  { id: 'outofstock', label: `Out of Stock (${outOfStockCount})` }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setStockStatusFilter(tab.id)}
+                    style={styles.statusPill(stockStatusFilter === tab.id, tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                <div style={styles.filterBox}>
+                  <SlidersHorizontal size={14} color="#64748b" />
+                  <select
+                    value={sizeFilter}
+                    onChange={(e) => setSizeFilter(e.target.value)}
+                    style={styles.selectInput}
+                  >
+                    {sizes.map((s, idx) => (
+                      <option key={idx} value={s}>{s === 'All' ? 'All Sizes' : `Size: ${s}`}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={styles.filterBox}>
+                  <Filter size={14} color="#64748b" />
+                  <select
+                    value={vendorFilter}
+                    onChange={(e) => setVendorFilter(e.target.value)}
+                    style={styles.selectInput}
+                  >
+                    {vendors.map((v, idx) => (
+                      <option key={idx} value={v}>{v === 'All' ? 'All Vendors' : v}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div style={styles.rowTwo}>
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                <button onClick={handleExportOverviewCSV} style={styles.exportBtn} title="Export CSV Overview">
+                  <Download size={15} />
+                  <span>Export CSV</span>
+                </button>
+                <button onClick={() => onStockOut(null)} style={styles.outwardBtn}>
+                  <TrendingDown size={15} />
+                  <span>Outward Dispatch</span>
+                </button>
+                <button onClick={onBulkInward} style={styles.bulkInwardBtn}>
+                  <Sparkles size={15} />
+                  <span>Bulk Inward</span>
+                </button>
+                <button onClick={onAdd} style={styles.addSkuBtn}>
+                  <Plus size={15} />
+                  <span>Add SKU</span>
+                </button>
+                <button onClick={() => onOpenManager('vendors')} style={styles.moreBtn} title="Manage Vendors">
+                  <MoreVertical size={16} />
+                </button>
+              </div>
+            </div>
           </div>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th onClick={() => handleSort('itemName')} style={styles.thSort}>
-                  Item Details {sortField === 'itemName' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th onClick={() => handleSort('skuCode')} style={styles.thSort}>
-                  SKU Code {sortField === 'skuCode' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th onClick={() => handleSort('party')} style={styles.thSort}>
-                  Vendor {sortField === 'party' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th onClick={() => handleSort('size')} style={styles.thSort}>
-                  Size {sortField === 'size' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th onClick={() => handleSort('purchasePrice')} style={styles.thSort} className="text-right">
-                  Buy Price {sortField === 'purchasePrice' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th onClick={() => handleSort('salePrice')} style={styles.thSort} className="text-right">
-                  Sell Price {sortField === 'salePrice' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th onClick={() => handleSort('currentlyAvailableStock')} style={styles.thSort} className="text-center">
-                  Stock Level {sortField === 'currentlyAvailableStock' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                </th>
-                <th className="text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredItems.map((item) => {
-                const stock = item.currentlyAvailableStock || 0;
-                let stockClass = 'badge-success';
-                let stockLabel = `${stock} in stock`;
-                if (stock === 0) {
-                  stockClass = 'badge-danger';
-                  stockLabel = 'Out of Stock';
-                } else if (stock <= 5) {
-                  stockClass = 'badge-warning';
-                  stockLabel = `Low (${stock})`;
-                }
 
-                return (
-                  <tr key={item._id}>
-                    <td>
-                      <div style={styles.itemCell}>
-                        <div style={styles.itemImgWrapper}>
-                          {item.imageUrl ? (
-                            <img 
-                              src={item.imageUrl} 
-                              alt={item.itemName} 
-                              style={styles.itemImg}
-                              onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                            />
-                          ) : null}
-                          <div style={{ ...styles.imgPlaceholder, display: item.imageUrl ? 'none' : 'flex' }}>
-                            {item.itemName ? item.itemName[0].toUpperCase() : 'E'}
-                          </div>
-                        </div>
-                        <div>
-                          <div style={styles.itemName}>{item.itemName}</div>
-                          <div style={styles.itemMeta}>Created: {formatDateDDMMYYYY(item.created_date_time)}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span style={styles.skuText}>{item.skuCode || 'N/A'}</span>
-                    </td>
-                    <td>{item.party}</td>
-                    <td>
-                      <span style={styles.sizeBadge}>{item.size}</span>
-                    </td>
-                    <td className="text-right">
-                      {item.purchasePrice ? `Rs. ${item.purchasePrice.toFixed(2)}` : 'Rs. 0.00'}
-                    </td>
-                    <td className="text-right">
-                      {item.salePrice ? `Rs. ${item.salePrice.toFixed(2)}` : 'Rs. 0.00'}
-                    </td>
-                    <td className="text-center">
-                      <span className={`badge ${stockClass}`}>{stockLabel}</span>
-                    </td>
-                    <td>
-                      <div style={styles.actionsCell}>
-                        <button
-                          onClick={() => onStockOut(item)}
-                          className="btn-icon"
-                          style={{ color: '#fca5a5' }}
-                          title="Outward Item"
-                        >
-                          <TrendingDown size={15} />
-                        </button>
-                        <button
-                          onClick={() => printBarcode(item)}
-                          className="btn-icon"
-                          title="Print 10x2.5cm Barcode Sticker"
-                        >
-                          <Printer size={15} />
-                        </button>
-                        <button
-                          onClick={() => onEdit(item)}
-                          className="btn-icon"
-                          title="Edit Item"
-                        >
-                          <Edit2 size={15} />
-                        </button>
-                        <button
-                          onClick={() => onDelete(item._id)}
-                          className="btn-icon"
-                          style={styles.trashBtn}
-                          title="Delete Item"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+          {/* Main Inventory Overview Data Table */}
+          <div style={styles.tablePanel}>
+            <div style={{ overflowX: 'auto' }}>
+              {filteredOverviewItems.length === 0 ? (
+                <div style={styles.emptyState}>
+                  <span style={{ fontSize: '2.8rem' }}>📦</span>
+                  <h4 style={{ margin: '0.5rem 0 0.2rem 0', color: '#1e293b', fontSize: '1.1rem' }}>No inventory items matching filter</h4>
+                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try adjusting your search query or filters.</p>
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', background: '#ffffff' }}>
+                  <thead>
+                    <tr style={{ background: '#1e293b', color: '#ffffff' }}>
+                      <th onClick={() => handleSort('itemName')} style={styles.thSort}>
+                        ITEM DETAILS {sortField === 'itemName' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                      <th onClick={() => handleSort('skuCode')} style={styles.thSort}>
+                        SKU CODE {sortField === 'skuCode' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                      <th onClick={() => handleSort('party')} style={styles.thSort}>
+                        VENDOR / BRAND {sortField === 'party' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                      <th onClick={() => handleSort('size')} style={styles.thSort}>
+                        SIZE {sortField === 'size' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                      <th onClick={() => handleSort('purchasePrice')} style={{ ...styles.thSort, textAlign: 'right' }}>
+                        BUY PRICE {sortField === 'purchasePrice' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                      <th onClick={() => handleSort('salePrice')} style={{ ...styles.thSort, textAlign: 'right' }}>
+                        SELL PRICE {sortField === 'salePrice' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                      <th onClick={() => handleSort('currentlyAvailableStock')} style={{ ...styles.thSort, textAlign: 'center' }}>
+                        AVAILABLE STOCK {sortField === 'currentlyAvailableStock' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                      </th>
+                      <th style={{ padding: '0.8rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em' }}>
+                        ACTIONS
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredOverviewItems.map((item) => {
+                      const stock = Number(item.currentlyAvailableStock) || 0;
+
+                      let stockBadgeBg = '#ecfdf5';
+                      let stockBadgeColor = '#059669';
+                      let stockBadgeBorder = '#a7f3d0';
+                      let stockLabel = `${stock} Units`;
+
+                      if (stock === 0) {
+                        stockBadgeBg = '#fef2f2';
+                        stockBadgeColor = '#dc2626';
+                        stockBadgeBorder = '#fecaca';
+                        stockLabel = 'Out of Stock';
+                      } else if (stock <= 5) {
+                        stockBadgeBg = '#fffbeb';
+                        stockBadgeColor = '#d97706';
+                        stockBadgeBorder = '#fde68a';
+                        stockLabel = `${stock} Units (Low)`;
+                      }
+
+                      return (
+                        <tr key={item._id} style={{ borderBottom: '1px solid #e2e8f0', background: '#ffffff' }}>
+                          <td style={{ padding: '0.8rem 1rem' }}>
+                            <div style={styles.itemCell}>
+                              <div style={styles.itemImgWrapper}>
+                                {item.imageUrl ? (
+                                  <img 
+                                    src={item.imageUrl} 
+                                    alt={item.itemName} 
+                                    style={styles.itemImg}
+                                    onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                                  />
+                                ) : null}
+                                <div style={{ ...styles.imgPlaceholder, display: item.imageUrl ? 'none' : 'flex' }}>
+                                  {item.itemName ? item.itemName[0].toUpperCase() : 'E'}
+                                </div>
+                              </div>
+                              <div>
+                                <div style={styles.itemName}>{item.itemName}</div>
+                                <div style={styles.itemMeta}>Created: {formatDateDDMMYYYY(item.created_date_time)}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem' }}>
+                            <span style={styles.skuText}>{item.skuCode || 'N/A'}</span>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+                            {item.party}
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem' }}>
+                            <span style={styles.sizeBadge}>{item.size}</span>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
+                            ₹ {Number(item.purchasePrice || 0).toFixed(2)}
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 700, color: '#0284c7' }}>
+                            ₹ {Number(item.salePrice || 0).toFixed(2)}
+                          </td>
+
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '4px 14px',
+                              borderRadius: '20px',
+                              fontSize: '0.82rem',
+                              fontWeight: 800,
+                              backgroundColor: stockBadgeBg,
+                              color: stockBadgeColor,
+                              border: `1.5px solid ${stockBadgeBorder}`,
+                              textAlign: 'center',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                            }}>
+                              {stockLabel}
+                            </span>
+                          </td>
+
+                          <td style={{ padding: '0.8rem 1rem' }}>
+                            <div style={styles.actionsCell}>
+                              <button
+                                onClick={() => onStockOut(item)}
+                                style={styles.tblActionBtn('#b91c1c', '#fee2e2', '#fca5a5')}
+                                title="Outward Dispatch Item"
+                              >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                  <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
+                                  <polyline points="17 18 23 18 23 12"/>
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => printBarcode(item)}
+                                style={styles.tblActionBtn('#0f172a', '#f1f5f9', '#94a3b8')}
+                                title="Print Barcode Sticker"
+                              >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                  <polyline points="6 9 6 2 18 2 18 9"/>
+                                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                                  <rect x="6" y="14" width="12" height="8"/>
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => onEdit(item)}
+                                style={styles.tblActionBtn('#0284c7', '#e0f2fe', '#38bdf8')}
+                                title="Edit Item Details"
+                              >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => onDelete(item._id)}
+                                style={styles.tblActionBtn('#e11d48', '#ffe4e6', '#fb7185')}
+                                title="Delete Item"
+                              >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e11d48" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                  <polyline points="3 6 5 6 21 6"/>
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                  <line x1="10" y1="11" x2="10" y2="17"/>
+                                  <line x1="14" y1="11" x2="14" y2="17"/>
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+
+      {/* ========================================================================= */}
+      {/* SCREEN 2: INWARD STOCK                                                    */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'inward' && (
+        <>
+          {/* Summary Metric Cards for Inward Stock */}
+          <div style={styles.statsGrid}>
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #059669' }}>
+              <div style={styles.statIconWrap('#059669', '#ecfdf5')}>
+                <Layers3 size={22} color="#059669" />
+              </div>
+              <div>
+                <div style={styles.statLabel}>INWARD TRANSACTIONS / SKUS</div>
+                <div style={{ ...styles.statVal, color: '#059669' }}>
+                  {inwardData.items?.length || 0} <span style={styles.statSubText}>records</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #0284c7' }}>
+              <div style={styles.statIconWrap('#0284c7', '#f0f9ff')}>
+                <ArrowDownRight size={22} color="#0284c7" />
+              </div>
+              <div>
+                <div style={styles.statLabel}>TOTAL UNITS RECEIVED</div>
+                <div style={{ ...styles.statVal, color: '#0284c7' }}>
+                  {(inwardData.totalQty || 0).toLocaleString()} <span style={styles.statSubText}>units</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #d97706' }}>
+              <div style={styles.statIconWrap('#d97706', '#fffbeb')}>
+                <IndianRupee size={22} color="#d97706" />
+              </div>
+              <div>
+                <div style={styles.statLabel}>TOTAL PURCHASE COST</div>
+                <div style={{ ...styles.statVal, color: '#d97706' }}>
+                  ₹ {(inwardData.totalPurchase || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Date Filter & Control Header */}
+          <div style={styles.controlHeader}>
+            <div style={styles.rowOne}>
+              {/* Search Box */}
+              <div style={styles.searchBox}>
+                <Search size={16} color="#64748b" style={{ flexShrink: 0 }} />
+                <input
+                  type="text"
+                  value={inwardSearchTerm}
+                  onChange={(e) => setInwardSearchTerm(e.target.value)}
+                  placeholder="Search inward SKU, item name, vendor..."
+                  style={styles.searchInput}
+                />
+              </div>
+
+              {/* Date Inputs & Quick Presets */}
+              <div style={styles.dateFilterContainer}>
+                <Calendar size={15} color="#64748b" />
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>From:</span>
+                <input
+                  type="date"
+                  value={inwardDateStart}
+                  onChange={(e) => {
+                    setInwardDateStart(e.target.value);
+                    fetchInwardData(e.target.value, inwardDateEnd);
+                  }}
+                  style={styles.dateInput}
+                />
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>To:</span>
+                <input
+                  type="date"
+                  value={inwardDateEnd}
+                  onChange={(e) => {
+                    setInwardDateEnd(e.target.value);
+                    fetchInwardData(inwardDateStart, e.target.value);
+                  }}
+                  style={styles.dateInput}
+                />
+
+                <div style={styles.presetGroup}>
+                  <button onClick={() => handleQuickDatePreset('inward', 'today')} style={styles.presetBtn}>Today</button>
+                  <button onClick={() => handleQuickDatePreset('inward', '7days')} style={styles.presetBtn}>7 Days</button>
+                  <button onClick={() => handleQuickDatePreset('inward', 'thisMonth')} style={styles.presetBtn}>This Month</button>
+                  <button onClick={() => handleQuickDatePreset('inward', 'all')} style={styles.presetBtn}>All Time</button>
+                </div>
+              </div>
+            </div>
+
+            <div style={styles.rowTwo}>
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                <button onClick={() => fetchInwardData()} style={styles.refreshBtn} title="Refresh Inward Log">
+                  <RefreshCw size={15} className={inwardLoading ? 'spin' : ''} />
+                  <span>Refresh</span>
+                </button>
+                <button onClick={handleExportInwardCSV} style={styles.exportBtn} title="Export CSV Log">
+                  <Download size={15} />
+                  <span>Export CSV</span>
+                </button>
+                <button 
+                  onClick={handleDownloadInwardPdf} 
+                  disabled={downloadingInwardPdf} 
+                  style={styles.pdfBtn}
+                  title="Download Official Inward PDF Report"
+                >
+                  <FileText size={15} />
+                  <span>{downloadingInwardPdf ? 'Generating PDF...' : 'Download PDF'}</span>
+                </button>
+                <button onClick={onBulkInward} style={styles.addInwardStockBtn}>
+                  <Sparkles size={15} />
+                  <span>+ Add Inward Stock</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Inward Stock History Table */}
+          <div style={styles.tablePanel}>
+            {inwardLoading ? (
+              <div style={styles.loadingBox}>
+                <RefreshCw size={28} color="#059669" style={{ animation: 'spin 1s linear infinite' }} />
+                <p style={{ color: '#475569', fontWeight: 600, marginTop: '0.8rem' }}>Loading Inward Stock History...</p>
+              </div>
+            ) : inwardError ? (
+              <div style={styles.errorBox}>
+                <AlertTriangle size={24} color="#dc2626" />
+                <span>{inwardError}</span>
+                <button onClick={() => fetchInwardData()} style={styles.retryBtn}>Retry</button>
+              </div>
+            ) : filteredInwardItems.length === 0 ? (
+              <div style={styles.emptyState}>
+                <span style={{ fontSize: '2.8rem' }}>📥</span>
+                <h4 style={{ margin: '0.5rem 0 0.2rem 0', color: '#1e293b', fontSize: '1.1rem' }}>No inward stock records found</h4>
+                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try clearing date filters or add inward stock.</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', background: '#ffffff' }}>
+                  <thead>
+                    <tr style={{ background: '#064e3b', color: '#ffffff' }}>
+                      <th style={styles.thStatic}>DATE & TIME</th>
+                      <th style={styles.thStatic}>PHOTO</th>
+                      <th style={styles.thStatic}>SKU CODE</th>
+                      <th style={styles.thStatic}>PRODUCT NAME</th>
+                      <th style={styles.thStatic}>VENDOR / SUPPLIER</th>
+                      <th style={{ ...styles.thStatic, textAlign: 'center' }}>SIZE & QUANTITY</th>
+                      <th style={{ ...styles.thStatic, textAlign: 'center' }}>QTY INWARDED</th>
+                      <th style={{ ...styles.thStatic, textAlign: 'right' }}>BUY PRICE (UNIT)</th>
+                      <th style={{ ...styles.thStatic, textAlign: 'right' }}>PURCHASE VALUE (TOTAL)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredInwardItems.map((item, idx) => {
+                      const dtStr = (item.created_date_time || item.date)
+                        ? new Date(item.created_date_time || item.date).toLocaleString('en-IN', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit', hour12: true
+                          })
+                        : 'N/A';
+                      const totalQty = item.qty || item.total || 0;
+                      const buyPrice = Number(item.purchasePrice || 0);
+                      const totalPurchase = Number(item.totalPurchaseAmount || (buyPrice * totalQty));
+
+                      return (
+                        <tr key={item.id || item._id || idx} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                          <td style={{ padding: '0.8rem 1rem', fontSize: '0.78rem', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            {dtStr}
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem' }}>
+                            <div style={styles.itemImgWrapper}>
+                              {item.imageUrl ? (
+                                <img 
+                                  src={item.imageUrl} 
+                                  alt={item.sku} 
+                                  style={styles.itemImg}
+                                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                                />
+                              ) : null}
+                              <div style={{ ...styles.imgPlaceholder, display: item.imageUrl ? 'none' : 'flex' }}>
+                                {item.itemName ? item.itemName[0].toUpperCase() : 'E'}
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem' }}>
+                            <span style={styles.skuText}>{item.skuCode || item.sku || 'N/A'}</span>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', fontWeight: 700, color: '#0f172a', fontSize: '0.88rem' }}>
+                            {item.itemName}
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+                            {item.party || 'N/A'}
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>
+                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                              {item.sizes?.map((s, sIdx) => (
+                                <span key={sIdx} style={styles.sizeTagBadge}>
+                                  {s.size}: <strong>{s.qty}</strong>
+                                </span>
+                              )) || (
+                                <span style={styles.sizeTagBadge}>Size: {item.size || 'N/A'}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>
+                            <span style={styles.qtyInwardBadge}>
+                              +{totalQty} Units
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
+                            ₹ {buyPrice.toFixed(2)}
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.9rem', fontWeight: 800, color: '#d97706' }}>
+                            ₹ {totalPurchase.toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+
+      {/* ========================================================================= */}
+      {/* SCREEN 3: OUTWARD STOCK                                                   */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'outward' && (
+        <>
+          {/* Summary Metric Cards for Outward Stock */}
+          <div style={styles.statsGrid}>
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #d97706' }}>
+              <div style={styles.statIconWrap('#d97706', '#fffbeb')}>
+                <Layers3 size={22} color="#d97706" />
+              </div>
+              <div>
+                <div style={styles.statLabel}>DISPATCH TRANSACTIONS / SKUS</div>
+                <div style={{ ...styles.statVal, color: '#d97706' }}>
+                  {outwardData.items?.length || 0} <span style={styles.statSubText}>records</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #dc2626' }}>
+              <div style={styles.statIconWrap('#dc2626', '#fef2f2')}>
+                <ArrowUpRight size={22} color="#dc2626" />
+              </div>
+              <div>
+                <div style={styles.statLabel}>TOTAL UNITS DISPATCHED</div>
+                <div style={{ ...styles.statVal, color: '#dc2626' }}>
+                  {(outwardData.totalQty || 0).toLocaleString()} <span style={styles.statSubText}>units</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #0284c7' }}>
+              <div style={styles.statIconWrap('#0284c7', '#f0f9ff')}>
+                <IndianRupee size={22} color="#0284c7" />
+              </div>
+              <div>
+                <div style={styles.statLabel}>TOTAL SALE REVENUE</div>
+                <div style={{ ...styles.statVal, color: '#0284c7' }}>
+                  ₹ {(outwardData.totalSell || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ ...styles.statCard, borderLeft: `4px solid ${(outwardData.totalProfit || 0) >= 0 ? '#059669' : '#dc2626'}` }}>
+              <div style={styles.statIconWrap((outwardData.totalProfit || 0) >= 0 ? '#059669' : '#dc2626', (outwardData.totalProfit || 0) >= 0 ? '#ecfdf5' : '#fef2f2')}>
+                <TrendingUp size={22} color={(outwardData.totalProfit || 0) >= 0 ? '#059669' : '#dc2626'} />
+              </div>
+              <div>
+                <div style={styles.statLabel}>ESTIMATED GROSS PROFIT</div>
+                <div style={{ ...styles.statVal, color: (outwardData.totalProfit || 0) >= 0 ? '#059669' : '#dc2626' }}>
+                  ₹ {(outwardData.totalProfit || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Date Filter & Control Header */}
+          <div style={styles.controlHeader}>
+            <div style={styles.rowOne}>
+              {/* Search Box */}
+              <div style={styles.searchBox}>
+                <Search size={16} color="#64748b" style={{ flexShrink: 0 }} />
+                <input
+                  type="text"
+                  value={outwardSearchTerm}
+                  onChange={(e) => setOutwardSearchTerm(e.target.value)}
+                  placeholder="Search outward SKU, item name, vendor..."
+                  style={styles.searchInput}
+                />
+              </div>
+
+              {/* Date Inputs & Quick Presets */}
+              <div style={styles.dateFilterContainer}>
+                <Calendar size={15} color="#64748b" />
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>From:</span>
+                <input
+                  type="date"
+                  value={outwardDateStart}
+                  onChange={(e) => {
+                    setOutwardDateStart(e.target.value);
+                    fetchOutwardData(e.target.value, outwardDateEnd);
+                  }}
+                  style={styles.dateInput}
+                />
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>To:</span>
+                <input
+                  type="date"
+                  value={outwardDateEnd}
+                  onChange={(e) => {
+                    setOutwardDateEnd(e.target.value);
+                    fetchOutwardData(outwardDateStart, e.target.value);
+                  }}
+                  style={styles.dateInput}
+                />
+
+                <div style={styles.presetGroup}>
+                  <button onClick={() => handleQuickDatePreset('outward', 'today')} style={styles.presetBtn}>Today</button>
+                  <button onClick={() => handleQuickDatePreset('outward', '7days')} style={styles.presetBtn}>7 Days</button>
+                  <button onClick={() => handleQuickDatePreset('outward', 'thisMonth')} style={styles.presetBtn}>This Month</button>
+                  <button onClick={() => handleQuickDatePreset('outward', 'all')} style={styles.presetBtn}>All Time</button>
+                </div>
+              </div>
+            </div>
+
+            <div style={styles.rowTwo}>
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                <button onClick={() => fetchOutwardData()} style={styles.refreshBtn} title="Refresh Outward Log">
+                  <RefreshCw size={15} className={outwardLoading ? 'spin' : ''} />
+                  <span>Refresh</span>
+                </button>
+                <button onClick={handleExportOutwardCSV} style={styles.exportBtn} title="Export CSV Log">
+                  <Download size={15} />
+                  <span>Export CSV</span>
+                </button>
+                <button 
+                  onClick={handleDownloadOutwardPdf} 
+                  disabled={downloadingOutwardPdf} 
+                  style={styles.pdfBtn}
+                  title="Download Official Outward PDF Report"
+                >
+                  <FileText size={15} />
+                  <span>{downloadingOutwardPdf ? 'Generating PDF...' : 'Download PDF'}</span>
+                </button>
+                <button onClick={() => onStockOut(null)} style={styles.outwardHeaderBtn}>
+                  <TrendingDown size={15} />
+                  <span>+ Dispatch Stock Out</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Outward Stock History Table */}
+          <div style={styles.tablePanel}>
+            {outwardLoading ? (
+              <div style={styles.loadingBox}>
+                <RefreshCw size={28} color="#d97706" style={{ animation: 'spin 1s linear infinite' }} />
+                <p style={{ color: '#475569', fontWeight: 600, marginTop: '0.8rem' }}>Loading Outward Stock History...</p>
+              </div>
+            ) : outwardError ? (
+              <div style={styles.errorBox}>
+                <AlertTriangle size={24} color="#dc2626" />
+                <span>{outwardError}</span>
+                <button onClick={() => fetchOutwardData()} style={styles.retryBtn}>Retry</button>
+              </div>
+            ) : filteredOutwardItems.length === 0 ? (
+              <div style={styles.emptyState}>
+                <span style={{ fontSize: '2.8rem' }}>📤</span>
+                <h4 style={{ margin: '0.5rem 0 0.2rem 0', color: '#1e293b', fontSize: '1.1rem' }}>No outward stock dispatches found</h4>
+                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try adjusting date filters or record a stock dispatch.</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', background: '#ffffff' }}>
+                  <thead>
+                    <tr style={{ background: '#7c2d12', color: '#ffffff' }}>
+                      <th style={styles.thStatic}>PHOTO</th>
+                      <th style={styles.thStatic}>SKU CODE</th>
+                      <th style={styles.thStatic}>PRODUCT NAME</th>
+                      <th style={styles.thStatic}>VENDOR / BRAND</th>
+                      <th style={{ ...styles.thStatic, textAlign: 'center' }}>SIZES & QUANTITIES</th>
+                      <th style={{ ...styles.thStatic, textAlign: 'center' }}>TOTAL QTY OUT</th>
+                      <th style={{ ...styles.thStatic, textAlign: 'right' }}>BUY PRICE (UNIT)</th>
+                      <th style={{ ...styles.thStatic, textAlign: 'right' }}>BUY VALUE (TOTAL)</th>
+                      <th style={{ ...styles.thStatic, textAlign: 'right' }}>SALE PRICE (UNIT)</th>
+                      <th style={{ ...styles.thStatic, textAlign: 'right' }}>SALE REVENUE</th>
+                      <th style={{ ...styles.thStatic, textAlign: 'right' }}>GROSS PROFIT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredOutwardItems.map((item, idx) => {
+                      const totalQty = item.total || item.qty || 0;
+                      const buyPrice = Number(item.purchasePrice || 0);
+                      const sellPrice = Number(item.salePrice || 0);
+                      const totalBuy = Number(item.totalPurchaseAmount || (buyPrice * totalQty));
+                      const totalSell = Number(item.totalSellableAmount || (sellPrice * totalQty));
+                      const profit = totalSell - totalBuy;
+
+                      return (
+                        <tr key={item.sku || item.id || idx} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#fdf8f6' }}>
+                          <td style={{ padding: '0.8rem 1rem' }}>
+                            <div style={styles.itemImgWrapper}>
+                              {item.imageUrl ? (
+                                <img 
+                                  src={item.imageUrl} 
+                                  alt={item.sku} 
+                                  style={styles.itemImg}
+                                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                                />
+                              ) : null}
+                              <div style={{ ...styles.imgPlaceholder, display: item.imageUrl ? 'none' : 'flex' }}>
+                                {item.itemName ? item.itemName[0].toUpperCase() : 'E'}
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem' }}>
+                            <span style={styles.skuText}>{item.sku || item.skuCode || 'N/A'}</span>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', fontWeight: 700, color: '#0f172a', fontSize: '0.88rem' }}>
+                            {item.itemName}
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+                            {item.party || 'N/A'}
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>
+                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                              {item.sizes?.map((s, sIdx) => (
+                                <span key={sIdx} style={styles.sizeTagBadgeOutward}>
+                                  {s.size}: <strong>{s.qty}</strong>
+                                </span>
+                              )) || (
+                                <span style={styles.sizeTagBadgeOutward}>Size: {item.size || 'N/A'}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>
+                            <span style={styles.qtyOutwardBadge}>
+                              -{totalQty} Units
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>
+                            ₹ {buyPrice.toFixed(2)}
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>
+                            ₹ {totalBuy.toFixed(2)}
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 700, color: '#0284c7' }}>
+                            ₹ {sellPrice.toFixed(2)}
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.9rem', fontWeight: 800, color: '#0284c7' }}>
+                            ₹ {totalSell.toFixed(2)}
+                          </td>
+                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.9rem', fontWeight: 800, color: profit >= 0 ? '#059669' : '#dc2626' }}>
+                            ₹ {profit.toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
     </div>
   );
 }
 
 const styles = {
-  gridPanel: {
-    padding: '1.5rem',
+  container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '1.2rem',
-    minHeight: '450px',
+    gap: '1.25rem',
+    width: '100%',
   },
-  controlHeader: {
+
+  // SUB-TAB TOP BAR STYLES
+  subTabBarContainer: {
     display: 'flex',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    gap: '1rem',
+    background: '#ffffff',
+    padding: '0.65rem 0.85rem',
+    borderRadius: '14px',
+    border: '1px solid #e2e8f0',
+    boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
+    flexWrap: 'wrap',
+  },
+  subTabBar: {
+    display: 'flex',
+    gap: '0.5rem',
+    alignItems: 'center',
+    background: '#f1f5f9',
+    padding: '4px',
+    borderRadius: '10px',
+    border: '1px solid #cbd5e1',
+  },
+  subTabButton: (active, type) => {
+    let activeBg = '#0f172a';
+    let activeColor = '#ffffff';
+    let activeShadow = '0 2px 8px rgba(15, 23, 42, 0.25)';
+
+    if (type === 'inward') {
+      activeBg = '#059669';
+      activeShadow = '0 2px 8px rgba(5, 150, 105, 0.25)';
+    } else if (type === 'outward') {
+      activeBg = '#d97706';
+      activeShadow = '0 2px 8px rgba(217, 119, 6, 0.25)';
+    }
+
+    return {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.55rem',
+      padding: '0.6rem 1.1rem',
+      borderRadius: '8px',
+      border: 'none',
+      background: active ? activeBg : 'transparent',
+      color: active ? activeColor : '#475569',
+      fontSize: '0.85rem',
+      fontWeight: active ? 800 : 600,
+      cursor: 'pointer',
+      boxShadow: active ? activeShadow : 'none',
+      transition: 'all 0.15s ease',
+    };
+  },
+  tabBadge: (active, color) => ({
+    fontSize: '0.72rem',
+    fontWeight: 800,
+    padding: '1px 7px',
+    borderRadius: '10px',
+    background: active ? 'rgba(255, 255, 255, 0.25)' : '#e2e8f0',
+    color: active ? '#ffffff' : color,
+    lineHeight: 1.4,
+  }),
+
+  bulkInwardHeaderBtn: {
+    padding: '0.55rem 1.1rem',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    background: 'linear-gradient(135deg, #059669, #047857)',
+    color: '#ffffff',
+    border: 'none',
+    boxShadow: '0 4px 10px rgba(5, 150, 105, 0.2)',
+  },
+  addSkuHeaderBtn: {
+    padding: '0.55rem 1.1rem',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    background: '#0284c7',
+    color: '#ffffff',
+    border: 'none',
+    boxShadow: '0 4px 10px rgba(2, 132, 199, 0.2)',
+  },
+  outwardHeaderBtn: {
+    padding: '0.55rem 1.1rem',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    background: 'linear-gradient(135deg, #d97706, #b45309)',
+    color: '#ffffff',
+    border: 'none',
+    boxShadow: '0 4px 10px rgba(217, 119, 6, 0.2)',
+  },
+
+  // STATS GRID STYLES
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+    gap: '1rem',
+  },
+  statCard: {
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '12px',
+    padding: '1.1rem 1.25rem',
+    display: 'flex',
     alignItems: 'center',
     gap: '1rem',
-    flexWrap: 'wrap',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+    transition: 'all 0.2s ease',
   },
-  leftControls: {
-    display: 'flex',
-    gap: '0.8rem',
-    flexWrap: 'wrap',
-    flex: 1,
-  },
-  searchBox: {
-    position: 'relative',
-    flex: 1,
-    minWidth: '240px',
-    maxWidth: '400px',
+  statIconWrap: (color, bg) => ({
+    width: '44px',
+    height: '44px',
+    borderRadius: '10px',
+    background: bg || `${color}15`,
+    border: `1px solid ${color}30`,
     display: 'flex',
     alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  }),
+  statLabel: {
+    fontSize: '0.7rem',
+    fontWeight: 800,
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
   },
-  searchIcon: {
-    position: 'absolute',
-    left: '0.75rem',
+  statSubText: {
+    fontSize: '0.8rem',
+    color: '#94a3b8',
+    fontWeight: 500,
+  },
+  statVal: {
+    fontSize: '1.35rem',
+    fontWeight: 900,
+    color: '#0f172a',
+    marginTop: '3px',
+  },
+
+  // TOOLBAR & CONTROL STYLES
+  controlHeader: {
+    padding: '1.25rem',
+    borderRadius: '12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+  },
+  rowOne: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '1rem',
+    flexWrap: 'wrap',
+    width: '100%',
+  },
+  rowTwo: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: '0.75rem',
+    width: '100%',
+    paddingTop: '0.65rem',
+    borderTop: '1px solid #f1f5f9',
+  },
+  searchBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.6rem',
+    background: '#f8fafc',
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    padding: '0.55rem 0.85rem',
+    minWidth: '260px',
+    flex: 1,
+    maxWidth: '380px',
   },
   searchInput: {
+    border: 'none',
+    background: 'none',
+    color: '#0f172a',
+    fontSize: '0.85rem',
+    outline: 'none',
     width: '100%',
-    paddingLeft: '2.2rem',
+  },
+  pillContainer: {
+    display: 'flex',
+    gap: '0.4rem',
+    background: '#f1f5f9',
+    padding: '4px',
+    borderRadius: '10px',
+    border: '1px solid #e2e8f0',
+  },
+  statusPill: (active, type) => {
+    let activeBg = '#4f46e5';
+    if (type === 'lowstock') activeBg = '#d97706';
+    if (type === 'outofstock') activeBg = '#dc2626';
+    if (type === 'instock') activeBg = '#059669';
+
+    return {
+      padding: '0.45rem 0.9rem',
+      borderRadius: '8px',
+      border: 'none',
+      background: active ? activeBg : 'transparent',
+      color: active ? '#ffffff' : '#475569',
+      fontSize: '0.78rem',
+      fontWeight: active ? 800 : 600,
+      cursor: 'pointer',
+      transition: 'all 0.15s ease',
+    };
   },
   filterBox: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem',
-    background: 'rgba(17, 24, 39, 0.6)',
-    border: '1px solid var(--border-light)',
-    padding: '0 0.5rem',
-    borderRadius: 'var(--radius-sm)',
+    gap: '0.4rem',
+    background: '#f8fafc',
+    border: '1px solid #cbd5e1',
+    padding: '0 0.6rem',
+    borderRadius: '8px',
   },
   selectInput: {
     border: 'none',
     background: 'none',
-    padding: '0.6rem 0.5rem',
-    fontSize: '0.85rem',
-    color: '#e5e7eb',
+    padding: '0.55rem 0.4rem',
+    fontSize: '0.82rem',
+    color: '#0f172a',
     outline: 'none',
     cursor: 'pointer',
   },
-  addBtn: {
-    padding: '0.6rem 1.2rem',
+
+  // DATE FILTER BAR STYLES
+  dateFilterContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    background: '#f8fafc',
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    padding: '0.4rem 0.75rem',
+    flexWrap: 'wrap',
   },
-  tableWrap: {
-    flex: 1,
+  dateInput: {
+    border: '1px solid #cbd5e1',
+    borderRadius: '6px',
+    padding: '0.35rem 0.5rem',
+    fontSize: '0.8rem',
+    color: '#0f172a',
+    outline: 'none',
+    background: '#ffffff',
   },
-  emptyTable: {
+  presetGroup: {
+    display: 'flex',
+    gap: '3px',
+    background: '#e2e8f0',
+    padding: '2px',
+    borderRadius: '6px',
+    marginLeft: '0.3rem',
+  },
+  presetBtn: {
+    padding: '0.3rem 0.6rem',
+    fontSize: '0.73rem',
+    fontWeight: 700,
+    border: 'none',
+    borderRadius: '4px',
+    background: '#ffffff',
+    color: '#334155',
+    cursor: 'pointer',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+  },
+
+  // BUTTON STYLES
+  refreshBtn: {
+    padding: '0.55rem 1rem',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    background: '#ffffff',
+    border: '1px solid #cbd5e1',
+    color: '#475569',
+  },
+  exportBtn: {
+    padding: '0.55rem 1.15rem',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    background: '#ffffff',
+    border: '1px solid #cbd5e1',
+    color: '#334155',
+  },
+  pdfBtn: {
+    padding: '0.55rem 1.15rem',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    background: '#eff6ff',
+    border: '1px solid #bfdbfe',
+    color: '#1d4ed8',
+  },
+  addInwardStockBtn: {
+    padding: '0.55rem 1.15rem',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    background: '#059669',
+    color: '#ffffff',
+    border: 'none',
+    boxShadow: '0 4px 12px rgba(5, 150, 105, 0.2)',
+  },
+  outwardBtn: {
+    padding: '0.55rem 1.15rem',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    color: '#dc2626',
+  },
+  bulkInwardBtn: {
+    padding: '0.55rem 1.15rem',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    background: 'linear-gradient(135deg, #4f46e5, #4338ca)',
+    color: '#ffffff',
+    border: 'none',
+    boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)',
+  },
+  addSkuBtn: {
+    padding: '0.55rem 1.15rem',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    background: '#10b981',
+    color: '#ffffff',
+    border: 'none',
+    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+  },
+  moreBtn: {
+    padding: '0.55rem 0.75rem',
+    borderRadius: '8px',
+    border: '1px solid #cbd5e1',
+    background: '#ffffff',
+    color: '#475569',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+  },
+
+  // TABLE CONTAINER STYLES
+  tablePanel: {
+    borderRadius: '12px',
+    overflow: 'hidden',
+    border: '1px solid #e2e8f0',
+    background: '#ffffff',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+  },
+  emptyState: {
+    padding: '4rem 1rem',
+    textAlign: 'center',
+  },
+  loadingBox: {
+    padding: '4rem 1rem',
+    textAlign: 'center',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '4rem 1rem',
+  },
+  errorBox: {
+    padding: '2rem',
     textAlign: 'center',
+    background: '#fef2f2',
+    color: '#dc2626',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.75rem',
+    fontWeight: 600,
+  },
+  retryBtn: {
+    padding: '0.4rem 0.9rem',
+    borderRadius: '6px',
+    background: '#dc2626',
+    color: '#ffffff',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '0.8rem',
+    fontWeight: 700,
   },
   thSort: {
+    padding: '0.85rem 1rem',
+    textAlign: 'left',
+    fontSize: '0.75rem',
+    fontWeight: 800,
+    letterSpacing: '0.04em',
     cursor: 'pointer',
     userSelect: 'none',
+  },
+  thStatic: {
+    padding: '0.85rem 1rem',
+    textAlign: 'left',
+    fontSize: '0.75rem',
+    fontWeight: 800,
+    letterSpacing: '0.04em',
   },
   itemCell: {
     display: 'flex',
@@ -512,12 +1734,12 @@ const styles = {
     gap: '0.75rem',
   },
   itemImgWrapper: {
-    width: '38px',
-    height: '38px',
-    borderRadius: '8px',
+    width: '42px',
+    height: '42px',
+    borderRadius: '10px',
     overflow: 'hidden',
-    background: 'rgba(255, 255, 255, 0.03)',
-    border: '1px solid var(--border-light)',
+    background: '#f8fafc',
+    border: '1px solid #cbd5e1',
     flexShrink: 0,
     position: 'relative',
   },
@@ -531,60 +1753,98 @@ const styles = {
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '0.9rem',
-    fontWeight: '600',
-    color: 'var(--primary)',
-    background: 'rgba(6, 182, 212, 0.1)',
+    fontSize: '1rem',
+    fontWeight: 800,
+    color: '#0284c7',
+    background: '#f0f9ff',
   },
   itemName: {
-    fontWeight: '500',
-    color: 'var(--text-primary)',
+    fontWeight: 700,
+    color: '#0f172a',
+    fontSize: '0.88rem',
   },
   itemMeta: {
     fontSize: '0.7rem',
-    color: 'var(--text-muted)',
+    color: '#64748b',
     marginTop: '2px',
   },
   skuText: {
     fontFamily: 'monospace',
-    fontSize: '0.8rem',
-    color: 'var(--primary)',
-    background: 'rgba(6, 182, 212, 0.05)',
-    padding: '0.15rem 0.4rem',
-    borderRadius: '4px',
-    border: '1px solid rgba(6, 182, 212, 0.1)',
+    fontSize: '0.82rem',
+    color: '#0284c7',
+    background: '#f0f9ff',
+    padding: '0.2rem 0.55rem',
+    borderRadius: '6px',
+    border: '1px solid #bae6fd',
+    fontWeight: 700,
   },
   sizeBadge: {
     fontSize: '0.8rem',
-    fontWeight: '600',
-    color: 'var(--text-primary)',
-    background: 'rgba(255, 255, 255, 0.06)',
-    padding: '0.15rem 0.45rem',
-    borderRadius: '4px',
-    border: '1px solid var(--border-light)',
+    fontWeight: 700,
+    color: '#334155',
+    background: '#f8fafc',
+    padding: '0.2rem 0.55rem',
+    borderRadius: '6px',
+    border: '1px solid #cbd5e1',
+  },
+  sizeTagBadge: {
+    fontSize: '0.75rem',
+    fontWeight: 500,
+    color: '#047857',
+    background: '#ecfdf5',
+    border: '1px solid #a7f3d0',
+    padding: '2px 8px',
+    borderRadius: '12px',
+  },
+  sizeTagBadgeOutward: {
+    fontSize: '0.75rem',
+    fontWeight: 500,
+    color: '#b45309',
+    background: '#fffbeb',
+    border: '1px solid #fde68a',
+    padding: '2px 8px',
+    borderRadius: '12px',
+  },
+  qtyInwardBadge: {
+    display: 'inline-block',
+    padding: '4px 12px',
+    borderRadius: '20px',
+    fontSize: '0.82rem',
+    fontWeight: 800,
+    backgroundColor: '#ecfdf5',
+    color: '#059669',
+    border: '1.5px solid #a7f3d0',
+  },
+  qtyOutwardBadge: {
+    display: 'inline-block',
+    padding: '4px 12px',
+    borderRadius: '20px',
+    fontSize: '0.82rem',
+    fontWeight: 800,
+    backgroundColor: '#fef2f2',
+    color: '#dc2626',
+    border: '1.5px solid #fecaca',
   },
   actionsCell: {
     display: 'flex',
     gap: '0.4rem',
     justifyContent: 'center',
   },
-  trashBtn: {
-    color: '#fca5a5',
-    borderColor: 'rgba(239, 68, 68, 0.1)',
-  },
+  tblActionBtn: (color, bg, border) => ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '36px',
+    height: '36px',
+    minWidth: '36px',
+    minHeight: '36px',
+    borderRadius: '8px',
+    border: `2px solid ${border}`,
+    background: bg,
+    color: color,
+    cursor: 'pointer',
+    boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+    transition: 'all 0.15s ease',
+    flexShrink: 0,
+  }),
 };
-
-// Inject CSS alignments
-const styleEl = document.createElement('style');
-styleEl.innerHTML = `
-  .text-right { text-align: right !important; }
-  .text-center { text-align: center !important; }
-  th.text-right { padding-right: 1.5rem; }
-  th.text-center { text-align: center !important; }
-  .trashBtn:hover {
-    background: var(--danger) !important;
-    border-color: var(--danger) !important;
-    color: white !important;
-  }
-`;
-document.head.appendChild(styleEl);

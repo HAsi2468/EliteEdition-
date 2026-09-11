@@ -240,31 +240,11 @@ const getAllJobCards = async (req, res) => {
       ]);
     } else if (!sortBy || sortBy === 'jobNo') {
       const order = sortOrder === 'desc' ? -1 : 1;
-      cards = await db.JobCard.aggregate([
-        { $match: filter },
-        {
-          $addFields: {
-            jobNoNum: {
-              $convert: {
-                input: {
-                  $let: {
-                    vars: {
-                      matchObj: { $regexFind: { input: "$jobNo", regex: "\\d+" } }
-                    },
-                    in: "$$matchObj.match"
-                  }
-                },
-                to: "int",
-                onError: 0,
-                onNull: 0
-              }
-            }
-          }
-        },
-        { $sort: { jobNoNum: order } },
-        { $skip: skip },
-        { $limit: Number(limit) }
-      ]);
+      cards = await db.JobCard.find(filter)
+        .sort({ created_date_time: order, _id: order })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean();
     } else {
       const order = sortOrder === 'desc' ? -1 : 1;
       const sort = { [sortBy]: order };
