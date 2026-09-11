@@ -455,23 +455,37 @@ const downloadLedgerPdf = async (req, res) => {
     }
     doc.moveDown(1);
 
-    // Table header
-    const colX = [40, 90, 155, 230, 310, 380, 430, 490];
+    // Table header configuration
+    const colX = [40, 90, 145, 215, 305, 395, 455, 500];
+    const colWidths = [45, 50, 65, 85, 85, 55, 40, 55];
     const headers = ['Date', 'Lot #', 'Type', 'Challan/Job', 'Fabric Quality', 'Vendor/Party', 'Panna', 'Qty'];
-    doc.fontSize(8).font('Helvetica-Bold');
-    headers.forEach((h, i) => doc.text(h, colX[i], doc.y, { width: colX[i + 1] ? colX[i + 1] - colX[i] - 2 : 70, continued: i < headers.length - 1 }));
-    doc.moveDown(0.5);
-    doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
-    doc.moveDown(0.4);
+
+    const renderTableHeader = () => {
+      const py = doc.y;
+      doc.fontSize(8).font('Helvetica-Bold').fillColor('black');
+      headers.forEach((h, i) => {
+        doc.text(h, colX[i], py, { width: colWidths[i], align: i === 7 ? 'right' : 'left' });
+      });
+      doc.moveDown(0.8);
+      doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+      doc.moveDown(0.4);
+    };
+
+    renderTableHeader();
 
     // Rows
     doc.font('Helvetica').fontSize(7.5);
     let totalIn = 0, totalOut = 0;
     for (const t of transactions) {
-      const y = doc.y;
-      if (y > 750) { doc.addPage(); }
+      if (doc.y > 740) {
+        doc.addPage();
+        renderTableHeader();
+        doc.font('Helvetica').fontSize(7.5);
+      }
+
       const isIn = t.type === 'INWARD';
       if (isIn) totalIn += t.qty; else totalOut += t.qty;
+
       const row = [
         new Date(t.date).toLocaleDateString('en-IN'),
         t.lotNo ? `#${t.lotNo}` : '-',
@@ -482,20 +496,26 @@ const downloadLedgerPdf = async (req, res) => {
         t.panna || '-',
         `${isIn ? '+' : '-'}${t.qty}`
       ];
+
+      const startY = doc.y;
+      let maxHeight = 0;
+
       row.forEach((cell, i) => {
-        doc.fillColor(isIn ? '#1a472a' : '#7f1d1d').text(String(cell), colX[i], doc.y, {
-          width: colX[i + 1] ? colX[i + 1] - colX[i] - 2 : 70,
-          continued: i < row.length - 1
-        });
+        doc.fillColor(isIn ? '#1a472a' : '#7f1d1d');
+        const opts = { width: colWidths[i], align: i === 7 ? 'right' : 'left' };
+        doc.text(String(cell), colX[i], startY, opts);
+        const cellH = doc.heightOfString(String(cell), opts);
+        if (cellH > maxHeight) maxHeight = cellH;
       });
-      doc.fillColor('black').moveDown(0.6);
+
+      doc.y = startY + maxHeight + 4;
     }
 
     // Summary
     doc.moveDown(1);
     doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
     doc.moveDown(0.5);
-    doc.font('Helvetica-Bold').fontSize(9);
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('black');
     doc.text(`Total Inward: +${totalIn} mtr`, 40);
     doc.text(`Total Outward: -${totalOut} mtr`);
     doc.text(`Net Stock: ${totalIn - totalOut} mtr`);

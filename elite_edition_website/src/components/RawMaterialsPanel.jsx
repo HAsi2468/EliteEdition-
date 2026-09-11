@@ -37,129 +37,128 @@ export default function RawMaterialsPanel() {
 
   const fileInputRef = useRef(null);
 
-  const handleExportCsv = () => {
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    const itemsMap = new Map();
-
-    // 1. Gather combinations from transactions
-    transactions.forEach(t => {
-      const mName = String(t.materialName || '').trim();
-      if (!mName) return;
-
-      const panna = String(t.panna || '').trim();
-      const paperQuality = String(t.paperQuality || '').trim();
-      const color = String(t.color || '').trim();
-      const canSize = t.canSize || '';
-      const metersPerRoll = t.metersPerRoll || '';
-
-      const key = `${mName}|||${panna}|||${paperQuality}|||${color}|||${canSize}|||${metersPerRoll}`;
-      if (!itemsMap.has(key)) {
-        itemsMap.set(key, { materialName: mName, panna, paperQuality, color, canSize, metersPerRoll, openingStock: 0, inwardQty: 0, outwardQty: 0, currentStock: 0 });
-      }
-
-      const item = itemsMap.get(key);
-      const qty = Number(t.qty || 0);
-      const tDate = new Date(t.date);
-      const isPrev = tDate < startOfMonth;
-      const isAdj = t.notes && t.notes.includes('Adjustment');
-
-      if (isPrev) {
-        if (t.type === 'INWARD') {
-          item.openingStock += qty;
-        } else {
-          item.openingStock -= qty;
-        }
-      } else {
-        if (t.type === 'INWARD') {
-          if (!isAdj) item.inwardQty += qty;
-        } else {
-          if (!isAdj) item.outwardQty += qty;
-        }
-      }
-    });
-
-    // 2. Add configured base materials from materialsList if not present
-    materialsList.forEach(m => {
-      const mName = String(m || '').trim();
-      if (!mName) return;
-      
-      const isSub = mName.toLowerCase().includes('sublimation');
-      const isButter = mName.toLowerCase().includes('butter');
-      const isInk = mName.toLowerCase().includes('ink');
-      
-      const pannas = (isSub || isButter) && printConfig?.widths?.length > 0 ? printConfig.widths : [''];
-      const paperQualities = isSub && printConfig?.paperTypes?.length > 0 ? printConfig.paperTypes : [''];
-      const colors = isInk && printConfig?.inkColors?.length > 0 ? printConfig.inkColors : [''];
-
-      pannas.forEach(p => {
-        paperQualities.forEach(pq => {
-          colors.forEach(col => {
-            const canSize = isInk ? (mName.toLowerCase().includes('grando') ? 5 : 10) : '';
-            const metersPerRoll = (isSub || isButter) ? 100 : '';
-            const key = `${mName}|||${p}|||${pq}|||${col}|||${canSize}|||${metersPerRoll}`;
-            if (!itemsMap.has(key)) {
-              itemsMap.set(key, { materialName: mName, panna: p, paperQuality: pq, color: col, canSize, metersPerRoll, openingStock: 0, inwardQty: 0, outwardQty: 0, currentStock: 0 });
-            }
-          });
-        });
-      });
-    });
-
-    // 3. Compute final currentStock and format as CSV
-    const rows = [];
-    itemsMap.forEach(item => {
-      let totalIn = 0;
-      let totalOut = 0;
-      transactions.forEach(t => {
-        if (String(t.materialName || '').trim().toLowerCase() === item.materialName.toLowerCase() &&
-            String(t.panna || '').trim() === item.panna &&
-            String(t.paperQuality || '').trim() === item.paperQuality &&
-            String(t.color || '').trim() === item.color &&
-            (t.canSize || '') == item.canSize &&
-            (t.metersPerRoll || '') == item.metersPerRoll) {
-          if (t.type === 'INWARD') totalIn += Number(t.qty || 0);
-          else totalOut += Number(t.qty || 0);
-        }
-      });
-      item.currentStock = totalIn - totalOut;
-      rows.push(item);
-    });
-
-    // Generate CSV string
-    const headers = ['Material Name', 'Panna', 'Paper Quality', 'Color', 'Can Size', 'Meters Per Roll', 'Opening Stock', 'Inward Qty', 'Outward Qty', 'Current Stock', 'Date', 'Challan No', 'Vendor Name', 'Job No', 'Party Name', 'Notes'];
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(r => [
-        `"${r.materialName}"`,
-        `"${r.panna}"`,
-        `"${r.paperQuality}"`,
-        `"${r.color}"`,
-        r.canSize,
-        r.metersPerRoll,
-        r.openingStock.toFixed(2),
-        r.inwardQty.toFixed(2),
-        r.outwardQty.toFixed(2),
-        r.currentStock.toFixed(2),
-        '""', // Date
-        '""', // Challan No
-        '""', // Vendor Name
-        '""', // Job No
-        '""', // Party Name
-        '""'  // Notes
-      ].join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const downloadCsvFile = (csvContent, fileName) => {
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `raw-materials-stock-${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', fileName);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const formatMaterialDetailsString = (t) => {
+    if (!t.materialName) return '-';
+    const nameLower = t.materialName.toLowerCase();
+    const details = [];
+    if (nameLower.includes('sublimation')) {
+      if (t.panna) details.push(`Panna: ${t.panna}`);
+      if (t.paperQuality) details.push(`Qual: ${t.paperQuality}`);
+      if (t.metersPerRoll) details.push(`${t.metersPerRoll}m`);
+    } else if (nameLower.includes('butter')) {
+      if (t.panna) details.push(`Panna: ${t.panna}`);
+      if (t.metersPerRoll) details.push(`${t.metersPerRoll}m`);
+    } else if (nameLower.includes('ink')) {
+      if (t.color) details.push(t.color);
+      if (t.canSize) details.push(`${t.canSize} Ltr`);
+    }
+    return details.length > 0 ? `${t.materialName} (${details.join(', ')})` : t.materialName;
+  };
+
+  const handleExportCsv = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    if (activeTab === 'inward') {
+      if (inwardTx.length === 0) {
+        alert('No inward transactions to export.');
+        return;
+      }
+      const headers = ['Date', 'Challan No', 'Material Name', 'Vendor Name', 'Qty', 'Unit', 'Notes'];
+      const csvLines = [
+        headers.join(','),
+        ...inwardTx.map(t => [
+          `"${formatDateDDMMYYYY(t.date)}"`,
+          `"${t.challanNo || ''}"`,
+          `"${formatMaterialDetailsString(t)}"`,
+          `"${t.vendorName || ''}"`,
+          t.qty,
+          `"${t.unit || 'Rolls'}"`,
+          `"${(t.notes || '').replace(/"/g, '""')}"`
+        ].join(','))
+      ].join('\n');
+
+      downloadCsvFile(csvLines, `Raw_Materials_Inward_Register_${todayStr}.csv`);
+      return;
+    }
+
+    if (activeTab === 'outward') {
+      if (outwardTx.length === 0) {
+        alert('No outward transactions to export.');
+        return;
+      }
+      const headers = ['Date', 'Job Card No', 'Material Name', 'Party Name', 'Qty', 'Unit', 'Notes'];
+      const csvLines = [
+        headers.join(','),
+        ...outwardTx.map(t => [
+          `"${formatDateDDMMYYYY(t.date)}"`,
+          `"${t.jobNo || ''}"`,
+          `"${formatMaterialDetailsString(t)}"`,
+          `"${t.partyName || ''}"`,
+          t.qty,
+          `"${t.unit || 'Rolls'}"`,
+          `"${(t.notes || '').replace(/"/g, '""')}"`
+        ].join(','))
+      ].join('\n');
+
+      downloadCsvFile(csvLines, `Raw_Materials_Outward_Register_${todayStr}.csv`);
+      return;
+    }
+
+    // Default / Dashboard tab: Export Stock Overview
+    if (filteredStock.length === 0) {
+      alert('No stock data to export.');
+      return;
+    }
+    const headers = ['Material Name', 'Total Inward', 'Total Outward', 'Current Stock', 'Unit'];
+    const csvLines = [
+      headers.join(','),
+      ...filteredStock.map(s => [
+        `"${s.materialName}"`,
+        s.totalInward,
+        s.totalOutward,
+        s.currentStock,
+        `"${s.unit || ''}"`
+      ].join(','))
+    ].join('\n');
+
+    downloadCsvFile(csvLines, `Raw_Materials_Stock_Overview_${todayStr}.csv`);
+  };
+
+  const handleOpenPdfModal = () => {
+    let ds = '';
+    let de = '';
+    let mat = '';
+
+    if (activeTab === 'inward') {
+      ds = inwardDateStart;
+      de = inwardDateEnd;
+      if (inwardMaterialType !== 'All') mat = inwardMaterialType;
+    } else if (activeTab === 'outward') {
+      ds = outwardDateStart;
+      de = outwardDateEnd;
+      if (outwardMaterialType !== 'All') mat = outwardMaterialType;
+    } else if (activeTab === 'dashboard') {
+      if (stockMaterialType !== 'All') mat = stockMaterialType;
+    }
+
+    setPdfFilter({
+      dateStart: ds || '',
+      dateEnd: de || '',
+      materialName: mat || ''
+    });
+    setIsPdfFilterOpen(true);
   };
 
   const handleImportCsv = (e) => {
@@ -176,12 +175,7 @@ export default function RawMaterialsPanel() {
           return;
         }
 
-        const rows = [];
-
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-
+        const parseLine = (line) => {
           const cols = [];
           let insideQuote = false;
           let currentWord = '';
@@ -190,50 +184,63 @@ export default function RawMaterialsPanel() {
             if (char === '"') {
               insideQuote = !insideQuote;
             } else if (char === ',' && !insideQuote) {
-              cols.push(currentWord.trim());
+              cols.push(currentWord.trim().replace(/^"|"$/g, ''));
               currentWord = '';
             } else {
               currentWord += char;
             }
           }
-          cols.push(currentWord.trim());
+          cols.push(currentWord.trim().replace(/^"|"$/g, ''));
+          return cols;
+        };
 
-          const materialName = cols[0];
-          const panna = cols[1];
-          const paperQuality = cols[2];
-          const color = cols[3];
-          const canSize = cols[4];
-          const metersPerRoll = cols[5];
-          const openingStock = cols[6];
-          const inwardQty = cols[7];
-          const outwardQty = cols[8];
-          const currentStock = cols[9];
-          const date = cols[10];
-          const challanNo = cols[11];
-          const vendorName = cols[12];
-          const jobNo = cols[13];
-          const partyName = cols[14];
-          const notes = cols[15];
+        const headers = parseLine(lines[0]).map(h => h.toLowerCase());
+        const getIdx = (name) => headers.findIndex(h => h.includes(name));
 
+        const matIdx = getIdx('material');
+        const pannaIdx = getIdx('panna');
+        const qualIdx = getIdx('paper quality') !== -1 ? getIdx('paper quality') : getIdx('quality');
+        const colorIdx = getIdx('color');
+        const canIdx = getIdx('can size') !== -1 ? getIdx('can size') : getIdx('can');
+        const metersIdx = getIdx('meters') !== -1 ? getIdx('meters') : getIdx('mtr');
+        const openIdx = getIdx('opening');
+        const inIdx = getIdx('inward');
+        const outIdx = getIdx('outward');
+        const currIdx = getIdx('current');
+        const dateIdx = getIdx('date');
+        const challanIdx = getIdx('challan');
+        const vendorIdx = getIdx('vendor');
+        const jobIdx = getIdx('job');
+        const partyIdx = getIdx('party');
+        const notesIdx = getIdx('notes');
+
+        const rows = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          const cols = parseLine(line);
+          const materialName = matIdx !== -1 ? cols[matIdx] : cols[0];
           if (!materialName) continue;
 
           rows.push({
             materialName,
-            panna,
-            paperQuality,
-            color,
-            canSize: canSize !== undefined && canSize !== '' ? parseFloat(canSize) : null,
-            metersPerRoll: metersPerRoll !== undefined && metersPerRoll !== '' ? parseFloat(metersPerRoll) : null,
-            openingStock: openingStock !== undefined && openingStock !== '' ? parseFloat(openingStock) : 0,
-            inwardQty: inwardQty !== undefined && inwardQty !== '' ? parseFloat(inwardQty) : 0,
-            outwardQty: outwardQty !== undefined && outwardQty !== '' ? parseFloat(outwardQty) : 0,
-            currentStock: currentStock !== undefined && currentStock !== '' ? parseFloat(currentStock) : 0,
-            date: date || '',
-            challanNo: challanNo || '',
-            vendorName: vendorName || '',
-            jobNo: jobNo || '',
-            partyName: partyName || '',
-            notes: notes || ''
+            panna: pannaIdx !== -1 ? cols[pannaIdx] : cols[1] || '',
+            paperQuality: qualIdx !== -1 ? cols[qualIdx] : cols[2] || '',
+            color: colorIdx !== -1 ? cols[colorIdx] : cols[3] || '',
+            canSize: canIdx !== -1 && cols[canIdx] ? parseFloat(cols[canIdx]) : (cols[4] ? parseFloat(cols[4]) : null),
+            metersPerRoll: metersIdx !== -1 && cols[metersIdx] ? parseFloat(cols[metersIdx]) : (cols[5] ? parseFloat(cols[5]) : null),
+            openingStock: openIdx !== -1 && cols[openIdx] ? parseFloat(cols[openIdx]) : (cols[6] ? parseFloat(cols[6]) : 0),
+            inwardQty: inIdx !== -1 && cols[inIdx] ? parseFloat(cols[inIdx]) : (cols[7] ? parseFloat(cols[7]) : 0),
+            outwardQty: outIdx !== -1 && cols[outIdx] ? parseFloat(cols[outIdx]) : (cols[8] ? parseFloat(cols[8]) : 0),
+            currentStock: currIdx !== -1 && cols[currIdx] ? parseFloat(cols[currIdx]) : (cols[9] ? parseFloat(cols[9]) : 0),
+            date: dateIdx !== -1 ? cols[dateIdx] : cols[10] || '',
+            challanNo: challanIdx !== -1 ? cols[challanIdx] : cols[11] || '',
+            vendorName: vendorIdx !== -1 ? cols[vendorIdx] : cols[12] || '',
+            jobNo: jobIdx !== -1 ? cols[jobIdx] : cols[13] || '',
+            partyName: partyIdx !== -1 ? cols[partyIdx] : cols[14] || '',
+            notes: notesIdx !== -1 ? cols[notesIdx] : cols[15] || ''
           });
         }
 
@@ -979,7 +986,7 @@ export default function RawMaterialsPanel() {
           accept=".csv"
           style={{ display: 'none' }}
         />
-        <button onClick={() => setIsPdfFilterOpen(true)} className="btn-secondary" title="Download Ledger PDF" style={{ gap: '0.4rem' }}>
+        <button onClick={handleOpenPdfModal} className="btn-secondary" title="Download Ledger PDF" style={{ gap: '0.4rem' }}>
           <FileDown size={16} /> PDF Report
         </button>
       </div>
