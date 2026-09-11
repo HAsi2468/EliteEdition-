@@ -507,12 +507,14 @@ export default function App() {
       if (activeTab === 'catalog') {
         const payload = {
           skuCode: formData.skuCode,
-          description: formData.itemName,
-          brand: formData.party,
+          description: formData.itemName || formData.description,
+          brand: formData.party || formData.brand,
           size: formData.size,
-          basePrice: formData.purchasePrice,
-          price: formData.salePrice,
-          imageUrl: formData.imageUrl
+          basePrice: formData.purchasePrice ?? formData.basePrice,
+          price: formData.salePrice ?? formData.price,
+          imageUrl: formData.imageUrl,
+          categoryName: formData.categoryName || '',
+          hsnCode: formData.hsnCode || '',
         };
         const newProduct = await api.createProductCatalog(payload);
         setCatalogItems(prev => [newProduct, ...prev]);
@@ -537,12 +539,14 @@ export default function App() {
       if (activeTab === 'catalog') {
         const payload = {
           skuCode: formData.skuCode,
-          description: formData.itemName,
-          brand: formData.party,
+          description: formData.itemName || formData.description,
+          brand: formData.party || formData.brand,
           size: formData.size,
-          basePrice: formData.purchasePrice,
-          price: formData.salePrice,
-          imageUrl: formData.imageUrl
+          basePrice: formData.purchasePrice ?? formData.basePrice,
+          price: formData.salePrice ?? formData.price,
+          imageUrl: formData.imageUrl,
+          categoryName: formData.categoryName || '',
+          hsnCode: formData.hsnCode || '',
         };
         await api.updateProductCatalog(editingItem._id, payload);
       } else if (activeTab === 'inventory') {

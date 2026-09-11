@@ -1,39 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, PackagePlus, Building2, Tag, FileText, DollarSign, Image as ImageIcon, CheckCircle, Barcode } from 'lucide-react';
+import { X, Sparkles, Layers, Tag, Building2, Barcode, DollarSign, Image as ImageIcon, CheckCircle, FileCode } from 'lucide-react';
 import { api } from '../services/api';
 import { extractSizeFromSku } from '../utils/skuHelper';
 
 export default function InventoryForm({ item, onSubmit, onClose }) {
   const [formData, setFormData] = useState({
-    party: '',
+    skuCode: '',
     itemName: '',
+    party: 'ANOUK',
+    categoryName: 'KURTA SET',
     size: '',
-    currentlyAvailableStock: 1,
-    qty: 1,
     purchasePrice: 0.0,
     salePrice: 0.0,
-    skuCode: '',
-    challanNo: '',
+    hsnCode: '',
     imageUrl: '',
+    currentlyAvailableStock: 0,
+    challanNo: '',
   });
 
   const [error, setError] = useState('');
   const [vendorsList, setVendorsList] = useState([]);
   const [catalogItems, setCatalogItems] = useState([]);
-  const [storeInventory, setStoreInventory] = useState([]);
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     const loadFormData = async () => {
       try {
-        const [vData, cData, invData] = await Promise.all([
+        const [vData, cData] = await Promise.all([
           api.getVendors().catch(() => []),
           api.getProductsCatalog().catch(() => []),
-          api.getInventory().catch(() => []),
         ]);
         setVendorsList(vData || []);
         setCatalogItems(cData || []);
-        setStoreInventory(invData || []);
       } catch (err) {
         console.warn('Failed to load form reference data:', err);
       }
@@ -43,36 +41,27 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
 
   useEffect(() => {
     if (item) {
-      const stockVal = item.currentlyAvailableStock ?? item.qty ?? 1;
+      const formattedSize = Array.isArray(item.size) 
+        ? item.size.join(', ') 
+        : (item.size || '');
+
       setFormData({
-        party: item.party || '',
-        itemName: item.itemName || '',
-        size: item.size || '',
-        currentlyAvailableStock: stockVal,
-        qty: stockVal,
-        purchasePrice: item.purchasePrice ?? 0.0,
-        salePrice: item.salePrice ?? 0.0,
         skuCode: item.skuCode || '',
-        challanNo: item.challanNo || '',
+        itemName: item.description || item.itemName || '',
+        party: item.brand || item.party || 'ANOUK',
+        categoryName: item.categoryName || 'KURTA SET',
+        size: formattedSize,
+        purchasePrice: item.basePrice ?? item.purchasePrice ?? 0.0,
+        salePrice: item.price ?? item.salePrice ?? 0.0,
+        hsnCode: item.hsnCode || '',
         imageUrl: item.imageUrl || '',
+        currentlyAvailableStock: item.currentlyAvailableStock ?? item.qty ?? 0,
+        challanNo: item.challanNo || '',
       });
     }
   }, [item]);
 
-  // Helper to extract effective size from catalog item or SKU string
-  const resolveEffectiveSize = (matchedCatObj, skuStr) => {
-    if (matchedCatObj && matchedCatObj.size) {
-      if (typeof matchedCatObj.size === 'string' && matchedCatObj.size.trim() && matchedCatObj.size.trim().toUpperCase() !== 'N/A') {
-        return matchedCatObj.size.trim().toUpperCase();
-      }
-      if (Array.isArray(matchedCatObj.size) && matchedCatObj.size.length > 0) {
-        const validFirst = matchedCatObj.size.find(s => typeof s === 'string' && s.trim() && s.trim().toUpperCase() !== 'N/A');
-        if (validFirst) return validFirst.trim().toUpperCase();
-      }
-    }
-    return extractSizeFromSku(skuStr) || '';
-  };
-
+  // Handle Input Changes
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -81,38 +70,28 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
       setImageError(false);
       
       const matchedCatalog = catalogItems.find(c => c.skuCode && c.skuCode.trim().toLowerCase() === sku.trim().toLowerCase());
-      const matchedInventory = storeInventory.find(inv => inv.skuCode && inv.skuCode.trim().toLowerCase() === sku.trim().toLowerCase());
-      
-      const currentStock = matchedInventory ? (matchedInventory.currentlyAvailableStock || 0) : 0;
-      const derivedSize = resolveEffectiveSize(matchedCatalog, sku);
+      const extractedSize = extractSizeFromSku(sku);
 
       if (matchedCatalog) {
         setFormData(prev => ({
           ...prev,
           skuCode: sku,
           itemName: matchedCatalog.description || prev.itemName,
-          size: derivedSize || prev.size,
+          party: matchedCatalog.brand || prev.party,
+          categoryName: matchedCatalog.categoryName || prev.categoryName,
+          size: Array.isArray(matchedCatalog.size) ? matchedCatalog.size.join(', ') : (matchedCatalog.size || extractedSize || prev.size),
           purchasePrice: matchedCatalog.basePrice ?? prev.purchasePrice,
           salePrice: matchedCatalog.price ?? prev.salePrice,
+          hsnCode: matchedCatalog.hsnCode || prev.hsnCode,
           imageUrl: matchedCatalog.imageUrl || prev.imageUrl,
-          party: matchedCatalog.brand ? (vendorsList.find(v => (v.name && v.name.toLowerCase() === matchedCatalog.brand.toLowerCase()) || (v.businessName && v.businessName.toLowerCase() === matchedCatalog.brand.toLowerCase()))?.businessName || matchedCatalog.brand) : prev.party,
-          currentlyAvailableStock: prev.currentlyAvailableStock || 1,
-          qty: prev.currentlyAvailableStock || 1,
         }));
       } else {
         setFormData(prev => ({
           ...prev,
           skuCode: sku,
-          size: derivedSize || prev.size,
+          size: prev.size || extractedSize || '',
         }));
       }
-    } else if (name === 'currentlyAvailableStock' || name === 'qty') {
-      const numVal = value === '' ? '' : Math.max(0, parseInt(value, 10) || 0);
-      setFormData(prev => ({
-        ...prev,
-        currentlyAvailableStock: numVal,
-        qty: numVal
-      }));
     } else if (name === 'party') {
       const selectedVal = value;
       const matchedVendor = vendorsList.find(v => 
@@ -128,7 +107,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
       setImageError(false);
       setFormData(prev => ({ ...prev, imageUrl: value }));
     } else {
-      const numericFields = ['purchasePrice', 'salePrice'];
+      const numericFields = ['purchasePrice', 'salePrice', 'currentlyAvailableStock'];
       setFormData(prev => ({
         ...prev,
         [name]: numericFields.includes(name) ? (value === '' ? '' : parseFloat(value) || 0) : value,
@@ -140,31 +119,31 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
     e.preventDefault();
     setError('');
 
+    if (!formData.skuCode.trim()) {
+      setError('SKU Code is required.');
+      return;
+    }
     if (!formData.itemName.trim()) {
-      setError('Item / Product Name is required.');
+      setError('Product Name / Description is required.');
       return;
     }
     if (!formData.party.trim()) {
-      setError('Vendor / Business Name is required.');
+      setError('Brand / Vendor is required.');
       return;
     }
     if (!formData.size.trim()) {
       setError('Product Size is required.');
       return;
     }
-    if (Number(formData.currentlyAvailableStock) <= 0) {
-      setError('Inward Quantity must be at least 1.');
-      return;
-    }
-
-    const stockVal = Number(formData.currentlyAvailableStock) || 1;
 
     const payload = {
       ...formData,
-      currentlyAvailableStock: stockVal,
-      qty: stockVal,
-      purchasePrice: Number(formData.purchasePrice) || 0.0,
-      salePrice: Number(formData.salePrice) || 0.0,
+      description: formData.itemName,
+      brand: formData.party,
+      basePrice: Number(formData.purchasePrice) || 0.0,
+      price: Number(formData.salePrice) || 0.0,
+      currentlyAvailableStock: Number(formData.currentlyAvailableStock) || 0,
+      qty: Number(formData.currentlyAvailableStock) || 0,
     };
 
     onSubmit(payload);
@@ -178,13 +157,13 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
           <div style={styles.headerTitleGroup}>
             <div style={styles.badge}>
               <Sparkles size={14} style={{ marginRight: '6px' }} />
-              SINGLE INWARD ENTRY
+              PRODUCT MASTER MANAGEMENT
             </div>
             <h2 style={styles.title}>
-              {item ? 'Edit Inward Inventory Item' : 'Single Item Inward Form'}
+              {item ? 'Edit Product Details' : 'Add New Product to Catalog'}
             </h2>
             <p style={styles.subtitle}>
-              Register stock inward entry with instant Uniware catalog auto-fill & vendor business name mapping.
+              Manage product SKU, brand, category, description, sizes, pricing, and image URL.
             </p>
           </div>
           <button onClick={onClose} style={styles.closeBtn} title="Close Form">
@@ -201,7 +180,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
 
         <form onSubmit={handleSubmit} style={styles.formContent}>
           <div style={styles.mainGrid}>
-            {/* Left Card: Thumbnail & Live Inward Summary */}
+            {/* Left Card: Image Preview & Live Product Card */}
             <div style={styles.summaryCard}>
               <div style={styles.imagePreviewContainer}>
                 {formData.imageUrl && !imageError ? (
@@ -227,11 +206,19 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                   <span style={styles.summaryValueSKU}>{formData.skuCode || 'NOT SET'}</span>
                 </div>
                 <div style={styles.summaryRow}>
-                  <span style={styles.summaryLabel}>INWARD QTY</span>
-                  <span style={styles.summaryValueQty}>{formData.currentlyAvailableStock || 0} Pcs</span>
+                  <span style={styles.summaryLabel}>BRAND</span>
+                  <span style={styles.summaryValueBrand}>{formData.party || 'ANOUK'}</span>
                 </div>
                 <div style={styles.summaryRow}>
-                  <span style={styles.summaryLabel}>PURCHASE PRICE</span>
+                  <span style={styles.summaryLabel}>CATEGORY</span>
+                  <span style={styles.summaryValueCat}>{formData.categoryName || 'KURTA SET'}</span>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>SIZE(S)</span>
+                  <span style={styles.summaryValueSize}>{formData.size || 'N/A'}</span>
+                </div>
+                <div style={styles.summaryRow}>
+                  <span style={styles.summaryLabel}>BASE PRICE</span>
                   <span style={styles.summaryValueCost}>Rs. {(Number(formData.purchasePrice) || 0).toFixed(2)}</span>
                 </div>
                 <div style={styles.summaryRow}>
@@ -241,126 +228,136 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
               </div>
             </div>
 
-            {/* Right Card: Form Controls */}
+            {/* Right Card: Product Form Fields */}
             <div style={styles.formFieldsGrid}>
-              {/* Row 1: SKU & Item Name */}
+              {/* Row 1: SKU & Product Name */}
               <div style={styles.formRow2Col}>
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
                     <Barcode size={14} color="#059669" />
-                    SKU Code (Auto-Fill)
+                    SKU Code *
                   </label>
                   <input
                     type="text"
                     name="skuCode"
                     value={formData.skuCode}
                     onChange={handleChange}
-                    list="form-skucodes-single"
-                    placeholder="Type or select SKU (e.g. 301_L)..."
+                    placeholder="e.g., 301_L, 273_2XL"
                     style={styles.input}
+                    required
                     autoComplete="off"
                   />
-                  <datalist id="form-skucodes-single">
-                    {catalogItems.map((c, i) => (
-                      <option key={i} value={c.skuCode}>
-                        {c.description ? `${c.description} (${c.brand || 'Uniware'})` : c.skuCode}
-                      </option>
-                    ))}
-                  </datalist>
                 </div>
 
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
                     <Tag size={14} color="#059669" />
-                    Item Name / Product Title *
+                    Product Title / Description *
                   </label>
                   <input
                     type="text"
                     name="itemName"
                     value={formData.itemName}
                     onChange={handleChange}
-                    placeholder="e.g., Kurta Set / Co-Ord Set"
+                    placeholder="e.g., Women Printed Kurta Set with Dupatta"
                     style={styles.input}
                     required
                   />
                 </div>
               </div>
 
-              {/* Row 2: Vendor & Challan No */}
+              {/* Row 2: Brand & Category */}
               <div style={styles.formRow2Col}>
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
                     <Building2 size={14} color="#059669" />
-                    Vendor / Company Name *
+                    Brand / Manufacturer *
                   </label>
                   <input
                     type="text"
                     name="party"
                     value={formData.party}
                     onChange={handleChange}
-                    list="form-vendors-single"
-                    placeholder="Select or type vendor company name..."
+                    list="form-brand-suggestions"
+                    placeholder="e.g., ANOUK, ELITE EDITION"
                     style={styles.input}
                     required
                   />
-                  <datalist id="form-vendors-single">
+                  <datalist id="form-brand-suggestions">
+                    <option value="ANOUK" />
+                    <option value="ELITE EDITION" />
                     {vendorsList.map((v, i) => (
-                      <option key={i} value={v.businessName || v.name}>
-                        {v.businessName ? `${v.businessName} (Contact: ${v.name})` : v.name}
-                      </option>
+                      <option key={i} value={v.businessName || v.name} />
                     ))}
                   </datalist>
                 </div>
 
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
-                    <FileText size={14} color="#059669" />
-                    Challan No. / Inward Bill No.
+                    <Layers size={14} color="#059669" />
+                    Category Name
                   </label>
                   <input
                     type="text"
-                    name="challanNo"
-                    value={formData.challanNo}
+                    name="categoryName"
+                    value={formData.categoryName}
                     onChange={handleChange}
-                    placeholder="e.g., CH-2026-001"
+                    list="form-category-suggestions"
+                    placeholder="e.g., KURTA SET, CO-ORD SET"
                     style={styles.input}
                   />
+                  <datalist id="form-category-suggestions">
+                    <option value="KURTA SET" />
+                    <option value="CO-ORD SET" />
+                    <option value="DRESS" />
+                    <option value="SUIT" />
+                    <option value="SAREE" />
+                    <option value="LEHENGA" />
+                    <option value="TOP" />
+                  </datalist>
                 </div>
               </div>
 
-              {/* Row 3: Size, Inward Qty, Purchase Price, Sale Price */}
-              <div style={styles.formRow4Col}>
+              {/* Row 3: Size(s) & HSN Code */}
+              <div style={styles.formRow2Col}>
                 <div style={styles.fieldCol}>
-                  <label style={styles.label}>Size *</label>
+                  <label style={styles.label}>
+                    Product Size(s) *
+                  </label>
                   <input
                     type="text"
                     name="size"
                     value={formData.size}
                     onChange={handleChange}
-                    placeholder="e.g., M, L, XL"
+                    placeholder="e.g., L or S, M, L, XL, 2XL"
                     style={styles.input}
                     required
                   />
                 </div>
 
                 <div style={styles.fieldCol}>
-                  <label style={{ ...styles.label, color: '#047857', fontWeight: '700' }}>
-                    Inward Qty *
+                  <label style={styles.label}>
+                    <FileCode size={14} color="#059669" />
+                    HSN Code
                   </label>
                   <input
-                    type="number"
-                    name="currentlyAvailableStock"
-                    value={formData.currentlyAvailableStock}
+                    type="text"
+                    name="hsnCode"
+                    value={formData.hsnCode}
                     onChange={handleChange}
-                    min="1"
-                    placeholder="1"
-                    style={styles.highlightInput}
-                    required
+                    placeholder="e.g., 6204"
+                    style={styles.input}
                   />
                 </div>
+              </div>
 
+              {/* Row 4: Base Price & Sale Price */}
+              <div style={styles.formRow2Col}>
                 <div style={styles.fieldCol}>
-                  <label style={styles.label}>Purchase Price (Rs.)</label>
+                  <label style={styles.label}>
+                    <DollarSign size={14} color="#059669" />
+                    Base Price / Cost (Rs.)
+                  </label>
                   <input
                     type="number"
                     name="purchasePrice"
@@ -374,7 +371,10 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                 </div>
 
                 <div style={styles.fieldCol}>
-                  <label style={styles.label}>Sale Price (Rs.)</label>
+                  <label style={styles.label}>
+                    <DollarSign size={14} color="#059669" />
+                    Sale Price / MOP (Rs.)
+                  </label>
                   <input
                     type="number"
                     name="salePrice"
@@ -388,7 +388,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                 </div>
               </div>
 
-              {/* Row 4: Image URL */}
+              {/* Row 5: Product Image URL */}
               <div style={styles.fieldColFull}>
                 <label style={styles.label}>
                   <ImageIcon size={14} color="#059669" />
@@ -412,8 +412,8 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
               Cancel
             </button>
             <button type="submit" style={styles.submitBtn}>
-              <PackagePlus size={18} />
-              {item ? 'Save Changes' : 'Submit Single Inward Entry'}
+              <CheckCircle size={18} />
+              {item ? 'Save Product Details' : 'Add Product to Catalog'}
             </button>
           </div>
         </form>
@@ -581,12 +581,24 @@ const styles = {
     borderRadius: '4px',
     fontFamily: 'monospace',
   },
-  summaryValueQty: {
-    fontWeight: '800',
+  summaryValueBrand: {
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  summaryValueCat: {
+    fontWeight: '600',
     color: '#059669',
     backgroundColor: '#d1fae5',
-    padding: '0.1rem 0.5rem',
-    borderRadius: '12px',
+    padding: '0.1rem 0.4rem',
+    borderRadius: '4px',
+    fontSize: '0.68rem',
+  },
+  summaryValueSize: {
+    fontWeight: '700',
+    color: '#475569',
+    backgroundColor: '#f1f5f9',
+    padding: '0.1rem 0.4rem',
+    borderRadius: '4px',
   },
   summaryValueCost: {
     fontWeight: '600',
@@ -605,11 +617,6 @@ const styles = {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: '1rem',
-  },
-  formRow4Col: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1.2fr 1fr 1fr',
-    gap: '0.75rem',
   },
   fieldCol: {
     display: 'flex',
@@ -640,18 +647,6 @@ const styles = {
     outline: 'none',
     boxSizing: 'border-box',
     transition: 'border-color 0.15s ease',
-  },
-  highlightInput: {
-    width: '100%',
-    padding: '0.55rem 0.75rem',
-    borderRadius: '8px',
-    border: '2px solid #059669',
-    backgroundColor: '#f0fdf4',
-    color: '#047857',
-    fontSize: '0.9rem',
-    fontWeight: '800',
-    outline: 'none',
-    boxSizing: 'border-box',
   },
   footer: {
     display: 'flex',
