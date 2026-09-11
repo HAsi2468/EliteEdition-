@@ -389,7 +389,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
     <div style={styles.container}>
       
       {/* ========================================================================= */}
-      {/* MAIN TOP NAVIGATION SUB-TAB BAR (3 SCREENS)                               */}
+      {/* MAIN TOP NAVIGATION SUB-TAB BAR (3 Dedicated Screens)                      */}
       {/* ========================================================================= */}
       <div style={styles.subTabBarContainer}>
         <div style={styles.subTabBar}>
@@ -398,9 +398,9 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
             onClick={() => setActiveSubTab('overview')}
             style={styles.subTabButton(activeSubTab === 'overview', 'overview')}
           >
-            <Package size={18} />
+            <Package size={17} />
             <span>Stock Overview</span>
-            <span style={styles.tabBadge(activeSubTab === 'overview', '#0284c7')}>
+            <span style={styles.tabBadge(activeSubTab === 'overview', '#3b82f6')}>
               {totalSkus}
             </span>
           </button>
@@ -410,10 +410,10 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
             onClick={() => setActiveSubTab('inward')}
             style={styles.subTabButton(activeSubTab === 'inward', 'inward')}
           >
-            <ArrowDownRight size={18} />
+            <ArrowDownRight size={17} />
             <span>Inward Stock</span>
-            <span style={styles.tabBadge(activeSubTab === 'inward', '#059669')}>
-              Log
+            <span style={styles.tabBadge(activeSubTab === 'inward', '#10b981')}>
+              Inward
             </span>
           </button>
 
@@ -422,10 +422,10 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
             onClick={() => setActiveSubTab('outward')}
             style={styles.subTabButton(activeSubTab === 'outward', 'outward')}
           >
-            <ArrowUpRight size={18} />
+            <ArrowUpRight size={17} />
             <span>Outward Stock</span>
-            <span style={styles.tabBadge(activeSubTab === 'outward', '#d97706')}>
-              Dispatch
+            <span style={styles.tabBadge(activeSubTab === 'outward', '#f59e0b')}>
+              Outward
             </span>
           </button>
         </div>
@@ -467,25 +467,25 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
         <>
           {/* Summary Metric Cards */}
           <div style={styles.statsGrid}>
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #0284c7' }}>
-              <div style={styles.statIconWrap('#0284c7', '#f0f9ff')}>
-                <Package size={22} color="#0284c7" />
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #3b82f6' }}>
+              <div style={styles.statIconWrap('#3b82f6', '#eff6ff')}>
+                <Package size={22} color="#3b82f6" />
               </div>
               <div>
-                <div style={styles.statLabel}>TOTAL SKUS / ITEMS</div>
-                <div style={{ ...styles.statVal, color: '#0284c7' }}>
-                  {totalSkus} <span style={styles.statSubText}>products</span>
+                <div style={styles.statLabel}>TOTAL SKUS / PRODUCTS</div>
+                <div style={{ ...styles.statVal, color: '#1e293b' }}>
+                  {totalSkus} <span style={styles.statSubText}>items</span>
                 </div>
               </div>
             </div>
 
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #4f46e5' }}>
-              <div style={styles.statIconWrap('#4f46e5', '#eef2ff')}>
-                <CheckCircle2 size={22} color="#4f46e5" />
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #6366f1' }}>
+              <div style={styles.statIconWrap('#6366f1', '#eef2ff')}>
+                <CheckCircle2 size={22} color="#6366f1" />
               </div>
               <div>
                 <div style={styles.statLabel}>TOTAL AVAILABLE STOCK</div>
-                <div style={{ ...styles.statVal, color: '#4f46e5' }}>
+                <div style={{ ...styles.statVal, color: '#1e293b' }}>
                   {totalAvailableStock.toLocaleString()} <span style={styles.statSubText}>units</span>
                 </div>
               </div>
@@ -493,11 +493,11 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
 
             <div 
               onClick={() => setStockStatusFilter('lowstock')}
-              style={{ ...styles.statCard, borderLeft: '4px solid #d97706', cursor: 'pointer' }}
+              style={{ ...styles.statCard, borderLeft: '4px solid #f59e0b', cursor: 'pointer' }}
               title="Click to filter Low Stock items"
             >
-              <div style={styles.statIconWrap('#d97706', '#fffbeb')}>
-                <AlertTriangle size={22} color="#d97706" />
+              <div style={styles.statIconWrap('#f59e0b', '#fffbeb')}>
+                <AlertTriangle size={22} color="#f59e0b" />
               </div>
               <div>
                 <div style={styles.statLabel}>LOW STOCK ALERT (≤ 5)</div>
@@ -509,11 +509,11 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
 
             <div 
               onClick={() => setStockStatusFilter('outofstock')}
-              style={{ ...styles.statCard, borderLeft: '4px solid #dc2626', cursor: 'pointer' }}
+              style={{ ...styles.statCard, borderLeft: '4px solid #ef4444', cursor: 'pointer' }}
               title="Click to filter Out of Stock items"
             >
-              <div style={styles.statIconWrap('#dc2626', '#fef2f2')}>
-                <XCircle size={22} color="#dc2626" />
+              <div style={styles.statIconWrap('#ef4444', '#fef2f2')}>
+                <XCircle size={22} color="#ef4444" />
               </div>
               <div>
                 <div style={styles.statLabel}>OUT OF STOCK</div>
@@ -523,9 +523,9 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
               </div>
             </div>
 
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #059669' }}>
-              <div style={styles.statIconWrap('#059669', '#ecfdf5')}>
-                <DollarSign size={22} color="#059669" />
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #10b981' }}>
+              <div style={styles.statIconWrap('#10b981', '#ecfdf5')}>
+                <DollarSign size={22} color="#10b981" />
               </div>
               <div>
                 <div style={styles.statLabel}>TOTAL BUY VALUATION</div>
@@ -633,7 +633,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
               ) : (
                 <table style={{ width: '100%', borderCollapse: 'collapse', background: '#ffffff' }}>
                   <thead>
-                    <tr style={{ background: '#1e293b', color: '#ffffff' }}>
+                    <tr style={styles.tableHeaderRow}>
                       <th onClick={() => handleSort('itemName')} style={styles.thSort}>
                         ITEM DETAILS {sortField === 'itemName' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                       </th>
@@ -655,13 +655,13 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                       <th onClick={() => handleSort('currentlyAvailableStock')} style={{ ...styles.thSort, textAlign: 'center' }}>
                         AVAILABLE STOCK {sortField === 'currentlyAvailableStock' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                       </th>
-                      <th style={{ padding: '0.8rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em' }}>
+                      <th style={{ padding: '0.85rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em' }}>
                         ACTIONS
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOverviewItems.map((item) => {
+                    {filteredOverviewItems.map((item, idx) => {
                       const stock = Number(item.currentlyAvailableStock) || 0;
 
                       let stockBadgeBg = '#ecfdf5';
@@ -682,8 +682,8 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                       }
 
                       return (
-                        <tr key={item._id} style={{ borderBottom: '1px solid #e2e8f0', background: '#ffffff' }}>
-                          <td style={{ padding: '0.8rem 1rem' }}>
+                        <tr key={item._id} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                          <td style={{ padding: '0.85rem 1rem' }}>
                             <div style={styles.itemCell}>
                               <div style={styles.itemImgWrapper}>
                                 {item.imageUrl ? (
@@ -704,26 +704,26 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                               </div>
                             </div>
                           </td>
-                          <td style={{ padding: '0.8rem 1rem' }}>
+                          <td style={{ padding: '0.85rem 1rem' }}>
                             <span style={styles.skuText}>{item.skuCode || 'N/A'}</span>
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+                          <td style={{ padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
                             {item.party}
                           </td>
-                          <td style={{ padding: '0.8rem 1rem' }}>
+                          <td style={{ padding: '0.85rem 1rem' }}>
                             <span style={styles.sizeBadge}>{item.size}</span>
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
                             ₹ {Number(item.purchasePrice || 0).toFixed(2)}
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 700, color: '#0284c7' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 700, color: '#0284c7' }}>
                             ₹ {Number(item.salePrice || 0).toFixed(2)}
                           </td>
 
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                             <span style={{
                               display: 'inline-block',
-                              padding: '4px 14px',
+                              padding: '5px 14px',
                               borderRadius: '20px',
                               fontSize: '0.82rem',
                               fontWeight: 800,
@@ -737,24 +737,24 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                             </span>
                           </td>
 
-                          <td style={{ padding: '0.8rem 1rem' }}>
+                          <td style={{ padding: '0.85rem 1rem' }}>
                             <div style={styles.actionsCell}>
                               <button
                                 onClick={() => onStockOut(item)}
                                 style={styles.tblActionBtn('#b91c1c', '#fee2e2', '#fca5a5')}
                                 title="Outward Dispatch Item"
                               >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
                                   <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
                                   <polyline points="17 18 23 18 23 12"/>
                                 </svg>
                               </button>
                               <button
                                 onClick={() => printBarcode(item)}
-                                style={styles.tblActionBtn('#0f172a', '#f1f5f9', '#94a3b8')}
+                                style={styles.tblActionBtn('#0f172a', '#f1f5f9', '#cbd5e1')}
                                 title="Print Barcode Sticker"
                               >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
                                   <polyline points="6 9 6 2 18 2 18 9"/>
                                   <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
                                   <rect x="6" y="14" width="12" height="8"/>
@@ -765,7 +765,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                                 style={styles.tblActionBtn('#0284c7', '#e0f2fe', '#38bdf8')}
                                 title="Edit Item Details"
                               >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
                                   <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
                                 </svg>
                               </button>
@@ -774,7 +774,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                                 style={styles.tblActionBtn('#e11d48', '#ffe4e6', '#fb7185')}
                                 title="Delete Item"
                               >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e11d48" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e11d48" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
                                   <polyline points="3 6 5 6 21 6"/>
                                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                                   <line x1="10" y1="11" x2="10" y2="17"/>
@@ -802,37 +802,37 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
         <>
           {/* Summary Metric Cards for Inward Stock */}
           <div style={styles.statsGrid}>
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #059669' }}>
-              <div style={styles.statIconWrap('#059669', '#ecfdf5')}>
-                <Layers3 size={22} color="#059669" />
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #10b981' }}>
+              <div style={styles.statIconWrap('#10b981', '#ecfdf5')}>
+                <Layers3 size={22} color="#10b981" />
               </div>
               <div>
-                <div style={styles.statLabel}>INWARD TRANSACTIONS / SKUS</div>
-                <div style={{ ...styles.statVal, color: '#059669' }}>
+                <div style={styles.statLabel}>INWARD LOG RECORDS</div>
+                <div style={{ ...styles.statVal, color: '#047857' }}>
                   {inwardData.items?.length || 0} <span style={styles.statSubText}>records</span>
                 </div>
               </div>
             </div>
 
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #0284c7' }}>
-              <div style={styles.statIconWrap('#0284c7', '#f0f9ff')}>
-                <ArrowDownRight size={22} color="#0284c7" />
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #3b82f6' }}>
+              <div style={styles.statIconWrap('#3b82f6', '#eff6ff')}>
+                <ArrowDownRight size={22} color="#3b82f6" />
               </div>
               <div>
                 <div style={styles.statLabel}>TOTAL UNITS RECEIVED</div>
-                <div style={{ ...styles.statVal, color: '#0284c7' }}>
+                <div style={{ ...styles.statVal, color: '#1d4ed8' }}>
                   {(inwardData.totalQty || 0).toLocaleString()} <span style={styles.statSubText}>units</span>
                 </div>
               </div>
             </div>
 
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #d97706' }}>
-              <div style={styles.statIconWrap('#d97706', '#fffbeb')}>
-                <IndianRupee size={22} color="#d97706" />
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #f59e0b' }}>
+              <div style={styles.statIconWrap('#f59e0b', '#fffbeb')}>
+                <IndianRupee size={22} color="#f59e0b" />
               </div>
               <div>
                 <div style={styles.statLabel}>TOTAL PURCHASE COST</div>
-                <div style={{ ...styles.statVal, color: '#d97706' }}>
+                <div style={{ ...styles.statVal, color: '#b45309' }}>
                   ₹ {(inwardData.totalPurchase || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                 </div>
               </div>
@@ -918,7 +918,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
           <div style={styles.tablePanel}>
             {inwardLoading ? (
               <div style={styles.loadingBox}>
-                <RefreshCw size={28} color="#059669" style={{ animation: 'spin 1s linear infinite' }} />
+                <RefreshCw size={28} color="#10b981" style={{ animation: 'spin 1s linear infinite' }} />
                 <p style={{ color: '#475569', fontWeight: 600, marginTop: '0.8rem' }}>Loading Inward Stock History...</p>
               </div>
             ) : inwardError ? (
@@ -937,7 +937,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', background: '#ffffff' }}>
                   <thead>
-                    <tr style={{ background: '#064e3b', color: '#ffffff' }}>
+                    <tr style={{ background: '#065f46', color: '#ffffff' }}>
                       <th style={styles.thStatic}>DATE & TIME</th>
                       <th style={styles.thStatic}>PHOTO</th>
                       <th style={styles.thStatic}>SKU CODE</th>
@@ -963,10 +963,10 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
 
                       return (
                         <tr key={item.id || item._id || idx} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                          <td style={{ padding: '0.8rem 1rem', fontSize: '0.78rem', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                          <td style={{ padding: '0.85rem 1rem', fontSize: '0.78rem', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' }}>
                             {dtStr}
                           </td>
-                          <td style={{ padding: '0.8rem 1rem' }}>
+                          <td style={{ padding: '0.85rem 1rem' }}>
                             <div style={styles.itemImgWrapper}>
                               {item.imageUrl ? (
                                 <img 
@@ -981,16 +981,16 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                               </div>
                             </div>
                           </td>
-                          <td style={{ padding: '0.8rem 1rem' }}>
+                          <td style={{ padding: '0.85rem 1rem' }}>
                             <span style={styles.skuText}>{item.skuCode || item.sku || 'N/A'}</span>
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', fontWeight: 700, color: '#0f172a', fontSize: '0.88rem' }}>
+                          <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: '#0f172a', fontSize: '0.88rem' }}>
                             {item.itemName}
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+                          <td style={{ padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
                             {item.party || 'N/A'}
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
                               {item.sizes?.map((s, sIdx) => (
                                 <span key={sIdx} style={styles.sizeTagBadge}>
@@ -1001,15 +1001,15 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                               )}
                             </div>
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                             <span style={styles.qtyInwardBadge}>
                               +{totalQty} Units
                             </span>
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
                             ₹ {buyPrice.toFixed(2)}
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.9rem', fontWeight: 800, color: '#d97706' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.9rem', fontWeight: 800, color: '#d97706' }}>
                             ₹ {totalPurchase.toFixed(2)}
                           </td>
                         </tr>
@@ -1031,21 +1031,21 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
         <>
           {/* Summary Metric Cards for Outward Stock */}
           <div style={styles.statsGrid}>
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #d97706' }}>
-              <div style={styles.statIconWrap('#d97706', '#fffbeb')}>
-                <Layers3 size={22} color="#d97706" />
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #f59e0b' }}>
+              <div style={styles.statIconWrap('#f59e0b', '#fffbeb')}>
+                <Layers3 size={22} color="#f59e0b" />
               </div>
               <div>
-                <div style={styles.statLabel}>DISPATCH TRANSACTIONS / SKUS</div>
-                <div style={{ ...styles.statVal, color: '#d97706' }}>
+                <div style={styles.statLabel}>DISPATCH TRANSACTIONS</div>
+                <div style={{ ...styles.statVal, color: '#b45309' }}>
                   {outwardData.items?.length || 0} <span style={styles.statSubText}>records</span>
                 </div>
               </div>
             </div>
 
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #dc2626' }}>
-              <div style={styles.statIconWrap('#dc2626', '#fef2f2')}>
-                <ArrowUpRight size={22} color="#dc2626" />
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #ef4444' }}>
+              <div style={styles.statIconWrap('#ef4444', '#fef2f2')}>
+                <ArrowUpRight size={22} color="#ef4444" />
               </div>
               <div>
                 <div style={styles.statLabel}>TOTAL UNITS DISPATCHED</div>
@@ -1055,21 +1055,21 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
               </div>
             </div>
 
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #0284c7' }}>
-              <div style={styles.statIconWrap('#0284c7', '#f0f9ff')}>
-                <IndianRupee size={22} color="#0284c7" />
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #3b82f6' }}>
+              <div style={styles.statIconWrap('#3b82f6', '#eff6ff')}>
+                <IndianRupee size={22} color="#3b82f6" />
               </div>
               <div>
                 <div style={styles.statLabel}>TOTAL SALE REVENUE</div>
-                <div style={{ ...styles.statVal, color: '#0284c7' }}>
+                <div style={{ ...styles.statVal, color: '#1d4ed8' }}>
                   ₹ {(outwardData.totalSell || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                 </div>
               </div>
             </div>
 
-            <div style={{ ...styles.statCard, borderLeft: `4px solid ${(outwardData.totalProfit || 0) >= 0 ? '#059669' : '#dc2626'}` }}>
-              <div style={styles.statIconWrap((outwardData.totalProfit || 0) >= 0 ? '#059669' : '#dc2626', (outwardData.totalProfit || 0) >= 0 ? '#ecfdf5' : '#fef2f2')}>
-                <TrendingUp size={22} color={(outwardData.totalProfit || 0) >= 0 ? '#059669' : '#dc2626'} />
+            <div style={{ ...styles.statCard, borderLeft: `4px solid ${(outwardData.totalProfit || 0) >= 0 ? '#10b981' : '#ef4444'}` }}>
+              <div style={styles.statIconWrap((outwardData.totalProfit || 0) >= 0 ? '#10b981' : '#ef4444', (outwardData.totalProfit || 0) >= 0 ? '#ecfdf5' : '#fef2f2')}>
+                <TrendingUp size={22} color={(outwardData.totalProfit || 0) >= 0 ? '#10b981' : '#ef4444'} />
               </div>
               <div>
                 <div style={styles.statLabel}>ESTIMATED GROSS PROFIT</div>
@@ -1159,7 +1159,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
           <div style={styles.tablePanel}>
             {outwardLoading ? (
               <div style={styles.loadingBox}>
-                <RefreshCw size={28} color="#d97706" style={{ animation: 'spin 1s linear infinite' }} />
+                <RefreshCw size={28} color="#f59e0b" style={{ animation: 'spin 1s linear infinite' }} />
                 <p style={{ color: '#475569', fontWeight: 600, marginTop: '0.8rem' }}>Loading Outward Stock History...</p>
               </div>
             ) : outwardError ? (
@@ -1202,8 +1202,8 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                       const profit = totalSell - totalBuy;
 
                       return (
-                        <tr key={item.sku || item.id || idx} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#fdf8f6' }}>
-                          <td style={{ padding: '0.8rem 1rem' }}>
+                        <tr key={item.sku || item.id || idx} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#fffbfb' }}>
+                          <td style={{ padding: '0.85rem 1rem' }}>
                             <div style={styles.itemImgWrapper}>
                               {item.imageUrl ? (
                                 <img 
@@ -1218,16 +1218,16 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                               </div>
                             </div>
                           </td>
-                          <td style={{ padding: '0.8rem 1rem' }}>
+                          <td style={{ padding: '0.85rem 1rem' }}>
                             <span style={styles.skuText}>{item.sku || item.skuCode || 'N/A'}</span>
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', fontWeight: 700, color: '#0f172a', fontSize: '0.88rem' }}>
+                          <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: '#0f172a', fontSize: '0.88rem' }}>
                             {item.itemName}
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+                          <td style={{ padding: '0.85rem 1rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
                             {item.party || 'N/A'}
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                             <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
                               {item.sizes?.map((s, sIdx) => (
                                 <span key={sIdx} style={styles.sizeTagBadgeOutward}>
@@ -1238,24 +1238,24 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                               )}
                             </div>
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                             <span style={styles.qtyOutwardBadge}>
                               -{totalQty} Units
                             </span>
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>
                             ₹ {buyPrice.toFixed(2)}
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>
                             ₹ {totalBuy.toFixed(2)}
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 700, color: '#0284c7' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 700, color: '#0284c7' }}>
                             ₹ {sellPrice.toFixed(2)}
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.9rem', fontWeight: 800, color: '#0284c7' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.9rem', fontWeight: 800, color: '#0284c7' }}>
                             ₹ {totalSell.toFixed(2)}
                           </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right', fontSize: '0.9rem', fontWeight: 800, color: profit >= 0 ? '#059669' : '#dc2626' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.9rem', fontWeight: 800, color: profit >= 0 ? '#059669' : '#dc2626' }}>
                             ₹ {profit.toFixed(2)}
                           </td>
                         </tr>
@@ -1279,6 +1279,7 @@ const styles = {
     flexDirection: 'column',
     gap: '1.25rem',
     width: '100%',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
 
   // SUB-TAB TOP BAR STYLES
@@ -1288,40 +1289,40 @@ const styles = {
     justifyContent: 'space-between',
     gap: '1rem',
     background: '#ffffff',
-    padding: '0.65rem 0.85rem',
-    borderRadius: '14px',
+    padding: '0.75rem 1rem',
+    borderRadius: '16px',
     border: '1px solid #e2e8f0',
-    boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
     flexWrap: 'wrap',
   },
   subTabBar: {
     display: 'flex',
-    gap: '0.5rem',
+    gap: '0.4rem',
     alignItems: 'center',
     background: '#f1f5f9',
-    padding: '4px',
-    borderRadius: '10px',
+    padding: '5px',
+    borderRadius: '12px',
     border: '1px solid #cbd5e1',
   },
   subTabButton: (active, type) => {
-    let activeBg = '#0f172a';
+    let activeBg = 'linear-gradient(135deg, #1e293b, #0f172a)';
     let activeColor = '#ffffff';
-    let activeShadow = '0 2px 8px rgba(15, 23, 42, 0.25)';
+    let activeShadow = '0 4px 12px rgba(15, 23, 42, 0.25)';
 
     if (type === 'inward') {
-      activeBg = '#059669';
-      activeShadow = '0 2px 8px rgba(5, 150, 105, 0.25)';
+      activeBg = 'linear-gradient(135deg, #10b981, #059669)';
+      activeShadow = '0 4px 12px rgba(16, 185, 129, 0.25)';
     } else if (type === 'outward') {
-      activeBg = '#d97706';
-      activeShadow = '0 2px 8px rgba(217, 119, 6, 0.25)';
+      activeBg = 'linear-gradient(135deg, #f59e0b, #d97706)';
+      activeShadow = '0 4px 12px rgba(245, 158, 11, 0.25)';
     }
 
     return {
       display: 'flex',
       alignItems: 'center',
-      gap: '0.55rem',
-      padding: '0.6rem 1.1rem',
-      borderRadius: '8px',
+      gap: '0.6rem',
+      padding: '0.65rem 1.25rem',
+      borderRadius: '9px',
       border: 'none',
       background: active ? activeBg : 'transparent',
       color: active ? activeColor : '#475569',
@@ -1329,60 +1330,60 @@ const styles = {
       fontWeight: active ? 800 : 600,
       cursor: 'pointer',
       boxShadow: active ? activeShadow : 'none',
-      transition: 'all 0.15s ease',
+      transition: 'all 0.2s ease',
     };
   },
   tabBadge: (active, color) => ({
     fontSize: '0.72rem',
     fontWeight: 800,
-    padding: '1px 7px',
-    borderRadius: '10px',
+    padding: '2px 8px',
+    borderRadius: '12px',
     background: active ? 'rgba(255, 255, 255, 0.25)' : '#e2e8f0',
     color: active ? '#ffffff' : color,
-    lineHeight: 1.4,
+    lineHeight: 1.3,
   }),
 
   bulkInwardHeaderBtn: {
-    padding: '0.55rem 1.1rem',
+    padding: '0.6rem 1.2rem',
     fontSize: '0.82rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
-    gap: '0.4rem',
-    borderRadius: '8px',
+    gap: '0.45rem',
+    borderRadius: '9px',
     cursor: 'pointer',
-    background: 'linear-gradient(135deg, #059669, #047857)',
+    background: 'linear-gradient(135deg, #10b981, #047857)',
     color: '#ffffff',
     border: 'none',
-    boxShadow: '0 4px 10px rgba(5, 150, 105, 0.2)',
+    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
   },
   addSkuHeaderBtn: {
-    padding: '0.55rem 1.1rem',
+    padding: '0.6rem 1.2rem',
     fontSize: '0.82rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
-    gap: '0.4rem',
-    borderRadius: '8px',
+    gap: '0.45rem',
+    borderRadius: '9px',
     cursor: 'pointer',
-    background: '#0284c7',
+    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
     color: '#ffffff',
     border: 'none',
-    boxShadow: '0 4px 10px rgba(2, 132, 199, 0.2)',
+    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.25)',
   },
   outwardHeaderBtn: {
-    padding: '0.55rem 1.1rem',
+    padding: '0.6rem 1.2rem',
     fontSize: '0.82rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
-    gap: '0.4rem',
-    borderRadius: '8px',
+    gap: '0.45rem',
+    borderRadius: '9px',
     cursor: 'pointer',
-    background: 'linear-gradient(135deg, #d97706, #b45309)',
+    background: 'linear-gradient(135deg, #f59e0b, #b45309)',
     color: '#ffffff',
     border: 'none',
-    boxShadow: '0 4px 10px rgba(217, 119, 6, 0.2)',
+    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.25)',
   },
 
   // STATS GRID STYLES
@@ -1394,24 +1395,25 @@ const styles = {
   statCard: {
     background: '#ffffff',
     border: '1px solid #e2e8f0',
-    borderRadius: '12px',
-    padding: '1.1rem 1.25rem',
+    borderRadius: '14px',
+    padding: '1.15rem 1.3rem',
     display: 'flex',
     alignItems: 'center',
     gap: '1rem',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
     transition: 'all 0.2s ease',
   },
   statIconWrap: (color, bg) => ({
-    width: '44px',
-    height: '44px',
-    borderRadius: '10px',
+    width: '46px',
+    height: '46px',
+    borderRadius: '12px',
     background: bg || `${color}15`,
     border: `1px solid ${color}30`,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    boxShadow: `0 4px 10px ${color}15`,
   }),
   statLabel: {
     fontSize: '0.7rem',
@@ -1426,7 +1428,7 @@ const styles = {
     fontWeight: 500,
   },
   statVal: {
-    fontSize: '1.35rem',
+    fontSize: '1.4rem',
     fontWeight: 900,
     color: '#0f172a',
     marginTop: '3px',
@@ -1435,13 +1437,13 @@ const styles = {
   // TOOLBAR & CONTROL STYLES
   controlHeader: {
     padding: '1.25rem',
-    borderRadius: '12px',
+    borderRadius: '14px',
     display: 'flex',
     flexDirection: 'column',
     gap: '1rem',
     background: '#ffffff',
     border: '1px solid #e2e8f0',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
   },
   rowOne: {
     display: 'flex',
@@ -1457,7 +1459,7 @@ const styles = {
     justifyContent: 'flex-end',
     gap: '0.75rem',
     width: '100%',
-    paddingTop: '0.65rem',
+    paddingTop: '0.75rem',
     borderTop: '1px solid #f1f5f9',
   },
   searchBox: {
@@ -1466,8 +1468,8 @@ const styles = {
     gap: '0.6rem',
     background: '#f8fafc',
     border: '1px solid #cbd5e1',
-    borderRadius: '8px',
-    padding: '0.55rem 0.85rem',
+    borderRadius: '9px',
+    padding: '0.6rem 0.9rem',
     minWidth: '260px',
     flex: 1,
     maxWidth: '380px',
@@ -1479,6 +1481,7 @@ const styles = {
     fontSize: '0.85rem',
     outline: 'none',
     width: '100%',
+    fontWeight: 500,
   },
   pillContainer: {
     display: 'flex',
@@ -1490,12 +1493,12 @@ const styles = {
   },
   statusPill: (active, type) => {
     let activeBg = '#4f46e5';
-    if (type === 'lowstock') activeBg = '#d97706';
-    if (type === 'outofstock') activeBg = '#dc2626';
-    if (type === 'instock') activeBg = '#059669';
+    if (type === 'lowstock') activeBg = '#f59e0b';
+    if (type === 'outofstock') activeBg = '#ef4444';
+    if (type === 'instock') activeBg = '#10b981';
 
     return {
-      padding: '0.45rem 0.9rem',
+      padding: '0.45rem 0.95rem',
       borderRadius: '8px',
       border: 'none',
       background: active ? activeBg : 'transparent',
@@ -1512,17 +1515,18 @@ const styles = {
     gap: '0.4rem',
     background: '#f8fafc',
     border: '1px solid #cbd5e1',
-    padding: '0 0.6rem',
-    borderRadius: '8px',
+    padding: '0 0.65rem',
+    borderRadius: '9px',
   },
   selectInput: {
     border: 'none',
     background: 'none',
-    padding: '0.55rem 0.4rem',
+    padding: '0.6rem 0.4rem',
     fontSize: '0.82rem',
     color: '#0f172a',
     outline: 'none',
     cursor: 'pointer',
+    fontWeight: 600,
   },
 
   // DATE FILTER BAR STYLES
@@ -1532,33 +1536,34 @@ const styles = {
     gap: '0.5rem',
     background: '#f8fafc',
     border: '1px solid #cbd5e1',
-    borderRadius: '8px',
+    borderRadius: '9px',
     padding: '0.4rem 0.75rem',
     flexWrap: 'wrap',
   },
   dateInput: {
     border: '1px solid #cbd5e1',
     borderRadius: '6px',
-    padding: '0.35rem 0.5rem',
+    padding: '0.4rem 0.55rem',
     fontSize: '0.8rem',
     color: '#0f172a',
     outline: 'none',
     background: '#ffffff',
+    fontWeight: 500,
   },
   presetGroup: {
     display: 'flex',
     gap: '3px',
     background: '#e2e8f0',
-    padding: '2px',
-    borderRadius: '6px',
+    padding: '3px',
+    borderRadius: '7px',
     marginLeft: '0.3rem',
   },
   presetBtn: {
-    padding: '0.3rem 0.6rem',
-    fontSize: '0.73rem',
+    padding: '0.32rem 0.65rem',
+    fontSize: '0.74rem',
     fontWeight: 700,
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '5px',
     background: '#ffffff',
     color: '#334155',
     cursor: 'pointer',
@@ -1567,79 +1572,79 @@ const styles = {
 
   // BUTTON STYLES
   refreshBtn: {
-    padding: '0.55rem 1rem',
+    padding: '0.6rem 1.1rem',
     fontSize: '0.82rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
     gap: '0.4rem',
-    borderRadius: '8px',
+    borderRadius: '9px',
     cursor: 'pointer',
     background: '#ffffff',
     border: '1px solid #cbd5e1',
     color: '#475569',
   },
   exportBtn: {
-    padding: '0.55rem 1.15rem',
+    padding: '0.6rem 1.15rem',
     fontSize: '0.82rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
     gap: '0.4rem',
-    borderRadius: '8px',
+    borderRadius: '9px',
     cursor: 'pointer',
     background: '#ffffff',
     border: '1px solid #cbd5e1',
     color: '#334155',
   },
   pdfBtn: {
-    padding: '0.55rem 1.15rem',
+    padding: '0.6rem 1.15rem',
     fontSize: '0.82rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
     gap: '0.4rem',
-    borderRadius: '8px',
+    borderRadius: '9px',
     cursor: 'pointer',
     background: '#eff6ff',
     border: '1px solid #bfdbfe',
     color: '#1d4ed8',
   },
   addInwardStockBtn: {
-    padding: '0.55rem 1.15rem',
+    padding: '0.6rem 1.15rem',
     fontSize: '0.82rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
     gap: '0.4rem',
-    borderRadius: '8px',
+    borderRadius: '9px',
     cursor: 'pointer',
-    background: '#059669',
+    background: '#10b981',
     color: '#ffffff',
     border: 'none',
-    boxShadow: '0 4px 12px rgba(5, 150, 105, 0.2)',
+    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
   },
   outwardBtn: {
-    padding: '0.55rem 1.15rem',
+    padding: '0.6rem 1.15rem',
     fontSize: '0.82rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
     gap: '0.4rem',
-    borderRadius: '8px',
+    borderRadius: '9px',
     cursor: 'pointer',
     background: '#fef2f2',
     border: '1px solid #fecaca',
     color: '#dc2626',
   },
   bulkInwardBtn: {
-    padding: '0.55rem 1.15rem',
+    padding: '0.6rem 1.15rem',
     fontSize: '0.82rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
     gap: '0.4rem',
-    borderRadius: '8px',
+    borderRadius: '9px',
     cursor: 'pointer',
     background: 'linear-gradient(135deg, #4f46e5, #4338ca)',
     color: '#ffffff',
@@ -1647,13 +1652,13 @@ const styles = {
     boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)',
   },
   addSkuBtn: {
-    padding: '0.55rem 1.15rem',
+    padding: '0.6rem 1.15rem',
     fontSize: '0.82rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
     gap: '0.4rem',
-    borderRadius: '8px',
+    borderRadius: '9px',
     cursor: 'pointer',
     background: '#10b981',
     color: '#ffffff',
@@ -1661,8 +1666,8 @@ const styles = {
     boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
   },
   moreBtn: {
-    padding: '0.55rem 0.75rem',
-    borderRadius: '8px',
+    padding: '0.6rem 0.8rem',
+    borderRadius: '9px',
     border: '1px solid #cbd5e1',
     background: '#ffffff',
     color: '#475569',
@@ -1673,11 +1678,15 @@ const styles = {
 
   // TABLE CONTAINER STYLES
   tablePanel: {
-    borderRadius: '12px',
+    borderRadius: '14px',
     overflow: 'hidden',
     border: '1px solid #e2e8f0',
     background: '#ffffff',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+  },
+  tableHeaderRow: {
+    background: '#0f172a',
+    color: '#ffffff',
   },
   emptyState: {
     padding: '4rem 1rem',
@@ -1703,8 +1712,8 @@ const styles = {
     fontWeight: 600,
   },
   retryBtn: {
-    padding: '0.4rem 0.9rem',
-    borderRadius: '6px',
+    padding: '0.45rem 1rem',
+    borderRadius: '7px',
     background: '#dc2626',
     color: '#ffffff',
     border: 'none',
@@ -1713,7 +1722,7 @@ const styles = {
     fontWeight: 700,
   },
   thSort: {
-    padding: '0.85rem 1rem',
+    padding: '0.9rem 1rem',
     textAlign: 'left',
     fontSize: '0.75rem',
     fontWeight: 800,
@@ -1722,7 +1731,7 @@ const styles = {
     userSelect: 'none',
   },
   thStatic: {
-    padding: '0.85rem 1rem',
+    padding: '0.9rem 1rem',
     textAlign: 'left',
     fontSize: '0.75rem',
     fontWeight: 800,
@@ -1731,17 +1740,18 @@ const styles = {
   itemCell: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.75rem',
+    gap: '0.8rem',
   },
   itemImgWrapper: {
-    width: '42px',
-    height: '42px',
+    width: '44px',
+    height: '44px',
     borderRadius: '10px',
     overflow: 'hidden',
     background: '#f8fafc',
     border: '1px solid #cbd5e1',
     flexShrink: 0,
     position: 'relative',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
   },
   itemImg: {
     width: '100%',
@@ -1773,7 +1783,7 @@ const styles = {
     fontSize: '0.82rem',
     color: '#0284c7',
     background: '#f0f9ff',
-    padding: '0.2rem 0.55rem',
+    padding: '0.25rem 0.6rem',
     borderRadius: '6px',
     border: '1px solid #bae6fd',
     fontWeight: 700,
@@ -1783,7 +1793,7 @@ const styles = {
     fontWeight: 700,
     color: '#334155',
     background: '#f8fafc',
-    padding: '0.2rem 0.55rem',
+    padding: '0.25rem 0.6rem',
     borderRadius: '6px',
     border: '1px solid #cbd5e1',
   },
@@ -1793,7 +1803,7 @@ const styles = {
     color: '#047857',
     background: '#ecfdf5',
     border: '1px solid #a7f3d0',
-    padding: '2px 8px',
+    padding: '3px 9px',
     borderRadius: '12px',
   },
   sizeTagBadgeOutward: {
@@ -1802,12 +1812,12 @@ const styles = {
     color: '#b45309',
     background: '#fffbeb',
     border: '1px solid #fde68a',
-    padding: '2px 8px',
+    padding: '3px 9px',
     borderRadius: '12px',
   },
   qtyInwardBadge: {
     display: 'inline-block',
-    padding: '4px 12px',
+    padding: '5px 14px',
     borderRadius: '20px',
     fontSize: '0.82rem',
     fontWeight: 800,
@@ -1817,7 +1827,7 @@ const styles = {
   },
   qtyOutwardBadge: {
     display: 'inline-block',
-    padding: '4px 12px',
+    padding: '5px 14px',
     borderRadius: '20px',
     fontSize: '0.82rem',
     fontWeight: 800,
@@ -1827,7 +1837,7 @@ const styles = {
   },
   actionsCell: {
     display: 'flex',
-    gap: '0.4rem',
+    gap: '0.45rem',
     justifyContent: 'center',
   },
   tblActionBtn: (color, bg, border) => ({
@@ -1838,12 +1848,12 @@ const styles = {
     height: '36px',
     minWidth: '36px',
     minHeight: '36px',
-    borderRadius: '8px',
+    borderRadius: '9px',
     border: `2px solid ${border}`,
     background: bg,
     color: color,
     cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+    boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
     transition: 'all 0.15s ease',
     flexShrink: 0,
   }),
