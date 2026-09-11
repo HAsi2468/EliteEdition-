@@ -25,6 +25,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
   // --- Sub-Screen 2: Inward Stock State ---
   const [inwardDateStart, setInwardDateStart] = useState('');
   const [inwardDateEnd, setInwardDateEnd] = useState('');
+  const [inwardPreset, setInwardPreset] = useState('all'); // 'today', '7days', 'thisMonth', 'all', 'custom'
   const [inwardSearchTerm, setInwardSearchTerm] = useState('');
   const [inwardData, setInwardData] = useState({ items: [], totalQty: 0, totalPurchase: 0 });
   const [inwardLoading, setInwardLoading] = useState(false);
@@ -34,6 +35,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
   // --- Sub-Screen 3: Outward Stock State ---
   const [outwardDateStart, setOutwardDateStart] = useState('');
   const [outwardDateEnd, setOutwardDateEnd] = useState('');
+  const [outwardPreset, setOutwardPreset] = useState('all'); // 'today', '7days', 'thisMonth', 'all', 'custom'
   const [outwardSearchTerm, setOutwardSearchTerm] = useState('');
   const [outwardData, setOutwardData] = useState({ items: [], totalQty: 0, totalPurchase: 0, totalSell: 0, totalProfit: 0 });
   const [outwardLoading, setOutwardLoading] = useState(false);
@@ -93,7 +95,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
     }
   }, [activeSubTab, fetchInwardData, fetchOutwardData]);
 
-  // Quick Date Preset Handler
+  // Quick Date Preset Handler matching regular ERP date filter
   const handleQuickDatePreset = (tab, preset) => {
     const today = new Date();
     const formatDate = (d) => d.toISOString().split('T')[0];
@@ -116,10 +118,12 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
     }
 
     if (tab === 'inward') {
+      setInwardPreset(preset);
       setInwardDateStart(start);
       setInwardDateEnd(end);
       fetchInwardData(start, end);
     } else if (tab === 'outward') {
+      setOutwardPreset(preset);
       setOutwardDateStart(start);
       setOutwardDateEnd(end);
       fetchOutwardData(start, end);
@@ -335,11 +339,12 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
     }
     let csv = `ELITE ONLINE — OUTWARD STOCK TRANSACTION LOG\n`;
     csv += `Date Range: ${outwardDateStart || 'All'} to ${outwardDateEnd || 'Today'}\n\n`;
-    csv += `SKU Code,Item Name,Vendor,Total Qty Dispatched,Unit Buy Price (INR),Total Buy Cost (INR),Unit Sell Price (INR),Total Sale Revenue (INR),Gross Profit (INR)\n`;
+    csv += `Date & Time,SKU Code,Item Name,Vendor,Total Qty Dispatched,Unit Buy Price (INR),Total Buy Cost (INR),Unit Sell Price (INR),Total Sale Revenue (INR),Gross Profit (INR)\n`;
 
     filteredOutwardItems.forEach(item => {
+      const dt = (item.created_date_time || item.createdAt || item.date) ? new Date(item.created_date_time || item.createdAt || item.date).toLocaleString('en-IN') : 'N/A';
       const profit = (item.totalSellableAmount || 0) - (item.totalPurchaseAmount || 0);
-      csv += `"${item.sku || item.skuCode || ''}","${(item.itemName || '').replace(/"/g, '""')}","${(item.party || '').replace(/"/g, '""')}",${item.total || 0},${Number(item.purchasePrice || 0).toFixed(2)},${Number(item.totalPurchaseAmount || 0).toFixed(2)},${Number(item.salePrice || 0).toFixed(2)},${Number(item.totalSellableAmount || 0).toFixed(2)},${profit.toFixed(2)}\n`;
+      csv += `"${dt}","${item.sku || item.skuCode || ''}","${(item.itemName || '').replace(/"/g, '""')}","${(item.party || '').replace(/"/g, '""')}",${item.total || 0},${Number(item.purchasePrice || 0).toFixed(2)},${Number(item.totalPurchaseAmount || 0).toFixed(2)},${Number(item.salePrice || 0).toFixed(2)},${Number(item.totalSellableAmount || 0).toFixed(2)},${profit.toFixed(2)}\n`;
     });
 
     downloadCsvBlob(csv, `EliteOnline_Outward_Stock_Log_${new Date().toISOString().split('T')[0]}.csv`);
@@ -854,24 +859,26 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                 />
               </div>
 
-              {/* Date Inputs & Quick Presets */}
+              {/* Exact Standard ERP Date Filter Component Matching Screenshot */}
               <div style={styles.dateFilterContainer}>
-                <Calendar size={15} color="#64748b" />
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>From:</span>
+                <Calendar size={16} color="#475569" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>From:</span>
                 <input
                   type="date"
                   value={inwardDateStart}
                   onChange={(e) => {
+                    setInwardPreset('custom');
                     setInwardDateStart(e.target.value);
                     fetchInwardData(e.target.value, inwardDateEnd);
                   }}
                   style={styles.dateInput}
                 />
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>To:</span>
+                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>To:</span>
                 <input
                   type="date"
                   value={inwardDateEnd}
                   onChange={(e) => {
+                    setInwardPreset('custom');
                     setInwardDateEnd(e.target.value);
                     fetchInwardData(inwardDateStart, e.target.value);
                   }}
@@ -879,10 +886,10 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                 />
 
                 <div style={styles.presetGroup}>
-                  <button onClick={() => handleQuickDatePreset('inward', 'today')} style={styles.presetBtn}>Today</button>
-                  <button onClick={() => handleQuickDatePreset('inward', '7days')} style={styles.presetBtn}>7 Days</button>
-                  <button onClick={() => handleQuickDatePreset('inward', 'thisMonth')} style={styles.presetBtn}>This Month</button>
-                  <button onClick={() => handleQuickDatePreset('inward', 'all')} style={styles.presetBtn}>All Time</button>
+                  <button onClick={() => handleQuickDatePreset('inward', 'today')} style={styles.presetBtn(inwardPreset === 'today')}>Today</button>
+                  <button onClick={() => handleQuickDatePreset('inward', '7days')} style={styles.presetBtn(inwardPreset === '7days')}>7 Days</button>
+                  <button onClick={() => handleQuickDatePreset('inward', 'thisMonth')} style={styles.presetBtn(inwardPreset === 'thisMonth')}>This Month</button>
+                  <button onClick={() => handleQuickDatePreset('inward', 'all')} style={styles.presetBtn(inwardPreset === 'all')}>All Time</button>
                 </div>
               </div>
             </div>
@@ -1095,24 +1102,26 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                 />
               </div>
 
-              {/* Date Inputs & Quick Presets */}
+              {/* Exact Standard ERP Date Filter Component Matching Screenshot */}
               <div style={styles.dateFilterContainer}>
-                <Calendar size={15} color="#64748b" />
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>From:</span>
+                <Calendar size={16} color="#475569" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>From:</span>
                 <input
                   type="date"
                   value={outwardDateStart}
                   onChange={(e) => {
+                    setOutwardPreset('custom');
                     setOutwardDateStart(e.target.value);
                     fetchOutwardData(e.target.value, outwardDateEnd);
                   }}
                   style={styles.dateInput}
                 />
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>To:</span>
+                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>To:</span>
                 <input
                   type="date"
                   value={outwardDateEnd}
                   onChange={(e) => {
+                    setOutwardPreset('custom');
                     setOutwardDateEnd(e.target.value);
                     fetchOutwardData(outwardDateStart, e.target.value);
                   }}
@@ -1120,10 +1129,10 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                 />
 
                 <div style={styles.presetGroup}>
-                  <button onClick={() => handleQuickDatePreset('outward', 'today')} style={styles.presetBtn}>Today</button>
-                  <button onClick={() => handleQuickDatePreset('outward', '7days')} style={styles.presetBtn}>7 Days</button>
-                  <button onClick={() => handleQuickDatePreset('outward', 'thisMonth')} style={styles.presetBtn}>This Month</button>
-                  <button onClick={() => handleQuickDatePreset('outward', 'all')} style={styles.presetBtn}>All Time</button>
+                  <button onClick={() => handleQuickDatePreset('outward', 'today')} style={styles.presetBtn(outwardPreset === 'today')}>Today</button>
+                  <button onClick={() => handleQuickDatePreset('outward', '7days')} style={styles.presetBtn(outwardPreset === '7days')}>7 Days</button>
+                  <button onClick={() => handleQuickDatePreset('outward', 'thisMonth')} style={styles.presetBtn(outwardPreset === 'thisMonth')}>This Month</button>
+                  <button onClick={() => handleQuickDatePreset('outward', 'all')} style={styles.presetBtn(outwardPreset === 'all')}>All Time</button>
                 </div>
               </div>
             </div>
@@ -1539,46 +1548,52 @@ const styles = {
     fontWeight: 600,
   },
 
-  // DATE FILTER BAR STYLES
+  // EXACT STANDARD ERP DATE FILTER COMPONENT MATCHING SCREENSHOT
   dateFilterContainer: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem',
+    gap: '0.65rem',
     background: '#f8fafc',
     border: '1px solid #cbd5e1',
-    borderRadius: '9px',
-    padding: '0.4rem 0.75rem',
+    borderRadius: '12px',
+    padding: '0.45rem 0.85rem',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
     flexWrap: 'wrap',
   },
   dateInput: {
     border: '1px solid #cbd5e1',
-    borderRadius: '6px',
-    padding: '0.4rem 0.55rem',
-    fontSize: '0.8rem',
+    borderRadius: '8px',
+    padding: '0.4rem 0.65rem',
+    fontSize: '0.83rem',
     color: '#0f172a',
+    fontWeight: 600,
     outline: 'none',
     background: '#ffffff',
-    fontWeight: 500,
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+    cursor: 'pointer',
   },
   presetGroup: {
     display: 'flex',
-    gap: '3px',
-    background: '#e2e8f0',
-    padding: '3px',
-    borderRadius: '7px',
-    marginLeft: '0.3rem',
+    alignItems: 'center',
+    gap: '4px',
+    background: '#eef2ff',
+    padding: '4px',
+    borderRadius: '10px',
+    border: '1px solid #e2e8f0',
+    marginLeft: '0.4rem',
   },
-  presetBtn: {
-    padding: '0.32rem 0.65rem',
-    fontSize: '0.74rem',
-    fontWeight: 700,
+  presetBtn: (active) => ({
+    padding: '0.4rem 0.85rem',
+    fontSize: '0.8rem',
+    fontWeight: active ? 800 : 700,
+    borderRadius: '8px',
     border: 'none',
-    borderRadius: '5px',
-    background: '#ffffff',
-    color: '#334155',
+    background: active ? '#ffffff' : 'transparent',
+    color: active ? '#1e293b' : '#475569',
     cursor: 'pointer',
-    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-  },
+    boxShadow: active ? '0 2px 6px rgba(0, 0, 0, 0.08)' : 'none',
+    transition: 'all 0.15s ease',
+  }),
 
   // BUTTON STYLES
   refreshBtn: {
