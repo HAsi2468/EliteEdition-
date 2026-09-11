@@ -149,6 +149,19 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
     onSubmit(payload);
   };
 
+  // Managed brands array for datalist dropdown
+  const managedBrands = (() => {
+    try {
+      const saved = localStorage.getItem('elite_managed_brands');
+      const custom = saved ? JSON.parse(saved) : ['ANOUK', 'ELITE EDITION', 'HERA', 'MYNTRA'];
+      const catBrands = catalogItems.map(c => c.brand).filter(Boolean);
+      const vBrands = vendorsList.map(v => v.businessName || v.name).filter(Boolean);
+      return Array.from(new Set([...custom, ...catBrands, ...vBrands])).sort();
+    } catch (e) {
+      return ['ANOUK', 'ELITE EDITION', 'HERA', 'MYNTRA'];
+    }
+  })();
+
   return (
     <div style={styles.overlay}>
       <div style={styles.container}>
@@ -284,10 +297,8 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                     required
                   />
                   <datalist id="form-brand-suggestions">
-                    <option value="ANOUK" />
-                    <option value="ELITE EDITION" />
-                    {vendorsList.map((v, i) => (
-                      <option key={i} value={v.businessName || v.name} />
+                    {managedBrands.map((b, i) => (
+                      <option key={i} value={b} />
                     ))}
                   </datalist>
                 </div>

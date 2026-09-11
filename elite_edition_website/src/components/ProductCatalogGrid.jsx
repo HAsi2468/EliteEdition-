@@ -1,12 +1,46 @@
-import React, { useState } from 'react';
-import { Edit2, Trash2, Search, Plus, SlidersHorizontal, RefreshCw, Eye, Tag, Printer } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Edit2, Trash2, Search, Plus, SlidersHorizontal, RefreshCw, Eye, Tag, Printer, Building2 } from 'lucide-react';
+import BrandManagerModal from './BrandManagerModal';
 
 export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onSync }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sizeFilter, setSizeFilter] = useState('All');
+  const [brandFilter, setBrandFilter] = useState('All');
   const [sortField, setSortField] = useState('description');
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
   const [syncing, setSyncing] = useState(false);
+  const [showBrandManager, setShowBrandManager] = useState(false);
+
+  // Managed custom brands in localStorage
+  const [customBrands, setCustomBrands] = useState(() => {
+    try {
+      const saved = localStorage.getItem('elite_managed_brands');
+      return saved ? JSON.parse(saved) : ['ANOUK', 'ELITE EDITION', 'HERA', 'MYNTRA'];
+    } catch (err) {
+      return ['ANOUK', 'ELITE EDITION', 'HERA', 'MYNTRA'];
+    }
+  });
+
+  const handleAddBrand = (brandName) => {
+    const updated = [...customBrands, brandName];
+    setCustomBrands(updated);
+    try {
+      localStorage.setItem('elite_managed_brands', JSON.stringify(updated));
+    } catch (e) {}
+  };
+
+  const handleDeleteBrand = (brandName) => {
+    const updated = customBrands.filter(b => b.toLowerCase() !== brandName.toLowerCase());
+    setCustomBrands(updated);
+    try {
+      localStorage.setItem('elite_managed_brands', JSON.stringify(updated));
+    } catch (e) {}
+  };
+
+  // Extract unique brands from catalog items + custom brands
+  const catalogBrands = Array.from(new Set(items.map(item => item.brand).filter(Boolean)));
+  const customOnlyBrands = customBrands.filter(b => !catalogBrands.some(cb => cb.toLowerCase() === b.toLowerCase()));
+  const allBrands = ['All', ...catalogBrands.sort(), ...customOnlyBrands.sort()];
 
   // Get unique sizes for the filter dropdown
   const sizes = ['All', ...new Set(items.flatMap(item => item.size || []).filter(Boolean))];
@@ -31,7 +65,10 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
       
       const matchSize = sizeFilter === 'All' || (item.size && item.size.includes(sizeFilter));
       
-      return matchSearch && matchSize;
+      const matchBrand = brandFilter === 'All' || 
+        (item.brand && item.brand.trim().toLowerCase() === brandFilter.trim().toLowerCase());
+
+      return matchSearch && matchSize && matchBrand;
     })
     .sort((a, b) => {
       let aVal = a[sortField];
@@ -344,9 +381,32 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
               ))}
             </select>
           </div>
+
+          <div style={styles.filterBox}>
+            <Building2 size={14} color="var(--text-muted)" />
+            <select
+              value={brandFilter}
+              onChange={(e) => setBrandFilter(e.target.value)}
+              style={styles.selectInput}
+            >
+              {allBrands.map((b, idx) => (
+                <option key={idx} value={b}>{b === 'All' ? 'All Brands' : b}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button 
+            onClick={() => setShowBrandManager(true)}
+            className="btn-secondary" 
+            style={{ ...styles.addBtn, background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', borderColor: 'rgba(99, 102, 241, 0.3)', fontWeight: 700 }}
+            title="Manage Brands & Dynamic Dropdown Values"
+          >
+            <Building2 size={16} />
+            <span>Manage Brands</span>
+          </button>
+
           <button 
             onClick={() => handlePrintBarcodes(filteredItems)} 
             className="btn-secondary" 
@@ -378,32 +438,30 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
       <div className="table-container" style={styles.tableWrap}>
         {filteredItems.length === 0 ? (
           <div style={styles.emptyTable}>
-            <span style={{ fontSize: '2.5rem' }}>🔍</span>
-            <h4 style={{ marginTop: '0.8rem', color: 'var(--text-primary)' }}>No catalog products found</h4>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Try adjusting your search terms or filters.</p>
+            No products match your filters.
           </div>
         ) : (
-          <table>
+          <table className="data-table" style={styles.table}>
             <thead>
               <tr>
-                <th onClick={() => handleSort('description')} style={styles.thSort}>
-                  Product Details {sortField === 'description' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                <th onClick={() => handleSort('description')} style={{ cursor: 'pointer' }}>
+                  PRODUCT DETAILS {sortField === 'description' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                 </th>
-                <th onClick={() => handleSort('skuCode')} style={styles.thSort}>
-                  SKU Code {sortField === 'skuCode' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                <th onClick={() => handleSort('skuCode')} style={{ cursor: 'pointer' }}>
+                  SKU CODE {sortField === 'skuCode' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                 </th>
-                <th onClick={() => handleSort('brand')} style={styles.thSort}>
-                  Brand {sortField === 'brand' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                <th onClick={() => handleSort('brand')} style={{ cursor: 'pointer' }}>
+                  BRAND {sortField === 'brand' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                 </th>
-                <th>Sizes</th>
-                <th onClick={() => handleSort('basePrice')} style={styles.thSort} className="text-right">
-                  Base Price {sortField === 'basePrice' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                <th>SIZES</th>
+                <th onClick={() => handleSort('basePrice')} style={{ cursor: 'pointer' }}>
+                  BASE PRICE {sortField === 'basePrice' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                 </th>
-                <th onClick={() => handleSort('price')} style={styles.thSort} className="text-right">
-                  Price {sortField === 'price' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                <th onClick={() => handleSort('price')} style={{ cursor: 'pointer' }}>
+                  PRICE {sortField === 'price' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                 </th>
-                <th className="text-center">Live Stock</th>
-                <th className="text-center">Actions</th>
+                <th className="text-center">LIVE STOCK</th>
+                <th className="text-center">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -441,43 +499,43 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
                         </div>
                         <div>
                           <div style={styles.itemName}>{item.description || 'Unnamed Product'}</div>
-                          <div style={styles.itemMeta}>Category: {item.categoryName || 'General'}</div>
+                          <div style={styles.itemMeta}>Category: {item.categoryName || 'KURTA SET'}</div>
                         </div>
                       </div>
                     </td>
                     <td>
-                      <span style={styles.skuText}>{item.skuCode || 'N/A'}</span>
+                      <span style={styles.skuBadge}>{item.skuCode}</span>
                     </td>
-                    <td>{item.brand || 'Uniware'}</td>
                     <td>
-                      <div style={{ display: 'flex', gap: '0.2rem', flexWrap: 'wrap' }}>
-                        {Array.isArray(item.size) ? (
-                          item.size.map((sz, i) => (
+                      <span style={styles.brandBadge}>{item.brand || 'ANOUK'}</span>
+                    </td>
+                    <td>
+                      {Array.isArray(item.size) ? (
+                        <div style={styles.sizeWrap}>
+                          {item.size.map((sz, i) => (
                             <span key={i} style={styles.sizeBadge}>{sz}</span>
-                          ))
-                        ) : item.size ? (
-                          <span style={styles.sizeBadge}>{item.size}</span>
-                        ) : (
-                          <span style={styles.sizeBadge}>N/A</span>
-                        )}
-                      </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span style={styles.sizeBadge}>{item.size || 'N/A'}</span>
+                      )}
                     </td>
-                    <td className="text-right">
-                      {item.basePrice ? `Rs. ${item.basePrice.toFixed(2)}` : 'Rs. 0.00'}
-                    </td>
-                    <td className="text-right">
-                      {item.price ? `Rs. ${item.price.toFixed(2)}` : 'Rs. 0.00'}
+                    <td>Rs. {(item.basePrice || 0).toFixed(2)}</td>
+                    <td style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
+                      Rs. {(item.price || 0).toFixed(2)}
                     </td>
                     <td className="text-center">
-                      <span className={`badge ${hasSnapshot ? stockClass : 'badge-secondary'}`}>{stockLabel}</span>
+                      <span className={`badge ${stockClass}`}>
+                        {stockLabel}
+                      </span>
                     </td>
-                    <td>
-                      <div style={styles.actionsCell}>
+                    <td className="text-center">
+                      <div style={styles.actionGroup}>
                         <button
                           onClick={() => handlePrintBarcodes(item)}
                           className="btn-icon"
-                          style={{ color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.2)', background: 'rgba(16, 185, 129, 0.08)' }}
-                          title="Print Barcode Label for this Product"
+                          style={{ color: '#059669', borderColor: '#a7f3d0', background: '#ecfdf5' }}
+                          title="Print Barcode Sticker for this product"
                         >
                           <Printer size={15} />
                         </button>
@@ -505,6 +563,17 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
           </table>
         )}
       </div>
+
+      {/* Brand Manager Modal */}
+      {showBrandManager && (
+        <BrandManagerModal
+          existingBrands={catalogBrands}
+          customBrands={customBrands}
+          onAddBrand={handleAddBrand}
+          onDeleteBrand={handleDeleteBrand}
+          onClose={() => setShowBrandManager(false)}
+        />
+      )}
     </div>
   );
 }
