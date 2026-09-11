@@ -719,20 +719,38 @@ export default function RawMaterialsPanel() {
   };
 
   // Filter local registers
+  const toYYYYMMDD = (d) => {
+    if (!d) return '';
+    try {
+      if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.trim())) return d.trim();
+      const dt = new Date(d);
+      if (isNaN(dt.getTime())) return '';
+      const yr = dt.getFullYear();
+      const mo = String(dt.getMonth() + 1).padStart(2, '0');
+      const dy = String(dt.getDate()).padStart(2, '0');
+      return `${yr}-${mo}-${dy}`;
+    } catch (e) {
+      return '';
+    }
+  };
+
   const matchesMaterialType = (materialName, filterType) => {
     if (!filterType || filterType === 'All') return true;
-    const name = (materialName || '').toLowerCase();
-    const target = filterType.toLowerCase();
-    if (target === 'ink') return name.includes('ink');
-    if (target === 'paper') return name.includes('paper');
+    if (!materialName) return false;
+    const name = String(materialName).trim().toLowerCase();
+    const target = String(filterType).trim().toLowerCase();
+    if (target === 'ink' || target === 'all inks') return name.includes('ink');
+    if (target === 'paper' || target === 'all papers') return name.includes('paper');
     if (target === 'butter paper' || target === 'butter') return name.includes('butter');
-    return name === target || name.includes(target) || target.includes(name);
+    if (target === 'sublimation paper' || target === 'sublimation') return name.includes('sublimation');
+    return name.includes(target) || target.includes(name);
   };
 
   const inwardTx = transactions.filter(t => {
     if (t.type !== 'INWARD') return false;
-    if (inwardDateStart && t.date < inwardDateStart) return false;
-    if (inwardDateEnd && t.date > inwardDateEnd + 'T23:59:59') return false;
+    const tDateYMD = toYYYYMMDD(t.date);
+    if (inwardDateStart && tDateYMD < inwardDateStart) return false;
+    if (inwardDateEnd && tDateYMD > inwardDateEnd) return false;
     if (!matchesMaterialType(t.materialName, inwardMaterialType)) return false;
     if (!inwardSearch) return true;
     const s = inwardSearch.toLowerCase();
@@ -741,13 +759,14 @@ export default function RawMaterialsPanel() {
       || (t.challanNo || '').toLowerCase().includes(s)
       || (t.panna || '').toLowerCase().includes(s)
       || (t.paperQuality || '').toLowerCase().includes(s)
-      || (t.color || '').toLowerCase().includes(s);
+      || (t.color || '').toLowerCase().includes(s)
+      || (t.notes || '').toLowerCase().includes(s);
   }).sort((a, b) => {
     let valA = a[inwardSortBy];
     let valB = b[inwardSortBy];
     if (inwardSortBy === 'date') {
-      valA = new Date(a.date);
-      valB = new Date(b.date);
+      valA = new Date(a.date).getTime();
+      valB = new Date(b.date).getTime();
     }
     if (valA < valB) return inwardSortOrder === 'asc' ? -1 : 1;
     if (valA > valB) return inwardSortOrder === 'asc' ? 1 : -1;
@@ -756,8 +775,9 @@ export default function RawMaterialsPanel() {
 
   const outwardTx = transactions.filter(t => {
     if (t.type !== 'OUTWARD') return false;
-    if (outwardDateStart && t.date < outwardDateStart) return false;
-    if (outwardDateEnd && t.date > outwardDateEnd + 'T23:59:59') return false;
+    const tDateYMD = toYYYYMMDD(t.date);
+    if (outwardDateStart && tDateYMD < outwardDateStart) return false;
+    if (outwardDateEnd && tDateYMD > outwardDateEnd) return false;
     if (!matchesMaterialType(t.materialName, outwardMaterialType)) return false;
     if (!outwardSearch) return true;
     const s = outwardSearch.toLowerCase();
@@ -766,13 +786,14 @@ export default function RawMaterialsPanel() {
       || (t.jobNo || '').toLowerCase().includes(s)
       || (t.panna || '').toLowerCase().includes(s)
       || (t.paperQuality || '').toLowerCase().includes(s)
-      || (t.color || '').toLowerCase().includes(s);
+      || (t.color || '').toLowerCase().includes(s)
+      || (t.notes || '').toLowerCase().includes(s);
   }).sort((a, b) => {
     let valA = a[outwardSortBy];
     let valB = b[outwardSortBy];
     if (outwardSortBy === 'date') {
-      valA = new Date(a.date);
-      valB = new Date(b.date);
+      valA = new Date(a.date).getTime();
+      valB = new Date(b.date).getTime();
     }
     if (valA < valB) return outwardSortOrder === 'asc' ? -1 : 1;
     if (valA > valB) return outwardSortOrder === 'asc' ? 1 : -1;
