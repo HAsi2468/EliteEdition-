@@ -901,9 +901,13 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                   <FileText size={15} />
                   <span>{downloadingInwardPdf ? 'Generating PDF...' : 'Download PDF'}</span>
                 </button>
-                <button onClick={onBulkInward} style={styles.addInwardStockBtn}>
+                <button onClick={onBulkInward} style={styles.addInwardStockBtn} title="Bulk Order / Multi Inward Stock">
                   <Sparkles size={15} />
-                  <span>+ Add Inward Stock</span>
+                  <span>+ Bulk Inward Stock</span>
+                </button>
+                <button onClick={onAdd} style={{ ...styles.addInwardStockBtn, background: '#0284c7', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.2)' }} title="Single SKU Inward Stock">
+                  <Plus size={15} />
+                  <span>+ Single Item Inward</span>
                 </button>
               </div>
             </div>
@@ -926,7 +930,17 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
               <div style={styles.emptyState}>
                 <span style={{ fontSize: '2.8rem' }}>📥</span>
                 <h4 style={{ margin: '0.5rem 0 0.2rem 0', color: '#1e293b', fontSize: '1.1rem' }}>No inward stock records found</h4>
-                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try clearing date filters or add inward stock.</p>
+                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0 0 1rem 0' }}>Try clearing date filters or add inward stock.</p>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <button onClick={onBulkInward} style={styles.addInwardStockBtn}>
+                    <Sparkles size={15} />
+                    <span>+ Add Bulk Inward</span>
+                  </button>
+                  <button onClick={onAdd} style={{ ...styles.addInwardStockBtn, background: '#0284c7' }}>
+                    <Plus size={15} />
+                    <span>+ Add Single Inward</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
