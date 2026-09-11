@@ -6,6 +6,7 @@ import {
   Layers, Database, Settings, Trash2, FileDown, Search, X,
   CheckCircle, AlertCircle, Calendar, Tag, User, Clipboard, Edit
 } from 'lucide-react';
+import DateRangePicker from './DateRangePicker';
 
 const parseCanSize = (val) => {
   if (val === undefined || val === null || val === '') return 0;
@@ -268,13 +269,23 @@ export default function RawMaterialsPanel() {
 
   const [inwardDateStart, setInwardDateStart] = useState('');
   const [inwardDateEnd, setInwardDateEnd] = useState('');
+  const [inwardPreset, setInwardPreset] = useState('all');
+  const [customInwardStart, setCustomInwardStart] = useState('');
+  const [customInwardEnd, setCustomInwardEnd] = useState('');
+  const [inwardMaterialType, setInwardMaterialType] = useState('All');
   const [inwardSortBy, setInwardSortBy] = useState('date');
   const [inwardSortOrder, setInwardSortOrder] = useState('desc');
 
   const [outwardDateStart, setOutwardDateStart] = useState('');
   const [outwardDateEnd, setOutwardDateEnd] = useState('');
+  const [outwardPreset, setOutwardPreset] = useState('all');
+  const [customOutwardStart, setCustomOutwardStart] = useState('');
+  const [customOutwardEnd, setCustomOutwardEnd] = useState('');
+  const [outwardMaterialType, setOutwardMaterialType] = useState('All');
   const [outwardSortBy, setOutwardSortBy] = useState('date');
   const [outwardSortOrder, setOutwardSortOrder] = useState('desc');
+
+  const [stockMaterialType, setStockMaterialType] = useState('All');
 
   // PDF download filter state
   const [pdfFilter, setPdfFilter] = useState({
@@ -708,10 +719,21 @@ export default function RawMaterialsPanel() {
   };
 
   // Filter local registers
+  const matchesMaterialType = (materialName, filterType) => {
+    if (!filterType || filterType === 'All') return true;
+    const name = (materialName || '').toLowerCase();
+    const target = filterType.toLowerCase();
+    if (target === 'ink') return name.includes('ink');
+    if (target === 'paper') return name.includes('paper');
+    if (target === 'butter paper' || target === 'butter') return name.includes('butter');
+    return name === target || name.includes(target) || target.includes(name);
+  };
+
   const inwardTx = transactions.filter(t => {
     if (t.type !== 'INWARD') return false;
     if (inwardDateStart && t.date < inwardDateStart) return false;
     if (inwardDateEnd && t.date > inwardDateEnd + 'T23:59:59') return false;
+    if (!matchesMaterialType(t.materialName, inwardMaterialType)) return false;
     if (!inwardSearch) return true;
     const s = inwardSearch.toLowerCase();
     return (t.materialName || '').toLowerCase().includes(s)
@@ -736,6 +758,7 @@ export default function RawMaterialsPanel() {
     if (t.type !== 'OUTWARD') return false;
     if (outwardDateStart && t.date < outwardDateStart) return false;
     if (outwardDateEnd && t.date > outwardDateEnd + 'T23:59:59') return false;
+    if (!matchesMaterialType(t.materialName, outwardMaterialType)) return false;
     if (!outwardSearch) return true;
     const s = outwardSearch.toLowerCase();
     return (t.materialName || '').toLowerCase().includes(s)
@@ -755,6 +778,8 @@ export default function RawMaterialsPanel() {
     if (valA > valB) return outwardSortOrder === 'asc' ? 1 : -1;
     return 0;
   });
+
+  const filteredStock = stock.filter(item => matchesMaterialType(item.materialName, stockMaterialType));
 
   const renderMaterialCell = (t) => {
     const nameLower = (t.materialName || '').toLowerCase();
@@ -946,11 +971,29 @@ export default function RawMaterialsPanel() {
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
               <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Layers size={20} /> Current Raw Material Stock
               </h2>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* Material Type / Category Filter */}
+                <select
+                  style={{ ...inputStyle, width: '180px', fontWeight: 700 }}
+                  value={stockMaterialType}
+                  onChange={e => setStockMaterialType(e.target.value)}
+                >
+                  <option value="All">All Material Types</option>
+                  <option value="Ink">All Inks (Grando / Printdot)</option>
+                  <option value="Paper">All Papers (Sublimation / Butter)</option>
+                  <option value="Sublimation Paper">Sublimation Paper</option>
+                  <option value="Butter Paper">Butter Paper</option>
+                  <option value="Grando Ink">Grando Ink</option>
+                  <option value="Printdot Ink">Printdot Ink</option>
+                  {materialsList.filter(m => !['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'].includes(m)).map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+
                 <button onClick={() => { setEditingTransaction(null); setIsInwardOpen(true); handleInwardTabChange('Sublimation Paper'); setInwardItems([]); }} className="btn-primary" style={{ gap: '0.4rem' }}>
                   <ArrowDownToLine size={16} /> Stock Inward
                 </button>
@@ -964,16 +1007,16 @@ export default function RawMaterialsPanel() {
             {stock.length > 0 && (
               <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
                 <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Items Configured</span><br /><strong>{materialsList.length}</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Active Stock Profiles</span><br /><strong>{stock.length}</strong></div>
+                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Active Stock Profiles</span><br /><strong>{filteredStock.length} / {stock.length}</strong></div>
                 <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Inward Transactions</span><br /><strong style={{ color: 'var(--success)' }}>{transactions.filter(t => t.type === 'INWARD').length}</strong></div>
                 <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Outward Transactions</span><br /><strong style={{ color: 'var(--danger)' }}>{transactions.filter(t => t.type === 'OUTWARD').length}</strong></div>
               </div>
             )}
 
             {/* Materials Stock Cards */}
-            {stock.length === 0 && !loading && <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No stock data logged yet. Click Stock Inward to add items.</p>}
+            {filteredStock.length === 0 && !loading && <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No stock data matching selected material filter.</p>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.2rem' }}>
-              {stock.map((item, idx) => {
+              {filteredStock.map((item, idx) => {
                 const isLow = item.currentStock <= 5;
                 const isEmpty = item.currentStock <= 0;
                 return (
@@ -1040,24 +1083,40 @@ export default function RawMaterialsPanel() {
                   />
                   <Search size={16} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
-                  <input
-                    type="date"
-                    value={inwardDateStart}
-                    onChange={e => setInwardDateStart(e.target.value)}
-                    style={{ ...inputStyle, width: '130px', padding: '0.3rem' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>To:</span>
-                  <input
-                    type="date"
-                    value={inwardDateEnd}
-                    onChange={e => setInwardDateEnd(e.target.value)}
-                    style={{ ...inputStyle, width: '130px', padding: '0.3rem' }}
-                  />
-                </div>
+
+                {/* Material Type / Category Filter */}
+                <select
+                  style={{ ...inputStyle, width: '180px', fontWeight: 700 }}
+                  value={inwardMaterialType}
+                  onChange={e => setInwardMaterialType(e.target.value)}
+                >
+                  <option value="All">All Material Types</option>
+                  <option value="Ink">All Inks (Grando / Printdot)</option>
+                  <option value="Paper">All Papers (Sublimation / Butter)</option>
+                  <option value="Sublimation Paper">Sublimation Paper</option>
+                  <option value="Butter Paper">Butter Paper</option>
+                  <option value="Grando Ink">Grando Ink</option>
+                  <option value="Printdot Ink">Printdot Ink</option>
+                  {materialsList.filter(m => !['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'].includes(m)).map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+
+                {/* Standard ERP DateRangePicker */}
+                <DateRangePicker
+                  preset={inwardPreset}
+                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                    setInwardPreset(p);
+                    setInwardDateStart(ds);
+                    setInwardDateEnd(de);
+                  }}
+                  customStart={customInwardStart}
+                  customEnd={customInwardEnd}
+                  onCustomChange={(s, e) => {
+                    setCustomInwardStart(s);
+                    setCustomInwardEnd(e);
+                  }}
+                />
               </div>
             </div>
 
@@ -1187,24 +1246,40 @@ export default function RawMaterialsPanel() {
                   />
                   <Search size={16} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
-                  <input
-                    type="date"
-                    value={outwardDateStart}
-                    onChange={e => setOutwardDateStart(e.target.value)}
-                    style={{ ...inputStyle, width: '130px', padding: '0.3rem' }}
-                  />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>To:</span>
-                  <input
-                    type="date"
-                    value={outwardDateEnd}
-                    onChange={e => setOutwardDateEnd(e.target.value)}
-                    style={{ ...inputStyle, width: '130px', padding: '0.3rem' }}
-                  />
-                </div>
+
+                {/* Material Type / Category Filter */}
+                <select
+                  style={{ ...inputStyle, width: '180px', fontWeight: 700 }}
+                  value={outwardMaterialType}
+                  onChange={e => setOutwardMaterialType(e.target.value)}
+                >
+                  <option value="All">All Material Types</option>
+                  <option value="Ink">All Inks (Grando / Printdot)</option>
+                  <option value="Paper">All Papers (Sublimation / Butter)</option>
+                  <option value="Sublimation Paper">Sublimation Paper</option>
+                  <option value="Butter Paper">Butter Paper</option>
+                  <option value="Grando Ink">Grando Ink</option>
+                  <option value="Printdot Ink">Printdot Ink</option>
+                  {materialsList.filter(m => !['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'].includes(m)).map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+
+                {/* Standard ERP DateRangePicker */}
+                <DateRangePicker
+                  preset={outwardPreset}
+                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                    setOutwardPreset(p);
+                    setOutwardDateStart(ds);
+                    setOutwardDateEnd(de);
+                  }}
+                  customStart={customOutwardStart}
+                  customEnd={customOutwardEnd}
+                  onCustomChange={(s, e) => {
+                    setCustomOutwardStart(s);
+                    setCustomOutwardEnd(e);
+                  }}
+                />
               </div>
             </div>
 
