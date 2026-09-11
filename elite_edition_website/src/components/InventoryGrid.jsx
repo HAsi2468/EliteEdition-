@@ -8,6 +8,7 @@ import {
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { api } from '../services/api';
+import DateRangePicker from './DateRangePicker';
 
 export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockOut, onOpenManager, onBulkInward, onQuickStockUpdate }) {
   // 3 Primary Sub-Screens: 'overview' (Stock Overview), 'inward' (Inward Stock), 'outward' (Outward Stock)
@@ -26,6 +27,8 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
   const [inwardDateStart, setInwardDateStart] = useState('');
   const [inwardDateEnd, setInwardDateEnd] = useState('');
   const [inwardPreset, setInwardPreset] = useState('all'); // 'today', '7days', 'thisMonth', 'all', 'custom'
+  const [customInwardStart, setCustomInwardStart] = useState('');
+  const [customInwardEnd, setCustomInwardEnd] = useState('');
   const [inwardSearchTerm, setInwardSearchTerm] = useState('');
   const [inwardData, setInwardData] = useState({ items: [], totalQty: 0, totalPurchase: 0 });
   const [inwardLoading, setInwardLoading] = useState(false);
@@ -36,6 +39,8 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
   const [outwardDateStart, setOutwardDateStart] = useState('');
   const [outwardDateEnd, setOutwardDateEnd] = useState('');
   const [outwardPreset, setOutwardPreset] = useState('all'); // 'today', '7days', 'thisMonth', 'all', 'custom'
+  const [customOutwardStart, setCustomOutwardStart] = useState('');
+  const [customOutwardEnd, setCustomOutwardEnd] = useState('');
   const [outwardSearchTerm, setOutwardSearchTerm] = useState('');
   const [outwardData, setOutwardData] = useState({ items: [], totalQty: 0, totalPurchase: 0, totalSell: 0, totalProfit: 0 });
   const [outwardLoading, setOutwardLoading] = useState(false);
@@ -859,39 +864,22 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                 />
               </div>
 
-              {/* Exact Standard ERP Date Filter Component Matching Screenshot */}
-              <div style={styles.dateFilterContainer}>
-                <Calendar size={16} color="#475569" style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>From:</span>
-                <input
-                  type="date"
-                  value={inwardDateStart}
-                  onChange={(e) => {
-                    setInwardPreset('custom');
-                    setInwardDateStart(e.target.value);
-                    fetchInwardData(e.target.value, inwardDateEnd);
-                  }}
-                  style={styles.dateInput}
-                />
-                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>To:</span>
-                <input
-                  type="date"
-                  value={inwardDateEnd}
-                  onChange={(e) => {
-                    setInwardPreset('custom');
-                    setInwardDateEnd(e.target.value);
-                    fetchInwardData(inwardDateStart, e.target.value);
-                  }}
-                  style={styles.dateInput}
-                />
-
-                <div style={styles.presetGroup}>
-                  <button onClick={() => handleQuickDatePreset('inward', 'today')} style={styles.presetBtn(inwardPreset === 'today')}>Today</button>
-                  <button onClick={() => handleQuickDatePreset('inward', '7days')} style={styles.presetBtn(inwardPreset === '7days')}>7 Days</button>
-                  <button onClick={() => handleQuickDatePreset('inward', 'thisMonth')} style={styles.presetBtn(inwardPreset === 'thisMonth')}>This Month</button>
-                  <button onClick={() => handleQuickDatePreset('inward', 'all')} style={styles.presetBtn(inwardPreset === 'all')}>All Time</button>
-                </div>
-              </div>
+              {/* Standard Regular DateRangePicker Component */}
+              <DateRangePicker
+                preset={inwardPreset}
+                onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                  setInwardPreset(p);
+                  setInwardDateStart(ds);
+                  setInwardDateEnd(de);
+                  fetchInwardData(ds, de);
+                }}
+                customStart={customInwardStart}
+                customEnd={customInwardEnd}
+                onCustomChange={(s, e) => {
+                  setCustomInwardStart(s);
+                  setCustomInwardEnd(e);
+                }}
+              />
             </div>
 
             <div style={styles.rowTwo}>
@@ -1102,39 +1090,22 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                 />
               </div>
 
-              {/* Exact Standard ERP Date Filter Component Matching Screenshot */}
-              <div style={styles.dateFilterContainer}>
-                <Calendar size={16} color="#475569" style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>From:</span>
-                <input
-                  type="date"
-                  value={outwardDateStart}
-                  onChange={(e) => {
-                    setOutwardPreset('custom');
-                    setOutwardDateStart(e.target.value);
-                    fetchOutwardData(e.target.value, outwardDateEnd);
-                  }}
-                  style={styles.dateInput}
-                />
-                <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1e293b' }}>To:</span>
-                <input
-                  type="date"
-                  value={outwardDateEnd}
-                  onChange={(e) => {
-                    setOutwardPreset('custom');
-                    setOutwardDateEnd(e.target.value);
-                    fetchOutwardData(outwardDateStart, e.target.value);
-                  }}
-                  style={styles.dateInput}
-                />
-
-                <div style={styles.presetGroup}>
-                  <button onClick={() => handleQuickDatePreset('outward', 'today')} style={styles.presetBtn(outwardPreset === 'today')}>Today</button>
-                  <button onClick={() => handleQuickDatePreset('outward', '7days')} style={styles.presetBtn(outwardPreset === '7days')}>7 Days</button>
-                  <button onClick={() => handleQuickDatePreset('outward', 'thisMonth')} style={styles.presetBtn(outwardPreset === 'thisMonth')}>This Month</button>
-                  <button onClick={() => handleQuickDatePreset('outward', 'all')} style={styles.presetBtn(outwardPreset === 'all')}>All Time</button>
-                </div>
-              </div>
+              {/* Standard Regular DateRangePicker Component */}
+              <DateRangePicker
+                preset={outwardPreset}
+                onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                  setOutwardPreset(p);
+                  setOutwardDateStart(ds);
+                  setOutwardDateEnd(de);
+                  fetchOutwardData(ds, de);
+                }}
+                customStart={customOutwardStart}
+                customEnd={customOutwardEnd}
+                onCustomChange={(s, e) => {
+                  setCustomOutwardStart(s);
+                  setCustomOutwardEnd(e);
+                }}
+              />
             </div>
 
             <div style={styles.rowTwo}>

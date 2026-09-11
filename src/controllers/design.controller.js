@@ -6,7 +6,10 @@ const getAll = async (req, res) => {
     const { search, category, colors, status, page = 1, limit = 50, sortBy, sortOrder, department } = req.query;
     const filter = {};
     if (status && status !== 'All') filter.status = status;
-    if (category && category !== 'All') filter.category = category;
+    if (category && category !== 'All') {
+      const escaped = String(category).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.category = { $regex: `^${escaped}$`, $options: 'i' };
+    }
     if (colors && colors !== 'All') filter.colors = { $regex: colors, $options: 'i' };
 
     let deptOr = null;
@@ -18,7 +21,9 @@ const getAll = async (req, res) => {
       ];
     } else if (department === 'digital_print') {
       filter.department = { $ne: 'stitching' };
-      filter.category = { $ne: 'Stitching' };
+      if (!filter.category) {
+        filter.category = { $ne: 'Stitching' };
+      }
     }
 
     if (search) {
@@ -132,9 +137,21 @@ const getNextDesignNumber = async (req, res) => {
 // Get all distinct categories for filter dropdown
 const getCategories = async (req, res) => {
   try {
-    const cats = await db.Design.distinct('category');
-    res.json(cats.filter(Boolean).sort());
+    const rawCats = await db.Design.distinct('category');
+    const defaultCats = [
+      'SUIT', 'KURTI', 'DUPATTA', 'TOP', 'BOTTOM', 'LEHENGA', 'STITCHING SET', 'KIDS', 'ETHNIC',
+      'Cotton', 'Polyester', 'Silk', 'Stitching', 'Digital Print'
+    ];
+    const combined = new Set();
+    [...defaultCats, ...(rawCats || [])].forEach(c => {
+      if (c && typeof c === 'string' && c.trim()) {
+        combined.add(c.trim());
+      }
+    });
+    const sorted = Array.from(combined).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    res.json(sorted);
   } catch (err) {
+    logger.error('design.getCategories error: %o', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
