@@ -1,74 +1,84 @@
 const Lead = require('../db/models/lead.model');
-const { evaluateLeadInquiry } = require('../services/leadEvaluator');
 
-// Ingest raw inquiry text, run AI Lead Evaluation engine, save to DB, and return standardized JSON
-const ingestAndQualifyLead = async (req, res) => {
+// Create new lead
+const createLead = async (req, res) => {
   try {
-    const { rawInquiryText, lead_source, companyEntity } = req.body;
-    if (!rawInquiryText || !String(rawInquiryText).trim()) {
-      return res.status(400).json({ success: false, error: 'Raw inquiry text is required.' });
+    const {
+      name,
+      phone,
+      companyName,
+      email,
+      source,
+      stage,
+      priority,
+      estimatedValue,
+      requirement,
+      notes,
+      followUpDate,
+      assignedTo,
+      companyEntity
+    } = req.body;
+
+    if (!name || !phone) {
+      return res.status(400).json({ success: false, error: 'Customer Name and Phone Number are required.' });
     }
 
-    const evaluationResult = evaluateLeadInquiry(rawInquiryText, lead_source);
-
-    const leadDoc = new Lead({
-      rawInquiryText: String(rawInquiryText).trim(),
-      companyEntity: companyEntity || 'Elite Digital Print',
-      lead_profile: evaluationResult.lead_profile,
-      inquiry_details: evaluationResult.inquiry_details,
-      qualification: evaluationResult.qualification,
-      action_plan: evaluationResult.action_plan,
-      auto_response_draft: evaluationResult.auto_response_draft,
-      scoring_breakdown: evaluationResult.scoring_breakdown,
-      status: 'New'
+    const newLead = new Lead({
+      name: String(name).trim(),
+      phone: String(phone).trim(),
+      companyName: companyName ? String(companyName).trim() : '',
+      email: email ? String(email).trim() : '',
+      source: source || 'WhatsApp',
+      stage: stage || 'New',
+      priority: priority || 'Medium',
+      estimatedValue: Number(estimatedValue) || 0,
+      requirement: requirement ? String(requirement).trim() : '',
+      notes: notes ? String(notes).trim() : '',
+      followUpDate: followUpDate ? new Date(followUpDate) : null,
+      assignedTo: assignedTo || 'Unassigned',
+      companyEntity: companyEntity || 'Elite Digital Print'
     });
 
-    await leadDoc.save();
+    await newLead.save();
 
     return res.status(201).json({
       success: true,
-      message: 'Lead successfully ingested & qualified by AI',
-      data: leadDoc,
-      evaluationJson: evaluationResult
+      message: 'Lead created successfully',
+      data: newLead
     });
   } catch (error) {
-    console.error('Error in ingestAndQualifyLead:', error);
+    console.error('Error in createLead:', error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };
 
-// Get list of leads with filtering
+// Get leads list with filtering
 const getLeads = async (req, res) => {
   try {
-    const { priority, pipeline_stage, search, lead_intent, companyEntity } = req.query;
+    const { stage, priority, search, companyEntity } = req.query;
     const filter = {};
 
     if (companyEntity) {
       filter.companyEntity = companyEntity;
     }
 
+    if (stage && stage !== 'All') {
+      filter.stage = stage;
+    }
+
     if (priority && priority !== 'All') {
-      filter['qualification.priority'] = priority;
-    }
-
-    if (pipeline_stage && pipeline_stage !== 'All') {
-      filter['qualification.pipeline_stage'] = pipeline_stage;
-    }
-
-    if (lead_intent && lead_intent !== 'All') {
-      filter['qualification.lead_intent'] = lead_intent;
+      filter.priority = priority;
     }
 
     if (search && String(search).trim()) {
       const sRegex = new RegExp(String(search).trim(), 'i');
       filter.$or = [
-        { rawInquiryText: sRegex },
-        { 'lead_profile.full_name': sRegex },
-        { 'lead_profile.phone': sRegex },
-        { 'lead_profile.email': sRegex },
-        { 'lead_profile.company_or_business_name': sRegex },
-        { 'inquiry_details.product_service_interest': sRegex },
-        { 'inquiry_details.raw_notes_summary': sRegex }
+        { name: sRegex },
+        { phone: sRegex },
+        { companyName: sRegex },
+        { email: sRegex },
+        { requirement: sRegex },
+        { notes: sRegex }
       ];
     }
 
@@ -124,35 +134,10 @@ const deleteLead = async (req, res) => {
   }
 };
 
-// Send / log auto response to lead
-const sendAutoResponse = async (req, res) => {
-  try {
-    const lead = await Lead.findById(req.params.id);
-    if (!lead) {
-      return res.status(404).json({ success: false, error: 'Lead not found.' });
-    }
-
-    lead.status = 'Contacted';
-    if (lead.qualification.pipeline_stage === 'New Lead') {
-      lead.qualification.pipeline_stage = 'Contacted';
-    }
-    await lead.save();
-
-    return res.status(200).json({
-      success: true,
-      message: `Auto response logged and dispatched via ${lead.auto_response_draft.channel}`,
-      data: lead
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
-  }
-};
-
 module.exports = {
-  ingestAndQualifyLead,
+  createLead,
   getLeads,
   getLeadById,
   updateLead,
-  deleteLead,
-  sendAutoResponse
+  deleteLead
 };

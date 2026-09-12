@@ -1834,14 +1834,14 @@ export const api = {
     });
   },
 
-  // CRM Lead AI Management
+  // CRM Lead Management
   async getLeads(params = {}) {
     const query = new URLSearchParams(params).toString();
     return request(`/leads${query ? `?${query}` : ''}`);
   },
 
-  async ingestAndQualifyLead(payload) {
-    return request('/leads/ingest', {
+  async createLead(payload) {
+    return request('/leads', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
@@ -1856,14 +1856,7 @@ export const api = {
 
   async deleteLead(id) {
     return request(`/leads/${id}`, { method: 'DELETE' });
-  },
-
-  async sendLeadAutoResponse(id, payload = {}) {
-    return request(`/leads/${id}/auto-respond`, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  },
+  }
 };
 
 
