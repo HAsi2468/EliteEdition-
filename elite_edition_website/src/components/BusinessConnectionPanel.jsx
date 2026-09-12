@@ -4,7 +4,7 @@ import {
   Phone, Mail, MapPin, Sparkles, TrendingUp, CheckCircle2, Trash2, Edit3,
   Copy, FileText, Send, RefreshCw, X, AlertCircle, Building2, CreditCard
 } from 'lucide-react';
-import api from '../services/api';
+import { api } from '../services/api';
 
 const RECORD_TYPES = [
   { key: 'ALL', label: 'All Connections', icon: Users, color: '#38bdf8' },
@@ -176,10 +176,10 @@ export default function BusinessConnectionPanel({ currentUser }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <Bot size={28} color="#38bdf8" /> Business Connections &amp; Master AI Agent
+            <UserCheck size={28} color="#38bdf8" /> Business Connection
           </h2>
           <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Centralized ERP/CRM Directory for Sales Leads, Vendors, Salaried Employees &amp; Factory Workers.
+            Centralized Directory for Sales Leads, Vendors, Salaried Employees &amp; Factory Workers.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.6rem' }}>
@@ -244,7 +244,7 @@ export default function BusinessConnectionPanel({ currentUser }) {
         })}
       </div>
 
-      {/* Master AI Agent Processing Box */}
+      {/* Quick Text Ingestion Box */}
       <div style={{
         background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.9) 100%)',
         border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: '14px', padding: '1.2rem', marginBottom: '1.5rem',
@@ -252,15 +252,12 @@ export default function BusinessConnectionPanel({ currentUser }) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Sparkles size={20} color="#f59e0b" />
-            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#38bdf8' }}>
-              Master AI Agent Processing Engine
+            <Sparkles size={18} color="#38bdf8" />
+            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#38bdf8' }}>
+              Quick Text Ingestion &amp; Field Extractor
             </h3>
-            <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: '12px', background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)', fontWeight: 700 }}>
-              Gemini 1.5 Powered
-            </span>
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Auto-classifies into LEAD, VENDOR, EMPLOYEE, or WORKER</span>
+          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Auto-classifies into Lead, Vendor, Employee, or Worker</span>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', flexDirection: 'column' }}>

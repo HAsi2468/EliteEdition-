@@ -24,6 +24,7 @@ import DigitalPrintExpenseModule from './components/DigitalPrintExpenseModule';
 import CompanyDedicatedDashboard from './components/CompanyDedicatedDashboard';
 import GarmentJobCardDashboard from './components/GarmentJobCardDashboard';
 import CrmPanel from './components/CrmPanel';
+import BusinessConnectionPanel from './components/BusinessConnectionPanel';
 import MasterAiProcessingAgent from './components/MasterAiProcessingAgent';
 import { COMPANIES, getCompanyById } from './config/companiesConfig';
 
@@ -201,7 +202,7 @@ export default function App() {
   // Department permission helpers
   // Department permission helpers
   const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
-  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent'];
+  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
   const STITCHING_PERMISSIONS = [
     'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
     'jobcards_stitching_challan', 'jobcards_stitching_settings', 'stitching'
@@ -968,10 +969,10 @@ export default function App() {
                     </button>
                   )}
 
-                  {/* Master AI Agent */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master_ai') || currentUser.permissions?.includes('jobcards')) && (
-                    <button onClick={() => { setActiveTab('jobcards_master_ai'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_master_ai' ? styles.navItemActive : {}) }}>
-                      <Sparkles size={18} color="#4f46e5" /><span>Master AI Agent</span>
+                  {/* Business Connection */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_business_connection') || currentUser.permissions?.includes('jobcards_master_ai') || currentUser.permissions?.includes('jobcards')) && (
+                    <button onClick={() => { setActiveTab('jobcards_business_connection'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...((activeTab === 'jobcards_business_connection' || activeTab === 'jobcards_master_ai') ? styles.navItemActive : {}) }}>
+                      <Users size={18} color="#38bdf8" /><span>Business Connection</span>
                     </button>
                   )}
 
@@ -1390,8 +1391,8 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_crm') || currentUser.permissions?.includes('crm_department') || currentUser.permissions?.includes('crm')) &&
                       renderNavItem('jobcards_crm', 'CRM Department', Users, null, 'CRM')
                     }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master_ai') || currentUser.permissions?.includes('jobcards')) &&
-                      renderNavItem('jobcards_master_ai', 'Master AI Agent', Sparkles, null, 'Master AI')
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_business_connection') || currentUser.permissions?.includes('jobcards_master_ai') || currentUser.permissions?.includes('jobcards')) &&
+                      renderNavItem('jobcards_business_connection', 'Business Connection', Users, null, 'Connections')
                     }
 
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) &&
@@ -1560,8 +1561,8 @@ export default function App() {
             <ReportsCenter department={activeDepartment === 'elite_online' ? 'elite-online' : 'elite-print'} />
           ) : activeTab === 'jobcards_crm' || activeTab === 'crm_department' || activeTab === 'crm' ? (
             <CrmPanel currentUser={currentUser} />
-          ) : activeTab === 'jobcards_master_ai' || activeTab === 'master_ai_agent' ? (
-            <MasterAiProcessingAgent />
+          ) : activeTab === 'jobcards_business_connection' || activeTab === 'jobcards_master_ai' || activeTab === 'master_ai_agent' || activeTab === 'business_connection' ? (
+            <BusinessConnectionPanel currentUser={currentUser} />
           ) : activeTab.startsWith('jobcards') ? (
             <JobCardPanel currentUser={currentUser} activeSubTab={activeTab === 'jobcards' ? 'jobcards' : activeTab.replace('jobcards_', '')} department={activeDepartment} />
           ) : activeTab === 'ee_dashboard' ? (
