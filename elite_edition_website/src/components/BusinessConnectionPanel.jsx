@@ -190,35 +190,23 @@ export default function BusinessConnectionPanel({ currentUser }) {
           </p>
         </div>
 
-        <div style={styles.headerBtnGroup}>
-          <button
-            onClick={fetchConnections}
-            disabled={loading}
-            style={styles.refreshBtn}
-            title="Refresh connections data"
-          >
-            <RefreshCw size={16} className={loading ? "spin-icon" : ""} />
-            <span>{loading ? 'Refreshing...' : 'Refresh Data'}</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setEditingId(null);
-              setFormData({
-                record_type: activeType === 'ALL' ? 'VENDOR' : activeType,
-                common_directory: { name: '', primary_phone: '', whatsapp_phone: '', email: '', city: '', state: '', address: '', is_active: true },
-                vendor_data: { company_name: '', gst_or_tax_id: '', bank_account: '', bank_ifsc: '', upi_id: '', payment_terms: 'Net 30', supplied_items: '' },
-                employee_data: { department: 'Production', designation: '', monthly_salary: '', joining_date: '', emergency_contact: '' },
-                worker_data: { designation: '', station_or_skill: '', wage_model: 'DAILY_WAGE', rate_amount: '', payout_schedule: 'WEEKLY' }
-              });
-              setShowModal(true);
-            }}
-            style={styles.addBtn}
-          >
-            <Plus size={18} />
-            <span>Add New Connection</span>
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            setEditingId(null);
+            setFormData({
+              record_type: activeType === 'ALL' ? 'VENDOR' : activeType,
+              common_directory: { name: '', primary_phone: '', whatsapp_phone: '', email: '', city: '', state: '', address: '', is_active: true },
+              vendor_data: { company_name: '', gst_or_tax_id: '', bank_account: '', bank_ifsc: '', upi_id: '', payment_terms: 'Net 30', supplied_items: '' },
+              employee_data: { department: 'Production', designation: '', monthly_salary: '', joining_date: '', emergency_contact: '' },
+              worker_data: { designation: '', station_or_skill: '', wage_model: 'DAILY_WAGE', rate_amount: '', payout_schedule: 'WEEKLY' }
+            });
+            setShowModal(true);
+          }}
+          style={styles.addBtn}
+        >
+          <Plus size={18} />
+          <span>Add New Connection</span>
+        </button>
       </div>
 
       {/* Metric Cards Grid */}

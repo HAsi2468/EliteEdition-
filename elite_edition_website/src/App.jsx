@@ -251,7 +251,7 @@ export default function App() {
       return;
     }
     if (activeDepartment === 'stitching' && (activeTab === 'jobcards_list' || activeTab === 'jobcards_catalogue' || activeTab === 'jobcards_fabric')) return;
-    if (activeTab.startsWith('jobcards')) {
+    if (activeTab.startsWith('jobcards') || activeTab === 'business_connection' || activeTab === 'crm' || activeTab === 'master_ai_agent') {
       setActiveDepartment('digital_print');
     } else if (activeTab.startsWith('ee_')) {
       setActiveDepartment('elite_edition');
@@ -337,14 +337,15 @@ export default function App() {
     if (!isAuthenticated || !currentUser) return;
 
     const ALL_SYSTEM_TABS = [
-      'dashboard', 'workspace', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
+      'dashboard', 'workspace', 'communication', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',
       'ee_dashboard', 'ee_invoices', 'ee_settings', 'ee_complaints', 'ee_expenses',
       'ef_dashboard', 'ef_invoices', 'ef_settings', 'ef_complaints', 'ef_expenses',
       'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'eo_complaints', 'eo_expenses',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
       'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense',
-      'jobcards_expenses', 'expense_dashboard', 'expense_create', 'expenses', 'jobcards_qa', 'qa', 'qa_dashboard', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent'
+      'jobcards_expenses', 'expense_dashboard', 'expense_create', 'expenses', 'jobcards_qa', 'qa', 'qa_dashboard', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent',
+      'jobcards_business_connection', 'business_connection', 'complaint_dashboard', 'complaint_create'
     ];
 
     if (currentUser.role === 'admin') {
