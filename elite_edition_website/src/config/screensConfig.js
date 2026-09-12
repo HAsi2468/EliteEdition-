@@ -17,42 +17,52 @@ export const AVAILABLE_SCREENS = [
   { id: 'admin', label: 'Admin User & Infrastructure Settings', category: 'General' },
 
   // Elite Online (E-Commerce)
-  { id: 'elite_online', label: 'Elite Online: Dashboard', category: 'Elite Online' },
+  { id: 'elite_online', label: 'Elite Online: Dashboard Overview', category: 'Elite Online' },
   { id: 'inventory', label: 'Elite Online: Store Inventory', category: 'Elite Online' },
   { id: 'catalog', label: 'Elite Online: Product Catalog', category: 'Elite Online' },
   { id: 'returns', label: 'Elite Online: Returns Department', category: 'Elite Online' },
   { id: 'sales', label: 'Elite Online: Sales Orders', category: 'Elite Online' },
+  { id: 'eo_complaints', label: 'Elite Online: Complaints Module', category: 'Elite Online' },
 
-  // Elite Edition (New Company)
+  // Elite Edition (Company)
+  { id: 'ee_dashboard', label: 'Elite Edition: Dashboard Overview', category: 'Elite Edition' },
   { id: 'ee_invoices', label: 'Elite Edition: Invoices & GST Billing', category: 'Elite Edition' },
+  { id: 'ee_complaints', label: 'Elite Edition: Complaints Module', category: 'Elite Edition' },
   { id: 'ee_settings', label: 'Elite Edition: Company Settings', category: 'Elite Edition' },
 
-  // Elite Fabtex (New Company)
+  // Elite Fabtex (Company)
+  { id: 'ef_dashboard', label: 'Elite Fabtex: Dashboard Overview', category: 'Elite Fabtex' },
   { id: 'ef_invoices', label: 'Elite Fabtex: Invoices & GST Billing', category: 'Elite Fabtex' },
+  { id: 'ef_complaints', label: 'Elite Fabtex: Complaints Module', category: 'Elite Fabtex' },
   { id: 'ef_settings', label: 'Elite Fabtex: Company Settings', category: 'Elite Fabtex' },
 
   // Elite Digital Print
-  { id: 'jobcards', label: 'Elite Prints: Dashboard', category: 'Elite Digital Print' },
-  { id: 'jobcards_list', label: 'Elite Prints: Job Card', category: 'Elite Digital Print' },
+  { id: 'jobcards', label: 'Elite Prints: Dashboard & Reports', category: 'Elite Digital Print' },
+  { id: 'jobcards_status_dashboard', label: 'Elite Prints: Pending Status Overview', category: 'Elite Digital Print' },
+  { id: 'jobcards_printing_log', label: 'Elite Prints: Printing Department', category: 'Elite Digital Print' },
+  { id: 'jobcards_fusing_log', label: 'Elite Prints: Fusing Department', category: 'Elite Digital Print' },
+  { id: 'jobcards_fabric', label: 'Elite Prints: Fabric Management', category: 'Elite Digital Print' },
+  { id: 'jobcards_billing', label: 'Elite Prints: Finance & Invoicing', category: 'Elite Digital Print' },
+  { id: 'jobcards_crm', label: 'Elite Prints: CRM & Lead Management', category: 'Elite Digital Print' },
+  { id: 'jobcards_business_connection', label: 'Elite Prints: Business Connection', category: 'Elite Digital Print' },
+  { id: 'jobcards_list', label: 'Elite Prints: Job Card List', category: 'Elite Digital Print' },
   { id: 'jobcards_catalogue', label: 'Elite Prints: Design Catalog', category: 'Elite Digital Print' },
   { id: 'jobcards_tracking', label: 'Elite Prints: Job Card Tracking', category: 'Elite Digital Print' },
-  { id: 'jobcards_printing_log', label: 'Elite Prints: Printing Department', category: 'Elite Digital Print' },
   { id: 'jobcards_master', label: 'Elite Prints: Design Master (100 Pic)', category: 'Elite Digital Print' },
-  { id: 'jobcards_fabric', label: 'Elite Prints: Fabric Management', category: 'Elite Digital Print' },
-  { id: 'jobcards_raw_materials', label: 'Elite Prints: Raw Materials', category: 'Elite Digital Print' },
-  { id: 'jobcards_billing', label: 'Elite Prints: Billing & Invoicing (General)', category: 'Elite Digital Print' },
   { id: 'jobcards_billing_elite', label: 'Elite Prints: Elite Edition Billing', category: 'Elite Digital Print' },
   { id: 'jobcards_billing_fabtex', label: 'Elite Prints: Elite Fabtex Billing', category: 'Elite Digital Print' },
-  { id: 'complaint_dashboard', label: 'Elite Prints: Complaint Dashboard (View Only)', category: 'Elite Digital Print' },
-  { id: 'complaint_create', label: 'Elite Prints: Log New Complaint (Create Access)', category: 'Elite Digital Print' },
-  { id: 'expense_dashboard', label: 'Elite Prints: Department Expenses (View Only)', category: 'Elite Digital Print' },
-  { id: 'expense_create', label: 'Elite Prints: Log Department Expense (IN/OUT)', category: 'Elite Digital Print' },
-  { id: 'jobcards_settings', label: 'Elite Prints: Settings', category: 'Elite Digital Print' },
+  { id: 'jobcards_raw_materials', label: 'Elite Prints: Raw Materials', category: 'Elite Digital Print' },
+  { id: 'jobcards_complain', label: 'Elite Prints: Complain Module', category: 'Elite Digital Print' },
+  { id: 'jobcards_qa', label: 'Elite Prints: QA & Quality Checking', category: 'Elite Digital Print' },
+  { id: 'expense_dashboard', label: 'Elite Prints: Department Expenses', category: 'Elite Digital Print' },
+  { id: 'jobcards_settings', label: 'Elite Prints: Print Settings', category: 'Elite Digital Print' },
 
   // Elite Stitching
+  { id: 'es_dashboard', label: 'Elite Stitching: Dashboard', category: 'Elite Stitching' },
   { id: 'stitching_jobcards', label: 'Elite Stitching: Job Card Tracking', category: 'Elite Stitching' },
   { id: 'stitching_design', label: 'Elite Stitching: Design Room', category: 'Elite Stitching' },
   { id: 'stitching_fabric', label: 'Elite Stitching: Fabric Challans', category: 'Elite Stitching' },
+  { id: 'es_complaints', label: 'Elite Stitching: Complaints Module', category: 'Elite Stitching' },
   { id: 'stitching_settings', label: 'Elite Stitching: Settings', category: 'Elite Stitching' },
 ];
 

@@ -950,7 +950,9 @@ export default function AdminPanel() {
                         const catScreens = AVAILABLE_SCREENS.filter(s => s.category === cat);
                         const allChecked = catScreens.every(s => formData.permissions.includes(s.id));
                         const catTitle = cat === 'General' ? '⚙️ Core & General' :
-                                         cat === 'Elite Edition' ? '🛍️ Elite Edition (E-Commerce)' :
+                                         cat === 'Elite Online' ? '🏪 Elite Online (E-Commerce)' :
+                                         cat === 'Elite Edition' ? '🏢 Elite Edition' :
+                                         cat === 'Elite Fabtex' ? '🏭 Elite Fabtex' :
                                          cat === 'Elite Digital Print' ? '🖨️ Elite Digital Print' :
                                          cat === 'Elite Stitching' ? '✂️ Elite Stitching' : `📁 ${cat}`;
 
