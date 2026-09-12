@@ -282,18 +282,69 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   });
 
   const [purchaseSearch, setPurchaseSearch] = useState('');
+  const createEmptyPurchaseItem = () => ({
+    id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    itemName: '',
+    quantity: '',
+    unit: 'Mtr',
+    rate: '',
+    amount: ''
+  });
+
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState({
     purchaseNo: 'PUR-2026-001',
     date: new Date().toISOString().split('T')[0],
     vendorName: '',
-    itemName: '',
-    quantity: '',
-    unit: 'Mtr',
-    rate: '',
+    items: [createEmptyPurchaseItem()],
     totalAmount: '',
     notes: ''
   });
+
+  const handleAddPurchaseItem = () => {
+    setPurchaseForm(prev => ({
+      ...prev,
+      items: [...(prev.items || []), createEmptyPurchaseItem()]
+    }));
+  };
+
+  const handleRemovePurchaseItem = (index) => {
+    setPurchaseForm(prev => {
+      const items = prev.items || [];
+      if (items.length <= 1) return prev;
+      const newItems = items.filter((_, idx) => idx !== index);
+      const sum = newItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+      return {
+        ...prev,
+        items: newItems,
+        totalAmount: sum > 0 ? sum.toFixed(2) : ''
+      };
+    });
+  };
+
+  const handleUpdatePurchaseItem = (index, field, value) => {
+    setPurchaseForm(prev => {
+      const items = prev.items || [];
+      const newItems = items.map((item, idx) => {
+        if (idx !== index) return item;
+        const updated = { ...item, [field]: value };
+        if (field === 'quantity' || field === 'rate') {
+          const q = parseFloat(field === 'quantity' ? value : updated.quantity);
+          const r = parseFloat(field === 'rate' ? value : updated.rate);
+          if (!isNaN(q) && !isNaN(r)) {
+            updated.amount = (q * r).toFixed(2);
+          }
+        }
+        return updated;
+      });
+      const sum = newItems.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+      return {
+        ...prev,
+        items: newItems,
+        totalAmount: sum > 0 ? sum.toFixed(2) : prev.totalAmount
+      };
+    });
+  };
 
   useEffect(() => {
     try {
@@ -303,24 +354,48 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
   const handleCreatePurchase = (e) => {
     e.preventDefault();
-    if (!purchaseForm.vendorName || !purchaseForm.itemName) {
-      alert('Please select Vendor Name and enter Item Name.');
+    if (!purchaseForm.vendorName) {
+      alert('Please select Vendor Name.');
       return;
     }
-    const qty = parseFloat(purchaseForm.quantity) || 0;
-    const r = parseFloat(purchaseForm.rate) || 0;
-    const calcTotal = parseFloat(purchaseForm.totalAmount) || (qty * r);
+
+    const validItems = (purchaseForm.items || []).filter(i => i.itemName && i.itemName.trim() !== '');
+    if (validItems.length === 0) {
+      alert('Please add at least one item description.');
+      return;
+    }
+
+    const calculatedTotal = validItems.reduce((acc, item) => {
+      const q = parseFloat(item.quantity) || 0;
+      const r = parseFloat(item.rate) || 0;
+      const amt = parseFloat(item.amount) || (q * r);
+      return acc + amt;
+    }, 0);
+
+    const finalTotal = parseFloat(purchaseForm.totalAmount) || calculatedTotal;
 
     const newPur = {
       id: `pur_${Date.now()}`,
       purchaseNo: purchaseForm.purchaseNo || `PUR-${Date.now().toString().slice(-4)}`,
       date: purchaseForm.date || new Date().toISOString().split('T')[0],
       vendorName: purchaseForm.vendorName,
-      itemName: purchaseForm.itemName,
-      quantity: qty,
-      unit: purchaseForm.unit || 'Mtr',
-      rate: r,
-      totalAmount: calcTotal,
+      items: validItems.map(item => {
+        const q = parseFloat(item.quantity) || 0;
+        const r = parseFloat(item.rate) || 0;
+        const amt = parseFloat(item.amount) || (q * r);
+        return {
+          itemName: item.itemName.trim(),
+          quantity: q,
+          unit: item.unit || 'Mtr',
+          rate: r,
+          amount: amt
+        };
+      }),
+      itemName: validItems.map(i => i.itemName.trim()).join(', '),
+      quantity: validItems.reduce((acc, i) => acc + (parseFloat(i.quantity) || 0), 0),
+      unit: validItems[0]?.unit || 'Mtr',
+      rate: validItems.length === 1 ? (parseFloat(validItems[0].rate) || 0) : '-',
+      totalAmount: finalTotal,
       notes: purchaseForm.notes || ''
     };
 
@@ -330,10 +405,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       purchaseNo: `PUR-2026-00${purchases.length + 2}`,
       date: new Date().toISOString().split('T')[0],
       vendorName: '',
-      itemName: '',
-      quantity: '',
-      unit: 'Mtr',
-      rate: '',
+      items: [createEmptyPurchaseItem()],
       totalAmount: '',
       notes: ''
     });
@@ -2752,17 +2824,38 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 ) : (
                   filteredPurchases.map((p) => (
                     <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9', color: '#1e293b' }}>
-                      <td style={{ padding: '0.85rem 1rem', fontWeight: 800, color: '#4f46e5' }}>{p.purchaseNo}</td>
-                      <td style={{ padding: '0.85rem 1rem', color: '#64748b' }}>{p.date}</td>
-                      <td style={{ padding: '0.85rem 1rem', fontWeight: 700 }}>{p.vendorName}</td>
-                      <td style={{ padding: '0.85rem 1rem' }}>
-                        <span style={{ fontWeight: 700 }}>{p.itemName}</span>
-                        {p.notes && <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{p.notes}</div>}
+                      <td style={{ padding: '0.85rem 1rem', fontWeight: 800, color: '#4f46e5', verticalAlign: 'top' }}>{p.purchaseNo}</td>
+                      <td style={{ padding: '0.85rem 1rem', color: '#64748b', verticalAlign: 'top' }}>{p.date}</td>
+                      <td style={{ padding: '0.85rem 1rem', fontWeight: 700, verticalAlign: 'top' }}>{p.vendorName}</td>
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'top' }}>
+                        {Array.isArray(p.items) && p.items.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {p.items.map((it, idx) => (
+                              <div key={idx} style={{ fontSize: '0.85rem' }}>
+                                <span style={{ fontWeight: 700 }}>• {it.itemName}</span>
+                                <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: '6px' }}>
+                                  ({it.quantity} {it.unit} @ ₹{it.rate} = ₹{Number(it.amount || (it.quantity * it.rate)).toLocaleString('en-IN')})
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ fontWeight: 700 }}>{p.itemName}</span>
+                        )}
+                        {p.notes && <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>{p.notes}</div>}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 700 }}>{p.quantity} {p.unit}</td>
-                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>₹{p.rate}</td>
-                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 900, color: '#0284c7' }}>₹{Number(p.totalAmount).toLocaleString('en-IN')}</td>
-                      <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>
+                        {Array.isArray(p.items) && p.items.length > 1 ? (
+                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{p.items.length} Items</span>
+                        ) : (
+                          `${p.quantity} ${p.unit}`
+                        )}
+                      </td>
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', verticalAlign: 'top' }}>
+                        {p.rate !== '-' ? `₹${p.rate}` : '-'}
+                      </td>
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 900, color: '#0284c7', verticalAlign: 'top' }}>₹{Number(p.totalAmount).toLocaleString('en-IN')}</td>
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'center', verticalAlign: 'top' }}>
                         <button
                           onClick={() => handleDeletePurchase(p.id)}
                           style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
@@ -2783,15 +2876,15 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       {/* ── NEW PURCHASE ENTRY MODAL ────────────────────────────────────────── */}
       {showPurchaseModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
-          <div style={{ width: '100%', maxWidth: '600px', background: '#ffffff', borderRadius: '14px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
-            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ width: '100%', maxWidth: '720px', maxHeight: '90vh', overflowY: 'auto', background: '#ffffff', borderRadius: '14px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <ShoppingBag size={20} /> New Vendor Purchase Entry
               </h3>
               <button onClick={() => setShowPurchaseModal(false)} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
             </div>
 
-            <form onSubmit={handleCreatePurchase} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', color: '#1e293b' }}>
+            <form onSubmit={handleCreatePurchase} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: '#1e293b' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Bill / Invoice No *</label>
@@ -2831,77 +2924,121 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 </select>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Item / Fabric Description *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Cotton 60x60 / Cyan Sublimation Ink"
-                  value={purchaseForm.itemName}
-                  onChange={e => setPurchaseForm({ ...purchaseForm, itemName: e.target.value })}
-                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 1fr', gap: '0.85rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Quantity</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={purchaseForm.quantity}
-                    onChange={e => {
-                      const q = e.target.value;
-                      const r = purchaseForm.rate;
-                      const tot = q && r ? (parseFloat(q) * parseFloat(r)).toFixed(2) : purchaseForm.totalAmount;
-                      setPurchaseForm({ ...purchaseForm, quantity: q, totalAmount: tot });
-                    }}
-                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Unit</label>
-                  <select
-                    value={purchaseForm.unit}
-                    onChange={e => setPurchaseForm({ ...purchaseForm, unit: e.target.value })}
-                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+              {/* ── MULTIPLE ITEMS SECTION ── */}
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155', margin: 0 }}>
+                    📦 Item / Fabric List ({(purchaseForm.items || []).length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddPurchaseItem}
+                    style={{ background: 'rgba(79, 70, 229, 0.1)', color: '#4f46e5', border: '1px solid rgba(79, 70, 229, 0.3)', padding: '0.35rem 0.75rem', borderRadius: '6px', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                   >
-                    <option value="Mtr">Mtr</option>
-                    <option value="Pcs">Pcs</option>
-                    <option value="Kg">Kg</option>
-                    <option value="Ltr">Ltr</option>
-                    <option value="Rolls">Rolls</option>
-                    <option value="Boxes">Boxes</option>
-                  </select>
+                    <Plus size={14} /> Add Another Item
+                  </button>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: 4 }}>Rate (₹)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={purchaseForm.rate}
-                    onChange={e => {
-                      const r = e.target.value;
-                      const q = purchaseForm.quantity;
-                      const tot = q && r ? (parseFloat(q) * parseFloat(r)).toFixed(2) : purchaseForm.totalAmount;
-                      setPurchaseForm({ ...purchaseForm, rate: r, totalAmount: tot });
-                    }}
-                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                  />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  {(purchaseForm.items || []).map((item, idx) => (
+                    <div key={item.id || idx} style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.85rem', position: 'relative' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#4f46e5' }}>Item #{idx + 1}</span>
+                        {(purchaseForm.items || []).length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePurchaseItem(idx)}
+                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px' }}
+                            title="Remove this item"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 2 }}>Item / Fabric Description *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Cotton 60x60 / Cyan Sublimation Ink / Butter Paper"
+                            value={item.itemName}
+                            onChange={e => handleUpdatePurchaseItem(idx, 'itemName', e.target.value)}
+                            style={{ width: '100%', padding: '0.5rem', fontSize: '0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                          />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.9fr 1fr 1fr', gap: '0.6rem' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 2 }}>Quantity</label>
+                            <input
+                              type="number"
+                              step="any"
+                              placeholder="0"
+                              value={item.quantity}
+                              onChange={e => handleUpdatePurchaseItem(idx, 'quantity', e.target.value)}
+                              style={{ width: '100%', padding: '0.5rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 2 }}>Unit</label>
+                            <select
+                              value={item.unit}
+                              onChange={e => handleUpdatePurchaseItem(idx, 'unit', e.target.value)}
+                              style={{ width: '100%', padding: '0.5rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                            >
+                              <option value="Mtr">Mtr</option>
+                              <option value="Pcs">Pcs</option>
+                              <option value="Kg">Kg</option>
+                              <option value="Ltr">Ltr</option>
+                              <option value="Rolls">Rolls</option>
+                              <option value="Boxes">Boxes</option>
+                              <option value="Bags">Bags</option>
+                              <option value="Set">Set</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: 2 }}>Rate (₹)</label>
+                            <input
+                              type="number"
+                              step="any"
+                              placeholder="0"
+                              value={item.rate}
+                              onChange={e => handleUpdatePurchaseItem(idx, 'rate', e.target.value)}
+                              style={{ width: '100%', padding: '0.5rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#0284c7', marginBottom: 2 }}>Amount (₹)</label>
+                            <input
+                              type="number"
+                              step="any"
+                              placeholder="0"
+                              value={item.amount}
+                              onChange={e => handleUpdatePurchaseItem(idx, 'amount', e.target.value)}
+                              style={{ width: '100%', padding: '0.5rem', fontSize: '0.82rem', fontWeight: 700, color: '#0284c7', borderRadius: '6px', border: '1px solid #93c5fd' }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', marginBottom: 4 }}>Total Amount (₹) *</label>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', marginBottom: 4 }}>Total Bill Amount (₹) *</label>
                 <input
                   type="number"
                   required
                   step="any"
                   value={purchaseForm.totalAmount}
                   onChange={e => setPurchaseForm({ ...purchaseForm, totalAmount: e.target.value })}
-                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.9rem', fontWeight: 800, borderRadius: '6px', border: '1px solid #0284c7', color: '#0284c7' }}
+                  style={{ width: '100%', padding: '0.6rem', fontSize: '0.95rem', fontWeight: 900, borderRadius: '6px', border: '1.5px solid #0284c7', color: '#0284c7', background: '#f0f9ff' }}
                 />
               </div>
 
@@ -2918,7 +3055,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" onClick={() => setShowPurchaseModal(false)} style={{ padding: '0.5rem 1.1rem', background: 'none', border: '1px solid #cbd5e1', color: '#475569', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ padding: '0.5rem 1.3rem', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer' }}>
+                <button type="submit" style={{ padding: '0.55rem 1.4rem', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)' }}>
                   Save Purchase Inward Entry
                 </button>
               </div>
