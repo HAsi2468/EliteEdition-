@@ -286,7 +286,7 @@ const downloadLedgerPdf = async (req, res) => {
 
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=raw-materials-ledger.pdf');
+    res.setHeader('Content-Disposition', 'inline; filename=raw-materials-ledger.pdf');
     doc.pipe(res);
 
     // Header
@@ -330,15 +330,17 @@ const downloadLedgerPdf = async (req, res) => {
       }
 
       const isIn = t.type === 'INWARD';
-      if (isIn) totalIn += t.qty; else totalOut += t.qty;
+      const qtyNum = Number(t.qty || 0);
+      if (isIn) totalIn += qtyNum; else totalOut += qtyNum;
 
+      const dateStr = t.date ? new Date(t.date).toLocaleDateString('en-IN') : '-';
       const row = [
-        new Date(t.date).toLocaleDateString('en-IN'),
-        t.type,
+        dateStr,
+        t.type || '-',
         isIn ? (t.challanNo || '-') : (t.jobNo || '-'),
         formatMaterialDetails(t),
         isIn ? (t.vendorName || '-') : (t.partyName || '-'),
-        `${isIn ? '+' : '-'}${t.qty}`,
+        `${isIn ? '+' : '-'}${qtyNum}`,
         t.unit || '-'
       ];
 
