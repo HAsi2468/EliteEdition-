@@ -56,5 +56,6 @@ router.use('/expenses', require('./expense.route'));
 router.use('/ai', require('./ai.route'));
 router.use('/backup', require('./backup.route'));
 router.use('/communication', require('./communication.route'));
+router.use('/leads', require('./lead.route'));
 
 module.exports = router;

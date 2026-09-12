@@ -23,6 +23,7 @@ import DigitalPrintComplainModule from './components/DigitalPrintComplainModule'
 import DigitalPrintExpenseModule from './components/DigitalPrintExpenseModule';
 import CompanyDedicatedDashboard from './components/CompanyDedicatedDashboard';
 import GarmentJobCardDashboard from './components/GarmentJobCardDashboard';
+import CrmPanel from './components/CrmPanel';
 import { COMPANIES, getCompanyById } from './config/companiesConfig';
 
 // Code-splitting lazy loads for heavy tab modules
@@ -1545,20 +1546,7 @@ export default function App() {
           ) : activeTab === 'reports' ? (
             <ReportsCenter department={activeDepartment === 'elite_online' ? 'elite-online' : 'elite-print'} />
           ) : activeTab === 'jobcards_crm' || activeTab === 'crm_department' || activeTab === 'crm' ? (
-            <div className="glass-panel" style={{ padding: '5rem 2rem', textAlign: 'center', maxWidth: 750, margin: '3rem auto', borderRadius: '18px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.25rem' }}>
-              <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(236,72,153,0.2), rgba(244,63,94,0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid rgba(236,72,153,0.4)', color: '#ec4899', boxShadow: '0 8px 24px rgba(236,72,153,0.2)' }}>
-                <Users size={40} />
-              </div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '5px 16px', borderRadius: '20px', background: 'rgba(236,72,153,0.15)', color: '#ec4899', border: '1px solid rgba(236,72,153,0.3)' }}>
-                Elite Digital Print — CRM Department
-              </div>
-              <h1 style={{ fontSize: '2.8rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #ec4899, #f43f5e)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                WORKING ON BY ❤️HASI❤️
-              </h1>
-              <p style={{ fontSize: '0.92rem', color: 'var(--text-muted)', margin: 0, maxWidth: 500, lineHeight: 1.6 }}>
-                This CRM module is currently under active development.
-              </p>
-            </div>
+            <CrmPanel currentUser={currentUser} />
           ) : activeTab.startsWith('jobcards') ? (
             <JobCardPanel currentUser={currentUser} activeSubTab={activeTab === 'jobcards' ? 'jobcards' : activeTab.replace('jobcards_', '')} department={activeDepartment} />
           ) : activeTab === 'ee_dashboard' ? (
