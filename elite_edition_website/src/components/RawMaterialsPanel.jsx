@@ -160,7 +160,8 @@ export default function RawMaterialsPanel() {
       dateStart: ds || '',
       dateEnd: de || '',
       materialName: mat || '',
-      type: typeVal
+      type: typeVal,
+      companyEntity: companyEntity || 'Elite Digital Print'
     });
     setIsPdfFilterOpen(true);
   };
@@ -720,7 +721,10 @@ export default function RawMaterialsPanel() {
     e.preventDefault();
     try {
       setPdfLoading(true);
-      await api.downloadRawMaterialLedgerPdf(pdfFilter);
+      await api.downloadRawMaterialLedgerPdf({
+        ...pdfFilter,
+        companyEntity: pdfFilter.companyEntity || companyEntity || 'Elite Digital Print'
+      });
       setIsPdfFilterOpen(false);
     } catch (err) {
       alert('Failed to download PDF: ' + err.message);

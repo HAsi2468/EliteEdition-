@@ -257,16 +257,24 @@ const deleteTransaction = async (req, res) => {
 // Generate Raw Material Ledger PDF
 const downloadLedgerPdf = async (req, res) => {
   try {
-    const { dateStart, dateEnd, materialName, type } = req.query;
+    const { dateStart, dateEnd, materialName, type, companyEntity } = req.query;
 
-    const matchStage = {};
+    const matchStage = buildRawCompFilter(companyEntity);
     if (dateStart || dateEnd) {
       matchStage.date = {};
-      if (dateStart && /^\d{4}-\d{2}-\d{2}$/.test(String(dateStart).trim())) {
-        matchStage.date.$gte = new Date(`${dateStart.trim()}T00:00:00.000Z`);
+      if (dateStart) {
+        const ds = new Date(dateStart);
+        if (!isNaN(ds.getTime())) {
+          ds.setHours(0, 0, 0, 0);
+          matchStage.date.$gte = ds;
+        }
       }
-      if (dateEnd && /^\d{4}-\d{2}-\d{2}$/.test(String(dateEnd).trim())) {
-        matchStage.date.$lte = new Date(`${dateEnd.trim()}T23:59:59.999Z`);
+      if (dateEnd) {
+        const de = new Date(dateEnd);
+        if (!isNaN(de.getTime())) {
+          de.setHours(23, 59, 59, 999);
+          matchStage.date.$lte = de;
+        }
       }
     }
 
@@ -286,44 +294,41 @@ const downloadLedgerPdf = async (req, res) => {
       }
     }
 
-    const transactions = await RawMaterialTransaction.find(matchStage).sort({ date: 1 });
+    const transactions = await RawMaterialTransaction.find(matchStage).sort({ date: 1, createdAt: 1 });
 
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
-    const buffers = [];
-    doc.on('data', buffers.push.bind(buffers));
 
-    doc.on('end', () => {
-      const pdfData = Buffer.concat(buffers);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'inline; filename=raw-materials-ledger.pdf');
-      res.setHeader('Content-Length', pdfData.length);
-      res.send(pdfData);
-    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename=raw-materials-ledger.pdf');
+    doc.pipe(res);
 
-    doc.on('error', (err) => {
-      console.error('PDFKit error:', err);
-      if (!res.headersSent) {
-        res.status(500).json({ success: false, error: err.message });
-      }
-    });
+    const toSafeText = (val) => {
+      if (val == null || val === undefined) return '';
+      return String(val)
+        .replace(/[—–]/g, '-')
+        .replace(/’/g, "'")
+        .replace(/[“”]/g, '"')
+        .replace(/[^\x00-\x7F]/g, '')
+        .trim();
+    };
 
     // Header
     const titleType = type && type !== 'All' ? `${type.toUpperCase()} ` : '';
-    doc.fontSize(18).font('Helvetica-Bold').fillColor('black').text(`Elite Digital Print — Raw Materials ${titleType}Ledger`, { align: 'center' });
+    doc.fontSize(16).font('Helvetica-Bold').fillColor('black').text(`Elite Digital Print - Raw Materials ${titleType}Ledger`, { align: 'center' });
     doc.moveDown(0.3);
     const dateLabel = dateStart || dateEnd
       ? `Period: ${dateStart || 'Start'} to ${dateEnd || 'Today'}`
       : 'All Transactions';
-    doc.fontSize(10).font('Helvetica').fillColor('black').text(dateLabel, { align: 'center' });
+    doc.fontSize(9).font('Helvetica').fillColor('black').text(dateLabel, { align: 'center' });
     if (materialName) {
       doc.text(`Material: ${materialName}`, { align: 'center' });
     }
-    doc.moveDown(1);
+    doc.moveDown(0.8);
 
     // Table header configuration
-    const colX = [40, 95, 155, 230, 340, 420, 480];
-    const colWidths = [50, 55, 70, 105, 75, 55, 60];
-    const headers = ['Date', 'Type', 'Challan/Job', 'Material Name', 'Vendor/Party', 'Qty', 'Unit'];
+    const colX = [40, 88, 131, 189, 282, 365, 408, 448];
+    const colWidths = [45, 40, 55, 90, 80, 40, 37, 107];
+    const headers = ['Date', 'Type', 'Challan/Job', 'Material Name', 'Vendor/Party', 'Qty', 'Unit', 'Notes'];
 
     const renderTableHeader = () => {
       const py = doc.y;
@@ -339,17 +344,17 @@ const downloadLedgerPdf = async (req, res) => {
     renderTableHeader();
 
     // Rows
-    doc.font('Helvetica').fontSize(7.5);
+    doc.font('Helvetica').fontSize(7);
     let totalIn = 0, totalOut = 0;
     if (transactions.length === 0) {
       doc.fontSize(9).font('Helvetica-Oblique').fillColor('#666666').text('No matching transactions found for the selected filters.', 40, doc.y);
       doc.moveDown(1);
     } else {
       for (const t of transactions) {
-        if (doc.y > 740) {
+        if (doc.y > 730) {
           doc.addPage();
           renderTableHeader();
-          doc.font('Helvetica').fontSize(7.5);
+          doc.font('Helvetica').fontSize(7);
         }
 
         const isIn = t.type === 'INWARD';
@@ -358,13 +363,14 @@ const downloadLedgerPdf = async (req, res) => {
 
         const dateStr = t.date ? new Date(t.date).toLocaleDateString('en-IN') : '-';
         const row = [
-          dateStr,
-          t.type || '-',
-          isIn ? (t.challanNo || '-') : (t.jobNo || '-'),
-          formatMaterialDetails(t),
-          isIn ? (t.vendorName || '-') : (t.partyName || '-'),
-          `${isIn ? '+' : '-'}${qtyNum}`,
-          t.unit || '-'
+          toSafeText(dateStr) || '-',
+          toSafeText(t.type) || '-',
+          toSafeText(isIn ? (t.challanNo || '-') : (t.jobNo || '-')) || '-',
+          toSafeText(formatMaterialDetails(t)) || '-',
+          toSafeText(isIn ? (t.vendorName || '-') : (t.partyName || '-')) || '-',
+          toSafeText(`${isIn ? '+' : '-'}${qtyNum}`) || '-',
+          toSafeText(t.unit) || '-',
+          toSafeText(t.notes) || '-'
         ];
 
         const startY = doc.y;
@@ -378,15 +384,16 @@ const downloadLedgerPdf = async (req, res) => {
           if (cellH > maxHeight) maxHeight = cellH;
         });
 
-        doc.y = startY + maxHeight + 4;
+        doc.y = startY + maxHeight + 3;
       }
     }
 
     // Summary
-    doc.moveDown(1);
+    if (doc.y > 700) doc.addPage();
+    doc.moveDown(0.5);
     doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
     doc.moveDown(0.5);
-    doc.font('Helvetica-Bold').fontSize(9).fillColor('black');
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('black');
     doc.text(`Total Inward: +${totalIn}`, 40);
     doc.text(`Total Outward: -${totalOut}`);
     doc.text(`Net Stock Change: ${totalIn - totalOut}`);
