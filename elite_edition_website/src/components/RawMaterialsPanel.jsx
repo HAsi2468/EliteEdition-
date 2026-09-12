@@ -20,7 +20,7 @@ const getSelectedCanSize = (currentVal, options) => {
   return match || currentVal;
 };
 
-export default function RawMaterialsPanel() {
+export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print' } = {}) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const currentUser = api.getCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
