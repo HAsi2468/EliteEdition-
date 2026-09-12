@@ -282,6 +282,9 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   });
 
   const [purchaseSearch, setPurchaseSearch] = useState('');
+  const [viewPurchaseModal, setViewPurchaseModal] = useState(null);
+  const [editingPurchaseId, setEditingPurchaseId] = useState(null);
+
   const createEmptyPurchaseItem = () => ({
     id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     itemName: '',
@@ -346,6 +349,35 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     });
   };
 
+  const handleEditPurchase = (p) => {
+    setEditingPurchaseId(p.id);
+    setPurchaseForm({
+      purchaseNo: p.purchaseNo || '',
+      date: p.date || new Date().toISOString().split('T')[0],
+      vendorName: p.vendorName || '',
+      items: Array.isArray(p.items) && p.items.length > 0
+        ? p.items.map(it => ({
+            id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            itemName: it.itemName || '',
+            quantity: it.quantity || '',
+            unit: it.unit || 'Mtr',
+            rate: it.rate || '',
+            amount: it.amount || (it.quantity && it.rate ? (it.quantity * it.rate).toFixed(2) : '')
+          }))
+        : [{
+            id: `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            itemName: p.itemName || '',
+            quantity: p.quantity || '',
+            unit: p.unit || 'Mtr',
+            rate: p.rate !== '-' ? p.rate : '',
+            amount: p.totalAmount || ''
+          }],
+      totalAmount: p.totalAmount || '',
+      notes: p.notes || ''
+    });
+    setShowPurchaseModal(true);
+  };
+
   useEffect(() => {
     try {
       localStorage.setItem(`elite_purchases_${companyEntity || 'edp'}`, JSON.stringify(purchases));
@@ -375,7 +407,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     const finalTotal = parseFloat(purchaseForm.totalAmount) || calculatedTotal;
 
     const newPur = {
-      id: `pur_${Date.now()}`,
+      id: editingPurchaseId || `pur_${Date.now()}`,
       purchaseNo: purchaseForm.purchaseNo || `PUR-${Date.now().toString().slice(-4)}`,
       date: purchaseForm.date || new Date().toISOString().split('T')[0],
       vendorName: purchaseForm.vendorName,
@@ -394,12 +426,18 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       itemName: validItems.map(i => i.itemName.trim()).join(', '),
       quantity: validItems.reduce((acc, i) => acc + (parseFloat(i.quantity) || 0), 0),
       unit: validItems[0]?.unit || 'Mtr',
-      rate: validItems.length === 1 ? (parseFloat(validItems[0].rate) || 0) : '-',
+      rate: validItems.length === 1 ? (parseFloat(validItems[0].rate) || 0) : (validItems.every(i => parseFloat(i.rate) === parseFloat(validItems[0].rate)) ? parseFloat(validItems[0].rate) : '-'),
       totalAmount: finalTotal,
       notes: purchaseForm.notes || ''
     };
 
-    setPurchases(prev => [newPur, ...prev]);
+    if (editingPurchaseId) {
+      setPurchases(prev => prev.map(p => p.id === editingPurchaseId ? newPur : p));
+      setEditingPurchaseId(null);
+    } else {
+      setPurchases(prev => [newPur, ...prev]);
+    }
+
     setShowPurchaseModal(false);
     setPurchaseForm({
       purchaseNo: `PUR-2026-00${purchases.length + 2}`,
@@ -2776,14 +2814,12 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
             <button
               onClick={() => {
+                setEditingPurchaseId(null);
                 setPurchaseForm({
                   purchaseNo: `PUR-2026-00${purchases.length + 1}`,
                   date: new Date().toISOString().split('T')[0],
                   vendorName: '',
-                  itemName: '',
-                  quantity: '',
-                  unit: 'Mtr',
-                  rate: '',
+                  items: [createEmptyPurchaseItem()],
                   totalAmount: '',
                   notes: ''
                 });
@@ -2845,24 +2881,64 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                         {p.notes && <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>{p.notes}</div>}
                       </td>
                       <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>
-                        {Array.isArray(p.items) && p.items.length > 1 ? (
-                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{p.items.length} Items</span>
-                        ) : (
-                          `${p.quantity} ${p.unit}`
-                        )}
+                        {(() => {
+                          if (Array.isArray(p.items) && p.items.length > 0) {
+                            const totalQty = p.items.reduce((acc, it) => acc + (parseFloat(it.quantity) || 0), 0);
+                            const units = [...new Set(p.items.map(it => it.unit).filter(Boolean))];
+                            const unitStr = units.length === 1 ? units[0] : 'Units';
+                            if (p.items.length > 1) {
+                              return (
+                                <div>
+                                  <span style={{ fontWeight: 800, color: '#1e293b' }}>{totalQty > 0 ? `${totalQty} ${unitStr}` : `${p.items.length} Items`}</span>
+                                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>({p.items.length} Items)</div>
+                                </div>
+                              );
+                            }
+                            return `${p.items[0].quantity || p.quantity || 0} ${p.items[0].unit || p.unit || 'Mtr'}`;
+                          }
+                          return `${p.quantity || 0} ${p.unit || 'Mtr'}`;
+                        })()}
                       </td>
-                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', verticalAlign: 'top' }}>
-                        {p.rate !== '-' ? `₹${p.rate}` : '-'}
+                      <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>
+                        {(() => {
+                          if (Array.isArray(p.items) && p.items.length > 0) {
+                            const rates = p.items.map(it => parseFloat(it.rate) || 0).filter(r => r > 0);
+                            const uniqueRates = [...new Set(rates)];
+                            if (uniqueRates.length === 0) return '-';
+                            if (uniqueRates.length === 1) return `₹${uniqueRates[0]}`;
+                            if (uniqueRates.length === 2) return `₹${uniqueRates[0]}, ₹${uniqueRates[1]}`;
+                            const minR = Math.min(...uniqueRates);
+                            const maxR = Math.max(...uniqueRates);
+                            return `₹${minR} - ₹${maxR}`;
+                          }
+                          return p.rate && p.rate !== '-' ? `₹${p.rate}` : '-';
+                        })()}
                       </td>
                       <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 900, color: '#0284c7', verticalAlign: 'top' }}>₹{Number(p.totalAmount).toLocaleString('en-IN')}</td>
                       <td style={{ padding: '0.85rem 1rem', textAlign: 'center', verticalAlign: 'top' }}>
-                        <button
-                          onClick={() => handleDeletePurchase(p.id)}
-                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
-                          title="Delete Purchase Entry"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                          <button
+                            onClick={() => setViewPurchaseModal(p)}
+                            style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', color: '#2563eb', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700 }}
+                            title="View Purchase Details"
+                          >
+                            <Eye size={13} /> View
+                          </button>
+                          <button
+                            onClick={() => handleEditPurchase(p)}
+                            style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#d97706', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700 }}
+                            title="Edit Purchase Entry"
+                          >
+                            <Edit2 size={13} /> Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeletePurchase(p.id)}
+                            style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444', borderRadius: '6px', padding: '4px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 700 }}
+                            title="Delete Purchase Entry"
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -2879,7 +2955,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           <div style={{ width: '100%', maxWidth: '720px', maxHeight: '90vh', overflowY: 'auto', background: '#ffffff', borderRadius: '14px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
             <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(135deg, #4f46e5, #3b82f6)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ShoppingBag size={20} /> New Vendor Purchase Entry
+                <ShoppingBag size={20} /> {editingPurchaseId ? 'Edit Vendor Purchase Entry' : 'New Vendor Purchase Entry'}
               </h3>
               <button onClick={() => setShowPurchaseModal(false)} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
             </div>
@@ -3060,6 +3136,109 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── VIEW PURCHASE ENTRY DETAILS MODAL ────────────────────────── */}
+      {viewPurchaseModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+          <div style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', background: '#ffffff', borderRadius: '14px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid #e2e8f0', background: 'linear-gradient(135deg, #1e293b, #334155)', color: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ShoppingBag size={20} /> Purchase Inward Details — {viewPurchaseModal.purchaseNo}
+              </h3>
+              <button onClick={() => setViewPurchaseModal(null)} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', color: '#1e293b' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Bill / Invoice No</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#4f46e5', marginTop: 2 }}>{viewPurchaseModal.purchaseNo}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Inward Date</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#334155', marginTop: 2 }}>{viewPurchaseModal.date}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vendor / Supplier</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: 2 }}>{viewPurchaseModal.vendorName}</div>
+                </div>
+              </div>
+
+              <div>
+                <h4 style={{ margin: '0 0 0.6rem 0', fontSize: '0.88rem', fontWeight: 800, color: '#334155' }}>
+                  📦 Purchased Items Breakdown
+                </h4>
+                <div style={{ borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#475569', fontWeight: 800, fontSize: '0.72rem', textTransform: 'uppercase' }}>
+                        <th style={{ padding: '0.6rem 0.8rem', width: '30px' }}>#</th>
+                        <th style={{ padding: '0.6rem 0.8rem' }}>Item Description</th>
+                        <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>Qty</th>
+                        <th style={{ padding: '0.6rem 0.8rem' }}>Unit</th>
+                        <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>Rate (₹)</th>
+                        <th style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>Amount (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.isArray(viewPurchaseModal.items) && viewPurchaseModal.items.length > 0 ? (
+                        viewPurchaseModal.items.map((it, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '0.6rem 0.8rem', color: '#64748b', fontWeight: 700 }}>{idx + 1}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', fontWeight: 700 }}>{it.itemName}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 700 }}>{it.quantity}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>{it.unit}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>₹{it.rate}</td>
+                            <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>₹{Number(it.amount || (it.quantity * it.rate)).toLocaleString('en-IN')}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>1</td>
+                          <td style={{ padding: '0.6rem 0.8rem', fontWeight: 700 }}>{viewPurchaseModal.itemName}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 700 }}>{viewPurchaseModal.quantity}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', color: '#64748b' }}>{viewPurchaseModal.unit}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right' }}>{viewPurchaseModal.rate !== '-' ? `₹${viewPurchaseModal.rate}` : '-'}</td>
+                          <td style={{ padding: '0.6rem 0.8rem', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>₹{Number(viewPurchaseModal.totalAmount).toLocaleString('en-IN')}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f0f9ff', border: '1.5px solid #93c5fd', padding: '0.85rem 1.1rem', borderRadius: '10px' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0369a1' }}>Total Bill Amount</span>
+                <span style={{ fontSize: '1.3rem', fontWeight: 900, color: '#0284c7' }}>₹{Number(viewPurchaseModal.totalAmount).toLocaleString('en-IN')}</span>
+              </div>
+
+              {viewPurchaseModal.notes && (
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', marginBottom: 2 }}>Notes / Remarks</div>
+                  <div style={{ fontSize: '0.85rem', color: '#334155', background: '#f8fafc', padding: '0.6rem 0.8rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>{viewPurchaseModal.notes}</div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const p = viewPurchaseModal;
+                    setViewPurchaseModal(null);
+                    handleEditPurchase(p);
+                  }}
+                  style={{ padding: '0.5rem 1.1rem', background: '#f59e0b', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Edit2 size={15} /> Edit Purchase Entry
+                </button>
+                <button type="button" onClick={() => setViewPurchaseModal(null)} style={{ padding: '0.5rem 1.2rem', background: '#475569', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 800, cursor: 'pointer' }}>
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
