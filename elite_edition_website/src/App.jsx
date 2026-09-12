@@ -25,7 +25,6 @@ import CompanyDedicatedDashboard from './components/CompanyDedicatedDashboard';
 import GarmentJobCardDashboard from './components/GarmentJobCardDashboard';
 import CrmPanel from './components/CrmPanel';
 import BusinessConnectionPanel from './components/BusinessConnectionPanel';
-import MasterAiProcessingAgent from './components/MasterAiProcessingAgent';
 import { COMPANIES, getCompanyById } from './config/companiesConfig';
 
 // Code-splitting lazy loads for heavy tab modules

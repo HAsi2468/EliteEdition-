@@ -1,17 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Bot, UserCheck, Briefcase, Users, HardHat, Plus, Search, MessageSquare,
-  Phone, Mail, MapPin, Sparkles, TrendingUp, CheckCircle2, Trash2, Edit3,
-  Copy, FileText, Send, RefreshCw, X, AlertCircle, Building2, CreditCard
+  UserCheck,
+  Briefcase,
+  Users,
+  HardHat,
+  Plus,
+  Search,
+  Phone,
+  Mail,
+  MapPin,
+  TrendingUp,
+  Trash2,
+  Edit3,
+  Building2,
+  FileText,
+  X,
+  AlertCircle,
+  CheckCircle,
+  CreditCard,
+  Tag
 } from 'lucide-react';
 import { api } from '../services/api';
 
 const RECORD_TYPES = [
-  { key: 'ALL', label: 'All Connections', icon: Users, color: '#38bdf8' },
-  { key: 'LEAD', label: 'Sales Leads', icon: TrendingUp, color: '#f59e0b' },
-  { key: 'VENDOR', label: 'Vendors & Suppliers', icon: Building2, color: '#10b981' },
-  { key: 'EMPLOYEE', label: 'Salaried Employees', icon: Briefcase, color: '#a855f7' },
-  { key: 'WORKER', label: 'Factory Workers', icon: HardHat, color: '#ec4899' }
+  { key: 'ALL', label: 'All Connections', icon: Users, color: '#2563eb' },
+  { key: 'LEAD', label: 'Sales Leads', icon: TrendingUp, color: '#0284c7' },
+  { key: 'VENDOR', label: 'Vendors & Suppliers', icon: Building2, color: '#0d9488' },
+  { key: 'EMPLOYEE', label: 'Salaried Staff', icon: Briefcase, color: '#6366f1' },
+  { key: 'WORKER', label: 'Factory Workers', icon: HardHat, color: '#2563eb' }
 ];
 
 export default function BusinessConnectionPanel({ currentUser }) {
@@ -22,32 +38,55 @@ export default function BusinessConnectionPanel({ currentUser }) {
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
 
-  // Master AI Processing State
-  const [rawText, setRawText] = useState('');
-  const [aiParsing, setAiParsing] = useState(false);
-  const [aiResult, setAiResult] = useState(null);
-  const [showAiModal, setShowAiModal] = useState(false);
-
   // Manual Add / Edit Modal State
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     record_type: 'LEAD',
     common_directory: {
-      name: '', primary_phone: '', whatsapp_phone: '', email: '', city: '', state: '', address: '', is_active: true
+      name: '',
+      primary_phone: '',
+      whatsapp_phone: '',
+      email: '',
+      city: '',
+      state: '',
+      address: '',
+      is_active: true
     },
     lead_data: {
-      business_name: '', product_or_sku_interest: '', quantity: '', budget: '', source: 'Direct',
-      lead_score: 50, priority: 'WARM', pipeline_stage: 'New Lead', suggested_next_action: '', sla_followup_hours: 1, instant_reply_text: ''
+      business_name: '',
+      product_or_sku_interest: '',
+      quantity: '',
+      budget: '',
+      source: 'Direct',
+      lead_score: 75,
+      priority: 'HOT',
+      pipeline_stage: 'New Lead',
+      suggested_next_action: '',
+      sla_followup_hours: 1,
+      instant_reply_text: ''
     },
     vendor_data: {
-      company_name: '', gst_or_tax_id: '', bank_account: '', bank_ifsc: '', upi_id: '', payment_terms: 'Advance', supplied_items: ''
+      company_name: '',
+      gst_or_tax_id: '',
+      bank_account: '',
+      bank_ifsc: '',
+      upi_id: '',
+      payment_terms: 'Net 30',
+      supplied_items: ''
     },
     employee_data: {
-      department: 'Production', designation: '', monthly_salary: '', joining_date: '', emergency_contact: ''
+      department: 'Production',
+      designation: '',
+      monthly_salary: '',
+      joining_date: '',
+      emergency_contact: ''
     },
     worker_data: {
-      station_or_skill: '', wage_model: 'DAILY_WAGE', rate_amount: '', payout_schedule: 'WEEKLY'
+      station_or_skill: '',
+      wage_model: 'DAILY_WAGE',
+      rate_amount: '',
+      payout_schedule: 'WEEKLY'
     }
   });
 
@@ -82,44 +121,19 @@ export default function BusinessConnectionPanel({ currentUser }) {
     fetchConnections();
   };
 
-  // Run Master AI Ingestion
-  const handleRunMasterAI = async () => {
-    if (!rawText.trim()) {
-      alert('Please enter or paste unstructured text to process with Master AI Agent.');
-      return;
-    }
-    setAiParsing(true);
-    try {
-      const parsed = await api.parseBusinessConnectionAI(rawText);
-      setAiResult(parsed);
-      setFormData(parsed);
-      setShowAiModal(true);
-    } catch (err) {
-      console.error('AI Parsing Error:', err);
-      alert('Failed to parse text with Master AI. Please check server logs.');
-    } finally {
-      setAiParsing(false);
-    }
-  };
-
-  // Save Connection (From AI Modal or Manual Form)
+  // Save Connection (Create or Edit)
   const handleSaveConnection = async () => {
     if (!formData.common_directory?.name) {
-      alert('Name is required in common directory.');
+      alert('Contact name is required.');
       return;
     }
     try {
       if (editingId) {
         await api.updateBusinessConnection(editingId, formData);
-        alert('Connection updated successfully!');
       } else {
         await api.createBusinessConnection(formData);
-        alert('Business Connection saved/upserted successfully!');
       }
       setShowModal(false);
-      setShowAiModal(false);
-      setRawText('');
-      setAiResult(null);
       setEditingId(null);
       fetchConnections();
     } catch (err) {
@@ -130,7 +144,7 @@ export default function BusinessConnectionPanel({ currentUser }) {
 
   // Delete Connection
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this connection?')) return;
+    if (!window.confirm('Are you sure you want to delete this business connection?')) return;
     try {
       await api.deleteBusinessConnection(id);
       fetchConnections();
@@ -159,7 +173,7 @@ export default function BusinessConnectionPanel({ currentUser }) {
   const handleOpenEdit = (item) => {
     setEditingId(item._id);
     setFormData({
-      record_type: item.record_type,
+      record_type: item.record_type || 'LEAD',
       companyEntity: item.companyEntity || 'Elite Digital Print',
       common_directory: item.common_directory || {},
       lead_data: item.lead_data || {},
@@ -171,47 +185,43 @@ export default function BusinessConnectionPanel({ currentUser }) {
   };
 
   return (
-    <div style={{ padding: '1.2rem', color: 'var(--text-primary)', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Header & Title */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+    <div style={styles.container}>
+      {/* Top Header */}
+      <div style={styles.headerRow}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <UserCheck size={28} color="#38bdf8" /> Business Connection
+          <h2 style={styles.pageTitle}>
+            <UserCheck size={28} color="#2563eb" />
+            <span>Business Connection</span>
           </h2>
-          <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Centralized Directory for Sales Leads, Vendors, Salaried Employees &amp; Factory Workers.
+          <p style={styles.pageSubtitle}>
+            Centralized directory for managing Sales Leads, Fabric Vendors, Salaried Staff & Factory Workers.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.6rem' }}>
-          <button
-            onClick={() => {
-              setEditingId(null);
-              setFormData({
-                record_type: 'LEAD',
-                common_directory: { name: '', primary_phone: '', whatsapp_phone: '', email: '', city: '', state: '', address: '', is_active: true },
-                lead_data: { business_name: '', product_or_sku_interest: '', quantity: '', budget: '', source: 'Direct', lead_score: 50, priority: 'WARM', pipeline_stage: 'New Lead', suggested_next_action: '', sla_followup_hours: 1, instant_reply_text: '' },
-                vendor_data: { company_name: '', gst_or_tax_id: '', bank_account: '', bank_ifsc: '', upi_id: '', payment_terms: 'Advance', supplied_items: '' },
-                employee_data: { department: 'Production', designation: '', monthly_salary: '', joining_date: '', emergency_contact: '' },
-                worker_data: { station_or_skill: '', wage_model: 'DAILY_WAGE', rate_amount: '', payout_schedule: 'WEEKLY' }
-              });
-              setShowModal(true);
-            }}
-            style={{
-              padding: '0.55rem 1.1rem', borderRadius: '8px', border: '1px solid rgba(56,189,248,0.4)',
-              background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)', color: '#fff',
-              fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-              boxShadow: '0 4px 14px rgba(37,99,235,0.3)'
-            }}
-          >
-            <Plus size={16} /> New Connection
-          </button>
-        </div>
+
+        <button
+          onClick={() => {
+            setEditingId(null);
+            setFormData({
+              record_type: 'LEAD',
+              common_directory: { name: '', primary_phone: '', whatsapp_phone: '', email: '', city: '', state: '', address: '', is_active: true },
+              lead_data: { business_name: '', product_or_sku_interest: '', quantity: '', budget: '', source: 'Direct', lead_score: 75, priority: 'HOT', pipeline_stage: 'New Lead', suggested_next_action: '', sla_followup_hours: 1, instant_reply_text: '' },
+              vendor_data: { company_name: '', gst_or_tax_id: '', bank_account: '', bank_ifsc: '', upi_id: '', payment_terms: 'Net 30', supplied_items: '' },
+              employee_data: { department: 'Production', designation: '', monthly_salary: '', joining_date: '', emergency_contact: '' },
+              worker_data: { station_or_skill: '', wage_model: 'DAILY_WAGE', rate_amount: '', payout_schedule: 'WEEKLY' }
+            });
+            setShowModal(true);
+          }}
+          style={styles.addBtn}
+        >
+          <Plus size={18} />
+          <span>Add New Connection</span>
+        </button>
       </div>
 
-      {/* Category Metric Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        {RECORD_TYPES.map(cat => {
-          const Icon = cat.icon;
+      {/* Metric Cards Grid */}
+      <div style={styles.metricsGrid}>
+        {RECORD_TYPES.map((cat) => {
+          const IconComponent = cat.icon;
           const isSelected = activeType === cat.key;
           let count = counts.total;
           if (cat.key === 'LEAD') count = counts.lead;
@@ -224,484 +234,500 @@ export default function BusinessConnectionPanel({ currentUser }) {
               key={cat.key}
               onClick={() => setActiveType(cat.key)}
               style={{
-                background: isSelected ? 'rgba(56, 189, 248, 0.12)' : 'var(--bg-card, rgba(15, 23, 42, 0.6))',
-                border: isSelected ? `2px solid ${cat.color}` : '1px solid var(--border-light, rgba(255,255,255,0.08))',
-                borderRadius: '12px', padding: '1rem', cursor: 'pointer', transition: 'all 0.2s ease',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                ...styles.metricCard,
+                ...(isSelected ? styles.metricCardSelected : {})
               }}
             >
               <div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>{cat.label}</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: isSelected ? cat.color : 'var(--text-primary)', marginTop: '2px' }}>
-                  {count}
-                </div>
+                <span style={styles.metricLabel}>{cat.label}</span>
+                <div style={styles.metricCount}>{count}</div>
               </div>
-              <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: `${cat.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icon size={22} color={cat.color} />
+              <div style={styles.metricIconBox}>
+                <IconComponent size={22} color="#2563eb" />
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Quick Text Ingestion Box */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.9) 100%)',
-        border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: '14px', padding: '1.2rem', marginBottom: '1.5rem',
-        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Sparkles size={18} color="#38bdf8" />
-            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#38bdf8' }}>
-              Quick Text Ingestion &amp; Field Extractor
-            </h3>
-          </div>
-          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Auto-classifies into Lead, Vendor, Employee, or Worker</span>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.75rem', flexDirection: 'column' }}>
-          <textarea
-            rows={3}
-            value={rawText}
-            onChange={(e) => setRawText(e.target.value)}
-            placeholder="Paste any unstructured message, Meta Ad inquiry, WhatsApp text, Vendor GST detail, or Worker daily wage note here... (e.g. 'Hi, Rahul Traders here from Surat +919898123456. Need 1000m Satin digital print @ Rs 45/m')"
-            style={{
-              width: '100%', padding: '0.75rem', borderRadius: '8px',
-              background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255,255,255,0.12)',
-              color: '#f8fafc', fontSize: '0.88rem', fontFamily: 'inherit', resize: 'vertical', outline: 'none'
-            }}
+      {/* Filter and Search Bar */}
+      <div style={styles.filterBar}>
+        <form onSubmit={handleSearchSubmit} style={styles.searchForm}>
+          <Search size={18} color="#64748b" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, phone, city, or company..."
+            style={styles.searchInput}
           />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-            {rawText && (
-              <button
-                type="button"
-                onClick={() => setRawText('')}
-                style={{ padding: '0.45rem 0.9rem', borderRadius: '6px', border: 'none', background: 'rgba(255,255,255,0.1)', color: '#94a3b8', fontSize: '0.8rem', cursor: 'pointer' }}
-              >
-                Clear
-              </button>
-            )}
-            <button
-              type="button"
-              disabled={aiParsing}
-              onClick={handleRunMasterAI}
-              style={{
-                padding: '0.55rem 1.4rem', borderRadius: '8px', border: 'none',
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#fff',
-                fontSize: '0.85rem', fontWeight: 800, cursor: aiParsing ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 14px rgba(245,158,11,0.3)',
-                opacity: aiParsing ? 0.7 : 1
-              }}
-            >
-              {aiParsing ? <RefreshCw size={16} className="spin" /> : <Bot size={16} />}
-              {aiParsing ? 'Master AI Processing...' : 'Ingest with Master AI'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter & Search Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem', marginBottom: '1rem' }}>
-        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.5rem', flex: 1, maxWidth: '450px' }}>
-          <div style={{ position: 'relative', width: '100%' }}>
-            <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              placeholder="Search by Name, Phone, City, GST, Skill, Department..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                width: '100%', padding: '0.5rem 0.6rem 0.5rem 2.2rem', borderRadius: '8px',
-                border: '1px solid var(--border-light, rgba(255,255,255,0.12))',
-                background: 'var(--bg-input, rgba(15,23,42,0.6))', color: 'var(--text-primary)', fontSize: '0.85rem'
-              }}
-            />
-          </div>
-          <button type="submit" style={{ padding: '0.5rem 1rem', borderRadius: '8px', background: 'var(--bg-card)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}>
-            Filter
+          <button type="submit" style={styles.searchBtn}>
+            Search
           </button>
         </form>
 
-        {activeType === 'LEAD' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Priority:</span>
-            {['ALL', 'HOT', 'WARM', 'COLD'].map(p => (
-              <button
-                key={p}
-                onClick={() => setPriorityFilter(p)}
-                style={{
-                  padding: '0.35rem 0.75rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
-                  border: priorityFilter === p ? '1.5px solid #38bdf8' : '1px solid var(--border-light)',
-                  background: priorityFilter === p ? 'rgba(56,189,248,0.15)' : 'transparent',
-                  color: priorityFilter === p ? '#38bdf8' : 'var(--text-muted)'
-                }}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-        )}
+        <div style={styles.priorityFilterGroup}>
+          <span style={styles.filterLabel}>Priority:</span>
+          {['ALL', 'HOT', 'WARM', 'COLD'].map((p) => (
+            <button
+              key={p}
+              onClick={() => setPriorityFilter(p)}
+              style={{
+                ...styles.priorityPillBtn,
+                ...(priorityFilter === p ? styles.priorityPillActive : {})
+              }}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Directory Data List */}
+      {/* Connections Data List */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-          <RefreshCw size={24} className="spin" style={{ marginBottom: '8px' }} />
-          <div>Loading Directory Records...</div>
+        <div style={styles.loadingBox}>
+          <span>Loading Business Connections...</span>
         </div>
       ) : connections.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem', background: 'var(--bg-card, rgba(15,23,42,0.4))', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
-          <Users size={36} color="var(--text-muted)" style={{ marginBottom: '8px' }} />
-          <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--text-primary)' }}>No connections found</h4>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>Try running the Master AI Agent above or adding a new record manually.</p>
+        <div style={styles.emptyState}>
+          <Users size={48} color="#94a3b8" />
+          <h3 style={styles.emptyTitle}>No Connections Found</h3>
+          <p style={styles.emptyText}>Click "Add New Connection" above to register a Lead, Vendor, Employee, or Worker.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1rem' }}>
-          {connections.map(item => {
+        <div style={styles.cardList}>
+          {connections.map((item) => {
             const dir = item.common_directory || {};
-            const recordType = item.record_type;
+            const typeKey = item.record_type || 'LEAD';
 
             return (
-              <div
-                key={item._id}
-                style={{
-                  background: 'var(--bg-card, rgba(15, 23, 42, 0.7))',
-                  border: '1px solid var(--border-light, rgba(255,255,255,0.08))',
-                  borderRadius: '12px', padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.8rem',
-                  position: 'relative', backdropFilter: 'blur(10px)', transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-                }}
-              >
-                {/* Header Row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <span style={{
-                      display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.04em',
-                      background: recordType === 'LEAD' ? 'rgba(245,158,11,0.15)' : recordType === 'VENDOR' ? 'rgba(16,185,129,0.15)' : recordType === 'EMPLOYEE' ? 'rgba(168,85,247,0.15)' : 'rgba(236,72,153,0.15)',
-                      color: recordType === 'LEAD' ? '#f59e0b' : recordType === 'VENDOR' ? '#10b981' : recordType === 'EMPLOYEE' ? '#a855f7' : '#ec4899',
-                      border: `1px solid ${recordType === 'LEAD' ? '#f59e0b40' : recordType === 'VENDOR' ? '#10b98140' : recordType === 'EMPLOYEE' ? '#a855f740' : '#ec489940'}`,
-                      marginBottom: '4px'
-                    }}>
-                      {recordType}
+              <div key={item._id} style={styles.connectionCard}>
+                <div style={styles.cardTopRow}>
+                  <div style={styles.cardIdentity}>
+                    <span
+                      style={{
+                        ...styles.typeBadge,
+                        backgroundColor:
+                          typeKey === 'LEAD' ? '#eff6ff' :
+                          typeKey === 'VENDOR' ? '#f0fdf4' :
+                          typeKey === 'EMPLOYEE' ? '#e0e7ff' : '#fff7ed',
+                        color:
+                          typeKey === 'LEAD' ? '#1d4ed8' :
+                          typeKey === 'VENDOR' ? '#15803d' :
+                          typeKey === 'EMPLOYEE' ? '#4338ca' : '#c2410c',
+                        border: `1px solid ${
+                          typeKey === 'LEAD' ? '#bfdbfe' :
+                          typeKey === 'VENDOR' ? '#bbf7d0' :
+                          typeKey === 'EMPLOYEE' ? '#c7d2fe' : '#ffedd5'
+                        }`
+                      }}
+                    >
+                      {typeKey}
                     </span>
-                    <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                      {dir.name || 'Unnamed Record'}
-                    </h4>
-                    {item.lead_data?.business_name && (
-                      <div style={{ fontSize: '0.78rem', color: '#38bdf8', fontWeight: 600, marginTop: '2px' }}>
-                        🏢 {item.lead_data.business_name}
-                      </div>
-                    )}
-                    {item.vendor_data?.company_name && (
-                      <div style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 600, marginTop: '2px' }}>
-                        🏭 {item.vendor_data.company_name}
-                      </div>
-                    )}
+                    <h3 style={styles.contactName}>{dir.name || 'Unnamed Contact'}</h3>
                   </div>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <button onClick={() => handleOpenEdit(item)} title="Edit Connection" style={{ padding: '4px', background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
-                      <Edit3 size={15} />
+
+                  <div style={styles.cardActions}>
+                    <button onClick={() => handleOpenEdit(item)} style={styles.iconBtnAction} title="Edit Connection">
+                      <Edit3 size={16} color="#2563eb" />
                     </button>
-                    <button onClick={() => handleDelete(item._id)} title="Delete" style={{ padding: '4px', background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
-                      <Trash2 size={15} />
+                    <button
+                      onClick={() => {
+                        setActiveConnectionForNote(item);
+                        setShowNoteModal(true);
+                      }}
+                      style={styles.iconBtnAction}
+                      title="Add Note"
+                    >
+                      <FileText size={16} color="#0284c7" />
+                    </button>
+                    <button onClick={() => handleDelete(item._id)} style={styles.iconBtnAction} title="Delete">
+                      <Trash2 size={16} color="#ef4444" />
                     </button>
                   </div>
                 </div>
 
-                {/* Common Directory Info */}
-                <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '4px', color: 'var(--text-muted)' }}>
+                {/* Contact Detail Chips */}
+                <div style={styles.contactDetailsRow}>
                   {dir.primary_phone && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Phone size={14} color="#38bdf8" />
+                    <div style={styles.detailChip}>
+                      <Phone size={14} color="#2563eb" />
                       <span>{dir.primary_phone}</span>
-                      {dir.whatsapp_phone && (
-                        <a
-                          href={`https://wa.me/${dir.whatsapp_phone.replace(/\D/g, '')}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ marginLeft: '4px', color: '#25d366', fontWeight: 700, fontSize: '0.75rem', textDecoration: 'none' }}
-                        >
-                          💬 WhatsApp
-                        </a>
-                      )}
                     </div>
                   )}
                   {dir.email && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Mail size={14} color="#a855f7" />
+                    <div style={styles.detailChip}>
+                      <Mail size={14} color="#2563eb" />
                       <span>{dir.email}</span>
                     </div>
                   )}
                   {(dir.city || dir.state) && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <MapPin size={14} color="#f59e0b" />
+                    <div style={styles.detailChip}>
+                      <MapPin size={14} color="#2563eb" />
                       <span>{[dir.city, dir.state].filter(Boolean).join(', ')}</span>
                     </div>
                   )}
                 </div>
 
-                {/* Specific Category Data Block */}
-                {recordType === 'LEAD' && item.lead_data && (
-                  <div style={{ background: 'rgba(245,158,11,0.06)', borderRadius: '8px', padding: '0.65rem 0.75rem', border: '1px solid rgba(245,158,11,0.2)', fontSize: '0.78rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 700, color: '#f59e0b' }}>
-                        Interest: {item.lead_data.product_or_sku_interest || 'N/A'}
-                      </span>
-                      <span style={{
-                        fontWeight: 800, padding: '1px 6px', borderRadius: '4px',
-                        background: item.lead_data.priority === 'HOT' ? '#ef444420' : item.lead_data.priority === 'WARM' ? '#f59e0b20' : '#3b82f620',
-                        color: item.lead_data.priority === 'HOT' ? '#ef4444' : item.lead_data.priority === 'WARM' ? '#f59e0b' : '#3b82f6'
-                      }}>
-                        {item.lead_data.priority} (Score: {item.lead_data.lead_score || 50})
-                      </span>
+                {/* Specific Category Highlight */}
+                {typeKey === 'LEAD' && item.lead_data && (
+                  <div style={styles.leadInfoBox}>
+                    <div style={styles.leadInfoItem}>
+                      <span style={styles.subLabel}>Interest:</span>
+                      <span style={styles.subVal}>{item.lead_data.product_or_sku_interest || 'General Inquiry'}</span>
                     </div>
-                    {item.lead_data.quantity && <div><strong>Quantity:</strong> {item.lead_data.quantity} mtr</div>}
-                    {item.lead_data.suggested_next_action && <div style={{ marginTop: '4px', color: '#f8fafc' }}><strong>Next Task:</strong> {item.lead_data.suggested_next_action}</div>}
-                    {item.lead_data.instant_reply_text && (
-                      <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>Instant WhatsApp Reply:</div>
-                        <div style={{ fontStyle: 'italic', color: '#cbd5e1', fontSize: '0.75rem', margin: '2px 0 4px' }}>"{item.lead_data.instant_reply_text}"</div>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(item.lead_data.instant_reply_text);
-                            alert('Instant reply copied to clipboard!');
-                          }}
-                          style={{ padding: '2px 8px', borderRadius: '4px', border: 'none', background: 'rgba(255,255,255,0.1)', color: '#38bdf8', fontSize: '0.7rem', cursor: 'pointer' }}
-                        >
-                          <Copy size={11} style={{ marginRight: '4px' }} /> Copy Instant Reply
-                        </button>
+                    {item.lead_data.quantity && (
+                      <div style={styles.leadInfoItem}>
+                        <span style={styles.subLabel}>Qty:</span>
+                        <span style={styles.subVal}>{item.lead_data.quantity} meters</span>
+                      </div>
+                    )}
+                    {item.lead_data.priority && (
+                      <span
+                        style={{
+                          ...styles.priorityPill,
+                          backgroundColor: item.lead_data.priority === 'HOT' ? '#fee2e2' : '#fef3c7',
+                          color: item.lead_data.priority === 'HOT' ? '#991b1b' : '#92400e'
+                        }}
+                      >
+                        {item.lead_data.priority}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {typeKey === 'VENDOR' && item.vendor_data && (
+                  <div style={styles.leadInfoBox}>
+                    <div style={styles.leadInfoItem}>
+                      <span style={styles.subLabel}>Company:</span>
+                      <span style={styles.subVal}>{item.vendor_data.company_name || dir.name}</span>
+                    </div>
+                    {item.vendor_data.gst_or_tax_id && (
+                      <div style={styles.leadInfoItem}>
+                        <span style={styles.subLabel}>GSTIN:</span>
+                        <span style={styles.subVal}>{item.vendor_data.gst_or_tax_id}</span>
+                      </div>
+                    )}
+                    <div style={styles.leadInfoItem}>
+                      <span style={styles.subLabel}>Terms:</span>
+                      <span style={styles.subVal}>{item.vendor_data.payment_terms || 'Net 30'}</span>
+                    </div>
+                  </div>
+                )}
+
+                {typeKey === 'EMPLOYEE' && item.employee_data && (
+                  <div style={styles.leadInfoBox}>
+                    <div style={styles.leadInfoItem}>
+                      <span style={styles.subLabel}>Dept:</span>
+                      <span style={styles.subVal}>{item.employee_data.department || 'Production'}</span>
+                    </div>
+                    {item.employee_data.designation && (
+                      <div style={styles.leadInfoItem}>
+                        <span style={styles.subLabel}>Role:</span>
+                        <span style={styles.subVal}>{item.employee_data.designation}</span>
+                      </div>
+                    )}
+                    {item.employee_data.monthly_salary && (
+                      <div style={styles.leadInfoItem}>
+                        <span style={styles.subLabel}>Salary:</span>
+                        <span style={styles.subVal}>₹{item.employee_data.monthly_salary.toLocaleString('en-IN')}/mo</span>
                       </div>
                     )}
                   </div>
                 )}
 
-                {recordType === 'VENDOR' && item.vendor_data && (
-                  <div style={{ background: 'rgba(16,185,129,0.06)', borderRadius: '8px', padding: '0.65rem 0.75rem', border: '1px solid rgba(16,185,129,0.2)', fontSize: '0.78rem' }}>
-                    <div style={{ fontWeight: 700, color: '#10b981', marginBottom: '2px' }}>Items: {item.vendor_data.supplied_items || 'General Supplies'}</div>
-                    {item.vendor_data.gst_or_tax_id && <div><strong>GST:</strong> {item.vendor_data.gst_or_tax_id}</div>}
-                    {item.vendor_data.payment_terms && <div><strong>Payment Terms:</strong> {item.vendor_data.payment_terms}</div>}
-                    {(item.vendor_data.bank_account || item.vendor_data.upi_id) && (
-                      <div style={{ marginTop: '4px', fontSize: '0.72rem', color: '#94a3b8' }}>
-                        Bank A/C: {item.vendor_data.bank_account || 'N/A'} ({item.vendor_data.bank_ifsc || 'No IFSC'}) | UPI: {item.vendor_data.upi_id || 'N/A'}
+                {typeKey === 'WORKER' && item.worker_data && (
+                  <div style={styles.leadInfoBox}>
+                    <div style={styles.leadInfoItem}>
+                      <span style={styles.subLabel}>Station:</span>
+                      <span style={styles.subVal}>{item.worker_data.station_or_skill || 'Machine Operator'}</span>
+                    </div>
+                    <div style={styles.leadInfoItem}>
+                      <span style={styles.subLabel}>Wage Model:</span>
+                      <span style={styles.subVal}>{item.worker_data.wage_model || 'DAILY_WAGE'}</span>
+                    </div>
+                    {item.worker_data.rate_amount && (
+                      <div style={styles.leadInfoItem}>
+                        <span style={styles.subLabel}>Rate:</span>
+                        <span style={styles.subVal}>₹{item.worker_data.rate_amount}</span>
                       </div>
                     )}
                   </div>
                 )}
-
-                {recordType === 'EMPLOYEE' && item.employee_data && (
-                  <div style={{ background: 'rgba(168,85,247,0.06)', borderRadius: '8px', padding: '0.65rem 0.75rem', border: '1px solid rgba(168,85,247,0.2)', fontSize: '0.78rem' }}>
-                    <div style={{ fontWeight: 700, color: '#a855f7', marginBottom: '2px' }}>
-                      {item.employee_data.department} — {item.employee_data.designation || 'Staff'}
-                    </div>
-                    {item.employee_data.monthly_salary && <div><strong>Monthly Salary:</strong> ₹{item.employee_data.monthly_salary.toLocaleString('en-IN')}</div>}
-                    {item.employee_data.joining_date && <div><strong>Joined:</strong> {item.employee_data.joining_date}</div>}
-                  </div>
-                )}
-
-                {recordType === 'WORKER' && item.worker_data && (
-                  <div style={{ background: 'rgba(236,72,153,0.06)', borderRadius: '8px', padding: '0.65rem 0.75rem', border: '1px solid rgba(236,72,153,0.2)', fontSize: '0.78rem' }}>
-                    <div style={{ fontWeight: 700, color: '#ec4899', marginBottom: '2px' }}>
-                      Station: {item.worker_data.station_or_skill || 'General Operator'}
-                    </div>
-                    <div><strong>Wage Model:</strong> {item.worker_data.wage_model} ({item.worker_data.payout_schedule} Payout)</div>
-                    {item.worker_data.rate_amount && <div><strong>Rate / Wage:</strong> ₹{item.worker_data.rate_amount}</div>}
-                  </div>
-                )}
-
-                {/* Footer Notes Action */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px solid var(--border-light, rgba(255,255,255,0.06))' }}>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    Notes: {item.notes?.length || 0}
-                  </span>
-                  <button
-                    onClick={() => {
-                      setActiveConnectionForNote(item);
-                      setShowNoteModal(true);
-                    }}
-                    style={{ padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--border-light)', background: 'transparent', color: 'var(--text-primary)', fontSize: '0.72rem', cursor: 'pointer' }}
-                  >
-                    + Add Note
-                  </button>
-                </div>
               </div>
             );
           })}
         </div>
       )}
 
-      {/* Manual / Edit Modal */}
+      {/* Modal: Add or Edit Connection */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ width: '100%', maxWidth: '650px', background: '#0f172a', border: '1px solid rgba(56,189,248,0.3)', borderRadius: '14px', padding: '1.25rem', color: '#f8fafc', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.6rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#38bdf8' }}>
-                {editingId ? 'Edit Business Connection' : 'Create New Business Connection'}
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <div style={styles.modalHeader}>
+              <h3 style={styles.modalTitle}>
+                {editingId ? 'Edit Business Connection' : 'Add New Connection'}
               </h3>
-              <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={20} /></button>
+              <button onClick={() => setShowModal(false)} style={styles.closeBtn}>
+                <X size={20} />
+              </button>
             </div>
 
-            {/* Record Type Switcher */}
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 700, display: 'block', marginBottom: '4px' }}>Classification Category:</label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {['LEAD', 'VENDOR', 'EMPLOYEE', 'WORKER'].map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setFormData(f => ({ ...f, record_type: t }))}
-                    style={{
-                      flex: 1, padding: '0.5rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer',
-                      border: formData.record_type === t ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.1)',
-                      background: formData.record_type === t ? 'rgba(56,189,248,0.15)' : 'rgba(15,23,42,0.6)',
-                      color: formData.record_type === t ? '#38bdf8' : '#94a3b8'
-                    }}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Common Directory Fields */}
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f59e0b', marginBottom: '6px' }}>📍 Common Directory Contact Details</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '1rem' }}>
-              <div>
-                <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Full Name *</label>
-                <input
-                  type="text"
-                  value={formData.common_directory?.name || ''}
-                  onChange={e => setFormData(f => ({ ...f, common_directory: { ...f.common_directory, name: e.target.value } }))}
-                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Primary Phone</label>
-                <input
-                  type="text"
-                  value={formData.common_directory?.primary_phone || ''}
-                  onChange={e => setFormData(f => ({ ...f, common_directory: { ...f.common_directory, primary_phone: e.target.value } }))}
-                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>WhatsApp Phone</label>
-                <input
-                  type="text"
-                  value={formData.common_directory?.whatsapp_phone || ''}
-                  onChange={e => setFormData(f => ({ ...f, common_directory: { ...f.common_directory, whatsapp_phone: e.target.value } }))}
-                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Email Address</label>
-                <input
-                  type="text"
-                  value={formData.common_directory?.email || ''}
-                  onChange={e => setFormData(f => ({ ...f, common_directory: { ...f.common_directory, email: e.target.value } }))}
-                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>City</label>
-                <input
-                  type="text"
-                  value={formData.common_directory?.city || ''}
-                  onChange={e => setFormData(f => ({ ...f, common_directory: { ...f.common_directory, city: e.target.value } }))}
-                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>State</label>
-                <input
-                  type="text"
-                  value={formData.common_directory?.state || ''}
-                  onChange={e => setFormData(f => ({ ...f, common_directory: { ...f.common_directory, state: e.target.value } }))}
-                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem' }}
-                />
-              </div>
-            </div>
-
-            {/* Category Specific Form Section */}
-            {formData.record_type === 'LEAD' && (
-              <>
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f59e0b', marginBottom: '6px' }}>🎯 Sales Lead Intelligence Data</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-                  <div>
-                    <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Business / Firm Name</label>
-                    <input type="text" value={formData.lead_data?.business_name || ''} onChange={e => setFormData(f => ({ ...f, lead_data: { ...f.lead_data, business_name: e.target.value } }))} style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Product / Fabric Interest</label>
-                    <input type="text" value={formData.lead_data?.product_or_sku_interest || ''} onChange={e => setFormData(f => ({ ...f, lead_data: { ...f.lead_data, product_or_sku_interest: e.target.value } }))} style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Quantity (Meters)</label>
-                    <input type="number" value={formData.lead_data?.quantity || ''} onChange={e => setFormData(f => ({ ...f, lead_data: { ...f.lead_data, quantity: Number(e.target.value) } }))} style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Priority</label>
-                    <select value={formData.lead_data?.priority || 'WARM'} onChange={e => setFormData(f => ({ ...f, lead_data: { ...f.lead_data, priority: e.target.value } }))} style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem' }}>
-                      <option value="HOT">HOT</option>
-                      <option value="WARM">WARM</option>
-                      <option value="COLD">COLD</option>
-                    </select>
-                  </div>
+            <div style={styles.modalBody}>
+              {/* Record Type Switcher */}
+              <div style={styles.formGroup}>
+                <label style={styles.formLabel}>Connection Type</label>
+                <div style={styles.typeSwitchGrid}>
+                  {['LEAD', 'VENDOR', 'EMPLOYEE', 'WORKER'].map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, record_type: t })}
+                      style={{
+                        ...styles.switchBtn,
+                        ...(formData.record_type === t ? styles.switchBtnActive : {})
+                      }}
+                    >
+                      {t}
+                    </button>
+                  ))}
                 </div>
-              </>
-            )}
+              </div>
 
-            {formData.record_type === 'VENDOR' && (
-              <>
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#10b981', marginBottom: '6px' }}>🏭 Vendor &amp; Payment Details</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-                  <div>
-                    <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Company Name</label>
-                    <input type="text" value={formData.vendor_data?.company_name || ''} onChange={e => setFormData(f => ({ ...f, vendor_data: { ...f.vendor_data, company_name: e.target.value } }))} style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>GST Number</label>
-                    <input type="text" value={formData.vendor_data?.gst_or_tax_id || ''} onChange={e => setFormData(f => ({ ...f, vendor_data: { ...f.vendor_data, gst_or_tax_id: e.target.value } }))} style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Bank Account No</label>
-                    <input type="text" value={formData.vendor_data?.bank_account || ''} onChange={e => setFormData(f => ({ ...f, vendor_data: { ...f.vendor_data, bank_account: e.target.value } }))} style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.72rem', color: '#94a3b8' }}>IFSC Code</label>
-                    <input type="text" value={formData.vendor_data?.bank_ifsc || ''} onChange={e => setFormData(f => ({ ...f, vendor_data: { ...f.vendor_data, bank_ifsc: e.target.value } }))} style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem' }} />
-                  </div>
+              {/* Common Directory Fields */}
+              <h4 style={styles.formSectionHeader}>Contact Directory</h4>
+              <div style={styles.formGrid}>
+                <div style={styles.formGroup}>
+                  <label style={styles.formLabel}>Full Name *</label>
+                  <input
+                    type="text"
+                    value={formData.common_directory.name}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        common_directory: { ...formData.common_directory, name: e.target.value }
+                      })
+                    }
+                    placeholder="e.g. Rahul Mehta"
+                    style={styles.formInput}
+                  />
                 </div>
-              </>
-            )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
-              <button type="button" onClick={() => setShowModal(false)} style={{ padding: '0.5rem 1.2rem', borderRadius: '6px', border: 'none', background: 'rgba(255,255,255,0.1)', color: '#94a3b8', cursor: 'pointer' }}>Cancel</button>
-              <button type="button" onClick={handleSaveConnection} style={{ padding: '0.5rem 1.4rem', borderRadius: '6px', border: 'none', background: '#38bdf8', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}>Save Record</button>
+                <div style={styles.formGroup}>
+                  <label style={styles.formLabel}>Primary Phone *</label>
+                  <input
+                    type="text"
+                    value={formData.common_directory.primary_phone}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        common_directory: { ...formData.common_directory, primary_phone: e.target.value }
+                      })
+                    }
+                    placeholder="e.g. +91 98251 44321"
+                    style={styles.formInput}
+                  />
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.formLabel}>Email Address</label>
+                  <input
+                    type="email"
+                    value={formData.common_directory.email}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        common_directory: { ...formData.common_directory, email: e.target.value }
+                      })
+                    }
+                    placeholder="e.g. rahul@example.com"
+                    style={styles.formInput}
+                  />
+                </div>
+
+                <div style={styles.formGroup}>
+                  <label style={styles.formLabel}>City / Location</label>
+                  <input
+                    type="text"
+                    value={formData.common_directory.city}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        common_directory: { ...formData.common_directory, city: e.target.value }
+                      })
+                    }
+                    placeholder="e.g. Surat"
+                    style={styles.formInput}
+                  />
+                </div>
+              </div>
+
+              {/* Specific Category Data Block */}
+              {formData.record_type === 'LEAD' && (
+                <>
+                  <h4 style={styles.formSectionHeader}>Lead & Sales Details</h4>
+                  <div style={styles.formGrid}>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Business Name</label>
+                      <input
+                        type="text"
+                        value={formData.lead_data.business_name}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            lead_data: { ...formData.lead_data, business_name: e.target.value }
+                          })
+                        }
+                        placeholder="e.g. Mehta Fashions"
+                        style={styles.formInput}
+                      />
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Product / SKU Interest</label>
+                      <input
+                        type="text"
+                        value={formData.lead_data.product_or_sku_interest}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            lead_data: { ...formData.lead_data, product_or_sku_interest: e.target.value }
+                          })
+                        }
+                        placeholder="e.g. Digital Cotton Satin Print"
+                        style={styles.formInput}
+                      />
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Quantity (Meters)</label>
+                      <input
+                        type="number"
+                        value={formData.lead_data.quantity}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            lead_data: { ...formData.lead_data, quantity: e.target.value }
+                          })
+                        }
+                        placeholder="500"
+                        style={styles.formInput}
+                      />
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Priority</label>
+                      <select
+                        value={formData.lead_data.priority}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            lead_data: { ...formData.lead_data, priority: e.target.value }
+                          })
+                        }
+                        style={styles.formSelect}
+                      >
+                        <option value="HOT">HOT</option>
+                        <option value="WARM">WARM</option>
+                        <option value="COLD">COLD</option>
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {formData.record_type === 'VENDOR' && (
+                <>
+                  <h4 style={styles.formSectionHeader}>Vendor & Payment Details</h4>
+                  <div style={styles.formGrid}>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Company Name</label>
+                      <input
+                        type="text"
+                        value={formData.vendor_data.company_name}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            vendor_data: { ...formData.vendor_data, company_name: e.target.value }
+                          })
+                        }
+                        placeholder="Apex Dyechem Pvt Ltd"
+                        style={styles.formInput}
+                      />
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>GSTIN / Tax ID</label>
+                      <input
+                        type="text"
+                        value={formData.vendor_data.gst_or_tax_id}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            vendor_data: { ...formData.vendor_data, gst_or_tax_id: e.target.value }
+                          })
+                        }
+                        placeholder="24AAACA1234F1Z9"
+                        style={styles.formInput}
+                      />
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Payment Terms</label>
+                      <select
+                        value={formData.vendor_data.payment_terms}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            vendor_data: { ...formData.vendor_data, payment_terms: e.target.value }
+                          })
+                        }
+                        style={styles.formSelect}
+                      >
+                        <option value="Advance">Advance</option>
+                        <option value="Net 15">Net 15</option>
+                        <option value="Net 30">Net 30</option>
+                        <option value="COD">COD</option>
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div style={styles.modalFooter}>
+              <button onClick={() => setShowModal(false)} style={styles.cancelBtn}>
+                Cancel
+              </button>
+              <button onClick={handleSaveConnection} style={styles.saveBtn}>
+                Save Connection
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* Note Modal */}
-      {showNoteModal && activeConnectionForNote && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ width: '100%', maxWidth: '480px', background: '#0f172a', border: '1px solid rgba(56,189,248,0.3)', borderRadius: '14px', padding: '1.25rem', color: '#f8fafc' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#38bdf8' }}>
-                Add Note — {activeConnectionForNote.common_directory?.name}
-              </h3>
-              <button onClick={() => setShowNoteModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={18} /></button>
+      {showNoteModal && (
+        <div style={styles.modalOverlay}>
+          <div style={{ ...styles.modalContent, maxWidth: '500px' }}>
+            <div style={styles.modalHeader}>
+              <h3 style={styles.modalTitle}>Add Connection Note</h3>
+              <button onClick={() => setShowNoteModal(false)} style={styles.closeBtn}>
+                <X size={20} />
+              </button>
             </div>
-            <textarea
-              rows={4}
-              value={noteText}
-              onChange={e => setNoteText(e.target.value)}
-              placeholder="Type internal note, followup comment, or payment detail..."
-              style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.8rem' }}>
-              <button onClick={() => setShowNoteModal(false)} style={{ padding: '0.45rem 1rem', borderRadius: '6px', border: 'none', background: 'rgba(255,255,255,0.1)', color: '#94a3b8', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={handleAddNote} style={{ padding: '0.45rem 1.2rem', borderRadius: '6px', border: 'none', background: '#38bdf8', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}>Save Note</button>
+            <div style={styles.modalBody}>
+              <textarea
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Type note details or update history..."
+                rows={4}
+                style={styles.formTextarea}
+              />
+            </div>
+            <div style={styles.modalFooter}>
+              <button onClick={() => setShowNoteModal(false)} style={styles.cancelBtn}>
+                Cancel
+              </button>
+              <button onClick={handleAddNote} style={styles.saveBtn}>
+                Add Note
+              </button>
             </div>
           </div>
         </div>
@@ -709,3 +735,442 @@ export default function BusinessConnectionPanel({ currentUser }) {
     </div>
   );
 }
+
+const styles = {
+  container: {
+    padding: '1.5rem',
+    maxWidth: '1400px',
+    margin: '0 auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1.5rem',
+    fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+    backgroundColor: '#f8fafc',
+    minHeight: '100vh'
+  },
+  headerRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '1rem',
+    backgroundColor: '#ffffff',
+    padding: '1.25rem 1.5rem',
+    borderRadius: '14px',
+    boxShadow: '0 4px 16px -2px rgba(37, 99, 235, 0.06)',
+    border: '1px solid #e2e8f0'
+  },
+  pageTitle: {
+    margin: 0,
+    fontSize: '1.5rem',
+    fontWeight: '800',
+    color: '#0f172a',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.6rem'
+  },
+  pageSubtitle: {
+    margin: '4px 0 0',
+    fontSize: '0.88rem',
+    color: '#64748b'
+  },
+  addBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.7rem 1.25rem',
+    borderRadius: '10px',
+    backgroundColor: '#2563eb',
+    color: '#ffffff',
+    fontSize: '0.9rem',
+    fontWeight: '700',
+    border: 'none',
+    cursor: 'pointer',
+    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.25)',
+    transition: 'all 0.2s ease'
+  },
+  metricsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '1rem'
+  },
+  metricCard: {
+    backgroundColor: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '12px',
+    padding: '1.1rem',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+    transition: 'all 0.2s ease'
+  },
+  metricCardSelected: {
+    border: '2px solid #2563eb',
+    backgroundColor: '#eff6ff',
+    boxShadow: '0 4px 16px rgba(37, 99, 235, 0.12)'
+  },
+  metricLabel: {
+    fontSize: '0.8rem',
+    fontWeight: '600',
+    color: '#64748b'
+  },
+  metricCount: {
+    fontSize: '1.65rem',
+    fontWeight: '800',
+    color: '#0f172a',
+    marginTop: '4px'
+  },
+  metricIconBox: {
+    width: '44px',
+    height: '44px',
+    borderRadius: '10px',
+    backgroundColor: '#dbeafe',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  filterBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '1rem',
+    backgroundColor: '#ffffff',
+    padding: '1rem 1.25rem',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+  },
+  searchForm: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    flex: '1',
+    maxWidth: '450px',
+    backgroundColor: '#f8fafc',
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    padding: '0.4rem 0.75rem'
+  },
+  searchInput: {
+    border: 'none',
+    backgroundColor: 'transparent',
+    outline: 'none',
+    width: '100%',
+    fontSize: '0.88rem',
+    color: '#0f172a'
+  },
+  searchBtn: {
+    padding: '0.35rem 0.85rem',
+    borderRadius: '6px',
+    backgroundColor: '#2563eb',
+    color: '#ffffff',
+    border: 'none',
+    fontSize: '0.8rem',
+    fontWeight: '600',
+    cursor: 'pointer'
+  },
+  priorityFilterGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem'
+  },
+  filterLabel: {
+    fontSize: '0.82rem',
+    fontWeight: '600',
+    color: '#64748b'
+  },
+  priorityPillBtn: {
+    padding: '0.35rem 0.75rem',
+    borderRadius: '20px',
+    border: '1px solid #e2e8f0',
+    backgroundColor: '#ffffff',
+    color: '#475569',
+    fontSize: '0.78rem',
+    fontWeight: '600',
+    cursor: 'pointer'
+  },
+  priorityPillActive: {
+    backgroundColor: '#2563eb',
+    color: '#ffffff',
+    borderColor: '#2563eb'
+  },
+  loadingBox: {
+    textAlign: 'center',
+    padding: '3rem',
+    color: '#64748b'
+  },
+  emptyState: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '4rem 1rem',
+    backgroundColor: '#ffffff',
+    borderRadius: '14px',
+    border: '1px solid #e2e8f0',
+    textAlign: 'center'
+  },
+  emptyTitle: {
+    fontSize: '1.1rem',
+    fontWeight: '700',
+    color: '#0f172a',
+    marginTop: '0.75rem',
+    marginBottom: '0.25rem'
+  },
+  emptyText: {
+    fontSize: '0.85rem',
+    color: '#64748b',
+    margin: 0
+  },
+  cardList: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+    gap: '1rem'
+  },
+  connectionCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+    padding: '1.1rem',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.85rem'
+  },
+  cardTopRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  cardIdentity: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.6rem'
+  },
+  typeBadge: {
+    padding: '0.2rem 0.55rem',
+    borderRadius: '6px',
+    fontSize: '0.72rem',
+    fontWeight: '800',
+    letterSpacing: '0.05em'
+  },
+  contactName: {
+    margin: 0,
+    fontSize: '1.05rem',
+    fontWeight: '700',
+    color: '#0f172a'
+  },
+  cardActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.35rem'
+  },
+  iconBtnAction: {
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '6px',
+    padding: '0.35rem',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  contactDetailsRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '0.5rem'
+  },
+  detailChip: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.35rem',
+    padding: '0.3rem 0.6rem',
+    borderRadius: '6px',
+    backgroundColor: '#eff6ff',
+    color: '#1e40af',
+    fontSize: '0.78rem',
+    fontWeight: '500'
+  },
+  leadInfoBox: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '0.6rem 0.75rem',
+    borderRadius: '8px',
+    backgroundColor: '#f8fafc',
+    border: '1px solid #f1f5f9',
+    fontSize: '0.8rem'
+  },
+  leadInfoItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.3rem'
+  },
+  subLabel: {
+    color: '#64748b',
+    fontWeight: '600'
+  },
+  subVal: {
+    color: '#0f172a',
+    fontWeight: '700'
+  },
+  priorityPill: {
+    padding: '0.15rem 0.45rem',
+    borderRadius: '4px',
+    fontSize: '0.7rem',
+    fontWeight: '800'
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    padding: '1rem'
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: '16px',
+    width: '100%',
+    maxWidth: '650px',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+    border: '1px solid #e2e8f0',
+    overflow: 'hidden'
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '1.25rem 1.5rem',
+    borderBottom: '1px solid #e2e8f0',
+    backgroundColor: '#f8fafc'
+  },
+  modalTitle: {
+    margin: 0,
+    fontSize: '1.15rem',
+    fontWeight: '700',
+    color: '#0f172a'
+  },
+  closeBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#64748b',
+    cursor: 'pointer'
+  },
+  modalBody: {
+    padding: '1.5rem',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1.25rem',
+    maxHeight: '75vh',
+    overflowY: 'auto'
+  },
+  formGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.35rem'
+  },
+  formLabel: {
+    fontSize: '0.8rem',
+    fontWeight: '600',
+    color: '#475569'
+  },
+  typeSwitchGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap: '0.5rem'
+  },
+  switchBtn: {
+    padding: '0.5rem',
+    borderRadius: '8px',
+    border: '1px solid #e2e8f0',
+    backgroundColor: '#f8fafc',
+    color: '#475569',
+    fontSize: '0.8rem',
+    fontWeight: '700',
+    cursor: 'pointer'
+  },
+  switchBtnActive: {
+    backgroundColor: '#2563eb',
+    color: '#ffffff',
+    borderColor: '#2563eb'
+  },
+  formSectionHeader: {
+    margin: '0.5rem 0 0',
+    fontSize: '0.9rem',
+    fontWeight: '700',
+    color: '#2563eb',
+    borderBottom: '1px solid #e2e8f0',
+    paddingBottom: '0.35rem'
+  },
+  formGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '0.85rem'
+  },
+  formInput: {
+    padding: '0.6rem 0.85rem',
+    borderRadius: '8px',
+    border: '1px solid #cbd5e1',
+    backgroundColor: '#ffffff',
+    color: '#0f172a',
+    fontSize: '0.88rem',
+    outline: 'none'
+  },
+  formSelect: {
+    padding: '0.6rem 0.85rem',
+    borderRadius: '8px',
+    border: '1px solid #cbd5e1',
+    backgroundColor: '#ffffff',
+    color: '#0f172a',
+    fontSize: '0.88rem',
+    outline: 'none'
+  },
+  formTextarea: {
+    width: '100%',
+    padding: '0.75rem',
+    borderRadius: '8px',
+    border: '1px solid #cbd5e1',
+    backgroundColor: '#ffffff',
+    color: '#0f172a',
+    fontSize: '0.88rem',
+    outline: 'none',
+    boxSizing: 'border-box'
+  },
+  modalFooter: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '0.75rem',
+    padding: '1rem 1.5rem',
+    borderTop: '1px solid #e2e8f0',
+    backgroundColor: '#f8fafc'
+  },
+  cancelBtn: {
+    padding: '0.6rem 1.1rem',
+    borderRadius: '8px',
+    border: '1px solid #cbd5e1',
+    backgroundColor: '#ffffff',
+    color: '#475569',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer'
+  },
+  saveBtn: {
+    padding: '0.6rem 1.25rem',
+    borderRadius: '8px',
+    border: 'none',
+    backgroundColor: '#2563eb',
+    color: '#ffffff',
+    fontSize: '0.85rem',
+    fontWeight: '700',
+    cursor: 'pointer'
+  }
+};
