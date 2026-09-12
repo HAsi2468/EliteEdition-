@@ -24,7 +24,6 @@ import { api } from '../services/api';
 
 const RECORD_TYPES = [
   { key: 'ALL', label: 'All Connections', icon: Users, color: '#2563eb' },
-  { key: 'LEAD', label: 'Sales Leads', icon: TrendingUp, color: '#0284c7' },
   { key: 'VENDOR', label: 'Vendors & Suppliers', icon: Building2, color: '#0d9488' },
   { key: 'EMPLOYEE', label: 'Salaried Staff', icon: Briefcase, color: '#6366f1' },
   { key: 'WORKER', label: 'Factory Workers', icon: HardHat, color: '#2563eb' }
@@ -32,7 +31,7 @@ const RECORD_TYPES = [
 
 export default function BusinessConnectionPanel({ currentUser }) {
   const [connections, setConnections] = useState([]);
-  const [counts, setCounts] = useState({ total: 0, lead: 0, vendor: 0, employee: 0, worker: 0 });
+  const [counts, setCounts] = useState({ total: 0, vendor: 0, employee: 0, worker: 0 });
   const [loading, setLoading] = useState(false);
   const [activeType, setActiveType] = useState('ALL');
   const [search, setSearch] = useState('');
@@ -42,7 +41,7 @@ export default function BusinessConnectionPanel({ currentUser }) {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
-    record_type: 'LEAD',
+    record_type: 'VENDOR',
     common_directory: {
       name: '',
       primary_phone: '',
@@ -194,7 +193,7 @@ export default function BusinessConnectionPanel({ currentUser }) {
             <span>Business Connection</span>
           </h2>
           <p style={styles.pageSubtitle}>
-            Centralized directory for managing Sales Leads, Fabric Vendors, Salaried Staff & Factory Workers.
+            Centralized directory for managing Fabric Vendors, Salaried Staff &amp; Factory Workers.
           </p>
         </div>
 
@@ -202,7 +201,7 @@ export default function BusinessConnectionPanel({ currentUser }) {
           onClick={() => {
             setEditingId(null);
             setFormData({
-              record_type: 'LEAD',
+              record_type: 'VENDOR',
               common_directory: { name: '', primary_phone: '', whatsapp_phone: '', email: '', city: '', state: '', address: '', is_active: true },
               lead_data: { business_name: '', product_or_sku_interest: '', quantity: '', budget: '', source: 'Direct', lead_score: 75, priority: 'HOT', pipeline_stage: 'New Lead', suggested_next_action: '', sla_followup_hours: 1, instant_reply_text: '' },
               vendor_data: { company_name: '', gst_or_tax_id: '', bank_account: '', bank_ifsc: '', upi_id: '', payment_terms: 'Net 30', supplied_items: '' },
@@ -224,7 +223,6 @@ export default function BusinessConnectionPanel({ currentUser }) {
           const IconComponent = cat.icon;
           const isSelected = activeType === cat.key;
           let count = counts.total;
-          if (cat.key === 'LEAD') count = counts.lead;
           if (cat.key === 'VENDOR') count = counts.vendor;
           if (cat.key === 'EMPLOYEE') count = counts.employee;
           if (cat.key === 'WORKER') count = counts.worker;
@@ -478,7 +476,7 @@ export default function BusinessConnectionPanel({ currentUser }) {
               <div style={styles.formGroup}>
                 <label style={styles.formLabel}>Connection Type</label>
                 <div style={styles.typeSwitchGrid}>
-                  {['LEAD', 'VENDOR', 'EMPLOYEE', 'WORKER'].map((t) => (
+                  {['VENDOR', 'EMPLOYEE', 'WORKER'].map((t) => (
                     <button
                       key={t}
                       type="button"
@@ -1085,7 +1083,7 @@ const styles = {
   },
   typeSwitchGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
+    gridTemplateColumns: 'repeat(3, 1fr)',
     gap: '0.5rem'
   },
   switchBtn: {
