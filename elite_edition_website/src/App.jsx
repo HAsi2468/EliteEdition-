@@ -341,7 +341,7 @@ export default function App() {
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
       'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense',
-      'jobcards_expenses', 'expense_dashboard', 'expense_create', 'expenses', 'jobcards_qa', 'qa', 'qa_dashboard'
+      'jobcards_expenses', 'expense_dashboard', 'expense_create', 'expenses', 'jobcards_qa', 'qa', 'qa_dashboard', 'jobcards_crm', 'crm_department', 'crm'
     ];
 
     if (currentUser.role === 'admin') {
@@ -961,7 +961,7 @@ export default function App() {
                   {/* CRM Department */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_crm') || currentUser.permissions?.includes('crm_department') || currentUser.permissions?.includes('crm')) && (
                     <button onClick={() => { setActiveTab('jobcards_crm'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_crm' ? styles.navItemActive : {}) }}>
-                      <Users size={18} color="#ec4899" /><span>CRM Department</span>
+                      <Users size={18} color="#2563eb" /><span>CRM Department</span>
                     </button>
                   )}
 
