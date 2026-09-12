@@ -1856,6 +1856,59 @@ export const api = {
 
   async deleteLead(id) {
     return request(`/leads/${id}`, { method: 'DELETE' });
+  },
+
+  // Business Connections (Master AI Agent & Directory)
+  async parseBusinessConnectionAI(rawText) {
+    return request('/business-connections/parse-ai', {
+      method: 'POST',
+      body: JSON.stringify({ raw_text: rawText })
+    });
+  },
+
+  async getBusinessConnections(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return request(`/business-connections${query ? `?${query}` : ''}`);
+  },
+
+  async createBusinessConnection(payload) {
+    return request('/business-connections', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async updateBusinessConnection(id, payload) {
+    return request(`/business-connections/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async deleteBusinessConnection(id) {
+    return request(`/business-connections/${id}`, { method: 'DELETE' });
+  },
+
+  async addBusinessConnectionNote(id, noteData) {
+    return request(`/business-connections/${id}/notes`, {
+      method: 'POST',
+      body: JSON.stringify(noteData)
+    });
+  },
+
+  // Centralized Master AI Processing Agent
+  async processMasterAiInput(payload) {
+    return request('/ai/master-agent', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async upsertMasterAiRecord(recordData) {
+    return request('/ai/upsert-record', {
+      method: 'POST',
+      body: JSON.stringify(recordData)
+    });
   }
 };
 

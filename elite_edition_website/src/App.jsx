@@ -24,6 +24,7 @@ import DigitalPrintExpenseModule from './components/DigitalPrintExpenseModule';
 import CompanyDedicatedDashboard from './components/CompanyDedicatedDashboard';
 import GarmentJobCardDashboard from './components/GarmentJobCardDashboard';
 import CrmPanel from './components/CrmPanel';
+import MasterAiProcessingAgent from './components/MasterAiProcessingAgent';
 import { COMPANIES, getCompanyById } from './config/companiesConfig';
 
 // Code-splitting lazy loads for heavy tab modules
@@ -65,7 +66,9 @@ import {
   Receipt,
   PanelLeftClose,
   PanelLeftOpen,
-  Clock
+  Clock,
+  Sparkles,
+  Bot
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
@@ -198,7 +201,7 @@ export default function App() {
   // Department permission helpers
   // Department permission helpers
   const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
-  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm'];
+  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent'];
   const STITCHING_PERMISSIONS = [
     'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
     'jobcards_stitching_challan', 'jobcards_stitching_settings', 'stitching'
@@ -341,7 +344,7 @@ export default function App() {
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
       'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense',
-      'jobcards_expenses', 'expense_dashboard', 'expense_create', 'expenses', 'jobcards_qa', 'qa', 'qa_dashboard', 'jobcards_crm', 'crm_department', 'crm'
+      'jobcards_expenses', 'expense_dashboard', 'expense_create', 'expenses', 'jobcards_qa', 'qa', 'qa_dashboard', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent'
     ];
 
     if (currentUser.role === 'admin') {
@@ -965,6 +968,13 @@ export default function App() {
                     </button>
                   )}
 
+                  {/* Master AI Agent */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master_ai') || currentUser.permissions?.includes('jobcards')) && (
+                    <button onClick={() => { setActiveTab('jobcards_master_ai'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_master_ai' ? styles.navItemActive : {}) }}>
+                      <Sparkles size={18} color="#4f46e5" /><span>Master AI Agent</span>
+                    </button>
+                  )}
+
                   {/* 3. Job Card */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) && (
                     <button onClick={() => { setActiveTab('jobcards_list'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_list' ? styles.navItemActive : {}) }}>
@@ -1380,6 +1390,9 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_crm') || currentUser.permissions?.includes('crm_department') || currentUser.permissions?.includes('crm')) &&
                       renderNavItem('jobcards_crm', 'CRM Department', Users, null, 'CRM')
                     }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_master_ai') || currentUser.permissions?.includes('jobcards')) &&
+                      renderNavItem('jobcards_master_ai', 'Master AI Agent', Sparkles, null, 'Master AI')
+                    }
 
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_list')) &&
                       renderNavItem('jobcards_list', 'Job Card', FileText, null, 'Job Card')
@@ -1547,6 +1560,8 @@ export default function App() {
             <ReportsCenter department={activeDepartment === 'elite_online' ? 'elite-online' : 'elite-print'} />
           ) : activeTab === 'jobcards_crm' || activeTab === 'crm_department' || activeTab === 'crm' ? (
             <CrmPanel currentUser={currentUser} />
+          ) : activeTab === 'jobcards_master_ai' || activeTab === 'master_ai_agent' ? (
+            <MasterAiProcessingAgent />
           ) : activeTab.startsWith('jobcards') ? (
             <JobCardPanel currentUser={currentUser} activeSubTab={activeTab === 'jobcards' ? 'jobcards' : activeTab.replace('jobcards_', '')} department={activeDepartment} />
           ) : activeTab === 'ee_dashboard' ? (

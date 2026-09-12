@@ -58,7 +58,7 @@ const createInward = async (req, res) => {
     }
 
     const { challanNo, vendorName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll, companyEntity } = req.body;
-    
+
     if (!materialName || qty == null || qty < 0) {
       return res.status(400).json({ success: false, error: 'Material Name and a valid Quantity are required.' });
     }
@@ -120,7 +120,7 @@ const createOutward = async (req, res) => {
     }
 
     const { jobNo, partyName, materialName, qty, unit, date, notes, panna, paperQuality, color, canSize, metersPerRoll, companyEntity } = req.body;
-    
+
     if (!materialName || qty == null || qty <= 0) {
       return res.status(400).json({ success: false, error: 'Material Name and a valid Quantity (>0) are required.' });
     }
@@ -417,7 +417,7 @@ const downloadLedgerPdf = async (req, res) => {
           if (activeLogo) {
             try {
               doc.image(activeLogo, 40, 18, { width: 75 });
-            } catch (e) {}
+            } catch (e) { }
           }
           doc.fontSize(9.5).font('Helvetica-Bold').fillColor('#111827').text(`${compName} - Raw Materials ${titleType}Ledger`, activeLogo ? 125 : 40, 20);
           doc.moveTo(40, 36).lineTo(555, 36).strokeColor('#e5e7eb').lineWidth(0.5).stroke();
