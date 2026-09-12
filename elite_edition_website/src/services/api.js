@@ -1176,6 +1176,7 @@ export const api = {
     if (params.dateStart) query.append('dateStart', params.dateStart);
     if (params.dateEnd) query.append('dateEnd', params.dateEnd);
     if (params.materialName && params.materialName !== 'All') query.append('materialName', params.materialName);
+    if (params.type && params.type !== 'All') query.append('type', params.type);
     const qs = query.toString() ? `?${query.toString()}` : '';
 
     const response = await fetch(`${baseUrl}/raw-materials/report/pdf${qs}`, {
@@ -1193,7 +1194,8 @@ export const api = {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `raw-materials-ledger${params.dateStart ? '-' + params.dateStart : ''}.pdf`);
+    const typeTag = params.type && params.type !== 'All' ? `-${params.type.toLowerCase()}` : '';
+    link.setAttribute('download', `raw-materials${typeTag}-ledger${params.dateStart ? '-' + params.dateStart : ''}.pdf`);
     document.body.appendChild(link);
     link.click();
     if (link.parentNode) link.parentNode.removeChild(link);

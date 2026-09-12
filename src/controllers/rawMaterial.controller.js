@@ -257,7 +257,7 @@ const deleteTransaction = async (req, res) => {
 // Generate Raw Material Ledger PDF
 const downloadLedgerPdf = async (req, res) => {
   try {
-    const { dateStart, dateEnd, materialName } = req.query;
+    const { dateStart, dateEnd, materialName, type } = req.query;
 
     const matchStage = {};
     if (dateStart || dateEnd) {
@@ -268,6 +268,10 @@ const downloadLedgerPdf = async (req, res) => {
       if (dateEnd && /^\d{4}-\d{2}-\d{2}$/.test(dateEnd.trim())) {
         matchStage.date.$lte = new Date(`${dateEnd.trim()}T23:59:59.999Z`);
       }
+    }
+
+    if (type && type !== 'All') {
+      matchStage.type = type.trim().toUpperCase();
     }
 
     if (materialName && materialName !== 'All') {
@@ -290,7 +294,8 @@ const downloadLedgerPdf = async (req, res) => {
     doc.pipe(res);
 
     // Header
-    doc.fontSize(18).font('Helvetica-Bold').fillColor('black').text('Elite Digital Print — Raw Materials Ledger', { align: 'center' });
+    const titleType = type && type !== 'All' ? `${type.toUpperCase()} ` : '';
+    doc.fontSize(18).font('Helvetica-Bold').fillColor('black').text(`Elite Digital Print — Raw Materials ${titleType}Ledger`, { align: 'center' });
     doc.moveDown(0.3);
     const dateLabel = dateStart || dateEnd
       ? `Period: ${dateStart || 'Start'} to ${dateEnd || 'Today'}`

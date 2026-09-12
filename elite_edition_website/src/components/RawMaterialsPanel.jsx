@@ -140,15 +140,18 @@ export default function RawMaterialsPanel() {
     let ds = '';
     let de = '';
     let mat = '';
+    let typeVal = 'All';
 
     if (activeTab === 'inward') {
       ds = inwardDateStart;
       de = inwardDateEnd;
       if (inwardMaterialType !== 'All') mat = inwardMaterialType;
+      typeVal = 'INWARD';
     } else if (activeTab === 'outward') {
       ds = outwardDateStart;
       de = outwardDateEnd;
       if (outwardMaterialType !== 'All') mat = outwardMaterialType;
+      typeVal = 'OUTWARD';
     } else if (activeTab === 'dashboard') {
       if (stockMaterialType !== 'All') mat = stockMaterialType;
     }
@@ -156,7 +159,8 @@ export default function RawMaterialsPanel() {
     setPdfFilter({
       dateStart: ds || '',
       dateEnd: de || '',
-      materialName: mat || ''
+      materialName: mat || '',
+      type: typeVal
     });
     setIsPdfFilterOpen(true);
   };
@@ -2033,6 +2037,15 @@ export default function RawMaterialsPanel() {
               <FileDown /> Raw Material Ledger Report
             </h3>
             <form onSubmit={handleDownloadPdf} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={labelStyle}>Transaction Type</label>
+                <select style={inputStyle} value={pdfFilter.type || 'All'} onChange={e => setPdfFilter(p => ({ ...p, type: e.target.value }))}>
+                  <option value="All">All Transactions (Inward & Outward)</option>
+                  <option value="INWARD">Inward Only</option>
+                  <option value="OUTWARD">Outward Only</option>
+                </select>
+              </div>
+
               <div>
                 <label style={labelStyle}>Material Item (Optional)</label>
                 <select style={inputStyle} value={pdfFilter.materialName} onChange={e => setPdfFilter(p => ({ ...p, materialName: e.target.value }))}>
