@@ -1200,7 +1200,10 @@ export const api = {
     document.body.appendChild(link);
     link.click();
     if (link.parentNode) link.parentNode.removeChild(link);
-    setTimeout(() => window.URL.revokeObjectURL(url), 2000);
+    try {
+      window.open(url, '_blank');
+    } catch (e) {}
+    setTimeout(() => window.URL.revokeObjectURL(url), 60000);
   },
 
   async importRawMaterialStock(rows) {
