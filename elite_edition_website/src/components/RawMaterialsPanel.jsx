@@ -973,19 +973,6 @@ export default function RawMaterialsPanel() {
             </button>
           ))}
         </div>
-        <button onClick={handleExportCsv} className="btn-secondary" title="Download Raw Materials Stock CSV" style={{ gap: '0.4rem' }}>
-          <FileDown size={16} /> Export CSV
-        </button>
-        <button onClick={() => fileInputRef.current && fileInputRef.current.click()} className="btn-secondary" title="Upload Raw Materials Stock CSV" style={{ gap: '0.4rem' }}>
-          <ArrowDownToLine size={16} /> Import CSV
-        </button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleImportCsv}
-          accept=".csv"
-          style={{ display: 'none' }}
-        />
         <button onClick={handleOpenPdfModal} className="btn-secondary" title="Download Ledger PDF" style={{ gap: '0.4rem' }}>
           <FileDown size={16} /> PDF Report
         </button>
