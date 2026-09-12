@@ -14,9 +14,11 @@ import {
   Building2,
   FileText,
   X,
-  RefreshCw
+  RefreshCw,
+  Printer
 } from 'lucide-react';
 import { api } from '../services/api';
+import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 
 const RECORD_TYPES = [
   { key: 'ALL', label: 'All Connections', icon: Users, color: '#2563eb' },
@@ -32,6 +34,11 @@ export default function BusinessConnectionPanel({ currentUser }) {
   const [activeType, setActiveType] = useState('ALL');
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
+
+  // Date Range Filter State
+  const [datePreset, setDatePreset] = useState('all');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
 
   // Manual Add / Edit Modal State
   const [showModal, setShowModal] = useState(false);
@@ -102,6 +109,155 @@ export default function BusinessConnectionPanel({ currentUser }) {
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     fetchConnections();
+  };
+
+  // Filter connections by date range
+  const dateRangeInfo = getDatePresetRange(datePreset, customStart, customEnd);
+  const filteredConnections = connections.filter((item) => {
+    if (!dateRangeInfo.dateStart && !dateRangeInfo.dateEnd) return true;
+    const itemDate = item.createdAt ? new Date(item.createdAt) : null;
+    if (!itemDate || isNaN(itemDate.getTime())) return true;
+    const itemYMD = itemDate.toISOString().split('T')[0];
+    if (dateRangeInfo.dateStart && itemYMD < dateRangeInfo.dateStart) return false;
+    if (dateRangeInfo.dateEnd && itemYMD > dateRangeInfo.dateEnd) return false;
+    return true;
+  });
+
+  // Export PDF Report
+  const handleExportPDF = () => {
+    const listToExport = filteredConnections;
+    if (!listToExport || listToExport.length === 0) {
+      alert('No connections to export.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to export PDF.');
+      return;
+    }
+
+    const activeCatObj = RECORD_TYPES.find((r) => r.key === activeType) || RECORD_TYPES[0];
+    const reportTitle = `Business Connections Directory Report (${activeCatObj.label})`;
+    const generatedTime = new Date().toLocaleString('en-IN');
+    const dateFilterLabel = dateRangeInfo.labelText || 'All Time Records';
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${reportTitle}</title>
+        <style>
+          body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 25px; color: #0f172a; background: #fff; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2563eb; padding-bottom: 15px; margin-bottom: 20px; }
+          .company { font-size: 22px; font-weight: 800; color: #2563eb; letter-spacing: -0.5px; }
+          .subtitle { font-size: 14px; font-weight: 600; color: #475569; margin-top: 4px; }
+          .meta { font-size: 11px; color: #64748b; text-align: right; }
+          .summary-cards { display: flex; gap: 15px; margin-bottom: 20px; }
+          .kpi { flex: 1; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
+          .kpi-label { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; }
+          .kpi-value { font-size: 18px; font-weight: 800; color: #0f172a; margin-top: 4px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+          th { background: #eff6ff; color: #1e40af; text-align: left; padding: 10px 12px; font-weight: 700; border-bottom: 1.5px solid #bfdbfe; }
+          td { padding: 9px 12px; border-bottom: 1px solid #e2e8f0; color: #334155; vertical-align: top; }
+          tr:nth-child(even) { background: #f8fafc; }
+          .type-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-weight: 800; font-size: 10px; text-transform: uppercase; }
+          .badge-vendor { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+          .badge-employee { background: #e0e7ff; color: #4338ca; border: 1px solid #c7d2fe; }
+          .badge-worker { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+          .footer { margin-top: 30px; font-size: 10px; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+          @media print {
+            body { margin: 15px; }
+            @page { size: A4 landscape; margin: 10mm; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="company">Elite Digital Prints</div>
+            <div class="subtitle">${reportTitle}</div>
+          </div>
+          <div class="meta">
+            <div>Generated: <strong>${generatedTime}</strong></div>
+            <div>Date Filter: <strong>${dateFilterLabel}</strong></div>
+          </div>
+        </div>
+
+        <div class="summary-cards">
+          <div class="kpi">
+            <div class="kpi-label">Filtered Directory Records</div>
+            <div class="kpi-value">${listToExport.length}</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Category Filter</div>
+            <div class="kpi-value" style="color: #2563eb;">${activeCatObj.label}</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 40px;">#</th>
+              <th>Contact Name</th>
+              <th>Type</th>
+              <th>Phone / Contact</th>
+              <th>City / Location</th>
+              <th>Job Designation / Details</th>
+              <th>Date Added</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${listToExport
+              .map((item, idx) => {
+                const dir = item.common_directory || {};
+                const type = item.record_type || 'VENDOR';
+                let details = '';
+                let typeClass = 'badge-vendor';
+                if (type === 'VENDOR') {
+                  typeClass = 'badge-vendor';
+                  details = `Company: ${item.vendor_data?.company_name || dir.name || '-'} ${item.vendor_data?.gst_or_tax_id ? '| GST: ' + item.vendor_data.gst_or_tax_id : ''}`;
+                } else if (type === 'EMPLOYEE') {
+                  typeClass = 'badge-employee';
+                  details = `Designation: ${item.employee_data?.designation || 'Staff'} | Dept: ${item.employee_data?.department || 'Production'} ${item.employee_data?.monthly_salary ? '| Salary: ₹' + Number(item.employee_data.monthly_salary).toLocaleString('en-IN') + '/mo' : ''}`;
+                } else if (type === 'WORKER') {
+                  typeClass = 'badge-worker';
+                  details = `Designation: ${item.worker_data?.designation || item.worker_data?.station_or_skill || 'Operator'} | Model: ${item.worker_data?.wage_model || 'DAILY_WAGE'} ${item.worker_data?.rate_amount ? '| Rate: ₹' + item.worker_data.rate_amount : ''}`;
+                }
+
+                const createdStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN') : '-';
+
+                return `
+                <tr>
+                  <td>${idx + 1}</td>
+                  <td style="font-weight: 700; color: #0f172a;">${dir.name || 'Unnamed Contact'}</td>
+                  <td><span class="type-badge ${typeClass}">${type}</span></td>
+                  <td>${dir.primary_phone || dir.email || '-'}</td>
+                  <td>${[dir.city, dir.state].filter(Boolean).join(', ') || '-'}</td>
+                  <td>${details}</td>
+                  <td>${createdStr}</td>
+                </tr>
+              `;
+              })
+              .join('')}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          Elite Digital Prints — Centralized Business Connections Directory Report &bull; Page 1 of 1
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 300);
+          }
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   // Save Connection (Create or Edit)
@@ -256,14 +412,43 @@ export default function BusinessConnectionPanel({ currentUser }) {
           </button>
         </form>
 
-        <button
-          onClick={fetchConnections}
-          disabled={loading}
-          style={styles.inlineRefreshBtn}
-        >
-          <RefreshCw size={14} className={loading ? "spin-icon" : ""} />
-          <span>Refresh</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <DateRangePicker
+            preset={datePreset}
+            onChange={({ preset, dateStart, dateEnd }) => {
+              setDatePreset(preset);
+              if (preset === 'custom') {
+                setCustomStart(dateStart);
+                setCustomEnd(dateEnd);
+              }
+            }}
+            customStart={customStart}
+            customEnd={customEnd}
+            onCustomChange={(s, e) => {
+              setCustomStart(s);
+              setCustomEnd(e);
+            }}
+          />
+
+          <button
+            onClick={handleExportPDF}
+            style={styles.pdfBtn}
+            title="Export PDF Report of Business Connections"
+          >
+            <Printer size={15} color="#2563eb" />
+            <span>Export PDF</span>
+          </button>
+
+          <button
+            onClick={fetchConnections}
+            disabled={loading}
+            style={styles.inlineRefreshBtn}
+            title="Refresh List"
+          >
+            <RefreshCw size={14} className={loading ? "spin-icon" : ""} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {/* Connections Data List */}
@@ -272,7 +457,7 @@ export default function BusinessConnectionPanel({ currentUser }) {
           <RefreshCw size={28} color="#2563eb" className="spin-icon" style={{ marginBottom: '0.5rem' }} />
           <div>Loading Business Connections...</div>
         </div>
-      ) : connections.length === 0 ? (
+      ) : filteredConnections.length === 0 ? (
         <div style={styles.emptyState}>
           <Users size={48} color="#94a3b8" />
           <h3 style={styles.emptyTitle}>No Connections Found</h3>
@@ -280,7 +465,7 @@ export default function BusinessConnectionPanel({ currentUser }) {
         </div>
       ) : (
         <div style={styles.cardList}>
-          {connections.map((item) => {
+          {filteredConnections.map((item) => {
             const dir = item.common_directory || {};
             const typeKey = item.record_type || 'VENDOR';
 
@@ -853,40 +1038,6 @@ const styles = {
     fontSize: '0.88rem',
     color: '#64748b'
   },
-  headerBtnGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.75rem'
-  },
-  refreshBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    padding: '0.7rem 1.25rem',
-    borderRadius: '10px',
-    backgroundColor: '#ffffff',
-    color: '#2563eb',
-    fontSize: '0.9rem',
-    fontWeight: '700',
-    border: '1.5px solid #2563eb',
-    cursor: 'pointer',
-    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.08)',
-    transition: 'all 0.2s ease'
-  },
-  inlineRefreshBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.35rem',
-    padding: '0.45rem 0.85rem',
-    borderRadius: '8px',
-    backgroundColor: '#eff6ff',
-    color: '#2563eb',
-    fontSize: '0.82rem',
-    fontWeight: '600',
-    border: '1px solid #bfdbfe',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease'
-  },
   addBtn: {
     display: 'flex',
     alignItems: 'center',
@@ -961,7 +1112,8 @@ const styles = {
     alignItems: 'center',
     gap: '0.5rem',
     flex: '1',
-    maxWidth: '550px',
+    minWidth: '280px',
+    maxWidth: '450px',
     backgroundColor: '#f8fafc',
     border: '1px solid #cbd5e1',
     borderRadius: '8px',
@@ -984,6 +1136,35 @@ const styles = {
     fontSize: '0.8rem',
     fontWeight: '600',
     cursor: 'pointer'
+  },
+  pdfBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    padding: '0.5rem 0.95rem',
+    borderRadius: '8px',
+    backgroundColor: '#ffffff',
+    color: '#0f172a',
+    fontSize: '0.82rem',
+    fontWeight: '700',
+    border: '1px solid #cbd5e1',
+    cursor: 'pointer',
+    boxShadow: '0 2px 6px rgba(15, 23, 42, 0.06)',
+    transition: 'all 0.2s ease'
+  },
+  inlineRefreshBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.35rem',
+    padding: '0.5rem 0.85rem',
+    borderRadius: '8px',
+    backgroundColor: '#eff6ff',
+    color: '#2563eb',
+    fontSize: '0.82rem',
+    fontWeight: '600',
+    border: '1px solid #bfdbfe',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
   },
   loadingBox: {
     display: 'flex',
