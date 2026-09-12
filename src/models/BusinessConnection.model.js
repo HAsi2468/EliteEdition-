@@ -44,6 +44,7 @@ const employeeDataSchema = new mongoose.Schema({
 }, { _id: false });
 
 const workerDataSchema = new mongoose.Schema({
+  designation: { type: String, default: null },
   station_or_skill: { type: String, default: null },
   wage_model: { type: String, enum: ['DAILY_WAGE', 'PIECE_RATE', 'MONTHLY'], default: 'DAILY_WAGE' },
   rate_amount: { type: Number, default: null },

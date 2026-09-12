@@ -9,16 +9,12 @@ import {
   Phone,
   Mail,
   MapPin,
-  TrendingUp,
   Trash2,
   Edit3,
   Building2,
   FileText,
   X,
-  AlertCircle,
-  CheckCircle,
-  CreditCard,
-  Tag
+  RefreshCw
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -52,19 +48,6 @@ export default function BusinessConnectionPanel({ currentUser }) {
       address: '',
       is_active: true
     },
-    lead_data: {
-      business_name: '',
-      product_or_sku_interest: '',
-      quantity: '',
-      budget: '',
-      source: 'Direct',
-      lead_score: 75,
-      priority: 'HOT',
-      pipeline_stage: 'New Lead',
-      suggested_next_action: '',
-      sla_followup_hours: 1,
-      instant_reply_text: ''
-    },
     vendor_data: {
       company_name: '',
       gst_or_tax_id: '',
@@ -82,6 +65,7 @@ export default function BusinessConnectionPanel({ currentUser }) {
       emergency_contact: ''
     },
     worker_data: {
+      designation: '',
       station_or_skill: '',
       wage_model: 'DAILY_WAGE',
       rate_amount: '',
@@ -172,19 +156,28 @@ export default function BusinessConnectionPanel({ currentUser }) {
   const handleOpenEdit = (item) => {
     setEditingId(item._id);
     setFormData({
-      record_type: item.record_type || 'LEAD',
+      record_type: item.record_type || 'VENDOR',
       companyEntity: item.companyEntity || 'Elite Digital Print',
-      common_directory: item.common_directory || {},
-      lead_data: item.lead_data || {},
-      vendor_data: item.vendor_data || {},
-      employee_data: item.employee_data || {},
-      worker_data: item.worker_data || {}
+      common_directory: item.common_directory || { name: '', primary_phone: '', whatsapp_phone: '', email: '', city: '', state: '', address: '', is_active: true },
+      vendor_data: item.vendor_data || { company_name: '', gst_or_tax_id: '', bank_account: '', bank_ifsc: '', upi_id: '', payment_terms: 'Net 30', supplied_items: '' },
+      employee_data: item.employee_data || { department: 'Production', designation: '', monthly_salary: '', joining_date: '', emergency_contact: '' },
+      worker_data: item.worker_data || { designation: '', station_or_skill: '', wage_model: 'DAILY_WAGE', rate_amount: '', payout_schedule: 'WEEKLY' }
     });
     setShowModal(true);
   };
 
   return (
     <div style={styles.container}>
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .spin-icon {
+          animation: spin 0.8s linear infinite;
+        }
+      `}</style>
+
       {/* Top Header */}
       <div style={styles.headerRow}>
         <div>
@@ -197,24 +190,35 @@ export default function BusinessConnectionPanel({ currentUser }) {
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setEditingId(null);
-            setFormData({
-              record_type: 'VENDOR',
-              common_directory: { name: '', primary_phone: '', whatsapp_phone: '', email: '', city: '', state: '', address: '', is_active: true },
-              lead_data: { business_name: '', product_or_sku_interest: '', quantity: '', budget: '', source: 'Direct', lead_score: 75, priority: 'HOT', pipeline_stage: 'New Lead', suggested_next_action: '', sla_followup_hours: 1, instant_reply_text: '' },
-              vendor_data: { company_name: '', gst_or_tax_id: '', bank_account: '', bank_ifsc: '', upi_id: '', payment_terms: 'Net 30', supplied_items: '' },
-              employee_data: { department: 'Production', designation: '', monthly_salary: '', joining_date: '', emergency_contact: '' },
-              worker_data: { station_or_skill: '', wage_model: 'DAILY_WAGE', rate_amount: '', payout_schedule: 'WEEKLY' }
-            });
-            setShowModal(true);
-          }}
-          style={styles.addBtn}
-        >
-          <Plus size={18} />
-          <span>Add New Connection</span>
-        </button>
+        <div style={styles.headerBtnGroup}>
+          <button
+            onClick={fetchConnections}
+            disabled={loading}
+            style={styles.refreshBtn}
+            title="Refresh connections data"
+          >
+            <RefreshCw size={16} className={loading ? "spin-icon" : ""} />
+            <span>{loading ? 'Refreshing...' : 'Refresh Data'}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setEditingId(null);
+              setFormData({
+                record_type: activeType === 'ALL' ? 'VENDOR' : activeType,
+                common_directory: { name: '', primary_phone: '', whatsapp_phone: '', email: '', city: '', state: '', address: '', is_active: true },
+                vendor_data: { company_name: '', gst_or_tax_id: '', bank_account: '', bank_ifsc: '', upi_id: '', payment_terms: 'Net 30', supplied_items: '' },
+                employee_data: { department: 'Production', designation: '', monthly_salary: '', joining_date: '', emergency_contact: '' },
+                worker_data: { designation: '', station_or_skill: '', wage_model: 'DAILY_WAGE', rate_amount: '', payout_schedule: 'WEEKLY' }
+              });
+              setShowModal(true);
+            }}
+            style={styles.addBtn}
+          >
+            <Plus size={18} />
+            <span>Add New Connection</span>
+          </button>
+        </div>
       </div>
 
       {/* Metric Cards Grid */}
@@ -256,7 +260,7 @@ export default function BusinessConnectionPanel({ currentUser }) {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, phone, city, or company..."
+            placeholder="Search by name, designation, phone, city, or company..."
             style={styles.searchInput}
           />
           <button type="submit" style={styles.searchBtn}>
@@ -264,39 +268,33 @@ export default function BusinessConnectionPanel({ currentUser }) {
           </button>
         </form>
 
-        <div style={styles.priorityFilterGroup}>
-          <span style={styles.filterLabel}>Priority:</span>
-          {['ALL', 'HOT', 'WARM', 'COLD'].map((p) => (
-            <button
-              key={p}
-              onClick={() => setPriorityFilter(p)}
-              style={{
-                ...styles.priorityPillBtn,
-                ...(priorityFilter === p ? styles.priorityPillActive : {})
-              }}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
+        <button
+          onClick={fetchConnections}
+          disabled={loading}
+          style={styles.inlineRefreshBtn}
+        >
+          <RefreshCw size={14} className={loading ? "spin-icon" : ""} />
+          <span>Refresh</span>
+        </button>
       </div>
 
       {/* Connections Data List */}
       {loading ? (
         <div style={styles.loadingBox}>
-          <span>Loading Business Connections...</span>
+          <RefreshCw size={28} color="#2563eb" className="spin-icon" style={{ marginBottom: '0.5rem' }} />
+          <div>Loading Business Connections...</div>
         </div>
       ) : connections.length === 0 ? (
         <div style={styles.emptyState}>
           <Users size={48} color="#94a3b8" />
           <h3 style={styles.emptyTitle}>No Connections Found</h3>
-          <p style={styles.emptyText}>Click "Add New Connection" above to register a Lead, Vendor, Employee, or Worker.</p>
+          <p style={styles.emptyText}>Click "Add New Connection" above to register a Vendor, Employee, or Worker.</p>
         </div>
       ) : (
         <div style={styles.cardList}>
           {connections.map((item) => {
             const dir = item.common_directory || {};
-            const typeKey = item.record_type || 'LEAD';
+            const typeKey = item.record_type || 'VENDOR';
 
             return (
               <div key={item._id} style={styles.connectionCard}>
@@ -306,17 +304,14 @@ export default function BusinessConnectionPanel({ currentUser }) {
                       style={{
                         ...styles.typeBadge,
                         backgroundColor:
-                          typeKey === 'LEAD' ? '#eff6ff' :
                           typeKey === 'VENDOR' ? '#f0fdf4' :
-                          typeKey === 'EMPLOYEE' ? '#e0e7ff' : '#fff7ed',
+                          typeKey === 'EMPLOYEE' ? '#e0e7ff' : '#eff6ff',
                         color:
-                          typeKey === 'LEAD' ? '#1d4ed8' :
                           typeKey === 'VENDOR' ? '#15803d' :
-                          typeKey === 'EMPLOYEE' ? '#4338ca' : '#c2410c',
+                          typeKey === 'EMPLOYEE' ? '#4338ca' : '#1d4ed8',
                         border: `1px solid ${
-                          typeKey === 'LEAD' ? '#bfdbfe' :
                           typeKey === 'VENDOR' ? '#bbf7d0' :
-                          typeKey === 'EMPLOYEE' ? '#c7d2fe' : '#ffedd5'
+                          typeKey === 'EMPLOYEE' ? '#c7d2fe' : '#bfdbfe'
                         }`
                       }}
                     >
@@ -368,32 +363,6 @@ export default function BusinessConnectionPanel({ currentUser }) {
                 </div>
 
                 {/* Specific Category Highlight */}
-                {typeKey === 'LEAD' && item.lead_data && (
-                  <div style={styles.leadInfoBox}>
-                    <div style={styles.leadInfoItem}>
-                      <span style={styles.subLabel}>Interest:</span>
-                      <span style={styles.subVal}>{item.lead_data.product_or_sku_interest || 'General Inquiry'}</span>
-                    </div>
-                    {item.lead_data.quantity && (
-                      <div style={styles.leadInfoItem}>
-                        <span style={styles.subLabel}>Qty:</span>
-                        <span style={styles.subVal}>{item.lead_data.quantity} meters</span>
-                      </div>
-                    )}
-                    {item.lead_data.priority && (
-                      <span
-                        style={{
-                          ...styles.priorityPill,
-                          backgroundColor: item.lead_data.priority === 'HOT' ? '#fee2e2' : '#fef3c7',
-                          color: item.lead_data.priority === 'HOT' ? '#991b1b' : '#92400e'
-                        }}
-                      >
-                        {item.lead_data.priority}
-                      </span>
-                    )}
-                  </div>
-                )}
-
                 {typeKey === 'VENDOR' && item.vendor_data && (
                   <div style={styles.leadInfoBox}>
                     <div style={styles.leadInfoItem}>
@@ -416,19 +385,19 @@ export default function BusinessConnectionPanel({ currentUser }) {
                 {typeKey === 'EMPLOYEE' && item.employee_data && (
                   <div style={styles.leadInfoBox}>
                     <div style={styles.leadInfoItem}>
-                      <span style={styles.subLabel}>Dept:</span>
-                      <span style={styles.subVal}>{item.employee_data.department || 'Production'}</span>
+                      <span style={styles.subLabel}>Designation:</span>
+                      <span style={styles.subVal}>{item.employee_data.designation || 'Salaried Staff'}</span>
                     </div>
-                    {item.employee_data.designation && (
+                    {item.employee_data.department && (
                       <div style={styles.leadInfoItem}>
-                        <span style={styles.subLabel}>Role:</span>
-                        <span style={styles.subVal}>{item.employee_data.designation}</span>
+                        <span style={styles.subLabel}>Dept:</span>
+                        <span style={styles.subVal}>{item.employee_data.department}</span>
                       </div>
                     )}
                     {item.employee_data.monthly_salary && (
                       <div style={styles.leadInfoItem}>
                         <span style={styles.subLabel}>Salary:</span>
-                        <span style={styles.subVal}>₹{item.employee_data.monthly_salary.toLocaleString('en-IN')}/mo</span>
+                        <span style={styles.subVal}>₹{Number(item.employee_data.monthly_salary).toLocaleString('en-IN')}/mo</span>
                       </div>
                     )}
                   </div>
@@ -436,9 +405,15 @@ export default function BusinessConnectionPanel({ currentUser }) {
 
                 {typeKey === 'WORKER' && item.worker_data && (
                   <div style={styles.leadInfoBox}>
+                    {item.worker_data.designation && (
+                      <div style={styles.leadInfoItem}>
+                        <span style={styles.subLabel}>Designation:</span>
+                        <span style={styles.subVal}>{item.worker_data.designation}</span>
+                      </div>
+                    )}
                     <div style={styles.leadInfoItem}>
-                      <span style={styles.subLabel}>Station:</span>
-                      <span style={styles.subVal}>{item.worker_data.station_or_skill || 'Machine Operator'}</span>
+                      <span style={styles.subLabel}>Station/Skill:</span>
+                      <span style={styles.subVal}>{item.worker_data.station_or_skill || 'Operator'}</span>
                     </div>
                     <div style={styles.leadInfoItem}>
                       <span style={styles.subLabel}>Wage Model:</span>
@@ -560,77 +535,7 @@ export default function BusinessConnectionPanel({ currentUser }) {
                 </div>
               </div>
 
-              {/* Specific Category Data Block */}
-              {formData.record_type === 'LEAD' && (
-                <>
-                  <h4 style={styles.formSectionHeader}>Lead & Sales Details</h4>
-                  <div style={styles.formGrid}>
-                    <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>Business Name</label>
-                      <input
-                        type="text"
-                        value={formData.lead_data.business_name}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            lead_data: { ...formData.lead_data, business_name: e.target.value }
-                          })
-                        }
-                        placeholder="e.g. Mehta Fashions"
-                        style={styles.formInput}
-                      />
-                    </div>
-                    <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>Product / SKU Interest</label>
-                      <input
-                        type="text"
-                        value={formData.lead_data.product_or_sku_interest}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            lead_data: { ...formData.lead_data, product_or_sku_interest: e.target.value }
-                          })
-                        }
-                        placeholder="e.g. Digital Cotton Satin Print"
-                        style={styles.formInput}
-                      />
-                    </div>
-                    <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>Quantity (Meters)</label>
-                      <input
-                        type="number"
-                        value={formData.lead_data.quantity}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            lead_data: { ...formData.lead_data, quantity: e.target.value }
-                          })
-                        }
-                        placeholder="500"
-                        style={styles.formInput}
-                      />
-                    </div>
-                    <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>Priority</label>
-                      <select
-                        value={formData.lead_data.priority}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            lead_data: { ...formData.lead_data, priority: e.target.value }
-                          })
-                        }
-                        style={styles.formSelect}
-                      >
-                        <option value="HOT">HOT</option>
-                        <option value="WARM">WARM</option>
-                        <option value="COLD">COLD</option>
-                      </select>
-                    </div>
-                  </div>
-                </>
-              )}
-
+              {/* Category Specific Form Fields */}
               {formData.record_type === 'VENDOR' && (
                 <>
                   <h4 style={styles.formSectionHeader}>Vendor & Payment Details</h4>
@@ -639,14 +544,14 @@ export default function BusinessConnectionPanel({ currentUser }) {
                       <label style={styles.formLabel}>Company Name</label>
                       <input
                         type="text"
-                        value={formData.vendor_data.company_name}
+                        value={formData.vendor_data?.company_name || ''}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
                             vendor_data: { ...formData.vendor_data, company_name: e.target.value }
                           })
                         }
-                        placeholder="Apex Dyechem Pvt Ltd"
+                        placeholder="e.g. Apex Dyechem Pvt Ltd"
                         style={styles.formInput}
                       />
                     </div>
@@ -654,7 +559,7 @@ export default function BusinessConnectionPanel({ currentUser }) {
                       <label style={styles.formLabel}>GSTIN / Tax ID</label>
                       <input
                         type="text"
-                        value={formData.vendor_data.gst_or_tax_id}
+                        value={formData.vendor_data?.gst_or_tax_id || ''}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
@@ -668,7 +573,7 @@ export default function BusinessConnectionPanel({ currentUser }) {
                     <div style={styles.formGroup}>
                       <label style={styles.formLabel}>Payment Terms</label>
                       <select
-                        value={formData.vendor_data.payment_terms}
+                        value={formData.vendor_data?.payment_terms || 'Net 30'}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
@@ -681,6 +586,194 @@ export default function BusinessConnectionPanel({ currentUser }) {
                         <option value="Net 15">Net 15</option>
                         <option value="Net 30">Net 30</option>
                         <option value="COD">COD</option>
+                      </select>
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Supplied Items</label>
+                      <input
+                        type="text"
+                        value={formData.vendor_data?.supplied_items || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            vendor_data: { ...formData.vendor_data, supplied_items: e.target.value }
+                          })
+                        }
+                        placeholder="e.g. Raw Fabric, Inks, Paper"
+                        style={styles.formInput}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {formData.record_type === 'EMPLOYEE' && (
+                <>
+                  <h4 style={styles.formSectionHeader}>Employee & Salary Details</h4>
+                  <div style={styles.formGrid}>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Job Designation *</label>
+                      <input
+                        type="text"
+                        value={formData.employee_data?.designation || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            employee_data: { ...formData.employee_data, designation: e.target.value }
+                          })
+                        }
+                        placeholder="e.g. Senior Fabric Designer, Chief Accountant"
+                        style={styles.formInput}
+                      />
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Department</label>
+                      <select
+                        value={formData.employee_data?.department || 'Production'}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            employee_data: { ...formData.employee_data, department: e.target.value }
+                          })
+                        }
+                        style={styles.formSelect}
+                      >
+                        <option value="Production">Production</option>
+                        <option value="Design">Design</option>
+                        <option value="Sales">Sales</option>
+                        <option value="Accounts">Accounts</option>
+                        <option value="Management">Management</option>
+                      </select>
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Monthly Salary (₹)</label>
+                      <input
+                        type="number"
+                        value={formData.employee_data?.monthly_salary || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            employee_data: { ...formData.employee_data, monthly_salary: e.target.value }
+                          })
+                        }
+                        placeholder="e.g. 35000"
+                        style={styles.formInput}
+                      />
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Joining Date</label>
+                      <input
+                        type="date"
+                        value={formData.employee_data?.joining_date || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            employee_data: { ...formData.employee_data, joining_date: e.target.value }
+                          })
+                        }
+                        style={styles.formInput}
+                      />
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Emergency Contact</label>
+                      <input
+                        type="text"
+                        value={formData.employee_data?.emergency_contact || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            employee_data: { ...formData.employee_data, emergency_contact: e.target.value }
+                          })
+                        }
+                        placeholder="e.g. +91 98765 43210"
+                        style={styles.formInput}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {formData.record_type === 'WORKER' && (
+                <>
+                  <h4 style={styles.formSectionHeader}>Worker & Wage Details</h4>
+                  <div style={styles.formGrid}>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Job Designation / Role *</label>
+                      <input
+                        type="text"
+                        value={formData.worker_data?.designation || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            worker_data: { ...formData.worker_data, designation: e.target.value }
+                          })
+                        }
+                        placeholder="e.g. Printing Press Operator, Cutting Specialist, QC Inspector"
+                        style={styles.formInput}
+                      />
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Station / Primary Skill</label>
+                      <input
+                        type="text"
+                        value={formData.worker_data?.station_or_skill || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            worker_data: { ...formData.worker_data, station_or_skill: e.target.value }
+                          })
+                        }
+                        placeholder="e.g. Sublimation Printer / Fabric Stretcher"
+                        style={styles.formInput}
+                      />
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Wage Model</label>
+                      <select
+                        value={formData.worker_data?.wage_model || 'DAILY_WAGE'}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            worker_data: { ...formData.worker_data, wage_model: e.target.value }
+                          })
+                        }
+                        style={styles.formSelect}
+                      >
+                        <option value="DAILY_WAGE">Daily Wage</option>
+                        <option value="PIECE_RATE">Piece Rate (Per Meter / Piece)</option>
+                        <option value="MONTHLY">Monthly Contract</option>
+                      </select>
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Rate Amount (₹)</label>
+                      <input
+                        type="number"
+                        value={formData.worker_data?.rate_amount || ''}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            worker_data: { ...formData.worker_data, rate_amount: e.target.value }
+                          })
+                        }
+                        placeholder="e.g. 700 / day or 5 / meter"
+                        style={styles.formInput}
+                      />
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Payout Schedule</label>
+                      <select
+                        value={formData.worker_data?.payout_schedule || 'WEEKLY'}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            worker_data: { ...formData.worker_data, payout_schedule: e.target.value }
+                          })
+                        }
+                        style={styles.formSelect}
+                      >
+                        <option value="WEEKLY">Weekly (Saturday Payout)</option>
+                        <option value="DAILY">Daily Cash</option>
+                        <option value="MONTHLY">Monthly</option>
                       </select>
                     </div>
                   </div>
@@ -772,6 +865,40 @@ const styles = {
     fontSize: '0.88rem',
     color: '#64748b'
   },
+  headerBtnGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem'
+  },
+  refreshBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.7rem 1.25rem',
+    borderRadius: '10px',
+    backgroundColor: '#ffffff',
+    color: '#2563eb',
+    fontSize: '0.9rem',
+    fontWeight: '700',
+    border: '1.5px solid #2563eb',
+    cursor: 'pointer',
+    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.08)',
+    transition: 'all 0.2s ease'
+  },
+  inlineRefreshBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.35rem',
+    padding: '0.45rem 0.85rem',
+    borderRadius: '8px',
+    backgroundColor: '#eff6ff',
+    color: '#2563eb',
+    fontSize: '0.82rem',
+    fontWeight: '600',
+    border: '1px solid #bfdbfe',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
+  },
   addBtn: {
     display: 'flex',
     alignItems: 'center',
@@ -846,7 +973,7 @@ const styles = {
     alignItems: 'center',
     gap: '0.5rem',
     flex: '1',
-    maxWidth: '450px',
+    maxWidth: '550px',
     backgroundColor: '#f8fafc',
     border: '1px solid #cbd5e1',
     borderRadius: '8px',
@@ -870,35 +997,14 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer'
   },
-  priorityFilterGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem'
-  },
-  filterLabel: {
-    fontSize: '0.82rem',
-    fontWeight: '600',
-    color: '#64748b'
-  },
-  priorityPillBtn: {
-    padding: '0.35rem 0.75rem',
-    borderRadius: '20px',
-    border: '1px solid #e2e8f0',
-    backgroundColor: '#ffffff',
-    color: '#475569',
-    fontSize: '0.78rem',
-    fontWeight: '600',
-    cursor: 'pointer'
-  },
-  priorityPillActive: {
-    backgroundColor: '#2563eb',
-    color: '#ffffff',
-    borderColor: '#2563eb'
-  },
   loadingBox: {
-    textAlign: 'center',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: '3rem',
-    color: '#64748b'
+    color: '#2563eb',
+    fontWeight: '600'
   },
   emptyState: {
     display: 'flex',
@@ -994,9 +1100,9 @@ const styles = {
   },
   leadInfoBox: {
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0.6rem 0.75rem',
+    flexDirection: 'column',
+    gap: '0.35rem',
+    padding: '0.65rem 0.75rem',
     borderRadius: '8px',
     backgroundColor: '#f8fafc',
     border: '1px solid #f1f5f9',
@@ -1005,21 +1111,16 @@ const styles = {
   leadInfoItem: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.3rem'
+    gap: '0.4rem'
   },
   subLabel: {
     color: '#64748b',
-    fontWeight: '600'
+    fontWeight: '600',
+    minWidth: '85px'
   },
   subVal: {
     color: '#0f172a',
     fontWeight: '700'
-  },
-  priorityPill: {
-    padding: '0.15rem 0.45rem',
-    borderRadius: '4px',
-    fontSize: '0.7rem',
-    fontWeight: '800'
   },
   modalOverlay: {
     position: 'fixed',

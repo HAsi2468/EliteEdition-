@@ -291,6 +291,8 @@ exports.getConnections = async (req, res) => {
         { 'lead_data.business_name': regex },
         { 'vendor_data.company_name': regex },
         { 'employee_data.department': regex },
+        { 'employee_data.designation': regex },
+        { 'worker_data.designation': regex },
         { 'worker_data.station_or_skill': regex }
       ];
     }
