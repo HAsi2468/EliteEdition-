@@ -697,7 +697,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
           ds = inwardDateStart || '';
           de = inwardDateEnd || '';
         }
-        mat = inwardTab !== 'All' ? inwardTab : (inwardMaterialType !== 'All' ? inwardMaterialType : '');
+        mat = inwardMaterialType !== 'All' ? inwardMaterialType : '';
         searchVal = inwardSearch || '';
       } else if (activeTab === 'outward') {
         typeVal = 'OUTWARD';
@@ -709,7 +709,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
           ds = outwardDateStart || '';
           de = outwardDateEnd || '';
         }
-        mat = outwardTab !== 'All' ? outwardTab : (outwardMaterialType !== 'All' ? outwardMaterialType : '');
+        mat = outwardMaterialType !== 'All' ? outwardMaterialType : '';
         searchVal = outwardSearch || '';
       } else if (activeTab === 'dashboard') {
         typeVal = 'All';
