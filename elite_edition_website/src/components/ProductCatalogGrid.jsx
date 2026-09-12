@@ -359,7 +359,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
       <div className="catalog-control-header" style={styles.controlHeader}>
         <div className="catalog-left-controls" style={styles.leftControls}>
           <div className="catalog-search-box" style={styles.searchBox}>
-            <Search size={16} color="var(--text-muted)" style={styles.searchIcon} />
+            <Search size={16} color="#64748b" style={styles.searchIcon} />
             <input
               type="text"
               value={searchTerm}
@@ -370,7 +370,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
           </div>
 
           <div className="catalog-filter-box" style={styles.filterBox}>
-            <SlidersHorizontal size={14} color="var(--text-muted)" />
+            <SlidersHorizontal size={14} color="#059669" />
             <select
               value={sizeFilter}
               onChange={(e) => setSizeFilter(e.target.value)}
@@ -383,7 +383,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
           </div>
 
           <div className="catalog-filter-box" style={styles.filterBox}>
-            <Building2 size={14} color="var(--text-muted)" />
+            <Building2 size={14} color="#059669" />
             <select
               value={brandFilter}
               onChange={(e) => setBrandFilter(e.target.value)}
@@ -396,11 +396,11 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
           </div>
         </div>
 
-        <div className="catalog-action-group" style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="catalog-action-group" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <button 
             onClick={() => setShowBrandManager(true)}
             className="btn-secondary" 
-            style={{ ...styles.addBtn, background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', borderColor: 'rgba(99, 102, 241, 0.3)', fontWeight: 700 }}
+            style={{ ...styles.addBtn, background: '#e0e7ff', color: '#4338ca', borderColor: '#c7d2fe', fontWeight: 700 }}
             title="Manage Brands & Dynamic Dropdown Values"
           >
             <Building2 size={16} />
@@ -410,7 +410,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
           <button 
             onClick={() => handlePrintBarcodes(filteredItems)} 
             className="btn-secondary" 
-            style={{ ...styles.addBtn, background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.3)', fontWeight: 700 }}
+            style={{ ...styles.addBtn, background: '#d1fae5', color: '#047857', borderColor: '#a7f3d0', fontWeight: 700 }}
             title="Print Barcode Labels for All Filtered Products"
           >
             <Printer size={16} />
@@ -421,13 +421,13 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
             onClick={handleSyncTrigger} 
             disabled={syncing} 
             className="btn-secondary" 
-            style={{ ...styles.addBtn, background: 'rgba(6, 182, 212, 0.1)', color: 'var(--primary)', borderColor: 'rgba(6, 182, 212, 0.2)' }}
+            style={{ ...styles.addBtn, background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd', fontWeight: 700 }}
           >
             <RefreshCw size={16} className={syncing ? 'spin-loader' : ''} />
             <span>Sync Catalog</span>
           </button>
           
-          <button onClick={onAdd} className="btn-success" style={styles.addBtn}>
+          <button onClick={onAdd} className="btn-success" style={styles.primaryAddBtn}>
             <Plus size={16} />
             Add Product
           </button>
@@ -578,13 +578,34 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
   );
 }
 
-// Inject Responsive Mobile CSS Styles
+// Inject Responsive Mobile & Laptop CSS Styles
 if (typeof document !== 'undefined') {
   const styleElId = 'product-catalog-grid-responsive-style';
   if (!document.getElementById(styleElId)) {
     const styleEl = document.createElement('style');
     styleEl.id = styleElId;
     styleEl.innerHTML = `
+      @media (max-width: 1200px) {
+        .catalog-control-header {
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 0.85rem !important;
+        }
+        .catalog-left-controls {
+          width: 100% !important;
+          flex-wrap: wrap !important;
+          justify-content: flex-start !important;
+        }
+        .catalog-search-box {
+          flex: 1 !important;
+          min-width: 220px !important;
+        }
+        .catalog-action-group {
+          width: 100% !important;
+          justify-content: flex-start !important;
+        }
+      }
+
       @media (max-width: 768px) {
         .catalog-control-header {
           flex-direction: column !important;
@@ -592,13 +613,15 @@ if (typeof document !== 'undefined') {
           gap: 0.75rem !important;
         }
         .catalog-left-controls {
-          flex-direction: column !important;
-          width: 100% !important;
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
           gap: 0.5rem !important;
+          width: 100% !important;
         }
         .catalog-search-box {
-          max-width: 100% !important;
+          grid-column: span 2 !important;
           width: 100% !important;
+          max-width: 100% !important;
         }
         .catalog-filter-box {
           width: 100% !important;
@@ -641,54 +664,87 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '1rem',
+    gap: '0.85rem',
     flexWrap: 'wrap',
   },
   leftControls: {
     display: 'flex',
-    gap: '0.8rem',
-    flexWrap: 'wrap',
-    flex: 1,
+    alignItems: 'center',
+    gap: '0.6rem',
+    flexWrap: 'nowrap',
   },
   searchBox: {
     position: 'relative',
-    flex: 1,
-    minWidth: '240px',
-    maxWidth: '400px',
+    width: '260px',
+    flexShrink: 0,
     display: 'flex',
     alignItems: 'center',
   },
   searchIcon: {
     position: 'absolute',
     left: '0.75rem',
+    pointerEvents: 'none',
   },
   searchInput: {
     width: '100%',
-    paddingLeft: '2.2rem',
+    padding: '0.55rem 0.75rem 0.55rem 2.2rem',
+    borderRadius: '8px',
+    border: '1px solid #cbd5e1',
+    backgroundColor: '#ffffff',
+    color: '#0f172a',
+    fontSize: '0.85rem',
+    fontWeight: '500',
+    outline: 'none',
+    boxSizing: 'border-box',
   },
   filterBox: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem',
-    background: 'rgba(17, 24, 39, 0.6)',
-    border: '1px solid var(--border-light)',
-    padding: '0 0.5rem',
-    borderRadius: 'var(--radius-sm)',
+    gap: '0.4rem',
+    backgroundColor: '#ffffff',
+    border: '1px solid #cbd5e1',
+    padding: '0 0.65rem',
+    borderRadius: '8px',
+    height: '38px',
+    boxSizing: 'border-box',
+    flexShrink: 0,
   },
   selectInput: {
     border: 'none',
-    background: 'none',
-    padding: '0.6rem 0.5rem',
+    backgroundColor: 'transparent',
+    padding: '0.4rem 0.2rem',
     fontSize: '0.85rem',
-    color: '#e5e7eb',
+    fontWeight: '600',
+    color: '#0f172a',
     outline: 'none',
     cursor: 'pointer',
   },
   addBtn: {
-    padding: '0.6rem 1.2rem',
-    display: 'flex',
+    padding: '0.55rem 1rem',
+    borderRadius: '8px',
+    fontSize: '0.825rem',
+    fontWeight: '700',
+    cursor: 'pointer',
+    display: 'inline-flex',
     alignItems: 'center',
     gap: '0.4rem',
+    boxSizing: 'border-box',
+    height: '38px',
+  },
+  primaryAddBtn: {
+    padding: '0.55rem 1.25rem',
+    borderRadius: '8px',
+    border: 'none',
+    backgroundColor: '#059669',
+    color: '#ffffff',
+    fontSize: '0.85rem',
+    fontWeight: '700',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    height: '38px',
+    boxShadow: '0 4px 6px -1px rgba(5, 150, 105, 0.3)',
   },
   tableWrap: {
     flex: 1,
