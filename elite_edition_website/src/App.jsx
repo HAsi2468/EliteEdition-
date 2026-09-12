@@ -1036,14 +1036,14 @@ export default function App() {
                   {/* CRM Department */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_crm') || currentUser.permissions?.includes('crm_department') || currentUser.permissions?.includes('crm')) && (
                     <button onClick={() => { setActiveTab('jobcards_crm'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_crm' ? styles.navItemActive : {}) }}>
-                      <Users size={18} color="#2563eb" /><span>CRM Department</span>
+                      <Users size={18} /><span>CRM Department</span>
                     </button>
                   )}
 
                   {/* Business Connection */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_business_connection') || currentUser.permissions?.includes('jobcards_master_ai') || currentUser.permissions?.includes('jobcards')) && (
                     <button onClick={() => { setActiveTab('jobcards_business_connection'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...((activeTab === 'jobcards_business_connection' || activeTab === 'jobcards_master_ai') ? styles.navItemActive : {}) }}>
-                      <Users size={18} color="#38bdf8" /><span>Business Connection</span>
+                      <Users size={18} /><span>Business Connection</span>
                     </button>
                   )}
 
