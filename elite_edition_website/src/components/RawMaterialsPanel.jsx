@@ -2,9 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import {
-  RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
-  Layers, Database, Settings, Trash2, FileDown, Search, X,
-  CheckCircle, AlertCircle, Calendar, Tag, User, Clipboard, Edit
+  Layers, Database, Settings, Trash2, Search, X,
+  Plus, Edit, ArrowDownToLine, ArrowUpFromLine, RefreshCw, FileSpreadsheet, AlertCircle
 } from 'lucide-react';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 
@@ -134,48 +133,6 @@ export default function RawMaterialsPanel() {
     ].join('\n');
 
     downloadCsvFile(csvLines, `Raw_Materials_Stock_Overview_${todayStr}.csv`);
-  };
-
-  const handleOpenPdfModal = () => {
-    let ds = '';
-    let de = '';
-    let mat = '';
-    let typeVal = 'All';
-
-    if (activeTab === 'inward') {
-      if (inwardPreset && inwardPreset !== 'all') {
-        const range = getDatePresetRange(inwardPreset, customInwardStart, customInwardEnd);
-        ds = range.dateStart;
-        de = range.dateEnd;
-      } else {
-        ds = inwardDateStart;
-        de = inwardDateEnd;
-      }
-      if (inwardMaterialType !== 'All') mat = inwardMaterialType;
-      typeVal = 'INWARD';
-    } else if (activeTab === 'outward') {
-      if (outwardPreset && outwardPreset !== 'all') {
-        const range = getDatePresetRange(outwardPreset, customOutwardStart, customOutwardEnd);
-        ds = range.dateStart;
-        de = range.dateEnd;
-      } else {
-        ds = outwardDateStart;
-        de = outwardDateEnd;
-      }
-      if (outwardMaterialType !== 'All') mat = outwardMaterialType;
-      typeVal = 'OUTWARD';
-    } else if (activeTab === 'dashboard') {
-      if (stockMaterialType !== 'All') mat = stockMaterialType;
-    }
-
-    setPdfFilter({
-      dateStart: ds || '',
-      dateEnd: de || '',
-      materialName: mat || '',
-      type: typeVal,
-      companyEntity: companyEntity || 'Elite Digital Print'
-    });
-    setIsPdfFilterOpen(true);
   };
 
   const handleImportCsv = (e) => {
@@ -310,15 +267,6 @@ export default function RawMaterialsPanel() {
   const [outwardSortOrder, setOutwardSortOrder] = useState('desc');
 
   const [stockMaterialType, setStockMaterialType] = useState('All');
-
-  // PDF download filter state
-  const [pdfFilter, setPdfFilter] = useState({
-    dateStart: '',
-    dateEnd: '',
-    materialName: ''
-  });
-  const [isPdfFilterOpen, setIsPdfFilterOpen] = useState(false);
-  const [pdfLoading, setPdfLoading] = useState(false);
 
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, label }
@@ -729,22 +677,6 @@ export default function RawMaterialsPanel() {
     }
   };
 
-  const handleDownloadPdf = async (e) => {
-    e.preventDefault();
-    try {
-      setPdfLoading(true);
-      await api.downloadRawMaterialLedgerPdf({
-        ...pdfFilter,
-        companyEntity: pdfFilter.companyEntity || companyEntity || 'Elite Digital Print'
-      });
-      setIsPdfFilterOpen(false);
-    } catch (err) {
-      alert('Failed to download PDF: ' + err.message);
-    } finally {
-      setPdfLoading(false);
-    }
-  };
-
   // Filter local registers
   const toYYYYMMDD = (d) => {
     if (!d) return '';
@@ -993,9 +925,6 @@ export default function RawMaterialsPanel() {
             </button>
           ))}
         </div>
-        <button onClick={handleOpenPdfModal} className="btn-secondary" title="Download Ledger PDF" style={{ gap: '0.4rem' }}>
-          <FileDown size={16} /> PDF Report
-        </button>
       </div>
 
       {error && <div style={{ color: 'red', padding: '1rem', background: '#ffebeb', borderRadius: '8px' }}>{error}</div>}
@@ -2035,64 +1964,6 @@ export default function RawMaterialsPanel() {
                 <button type="button" onClick={() => setIsOutwardOpen(false)} className="btn-secondary" style={{ flex: 1 }}>Cancel</button>
                 <button type="submit" className="btn-primary" style={{ flex: 1 }} disabled={loading}>
                   {loading ? 'Submitting...' : outwardItems.length > 0 ? `Save Outward (${outwardItems.length})` : 'Save Outward'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ─── LEDGER PDF DOWNLOAD FILTERS MODAL ─── */}
-      {isPdfFilterOpen && (
-        <div className="modal-backdrop">
-          <div className="modal-content glass-panel" style={{ maxWidth: '400px', padding: '2rem', position: 'relative' }}>
-            <button onClick={() => setIsPdfFilterOpen(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-              <X size={20} />
-            </button>
-            <h3 style={{ margin: '0 0 1.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <FileDown /> Raw Material Ledger Report
-            </h3>
-            <form onSubmit={handleDownloadPdf} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={labelStyle}>Transaction Type</label>
-                <select style={inputStyle} value={pdfFilter.type || 'All'} onChange={e => setPdfFilter(p => ({ ...p, type: e.target.value }))}>
-                  <option value="All">All Transactions (Inward & Outward)</option>
-                  <option value="INWARD">Inward Only</option>
-                  <option value="OUTWARD">Outward Only</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={labelStyle}>Material Item (Optional)</label>
-                <select style={inputStyle} value={pdfFilter.materialName} onChange={e => setPdfFilter(p => ({ ...p, materialName: e.target.value }))}>
-                  <option value="">-- All Materials --</option>
-                  <option value="Ink">All Inks (Grando / Printdot)</option>
-                  <option value="Paper">All Papers (Sublimation / Butter)</option>
-                  <option value="Sublimation Paper">Sublimation Paper</option>
-                  <option value="Butter Paper">Butter Paper</option>
-                  <option value="Grando Ink">Grando Ink</option>
-                  <option value="Printdot Ink">Printdot Ink</option>
-                  {materialsList.filter(m => !['Sublimation Paper', 'Butter Paper', 'Grando Ink', 'Printdot Ink'].includes(m)).map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Start Date (Optional)</label>
-                  <input type="date" style={inputStyle} value={pdfFilter.dateStart} onChange={e => setPdfFilter(p => ({ ...p, dateStart: e.target.value }))} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>End Date (Optional)</label>
-                  <input type="date" style={inputStyle} value={pdfFilter.dateEnd} onChange={e => setPdfFilter(p => ({ ...p, dateEnd: e.target.value }))} />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setIsPdfFilterOpen(false)} className="btn-secondary" style={{ flex: 1 }}>Cancel</button>
-                <button type="submit" className="btn-primary" style={{ flex: 1 }} disabled={pdfLoading}>
-                  {pdfLoading ? <RefreshCw className="spin-loader" /> : 'Download PDF'}
                 </button>
               </div>
             </form>
