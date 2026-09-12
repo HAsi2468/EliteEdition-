@@ -27,7 +27,7 @@ const STAGES = [
   { id: 'New', label: 'New Inquiry', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)' },
   { id: 'Contacted', label: 'Contacted', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.12)' },
   { id: 'In Discussion', label: 'In Discussion', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' },
-  { id: 'Quotation Sent', label: 'Quotation Sent', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.12)' },
+  { id: 'Quotation Sent', label: 'Quotation Sent', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.12)' },
   { id: 'Order Confirmed', label: 'Order Confirmed', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' },
   { id: 'Lost', label: 'Closed / Lost', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)' }
 ];
@@ -206,8 +206,8 @@ export default function CrmPanel({ currentUser }) {
           gap: '1rem',
           padding: '1.5rem 1.8rem',
           borderRadius: '16px',
-          background: 'linear-gradient(135deg, rgba(236,72,153,0.1) 0%, rgba(244,63,94,0.05) 100%)',
-          border: '1px solid rgba(236,72,153,0.2)',
+          background: 'linear-gradient(135deg, rgba(37,99,235,0.12) 0%, rgba(59,130,246,0.06) 100%)',
+          border: '1px solid rgba(37,99,235,0.25)',
           marginBottom: '1.5rem'
         }}
       >
@@ -217,12 +217,12 @@ export default function CrmPanel({ currentUser }) {
               width: 52,
               height: 52,
               borderRadius: '14px',
-              background: 'linear-gradient(135deg, #ec4899, #f43f5e)',
+              background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: '#fff',
-              boxShadow: '0 8px 16px rgba(236, 72, 153, 0.3)'
+              boxShadow: '0 8px 16px rgba(37, 99, 235, 0.35)'
             }}
           >
             <Users size={28} />
@@ -245,13 +245,13 @@ export default function CrmPanel({ currentUser }) {
             gap: '8px',
             padding: '10px 20px',
             borderRadius: '10px',
-            background: 'linear-gradient(135deg, #ec4899, #f43f5e)',
+            background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
             color: '#fff',
             border: 'none',
             fontWeight: 700,
             fontSize: '0.9rem',
             cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(236, 72, 153, 0.35)',
+            boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
             transition: 'all 0.2s ease'
           }}
         >
@@ -286,8 +286,8 @@ export default function CrmPanel({ currentUser }) {
           <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px', color: '#10b981' }}>{confirmedCount}</div>
         </div>
         <div className="glass-panel" style={{ padding: '1.2rem', borderRadius: '14px', border: '1px solid var(--border-light)' }}>
-          <div style={{ fontSize: '0.8rem', color: '#ec4899', fontWeight: 600, textTransform: 'uppercase' }}>Total Pipeline Value</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px', color: '#ec4899' }}>
+          <div style={{ fontSize: '0.8rem', color: '#2563eb', fontWeight: 600, textTransform: 'uppercase' }}>Total Pipeline Value</div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px', color: '#2563eb' }}>
             ₹{totalPipelineVal.toLocaleString('en-IN')}
           </div>
         </div>
@@ -332,7 +332,7 @@ export default function CrmPanel({ currentUser }) {
               style={{
                 padding: '9px 16px',
                 borderRadius: '10px',
-                background: 'var(--primary-color, #ec4899)',
+                background: '#2563eb',
                 color: '#fff',
                 border: 'none',
                 fontWeight: 600,
@@ -380,9 +380,9 @@ export default function CrmPanel({ currentUser }) {
                   fontSize: '0.82rem',
                   fontWeight: 600,
                   whiteSpace: 'nowrap',
-                  border: isActive ? `1.5px solid ${s.color || '#ec4899'}` : '1px solid var(--border-light)',
-                  background: isActive ? (s.bg || 'rgba(236,72,153,0.15)') : 'transparent',
-                  color: isActive ? (s.color || '#ec4899') : 'var(--text-muted)',
+                  border: isActive ? `1.5px solid ${s.color || '#2563eb'}` : '1px solid var(--border-light)',
+                  background: isActive ? (s.bg || 'rgba(37,99,235,0.15)') : 'transparent',
+                  color: isActive ? (s.color || '#2563eb') : 'var(--text-muted)',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease'
                 }}
@@ -435,7 +435,7 @@ export default function CrmPanel({ currentUser }) {
                         onClick={() => setSelectedLead(lead)}
                         style={{
                           borderBottom: '1px solid var(--border-light)',
-                          background: isSelected ? 'rgba(236,72,153,0.08)' : 'transparent',
+                          background: isSelected ? 'rgba(37,99,235,0.1)' : 'transparent',
                           cursor: 'pointer',
                           transition: 'background 0.15s ease'
                         }}
@@ -500,7 +500,7 @@ export default function CrmPanel({ currentUser }) {
                         </td>
 
                         {/* Value */}
-                        <td style={{ padding: '12px 16px', fontWeight: 700, color: lead.estimatedValue ? '#ec4899' : 'var(--text-muted)' }}>
+                        <td style={{ padding: '12px 16px', fontWeight: 700, color: lead.estimatedValue ? '#2563eb' : 'var(--text-muted)' }}>
                           {lead.estimatedValue ? `₹${Number(lead.estimatedValue).toLocaleString('en-IN')}` : '-'}
                         </td>
 
@@ -685,7 +685,7 @@ export default function CrmPanel({ currentUser }) {
               </div>
               <div>
                 <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Est. Value: </span>
-                <strong style={{ color: '#ec4899' }}>
+                <strong style={{ color: '#2563eb' }}>
                   {selectedLead.estimatedValue ? `₹${Number(selectedLead.estimatedValue).toLocaleString('en-IN')}` : 'Not set'}
                 </strong>
               </div>
@@ -1016,7 +1016,7 @@ export default function CrmPanel({ currentUser }) {
                   style={{
                     padding: '9px 22px',
                     borderRadius: '8px',
-                    background: 'linear-gradient(135deg, #ec4899, #f43f5e)',
+                    background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
                     color: '#fff',
                     border: 'none',
                     fontWeight: 700,
