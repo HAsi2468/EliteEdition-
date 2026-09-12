@@ -189,8 +189,28 @@ const getTransactions = async (req, res) => {
 // Get current stock overview grouped by material name
 const getStockOverview = async (req, res) => {
   try {
-    const { companyEntity } = req.query;
+    const { companyEntity, dateStart, dateEnd } = req.query;
     const matchStage = buildRawCompFilter(companyEntity);
+
+    if (dateStart || dateEnd) {
+      matchStage.date = {};
+      if (dateStart) {
+        const dsStr = String(dateStart).trim();
+        const ds = /^\d{4}-\d{2}-\d{2}$/.test(dsStr) ? new Date(`${dsStr}T00:00:00.000`) : new Date(dateStart);
+        if (!isNaN(ds.getTime())) {
+          ds.setHours(0, 0, 0, 0);
+          matchStage.date.$gte = ds;
+        }
+      }
+      if (dateEnd) {
+        const deStr = String(dateEnd).trim();
+        const de = /^\d{4}-\d{2}-\d{2}$/.test(deStr) ? new Date(`${deStr}T23:59:59.999`) : new Date(dateEnd);
+        if (!isNaN(de.getTime())) {
+          de.setHours(23, 59, 59, 999);
+          matchStage.date.$lte = de;
+        }
+      }
+    }
 
     const pipeline = [
       { $match: matchStage },

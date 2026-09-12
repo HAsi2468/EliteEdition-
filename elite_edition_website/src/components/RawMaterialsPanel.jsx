@@ -267,6 +267,11 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
   const [outwardSortOrder, setOutwardSortOrder] = useState('desc');
 
   const [stockMaterialType, setStockMaterialType] = useState('All');
+  const [stockDateStart, setStockDateStart] = useState('');
+  const [stockDateEnd, setStockDateEnd] = useState('');
+  const [stockPreset, setStockPreset] = useState('all');
+  const [customStockStart, setCustomStockStart] = useState('');
+  const [customStockEnd, setCustomStockEnd] = useState('');
   const [pdfLoading, setPdfLoading] = useState(false);
 
   // Delete confirmation
@@ -361,6 +366,27 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    const fetchStock = async () => {
+      try {
+        const stockParams = {};
+        if (stockPreset && stockPreset !== 'all') {
+          const range = getDatePresetRange(stockPreset, customStockStart, customStockEnd);
+          if (range.dateStart) stockParams.dateStart = range.dateStart;
+          if (range.dateEnd) stockParams.dateEnd = range.dateEnd;
+        } else {
+          if (stockDateStart) stockParams.dateStart = stockDateStart;
+          if (stockDateEnd) stockParams.dateEnd = stockDateEnd;
+        }
+        const stockRes = await api.getRawMaterialStock(stockParams);
+        if (stockRes && stockRes.success) setStock(stockRes.data);
+      } catch (e) {
+        console.warn('Failed to fetch stock for date range:', e);
+      }
+    };
+    fetchStock();
+  }, [stockPreset, stockDateStart, stockDateEnd, customStockStart, customStockEnd]);
 
   // Helper to get defaults for a material
   const getMaterialDefaults = (materialName, configData) => {
@@ -713,6 +739,14 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
         searchVal = outwardSearch || '';
       } else if (activeTab === 'dashboard') {
         typeVal = 'All';
+        if (stockPreset && stockPreset !== 'all') {
+          const range = getDatePresetRange(stockPreset, customStockStart, customStockEnd);
+          ds = range.dateStart || '';
+          de = range.dateEnd || '';
+        } else {
+          ds = stockDateStart || '';
+          de = stockDateEnd || '';
+        }
         mat = stockMaterialType !== 'All' ? stockMaterialType : '';
       }
 
@@ -811,6 +845,20 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
     if (valA < valB) return outwardSortOrder === 'asc' ? -1 : 1;
     if (valA > valB) return outwardSortOrder === 'asc' ? 1 : -1;
     return 0;
+  });
+
+  const stockFilteredTx = transactions.filter(t => {
+    let ds = stockDateStart;
+    let de = stockDateEnd;
+    if (stockPreset && stockPreset !== 'all') {
+      const range = getDatePresetRange(stockPreset, customStockStart, customStockEnd);
+      ds = range.dateStart || '';
+      de = range.dateEnd || '';
+    }
+    const tDateYMD = toYYYYMMDD(t.date);
+    if (ds && tDateYMD < ds) return false;
+    if (de && tDateYMD > de) return false;
+    return true;
   });
 
   const filteredStock = stock.filter(item => matchesMaterialType(item.materialName, stockMaterialType));
@@ -1022,6 +1070,22 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                   ))}
                 </select>
 
+                {/* Standard ERP DateRangePicker */}
+                <DateRangePicker
+                  preset={stockPreset}
+                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                    setStockPreset(p);
+                    setStockDateStart(ds);
+                    setStockDateEnd(de);
+                  }}
+                  customStart={customStockStart}
+                  customEnd={customStockEnd}
+                  onCustomChange={(s, e) => {
+                    setCustomStockStart(s);
+                    setCustomStockEnd(e);
+                  }}
+                />
+
                 <button onClick={() => { setEditingTransaction(null); setIsInwardOpen(true); handleInwardTabChange('Sublimation Paper'); setInwardItems([]); }} className="btn-primary" style={{ gap: '0.4rem' }}>
                   <ArrowDownToLine size={16} /> Stock Inward
                 </button>
@@ -1036,8 +1100,8 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
               <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
                 <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Items Configured</span><br /><strong>{materialsList.length}</strong></div>
                 <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Active Stock Profiles</span><br /><strong>{filteredStock.length} / {stock.length}</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Inward Transactions</span><br /><strong style={{ color: 'var(--success)' }}>{transactions.filter(t => t.type === 'INWARD').length}</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Outward Transactions</span><br /><strong style={{ color: 'var(--danger)' }}>{transactions.filter(t => t.type === 'OUTWARD').length}</strong></div>
+                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Inward Transactions</span><br /><strong style={{ color: 'var(--success)' }}>{stockFilteredTx.filter(t => t.type === 'INWARD').length}</strong></div>
+                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Outward Transactions</span><br /><strong style={{ color: 'var(--danger)' }}>{stockFilteredTx.filter(t => t.type === 'OUTWARD').length}</strong></div>
               </div>
             )}
 

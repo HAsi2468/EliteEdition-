@@ -1140,8 +1140,9 @@ export const api = {
     return request('/raw-materials/transactions');
   },
 
-  async getRawMaterialStock() {
-    return request('/raw-materials/stock');
+  async getRawMaterialStock(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return request(`/raw-materials/stock${query ? `?${query}` : ''}`);
   },
 
   async createRawMaterialInward(payload) {
