@@ -257,7 +257,7 @@ const deleteTransaction = async (req, res) => {
 // Generate Raw Material Ledger PDF
 const downloadLedgerPdf = async (req, res) => {
   try {
-    const { dateStart, dateEnd, materialName, type, companyEntity } = req.query;
+    const { dateStart, dateEnd, materialName, type, companyEntity, search } = req.query;
 
     const matchStage = buildRawCompFilter(companyEntity);
     if (dateStart || dateEnd) {
@@ -295,6 +295,22 @@ const downloadLedgerPdf = async (req, res) => {
         const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         matchStage.materialName = new RegExp(escaped, 'i');
       }
+    }
+
+    if (search && String(search).trim()) {
+      const sEsc = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const sRegex = new RegExp(sEsc, 'i');
+      matchStage.$or = [
+        { materialName: sRegex },
+        { vendorName: sRegex },
+        { partyName: sRegex },
+        { challanNo: sRegex },
+        { jobNo: sRegex },
+        { panna: sRegex },
+        { paperQuality: sRegex },
+        { color: sRegex },
+        { notes: sRegex }
+      ];
     }
 
     const transactions = await RawMaterialTransaction.find(matchStage).sort({ date: 1, createdAt: 1 });

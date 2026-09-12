@@ -1177,6 +1177,7 @@ export const api = {
     if (params.dateEnd) query.append('dateEnd', params.dateEnd);
     if (params.materialName && params.materialName !== 'All') query.append('materialName', params.materialName);
     if (params.type && params.type !== 'All') query.append('type', params.type);
+    if (params.search) query.append('search', params.search);
     if (params.companyEntity) query.append('companyEntity', params.companyEntity);
     const qs = query.toString() ? `?${query.toString()}` : '';
 

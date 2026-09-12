@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import {
-  Layers, Database, Settings, Trash2, Search, X,
+  Layers, Database, Settings, Trash2, Search, X, FileDown,
   Plus, Edit, ArrowDownToLine, ArrowUpFromLine, RefreshCw, FileSpreadsheet, AlertCircle
 } from 'lucide-react';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
@@ -267,6 +267,7 @@ export default function RawMaterialsPanel() {
   const [outwardSortOrder, setOutwardSortOrder] = useState('desc');
 
   const [stockMaterialType, setStockMaterialType] = useState('All');
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, label }
@@ -677,6 +678,59 @@ export default function RawMaterialsPanel() {
     }
   };
 
+  const handleDownloadScreenPdf = async () => {
+    try {
+      setPdfLoading(true);
+      let ds = '';
+      let de = '';
+      let mat = '';
+      let typeVal = 'All';
+      let searchVal = '';
+
+      if (activeTab === 'inward') {
+        typeVal = 'INWARD';
+        if (inwardPreset && inwardPreset !== 'all') {
+          const range = getDatePresetRange(inwardPreset, customInwardStart, customInwardEnd);
+          ds = range.dateStart || '';
+          de = range.dateEnd || '';
+        } else {
+          ds = inwardDateStart || '';
+          de = inwardDateEnd || '';
+        }
+        mat = inwardTab !== 'All' ? inwardTab : (inwardMaterialType !== 'All' ? inwardMaterialType : '');
+        searchVal = inwardSearch || '';
+      } else if (activeTab === 'outward') {
+        typeVal = 'OUTWARD';
+        if (outwardPreset && outwardPreset !== 'all') {
+          const range = getDatePresetRange(outwardPreset, customOutwardStart, customOutwardEnd);
+          ds = range.dateStart || '';
+          de = range.dateEnd || '';
+        } else {
+          ds = outwardDateStart || '';
+          de = outwardDateEnd || '';
+        }
+        mat = outwardTab !== 'All' ? outwardTab : (outwardMaterialType !== 'All' ? outwardMaterialType : '');
+        searchVal = outwardSearch || '';
+      } else if (activeTab === 'dashboard') {
+        typeVal = 'All';
+        mat = stockMaterialType !== 'All' ? stockMaterialType : '';
+      }
+
+      await api.downloadRawMaterialLedgerPdf({
+        type: typeVal,
+        materialName: mat,
+        dateStart: ds,
+        dateEnd: de,
+        search: searchVal,
+        companyEntity: companyEntity || 'Elite Digital Print'
+      });
+    } catch (err) {
+      alert('Failed to download PDF report: ' + err.message);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   // Filter local registers
   const toYYYYMMDD = (d) => {
     if (!d) return '';
@@ -925,6 +979,16 @@ export default function RawMaterialsPanel() {
             </button>
           ))}
         </div>
+        <button
+          onClick={handleDownloadScreenPdf}
+          className="btn-secondary"
+          disabled={pdfLoading}
+          title={`Download ${activeTab === 'inward' ? 'Inward Register' : activeTab === 'outward' ? 'Outward Register' : 'Stock Overview'} PDF Report`}
+          style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+        >
+          {pdfLoading ? <RefreshCw className="spin-loader" size={16} /> : <FileDown size={16} />}
+          PDF Report
+        </button>
       </div>
 
       {error && <div style={{ color: 'red', padding: '1rem', background: '#ffebeb', borderRadius: '8px' }}>{error}</div>}
