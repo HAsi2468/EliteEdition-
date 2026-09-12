@@ -1,5 +1,7 @@
 const RawMaterialTransaction = require('../db/models/rawMaterialTransaction.model');
 const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
 
 const formatMaterialDetails = (t) => {
   if (!t.materialName) return '-';
@@ -331,18 +333,38 @@ const downloadLedgerPdf = async (req, res) => {
         .trim();
     };
 
-    // Header
+    const digitalLogoPath = path.join(__dirname, 'DigitalLogo.png');
+    const logoPath = path.join(__dirname, 'Logo.png');
+    const activeLogo = fs.existsSync(digitalLogoPath) ? digitalLogoPath : (fs.existsSync(logoPath) ? logoPath : null);
+
     const titleType = type && type !== 'All' ? `${type.toUpperCase()} ` : '';
-    doc.fontSize(16).font('Helvetica-Bold').fillColor('black').text(`Elite Digital Print - Raw Materials ${titleType}Ledger`, { align: 'center' });
-    doc.moveDown(0.3);
+    const compName = companyEntity || 'Elite Digital Print';
+
+    // Header drawing
+    if (activeLogo) {
+      try {
+        doc.image(activeLogo, 40, 22, { width: 105 });
+      } catch (e) {
+        console.warn('Failed to embed logo in raw material PDF:', e);
+      }
+    }
+
+    const textX = activeLogo ? 155 : 40;
+    const textW = activeLogo ? 400 : 515;
+
+    doc.fontSize(14).font('Helvetica-Bold').fillColor('#111827').text(`${compName}`, textX, 24, { width: textW, align: activeLogo ? 'left' : 'center' });
+    doc.fontSize(10.5).font('Helvetica-Bold').fillColor('#374151').text(`Raw Materials ${titleType}Ledger`, textX, 41, { width: textW, align: activeLogo ? 'left' : 'center' });
+
     const dateLabel = dateStart || dateEnd
       ? `Period: ${dateStart || 'Start'} to ${dateEnd || 'Today'}`
-      : 'All Transactions';
-    doc.fontSize(9).font('Helvetica').fillColor('black').text(dateLabel, { align: 'center' });
-    if (materialName) {
-      doc.text(`Material: ${materialName}`, { align: 'center' });
-    }
-    doc.moveDown(0.8);
+      : 'Period: All Transactions';
+    const matLabel = materialName && materialName !== 'All' ? ` | Material: ${materialName}` : '';
+    const searchLabel = search ? ` | Search: "${search}"` : '';
+
+    doc.fontSize(8.5).font('Helvetica').fillColor('#6b7280').text(`${dateLabel}${matLabel}${searchLabel}`, textX, 56, { width: textW, align: activeLogo ? 'left' : 'center' });
+
+    doc.moveTo(40, 75).lineTo(555, 75).strokeColor('#d1d5db').lineWidth(0.8).stroke();
+    doc.y = 85;
 
     // Table header configuration
     const colX = [40, 88, 131, 189, 282, 365, 408, 448];
@@ -351,12 +373,12 @@ const downloadLedgerPdf = async (req, res) => {
 
     const renderTableHeader = () => {
       const py = doc.y;
-      doc.fontSize(8).font('Helvetica-Bold').fillColor('black');
+      doc.fontSize(8).font('Helvetica-Bold').fillColor('#111827');
       headers.forEach((h, i) => {
         doc.text(h, colX[i], py, { width: colWidths[i], align: i === 5 ? 'right' : 'left' });
       });
       doc.moveDown(0.8);
-      doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+      doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor('#9ca3af').lineWidth(0.75).stroke();
       doc.moveDown(0.4);
     };
 
@@ -372,6 +394,14 @@ const downloadLedgerPdf = async (req, res) => {
       for (const t of transactions) {
         if (doc.y > 730) {
           doc.addPage();
+          if (activeLogo) {
+            try {
+              doc.image(activeLogo, 40, 18, { width: 75 });
+            } catch (e) {}
+          }
+          doc.fontSize(9.5).font('Helvetica-Bold').fillColor('#111827').text(`${compName} - Raw Materials ${titleType}Ledger`, activeLogo ? 125 : 40, 20);
+          doc.moveTo(40, 36).lineTo(555, 36).strokeColor('#e5e7eb').lineWidth(0.5).stroke();
+          doc.y = 42;
           renderTableHeader();
           doc.font('Helvetica').fontSize(7);
         }
