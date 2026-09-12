@@ -262,25 +262,25 @@ const downloadLedgerPdf = async (req, res) => {
     const matchStage = {};
     if (dateStart || dateEnd) {
       matchStage.date = {};
-      if (dateStart && /^\d{4}-\d{2}-\d{2}$/.test(dateStart.trim())) {
+      if (dateStart && /^\d{4}-\d{2}-\d{2}$/.test(String(dateStart).trim())) {
         matchStage.date.$gte = new Date(`${dateStart.trim()}T00:00:00.000Z`);
       }
-      if (dateEnd && /^\d{4}-\d{2}-\d{2}$/.test(dateEnd.trim())) {
+      if (dateEnd && /^\d{4}-\d{2}-\d{2}$/.test(String(dateEnd).trim())) {
         matchStage.date.$lte = new Date(`${dateEnd.trim()}T23:59:59.999Z`);
       }
     }
 
     if (type && type !== 'All') {
-      matchStage.type = type.trim().toUpperCase();
+      matchStage.type = new RegExp('^' + type.trim() + '$', 'i');
     }
 
     if (materialName && materialName !== 'All') {
-      const target = materialName.trim();
+      const target = String(materialName).trim();
       if (target.toLowerCase() === 'ink' || target.toLowerCase() === 'all inks') {
         matchStage.materialName = new RegExp('ink', 'i');
       } else if (target.toLowerCase() === 'paper' || target.toLowerCase() === 'all papers') {
         matchStage.materialName = new RegExp('paper', 'i');
-      } else {
+      } else if (target !== '') {
         const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         matchStage.materialName = new RegExp(escaped, 'i');
       }
@@ -289,9 +289,23 @@ const downloadLedgerPdf = async (req, res) => {
     const transactions = await RawMaterialTransaction.find(matchStage).sort({ date: 1 });
 
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'inline; filename=raw-materials-ledger.pdf');
-    doc.pipe(res);
+    const buffers = [];
+    doc.on('data', buffers.push.bind(buffers));
+
+    doc.on('end', () => {
+      const pdfData = Buffer.concat(buffers);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename=raw-materials-ledger.pdf');
+      res.setHeader('Content-Length', pdfData.length);
+      res.send(pdfData);
+    });
+
+    doc.on('error', (err) => {
+      console.error('PDFKit error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
 
     // Header
     const titleType = type && type !== 'All' ? `${type.toUpperCase()} ` : '';
@@ -327,40 +341,45 @@ const downloadLedgerPdf = async (req, res) => {
     // Rows
     doc.font('Helvetica').fontSize(7.5);
     let totalIn = 0, totalOut = 0;
-    for (const t of transactions) {
-      if (doc.y > 740) {
-        doc.addPage();
-        renderTableHeader();
-        doc.font('Helvetica').fontSize(7.5);
+    if (transactions.length === 0) {
+      doc.fontSize(9).font('Helvetica-Oblique').fillColor('#666666').text('No matching transactions found for the selected filters.', 40, doc.y);
+      doc.moveDown(1);
+    } else {
+      for (const t of transactions) {
+        if (doc.y > 740) {
+          doc.addPage();
+          renderTableHeader();
+          doc.font('Helvetica').fontSize(7.5);
+        }
+
+        const isIn = t.type === 'INWARD';
+        const qtyNum = Number(t.qty || 0);
+        if (isIn) totalIn += qtyNum; else totalOut += qtyNum;
+
+        const dateStr = t.date ? new Date(t.date).toLocaleDateString('en-IN') : '-';
+        const row = [
+          dateStr,
+          t.type || '-',
+          isIn ? (t.challanNo || '-') : (t.jobNo || '-'),
+          formatMaterialDetails(t),
+          isIn ? (t.vendorName || '-') : (t.partyName || '-'),
+          `${isIn ? '+' : '-'}${qtyNum}`,
+          t.unit || '-'
+        ];
+
+        const startY = doc.y;
+        let maxHeight = 0;
+
+        row.forEach((cell, i) => {
+          doc.fillColor(isIn ? '#1a472a' : '#7f1d1d');
+          const opts = { width: colWidths[i], align: i === 5 ? 'right' : 'left' };
+          doc.text(String(cell), colX[i], startY, opts);
+          const cellH = doc.heightOfString(String(cell), opts);
+          if (cellH > maxHeight) maxHeight = cellH;
+        });
+
+        doc.y = startY + maxHeight + 4;
       }
-
-      const isIn = t.type === 'INWARD';
-      const qtyNum = Number(t.qty || 0);
-      if (isIn) totalIn += qtyNum; else totalOut += qtyNum;
-
-      const dateStr = t.date ? new Date(t.date).toLocaleDateString('en-IN') : '-';
-      const row = [
-        dateStr,
-        t.type || '-',
-        isIn ? (t.challanNo || '-') : (t.jobNo || '-'),
-        formatMaterialDetails(t),
-        isIn ? (t.vendorName || '-') : (t.partyName || '-'),
-        `${isIn ? '+' : '-'}${qtyNum}`,
-        t.unit || '-'
-      ];
-
-      const startY = doc.y;
-      let maxHeight = 0;
-
-      row.forEach((cell, i) => {
-        doc.fillColor(isIn ? '#1a472a' : '#7f1d1d');
-        const opts = { width: colWidths[i], align: i === 5 ? 'right' : 'left' };
-        doc.text(String(cell), colX[i], startY, opts);
-        const cellH = doc.heightOfString(String(cell), opts);
-        if (cellH > maxHeight) maxHeight = cellH;
-      });
-
-      doc.y = startY + maxHeight + 4;
     }
 
     // Summary
