@@ -6,7 +6,7 @@ import {
   Layers, Database, Settings, Trash2, FileDown, Search, X,
   CheckCircle, AlertCircle, Calendar, Tag, User, Clipboard, Edit
 } from 'lucide-react';
-import DateRangePicker from './DateRangePicker';
+import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 
 const parseCanSize = (val) => {
   if (val === undefined || val === null || val === '') return 0;
@@ -143,13 +143,25 @@ export default function RawMaterialsPanel() {
     let typeVal = 'All';
 
     if (activeTab === 'inward') {
-      ds = inwardDateStart;
-      de = inwardDateEnd;
+      if (inwardPreset && inwardPreset !== 'all') {
+        const range = getDatePresetRange(inwardPreset, customInwardStart, customInwardEnd);
+        ds = range.dateStart;
+        de = range.dateEnd;
+      } else {
+        ds = inwardDateStart;
+        de = inwardDateEnd;
+      }
       if (inwardMaterialType !== 'All') mat = inwardMaterialType;
       typeVal = 'INWARD';
     } else if (activeTab === 'outward') {
-      ds = outwardDateStart;
-      de = outwardDateEnd;
+      if (outwardPreset && outwardPreset !== 'all') {
+        const range = getDatePresetRange(outwardPreset, customOutwardStart, customOutwardEnd);
+        ds = range.dateStart;
+        de = range.dateEnd;
+      } else {
+        ds = outwardDateStart;
+        de = outwardDateEnd;
+      }
       if (outwardMaterialType !== 'All') mat = outwardMaterialType;
       typeVal = 'OUTWARD';
     } else if (activeTab === 'dashboard') {

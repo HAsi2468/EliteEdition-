@@ -263,14 +263,16 @@ const downloadLedgerPdf = async (req, res) => {
     if (dateStart || dateEnd) {
       matchStage.date = {};
       if (dateStart) {
-        const ds = new Date(dateStart);
+        const dsStr = String(dateStart).trim();
+        const ds = /^\d{4}-\d{2}-\d{2}$/.test(dsStr) ? new Date(`${dsStr}T00:00:00.000`) : new Date(dateStart);
         if (!isNaN(ds.getTime())) {
           ds.setHours(0, 0, 0, 0);
           matchStage.date.$gte = ds;
         }
       }
       if (dateEnd) {
-        const de = new Date(dateEnd);
+        const deStr = String(dateEnd).trim();
+        const de = /^\d{4}-\d{2}-\d{2}$/.test(deStr) ? new Date(`${deStr}T23:59:59.999`) : new Date(dateEnd);
         if (!isNaN(de.getTime())) {
           de.setHours(23, 59, 59, 999);
           matchStage.date.$lte = de;
@@ -284,9 +286,10 @@ const downloadLedgerPdf = async (req, res) => {
 
     if (materialName && materialName !== 'All') {
       const target = String(materialName).trim();
-      if (target.toLowerCase() === 'ink' || target.toLowerCase() === 'all inks') {
+      const lower = target.toLowerCase();
+      if (lower === 'ink' || lower.includes('all inks') || lower === 'all inks') {
         matchStage.materialName = new RegExp('ink', 'i');
-      } else if (target.toLowerCase() === 'paper' || target.toLowerCase() === 'all papers') {
+      } else if (lower === 'paper' || lower.includes('all papers') || lower === 'all papers') {
         matchStage.materialName = new RegExp('paper', 'i');
       } else if (target !== '') {
         const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
