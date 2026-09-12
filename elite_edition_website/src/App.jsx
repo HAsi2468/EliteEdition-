@@ -705,44 +705,63 @@ export default function App() {
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
-          {/* Interactive Company Switcher Pill (Option 1 & Option 3 Combined) */}
-          <div 
-            onClick={() => setShowCompanyQuickSheet(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              cursor: 'pointer',
-              padding: '0.25rem 0.55rem',
-              borderRadius: '8px',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
-              background: 'rgba(99, 102, 241, 0.08)',
-              transition: 'all 0.15s ease'
-            }}
-            title="Tap to quick-switch company (or hold hamburger button)"
-          >
-            <div style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '6px',
-              background: 'linear-gradient(135deg, var(--primary, #6366f1), #0891b2)',
-              color: '#fff',
-              fontWeight: 800,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.78rem',
-              letterSpacing: '0.02em',
-              flexShrink: 0,
-              boxShadow: '0 2px 6px rgba(99,102,241,0.25)'
-            }}>
-              {activeTab === 'workspace' ? 'WS' : (getCompanyById(activeDepartment)?.code || 'EO')}
-            </div>
-            <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-              {activeTab === 'workspace' ? 'Workspace' : (getCompanyById(activeDepartment)?.name || 'Elite Online')}
-            </span>
-            <ChevronDown size={14} color="#6366f1" style={{ flexShrink: 0 }} />
-          </div>
+          {/* Interactive Company Switcher Pill */}
+          {(() => {
+            const activeComp = getCompanyById(activeDepartment);
+            const ActiveIcon = activeComp?.iconName === 'Store' ? Store : activeComp?.iconName === 'Printer' ? Printer : activeComp?.iconName === 'Scissors' ? Scissors : Building;
+            const brandColor = activeComp?.iconColor || '#6366f1';
+
+            return (
+              <div 
+                onClick={() => setShowCompanyQuickSheet(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  cursor: 'pointer',
+                  padding: '0.3rem 0.65rem 0.3rem 0.4rem',
+                  borderRadius: '10px',
+                  border: `1px solid ${brandColor}40`,
+                  background: `${brandColor}12`,
+                  transition: 'all 0.15s ease'
+                }}
+                title="Tap to switch active company entity workspace"
+              >
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '7px',
+                  background: activeComp?.gradient || 'linear-gradient(135deg, #6366f1, #0891b2)',
+                  color: '#fff',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: `0 2px 6px ${brandColor}40`
+                }}>
+                  <ActiveIcon size={15} color="#ffffff" />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                    {activeTab === 'workspace' ? 'Workspace' : (activeComp?.name || 'Elite Online')}
+                  </span>
+                  <span style={{
+                    fontSize: '0.65rem',
+                    fontWeight: 800,
+                    padding: '1px 5px',
+                    borderRadius: '4px',
+                    background: `${brandColor}25`,
+                    color: brandColor,
+                    lineHeight: 1.2
+                  }}>
+                    {activeComp?.code || 'EO'}
+                  </span>
+                </div>
+                <ChevronDown size={14} color={brandColor} style={{ flexShrink: 0 }} />
+              </div>
+            );
+          })()}
 
           {/* Master Company Switcher Buttons */}
           <div className="dept-switcher-header">
@@ -761,9 +780,10 @@ export default function App() {
                   key={company.id}
                   onClick={() => handleSwitchDepartment(company.id)}
                   className={`dept-switch-btn ${isActive ? 'active' : ''}`}
+                  style={isActive ? { background: company.gradient, boxShadow: `0 2px 10px ${company.iconColor}40` } : {}}
                   title={`Switch to ${company.name} Workspace (${company.type})`}
                 >
-                  <IconComponent size={15} />
+                  <IconComponent size={15} color={isActive ? '#ffffff' : (company.iconColor || 'currentColor')} />
                   <span>{company.name}</span>
                 </button>
               );
@@ -861,16 +881,65 @@ export default function App() {
         <div className="mobile-drawer-overlay" onClick={() => setMobileMenuOpen(false)}>
           <div className="mobile-drawer-content" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={styles.logoBadge}>{getCompanyById(activeDepartment)?.code || 'EO'}</div>
-                <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                  {getCompanyById(activeDepartment)?.name || 'Elite Online'}
-                </span>
-              </div>
+              {(() => {
+                const comp = getCompanyById(activeDepartment);
+                const CompIcon = comp?.iconName === 'Store' ? Store : comp?.iconName === 'Printer' ? Printer : comp?.iconName === 'Scissors' ? Scissors : Building;
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      background: comp?.gradient || 'linear-gradient(135deg, #6366f1, #0891b2)',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      boxShadow: `0 2px 8px ${comp?.iconColor || '#6366f1'}40`
+                    }}>
+                      <CompIcon size={16} color="#ffffff" />
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-primary)', display: 'block', lineHeight: 1.2 }}>
+                        {comp?.name || 'Elite Online'}
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: comp?.iconColor || '#6366f1', fontWeight: 700 }}>
+                        {comp?.code} • {comp?.type}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
               <button onClick={() => setMobileMenuOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: '0.25rem' }}>
                 <X size={20} />
               </button>
             </div>
+
+            {/* Quick Switch Button in Mobile Drawer */}
+            <button
+              onClick={() => { setShowCompanyQuickSheet(true); setMobileMenuOpen(false); }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.55rem 0.75rem',
+                borderRadius: '8px',
+                background: 'rgba(99, 102, 241, 0.08)',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                color: 'var(--text-primary)',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                marginTop: '0.5rem'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <Layers size={14} color="#6366f1" />
+                <span>Switch Company Workspace</span>
+              </div>
+              <ChevronRight size={14} color="#6366f1" />
+            </button>
 
             {/* Modules List inside Mobile Drawer */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.75rem' }}>
@@ -1757,6 +1826,8 @@ export default function App() {
                 if (company.id === 'stitching' && !hasStitchingAccess) return null;
 
                 const isActive = activeDepartment === company.id && activeTab !== 'workspace';
+                const CompIcon = company.iconName === 'Store' ? Store : company.iconName === 'Printer' ? Printer : company.iconName === 'Scissors' ? Scissors : Building;
+                const brandColor = company.iconColor || '#6366f1';
 
                 return (
                   <div
@@ -1772,41 +1843,61 @@ export default function App() {
                       justifyContent: 'space-between',
                       padding: '0.85rem 1rem',
                       borderRadius: '14px',
-                      border: isActive ? '2px solid #6366f1' : '1px solid #e2e8f0',
-                      background: isActive ? 'rgba(99, 102, 241, 0.08)' : '#ffffff',
+                      border: isActive ? `2px solid ${brandColor}` : '1px solid #e2e8f0',
+                      background: isActive ? `${brandColor}0d` : '#ffffff',
                       cursor: 'pointer',
-                      boxShadow: isActive ? '0 4px 14px rgba(99, 102, 241, 0.2)' : '0 1px 3px rgba(0,0,0,0.03)',
+                      boxShadow: isActive ? `0 4px 14px ${brandColor}35` : '0 1px 3px rgba(0,0,0,0.03)',
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
                       <div style={{
-                        width: '38px',
-                        height: '38px',
-                        borderRadius: '10px',
-                        background: isActive ? 'linear-gradient(135deg, #4f46e5, #0891b2)' : '#f1f5f9',
-                        color: isActive ? '#ffffff' : '#475569',
-                        fontWeight: 800,
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '12px',
+                        background: company.gradient || 'linear-gradient(135deg, #6366f1, #0891b2)',
+                        color: '#ffffff',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: '0.88rem',
-                        flexShrink: 0
+                        flexShrink: 0,
+                        boxShadow: `0 3px 10px ${brandColor}40`
                       }}>
-                        {company.code}
+                        <CompIcon size={20} color="#ffffff" />
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
-                          {company.name}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
+                            {company.name}
+                          </span>
+                          <span style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            padding: '2px 6px',
+                            borderRadius: '6px',
+                            background: `${brandColor}18`,
+                            color: brandColor,
+                            border: `1px solid ${brandColor}30`
+                          }}>
+                            {company.code}
+                          </span>
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+                        <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
                           {company.type}
                         </div>
                       </div>
                     </div>
 
                     {isActive ? (
-                      <span style={{ padding: '0.25rem 0.65rem', borderRadius: '20px', background: '#6366f1', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800 }}>
+                      <span style={{
+                        padding: '0.28rem 0.75rem',
+                        borderRadius: '20px',
+                        background: brandColor,
+                        color: '#ffffff',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        boxShadow: `0 2px 8px ${brandColor}50`
+                      }}>
                         Active ✓
                       </span>
                     ) : (

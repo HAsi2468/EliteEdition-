@@ -11,7 +11,9 @@ export const COMPANIES = [
     type: 'E-Commerce Store & Operations',
     iconName: 'Store',
     defaultTab: 'dashboard',
-    badgeColor: '#4f46e5',
+    badgeColor: '#6366f1',
+    iconColor: '#6366f1',
+    gradient: 'linear-gradient(135deg, #6366f1, #4f46e5)',
     description: 'Online store inventory, catalog, sales orders & return management.'
   },
   {
@@ -21,7 +23,9 @@ export const COMPANIES = [
     type: 'Digital Textile Printing',
     iconName: 'Printer',
     defaultTab: 'jobcards',
-    badgeColor: '#4f46e5',
+    badgeColor: '#0284c7',
+    iconColor: '#0284c7',
+    gradient: 'linear-gradient(135deg, #0284c7, #0369a1)',
     description: 'Job cards, printing logs, fabric inventory & production tracking.'
   },
   {
@@ -31,7 +35,9 @@ export const COMPANIES = [
     type: 'Garment Stitching & Manufacturing',
     iconName: 'Scissors',
     defaultTab: 'es_dashboard',
-    badgeColor: '#4f46e5',
+    badgeColor: '#10b981',
+    iconColor: '#10b981',
+    gradient: 'linear-gradient(135deg, #10b981, #059669)',
     description: 'Stitching job cards, design room & stitching fabric challans.'
   },
   {
@@ -41,7 +47,9 @@ export const COMPANIES = [
     type: 'Wholesale & Corporate Entity',
     iconName: 'Building',
     defaultTab: 'ee_invoices',
-    badgeColor: '#4f46e5',
+    badgeColor: '#8b5cf6',
+    iconColor: '#8b5cf6',
+    gradient: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
     description: 'Company workspace for wholesale billing and settings.'
   },
   {
@@ -51,7 +59,9 @@ export const COMPANIES = [
     type: 'Fabric & Textile Sales Entity',
     iconName: 'Building',
     defaultTab: 'ef_invoices',
-    badgeColor: '#4f46e5',
+    badgeColor: '#f59e0b',
+    iconColor: '#f59e0b',
+    gradient: 'linear-gradient(135deg, #f59e0b, #d97706)',
     description: 'Company workspace for fabric billing and settings.'
   }
 ];
