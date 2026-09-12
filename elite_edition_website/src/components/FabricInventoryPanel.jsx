@@ -3973,57 +3973,57 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         </div>
       )}
 
-      {/* ── Challan View Modal ── */}
+      {/* ── Challan View Modal (White & Blue Theme) ── */}
       {viewChallanModal && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', padding: '1.5rem', background: 'var(--card-bg)', border: '1px solid var(--border-light)', borderRadius: 12 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }}>
+          <div style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', padding: '1.5rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '16px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', color: '#0f172a' }}>
             {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.85rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ margin: 0, color: 'var(--primary)', fontWeight: 800, fontSize: '1.1rem' }}>
+                <h3 style={{ margin: 0, color: '#2563eb', fontWeight: 800, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   📄 Delivery Challan EDP-{viewChallanModal.challanNo}
                 </h3>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
                   Date: {formatDateDDMMYYYY(viewChallanModal.date)}
                 </span>
               </div>
-              <button className="btn-icon" onClick={() => setViewChallanModal(null)} style={{ padding: '0.35rem' }}>
+              <button onClick={() => setViewChallanModal(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.4rem', cursor: 'pointer', color: '#475569' }}>
                 <X size={18} />
               </button>
             </div>
 
-            {/* Details Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', fontSize: '0.85rem', marginBottom: '1.25rem', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-light)' }}>
-              <div><span style={{ color: 'var(--text-muted)' }}>Billed To:</span> <strong style={{ color: '#a78bfa', fontWeight: 800 }}>{viewChallanModal.billTo || viewChallanModal.partyName || '—'}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Party / Delivery:</span> <strong style={{ color: 'var(--text-primary)' }}>{viewChallanModal.partyName || '—'}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Job No:</span> <strong style={{ color: 'var(--primary)' }}>#{viewChallanModal.jobNo || '—'}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Design / Name:</span> <strong>{viewChallanModal.designNo || '—'}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Fabric Quality:</span> <strong>{viewChallanModal.fabricName || '—'}</strong> ({viewChallanModal.panna || '58'}")</div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Lot No:</span> <strong>{viewChallanModal.lotNo ? `#${viewChallanModal.lotNo}` : '—'}</strong></div>
-              <div><span style={{ color: 'var(--text-muted)' }}>Delivery By:</span> <strong>{viewChallanModal.deliveryBy || '—'}</strong></div>
-              {viewChallanModal.vendorChallanNo && <div><span style={{ color: 'var(--text-muted)' }}>Vendor Ch:</span> <strong>{viewChallanModal.vendorChallanNo}</strong></div>}
-              {viewChallanModal.pcs && <div><span style={{ color: 'var(--text-muted)' }}>PCS:</span> <strong>{viewChallanModal.pcs} pcs</strong></div>}
+            {/* Details Grid - White & Blue */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', fontSize: '0.85rem', marginBottom: '1.25rem', background: '#f8fafc', padding: '1.1rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <div><span style={{ color: '#64748b', fontWeight: 600 }}>Billed To:</span> <strong style={{ color: '#2563eb', fontWeight: 800 }}>{viewChallanModal.billTo || viewChallanModal.partyName || '—'}</strong></div>
+              <div><span style={{ color: '#64748b', fontWeight: 600 }}>Party / Delivery:</span> <strong style={{ color: '#0f172a', fontWeight: 700 }}>{viewChallanModal.partyName || '—'}</strong></div>
+              <div><span style={{ color: '#64748b', fontWeight: 600 }}>Job No:</span> <strong style={{ color: '#1d4ed8', fontWeight: 800 }}>#{viewChallanModal.jobNo || '—'}</strong></div>
+              <div><span style={{ color: '#64748b', fontWeight: 600 }}>Design / Name:</span> <strong style={{ color: '#0f172a' }}>{viewChallanModal.designNo || '—'}</strong></div>
+              <div><span style={{ color: '#64748b', fontWeight: 600 }}>Fabric Quality:</span> <strong style={{ color: '#0f172a' }}>{viewChallanModal.fabricName || '—'}</strong> ({viewChallanModal.panna || '58'}")</div>
+              <div><span style={{ color: '#64748b', fontWeight: 600 }}>Lot No:</span> <strong style={{ color: '#0f172a' }}>{viewChallanModal.lotNo ? `#${viewChallanModal.lotNo}` : '—'}</strong></div>
+              <div><span style={{ color: '#64748b', fontWeight: 600 }}>Delivery By:</span> <strong style={{ color: '#0f172a' }}>{viewChallanModal.deliveryBy || '—'}</strong></div>
+              {viewChallanModal.vendorChallanNo && <div><span style={{ color: '#64748b', fontWeight: 600 }}>Vendor Ch:</span> <strong style={{ color: '#0f172a' }}>{viewChallanModal.vendorChallanNo}</strong></div>}
+              {viewChallanModal.pcs && <div><span style={{ color: '#64748b', fontWeight: 600 }}>PCS:</span> <strong style={{ color: '#0f172a' }}>{viewChallanModal.pcs} pcs</strong></div>}
             </div>
 
             {/* TP Details List */}
             {viewChallanModal.tpDetails && viewChallanModal.tpDetails.length > 0 && (
               <div style={{ marginBottom: '1.25rem' }}>
-                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   TP / Roll Breakdown ({viewChallanModal.tpDetails.length} Rolls)
                 </div>
-                <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: 6 }}>
-                  <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', fontSize: '0.82rem', borderCollapse: 'collapse' }}>
                     <thead>
-                      <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border-light)', textAlign: 'left' }}>
-                        <th style={{ padding: '0.4rem 0.6rem' }}>TP #</th>
-                        <th style={{ padding: '0.4rem 0.6rem', textAlign: 'right' }}>Meters (mtr)</th>
+                      <tr style={{ background: '#eff6ff', borderBottom: '1px solid #bfdbfe', textAlign: 'left', color: '#1e40af' }}>
+                        <th style={{ padding: '0.5rem 0.75rem', fontWeight: '700' }}>TP #</th>
+                        <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontWeight: '700' }}>Meters (mtr)</th>
                       </tr>
                     </thead>
                     <tbody>
                       {viewChallanModal.tpDetails.map((tp, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                          <td style={{ padding: '0.35rem 0.6rem', fontWeight: 600 }}>TP-{tp.tpNo || (idx + 1)}</td>
-                          <td style={{ padding: '0.35rem 0.6rem', textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>{Number(tp.tpMeter || 0).toFixed(2)} mtr</td>
+                        <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                          <td style={{ padding: '0.45rem 0.75rem', fontWeight: '600', color: '#334155' }}>TP-{tp.tpNo || (idx + 1)}</td>
+                          <td style={{ padding: '0.45rem 0.75rem', textAlign: 'right', fontWeight: '700', color: '#16a34a' }}>{Number(tp.tpMeter || 0).toFixed(2)} mtr</td>
                         </tr>
                       ))}
                     </tbody>
@@ -4032,24 +4032,26 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               </div>
             )}
 
-            {/* Summary Totals */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: 'rgba(16,185,129,0.06)', borderRadius: 8, border: '1px solid rgba(16,185,129,0.2)', marginBottom: '1.25rem' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>Total Outward Quantity:</span>
-              <span style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--success)' }}>
+            {/* Summary Totals - Light Blue Theme */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.1rem', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe', marginBottom: '1.25rem' }}>
+              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1e40af' }}>Total Outward Quantity:</span>
+              <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1d4ed8' }}>
                 {parseFloat(viewChallanModal.totalMtr || 0).toFixed(2)} mtr ({viewChallanModal.totalTp || 0} Rolls)
               </span>
             </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons - White & Blue Theme */}
             <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              <button className="btn-secondary" onClick={() => setViewChallanModal(null)}>Close</button>
-              <button className="btn-primary" style={{ background: 'linear-gradient(135deg,#7c3aed,#6366f1)', display: 'inline-flex', alignItems: 'center', gap: '4px' }} onClick={() => { setViewChallanModal(null); handleCreateBillFromChallan(viewChallanModal); }}>
+              <button onClick={() => setViewChallanModal(null)} style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#475569', fontWeight: '600', cursor: 'pointer' }}>
+                Close
+              </button>
+              <button onClick={() => { setViewChallanModal(null); handleCreateBillFromChallan(viewChallanModal); }} style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: 'none', backgroundColor: '#2563eb', color: '#ffffff', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)' }}>
                 <Receipt size={15} /> Create Bill
               </button>
-              <button className="btn-primary" style={{ background: 'linear-gradient(135deg,#10b981,#059669)', display: 'inline-flex', alignItems: 'center', gap: '4px' }} onClick={() => handleDownloadChallanPdf(viewChallanModal._id, viewChallanModal.challanNo)}>
+              <button onClick={() => handleDownloadChallanPdf(viewChallanModal._id, viewChallanModal.challanNo)} style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: 'none', backgroundColor: '#0284c7', color: '#ffffff', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)' }}>
                 <FileDown size={15} /> Download PDF
               </button>
-              <button className="btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }} onClick={() => { setViewChallanModal(null); startEditChallan(viewChallanModal); }}>
+              <button onClick={() => { setViewChallanModal(null); startEditChallan(viewChallanModal); }} style={{ padding: '0.6rem 1.1rem', borderRadius: '8px', border: '1px solid #2563eb', backgroundColor: '#ffffff', color: '#2563eb', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                 <Edit size={15} /> Edit Challan
               </button>
             </div>
