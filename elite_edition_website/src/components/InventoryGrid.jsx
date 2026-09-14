@@ -990,11 +990,7 @@ export default function InventoryGrid({
               <div style={styles.emptyState}>
                 <span style={{ fontSize: '2.8rem' }}>📥</span>
                 <h4 style={{ margin: '0.5rem 0 0.2rem 0', color: '#1e293b', fontSize: '1.1rem' }}>No inward stock records found</h4>
-                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0 0 1rem 0' }}>Try clearing date filters or add inward stock.</p>
-                <button onClick={onBulkInward} style={styles.addInwardStockBtn}>
-                  <Sparkles size={15} />
-                  <span>+ Add Inward Stock</span>
-                </button>
+                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try clearing date filters or add inward stock.</p>
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>

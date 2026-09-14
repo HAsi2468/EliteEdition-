@@ -1186,11 +1186,6 @@ export default function App() {
                       <Database size={18} /><span>Store Inventory</span>
                     </button>
                   )}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('catalog')) && (
-                    <button onClick={() => { setActiveTab('catalog'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'catalog' ? styles.navItemActive : {}) }}>
-                      <BookOpen size={18} /><span>Product Catalog</span>
-                    </button>
-                  )}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('returns')) && (
                     <button onClick={() => { setActiveTab('returns'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'returns' ? styles.navItemActive : {}) }}>
                       <PackageMinus size={18} /><span>Returns Department</span>
@@ -1549,9 +1544,6 @@ export default function App() {
                   }
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('inventory')) &&
                     renderNavItem('inventory', 'Store Inventory', Database, null, 'Inventory')
-                  }
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('catalog')) &&
-                    renderNavItem('catalog', 'Product Catalog', BookOpen, null, 'Products')
                   }
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('returns')) &&
                     renderNavItem('returns', 'Returns Department', PackageMinus, null, 'Returns')
