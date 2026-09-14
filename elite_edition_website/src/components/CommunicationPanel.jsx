@@ -772,7 +772,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
               }}
             >
               <CheckSquare size={13} />
-              <span>TASK</span>
+              <span>Task</span>
             </button>
           </div>
 

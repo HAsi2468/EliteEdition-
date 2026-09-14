@@ -396,19 +396,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
           <div style={{ width: 38, height: 38, borderRadius: '10px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}>
             <CheckSquare size={22} />
           </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div>
               <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-                TASK — TaskOPad Workforce Operations
+                Task
               </h2>
-              <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '1px 7px', borderRadius: '10px', textTransform: 'uppercase' }}>
-                TaskOPad Engine
-              </span>
             </div>
-            <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-              Assign tasks by &amp; to staff, live time tracking, Kanban boards &amp; checklists
-            </p>
-          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
