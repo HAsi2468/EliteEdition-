@@ -38,7 +38,11 @@ export default function InventoryGrid({
   // --- Sub-Screen 1: Stock Overview State ---
   const [searchTerm, setSearchTerm] = useState('');
   const [sizeFilter, setSizeFilter] = useState('All');
-  const [vendorFilter, setVendorFilter] = useState('All');
+  const [overviewDateStart, setOverviewDateStart] = useState('');
+  const [overviewDateEnd, setOverviewDateEnd] = useState('');
+  const [overviewPreset, setOverviewPreset] = useState('all');
+  const [customOverviewStart, setCustomOverviewStart] = useState('');
+  const [customOverviewEnd, setCustomOverviewEnd] = useState('');
   const [stockStatusFilter, setStockStatusFilter] = useState('all'); // 'all', 'instock', 'lowstock', 'outofstock'
   const [sortField, setSortField] = useState('itemName');
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
@@ -227,19 +231,28 @@ export default function InventoryGrid({
       const stock = Number(item.currentlyAvailableStock) || 0;
       const matchSearch = matchSearchQuery(item, searchTerm, ['itemName', 'party', 'skuCode', 'category', 'notes']);
       const matchSize = sizeFilter === 'All' || item.size === sizeFilter;
-      const matchVendor = vendorFilter === 'All' || 
-        (item.party && item.party.trim().toLowerCase() === vendorFilter.trim().toLowerCase()) ||
-        (Array.isArray(item.brandCodes) && item.brandCodes.some(bc => {
-          const bName = typeof bc === 'object' ? bc.brand : bc;
-          return bName && bName.trim().toLowerCase() === vendorFilter.trim().toLowerCase();
-        }));
+      
+      const matchDate = (() => {
+        if (!overviewDateStart && !overviewDateEnd) return true;
+        const itemDate = new Date(item.created_date_time || item.createdAt || item.date || 0);
+        if (isNaN(itemDate.getTime())) return true;
+        if (overviewDateStart) {
+          const sDate = new Date(`${overviewDateStart}T00:00:00`);
+          if (itemDate < sDate) return false;
+        }
+        if (overviewDateEnd) {
+          const eDate = new Date(`${overviewDateEnd}T23:59:59`);
+          if (itemDate > eDate) return false;
+        }
+        return true;
+      })();
       
       let matchStatus = true;
       if (stockStatusFilter === 'instock') matchStatus = stock > 0;
       else if (stockStatusFilter === 'lowstock') matchStatus = stock > 0 && stock <= 5;
       else if (stockStatusFilter === 'outofstock') matchStatus = stock === 0;
 
-      return matchSearch && matchSize && matchVendor && matchStatus;
+      return matchSearch && matchSize && matchDate && matchStatus;
     })
     .sort((a, b) => {
       let aVal = a[sortField];
@@ -749,18 +762,20 @@ export default function InventoryGrid({
                 </select>
               </div>
 
-              <div style={styles.filterBox}>
-                <Filter size={14} color="#64748b" />
-                <select
-                  value={vendorFilter}
-                  onChange={(e) => setVendorFilter(e.target.value)}
-                  style={styles.selectInput}
-                >
-                  {vendors.map((v, idx) => (
-                    <option key={idx} value={v}>{v === 'All' ? 'All Vendors' : v}</option>
-                  ))}
-                </select>
-              </div>
+              <DateRangePicker
+                preset={overviewPreset}
+                onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                  setOverviewPreset(p);
+                  setOverviewDateStart(ds);
+                  setOverviewDateEnd(de);
+                }}
+                customStart={customOverviewStart}
+                customEnd={customOverviewEnd}
+                onCustomChange={(s, e) => {
+                  setCustomOverviewStart(s);
+                  setCustomOverviewEnd(e);
+                }}
+              />
 
             </div>
           </div>
