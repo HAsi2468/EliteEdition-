@@ -45,14 +45,23 @@ const getOrders = async (
 
     if (skuCode) {
       const skuArray = skuCode.split(',').map((code) => code.trim());
-      whereClause.skuCode = { $in: skuArray };
+      const skuRegexes = skuArray.map(c => new RegExp(`^${c}$`, 'i'));
+      whereClause.$or = [
+        { skuCode: { $in: skuArray } },
+        { brandCodes: { $in: skuArray } },
+        { 'brandCodes.code': { $in: skuArray } },
+        { 'brandCodes.code': { $in: skuRegexes } }
+      ];
     }
     if (filters) {
       if (filters.search) {
         const searchRegex = new RegExp(filters.search, 'i');
         whereClause.$or = [
           { skuCode: searchRegex },
-          { description: searchRegex }
+          { description: searchRegex },
+          { brandCodes: searchRegex },
+          { 'brandCodes.code': searchRegex },
+          { 'brandCodes.brand': searchRegex }
         ];
       }
       Object.keys(filters).forEach((filterKey) => {

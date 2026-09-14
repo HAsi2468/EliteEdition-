@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Edit2, Trash2, Search, Plus, SlidersHorizontal, RefreshCw, Eye, Tag, Printer, Building2 } from 'lucide-react';
 import BrandManagerModal from './BrandManagerModal';
+import { matchSearchQuery } from '../utils/searchUtils';
 
 export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onSync, onOpenManager }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -101,15 +102,13 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
   // Filter & Search Logic
   const filteredItems = items
     .filter(item => {
-      const matchSearch = 
-        (item.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.brand || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.skuCode || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchSearch = matchSearchQuery(item, searchTerm, ['description', 'brand', 'skuCode', 'categoryName', 'color', 'size']);
       
       const matchSize = sizeFilter === 'All' || (item.size && item.size.includes(sizeFilter));
       
       const matchBrand = brandFilter === 'All' || 
-        (item.brand && item.brand.trim().toLowerCase() === brandFilter.trim().toLowerCase());
+        (item.brand && item.brand.trim().toLowerCase() === brandFilter.trim().toLowerCase()) ||
+        (Array.isArray(item.brandCodes) && item.brandCodes.some(bc => (typeof bc === 'object' ? bc.brand : bc)?.trim().toLowerCase() === brandFilter.trim().toLowerCase()));
 
       return matchSearch && matchSize && matchBrand;
     })

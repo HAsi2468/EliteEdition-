@@ -133,7 +133,11 @@ const getInventory = async (req, res) => {
       whereClause.$or = [
         { party: searchRegex },
         { itemName: searchRegex },
-        { size: searchRegex }
+        { size: searchRegex },
+        { skuCode: searchRegex },
+        { brandCodes: searchRegex },
+        { 'brandCodes.code': searchRegex },
+        { 'brandCodes.brand': searchRegex }
       ];
       logger.info(`[INVENTORY] GET — Search: "${search}"`);
     } else {
