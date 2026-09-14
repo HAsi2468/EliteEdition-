@@ -47,6 +47,43 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     return [createEmptyRow()];
   });
 
+  // Combine parties with managed brands & catalog brands
+  const [allParties, setAllParties] = useState([]);
+
+  useEffect(() => {
+    let managedBrands = [];
+    try {
+      const saved = localStorage.getItem('elite_managed_brands');
+      if (saved) {
+        managedBrands = JSON.parse(saved);
+      }
+    } catch (e) {}
+
+    const merged = [...(parties || [])];
+    const existing = new Set(merged.map(p => (p.businessName || p.name || '').trim().toLowerCase()));
+
+    (managedBrands || []).forEach(b => {
+      const name = typeof b === 'string' ? b : (b?.name || '');
+      if (name && !existing.has(name.trim().toLowerCase())) {
+        existing.add(name.trim().toLowerCase());
+        merged.push({ businessName: name, name: name });
+      }
+    });
+
+    (items || []).forEach(item => {
+      if (item.brand && !existing.has(item.brand.trim().toLowerCase())) {
+        existing.add(item.brand.trim().toLowerCase());
+        merged.push({ businessName: item.brand, name: item.brand });
+      }
+      if (item.party && !existing.has(item.party.trim().toLowerCase())) {
+        existing.add(item.party.trim().toLowerCase());
+        merged.push({ businessName: item.party, name: item.party });
+      }
+    });
+
+    setAllParties(merged);
+  }, [parties, items]);
+
   // Preserve scroll position on mount/unmount
   useEffect(() => {
     scrollPosRef.current = window.scrollY || document.documentElement.scrollTop || 0;
@@ -619,7 +656,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
             </datalist>
 
             <datalist id="outward-parties-list">
-              {parties.map((p, i) => (
+              {allParties.map((p, i) => (
                 <option key={i} value={p.businessName || p.name}>
                   {p.businessName ? `${p.businessName} (Contact: ${p.name})` : p.name}
                 </option>

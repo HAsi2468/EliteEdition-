@@ -53,7 +53,43 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
           api.getProductsCatalog().catch(() => []),
           api.getInventory().catch(() => []),
         ]);
-        setVendorsList(vData || []);
+
+        // Load managed custom brands from localStorage
+        let managedBrands = [];
+        try {
+          const saved = localStorage.getItem('elite_managed_brands');
+          if (saved) {
+            managedBrands = JSON.parse(saved);
+          }
+        } catch (e) {
+          console.warn('Failed to parse managed brands', e);
+        }
+
+        // Merge vendor businessNames/names with managed brands
+        const mergedVendors = [...(vData || [])];
+        const existingNames = new Set(mergedVendors.map(v => (v.businessName || v.name || '').trim().toLowerCase()));
+
+        (managedBrands || []).forEach(b => {
+          const name = typeof b === 'string' ? b : (b?.name || '');
+          if (name && !existingNames.has(name.trim().toLowerCase())) {
+            existingNames.add(name.trim().toLowerCase());
+            mergedVendors.push({ businessName: name, name: name });
+          }
+        });
+
+        // Also add unique brand/party from catalog & inventory items
+        (cData || []).concat(invData || []).forEach(item => {
+          if (item.brand && !existingNames.has(item.brand.trim().toLowerCase())) {
+            existingNames.add(item.brand.trim().toLowerCase());
+            mergedVendors.push({ businessName: item.brand, name: item.brand });
+          }
+          if (item.party && !existingNames.has(item.party.trim().toLowerCase())) {
+            existingNames.add(item.party.trim().toLowerCase());
+            mergedVendors.push({ businessName: item.party, name: item.party });
+          }
+        });
+
+        setVendorsList(mergedVendors);
         setCatalogItems(cData || []);
         setStoreInventory(invData || []);
       } catch (err) {
