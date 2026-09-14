@@ -211,10 +211,6 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
       setError('Product Name / Description is required.');
       return;
     }
-    if (!formData.party.trim()) {
-      setError('Brand / Vendor is required.');
-      return;
-    }
     if (!formData.size.trim()) {
       setError('Product Size is required.');
       return;
@@ -223,11 +219,20 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
     // Filter valid brand codes
     const validBrandCodes = brandCodes.filter(bc => bc.code && bc.code.trim());
 
+    let primaryBrand = formData.party ? formData.party.trim() : '';
+    if (!primaryBrand && validBrandCodes.length > 0) {
+      primaryBrand = validBrandCodes[0].brand || 'ELITE EDITION';
+    }
+    if (!primaryBrand) {
+      primaryBrand = 'ELITE EDITION';
+    }
+
     const payload = {
       ...formData,
+      party: primaryBrand,
+      brand: primaryBrand,
       brandCodes: validBrandCodes,
       description: formData.itemName,
-      brand: formData.party,
       basePrice: Number(formData.purchasePrice) || 0.0,
       price: Number(formData.salePrice) || 0.0,
       currentlyAvailableStock: Number(formData.currentlyAvailableStock) || 0,
@@ -367,30 +372,8 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                 </div>
               </div>
 
-              {/* Row 2: Brand & Category */}
+              {/* Row 2: Category & HSN Code */}
               <div className="inventory-form-row-2col" style={styles.formRow2Col}>
-                <div style={styles.fieldCol}>
-                  <label style={styles.label}>
-                    <Building2 size={14} color="#059669" />
-                    Brand / Manufacturer *
-                  </label>
-                  <input
-                    type="text"
-                    name="party"
-                    value={formData.party}
-                    onChange={handleChange}
-                    list="form-brand-suggestions"
-                    placeholder="e.g., ANOUK, ELITE EDITION"
-                    style={styles.input}
-                    required
-                  />
-                  <datalist id="form-brand-suggestions">
-                    {managedBrands.map((b, i) => (
-                      <option key={i} value={b} />
-                    ))}
-                  </datalist>
-                </div>
-
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
                     <Layers size={14} color="#059669" />
@@ -415,24 +398,6 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                     <option value="TOP" />
                   </datalist>
                 </div>
-              </div>
-
-              {/* Row 3: Size(s) & HSN Code */}
-              <div className="inventory-form-row-2col" style={styles.formRow2Col}>
-                <div style={styles.fieldCol}>
-                  <label style={styles.label}>
-                    Product Size(s) *
-                  </label>
-                  <input
-                    type="text"
-                    name="size"
-                    value={formData.size}
-                    onChange={handleChange}
-                    placeholder="e.g., L or S, M, L, XL, 2XL"
-                    style={styles.input}
-                    required
-                  />
-                </div>
 
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
@@ -448,6 +413,22 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                     style={styles.input}
                   />
                 </div>
+              </div>
+
+              {/* Row 3: Size(s) */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Product Size(s) *
+                </label>
+                <input
+                  type="text"
+                  name="size"
+                  value={formData.size}
+                  onChange={handleChange}
+                  placeholder="e.g., L or S, M, L, XL, 2XL"
+                  style={styles.input}
+                  required
+                />
               </div>
 
               {/* Row 4: Base Price & Sale Price */}
