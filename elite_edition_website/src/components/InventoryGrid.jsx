@@ -3,7 +3,7 @@ import {
   Edit2, Trash2, Printer, Search, Plus, Minus, SlidersHorizontal, 
   TrendingDown, MoreVertical, Sparkles, Package, AlertTriangle, 
   CheckCircle2, XCircle, DollarSign, Download, Filter, Calendar,
-  RefreshCw, FileText, TrendingUp, Layers3, IndianRupee, ArrowDownRight, ArrowUpRight, Building2, BookOpen
+  RefreshCw, FileText, TrendingUp, Layers3, IndianRupee, ArrowDownRight, ArrowUpRight, Building2, BookOpen, Eye, X
 } from 'lucide-react';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
@@ -33,6 +33,7 @@ export default function InventoryGrid({
   // Modals for Vendor & Party Managers
   const [showVendorManager, setShowVendorManager] = useState(false);
   const [showPartyManager, setShowPartyManager] = useState(false);
+  const [viewingItem, setViewingItem] = useState(null);
 
   // --- Sub-Screen 1: Stock Overview State ---
   const [searchTerm, setSearchTerm] = useState('');
@@ -1185,49 +1186,78 @@ export default function InventoryGrid({
                             ₹ {totalPurchase.toFixed(2)}
                           </td>
                           <td style={{ padding: '0.85rem 1rem' }}>
-                            <div style={styles.actionsCell}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'center' }}>
+                              {/* Display / View Item Button */}
                               <button
-                                onClick={() => onStockOut(item)}
-                                style={styles.tblActionBtn('#b91c1c', '#fee2e2', '#fca5a5')}
-                                title="Outward Dispatch Item"
+                                type="button"
+                                onClick={() => setViewingItem(item)}
+                                style={{
+                                  padding: '0.4rem 0.65rem',
+                                  background: '#eff6ff',
+                                  border: '1px solid #bfdbfe',
+                                  color: '#2563eb',
+                                  borderRadius: '8px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                                }}
+                                title="Display Item Details"
                               >
-                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
-                                  <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
-                                  <polyline points="17 18 23 18 23 12"/>
-                                </svg>
+                                <Eye size={14} />
+                                <span>Display</span>
                               </button>
+
+                              {/* Edit Button */}
                               <button
-                                onClick={() => printBarcode(item)}
-                                style={styles.tblActionBtn('#0f172a', '#f1f5f9', '#cbd5e1')}
-                                title="Print Barcode Sticker"
-                              >
-                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
-                                  <polyline points="6 9 6 2 18 2 18 9"/>
-                                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-                                  <rect x="6" y="14" width="12" height="8"/>
-                                </svg>
-                              </button>
-                              <button
+                                type="button"
                                 onClick={() => onEdit(item)}
-                                style={styles.tblActionBtn('#0284c7', '#e0f2fe', '#38bdf8')}
+                                style={{
+                                  padding: '0.4rem 0.65rem',
+                                  background: '#f0fdf4',
+                                  border: '1px solid #bbf7d0',
+                                  color: '#16a34a',
+                                  borderRadius: '8px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                                }}
                                 title="Edit Item Details"
                               >
-                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
-                                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
-                                </svg>
+                                <Edit2 size={14} />
+                                <span>Edit</span>
                               </button>
+
+                              {/* Delete Button */}
                               {onDelete && (
                                 <button
+                                  type="button"
                                   onClick={() => onDelete(item._id || item.id)}
-                                  style={styles.tblActionBtn('#e11d48', '#ffe4e6', '#fb7185')}
+                                  style={{
+                                    padding: '0.4rem 0.65rem',
+                                    background: '#fef2f2',
+                                    border: '1px solid #fecaca',
+                                    color: '#dc2626',
+                                    borderRadius: '8px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.35rem',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                                  }}
                                   title="Delete Item"
                                 >
-                                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e11d48" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
-                                    <polyline points="3 6 5 6 21 6"/>
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                    <line x1="10" y1="11" x2="10" y2="17"/>
-                                    <line x1="14" y1="11" x2="14" y2="17"/>
-                                  </svg>
+                                  <Trash2 size={14} />
+                                  <span>Delete</span>
                                 </button>
                               )}
                             </div>
@@ -1591,6 +1621,110 @@ export default function InventoryGrid({
         />
       )}
 
+      {/* Display Item Modal */}
+      {viewingItem && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+            boxSizing: 'border-box'
+          }}
+          onClick={() => setViewingItem(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              maxWidth: '520px',
+              width: '100%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1px solid #e2e8f0',
+              overflow: 'hidden'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.25rem', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <Package size={20} color="#2563eb" />
+                <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Item Details Display</h4>
+              </div>
+              <button onClick={() => setViewingItem(null)} style={{ background: '#f1f5f9', border: 'none', color: '#64748b', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                {viewingItem.imageUrl ? (
+                  <img src={viewingItem.imageUrl} alt={viewingItem.itemName} style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover', border: '1px solid #cbd5e1' }} />
+                ) : (
+                  <div style={{ width: '80px', height: '80px', borderRadius: '12px', background: '#f1f5f9', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', fontWeight: 800, color: '#94a3b8' }}>
+                    {viewingItem.itemName ? viewingItem.itemName[0].toUpperCase() : 'E'}
+                  </div>
+                )}
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>{viewingItem.itemName || 'Unnamed Item'}</h3>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2563eb', background: '#eff6ff', padding: '0.2rem 0.6rem', borderRadius: '6px', display: 'inline-block', marginTop: '0.35rem' }}>
+                    SKU: {viewingItem.skuCode || viewingItem.sku || 'N/A'}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ gridTemplateColumns: '1fr 1fr', display: 'grid', gap: '0.85rem', background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700, display: 'block' }}>VENDOR / SUPPLIER</span>
+                  <strong style={{ color: '#0f172a' }}>{viewingItem.party || 'N/A'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700, display: 'block' }}>UNIT BUY PRICE</span>
+                  <strong style={{ color: '#059669' }}>₹ {Number(viewingItem.purchasePrice || 0).toFixed(2)}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700, display: 'block' }}>TOTAL QUANTITY</span>
+                  <strong style={{ color: '#2563eb' }}>{viewingItem.qty || viewingItem.total || viewingItem.currentlyAvailableStock || 0} Units</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700, display: 'block' }}>RECORDED DATE</span>
+                  <strong style={{ color: '#475569' }}>
+                    {(viewingItem.created_date_time || viewingItem.date) 
+                      ? formatDateDDMMYYYY(viewingItem.created_date_time || viewingItem.date) 
+                      : 'N/A'}
+                  </strong>
+                </div>
+              </div>
+
+              {Array.isArray(viewingItem.sizes) && viewingItem.sizes.length > 0 && (
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700, display: 'block', marginBottom: '0.35rem' }}>SIZE BREAKDOWN</span>
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    {viewingItem.sizes.map((s, sIdx) => (
+                      <span key={sIdx} style={{ background: '#e2e8f0', color: '#1e293b', padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 700 }}>
+                        {s.size}: {s.qty}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '0.85rem 1.25rem', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setViewingItem(null)} style={{ padding: '0.5rem 1.2rem', background: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
