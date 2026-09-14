@@ -51,6 +51,8 @@ export default function BrandManagerModal({
     }
   };
 
+  const [activeTab, setActiveTab] = useState('brands'); // 'brands' | 'categories'
+
   // Internal custom brands state synced with localStorage
   const [customBrands, setCustomBrands] = useState(() => {
     if (Array.isArray(propCustomBrands) && propCustomBrands.length > 0) {
@@ -63,6 +65,75 @@ export default function BrandManagerModal({
       return ['ANOUK', 'ELITE EDITION', 'HERA', 'MYNTRA'];
     }
   });
+
+  // Internal custom categories state synced with localStorage
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [editCategoryInputValue, setEditCategoryInputValue] = useState('');
+  const [customCategories, setCustomCategories] = useState(() => {
+    try {
+      const saved = localStorage.getItem('elite_managed_categories');
+      return saved ? JSON.parse(saved) : ['KURTA SET', 'CO-ORD SET', 'DRESS', 'SUIT', 'SAREE', 'LEHENGA', 'TOP', 'BOTTOM', 'ETHNIC', 'STITCHING SET'];
+    } catch (e) {
+      return ['KURTA SET', 'CO-ORD SET', 'DRESS', 'SUIT', 'SAREE', 'LEHENGA', 'TOP', 'BOTTOM'];
+    }
+  });
+
+  const persistCategories = (newList) => {
+    setCustomCategories(newList);
+    try {
+      localStorage.setItem('elite_managed_categories', JSON.stringify(newList));
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('elite_categories_updated', { detail: newList }));
+    } catch (e) {}
+  };
+
+  const handleAddCategory = (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    const trimmed = newCategoryName.trim().toUpperCase();
+    if (!trimmed) {
+      setError('Category name cannot be empty.');
+      return;
+    }
+    if (customCategories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      setError(`Category "${trimmed}" already exists.`);
+      return;
+    }
+    const updated = [...customCategories, trimmed];
+    persistCategories(updated);
+    setNewCategoryName('');
+    setSuccess(`Category "${trimmed}" added successfully.`);
+    setTimeout(() => setSuccess(''), 3000);
+  };
+
+  const handleDeleteCategory = (catToDelete) => {
+    if (!window.confirm(`Delete custom category "${catToDelete}"?`)) return;
+    setError('');
+    setSuccess('');
+    const updated = customCategories.filter(c => c.toLowerCase() !== catToDelete.toLowerCase());
+    persistCategories(updated);
+    setSuccess(`Category "${catToDelete}" removed.`);
+    setTimeout(() => setSuccess(''), 3000);
+  };
+
+  const saveEditCategory = (oldCat) => {
+    const trimmed = editCategoryInputValue.trim().toUpperCase();
+    if (!trimmed) {
+      setError('Category name cannot be empty.');
+      return;
+    }
+    if (trimmed !== oldCat.toUpperCase() && customCategories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      setError(`Category "${trimmed}" already exists.`);
+      return;
+    }
+    const updated = customCategories.map(c => (c.toLowerCase() === oldCat.toLowerCase() ? trimmed : c));
+    persistCategories(updated);
+    setEditingCategory(null);
+    setSuccess(`Updated category to "${trimmed}".`);
+    setTimeout(() => setSuccess(''), 3000);
+  };
 
   // Keep state updated if prop changes
   useEffect(() => {
@@ -100,6 +171,12 @@ export default function BrandManagerModal({
     if (!searchTerm.trim()) return allCurrentBrands;
     return allCurrentBrands.filter(b => b.toLowerCase().includes(searchTerm.trim().toLowerCase()));
   }, [allCurrentBrands, searchTerm]);
+
+  // Filtered categories matching search query
+  const filteredCategories = useMemo(() => {
+    if (!searchTerm.trim()) return customCategories;
+    return customCategories.filter(c => c.toLowerCase().includes(searchTerm.trim().toLowerCase()));
+  }, [customCategories, searchTerm]);
 
   // Helper to persist custom brands
   const persistBrands = (newBrandsList) => {
@@ -202,31 +279,92 @@ export default function BrandManagerModal({
           <div style={styles.headerTitleGroup}>
             <div style={styles.badge}>
               <Sparkles size={13} style={{ marginRight: '4px' }} />
-              DYNAMIC BRAND MANAGER
+              DYNAMIC CATALOG SETTINGS
             </div>
-            <h2 style={styles.title}>Manage Catalog Brands</h2>
+            <h2 style={styles.title}>Manage Catalog Brands & Categories</h2>
           </div>
           <button type="button" onClick={handleModalClose} style={styles.closeBtn} title="Close Modal (Esc)">
             <X size={18} />
           </button>
         </div>
 
+        {/* Tab Selection Bar */}
+        <div style={{ display: 'flex', gap: '0.5rem', padding: '0.6rem 1.5rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => { setActiveTab('brands'); setError(''); setSuccess(''); setSearchTerm(''); }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.45rem 1rem',
+              borderRadius: '8px',
+              border: activeTab === 'brands' ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+              background: activeTab === 'brands' ? '#eff6ff' : '#ffffff',
+              color: activeTab === 'brands' ? '#1d4ed8' : '#64748b',
+              fontWeight: 700,
+              fontSize: '0.82rem',
+              cursor: 'pointer'
+            }}
+          >
+            <Building2 size={14} color={activeTab === 'brands' ? '#2563eb' : '#64748b'} />
+            <span>Manage Brands ({allCurrentBrands.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setActiveTab('categories'); setError(''); setSuccess(''); setSearchTerm(''); }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.45rem 1rem',
+              borderRadius: '8px',
+              border: activeTab === 'categories' ? '1.5px solid #059669' : '1px solid #cbd5e1',
+              background: activeTab === 'categories' ? '#ecfdf5' : '#ffffff',
+              color: activeTab === 'categories' ? '#047857' : '#64748b',
+              fontWeight: 700,
+              fontSize: '0.82rem',
+              cursor: 'pointer'
+            }}
+          >
+            <Tag size={14} color={activeTab === 'categories' ? '#059669' : '#64748b'} />
+            <span>Manage Categories ({customCategories.length})</span>
+          </button>
+        </div>
+
         {/* Stats Strip */}
         <div style={styles.statsStrip}>
-          <div style={styles.statBox}>
-            <span style={styles.statLabel}>TOTAL BRANDS</span>
-            <span style={styles.statValue}>{allCurrentBrands.length}</span>
-          </div>
-          <div style={styles.statDivider} />
-          <div style={styles.statBox}>
-            <span style={styles.statLabel}>CUSTOM BRANDS</span>
-            <span style={styles.statValueCustom}>{customBrands.length}</span>
-          </div>
-          <div style={styles.statDivider} />
-          <div style={styles.statBox}>
-            <span style={styles.statLabel}>CATALOG BRANDS</span>
-            <span style={styles.statValueCat}>{safeExisting.length}</span>
-          </div>
+          {activeTab === 'brands' ? (
+            <>
+              <div style={styles.statBox}>
+                <span style={styles.statLabel}>TOTAL BRANDS</span>
+                <span style={styles.statValue}>{allCurrentBrands.length}</span>
+              </div>
+              <div style={styles.statDivider} />
+              <div style={styles.statBox}>
+                <span style={styles.statLabel}>CUSTOM BRANDS</span>
+                <span style={styles.statValueCustom}>{customBrands.length}</span>
+              </div>
+              <div style={styles.statDivider} />
+              <div style={styles.statBox}>
+                <span style={styles.statLabel}>CATALOG BRANDS</span>
+                <span style={styles.statValueCat}>{safeExisting.length}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={styles.statBox}>
+                <span style={styles.statLabel}>TOTAL CATEGORIES</span>
+                <span style={{ ...styles.statValue, color: '#059669' }}>{customCategories.length}</span>
+              </div>
+              <div style={styles.statDivider} />
+              <div style={styles.statBox}>
+                <span style={styles.statLabel}>ACTIVE GARMENT TYPES</span>
+                <span style={styles.statValueCustom}>All Dynamic</span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Modal Body */}
@@ -245,132 +383,260 @@ export default function BrandManagerModal({
             </div>
           )}
 
-          {/* Quick Add Brand Input Strip */}
-          <form onSubmit={handleAdd} style={styles.addForm}>
-            <div style={styles.inputGroup}>
-              <Building2 size={18} color="#2563eb" style={{ marginLeft: '10px', flexShrink: 0 }} />
-              <input
-                type="text"
-                value={newBrandName}
-                onChange={(e) => setNewBrandName(e.target.value)}
-                placeholder="Type new brand name (e.g. ZARA, HERA, MYNTRA)..."
-                style={styles.input}
-                autoFocus
-              />
-              <button type="submit" style={styles.addBtn}>
-                <Plus size={15} />
-                <span>Add Brand</span>
-              </button>
-            </div>
-          </form>
+          {/* BRANDS TAB CONTENT */}
+          {activeTab === 'brands' && (
+            <>
+              {/* Quick Add Brand Input Strip */}
+              <form onSubmit={handleAdd} style={styles.addForm}>
+                <div style={styles.inputGroup}>
+                  <Building2 size={18} color="#2563eb" style={{ marginLeft: '10px', flexShrink: 0 }} />
+                  <input
+                    type="text"
+                    value={newBrandName}
+                    onChange={(e) => setNewBrandName(e.target.value)}
+                    placeholder="Type new brand name (e.g. ZARA, HERA, MYNTRA)..."
+                    style={styles.input}
+                    autoFocus
+                  />
+                  <button type="submit" style={styles.addBtn}>
+                    <Plus size={15} />
+                    <span>Add Brand</span>
+                  </button>
+                </div>
+              </form>
 
-          {/* Search Filter Bar */}
-          <div style={styles.searchWrap}>
-            <Search size={15} color="#64748b" style={{ marginLeft: '10px', flexShrink: 0 }} />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search brand list..."
-              style={styles.searchInput}
-            />
-            {searchTerm && (
-              <button onClick={() => setSearchTerm('')} style={styles.clearSearchBtn} title="Clear Search">
-                <X size={13} />
-              </button>
-            )}
-          </div>
-
-          {/* Brands Directory Grid */}
-          <div style={styles.sectionHeader}>
-            <span>ACTIVE BRANDS DIRECTORY ({filteredBrands.length})</span>
-          </div>
-
-          <div style={styles.brandsGrid}>
-            {filteredBrands.length === 0 ? (
-              <div style={styles.emptyState}>
-                <Tag size={24} color="#94a3b8" />
-                <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                  {searchTerm ? `No brands matching "${searchTerm}"` : 'No active brands available.'}
-                </p>
+              {/* Search Filter Bar */}
+              <div style={styles.searchWrap}>
+                <Search size={15} color="#64748b" style={{ marginLeft: '10px', flexShrink: 0 }} />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search brand list..."
+                  style={styles.searchInput}
+                />
+                {searchTerm && (
+                  <button onClick={() => setSearchTerm('')} style={styles.clearSearchBtn} title="Clear Search">
+                    <X size={13} />
+                  </button>
+                )}
               </div>
-            ) : (
-              filteredBrands.map((brand, idx) => {
-                const isCustom = customBrands.some(cb => cb.toLowerCase() === brand.toLowerCase());
-                const isEditing = editingBrand === brand;
 
-                if (isEditing) {
-                  return (
-                    <div key={`edit-${idx}`} style={styles.brandChipEditing}>
-                      <input
-                        type="text"
-                        value={editInputValue}
-                        onChange={(e) => setEditInputValue(e.target.value)}
-                        style={styles.editInput}
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') saveEdit(brand);
-                          if (e.key === 'Escape') setEditingBrand(null);
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => saveEdit(brand)}
-                        style={styles.saveBtn}
-                        title="Save Brand Name"
-                      >
-                        <Check size={13} color="#ffffff" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingBrand(null)}
-                        style={styles.cancelBtn}
-                        title="Cancel Editing"
-                      >
-                        <X size={13} color="#64748b" />
-                      </button>
-                    </div>
-                  );
-                }
+              {/* Brands Directory Grid */}
+              <div style={styles.sectionHeader}>
+                <span>ACTIVE BRANDS DIRECTORY ({filteredBrands.length})</span>
+              </div>
 
-                return (
-                  <div key={`brand-${idx}`} style={isCustom ? styles.brandChipCustom : styles.brandChip}>
-                    <div style={styles.brandChipLeft}>
-                      <Tag size={13} color={isCustom ? '#2563eb' : '#64748b'} />
-                      <span style={isCustom ? styles.brandNameCustom : styles.brandName}>{brand}</span>
-                    </div>
+              <div style={styles.brandsGrid}>
+                {filteredBrands.length === 0 ? (
+                  <div style={styles.emptyState}>
+                    <Tag size={24} color="#94a3b8" />
+                    <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                      {searchTerm ? `No brands matching "${searchTerm}"` : 'No active brands available.'}
+                    </p>
+                  </div>
+                ) : (
+                  filteredBrands.map((brand, idx) => {
+                    const isCustom = customBrands.some(cb => cb.toLowerCase() === brand.toLowerCase());
+                    const isEditing = editingBrand === brand;
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <span style={isCustom ? styles.customBadge : styles.catBadge}>
-                        {isCustom ? 'Custom' : 'Catalog'}
-                      </span>
-
-                      {isCustom && (
-                        <>
+                    if (isEditing) {
+                      return (
+                        <div key={`edit-${idx}`} style={styles.brandChipEditing}>
+                          <input
+                            type="text"
+                            value={editInputValue}
+                            onChange={(e) => setEditInputValue(e.target.value)}
+                            style={styles.editInput}
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveEdit(brand);
+                              if (e.key === 'Escape') setEditingBrand(null);
+                            }}
+                          />
                           <button
                             type="button"
-                            onClick={() => startEdit(brand)}
-                            style={styles.actionIconBtn}
-                            title={`Rename ${brand}`}
+                            onClick={() => saveEdit(brand)}
+                            style={styles.saveBtn}
+                            title="Save Brand Name"
                           >
-                            <Edit2 size={13} color="#2563eb" />
+                            <Check size={13} color="#ffffff" />
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDelete(brand)}
+                            onClick={() => setEditingBrand(null)}
+                            style={styles.cancelBtn}
+                            title="Cancel Editing"
+                          >
+                            <X size={13} color="#64748b" />
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={`brand-${idx}`} style={isCustom ? styles.brandChipCustom : styles.brandChip}>
+                        <div style={styles.brandChipLeft}>
+                          <Tag size={13} color={isCustom ? '#2563eb' : '#64748b'} />
+                          <span style={isCustom ? styles.brandNameCustom : styles.brandName}>{brand}</span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <span style={isCustom ? styles.customBadge : styles.catBadge}>
+                            {isCustom ? 'Custom' : 'Catalog'}
+                          </span>
+
+                          {isCustom && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => startEdit(brand)}
+                                style={styles.actionIconBtn}
+                                title={`Rename ${brand}`}
+                              >
+                                <Edit2 size={13} color="#2563eb" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(brand)}
+                                style={styles.actionIconBtn}
+                                title={`Delete ${brand}`}
+                              >
+                                <Trash2 size={13} color="#ef4444" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
+
+          {/* CATEGORIES TAB CONTENT */}
+          {activeTab === 'categories' && (
+            <>
+              {/* Quick Add Category Input Strip */}
+              <form onSubmit={handleAddCategory} style={styles.addForm}>
+                <div style={styles.inputGroup}>
+                  <Tag size={18} color="#059669" style={{ marginLeft: '10px', flexShrink: 0 }} />
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="Type new category name (e.g. DRESS, LEHENGA, SAREE)..."
+                    style={styles.input}
+                    autoFocus
+                  />
+                  <button type="submit" style={{ ...styles.addBtn, background: '#059669' }}>
+                    <Plus size={15} />
+                    <span>Add Category</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* Search Category Bar */}
+              <div style={styles.searchWrap}>
+                <Search size={15} color="#64748b" style={{ marginLeft: '10px', flexShrink: 0 }} />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search category list..."
+                  style={styles.searchInput}
+                />
+                {searchTerm && (
+                  <button onClick={() => setSearchTerm('')} style={styles.clearSearchBtn} title="Clear Search">
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {/* Categories Directory Grid */}
+              <div style={styles.sectionHeader}>
+                <span>ACTIVE CATEGORIES DIRECTORY ({filteredCategories.length})</span>
+              </div>
+
+              <div style={styles.brandsGrid}>
+                {filteredCategories.length === 0 ? (
+                  <div style={styles.emptyState}>
+                    <Tag size={24} color="#94a3b8" />
+                    <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                      {searchTerm ? `No categories matching "${searchTerm}"` : 'No categories available.'}
+                    </p>
+                  </div>
+                ) : (
+                  filteredCategories.map((cat, idx) => {
+                    const isEditing = editingCategory === cat;
+
+                    if (isEditing) {
+                      return (
+                        <div key={`edit-cat-${idx}`} style={{ ...styles.brandChipEditing, borderColor: '#059669' }}>
+                          <input
+                            type="text"
+                            value={editCategoryInputValue}
+                            onChange={(e) => setEditCategoryInputValue(e.target.value)}
+                            style={styles.editInput}
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveEditCategory(cat);
+                              if (e.key === 'Escape') setEditingCategory(null);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => saveEditCategory(cat)}
+                            style={{ ...styles.saveBtn, background: '#059669' }}
+                            title="Save Category Name"
+                          >
+                            <Check size={13} color="#ffffff" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingCategory(null)}
+                            style={styles.cancelBtn}
+                            title="Cancel Editing"
+                          >
+                            <X size={13} color="#64748b" />
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={`cat-${idx}`} style={{ ...styles.brandChipCustom, background: '#ecfdf5', borderColor: '#a7f3d0' }}>
+                        <div style={styles.brandChipLeft}>
+                          <Tag size={13} color="#059669" />
+                          <span style={{ ...styles.brandNameCustom, color: '#047857' }}>{cat}</span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => { setEditingCategory(cat); setEditCategoryInputValue(cat); setError(''); }}
                             style={styles.actionIconBtn}
-                            title={`Delete ${brand}`}
+                            title={`Rename ${cat}`}
+                          >
+                            <Edit2 size={13} color="#059669" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCategory(cat)}
+                            style={styles.actionIconBtn}
+                            title={`Delete ${cat}`}
                           >
                             <Trash2 size={13} color="#ef4444" />
                           </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Footer */}

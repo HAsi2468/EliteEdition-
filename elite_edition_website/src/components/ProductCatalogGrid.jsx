@@ -480,10 +480,10 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
             onClick={handleOpenBrandManager}
             className="btn-secondary" 
             style={{ ...styles.addBtn, background: '#e0e7ff', color: '#4338ca', borderColor: '#c7d2fe', fontWeight: 700 }}
-            title="Manage Brands & Dynamic Dropdown Values"
+            title="Manage Brands, Categories & Dynamic Catalog Values"
           >
             <Building2 size={16} />
-            <span>Manage Brands</span>
+            <span>Manage Brands & Categories</span>
           </button>
 
           <button 
