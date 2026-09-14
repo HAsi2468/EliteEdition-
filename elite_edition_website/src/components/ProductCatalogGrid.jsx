@@ -469,13 +469,13 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
       </div>
 
       {/* Table Container */}
-      <div className="table-container data-table-container" style={styles.tableWrap}>
+      <div className="table-container data-table-container" style={{ ...styles.tableWrap, overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
         {filteredItems.length === 0 ? (
           <div style={styles.emptyTable}>
             No products match your filters.
           </div>
         ) : (
-          <table className="data-table" style={styles.table}>
+          <table className="data-table" style={{ ...styles.table, minWidth: '820px', width: '100%' }}>
             <thead>
               <tr>
                 <th onClick={() => handleSort('description')} style={{ cursor: 'pointer' }}>
@@ -863,3 +863,45 @@ const styles = {
     borderColor: 'rgba(239, 68, 68, 0.1)',
   },
 };
+
+if (typeof document !== 'undefined') {
+  const styleElId = 'catalog-grid-responsive-style';
+  if (!document.getElementById(styleElId)) {
+    const styleEl = document.createElement('style');
+    styleEl.id = styleElId;
+    styleEl.innerHTML = `
+      @media (max-width: 768px) {
+        .catalog-control-header {
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 0.65rem !important;
+          padding: 0.85rem !important;
+        }
+        .catalog-left-controls {
+          flex-direction: column !important;
+          width: 100% !important;
+          gap: 0.5rem !important;
+        }
+        .catalog-search-box {
+          width: 100% !important;
+        }
+        .catalog-filter-box {
+          width: 100% !important;
+        }
+        .catalog-action-group {
+          display: grid !important;
+          grid-template-columns: repeat(2, 1fr) !important;
+          width: 100% !important;
+          gap: 0.5rem !important;
+        }
+        .catalog-action-group button {
+          width: 100% !important;
+          justify-content: center !important;
+          box-sizing: border-box !important;
+        }
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
+}
+

@@ -425,7 +425,7 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
             <ArrowDownRight size={17} />
             <span>Inward Stock</span>
             <span style={styles.tabBadge(activeSubTab === 'inward', '#10b981')}>
-              Inward
+              {inwardData.items?.length || 0}
             </span>
           </button>
 
@@ -437,7 +437,7 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
             <ArrowUpRight size={17} />
             <span>Outward Stock</span>
             <span style={styles.tabBadge(activeSubTab === 'outward', '#f59e0b')}>
-              Outward
+              {outwardData.items?.length || 0}
             </span>
           </button>
         </div>
@@ -592,7 +592,7 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
                   <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try adjusting your search query or filters.</p>
                 </div>
               ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', background: '#ffffff' }}>
+                <table style={{ width: '100%', minWidth: '820px', borderCollapse: 'collapse', background: '#ffffff' }}>
                   <thead>
                     <tr style={styles.tableHeaderRow}>
                       <th onClick={() => handleSort('itemName')} style={styles.thSort}>
@@ -834,7 +834,7 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
             </div>
 
             <div style={styles.rowTwo}>
-              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+              <div className="inv-row-two-actions" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button onClick={() => fetchInwardData()} style={styles.refreshBtn} title="Refresh Inward Log">
                   <RefreshCw size={15} className={inwardLoading ? 'spin' : ''} />
                   <span>Refresh</span>
@@ -885,7 +885,7 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', background: '#ffffff' }}>
+                <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse', background: '#ffffff' }}>
                   <thead>
                     <tr style={{ background: '#065f46', color: '#ffffff' }}>
                       <th style={styles.thStatic}>DATE & TIME</th>
@@ -1064,7 +1064,7 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
             </div>
 
             <div style={styles.rowTwo}>
-              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+              <div className="inv-row-two-actions" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button onClick={() => fetchOutwardData()} style={styles.refreshBtn} title="Refresh Outward Log">
                   <RefreshCw size={15} className={outwardLoading ? 'spin' : ''} />
                   <span>Refresh</span>
@@ -1111,7 +1111,7 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', background: '#ffffff' }}>
+                <table style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', background: '#ffffff' }}>
                   <thead>
                     <tr style={{ background: '#7c2d12', color: '#ffffff' }}>
                       <th style={styles.thStatic}>DATE & TIME</th>
@@ -1819,21 +1819,46 @@ if (typeof document !== 'undefined') {
     styleEl.innerHTML = `
       @media (max-width: 768px) {
         .inv-sub-tab-bar-container {
-          overflow-x: auto !important;
-          -webkit-overflow-scrolling: touch !important;
-          padding-bottom: 4px !important;
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 0 !important;
           width: 100% !important;
+          overflow: visible !important;
         }
         .inv-sub-tab-bar {
-          display: flex !important;
-          width: max-content !important;
-          min-width: 100% !important;
-          gap: 0.35rem !important;
+          display: grid !important;
+          grid-template-columns: repeat(3, 1fr) !important;
+          width: 100% !important;
+          gap: 4px !important;
+          padding: 4px !important;
+          box-sizing: border-box !important;
+          border-radius: 12px !important;
+          background: #f1f5f9 !important;
+          border: 1px solid #cbd5e1 !important;
         }
         .inv-sub-tab-bar button {
-          padding: 0.55rem 0.75rem !important;
+          width: 100% !important;
+          justify-content: center !important;
+          text-align: center !important;
+          padding: 0.55rem 0.2rem !important;
+          font-size: 0.72rem !important;
+          gap: 0.25rem !important;
+          flex-direction: column !important;
+          box-sizing: border-box !important;
+        }
+        .inv-row-two-actions {
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          width: 100% !important;
+          gap: 0.5rem !important;
+        }
+        .inv-row-two-actions button {
+          width: 100% !important;
+          justify-content: center !important;
+          padding: 0.6rem 0.4rem !important;
           font-size: 0.78rem !important;
-          white-space: nowrap !important;
+          box-sizing: border-box !important;
         }
         .inv-stats-grid {
           grid-template-columns: repeat(2, 1fr) !important;
