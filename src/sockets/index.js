@@ -67,8 +67,8 @@ const setupSockets = (io) => {
           attachment: attachment || undefined,
           mentions: mentions,
           recordMentions: recordMentions,
-          readBy: [senderId]
-        });
+        // Update room updatedAt timestamp
+        await ChatRoom.findByIdAndUpdate(roomId, { updatedAt: new Date() });
 
         const populatedMessage = await ChatMessage.findById(newMessage._id)
           .populate('senderId', 'name username email')

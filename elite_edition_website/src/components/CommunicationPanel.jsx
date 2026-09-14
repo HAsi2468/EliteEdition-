@@ -280,6 +280,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
 
     setCreatingGroup(true);
     try {
+      const myId = currentUser?.id || currentUser?._id;
       const res = await api.createCommunicationGroup({
         name: newGroupName.trim(),
         description: newGroupDesc.trim(),
@@ -287,7 +288,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
         companyEntity: newGroupCompany,
         permissionScope: newGroupScope,
         subscribedModules: selectedModules,
-        subscribedActions: selectedActions
+        subscribedActions: selectedActions,
+        userId: myId
       });
 
       if (res.success && res.data) {

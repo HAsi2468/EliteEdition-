@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { ChatRoom, ChatMessage, user: User } = require('../db/models');
 const { syncCommunicationGroups } = require('../utils/syncCommunicationGroups');
 const { publishActivity } = require('../utils/activityEvent');
@@ -14,22 +15,41 @@ const getGroups = async (req, res) => {
       currentUser = await User.findById(userId);
     }
 
+    const currentUserId = currentUser ? currentUser._id : (userId ? new mongoose.Types.ObjectId(userId) : null);
+
     let query = { isArchived: { $ne: true } };
 
-    if (currentUser && currentUser.role !== 'admin') {
-      // User can view groups where they are explicit members OR matches their permissions
-      query = {
-        isArchived: { $ne: true },
-        $or: [
-          { members: currentUser._id },
-          { isSystemGroup: true, permissionScope: { $in: currentUser.permissions || [] } },
-          { isSystemGroup: { $ne: true } }
-        ]
-      };
+    if (currentUserId) {
+      if (currentUser && currentUser.role === 'admin') {
+        // Admin can see all group channels, but for direct 1-on-1 DMs, only see DMs they belong to
+        query = {
+          isArchived: { $ne: true },
+          $or: [
+            { type: 'group' },
+            { type: 'direct', members: currentUserId }
+          ]
+        };
+      } else {
+        // Non-admin users see direct DMs where they are a member, and groups matching membership or permissions
+        query = {
+          isArchived: { $ne: true },
+          $or: [
+            { type: 'direct', members: currentUserId },
+            { 
+              type: 'group',
+              $or: [
+                { members: currentUserId },
+                { isSystemGroup: true, permissionScope: { $in: currentUser?.permissions || [] } },
+                { isSystemGroup: { $ne: true } }
+              ]
+            }
+          ]
+        };
+      }
     }
 
     let rooms = await ChatRoom.find(query)
-      .populate('members', 'name email role permissions')
+      .populate('members', 'name email role permissions department')
       .sort({ updatedAt: -1 });
 
     if (rooms.length === 0) {
@@ -249,7 +269,7 @@ const acknowledgeMessage = async (req, res) => {
 const getUsersForDM = async (req, res) => {
   try {
     const currentUserId = req.user ? req.user._id : req.query.userId;
-    const query = currentUserId ? { _id: { $ne: currentUserId } } : {};
+    const query = currentUserId ? { _id: { $ne: new mongoose.Types.ObjectId(currentUserId) } } : {};
     const users = await User.find(query).select('name username email role department').sort({ name: 1 });
     res.json({ success: true, data: users });
   } catch (error) {
@@ -263,22 +283,25 @@ const getUsersForDM = async (req, res) => {
  */
 const createOrGetDirectRoom = async (req, res) => {
   try {
-    const currentUserId = (req.user && req.user._id) ? req.user._id : (req.body.userId || req.query.userId);
+    const rawCurrentUserId = (req.user && req.user._id) ? req.user._id : (req.body.userId || req.query.userId);
     const { targetUserId } = req.body;
 
-    if (!currentUserId || !targetUserId) {
+    if (!rawCurrentUserId || !targetUserId) {
       return res.status(400).json({ success: false, message: 'Current user ID and Target user ID are required' });
     }
+
+    const currentUserId = new mongoose.Types.ObjectId(rawCurrentUserId);
+    const targetObjId = new mongoose.Types.ObjectId(targetUserId);
 
     // Check if direct room already exists between these 2 users
     let room = await ChatRoom.findOne({
       type: 'direct',
-      members: { $all: [currentUserId, targetUserId], $size: 2 }
+      members: { $all: [currentUserId, targetObjId], $size: 2 }
     }).populate('members', 'name email role permissions department');
 
     if (!room) {
       const u1 = await User.findById(currentUserId);
-      const u2 = await User.findById(targetUserId);
+      const u2 = await User.findById(targetObjId);
 
       const name1 = u1 ? (u1.name || u1.username) : 'User';
       const name2 = u2 ? (u2.name || u2.username) : 'User';
@@ -286,7 +309,7 @@ const createOrGetDirectRoom = async (req, res) => {
       room = await ChatRoom.create({
         name: `${name1} & ${name2}`,
         type: 'direct',
-        members: [currentUserId, targetUserId],
+        members: [currentUserId, targetObjId],
         department: u2 ? (u2.department || 'General') : 'General',
         permissionScope: 'direct_msg'
       });
@@ -337,7 +360,11 @@ const createGroup = async (req, res) => {
       });
     });
 
-    const memberIds = matchingUsers.map(u => u._id);
+    const creatorId = req.user ? req.user._id : (req.body.userId || req.query.userId);
+    let memberIds = matchingUsers.map(u => String(u._id));
+    if (creatorId && !memberIds.includes(String(creatorId))) {
+      memberIds.push(String(creatorId));
+    }
 
     const room = await ChatRoom.create({
       name: name.trim(),
@@ -346,7 +373,7 @@ const createGroup = async (req, res) => {
       department: department.trim(),
       companyEntity: companyEntity.trim(),
       permissionScope: permissionScope.trim(),
-      isSystemGroup: true,
+      isSystemGroup: false,
       subscribedModules: subscribedModules || [],
       subscribedActions: subscribedActions || [],
       members: memberIds
