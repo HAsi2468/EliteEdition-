@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw, Building2, Tag, Search, Check } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -349,9 +350,13 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
     }
   };
 
-  return (
-    <div className="modal-overlay">
-      <div className="modal-content" style={styles.content}>
+  const handleAddBrand = handleAddBrandTag;
+  const handleSaveRenameBrand = handleSaveEditedBrandTag;
+  const filteredCustomBrands = customBrands.filter(b => b.toLowerCase().includes((brandSearchTerm || '').toLowerCase()));
+
+  const modalMarkup = (
+    <div className="modal-overlay" style={styles.overlay} onClick={handleModalClose}>
+      <div className="modal-content" style={styles.content} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div style={styles.header}>
           <h2 style={styles.title}>Manager Control Panel</h2>
@@ -392,40 +397,40 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
               </button>
             )}
             {context === 'elite_online' && (
-              <>
-                <button
-                  onClick={() => setActiveTab('products')}
-                  style={{ ...styles.tabBtn, ...(activeTab === 'products' ? styles.tabBtnActive : {}) }}
-                >
-                  <ShoppingBag size={16} />
-                  <span>Products Catalog</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('history')}
-                  style={{ ...styles.tabBtn, ...(activeTab === 'history' ? styles.tabBtnActive : {}) }}
-                >
-                  <History size={16} />
-                  <span>Outward Log</span>
-                </button>
-              </>
+              <button
+                onClick={() => setActiveTab('products')}
+                style={{ ...styles.tabBtn, ...(activeTab === 'products' ? styles.tabBtnActive : {}) }}
+              >
+                <ShoppingBag size={16} />
+                <span>Products Catalog</span>
+              </button>
+            )}
+            {context === 'elite_online' && (
+              <button
+                onClick={() => setActiveTab('history')}
+                style={{ ...styles.tabBtn, ...(activeTab === 'history' ? styles.tabBtnActive : {}) }}
+              >
+                <History size={16} />
+                <span>Stock Out Log</span>
+              </button>
             )}
           </nav>
 
-          {/* Right Content View */}
+          {/* Right Tab Body Content Area */}
           <div style={styles.mainArea}>
             {loading ? (
               <div style={styles.loaderBox}>
-                <RotateCw size={24} className="spin-loader" color="var(--primary)" />
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Loading records...</span>
+                <RefreshCw className="animate-spin" size={24} color="var(--primary)" />
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Loading manager records...</span>
               </div>
             ) : (
               <>
                 {/* 0. BRANDS TAB */}
                 {activeTab === 'brands' && (
                   <div style={styles.tabContent}>
-                    <form onSubmit={handleAddBrandTag} style={styles.inlineForm}>
-                      <h4 style={styles.formTitle}>ADD NEW CATALOG BRAND</h4>
-                      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', marginTop: '0.5rem' }}>
+                    <form onSubmit={handleAddBrand} style={styles.inlineForm}>
+                      <span style={styles.formTitle}>Add New Catalog Brand</span>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <input
                           type="text"
                           value={newBrandInput}
@@ -447,7 +452,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                         value={brandSearchTerm}
                         onChange={(e) => setBrandSearchTerm(e.target.value)}
                         placeholder="Filter catalog brands..."
-                        style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-primary)', fontSize: '0.85rem', flex: 1 }}
+                        style={{ background: 'none', border: 'none', color: '#fff', fontSize: '0.8rem', outline: 'none', flex: 1 }}
                       />
                       {brandSearchTerm && (
                         <button onClick={() => setBrandSearchTerm('')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }} title="Clear Search">
@@ -456,119 +461,94 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                       )}
                     </div>
 
-                    <div style={{ marginTop: '0.75rem' }}>
-                      <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.04em' }}>
-                        ACTIVE CATALOG BRANDS ({customBrands.filter(b => b.toLowerCase().includes(brandSearchTerm.toLowerCase())).length})
-                      </h4>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        {customBrands
-                          .filter(b => b.toLowerCase().includes(brandSearchTerm.toLowerCase()))
-                          .map((brand, idx) => {
-                            const isEditing = editingBrandTag === brand;
-                            if (isEditing) {
-                              return (
-                                <div key={`edit-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid #3b82f6', padding: '0.3rem 0.5rem', borderRadius: '8px' }}>
-                                  <input
-                                    type="text"
-                                    value={editingBrandInputValue}
-                                    onChange={(e) => setEditingBrandInputValue(e.target.value)}
-                                    style={{ border: 'none', background: 'transparent', outline: 'none', color: '#ffffff', fontSize: '0.85rem', fontWeight: 700, width: '110px' }}
-                                    autoFocus
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') handleSaveEditedBrandTag(brand);
-                                      if (e.key === 'Escape') setEditingBrandTag(null);
-                                    }}
-                                  />
-                                  <button type="button" onClick={() => handleSaveEditedBrandTag(brand)} style={{ background: '#3b82f6', border: 'none', borderRadius: '4px', padding: '0.2rem 0.4rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Save">
-                                    <Check size={13} color="#ffffff" />
-                                  </button>
-                                  <button type="button" onClick={() => setEditingBrandTag(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', display: 'flex' }} title="Cancel">
-                                    <X size={13} color="#94a3b8" />
-                                  </button>
-                                </div>
-                              );
-                            }
-                            return (
-                              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '0.4rem 0.75rem', borderRadius: '8px' }}>
-                                <Tag size={13} color="#34d399" />
-                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#34d399' }}>{brand}</span>
-                                <button type="button" onClick={() => { setEditingBrandTag(brand); setEditingBrandInputValue(brand); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', marginLeft: '0.2rem' }} title={`Rename ${brand}`}>
-                                  <Edit2 size={13} color="#60a5fa" />
-                                </button>
-                                <button type="button" onClick={() => handleDeleteBrandTag(brand)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }} title={`Delete ${brand}`}>
-                                  <Trash2 size={13} color="#f87171" />
-                                </button>
-                              </div>
-                            );
-                          })}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: '800', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+                        MANAGED BRANDS DIRECTORY ({filteredCustomBrands.length})
+                      </span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', maxHeight: '350px', overflowY: 'auto', padding: '0.2rem' }}>
+                        {filteredCustomBrands.map((b, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'rgba(37, 99, 235, 0.15)', border: '1px solid rgba(37, 99, 235, 0.3)', padding: '0.35rem 0.65rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '700', color: '#60a5fa' }}>
+                            <Tag size={13} color="#60a5fa" />
+                            {editingBrandTag === b ? (
+                              <input
+                                type="text"
+                                value={editingBrandInputValue}
+                                onChange={(e) => setEditingBrandInputValue(e.target.value)}
+                                autoFocus
+                                style={{ background: '#1e293b', border: '1px solid #3b82f6', color: '#fff', fontSize: '0.75rem', padding: '2px 4px', borderRadius: '4px', width: '90px' }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveRenameBrand(b);
+                                  if (e.key === 'Escape') setEditingBrandTag(null);
+                                }}
+                              />
+                            ) : (
+                              <span>{b}</span>
+                            )}
+                            {editingBrandTag === b ? (
+                              <button onClick={() => handleSaveRenameBrand(b)} style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: 0, display: 'flex' }} title="Save">
+                                <Check size={13} />
+                              </button>
+                            ) : (
+                              <button onClick={() => { setEditingBrandTag(b); setEditingBrandInputValue(b); }} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0, display: 'flex' }} title="Rename Brand">
+                                <Edit2 size={12} />
+                              </button>
+                            )}
+                            <button onClick={() => handleDeleteBrandTag(b)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, display: 'flex' }} title="Delete Custom Brand">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
                 )}
+
+                {/* 1. VENDORS TAB */}
                 {activeTab === 'vendors' && (
                   <div style={styles.tabContent}>
-                    {/* Add / Edit Form */}
                     <form onSubmit={handleVendorSubmit} style={styles.inlineForm}>
-                      <h4 style={styles.formTitle}>{editingId ? 'EDIT VENDOR / SUPPLIER' : 'ADD NEW VENDOR / SUPPLIER'}</h4>
-                      
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                        <div style={{ gridColumn: 'span 2' }}>
-                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>CONTACT PERSON NAME *</label>
-                          <input
-                            type="text"
-                            value={vendorForm.name}
-                            onChange={(e) => setVendorForm({ ...vendorForm, name: e.target.value })}
-                            placeholder="Enter contact person name"
-                            required
-                            style={styles.formInput}
-                          />
-                        </div>
-
-                        <div style={{ gridColumn: 'span 2' }}>
-                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>BUSINESS / COMPANY NAME</label>
-                          <input
-                            type="text"
-                            value={vendorForm.businessName}
-                            onChange={(e) => setVendorForm({ ...vendorForm, businessName: e.target.value })}
-                            placeholder="Enter business or company name"
-                            style={styles.formInput}
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>PHONE NUMBER</label>
-                          <input
-                            type="text"
-                            value={vendorForm.phone}
-                            onChange={(e) => setVendorForm({ ...vendorForm, phone: e.target.value })}
-                            placeholder="Enter phone number"
-                            style={styles.formInput}
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>GSTIN NUMBER</label>
-                          <input
-                            type="text"
-                            value={vendorForm.gstin}
-                            onChange={(e) => setVendorForm({ ...vendorForm, gstin: e.target.value })}
-                            placeholder="e.g. 24AAAAA0000A1Z5"
-                            style={styles.formInput}
-                          />
-                        </div>
-
-                        <div style={{ gridColumn: 'span 2' }}>
-                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.03em' }}>BILLING ADDRESS</label>
-                          <textarea
-                            rows="3"
-                            value={vendorForm.address}
-                            onChange={(e) => setVendorForm({ ...vendorForm, address: e.target.value })}
-                            placeholder="Enter complete billing address"
-                            style={{ ...styles.formInput, width: '100%', resize: 'vertical' }}
-                          />
-                        </div>
+                      <span style={styles.formTitle}>
+                        {editingId ? 'Edit Vendor / Supplier' : 'Add New Vendor / Supplier'}
+                      </span>
+                      <div style={styles.formGrid}>
+                        <input
+                          type="text"
+                          placeholder="Vendor Contact Person *"
+                          value={vendorForm.name}
+                          onChange={(e) => setVendorForm({ ...vendorForm, name: e.target.value })}
+                          required
+                          style={styles.formInput}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Business / Company Name *"
+                          value={vendorForm.businessName}
+                          onChange={(e) => setVendorForm({ ...vendorForm, businessName: e.target.value })}
+                          required
+                          style={styles.formInput}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Phone Number"
+                          value={vendorForm.phone}
+                          onChange={(e) => setVendorForm({ ...vendorForm, phone: e.target.value })}
+                          style={styles.formInput}
+                        />
+                        <input
+                          type="text"
+                          placeholder="GSTIN Number"
+                          value={vendorForm.gstin}
+                          onChange={(e) => setVendorForm({ ...vendorForm, gstin: e.target.value })}
+                          style={styles.formInput}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Full Address"
+                          value={vendorForm.address}
+                          onChange={(e) => setVendorForm({ ...vendorForm, address: e.target.value })}
+                          style={{ ...styles.formInput, gridColumn: 'span 2' }}
+                        />
                       </div>
-
                       <div style={styles.formActions}>
                         {editingId && (
                           <button
@@ -578,52 +558,47 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                               setVendorForm({ name: '', businessName: '', phone: '', gstin: '', address: '' });
                             }}
                             className="btn-secondary"
-                            style={styles.formBtn}
+                            style={styles.cancelBtn}
                           >
                             Cancel
                           </button>
                         )}
-                        <button type="submit" style={{ ...styles.formBtn, background: '#4f46e5', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, padding: '0.55rem 1.35rem', boxShadow: '0 4px 12px rgba(79,70,229,0.25)', cursor: 'pointer' }}>
-                          <Save size={15} />
-                          <span>{editingId ? 'Save Vendor' : 'Save Vendor'}</span>
+                        <button type="submit" className="btn-primary" style={styles.submitBtn}>
+                          <Save size={14} /> {editingId ? 'Update Vendor' : 'Save Vendor'}
                         </button>
                       </div>
                     </form>
 
-                    {/* Table List */}
                     <div className="table-container" style={styles.tableWrap}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <table>
                         <thead>
-                          <tr style={{ background: '#1e293b', color: '#ffffff' }}>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>CONTACT / COMPANY NAME</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>PHONE</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>GSTIN</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>ADDRESS</th>
-                            <th style={{ padding: '0.75rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase' }}>ACTIONS</th>
+                          <tr>
+                            <th>Company</th>
+                            <th>Contact Person</th>
+                            <th>Phone</th>
+                            <th>GSTIN</th>
+                            <th className="text-center">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {vendors.length === 0 ? (
                             <tr>
-                              <td colSpan="5" style={{ padding: '1.5rem', color: 'var(--text-muted)', textAlign: 'center' }}>No vendors registered yet.</td>
+                              <td colSpan="5" className="text-center" style={{ color: 'var(--text-muted)' }}>No vendors found.</td>
                             </tr>
                           ) : (
                             vendors.map((v) => (
-                              <tr key={v._id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                <td style={{ padding: '0.75rem 1rem', fontWeight: '600', color: 'var(--text-primary)' }}>
-                                  <div style={{ fontSize: '0.88rem' }}>{v.name}</div>
-                                  {v.businessName && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: 2 }}>{v.businessName}</div>}
-                                </td>
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>{v.phone || '-'}</td>
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', fontFamily: 'monospace', fontWeight: 600, color: 'var(--primary)' }}>{v.gstin || '-'}</td>
-                                <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.address || '-'}</td>
-                                <td style={{ padding: '0.75rem 1rem' }}>
+                              <tr key={v._id}>
+                                <td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{v.businessName || 'N/A'}</td>
+                                <td>{v.name}</td>
+                                <td>{v.phone || 'N/A'}</td>
+                                <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{v.gstin || 'N/A'}</td>
+                                <td>
                                   <div style={styles.actionsCell}>
                                     <button onClick={() => handleEditVendor(v)} className="btn-icon" title="Edit">
-                                      <Edit2 size={14} />
+                                      <Edit2 size={13} />
                                     </button>
                                     <button onClick={() => handleDeleteVendor(v._id)} className="btn-icon" style={styles.trashBtn} title="Delete">
-                                      <Trash2 size={14} />
+                                      <Trash2 size={13} />
                                     </button>
                                   </div>
                                 </td>
@@ -640,28 +615,30 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                 {activeTab === 'parties' && (
                   <div style={styles.tabContent}>
                     <form onSubmit={handlePartySubmit} style={styles.inlineForm}>
-                      <h4 style={styles.formTitle}>{editingId ? 'Edit Party' : 'Add New Party'}</h4>
+                      <span style={styles.formTitle}>
+                        {editingId ? 'Edit Receiver Party' : 'Add New Receiver Party'}
+                      </span>
                       <div style={styles.formGrid}>
                         <input
                           type="text"
+                          placeholder="Party / Receiver Name *"
                           value={partyForm.name}
                           onChange={(e) => setPartyForm({ ...partyForm, name: e.target.value })}
-                          placeholder="Party Name *"
                           required
                           style={styles.formInput}
                         />
                         <input
                           type="text"
+                          placeholder="Phone Number"
                           value={partyForm.phone}
                           onChange={(e) => setPartyForm({ ...partyForm, phone: e.target.value })}
-                          placeholder="Phone Number"
                           style={styles.formInput}
                         />
                         <input
                           type="text"
+                          placeholder="Address / Destination"
                           value={partyForm.address}
                           onChange={(e) => setPartyForm({ ...partyForm, address: e.target.value })}
-                          placeholder="Address"
                           style={{ ...styles.formInput, gridColumn: 'span 2' }}
                         />
                       </div>
@@ -674,14 +651,13 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                               setPartyForm({ name: '', phone: '', address: '' });
                             }}
                             className="btn-secondary"
-                            style={styles.formBtn}
+                            style={styles.cancelBtn}
                           >
                             Cancel
                           </button>
                         )}
-                        <button type="submit" className="btn-success" style={styles.formBtn}>
-                          <Save size={14} />
-                          <span>{editingId ? 'Save' : 'Create'}</span>
+                        <button type="submit" className="btn-primary" style={styles.submitBtn}>
+                          <Save size={14} /> {editingId ? 'Update Party' : 'Save Party'}
                         </button>
                       </div>
                     </form>
@@ -690,7 +666,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                       <table>
                         <thead>
                           <tr>
-                            <th>Name</th>
+                            <th>Party Name</th>
                             <th>Phone</th>
                             <th>Address</th>
                             <th className="text-center">Actions</th>
@@ -699,14 +675,14 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                         <tbody>
                           {parties.length === 0 ? (
                             <tr>
-                              <td colSpan="4" className="text-center" style={{ color: 'var(--text-muted)' }}>No parties registered.</td>
+                              <td colSpan="4" className="text-center" style={{ color: 'var(--text-muted)' }}>No parties found.</td>
                             </tr>
                           ) : (
                             parties.map((p) => (
                               <tr key={p._id}>
                                 <td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{p.name}</td>
-                                <td>{p.phone || '-'}</td>
-                                <td style={{ fontSize: '0.8rem', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.address || '-'}</td>
+                                <td>{p.phone || 'N/A'}</td>
+                                <td>{p.address || 'N/A'}</td>
                                 <td>
                                   <div style={styles.actionsCell}>
                                     <button onClick={() => handleEditParty(p)} className="btn-icon" title="Edit">
@@ -729,29 +705,11 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                 {/* 3. PRODUCTS CATALOG TAB */}
                 {activeTab === 'products' && (
                   <div style={styles.tabContent}>
-                    {/* Catalog Control Header */}
                     <div style={styles.catalogCtrl}>
-                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <button
-                          onClick={handleSyncProducts}
-                          disabled={syncing}
-                          className="btn-primary"
-                          style={styles.syncBtn}
-                        >
-                          <RefreshCw size={14} className={syncing ? 'spin-loader' : ''} />
-                          <span>{syncing ? 'Syncing...' : 'Sync Missing Products'}</span>
-                        </button>
-                        <button
-                          onClick={handleResetAndSyncUniwareSkus}
-                          disabled={syncing}
-                          className="btn-primary"
-                          style={{ ...styles.syncBtn, background: '#e11d48', border: '1px solid #be123c', color: '#ffffff' }}
-                          title="Clear all mismatched local SKUs and fetch fresh active SKUs from Uniware"
-                        >
-                          <RefreshCw size={14} className={syncing ? 'spin-loader' : ''} />
-                          <span>Reset & Set New SKUs from Uniware</span>
-                        </button>
-                      </div>
+                      <button onClick={handleSyncProducts} disabled={syncing} className="btn-secondary" style={styles.syncBtn}>
+                        <RotateCw size={14} className={syncing ? 'animate-spin' : ''} />
+                        {syncing ? 'Syncing...' : 'Sync Catalog from Store Inventory'}
+                      </button>
                     </div>
 
                     <form onSubmit={handleProductSubmit} style={styles.inlineForm}>

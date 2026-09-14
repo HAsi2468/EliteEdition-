@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { X, Building2, Plus, Trash2, CheckCircle, Tag, Sparkles, Search, Edit2, Check, AlertCircle } from 'lucide-react';
 
 export default function BrandManagerModal({ 
@@ -193,7 +194,7 @@ export default function BrandManagerModal({
     setTimeout(() => setSuccess(''), 3000);
   };
 
-  return (
+  const modalMarkup = (
     <div className="modal-overlay" style={styles.overlay} onClick={handleModalClose}>
       <div style={styles.container} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
@@ -382,31 +383,43 @@ export default function BrandManagerModal({
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return ReactDOM.createPortal(modalMarkup, document.body);
+  }
+  return modalMarkup;
 }
 
 const styles = {
   overlay: {
     position: 'fixed',
-    top: 0, left: 0, right: 0, bottom: 0,
+    top: 0,
+    left: 0,
+    width: '100vw',
+    height: '100vh',
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     backdropFilter: 'blur(6px)',
+    WebkitBackdropFilter: 'blur(6px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 100000,
-    padding: '0.75rem',
+    zIndex: 999999,
+    padding: '1rem',
+    boxSizing: 'border-box',
   },
   container: {
     backgroundColor: '#ffffff',
     borderRadius: '14px',
     width: '100%',
     maxWidth: '540px',
-    boxShadow: '0 20px 40px rgba(15, 23, 42, 0.2), 0 1px 3px rgba(0, 0, 0, 0.05)',
+    boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 2px 4px rgba(0, 0, 0, 0.1)',
     border: '1px solid #e2e8f0',
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
     maxHeight: '85vh',
+    position: 'relative',
+    margin: 'auto',
   },
   header: {
     padding: '1rem 1.25rem 0.85rem 1.25rem',

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { X, Sparkles, Layers, Tag, Building2, Barcode, DollarSign, Image as ImageIcon, CheckCircle, FileCode } from 'lucide-react';
 import { api } from '../services/api';
 import { extractSizeFromSku } from '../utils/skuHelper';
@@ -417,7 +418,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
                     <DollarSign size={14} color="#059669" />
-                    Sale Price / MOP (Rs.)
+                    Sale Price / MSRP (Rs.)
                   </label>
                   <input
                     type="number"
@@ -432,18 +433,17 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                 </div>
               </div>
 
-              {/* Row 5: Product Image URL */}
-              <div style={styles.fieldColFull}>
+              {/* Row 5: Image URL */}
+              <div style={styles.formGroup}>
                 <label style={styles.label}>
-                  <ImageIcon size={14} color="#059669" />
-                  Product Image URL
+                  Product Image URL (Direct Link)
                 </label>
                 <input
                   type="text"
                   name="imageUrl"
                   value={formData.imageUrl}
                   onChange={handleChange}
-                  placeholder="https://example.com/product-image.jpg"
+                  placeholder="https://example.com/image.jpg"
                   style={styles.input}
                 />
               </div>
@@ -456,14 +456,19 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
               Cancel
             </button>
             <button type="submit" style={styles.submitBtn}>
-              <CheckCircle size={18} />
-              {item ? 'Save Product Details' : 'Add Product to Catalog'}
+              <CheckCircle size={16} style={{ marginRight: '6px' }} />
+              {item ? 'Save Changes' : 'Add Product'}
             </button>
           </div>
         </form>
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return ReactDOM.createPortal(modalMarkup, document.body);
+  }
+  return modalMarkup;
 }
 
 // Inject Responsive Mobile CSS Styles
@@ -517,27 +522,31 @@ const styles = {
     position: 'fixed',
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
+    width: '100vw',
+    height: '100vh',
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     backdropFilter: 'blur(6px)',
+    WebkitBackdropFilter: 'blur(6px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 99999,
+    zIndex: 999999,
     padding: '1.25rem',
+    boxSizing: 'border-box',
   },
   container: {
     backgroundColor: '#ffffff',
     borderRadius: '16px',
     width: '100%',
     maxWidth: '920px',
-    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
     border: '1px solid #e2e8f0',
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
     maxHeight: '92vh',
+    position: 'relative',
+    margin: 'auto',
   },
   header: {
     padding: '1.25rem 1.75rem',
