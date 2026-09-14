@@ -49,44 +49,12 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     return [createEmptyRow()];
   });
 
-  // Combine parties with managed brands & catalog brands
+  // Real registered parties for autocompletion
   const [allParties, setAllParties] = useState([]);
 
   useEffect(() => {
-    let managedBrands = [];
-    try {
-      const saved = localStorage.getItem('elite_managed_brands');
-      if (saved) {
-        managedBrands = JSON.parse(saved);
-      }
-    } catch (e) {}
-
-    const merged = [];
-    const existingKeys = new Set();
-
-    const addPartyCandidate = (bName, cName) => {
-      if (!bName || typeof bName !== 'string') return;
-      const trimmedB = bName.trim();
-      if (!trimmedB || trimmedB.toUpperCase() === 'ALL') return;
-      const key = trimmedB.toUpperCase();
-      if (!existingKeys.has(key)) {
-        existingKeys.add(key);
-        merged.push({ businessName: key, name: cName || key });
-      }
-    };
-
-    (parties || []).forEach(p => addPartyCandidate(p.businessName || p.name, p.name));
-    (managedBrands || []).forEach(b => {
-      const name = typeof b === 'string' ? b : (b?.name || '');
-      addPartyCandidate(name);
-    });
-    (items || []).forEach(item => {
-      if (item.brand) addPartyCandidate(item.brand);
-      if (item.party) addPartyCandidate(item.party);
-    });
-
-    setAllParties(merged);
-  }, [parties, items]);
+    setAllParties(parties || []);
+  }, [parties]);
 
   // Preserve scroll position on mount/unmount
   useEffect(() => {

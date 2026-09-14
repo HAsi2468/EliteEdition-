@@ -9,12 +9,17 @@ import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { api } from '../services/api';
 import DateRangePicker from './DateRangePicker';
+import VendorPartyManagerModal from './VendorPartyManagerModal';
 
 export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onStockOut, onOpenManager, onBulkInward, onQuickStockUpdate }) {
   const safeItems = Array.isArray(items) ? items : [];
 
   // 3 Primary Sub-Screens: 'overview' (Stock Overview), 'inward' (Inward Stock), 'outward' (Outward Stock)
   const [activeSubTab, setActiveSubTab] = useState('overview');
+
+  // Modals for Vendor & Party Managers
+  const [showVendorManager, setShowVendorManager] = useState(false);
+  const [showPartyManager, setShowPartyManager] = useState(false);
 
   // --- Sub-Screen 1: Stock Overview State ---
   const [searchTerm, setSearchTerm] = useState('');
@@ -633,6 +638,16 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
                     ))}
                   </select>
                 </div>
+
+                <button onClick={() => setShowVendorManager(true)} style={styles.vendorBtn} title="Manage Vendors & Suppliers">
+                  <Building2 size={14} />
+                  <span>Manage Vendors</span>
+                </button>
+
+                <button onClick={() => setShowPartyManager(true)} style={styles.partyBtn} title="Manage Recipient Parties">
+                  <Building2 size={14} />
+                  <span>Manage Parties</span>
+                </button>
               </div>
             </div>
 
@@ -866,11 +881,11 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
           </div>
 
           {/* Date Filter & Control Header */}
-          <div style={styles.controlHeader}>
-            <div style={styles.rowOne}>
+          <div style={{ ...styles.controlHeader, padding: '0.6rem 0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.65rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flex: 1, minWidth: '280px', flexWrap: 'wrap' }}>
               {/* Search Box */}
-              <div style={styles.searchBox}>
-                <Search size={16} color="#64748b" style={{ flexShrink: 0 }} />
+              <div style={{ ...styles.searchBox, maxWidth: '280px', padding: '0.45rem 0.75rem' }}>
+                <Search size={15} color="#64748b" style={{ flexShrink: 0 }} />
                 <input
                   type="text"
                   value={inwardSearchTerm}
@@ -898,30 +913,28 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
               />
             </div>
 
-            <div style={styles.rowTwo}>
-              <div className="inv-row-two-actions" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button onClick={() => fetchInwardData()} style={styles.refreshBtn} title="Refresh Inward Log">
-                  <RefreshCw size={15} className={inwardLoading ? 'spin' : ''} />
-                  <span>Refresh</span>
-                </button>
-                <button onClick={handleExportInwardCSV} style={styles.exportBtn} title="Export CSV Log">
-                  <Download size={15} />
-                  <span>Export CSV</span>
-                </button>
-                <button 
-                  onClick={handleDownloadInwardPdf} 
-                  disabled={downloadingInwardPdf} 
-                  style={styles.pdfBtn}
-                  title="Download Official Inward PDF Report"
-                >
-                  <FileText size={15} />
-                  <span>{downloadingInwardPdf ? 'Generating PDF...' : 'Download PDF'}</span>
-                </button>
-                <button onClick={onBulkInward} style={styles.addInwardStockBtn} title="Add Inward Stock">
-                  <Sparkles size={15} />
-                  <span>+ Add Inward Stock</span>
-                </button>
-              </div>
+            <div className="inv-row-two-actions" style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button onClick={() => fetchInwardData()} style={styles.refreshBtn} title="Refresh Inward Log">
+                <RefreshCw size={14} className={inwardLoading ? 'spin' : ''} />
+                <span>Refresh</span>
+              </button>
+              <button onClick={() => setShowVendorManager(true)} style={styles.vendorBtn} title="Manage Vendors & Suppliers">
+                <Building2 size={14} />
+                <span>Manage Vendors</span>
+              </button>
+              <button 
+                onClick={handleDownloadInwardPdf} 
+                disabled={downloadingInwardPdf} 
+                style={styles.pdfBtn}
+                title="Download Official Inward PDF Report"
+              >
+                <FileText size={14} />
+                <span>{downloadingInwardPdf ? 'PDF...' : 'Download PDF'}</span>
+              </button>
+              <button onClick={onBulkInward} style={styles.addInwardStockBtn} title="Add Inward Stock">
+                <Sparkles size={14} />
+                <span>+ Add Inward Stock</span>
+              </button>
             </div>
           </div>
 
@@ -1096,16 +1109,16 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
           </div>
 
           {/* Date Filter & Control Header */}
-          <div style={styles.controlHeader}>
-            <div style={styles.rowOne}>
+          <div style={{ ...styles.controlHeader, padding: '0.6rem 0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.65rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flex: 1, minWidth: '280px', flexWrap: 'wrap' }}>
               {/* Search Box */}
-              <div style={styles.searchBox}>
-                <Search size={16} color="#64748b" style={{ flexShrink: 0 }} />
+              <div style={{ ...styles.searchBox, maxWidth: '280px', padding: '0.45rem 0.75rem' }}>
+                <Search size={15} color="#64748b" style={{ flexShrink: 0 }} />
                 <input
                   type="text"
                   value={outwardSearchTerm}
                   onChange={(e) => setOutwardSearchTerm(e.target.value)}
-                  placeholder="Search outward SKU, item name, vendor..."
+                  placeholder="Search outward SKU, item name, party..."
                   style={styles.searchInput}
                 />
               </div>
@@ -1128,30 +1141,28 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
               />
             </div>
 
-            <div style={styles.rowTwo}>
-              <div className="inv-row-two-actions" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button onClick={() => fetchOutwardData()} style={styles.refreshBtn} title="Refresh Outward Log">
-                  <RefreshCw size={15} className={outwardLoading ? 'spin' : ''} />
-                  <span>Refresh</span>
-                </button>
-                <button onClick={handleExportOutwardCSV} style={styles.exportBtn} title="Export CSV Log">
-                  <Download size={15} />
-                  <span>Export CSV</span>
-                </button>
-                <button 
-                  onClick={handleDownloadOutwardPdf} 
-                  disabled={downloadingOutwardPdf} 
-                  style={styles.pdfBtn}
-                  title="Download Official Outward PDF Report"
-                >
-                  <FileText size={15} />
-                  <span>{downloadingOutwardPdf ? 'Generating PDF...' : 'Download PDF'}</span>
-                </button>
-                <button onClick={() => onStockOut(null)} style={styles.outwardHeaderBtn}>
-                  <TrendingDown size={15} />
-                  <span>+ Dispatch Stock Out</span>
-                </button>
-              </div>
+            <div className="inv-row-two-actions" style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button onClick={() => fetchOutwardData()} style={styles.refreshBtn} title="Refresh Outward Log">
+                <RefreshCw size={14} className={outwardLoading ? 'spin' : ''} />
+                <span>Refresh</span>
+              </button>
+              <button onClick={() => setShowPartyManager(true)} style={styles.partyBtn} title="Manage Recipient Parties">
+                <Building2 size={14} />
+                <span>Manage Parties</span>
+              </button>
+              <button 
+                onClick={handleDownloadOutwardPdf} 
+                disabled={downloadingOutwardPdf} 
+                style={styles.pdfBtn}
+                title="Download Official Outward PDF Report"
+              >
+                <FileText size={14} />
+                <span>{downloadingOutwardPdf ? 'PDF...' : 'Download PDF'}</span>
+              </button>
+              <button onClick={() => onStockOut(null)} style={styles.outwardHeaderBtn}>
+                <TrendingDown size={14} />
+                <span>+ Dispatch Stock Out</span>
+              </button>
             </div>
           </div>
 
@@ -1277,6 +1288,20 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
             )}
           </div>
         </>
+      )}
+
+      {showVendorManager && (
+        <VendorPartyManagerModal
+          mode="vendors"
+          onClose={() => setShowVendorManager(false)}
+        />
+      )}
+
+      {showPartyManager && (
+        <VendorPartyManagerModal
+          mode="parties"
+          onClose={() => setShowPartyManager(false)}
+        />
       )}
 
     </div>
@@ -1612,6 +1637,34 @@ const styles = {
     background: '#ffffff',
     border: '1px solid #cbd5e1',
     color: '#334155',
+  },
+  vendorBtn: {
+    padding: '0.6rem 1.15rem',
+    fontSize: '0.82rem',
+    fontWeight: 800,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    borderRadius: '9px',
+    cursor: 'pointer',
+    background: '#ecfdf5',
+    border: '1px solid #a7f3d0',
+    color: '#047857',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+  },
+  partyBtn: {
+    padding: '0.6rem 1.15rem',
+    fontSize: '0.82rem',
+    fontWeight: 800,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    borderRadius: '9px',
+    cursor: 'pointer',
+    background: '#eff6ff',
+    border: '1px solid #bfdbfe',
+    color: '#1d4ed8',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
   },
   pdfBtn: {
     padding: '0.6rem 1.15rem',

@@ -56,47 +56,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
           api.getInventory().catch(() => []),
         ]);
 
-        // Load managed custom brands from localStorage
-        let managedBrands = [];
-        try {
-          const saved = localStorage.getItem('elite_managed_brands');
-          if (saved) {
-            managedBrands = JSON.parse(saved);
-          }
-        } catch (e) {
-          console.warn('Failed to parse managed brands', e);
-        }
-
-        // Merge vendor businessNames/names with managed brands case-insensitively
-        const mergedVendors = [];
-        const existingKeys = new Set();
-
-        const addVendorItem = (bName, cName) => {
-          if (!bName || typeof bName !== 'string') return;
-          const trimmedB = bName.trim();
-          if (!trimmedB || trimmedB.toUpperCase() === 'ALL') return;
-          const key = trimmedB.toUpperCase();
-          if (!existingKeys.has(key)) {
-            existingKeys.add(key);
-            mergedVendors.push({ businessName: key, name: cName || key });
-          }
-        };
-
-        (vData || []).forEach(v => {
-          addVendorItem(v.businessName || v.name, v.name);
-        });
-
-        (managedBrands || []).forEach(b => {
-          const name = typeof b === 'string' ? b : (b?.name || '');
-          addVendorItem(name);
-        });
-
-        (cData || []).concat(invData || []).forEach(item => {
-          if (item.brand) addVendorItem(item.brand);
-          if (item.party) addVendorItem(item.party);
-        });
-
-        setVendorsList(mergedVendors);
+        setVendorsList(vData || []);
         setCatalogItems(cData || []);
         setStoreInventory(invData || []);
       } catch (err) {
@@ -115,7 +75,26 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
       (v.name && v.name.trim().toLowerCase() === val.trim().toLowerCase()) ||
       (v.businessName && v.businessName.trim().toLowerCase() === val.trim().toLowerCase())
     );
-    return match && match.businessName ? match.businessName : val;
+    return match ? (match.businessName || match.name) : val;
+  };
+
+  // Quick Set Vendor for all rows
+  const applyQuickSetVendor = (val) => {
+    setBulkVendor(val);
+    const resolvedVendor = resolveVendorName(val) || val;
+    setFormRows(prev => prev.map(item => ({
+      ...item,
+      party: resolvedVendor
+    })));
+  };
+
+  // Quick Set Challan for all rows
+  const applyQuickSetChallan = (val) => {
+    setBulkChallanNo(val);
+    setFormRows(prev => prev.map(item => ({
+      ...item,
+      challanNo: val
+    })));
   };
 
   // Add a new empty row
