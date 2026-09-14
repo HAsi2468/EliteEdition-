@@ -3,37 +3,76 @@ const logger = require('../config/logger');
 const { getAccessToken, getInventorySnapshot: fetchSnapshot } = require('../services/api.service');
 const { extractBaseSku, extractSizeFromSku } = require('../utils/skuHelper');
 
+async function resolveMasterSkuForBackend(inputSku, inputSize) {
+  if (!inputSku || typeof inputSku !== 'string') return inputSku;
+  const cleanSku = inputSku.trim();
+
+  const matchedProd = await db.Product.findOne({
+    $or: [
+      { 'brandCodes': cleanSku },
+      { 'brandCodes.code': cleanSku }
+    ]
+  }).lean() || await db.InventoryProduct.findOne({
+    $or: [
+      { 'brandCodes': cleanSku },
+      { 'brandCodes.code': cleanSku }
+    ]
+  }).lean();
+
+  if (matchedProd && matchedProd.skuCode) {
+    const baseSku = matchedProd.skuCode.trim();
+    const hasSize = extractSizeFromSku(baseSku);
+    if (hasSize) return baseSku;
+    if (inputSize && inputSize !== 'N/A') return `${baseSku}_${inputSize.toUpperCase()}`;
+    return baseSku;
+  }
+  return cleanSku;
+}
+
 const createInventory = async (req, res) => {
   try {
     if (Array.isArray(req.body)) {
       logger.info(`[INVENTORY] Bulk create request — ${req.body.length} items`);
-      const itemsToCreate = req.body.map(item => {
+      
+      const processedItems = [];
+      for (const item of req.body) {
         const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode, date, challanNo, brandCodes } = item;
         if (!party || !itemName || !size) {
           throw new Error('Party, Item Name, and Size are required for all bulk items');
         }
-        return {
-          party,
-          itemName,
-          size,
-          currentlyAvailableStock: currentlyAvailableStock || 0,
-          salePrice: salePrice || 0.0,
-          purchasePrice: purchasePrice || 0.0,
-          qty: qty || 0,
-          imageUrl: imageUrl || '',
-          skuCode: skuCode || '',
-          challanNo: challanNo || '',
-          brandCodes: brandCodes || [],
-          date: date || new Date(),
-        };
-      });
 
-      const createdItems = await db.Inventory.insertMany(itemsToCreate);
-      logger.info(`[INVENTORY] ✅ Bulk created ${createdItems.length} items successfully`);
-      createdItems.forEach((item, i) => {
-        logger.info(`[INVENTORY]   [${i + 1}] Party: "${item.party}" | Item: "${item.itemName}" | Size: ${item.size} | Qty: ${item.qty} | Challan: ${item.challanNo || 'N/A'}`);
-      });
-      return res.status(201).json(createdItems);
+        const masterSku = await resolveMasterSkuForBackend(skuCode, size);
+        const finalItemName = (itemName === skuCode || !itemName) ? masterSku : itemName;
+
+        // Check if an existing inventory record exists for masterSku to consolidate stock
+        let existingRecord = await db.Inventory.findOne({ skuCode: masterSku });
+        if (existingRecord) {
+          existingRecord.qty = (existingRecord.qty || 0) + (qty || 0);
+          existingRecord.currentlyAvailableStock = existingRecord.qty;
+          if (imageUrl) existingRecord.imageUrl = imageUrl;
+          await existingRecord.save();
+          processedItems.push(existingRecord);
+        } else {
+          const newRecord = await db.Inventory.create({
+            party,
+            itemName: finalItemName,
+            size,
+            currentlyAvailableStock: qty || currentlyAvailableStock || 0,
+            salePrice: salePrice || 0.0,
+            purchasePrice: purchasePrice || 0.0,
+            qty: qty || 0,
+            imageUrl: imageUrl || '',
+            skuCode: masterSku,
+            challanNo: challanNo || '',
+            brandCodes: brandCodes || [],
+            date: date || new Date(),
+          });
+          processedItems.push(newRecord);
+        }
+      }
+
+      logger.info(`[INVENTORY] ✅ Bulk created/updated ${processedItems.length} items successfully`);
+      return res.status(201).json(processedItems);
     }
 
     const { party, itemName, size, currentlyAvailableStock, salePrice, purchasePrice, qty, imageUrl, skuCode, date, challanNo, brandCodes } = req.body;
@@ -44,22 +83,35 @@ const createInventory = async (req, res) => {
       return res.status(400).json({ error: 'Party, Item Name, and Size are required' });
     }
 
+    const masterSku = await resolveMasterSkuForBackend(skuCode, size);
+    const finalItemName = (itemName === skuCode || !itemName) ? masterSku : itemName;
+
+    let existingRecord = await db.Inventory.findOne({ skuCode: masterSku });
+    if (existingRecord) {
+      existingRecord.qty = (existingRecord.qty || 0) + (qty || 0);
+      existingRecord.currentlyAvailableStock = existingRecord.qty;
+      if (imageUrl) existingRecord.imageUrl = imageUrl;
+      await existingRecord.save();
+      logger.info(`[INVENTORY] ✅ Consolidated into existing Master SKU — ID: ${existingRecord._id} | SKU: ${masterSku} | Total Qty: ${existingRecord.qty}`);
+      return res.status(200).json(existingRecord);
+    }
+
     const newItem = await db.Inventory.create({
       party,
-      itemName,
+      itemName: finalItemName,
       size,
       currentlyAvailableStock: currentlyAvailableStock || 0,
       salePrice: salePrice || 0.0,
       purchasePrice: purchasePrice || 0.0,
       qty: qty || 0,
       imageUrl: imageUrl || '',
-      skuCode: skuCode || '',
+      skuCode: masterSku,
       challanNo: challanNo || '',
       brandCodes: brandCodes || [],
       date: date || new Date(),
     });
 
-    logger.info(`[INVENTORY] ✅ Created — ID: ${newItem._id} | Party: "${newItem.party}" | Item: "${newItem.itemName}" | Size: ${newItem.size} | Qty: ${newItem.qty} | Buy: Rs.${newItem.purchasePrice} | Sell: Rs.${newItem.salePrice}`);
+    logger.info(`[INVENTORY] ✅ Created — ID: ${newItem._id} | SKU: "${newItem.skuCode}" | Party: "${newItem.party}" | Size: ${newItem.size} | Qty: ${newItem.qty}`);
     res.status(201).json(newItem);
   } catch (error) {
     logger.error('[INVENTORY] Error creating inventory item: %o', error);
