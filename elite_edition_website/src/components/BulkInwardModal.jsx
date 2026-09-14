@@ -267,7 +267,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   const totalInwardUnits = formRows.reduce((acc, curr) => acc + (curr.skuCode ? (curr.qty || 0) : 0), 0);
   const activeRowsCount = formRows.filter(r => r.skuCode && r.skuCode.trim()).length;
 
-  return ReactDOM.createPortal(
+  const modalMarkup = (
     <div
       style={{
         position: 'fixed',
@@ -617,6 +617,11 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return ReactDOM.createPortal(modalMarkup, document.body);
+  }
+  return modalMarkup;
 }
 
 // Inject Responsive Mobile CSS Styles for Bulk Inward Modal

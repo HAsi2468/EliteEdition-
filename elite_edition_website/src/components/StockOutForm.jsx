@@ -146,7 +146,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     });
   };
 
-  return ReactDOM.createPortal(
+  const modalMarkup = (
     <div
       style={{
         position: 'fixed',
@@ -353,9 +353,13 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
           </div>
         </form>
       </div>
-    </div>,
-    document.body
+    </div>
   );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return ReactDOM.createPortal(modalMarkup, document.body);
+  }
+  return modalMarkup;
 }
 
 const styles = {

@@ -476,7 +476,7 @@ export default function DateRangePicker({
         <ChevronDown size={14} color="#64748b" style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
       </button>
 
-      {isOpen && ReactDOM.createPortal(popoverMenu, document.body)}
+      {isOpen && typeof document !== 'undefined' && document.body ? ReactDOM.createPortal(popoverMenu, document.body) : null}
     </div>
   );
 }
