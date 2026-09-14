@@ -582,15 +582,24 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
           </div>
 
           {/* Search, Filters & Action Toolbar */}
-          <div className="inv-control-header" style={styles.controlHeader}>
-            <div className="inv-row-one" style={styles.rowOne}>
-              <div className="inv-search-box" style={styles.searchBox}>
-                <Search size={16} color="#64748b" style={{ flexShrink: 0 }} />
+          <div className="inv-control-header" style={{
+            ...styles.controlHeader,
+            flexDirection: 'row',
+            flexWrap: 'nowrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.5rem',
+            overflowX: 'auto',
+            whiteSpace: 'nowrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+              <div className="inv-search-box" style={{ ...styles.searchBox, minWidth: '180px', maxWidth: '240px', padding: '0.35rem 0.65rem' }}>
+                <Search size={14} color="#64748b" style={{ flexShrink: 0 }} />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search SKU, item name, vendor..."
+                  placeholder="Search SKU, item..."
                   style={styles.searchInput}
                 />
               </div>
@@ -611,46 +620,45 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
                   </button>
                 ))}
               </div>
-
-              <div className="inv-dropdown-group" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                <div style={styles.filterBox}>
-                  <SlidersHorizontal size={14} color="#64748b" />
-                  <select
-                    value={sizeFilter}
-                    onChange={(e) => setSizeFilter(e.target.value)}
-                    style={styles.selectInput}
-                  >
-                    {sizes.map((s, idx) => (
-                      <option key={idx} value={s}>{s === 'All' ? 'All Sizes' : `Size: ${s}`}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={styles.filterBox}>
-                  <Filter size={14} color="#64748b" />
-                  <select
-                    value={vendorFilter}
-                    onChange={(e) => setVendorFilter(e.target.value)}
-                    style={styles.selectInput}
-                  >
-                    {vendors.map((v, idx) => (
-                      <option key={idx} value={v}>{v === 'All' ? 'All Vendors' : v}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <button onClick={() => setShowVendorManager(true)} style={styles.vendorBtn} title="Manage Vendors & Suppliers">
-                  <Building2 size={14} />
-                  <span>Manage Vendors</span>
-                </button>
-
-                <button onClick={() => setShowPartyManager(true)} style={styles.partyBtn} title="Manage Recipient Parties">
-                  <Building2 size={14} />
-                  <span>Manage Parties</span>
-                </button>
-              </div>
             </div>
 
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
+              <div style={styles.filterBox}>
+                <SlidersHorizontal size={14} color="#64748b" />
+                <select
+                  value={sizeFilter}
+                  onChange={(e) => setSizeFilter(e.target.value)}
+                  style={styles.selectInput}
+                >
+                  {sizes.map((s, idx) => (
+                    <option key={idx} value={s}>{s === 'All' ? 'All Sizes' : `Size: ${s}`}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={styles.filterBox}>
+                <Filter size={14} color="#64748b" />
+                <select
+                  value={vendorFilter}
+                  onChange={(e) => setVendorFilter(e.target.value)}
+                  style={styles.selectInput}
+                >
+                  {vendors.map((v, idx) => (
+                    <option key={idx} value={v}>{v === 'All' ? 'All Vendors' : v}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button onClick={() => setShowVendorManager(true)} style={{ ...styles.vendorBtn, padding: '0.45rem 0.75rem' }} title="Manage Vendors & Suppliers">
+                <Building2 size={14} />
+                <span>Manage Vendors</span>
+              </button>
+
+              <button onClick={() => setShowPartyManager(true)} style={{ ...styles.partyBtn, padding: '0.45rem 0.75rem' }} title="Manage Recipient Parties">
+                <Building2 size={14} />
+                <span>Manage Parties</span>
+              </button>
+            </div>
           </div>
 
           {/* Main Inventory Overview Data Table */}
@@ -885,6 +893,7 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
             ...styles.controlHeader,
             padding: '0.45rem 0.85rem',
             display: 'flex',
+            flexDirection: 'row',
             alignItems: 'center',
             justify: 'space-between',
             flexWrap: 'nowrap',
@@ -1123,6 +1132,7 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
             ...styles.controlHeader,
             padding: '0.45rem 0.85rem',
             display: 'flex',
+            flexDirection: 'row',
             alignItems: 'center',
             justify: 'space-between',
             flexWrap: 'nowrap',
@@ -1491,14 +1501,19 @@ const styles = {
 
   // TOOLBAR & CONTROL STYLES
   controlHeader: {
-    padding: '1.25rem',
-    borderRadius: '14px',
+    padding: '0.45rem 0.85rem',
+    borderRadius: '12px',
     display: 'flex',
-    flexDirection: 'column',
-    gap: '1rem',
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '0.5rem',
     background: '#ffffff',
     border: '1px solid #e2e8f0',
     boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+    overflowX: 'auto',
+    whiteSpace: 'nowrap',
   },
   rowOne: {
     display: 'flex',
