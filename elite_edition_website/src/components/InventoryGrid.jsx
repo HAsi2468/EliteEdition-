@@ -50,6 +50,8 @@ export default function InventoryGrid({
   const [customInwardStart, setCustomInwardStart] = useState('');
   const [customInwardEnd, setCustomInwardEnd] = useState('');
   const [inwardSearchTerm, setInwardSearchTerm] = useState('');
+  const [inwardSortField, setInwardSortField] = useState('created_date_time');
+  const [inwardSortOrder, setInwardSortOrder] = useState('desc');
   const [inwardData, setInwardData] = useState({ items: [], totalQty: 0, totalPurchase: 0 });
   const [inwardLoading, setInwardLoading] = useState(false);
   const [inwardError, setInwardError] = useState('');
@@ -58,6 +60,8 @@ export default function InventoryGrid({
   // --- Sub-Screen 3: Outward Stock State ---
   const [outwardDateStart, setOutwardDateStart] = useState('');
   const [outwardDateEnd, setOutwardDateEnd] = useState('');
+  const [outwardSortField, setOutwardSortField] = useState('created_date_time');
+  const [outwardSortOrder, setOutwardSortOrder] = useState('desc');
   const [outwardPreset, setOutwardPreset] = useState('all'); // 'today', '7days', 'thisMonth', 'all', 'custom'
   const [customOutwardStart, setCustomOutwardStart] = useState('');
   const [customOutwardEnd, setCustomOutwardEnd] = useState('');
@@ -254,16 +258,99 @@ export default function InventoryGrid({
     });
 
   // Filtered Inward Log Items
-  const filteredInwardItems = (inwardData.items || []).filter(item => {
-    if (!inwardSearchTerm.trim()) return true;
-    return matchSearchQuery(item, inwardSearchTerm, ['itemName', 'party', 'skuCode', 'sku']);
-  });
+  const handleInwardSort = (field) => {
+    if (inwardSortField === field) {
+      setInwardSortOrder(inwardSortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setInwardSortField(field);
+      setInwardSortOrder('asc');
+    }
+  };
+
+  const filteredInwardItems = (inwardData.items || [])
+    .filter(item => {
+      if (!inwardSearchTerm.trim()) return true;
+      return matchSearchQuery(item, inwardSearchTerm, ['itemName', 'party', 'skuCode', 'sku']);
+    })
+    .sort((a, b) => {
+      let aVal = a[inwardSortField];
+      let bVal = b[inwardSortField];
+
+      if (inwardSortField === 'created_date_time' || inwardSortField === 'date') {
+        aVal = new Date(a.created_date_time || a.date || 0).getTime();
+        bVal = new Date(b.created_date_time || b.date || 0).getTime();
+      } else if (inwardSortField === 'qty' || inwardSortField === 'total') {
+        aVal = Number(a.qty || a.total || 0);
+        bVal = Number(b.qty || b.total || 0);
+      } else if (inwardSortField === 'purchasePrice') {
+        aVal = Number(a.purchasePrice || 0);
+        bVal = Number(b.purchasePrice || 0);
+      } else if (inwardSortField === 'totalPurchaseAmount') {
+        aVal = Number(a.totalPurchaseAmount || (Number(a.purchasePrice || 0) * Number(a.qty || a.total || 0)));
+        bVal = Number(b.totalPurchaseAmount || (Number(b.purchasePrice || 0) * Number(b.qty || b.total || 0)));
+      } else {
+        aVal = (aVal || '').toString().toLowerCase();
+        bVal = (bVal || '').toString().toLowerCase();
+      }
+
+      if (aVal < bVal) return inwardSortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return inwardSortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   // Filtered Outward Log Items
-  const filteredOutwardItems = (outwardData.items || []).filter(item => {
-    if (!outwardSearchTerm.trim()) return true;
-    return matchSearchQuery(item, outwardSearchTerm, ['itemName', 'party', 'skuCode', 'sku']);
-  });
+  const handleOutwardSort = (field) => {
+    if (outwardSortField === field) {
+      setOutwardSortOrder(outwardSortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setOutwardSortField(field);
+      setOutwardSortOrder('asc');
+    }
+  };
+
+  const filteredOutwardItems = (outwardData.items || [])
+    .filter(item => {
+      if (!outwardSearchTerm.trim()) return true;
+      return matchSearchQuery(item, outwardSearchTerm, ['itemName', 'party', 'skuCode', 'sku']);
+    })
+    .sort((a, b) => {
+      let aVal = a[outwardSortField];
+      let bVal = b[outwardSortField];
+
+      if (outwardSortField === 'created_date_time' || outwardSortField === 'createdAt' || outwardSortField === 'date') {
+        aVal = new Date(a.created_date_time || a.createdAt || a.date || 0).getTime();
+        bVal = new Date(b.created_date_time || b.createdAt || b.date || 0).getTime();
+      } else if (outwardSortField === 'total' || outwardSortField === 'qty') {
+        aVal = Number(a.total || a.qty || 0);
+        bVal = Number(b.total || b.qty || 0);
+      } else if (outwardSortField === 'purchasePrice') {
+        aVal = Number(a.purchasePrice || 0);
+        bVal = Number(b.purchasePrice || 0);
+      } else if (outwardSortField === 'salePrice') {
+        aVal = Number(a.salePrice || 0);
+        bVal = Number(b.salePrice || 0);
+      } else if (outwardSortField === 'totalPurchaseAmount') {
+        aVal = Number(a.totalPurchaseAmount || (Number(a.purchasePrice || 0) * Number(a.total || a.qty || 0)));
+        bVal = Number(b.totalPurchaseAmount || (Number(b.purchasePrice || 0) * Number(b.total || b.qty || 0)));
+      } else if (outwardSortField === 'totalSellableAmount') {
+        aVal = Number(a.totalSellableAmount || (Number(a.salePrice || 0) * Number(a.total || a.qty || 0)));
+        bVal = Number(b.totalSellableAmount || (Number(a.salePrice || 0) * Number(a.total || a.qty || 0)));
+      } else if (outwardSortField === 'profit') {
+        const aBuy = Number(a.totalPurchaseAmount || (Number(a.purchasePrice || 0) * Number(a.total || a.qty || 0)));
+        const aSell = Number(a.totalSellableAmount || (Number(a.salePrice || 0) * Number(a.total || a.qty || 0)));
+        aVal = aSell - aBuy;
+        const bBuy = Number(b.totalPurchaseAmount || (Number(b.purchasePrice || 0) * Number(b.total || b.qty || 0)));
+        const bSell = Number(b.totalSellableAmount || (Number(b.salePrice || 0) * Number(b.total || b.qty || 0)));
+        bVal = bSell - bBuy;
+      } else {
+        aVal = (aVal || '').toString().toLowerCase();
+        bVal = (bVal || '').toString().toLowerCase();
+      }
+
+      if (aVal < bVal) return outwardSortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return outwardSortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   // Thermal Barcode Printing
   const printBarcode = (item) => {
@@ -738,6 +825,9 @@ export default function InventoryGrid({
                           </span>
                         </div>
                       </th>
+                      <th style={{ padding: '0.85rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em' }}>
+                        ACTIONS
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -821,6 +911,53 @@ export default function InventoryGrid({
                             }}>
                               {stockLabel}
                             </span>
+                          </td>
+
+                          <td style={{ padding: '0.85rem 1rem' }}>
+                            <div style={styles.actionsCell}>
+                              <button
+                                onClick={() => onStockOut(item)}
+                                style={styles.tblActionBtn('#b91c1c', '#fee2e2', '#fca5a5')}
+                                title="Outward Dispatch Item"
+                              >
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                  <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
+                                  <polyline points="17 18 23 18 23 12"/>
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => printBarcode(item)}
+                                style={styles.tblActionBtn('#0f172a', '#f1f5f9', '#cbd5e1')}
+                                title="Print Barcode Sticker"
+                              >
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                  <polyline points="6 9 6 2 18 2 18 9"/>
+                                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                                  <rect x="6" y="14" width="12" height="8"/>
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => onEdit(item)}
+                                style={styles.tblActionBtn('#0284c7', '#e0f2fe', '#38bdf8')}
+                                title="Edit Item Details"
+                              >
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => onDelete(item._id)}
+                                style={styles.tblActionBtn('#e11d48', '#ffe4e6', '#fb7185')}
+                                title="Delete Item"
+                              >
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e11d48" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                  <polyline points="3 6 5 6 21 6"/>
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                  <line x1="10" y1="11" x2="10" y2="17"/>
+                                  <line x1="14" y1="11" x2="14" y2="17"/>
+                                </svg>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -971,15 +1108,64 @@ export default function InventoryGrid({
                 <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse', background: '#ffffff' }}>
                   <thead>
                     <tr style={{ background: '#065f46', color: '#ffffff' }}>
-                      <th style={styles.thStatic}>DATE & TIME</th>
-                      <th style={styles.thStatic}>PHOTO</th>
-                      <th style={styles.thStatic}>SKU CODE</th>
-                      <th style={styles.thStatic}>PRODUCT NAME</th>
-                      <th style={styles.thStatic}>VENDOR / SUPPLIER</th>
-                      <th style={{ ...styles.thStatic, textAlign: 'center' }}>SIZE & QUANTITY</th>
-                      <th style={{ ...styles.thStatic, textAlign: 'center' }}>QTY INWARDED</th>
-                      <th style={{ ...styles.thStatic, textAlign: 'right' }}>BUY PRICE (UNIT)</th>
-                      <th style={{ ...styles.thStatic, textAlign: 'right' }}>PURCHASE VALUE (TOTAL)</th>
+                      <th onClick={() => handleInwardSort('created_date_time')} style={{ ...styles.thSort, color: '#ffffff' }} title="Sort by Date & Time">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>DATE & TIME</span>
+                          <span style={{ fontSize: '0.75rem', color: inwardSortField === 'created_date_time' ? '#6ee7b7' : 'rgba(255,255,255,0.6)' }}>
+                            {inwardSortField === 'created_date_time' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th style={{ ...styles.thStatic, color: '#ffffff' }}>PHOTO</th>
+                      <th onClick={() => handleInwardSort('skuCode')} style={{ ...styles.thSort, color: '#ffffff' }} title="Sort by SKU Code">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>SKU CODE</span>
+                          <span style={{ fontSize: '0.75rem', color: inwardSortField === 'skuCode' ? '#6ee7b7' : 'rgba(255,255,255,0.6)' }}>
+                            {inwardSortField === 'skuCode' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th onClick={() => handleInwardSort('itemName')} style={{ ...styles.thSort, color: '#ffffff' }} title="Sort by Product Name">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>PRODUCT NAME</span>
+                          <span style={{ fontSize: '0.75rem', color: inwardSortField === 'itemName' ? '#6ee7b7' : 'rgba(255,255,255,0.6)' }}>
+                            {inwardSortField === 'itemName' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th onClick={() => handleInwardSort('party')} style={{ ...styles.thSort, color: '#ffffff' }} title="Sort by Vendor / Supplier">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>VENDOR / SUPPLIER</span>
+                          <span style={{ fontSize: '0.75rem', color: inwardSortField === 'party' ? '#6ee7b7' : 'rgba(255,255,255,0.6)' }}>
+                            {inwardSortField === 'party' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th style={{ ...styles.thStatic, textAlign: 'center', color: '#ffffff' }}>SIZE & QUANTITY</th>
+                      <th onClick={() => handleInwardSort('qty')} style={{ ...styles.thSort, textAlign: 'center', color: '#ffffff' }} title="Sort by Quantity Inwarded">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'center' }}>
+                          <span>QTY INWARDED</span>
+                          <span style={{ fontSize: '0.75rem', color: inwardSortField === 'qty' ? '#6ee7b7' : 'rgba(255,255,255,0.6)' }}>
+                            {inwardSortField === 'qty' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th onClick={() => handleInwardSort('purchasePrice')} style={{ ...styles.thSort, textAlign: 'right', color: '#ffffff' }} title="Sort by Buy Price Unit">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                          <span>BUY PRICE (UNIT)</span>
+                          <span style={{ fontSize: '0.75rem', color: inwardSortField === 'purchasePrice' ? '#6ee7b7' : 'rgba(255,255,255,0.6)' }}>
+                            {inwardSortField === 'purchasePrice' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th onClick={() => handleInwardSort('totalPurchaseAmount')} style={{ ...styles.thSort, textAlign: 'right', color: '#ffffff' }} title="Sort by Total Purchase Value">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                          <span>PURCHASE VALUE (TOTAL)</span>
+                          <span style={{ fontSize: '0.75rem', color: inwardSortField === 'totalPurchaseAmount' ? '#6ee7b7' : 'rgba(255,255,255,0.6)' }}>
+                            {inwardSortField === 'totalPurchaseAmount' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1206,18 +1392,88 @@ export default function InventoryGrid({
                 <table style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', background: '#ffffff' }}>
                   <thead>
                     <tr style={{ background: '#7c2d12', color: '#ffffff' }}>
-                      <th style={styles.thStatic}>DATE & TIME</th>
-                      <th style={styles.thStatic}>PHOTO</th>
-                      <th style={styles.thStatic}>SKU CODE</th>
-                      <th style={styles.thStatic}>PRODUCT NAME</th>
-                      <th style={styles.thStatic}>VENDOR / BRAND</th>
-                      <th style={{ ...styles.thStatic, textAlign: 'center' }}>SIZES & QUANTITIES</th>
-                      <th style={{ ...styles.thStatic, textAlign: 'center' }}>TOTAL QTY OUT</th>
-                      <th style={{ ...styles.thStatic, textAlign: 'right' }}>BUY PRICE (UNIT)</th>
-                      <th style={{ ...styles.thStatic, textAlign: 'right' }}>BUY VALUE (TOTAL)</th>
-                      <th style={{ ...styles.thStatic, textAlign: 'right' }}>SALE PRICE (UNIT)</th>
-                      <th style={{ ...styles.thStatic, textAlign: 'right' }}>SALE REVENUE</th>
-                      <th style={{ ...styles.thStatic, textAlign: 'right' }}>GROSS PROFIT</th>
+                      <th onClick={() => handleOutwardSort('created_date_time')} style={{ ...styles.thSort, color: '#ffffff' }} title="Sort by Date & Time">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>DATE & TIME</span>
+                          <span style={{ fontSize: '0.75rem', color: outwardSortField === 'created_date_time' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                            {outwardSortField === 'created_date_time' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th style={{ ...styles.thStatic, color: '#ffffff' }}>PHOTO</th>
+                      <th onClick={() => handleOutwardSort('skuCode')} style={{ ...styles.thSort, color: '#ffffff' }} title="Sort by SKU Code">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>SKU CODE</span>
+                          <span style={{ fontSize: '0.75rem', color: outwardSortField === 'skuCode' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                            {outwardSortField === 'skuCode' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th onClick={() => handleOutwardSort('itemName')} style={{ ...styles.thSort, color: '#ffffff' }} title="Sort by Product Name">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>PRODUCT NAME</span>
+                          <span style={{ fontSize: '0.75rem', color: outwardSortField === 'itemName' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                            {outwardSortField === 'itemName' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th onClick={() => handleOutwardSort('party')} style={{ ...styles.thSort, color: '#ffffff' }} title="Sort by Vendor / Brand">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>VENDOR / BRAND</span>
+                          <span style={{ fontSize: '0.75rem', color: outwardSortField === 'party' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                            {outwardSortField === 'party' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th style={{ ...styles.thStatic, textAlign: 'center', color: '#ffffff' }}>SIZES & QUANTITIES</th>
+                      <th onClick={() => handleOutwardSort('total')} style={{ ...styles.thSort, textAlign: 'center', color: '#ffffff' }} title="Sort by Total Qty Out">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'center' }}>
+                          <span>TOTAL QTY OUT</span>
+                          <span style={{ fontSize: '0.75rem', color: outwardSortField === 'total' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                            {outwardSortField === 'total' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th onClick={() => handleOutwardSort('purchasePrice')} style={{ ...styles.thSort, textAlign: 'right', color: '#ffffff' }} title="Sort by Buy Price Unit">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                          <span>BUY PRICE (UNIT)</span>
+                          <span style={{ fontSize: '0.75rem', color: outwardSortField === 'purchasePrice' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                            {outwardSortField === 'purchasePrice' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th onClick={() => handleOutwardSort('totalPurchaseAmount')} style={{ ...styles.thSort, textAlign: 'right', color: '#ffffff' }} title="Sort by Buy Value Total">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                          <span>BUY VALUE (TOTAL)</span>
+                          <span style={{ fontSize: '0.75rem', color: outwardSortField === 'totalPurchaseAmount' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                            {outwardSortField === 'totalPurchaseAmount' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th onClick={() => handleOutwardSort('salePrice')} style={{ ...styles.thSort, textAlign: 'right', color: '#ffffff' }} title="Sort by Sale Price Unit">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                          <span>SALE PRICE (UNIT)</span>
+                          <span style={{ fontSize: '0.75rem', color: outwardSortField === 'salePrice' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                            {outwardSortField === 'salePrice' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th onClick={() => handleOutwardSort('totalSellableAmount')} style={{ ...styles.thSort, textAlign: 'right', color: '#ffffff' }} title="Sort by Sale Revenue">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                          <span>SALE REVENUE</span>
+                          <span style={{ fontSize: '0.75rem', color: outwardSortField === 'totalSellableAmount' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                            {outwardSortField === 'totalSellableAmount' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
+                      <th onClick={() => handleOutwardSort('profit')} style={{ ...styles.thSort, textAlign: 'right', color: '#ffffff' }} title="Sort by Gross Profit">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                          <span>GROSS PROFIT</span>
+                          <span style={{ fontSize: '0.75rem', color: outwardSortField === 'profit' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                            {outwardSortField === 'profit' ? (outwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                          </span>
+                        </div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
