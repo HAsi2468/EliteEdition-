@@ -3,19 +3,32 @@ import {
   Edit2, Trash2, Printer, Search, Plus, Minus, SlidersHorizontal, 
   TrendingDown, MoreVertical, Sparkles, Package, AlertTriangle, 
   CheckCircle2, XCircle, DollarSign, Download, Filter, Calendar,
-  RefreshCw, FileText, TrendingUp, Layers3, IndianRupee, ArrowDownRight, ArrowUpRight, Building2
+  RefreshCw, FileText, TrendingUp, Layers3, IndianRupee, ArrowDownRight, ArrowUpRight, Building2, BookOpen
 } from 'lucide-react';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { api } from '../services/api';
 import DateRangePicker from './DateRangePicker';
 import VendorPartyManagerModal from './VendorPartyManagerModal';
+import ProductCatalogGrid from './ProductCatalogGrid';
 
-export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onStockOut, onOpenManager, onBulkInward, onQuickStockUpdate }) {
+export default function InventoryGrid({ 
+  items = [], 
+  catalogItems = [],
+  onEdit, 
+  onDelete, 
+  onAdd, 
+  onStockOut, 
+  onOpenManager, 
+  onBulkInward, 
+  onQuickStockUpdate,
+  onSyncCatalog,
+  initialSubTab = 'overview'
+}) {
   const safeItems = Array.isArray(items) ? items : [];
 
-  // 3 Primary Sub-Screens: 'overview' (Stock Overview), 'inward' (Inward Stock), 'outward' (Outward Stock)
-  const [activeSubTab, setActiveSubTab] = useState('overview');
+  // 4 Primary Sub-Screens: 'overview' (Stock Overview), 'inward' (Inward Stock), 'outward' (Outward Stock), 'catalog' (Product Catalog)
+  const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
 
   // Modals for Vendor & Party Managers
   const [showVendorManager, setShowVendorManager] = useState(false);
@@ -499,6 +512,18 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
             <span>Outward Stock</span>
             <span style={styles.tabBadge(activeSubTab === 'outward', '#f59e0b')}>
               {outwardData.items?.length || 0}
+            </span>
+          </button>
+
+          {/* Tab 4: Product Catalog */}
+          <button
+            onClick={() => setActiveSubTab('catalog')}
+            style={styles.subTabButton(activeSubTab === 'catalog', 'catalog')}
+          >
+            <BookOpen size={17} />
+            <span>Product Catalog</span>
+            <span style={styles.tabBadge(activeSubTab === 'catalog', '#8b5cf6')}>
+              {catalogItems.length}
             </span>
           </button>
         </div>
@@ -1311,6 +1336,20 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
         </>
       )}
 
+      {/* ========================================================================= */}
+      {/* SCREEN 4: PRODUCT CATALOG                                                  */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'catalog' && (
+        <ProductCatalogGrid
+          items={catalogItems}
+          onAdd={onAdd}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onSync={onSyncCatalog}
+          onOpenManager={onOpenManager}
+        />
+      )}
+
       {showVendorManager && (
         <VendorPartyManagerModal
           mode="vendors"
@@ -1371,6 +1410,9 @@ const styles = {
     } else if (type === 'outward') {
       activeBg = 'linear-gradient(135deg, #f59e0b, #d97706)';
       activeShadow = '0 4px 12px rgba(245, 158, 11, 0.25)';
+    } else if (type === 'catalog') {
+      activeBg = 'linear-gradient(135deg, #8b5cf6, #6d28d9)';
+      activeShadow = '0 4px 12px rgba(139, 92, 246, 0.25)';
     }
 
     return {

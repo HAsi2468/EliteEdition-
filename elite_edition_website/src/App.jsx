@@ -545,7 +545,8 @@ export default function App() {
     if (!editingItem || !editingItem._id) return;
     setLoading(true);
     try {
-      if (activeTab === 'catalog') {
+      const isCatalog = activeTab === 'catalog' || catalogItems.some(c => c._id === editingItem._id) || 'basePrice' in editingItem;
+      if (isCatalog) {
         const payload = {
           skuCode: formData.skuCode,
           description: formData.itemName || formData.description,
@@ -559,7 +560,7 @@ export default function App() {
           brandCodes: formData.brandCodes || [],
         };
         await api.updateProductCatalog(editingItem._id, payload);
-      } else if (activeTab === 'inventory') {
+      } else {
         const updatedItem = await api.updateInventory(editingItem._id, formData);
         setItems(prev => prev.map(item => item._id === editingItem._id ? { ...item, ...updatedItem } : item));
       }
@@ -576,7 +577,8 @@ export default function App() {
   };
 
   const handleDeleteItem = async (id) => {
-    if (activeTab === 'catalog') {
+    const isCatalog = activeTab === 'catalog' || catalogItems.some(c => c._id === id);
+    if (isCatalog) {
       if (!window.confirm('Are you sure you want to delete this product from catalog?')) return;
       setLoading(true);
       try {
@@ -589,7 +591,7 @@ export default function App() {
         setLoading(false);
         restoreSavedScrollPos();
       }
-    } else if (activeTab === 'inventory') {
+    } else {
       if (!window.confirm('Are you sure you want to delete this inventory item?')) return;
       setLoading(true);
       try {
@@ -1659,6 +1661,7 @@ export default function App() {
           ) : activeTab === 'inventory' ? (
             <InventoryGrid
               items={items}
+              catalogItems={catalogItems}
               onAdd={triggerAddModal}
               onEdit={triggerEditModal}
               onDelete={handleDeleteItem}
@@ -1666,15 +1669,22 @@ export default function App() {
               onOpenManager={(tab) => triggerManagerModal(tab || 'brands')}
               onBulkInward={() => setIsBulkInwardOpen(true)}
               onQuickStockUpdate={handleQuickStockUpdate}
+              onSyncCatalog={handleSyncCatalog}
+              initialSubTab="overview"
             />
           ) : activeTab === 'catalog' ? (
-            <ProductCatalogGrid
-              items={catalogItems}
+            <InventoryGrid
+              items={items}
+              catalogItems={catalogItems}
               onAdd={triggerAddModal}
               onEdit={triggerEditModal}
               onDelete={handleDeleteItem}
-              onSync={handleSyncCatalog}
+              onStockOut={triggerStockOutModal}
               onOpenManager={(tab) => triggerManagerModal(tab || 'brands')}
+              onBulkInward={() => setIsBulkInwardOpen(true)}
+              onQuickStockUpdate={handleQuickStockUpdate}
+              onSyncCatalog={handleSyncCatalog}
+              initialSubTab="catalog"
             />
           ) : activeTab === 'returns' ? (
             <ReturnsManager />
