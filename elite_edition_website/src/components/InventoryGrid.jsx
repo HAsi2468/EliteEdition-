@@ -403,8 +403,8 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
       {/* ========================================================================= */}
       {/* MAIN TOP NAVIGATION SUB-TAB BAR (3 Dedicated Screens)                      */}
       {/* ========================================================================= */}
-      <div style={styles.subTabBarContainer}>
-        <div style={styles.subTabBar}>
+      <div className="inv-sub-tab-bar-container" style={styles.subTabBarContainer}>
+        <div className="inv-sub-tab-bar" style={styles.subTabBar}>
           {/* Tab 1: Stock Overview */}
           <button
             onClick={() => setActiveSubTab('overview')}
@@ -450,7 +450,7 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
       {activeSubTab === 'overview' && (
         <>
           {/* Summary Metric Cards */}
-          <div style={styles.statsGrid}>
+          <div className="inv-stats-grid" style={styles.statsGrid}>
             <div style={{ ...styles.statCard, borderLeft: '4px solid #3b82f6' }}>
               <div style={styles.statIconWrap('#3b82f6', '#eff6ff')}>
                 <Package size={22} color="#3b82f6" />
@@ -521,9 +521,9 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
           </div>
 
           {/* Search, Filters & Action Toolbar */}
-          <div style={styles.controlHeader}>
-            <div style={styles.rowOne}>
-              <div style={styles.searchBox}>
+          <div className="inv-control-header" style={styles.controlHeader}>
+            <div className="inv-row-one" style={styles.rowOne}>
+              <div className="inv-search-box" style={styles.searchBox}>
                 <Search size={16} color="#64748b" style={{ flexShrink: 0 }} />
                 <input
                   type="text"
@@ -534,7 +534,7 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
                 />
               </div>
 
-              <div style={styles.pillContainer}>
+              <div className="inv-pill-container" style={styles.pillContainer}>
                 {[
                   { id: 'all', label: `All (${items.length})` },
                   { id: 'instock', label: `In Stock (${items.length - outOfStockCount})` },
@@ -551,7 +551,7 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
                 ))}
               </div>
 
-              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+              <div className="inv-dropdown-group" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
                 <div style={styles.filterBox}>
                   <SlidersHorizontal size={14} color="#64748b" />
                   <select
@@ -1809,3 +1809,78 @@ const styles = {
     flexShrink: 0,
   }),
 };
+
+// Inject Responsive Mobile CSS Styles for Store Inventory
+if (typeof document !== 'undefined') {
+  const styleElId = 'inventory-grid-responsive-style';
+  if (!document.getElementById(styleElId)) {
+    const styleEl = document.createElement('style');
+    styleEl.id = styleElId;
+    styleEl.innerHTML = `
+      @media (max-width: 768px) {
+        .inv-sub-tab-bar-container {
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+          padding-bottom: 4px !important;
+          width: 100% !important;
+        }
+        .inv-sub-tab-bar {
+          display: flex !important;
+          width: max-content !important;
+          min-width: 100% !important;
+          gap: 0.35rem !important;
+        }
+        .inv-sub-tab-bar button {
+          padding: 0.55rem 0.75rem !important;
+          font-size: 0.78rem !important;
+          white-space: nowrap !important;
+        }
+        .inv-stats-grid {
+          grid-template-columns: repeat(2, 1fr) !important;
+          gap: 0.5rem !important;
+        }
+        .inv-control-header {
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 0.65rem !important;
+          padding: 0.85rem !important;
+        }
+        .inv-row-one {
+          flex-direction: column !important;
+          width: 100% !important;
+          gap: 0.65rem !important;
+        }
+        .inv-search-box {
+          width: 100% !important;
+        }
+        .inv-pill-container {
+          width: 100% !important;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          padding-bottom: 3px !important;
+        }
+        .inv-dropdown-group {
+          width: 100% !important;
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          gap: 0.5rem !important;
+        }
+        .inv-dropdown-group > div {
+          width: 100% !important;
+        }
+        .inv-dropdown-group select {
+          width: 100% !important;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .inv-stats-grid {
+          grid-template-columns: 1fr 1fr !important;
+        }
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
+}

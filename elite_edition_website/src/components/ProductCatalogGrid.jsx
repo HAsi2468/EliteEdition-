@@ -667,14 +667,15 @@ if (typeof document !== 'undefined') {
         }
         .catalog-action-group {
           width: 100% !important;
-          display: grid !important;
-          grid-template-columns: repeat(2, 1fr) !important;
+          display: flex !important;
+          flex-direction: column !important;
           gap: 0.5rem !important;
         }
         .catalog-action-group button {
+          width: 100% !important;
           justify-content: center !important;
-          font-size: 0.75rem !important;
-          padding: 0.55rem 0.4rem !important;
+          font-size: 0.8rem !important;
+          padding: 0.6rem 0.5rem !important;
         }
         .data-table-container {
           overflow-x: auto !important;
