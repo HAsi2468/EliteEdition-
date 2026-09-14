@@ -12,21 +12,29 @@ export default function CameraBarcodeScanner({ onScan, onClose }) {
   const lastScanTimeRef = useRef(0);
   const lastCodeRef = useRef('');
 
-  const regionId = 'camera-barcode-reader-viewport';
+  const onScanRef = useRef(onScan);
+
+  // Keep ref updated on every render without triggering useEffect re-runs
+  useEffect(() => {
+    onScanRef.current = onScan;
+  });
 
   useEffect(() => {
     let isMounted = true;
+    let timer = null;
 
     const startScanner = async () => {
       try {
         setErrorMsg('');
+        const viewportEl = document.getElementById(regionId);
+        if (!viewportEl) return;
+
         const html5Qrcode = new Html5Qrcode(regionId);
         html5QrcodeScannerRef.current = html5Qrcode;
 
         const config = {
           fps: 15,
           qrbox: (viewfinderWidth, viewfinderHeight) => {
-            // Adaptive bounding box fitting ~30% height aspect ratio
             const minDim = Math.min(viewfinderWidth, viewfinderHeight);
             return {
               width: Math.floor(viewfinderWidth * 0.85),
@@ -36,15 +44,15 @@ export default function CameraBarcodeScanner({ onScan, onClose }) {
           aspectRatio: 1.777778
         };
 
-        // Try environment/back camera first
         await html5Qrcode.start(
           { facingMode: 'environment' },
           config,
           (decodedText) => {
             const now = Date.now();
-            const cleanText = decodedText.trim();
+            const cleanText = (decodedText || '').trim();
+            if (!cleanText) return;
             
-            // Throttle identical scans within 800ms to prevent accidental rapid re-triggering
+            // Throttle identical scans within 800ms
             if (cleanText === lastCodeRef.current && now - lastScanTimeRef.current < 800) {
               return;
             }
@@ -55,11 +63,13 @@ export default function CameraBarcodeScanner({ onScan, onClose }) {
             if (isMounted) {
               setLastScannedCode(cleanText);
               playSuccessBeep();
-              onScan(cleanText);
+              if (onScanRef.current) {
+                onScanRef.current(cleanText);
+              }
             }
           },
           (errorMessage) => {
-            // Frame scan failure - normal when no barcode is in front of camera
+            // Frame scan failure - normal when no barcode present
           }
         );
 
@@ -75,19 +85,30 @@ export default function CameraBarcodeScanner({ onScan, onClose }) {
       }
     };
 
-    startScanner();
+    // Small delay to ensure DOM container is attached before starting Html5Qrcode
+    timer = setTimeout(() => {
+      startScanner();
+    }, 50);
 
     return () => {
       isMounted = false;
-      if (html5QrcodeScannerRef.current) {
-        html5QrcodeScannerRef.current.stop().then(() => {
-          html5QrcodeScannerRef.current.clear();
-        }).catch((e) => {
-          // ignore cleanup error
-        });
+      if (timer) clearTimeout(timer);
+      const scanner = html5QrcodeScannerRef.current;
+      if (scanner) {
+        try {
+          if (scanner.isScanning) {
+            scanner.stop().then(() => {
+              try { scanner.clear(); } catch (e) {}
+            }).catch(() => {});
+          } else {
+            try { scanner.clear(); } catch (e) {}
+          }
+        } catch (e) {
+          // ignore synchronous cleanup errors
+        }
       }
     };
-  }, [onScan]);
+  }, []); // Run ONLY ONCE on mount
 
   return (
     <div style={styles.scannerWrapper}>

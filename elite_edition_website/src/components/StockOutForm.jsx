@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { X, QrCode, ClipboardList, Info, AlertTriangle, Camera, Check } from 'lucide-react';
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 import CameraBarcodeScanner from './CameraBarcodeScanner';
 
-export default function StockOutForm({ items, parties, prefilledItem, onSubmit, onClose }) {
+export default function StockOutForm({ items = [], parties = [], prefilledItem, onSubmit, onClose }) {
   const [skuCode, setSkuCode] = useState('');
   const [selectedParty, setSelectedParty] = useState('');
   const [customParty, setCustomParty] = useState('');
@@ -39,8 +40,8 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
       return;
     }
 
-    const found = items.find(
-      (item) => (item.skuCode || '').toLowerCase().trim() === skuCode.toLowerCase().trim()
+    const found = (items || []).find(
+      (item) => (item?.skuCode || '').toLowerCase().trim() === skuCode.toLowerCase().trim()
     );
 
     if (found) {
@@ -56,8 +57,8 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
     const cleanSku = (scannedCode || '').trim();
     if (!cleanSku) return;
 
-    const found = items.find(
-      (item) => (item.skuCode || '').toLowerCase().trim() === cleanSku.toLowerCase()
+    const found = (items || []).find(
+      (item) => (item?.skuCode || '').toLowerCase().trim() === cleanSku.toLowerCase()
     );
 
     if (!found) {
@@ -147,14 +148,34 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
     });
   };
 
-  return (
-    <div className="modal-overlay">
-      <div className="modal-content" style={styles.content}>
+  return ReactDOM.createPortal(
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(4px)',
+        zIndex: 99999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1rem',
+        boxSizing: 'border-box'
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={styles.content}
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Header */}
         <div style={styles.header}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <ClipboardList size={20} color="var(--primary)" />
+            <ClipboardList size={20} color="#2563eb" />
             <h3 style={styles.title}>Dispatch Outward Stock</h3>
           </div>
           
@@ -163,7 +184,7 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
               type="button"
               onClick={() => setShowCameraScanner(!showCameraScanner)}
               style={{
-                background: showCameraScanner ? '#dc2626' : '#0284c7',
+                background: showCameraScanner ? '#dc2626' : '#2563eb',
                 color: '#ffffff',
                 border: 'none',
                 padding: '0.35rem 0.65rem',
@@ -175,7 +196,7 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
                 alignItems: 'center',
                 gap: '0.35rem'
               }}
-              title="Toggle Mobile Camera Scanner (30% Screen Height)"
+              title="Toggle Mobile Camera Scanner"
             >
               <Camera size={15} />
               <span>{showCameraScanner ? 'Close Camera' : '📷 Camera Scan'}</span>
@@ -194,7 +215,7 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
           </div>
         )}
 
-        {/* Embedded Camera Scanner (30% screen height preview) */}
+        {/* Embedded Camera Scanner */}
         {showCameraScanner && (
           <CameraBarcodeScanner
             onScan={(code) => processBarcodeScan(code)}
@@ -222,9 +243,9 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
                 disabled={!!prefilledItem}
                 style={styles.skuInput}
               />
-              <QrCode size={18} color="var(--primary)" style={styles.scanIcon} />
+              <QrCode size={18} color="#2563eb" style={styles.scanIcon} />
             </div>
-            <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '0.2rem 0 0 2px' }}>
+            <p style={{ fontSize: '0.7rem', color: '#64748b', margin: '0.2rem 0 0 2px' }}>
               💡 Scanning the same barcode multiple times auto-increments quantity.
             </p>
           </div>
@@ -251,27 +272,32 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
                   </div>
                 </div>
               </div>
-              <div style={styles.stockLevelBadge(matchedItem.currentlyAvailableStock)}>
-                {matchedItem.currentlyAvailableStock} Available
+
+              <div style={styles.stockLevelBadge(matchedItem.currentlyAvailableStock || 0)}>
+                {matchedItem.currentlyAvailableStock || 0} in stock
               </div>
             </div>
           ) : skuCode.trim() ? (
             <div style={styles.noMatchCard}>
               <Info size={16} />
-              <span>No matching item found in active stock.</span>
+              <span>No inventory item matches SKU "{skuCode}".</span>
             </div>
           ) : null}
 
-          {/* Party Recipient Selection */}
+          {/* Recipient Party Field */}
           <div style={styles.colFull}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
-              <label style={styles.label}>Recipient Party *</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={styles.label}>Recipient / Outward Party *</label>
               <button
                 type="button"
-                onClick={() => setUseCustomParty(!useCustomParty)}
+                onClick={() => {
+                  setUseCustomParty(!useCustomParty);
+                  setSelectedParty('');
+                  setCustomParty('');
+                }}
                 style={styles.toggleBtn}
               >
-                {useCustomParty ? 'Select Existing Party' : 'Enter Custom Party'}
+                {useCustomParty ? '← Choose Existing Party' : '+ Enter Custom Party'}
               </button>
             </div>
 
@@ -280,9 +306,9 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
                 type="text"
                 value={customParty}
                 onChange={(e) => setCustomParty(e.target.value)}
-                placeholder="Enter custom party name..."
+                placeholder="Enter party / client name..."
                 required
-                style={{ width: '100%' }}
+                style={styles.selectInput}
               />
             ) : (
               <select
@@ -292,18 +318,18 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
                 style={styles.selectInput}
               >
                 <option value="">-- Select Recipient Party --</option>
-                {parties.map((p, idx) => (
-                  <option key={p.id || idx} value={p.name}>
-                    {p.name} {p.phone ? `(${p.phone})` : ''}
+                {(parties || []).map((party, idx) => (
+                  <option key={idx} value={typeof party === 'string' ? party : (party.name || party.businessName || party.id)}>
+                    {typeof party === 'string' ? party : (party.businessName || party.name || party.id)}
                   </option>
                 ))}
               </select>
             )}
           </div>
 
-          {/* Quantity Outward */}
+          {/* Quantity Out Input */}
           <div style={styles.colFull}>
-            <label style={styles.label}>Quantity to Outward *</label>
+            <label style={styles.label}>Quantity Outward *</label>
             <input
               type="number"
               value={qtyOut}
@@ -311,18 +337,17 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
               min="1"
               max={matchedItem ? (matchedItem.currentlyAvailableStock || 1) : 9999}
               required
-              style={{ width: '100%', fontSize: '1.05rem', fontWeight: 'bold' }}
+              style={{ ...styles.selectInput, fontSize: '1.05rem', fontWeight: 'bold' }}
             />
           </div>
 
           <div style={styles.footer}>
-            <button type="button" onClick={onClose} className="btn-secondary">
+            <button type="button" onClick={onClose} style={{ padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-success"
-              style={styles.submitBtn}
+              style={{ padding: '0.5rem 1.2rem', borderRadius: '6px', border: 'none', background: '#2563eb', color: '#ffffff', fontWeight: 600, cursor: 'pointer', ...styles.submitBtn }}
               disabled={matchedItem && (matchedItem.currentlyAvailableStock || 0) < Number(qtyOut)}
             >
               Outward Dispatch
@@ -330,7 +355,8 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -341,6 +367,10 @@ const styles = {
     width: '95%',
     maxHeight: '90vh',
     overflowY: 'auto',
+    background: '#ffffff',
+    borderRadius: '12px',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+    border: '1px solid #e2e8f0',
   },
   header: {
     display: 'flex',

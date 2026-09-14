@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { X, Plus, Trash2, CheckCircle, Sparkles, AlertCircle, Scan, Image as ImageIcon, Camera } from 'lucide-react';
 import { api } from '../services/api';
 import { extractSizeFromSku } from '../utils/skuHelper';
@@ -262,9 +263,29 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   const totalInwardUnits = formRows.reduce((acc, curr) => acc + (curr.skuCode ? (curr.qty || 0) : 0), 0);
   const activeRowsCount = formRows.filter(r => r.skuCode && r.skuCode.trim()).length;
 
-  return (
-    <div className="modal-overlay">
-      <div className="modal-content" style={styles.modalContent}>
+  return ReactDOM.createPortal(
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(4px)',
+        zIndex: 99999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1rem',
+        boxSizing: 'border-box'
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={styles.modalContent}
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Header */}
         <div style={styles.header}>
@@ -324,7 +345,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
           </div>
         )}
 
-        {/* Embedded Mobile Camera Scanner (occupies 30% screen height) */}
+        {/* Embedded Mobile Camera Scanner */}
         {showCameraScanner && (
           <CameraBarcodeScanner
             onScan={(code) => processScannedSku(code)}
@@ -338,31 +359,23 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
           {/* Quick Set Header Bar */}
           <div style={styles.quickSetPanel}>
             <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#d97706', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              ⚡ Quick Set All:
+              ⚡ Quick Set All Rows:
             </span>
-            <div style={{ display: 'flex', gap: '0.6rem', flex: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
               <input
                 type="text"
-                placeholder="Set Vendor / Company..."
+                list="master-vendors-list"
                 value={bulkVendor}
-                onChange={(e) => setBulkVendor(e.target.value)}
-                list="bulk-vendors-list"
+                onChange={e => applyQuickSetVendor(e.target.value)}
+                placeholder="Bulk Vendor for all rows..."
                 style={styles.quickInput}
               />
-              <datalist id="bulk-vendors-list">
-                {vendorsList.map((v, i) => (
-                  <option key={i} value={v.businessName || v.name}>
-                    {v.businessName ? `${v.businessName} (Contact: ${v.name})` : v.name}
-                  </option>
-                ))}
-              </datalist>
-
               <input
                 type="text"
-                placeholder="Set Challan No..."
                 value={bulkChallanNo}
-                onChange={(e) => setBulkChallanNo(e.target.value)}
-                style={{ ...styles.quickInput, maxWidth: '160px' }}
+                onChange={e => applyQuickSetChallan(e.target.value)}
+                placeholder="Bulk Challan No for all rows..."
+                style={styles.quickInput}
               />
 
               <button

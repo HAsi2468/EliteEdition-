@@ -10,7 +10,9 @@ import { matchSearchQuery } from '../utils/searchUtils';
 import { api } from '../services/api';
 import DateRangePicker from './DateRangePicker';
 
-export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockOut, onOpenManager, onBulkInward, onQuickStockUpdate }) {
+export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onStockOut, onOpenManager, onBulkInward, onQuickStockUpdate }) {
+  const safeItems = Array.isArray(items) ? items : [];
+
   // 3 Primary Sub-Screens: 'overview' (Stock Overview), 'inward' (Inward Stock), 'outward' (Outward Stock)
   const [activeSubTab, setActiveSubTab] = useState('overview');
 
@@ -48,15 +50,15 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
   const [downloadingOutwardPdf, setDownloadingOutwardPdf] = useState(false);
 
   // Unique sizes & vendors for Overview dropdowns
-  const sizes = ['All', ...new Set(items.map(item => item.size).filter(Boolean))];
-  const vendors = ['All', ...new Set(items.map(item => item.party).filter(Boolean))];
+  const sizes = ['All', ...new Set(safeItems.map(item => item.size).filter(Boolean))];
+  const vendors = ['All', ...new Set(safeItems.map(item => item.party).filter(Boolean))];
 
   // Overview Metrics
-  const totalSkus = items.length;
-  const totalAvailableStock = items.reduce((acc, item) => acc + (Number(item.currentlyAvailableStock) || 0), 0);
-  const lowStockCount = items.filter(item => (Number(item.currentlyAvailableStock) || 0) > 0 && (Number(item.currentlyAvailableStock) || 0) <= 5).length;
-  const outOfStockCount = items.filter(item => (Number(item.currentlyAvailableStock) || 0) === 0).length;
-  const totalBuyValuation = items.reduce((acc, item) => acc + ((Number(item.purchasePrice) || 0) * (Number(item.currentlyAvailableStock) || 0)), 0);
+  const totalSkus = safeItems.length;
+  const totalAvailableStock = safeItems.reduce((acc, item) => acc + (Number(item.currentlyAvailableStock) || 0), 0);
+  const lowStockCount = safeItems.filter(item => (Number(item.currentlyAvailableStock) || 0) > 0 && (Number(item.currentlyAvailableStock) || 0) <= 5).length;
+  const outOfStockCount = safeItems.filter(item => (Number(item.currentlyAvailableStock) || 0) === 0).length;
+  const totalBuyValuation = safeItems.reduce((acc, item) => acc + ((Number(item.purchasePrice) || 0) * (Number(item.currentlyAvailableStock) || 0)), 0);
 
   // --- Data Fetching for Inward & Outward Screens ---
   const fetchInwardData = useCallback(async (start = inwardDateStart, end = inwardDateEnd) => {
@@ -146,7 +148,7 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
   };
 
   // Overview Filtered Items
-  const filteredOverviewItems = items
+  const filteredOverviewItems = safeItems
     .filter(item => {
       const stock = Number(item.currentlyAvailableStock) || 0;
       const matchSearch = matchSearchQuery(item, searchTerm, ['itemName', 'party', 'skuCode', 'category', 'notes']);
