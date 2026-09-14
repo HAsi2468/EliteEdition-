@@ -125,7 +125,10 @@ export default function ReturnsManager() {
   }, []);
 
   const handlePartySelect = (selectedVal) => {
-    if (!selectedVal) return;
+    if (!selectedVal || !selectedVal.trim()) {
+      setParty('');
+      return;
+    }
     const matchedVendor = vendorsList.find(v => 
       (v.name && v.name.trim().toLowerCase() === selectedVal.trim().toLowerCase()) ||
       (v.businessName && v.businessName.trim().toLowerCase() === selectedVal.trim().toLowerCase())

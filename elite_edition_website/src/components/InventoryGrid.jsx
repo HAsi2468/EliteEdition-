@@ -705,9 +705,6 @@ export default function InventoryGrid({
                       <th onClick={() => handleSort('purchasePrice')} style={{ ...styles.thSort, textAlign: 'right' }}>
                         BUY PRICE {sortField === 'purchasePrice' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                       </th>
-                      <th onClick={() => handleSort('salePrice')} style={{ ...styles.thSort, textAlign: 'right' }}>
-                        SELL PRICE {sortField === 'salePrice' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-                      </th>
                       <th onClick={() => handleSort('currentlyAvailableStock')} style={{ ...styles.thSort, textAlign: 'center' }}>
                         AVAILABLE STOCK {sortField === 'currentlyAvailableStock' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                       </th>
@@ -780,9 +777,6 @@ export default function InventoryGrid({
                           </td>
                           <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>
                             ₹ {Number(item.purchasePrice || 0).toFixed(2)}
-                          </td>
-                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.85rem', fontWeight: 700, color: '#0284c7' }}>
-                            ₹ {Number(item.salePrice || 0).toFixed(2)}
                           </td>
 
                           <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>

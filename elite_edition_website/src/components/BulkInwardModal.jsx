@@ -462,14 +462,6 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                 placeholder="Bulk Challan No for all rows..."
                 style={styles.quickInput}
               />
-
-              <button
-                type="button"
-                onClick={applyQuickSettings}
-                style={styles.applyAllBtn}
-              >
-                Apply to All Rows
-              </button>
             </div>
           </div>
 
@@ -480,14 +472,13 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                 <tr>
                   <th style={{ width: '4%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>SR NO</th>
                   <th style={{ width: '6%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>IMAGE</th>
-                  <th style={{ width: '18%', padding: '0.75rem 0.6rem' }}>SKU CODE *</th>
-                  <th style={{ width: '18%', padding: '0.75rem 0.6rem' }}>ITEM NAME / DETAILS</th>
-                  <th style={{ width: '8%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>SIZE</th>
-                  <th style={{ width: '8%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>QTY *</th>
-                  <th style={{ width: '10%', padding: '0.75rem 0.4rem', textAlign: 'right' }}>BUY PRICE</th>
-                  <th style={{ width: '10%', padding: '0.75rem 0.4rem', textAlign: 'right' }}>SELL PRICE</th>
-                  <th style={{ width: '14%', padding: '0.75rem 0.6rem' }}>VENDOR / COMPANY *</th>
-                  <th style={{ width: '12%', padding: '0.75rem 0.6rem' }}>CHALLAN NO.</th>
+                  <th style={{ width: '20%', padding: '0.75rem 0.6rem' }}>SKU CODE *</th>
+                  <th style={{ width: '20%', padding: '0.75rem 0.6rem' }}>ITEM NAME / DETAILS</th>
+                  <th style={{ width: '10%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>SIZE</th>
+                  <th style={{ width: '9%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>QTY *</th>
+                  <th style={{ width: '11%', padding: '0.75rem 0.4rem', textAlign: 'right' }}>BUY PRICE</th>
+                  <th style={{ width: '12%', padding: '0.75rem 0.6rem' }}>VENDOR / COMPANY *</th>
+                  <th style={{ width: '10%', padding: '0.75rem 0.6rem' }}>CHALLAN NO.</th>
                   <th style={{ width: '4%', padding: '0.75rem 0.4rem', textAlign: 'center' }}></th>
                 </tr>
               </thead>
@@ -550,14 +541,23 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                       />
                     </td>
 
-                    {/* Size */}
+                    {/* Size (Auto-populated / Read-only) */}
                     <td style={{ padding: '0.5rem 0.4rem' }}>
                       <input
                         type="text"
-                        value={row.size}
-                        onChange={(e) => handleRowFieldChange(idx, 'size', e.target.value)}
-                        placeholder="M, L..."
-                        style={{ ...styles.cellInput, textAlign: 'center' }}
+                        value={typeof row.size === 'string' ? row.size : (Array.isArray(row.size) ? row.size.join('/') : (row.size || ''))}
+                        readOnly
+                        tabIndex={-1}
+                        placeholder="Size..."
+                        style={{
+                          ...styles.cellInput,
+                          textAlign: 'center',
+                          fontWeight: 700,
+                          background: '#f8fafc',
+                          color: '#64748b',
+                          cursor: 'not-allowed',
+                          borderColor: '#e2e8f0'
+                        }}
                       />
                     </td>
 
@@ -579,18 +579,6 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                         type="number"
                         value={row.purchasePrice}
                         onChange={(e) => handleRowFieldChange(idx, 'purchasePrice', e.target.value)}
-                        step="0.01"
-                        min="0"
-                        style={{ ...styles.cellInput, textAlign: 'right', color: '#0f172a' }}
-                      />
-                    </td>
-
-                    {/* Sell Price */}
-                    <td style={{ padding: '0.5rem 0.4rem' }}>
-                      <input
-                        type="number"
-                        value={row.salePrice}
-                        onChange={(e) => handleRowFieldChange(idx, 'salePrice', e.target.value)}
                         step="0.01"
                         min="0"
                         style={{ ...styles.cellInput, textAlign: 'right', color: '#0f172a' }}

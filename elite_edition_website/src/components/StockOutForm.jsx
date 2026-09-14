@@ -153,7 +153,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
       return;
     }
 
-    const available = foundInv.currentlyAvailableStock || 0;
+    const available = foundInv.currentlyAvailableStock ?? foundInv.qty ?? 0;
     const resolvedSize = resolveEffectiveSize(foundInv, cleanSku);
     const masterSku = resolveMasterSku(foundInv, cleanSku, resolvedSize);
 
@@ -166,7 +166,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     playSuccessBeep();
     setError('');
 
-    const partyValue = useCustomParty ? customParty.trim() : (defaultParty.trim() || resolveVendorName(foundInv.party) || '');
+    const partyValue = useCustomParty ? customParty.trim() : (defaultParty.trim() || '');
 
     setFormRows(prev => {
       const existingIndex = prev.findIndex(r => r.skuCode && (r.skuCode.trim().toLowerCase() === cleanSku.toLowerCase() || r.skuCode.trim().toLowerCase() === masterSku.toLowerCase()));
@@ -252,9 +252,16 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
         updated[index].skuCode = masterSku;
         updated[index].itemName = foundInv.itemName || masterSku;
         updated[index].size = resolvedSize;
-        updated[index].availableStock = foundInv.currentlyAvailableStock || 0;
-        updated[index].party = updated[index].party || defaultParty || resolveVendorName(foundInv.party) || '';
+        updated[index].availableStock = foundInv.currentlyAvailableStock ?? foundInv.qty ?? 0;
+        updated[index].party = updated[index].party || defaultParty || '';
         updated[index].imageUrl = foundInv.imageUrl || '';
+        setError('');
+      } else {
+        updated[index].itemName = '';
+        updated[index].size = extractSizeFromSku(value) || 'N/A';
+        updated[index].availableStock = 0;
+        updated[index].party = updated[index].party || defaultParty || '';
+        updated[index].imageUrl = '';
       }
     } else {
       updated[index][field] = value;
@@ -439,7 +446,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                       onChange={(e) => {
                         const val = resolveVendorName(e.target.value);
                         setDefaultParty(val);
-                        setFormRows(prev => prev.map(r => ({ ...r, party: r.party || val })));
+                        setFormRows(prev => prev.map(r => ({ ...r, party: val })));
                       }}
                       style={{ flex: 1, padding: '0.45rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.82rem', color: '#0f172a' }}
                     />
@@ -477,7 +484,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                       value={customParty}
                       onChange={(e) => {
                         setCustomParty(e.target.value);
-                        setFormRows(prev => prev.map(r => ({ ...r, party: r.party || e.target.value })));
+                        setFormRows(prev => prev.map(r => ({ ...r, party: e.target.value })));
                       }}
                       style={{ flex: 1, padding: '0.45rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.82rem', color: '#0f172a' }}
                     />
