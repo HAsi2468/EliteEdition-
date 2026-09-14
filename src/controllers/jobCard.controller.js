@@ -420,6 +420,7 @@ const updateJobCard = async (req, res) => {
     const changesArr = [];
     const fieldsToTrack = [
       ['party', 'Party Name'],
+      ['billNo', 'Bill No'],
       ['designName', 'Design'],
       ['designNo', 'Design No'],
       ['fabric', 'Fabric'],

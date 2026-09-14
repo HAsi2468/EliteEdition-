@@ -206,7 +206,7 @@ export default function JobCardTracking({ onPreview }) {
       const res = await api.updateJobCard(cardId, updated);
       
       // Update local cards list
-      setCards(prev => prev.map(c => c._id === cardId ? { ...c, ...res } : c));
+      setCards(prev => prev.map(c => c._id === cardId ? { ...c, ...res, ...updated } : c));
       
       // Remove from modified list
       setModifiedCards(prev => {

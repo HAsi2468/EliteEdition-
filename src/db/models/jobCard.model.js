@@ -33,6 +33,7 @@ const jobCardSchema = new mongoose.Schema(
     profile:          { type: String, default: '', trim: true },
     billTo:           { type: String, default: '', trim: true },
     shipTo:           { type: String, default: '', trim: true },
+    billNo:           { type: String, default: '', trim: true },
     machineName:      { type: String, default: '', trim: true },
     note1:            { type: String, default: '', trim: true },
     note2:            { type: String, default: '', trim: true },
