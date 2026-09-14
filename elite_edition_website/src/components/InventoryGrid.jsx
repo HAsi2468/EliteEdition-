@@ -649,15 +649,6 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
                 </select>
               </div>
 
-              <button onClick={() => setShowVendorManager(true)} style={{ ...styles.vendorBtn, padding: '0.45rem 0.75rem' }} title="Manage Vendors & Suppliers">
-                <Building2 size={14} />
-                <span>Manage Vendors</span>
-              </button>
-
-              <button onClick={() => setShowPartyManager(true)} style={{ ...styles.partyBtn, padding: '0.45rem 0.75rem' }} title="Manage Recipient Parties">
-                <Building2 size={14} />
-                <span>Manage Parties</span>
-              </button>
             </div>
           </div>
 
