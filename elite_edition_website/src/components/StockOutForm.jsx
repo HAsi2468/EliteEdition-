@@ -4,6 +4,7 @@ import { X, QrCode, ClipboardList, Info, AlertTriangle, Camera, Check, Plus, Tra
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 import CameraBarcodeScanner from './CameraBarcodeScanner';
 import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
+import VendorPartyManagerModal from './VendorPartyManagerModal';
 
 export default function StockOutForm({ items = [], parties = [], prefilledItem, onSubmit, onClose }) {
   const [defaultParty, setDefaultParty] = useState('');
@@ -14,6 +15,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
   const [scanInput, setScanInput] = useState('');
   const [error, setError] = useState('');
   const [showCameraScanner, setShowCameraScanner] = useState(false);
+  const [showPartyManager, setShowPartyManager] = useState(false);
 
   // Scroll preservation reference
   const scrollPosRef = useRef(0);
@@ -458,7 +460,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                   Default Recipient Party / Vendor
                 </label>
                 {!useCustomParty ? (
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                     <input
                       type="text"
                       list="outward-parties-list"
@@ -471,6 +473,28 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                       }}
                       style={{ flex: 1, padding: '0.45rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.82rem', color: '#0f172a' }}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPartyManager(true)}
+                      style={{
+                        padding: '0.45rem 0.65rem',
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        color: '#3b82f6',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        whiteSpace: 'nowrap'
+                      }}
+                      title="Manage Recipient Parties"
+                    >
+                      <Building2 size={14} />
+                      <span>+ Manage Parties</span>
+                    </button>
                     <button type="button" onClick={() => setUseCustomParty(true)} style={{ padding: '0.45rem 0.65rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
                       + Custom
                     </button>
@@ -714,6 +738,18 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
         </div>
 
       </div>
+
+      {showPartyManager && (
+        <VendorPartyManagerModal
+          mode="parties"
+          onClose={() => setShowPartyManager(false)}
+          onSelectParty={(pName) => {
+            setDefaultParty(pName);
+            setFormRows(prev => prev.map(r => ({ ...r, party: r.party || pName })));
+            setShowPartyManager(false);
+          }}
+        />
+      )}
     </div>
   );
 

@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Plus, Trash2, CheckCircle, Sparkles, AlertCircle, Scan, Image as ImageIcon, Camera } from 'lucide-react';
+import { X, Plus, Trash2, CheckCircle, Sparkles, AlertCircle, Scan, Image as ImageIcon, Camera, Building2 } from 'lucide-react';
 import { api } from '../services/api';
 import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 import CameraBarcodeScanner from './CameraBarcodeScanner';
+import VendorPartyManagerModal from './VendorPartyManagerModal';
 
 export default function BulkInwardModal({ onSubmit, onClose }) {
   const [error, setError] = useState('');
   const [showCameraScanner, setShowCameraScanner] = useState(false);
+  const [showVendorManager, setShowVendorManager] = useState(false);
   
   // Master Reference Lists
   const [vendorsList, setVendorsList] = useState([]);
@@ -436,14 +438,39 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
               ⚡ Quick Set All Rows:
             </span>
             <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
-              <input
-                type="text"
-                list="master-vendors-list"
-                value={bulkVendor}
-                onChange={e => applyQuickSetVendor(e.target.value)}
-                placeholder="Bulk Vendor for all rows..."
-                style={styles.quickInput}
-              />
+              <div style={{ display: 'flex', gap: '0.35rem', flex: 1, minWidth: '240px', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  list="master-vendors-list"
+                  value={bulkVendor}
+                  onChange={e => applyQuickSetVendor(e.target.value)}
+                  placeholder="Bulk Vendor for all rows..."
+                  style={{ ...styles.quickInput, flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowVendorManager(true)}
+                  style={{
+                    padding: '0.45rem 0.65rem',
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    color: '#059669',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                  }}
+                  title="Manage Vendors & Suppliers"
+                >
+                  <Building2 size={14} />
+                  <span>+ Manage Vendors</span>
+                </button>
+              </div>
               <input
                 type="text"
                 value={bulkChallanNo}
@@ -684,6 +711,18 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
         </div>
 
       </div>
+
+      {showVendorManager && (
+        <VendorPartyManagerModal
+          mode="vendors"
+          onClose={() => setShowVendorManager(false)}
+          onSelectVendor={(vName) => {
+            setBulkVendor(vName);
+            applyQuickSetVendor(vName);
+            setShowVendorManager(false);
+          }}
+        />
+      )}
     </div>
   );
 
