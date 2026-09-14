@@ -11,6 +11,7 @@ export const AVAILABLE_SCREENS = [
   // General & Core
   { id: 'dashboard', label: 'Dashboard Overview', category: 'General' },
   { id: 'workspace', label: 'Workspace / Chat', category: 'General' },
+  { id: 'task_management', label: 'Inter-Department: Task Management (TASK)', category: 'General' },
   { id: 'reports', label: 'Reports Center', category: 'General' },
   { id: 'unicommerce', label: 'Uniware Integrations', category: 'General' },
   { id: 'myntra', label: 'Myntra Integrations', category: 'General' },

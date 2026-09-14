@@ -15,6 +15,7 @@ import StitchingSettings from './components/StitchingSettings';
 import AdminPanel from './components/AdminPanel';
 import Workspace from './components/Workspace';
 import CommunicationPanel from './components/CommunicationPanel';
+import TaskManagerPanel from './components/TaskManagerPanel';
 import EliteModalDialog from './components/EliteModalDialog';
 import CompanySettingsPanel from './components/CompanySettingsPanel';
 import EliteBillingDepartment from './components/EliteBillingDepartment';
@@ -1739,6 +1740,8 @@ export default function App() {
             <MyntraHub />
           ) : activeTab === 'communication' ? (
             <CommunicationPanel currentUser={currentUser} onNavigateTab={(tab) => setActiveTab(tab)} />
+          ) : activeTab === 'task_management' ? (
+            <TaskManagerPanel currentUser={currentUser} onNavigateTab={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'workspace' ? null : activeTab === 'admin' ? (
             <AdminPanel />
           ) : (

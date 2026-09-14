@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api, getBaseUrl } from '../services/api';
 import { io } from 'socket.io-client';
+import TaskManagerPanel from './TaskManagerPanel';
 import {
   MessageSquare,
   Activity,
@@ -35,7 +36,8 @@ import {
   Lock,
   PlusCircle,
   Sliders,
-  Trash2
+  Trash2,
+  CheckSquare
 } from 'lucide-react';
 
 export default function CommunicationPanel({ currentUser, onNavigateTab }) {
@@ -456,12 +458,42 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
     if (!group || group.type !== 'direct' || !group.members || group.members.length === 0) return null;
     const myId = String(currentUser?._id || currentUser?.id || '');
     
-    const otherMember = group.members.find((m) => {
+    let otherMember = group.members.find((m) => {
       const memberId = String(typeof m === 'object' ? (m._id || m.id) : m);
       return memberId && memberId !== myId;
     });
 
-    return otherMember || group.members[0] || null;
+    if (!otherMember) otherMember = group.members[0];
+
+    // If otherMember is string ID or lacks details, attempt lookup in allUsers
+    const otherId = String(typeof otherMember === 'object' ? (otherMember._id || otherMember.id) : otherMember);
+    if (allUsers && allUsers.length > 0) {
+      const matched = allUsers.find((u) => String(u._id || u.id) === otherId);
+      if (matched) return matched;
+    }
+
+    return otherMember || null;
+  };
+
+  const handleRosterTabChange = (tab) => {
+    setRosterTab(tab);
+    if (tab === 'direct') {
+      const dmRooms = groups.filter((g) => g.type === 'direct');
+      if (dmRooms.length > 0) {
+        if (!activeGroup || activeGroup.type !== 'direct') {
+          setActiveGroup(dmRooms[0]);
+        }
+      } else {
+        setActiveGroup(null);
+      }
+    } else if (tab === 'groups') {
+      const groupRooms = groups.filter((g) => g.type !== 'direct');
+      if (groupRooms.length > 0) {
+        if (!activeGroup || activeGroup.type === 'direct') {
+          setActiveGroup(groupRooms[0]);
+        }
+      }
+    }
   };
 
   const filteredGroups = groups.filter((g) => {
@@ -666,7 +698,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
         </div>
       </div>
 
-      {/* ── MAIN SPLIT VIEW (LEFT = ROSTER | RIGHT = CHAT / STREAM) ── */}
+      {/* ── MAIN SPLIT VIEW (LEFT = ROSTER | RIGHT = CHAT / TASK STREAM) ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr', gap: '0.75rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         
         {/* ════ LEFT COLUMN: GROUPS & DM ROSTER ════ */}
@@ -675,7 +707,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
           {/* Dual Roster Mode Switcher Pills (Groups vs Personal DMs) */}
           <div style={{ padding: '0.5rem 0.65rem', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-th)', display: 'flex', gap: '4px', flexShrink: 0 }}>
             <button
-              onClick={() => setRosterTab('groups')}
+              onClick={() => handleRosterTabChange('groups')}
               style={{
                 flex: 1,
                 padding: '0.35rem 0.45rem',
@@ -698,7 +730,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
             </button>
 
             <button
-              onClick={() => setRosterTab('direct')}
+              onClick={() => handleRosterTabChange('direct')}
               style={{
                 flex: 1,
                 padding: '0.35rem 0.45rem',
@@ -718,6 +750,29 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
             >
               <User size={13} />
               <span>Personal DMs</span>
+            </button>
+
+            <button
+              onClick={() => setRosterTab('tasks')}
+              style={{
+                flex: 1,
+                padding: '0.35rem 0.45rem',
+                fontSize: '0.74rem',
+                fontWeight: 800,
+                borderRadius: '6px',
+                border: rosterTab === 'tasks' ? '1px solid #2563eb' : '1px solid transparent',
+                background: rosterTab === 'tasks' ? '#2563eb' : 'transparent',
+                color: rosterTab === 'tasks' ? '#ffffff' : 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <CheckSquare size={13} />
+              <span>TASK</span>
             </button>
           </div>
 
@@ -868,10 +923,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
           </div>
         </div>
 
-        {/* ════ RIGHT COLUMN: CHAT STREAM & ACTIVITY FEED ════ */}
+        {/* ════ RIGHT COLUMN: CHAT STREAM / TASK MANAGER / ACTIVITY FEED ════ */}
         <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', borderRadius: '12px', overflow: 'hidden' }}>
           
-          {activeGroup ? (
+          {rosterTab === 'tasks' ? (
+            <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
+          ) : activeGroup ? (
             <>
               {/* Group / Direct Top Header */}
               {(() => {
@@ -1186,8 +1243,28 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
               </form>
             </>
           ) : (
-            <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)' }}>
-              Select a group or contact from the left roster to view messages.
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>
+              <div style={{ width: 54, height: 54, borderRadius: '50%', background: 'rgba(37,99,235,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', marginBottom: '1rem' }}>
+                <User size={28} />
+              </div>
+              <h3 style={{ margin: '0 0 0.4rem', fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                {rosterTab === 'direct' ? 'Personal 1-on-1 Messages' : 'Communication Stream'}
+              </h3>
+              <p style={{ margin: '0 0 1.2rem', fontSize: '0.8rem', color: 'var(--text-muted)', maxWidth: 360, lineHeight: 1.4 }}>
+                {rosterTab === 'direct'
+                  ? "You don't have any active direct conversations selected yet. Click below to start a private chat with a staff member."
+                  : 'Select a group from the left side panel to view messages.'}
+              </p>
+              {rosterTab === 'direct' && (
+                <button
+                  onClick={handleOpenNewDmModal}
+                  className="btn-primary"
+                  style={{ fontSize: '0.82rem', padding: '0.5rem 1.2rem', gap: '0.4rem', borderRadius: '8px' }}
+                >
+                  <Plus size={16} />
+                  <span>+ Start Private Chat</span>
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -1916,6 +1916,82 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(recordData)
     });
+  },
+
+  // ── Task Management Module (TaskOPad) Endpoints ──
+  async getTasks(params = {}) {
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') queryParams.append(k, v);
+    });
+    const qs = queryParams.toString() ? `?${queryParams.toString()}` : '';
+    return request(`/tasks${qs}`);
+  },
+
+  async getTaskById(id) {
+    return request(`/tasks/${id}`);
+  },
+
+  async createTask(taskData) {
+    return request('/tasks', {
+      method: 'POST',
+      body: JSON.stringify(taskData)
+    });
+  },
+
+  async updateTask(id, taskData) {
+    return request(`/tasks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(taskData)
+    });
+  },
+
+  async deleteTask(id) {
+    return request(`/tasks/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async startTaskTimer(id, userId) {
+    return request(`/tasks/${id}/timer/start`, {
+      method: 'POST',
+      body: JSON.stringify({ userId })
+    });
+  },
+
+  async stopTaskTimer(id, payload = {}) {
+    return request(`/tasks/${id}/timer/stop`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async addTaskTimeLog(id, logData) {
+    return request(`/tasks/${id}/timelogs`, {
+      method: 'POST',
+      body: JSON.stringify(logData)
+    });
+  },
+
+  async addTaskChecklistItem(id, itemData) {
+    return request(`/tasks/${id}/checklist`, {
+      method: 'POST',
+      body: JSON.stringify(itemData)
+    });
+  },
+
+  async toggleTaskChecklistItem(id, itemId, completed) {
+    return request(`/tasks/${id}/checklist/${itemId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ completed })
+    });
+  },
+
+  async addTaskComment(id, commentData) {
+    return request(`/tasks/${id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(commentData)
+    });
   }
 };
 
