@@ -509,15 +509,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
             <span>Manage Brands & Categories</span>
           </button>
 
-          <button 
-            onClick={() => handlePrintBarcodes(filteredItems)} 
-            className="btn-secondary" 
-            style={{ ...styles.addBtn, padding: '0.45rem 0.75rem', background: '#d1fae5', color: '#047857', borderColor: '#a7f3d0', fontWeight: 700 }}
-            title="Print Barcode Labels for All Filtered Products"
-          >
-            <Printer size={14} />
-            <span>Print All Barcodes ({filteredItems.length})</span>
-          </button>
+
 
           <button onClick={onAdd} className="btn-success" style={{ ...styles.primaryAddBtn, padding: '0.45rem 0.85rem' }}>
             <Plus size={14} />
@@ -632,14 +624,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
                     </td>
                     <td className="text-center">
                       <div style={styles.actionGroup}>
-                        <button
-                          onClick={() => handlePrintBarcodes(item)}
-                          className="btn-icon"
-                          style={{ color: '#059669', borderColor: '#a7f3d0', background: '#ecfdf5' }}
-                          title="Print Barcode Sticker for this product"
-                        >
-                          <Printer size={15} />
-                        </button>
+
                         <button
                           onClick={() => onEdit(item)}
                           className="btn-icon"
