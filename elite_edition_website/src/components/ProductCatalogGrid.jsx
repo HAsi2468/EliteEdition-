@@ -645,7 +645,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
       {/* Brand Manager Modal */}
       {showBrandManager && (
         <BrandManagerModal
-          existingBrands={catalogBrands || []}
+          existingBrands={sortedCatalogBrands || []}
           customBrands={customBrands || []}
           onAddBrand={handleAddBrand}
           onDeleteBrand={handleDeleteBrand}
