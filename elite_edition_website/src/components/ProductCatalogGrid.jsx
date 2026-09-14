@@ -442,15 +442,30 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
   return (
     <div className="glass-panel" style={styles.gridPanel}>
       {/* Control Header */}
-      <div className="catalog-control-header" style={styles.controlHeader}>
-        <div className="catalog-left-controls" style={styles.leftControls}>
-          <div className="catalog-search-box" style={styles.searchBox}>
-            <Search size={16} color="#64748b" style={styles.searchIcon} />
+      <div className="catalog-control-header" style={{
+        ...styles.controlHeader,
+        display: 'flex',
+        flexDirection: 'row',
+        flexWrap: 'nowrap',
+        alignItems: 'center',
+        justify: 'space-between',
+        padding: '0.45rem 0.85rem',
+        borderRadius: '12px',
+        background: '#ffffff',
+        border: '1px solid #e2e8f0',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+        gap: '0.5rem',
+        overflowX: 'auto',
+        whiteSpace: 'nowrap'
+      }}>
+        <div className="catalog-left-controls" style={{ ...styles.leftControls, flexShrink: 0, flexWrap: 'nowrap' }}>
+          <div className="catalog-search-box" style={{ ...styles.searchBox, minWidth: '180px', maxWidth: '240px' }}>
+            <Search size={14} color="#64748b" style={styles.searchIcon} />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search catalog by SKU, name, or brand..."
+              placeholder="Search catalog by SKU, name..."
               style={styles.searchInput}
             />
           </div>
@@ -482,31 +497,31 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
           </div>
         </div>
 
-        <div className="catalog-action-group" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="catalog-action-group" style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0, flexWrap: 'nowrap' }}>
           <button 
             type="button"
             onClick={handleOpenBrandManager}
             className="btn-secondary" 
-            style={{ ...styles.addBtn, background: '#e0e7ff', color: '#4338ca', borderColor: '#c7d2fe', fontWeight: 700 }}
+            style={{ ...styles.addBtn, padding: '0.45rem 0.75rem', background: '#e0e7ff', color: '#4338ca', borderColor: '#c7d2fe', fontWeight: 700 }}
             title="Manage Brands, Categories & Dynamic Catalog Values"
           >
-            <Building2 size={16} />
+            <Building2 size={14} />
             <span>Manage Brands & Categories</span>
           </button>
 
           <button 
             onClick={() => handlePrintBarcodes(filteredItems)} 
             className="btn-secondary" 
-            style={{ ...styles.addBtn, background: '#d1fae5', color: '#047857', borderColor: '#a7f3d0', fontWeight: 700 }}
+            style={{ ...styles.addBtn, padding: '0.45rem 0.75rem', background: '#d1fae5', color: '#047857', borderColor: '#a7f3d0', fontWeight: 700 }}
             title="Print Barcode Labels for All Filtered Products"
           >
-            <Printer size={16} />
+            <Printer size={14} />
             <span>Print All Barcodes ({filteredItems.length})</span>
           </button>
 
-          <button onClick={onAdd} className="btn-success" style={styles.primaryAddBtn}>
-            <Plus size={16} />
-            Add Product
+          <button onClick={onAdd} className="btn-success" style={{ ...styles.primaryAddBtn, padding: '0.45rem 0.85rem' }}>
+            <Plus size={14} />
+            <span>+ Add Product</span>
           </button>
         </div>
       </div>
@@ -749,10 +764,13 @@ const styles = {
   },
   controlHeader: {
     display: 'flex',
-    justifyContent: 'space-between',
+    flexDirection: 'row',
+    justify: 'space-between',
     alignItems: 'center',
-    gap: '0.85rem',
-    flexWrap: 'wrap',
+    gap: '0.5rem',
+    flexWrap: 'nowrap',
+    overflowX: 'auto',
+    whiteSpace: 'nowrap',
   },
   leftControls: {
     display: 'flex',
