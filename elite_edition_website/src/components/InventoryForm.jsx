@@ -96,7 +96,22 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
         challanNo: item.challanNo || '',
       });
 
-      setBrandCodes(Array.isArray(item.brandCodes) ? item.brandCodes : []);
+      const rawBrandCodes = Array.isArray(item.brandCodes) ? item.brandCodes : [];
+      const normalizedBrandCodes = rawBrandCodes.map(bc => {
+        if (typeof bc === 'string') {
+          return { brand: item.brand || item.party || 'ANOUK', code: bc, size: formattedSize };
+        }
+        if (bc && typeof bc === 'object') {
+          return {
+            brand: bc.brand || item.brand || item.party || 'ANOUK',
+            code: bc.code || '',
+            size: bc.size || formattedSize
+          };
+        }
+        return { brand: 'ANOUK', code: '' };
+      }).filter(bc => bc.code || bc.brand);
+
+      setBrandCodes(normalizedBrandCodes);
     }
   }, [item]);
 

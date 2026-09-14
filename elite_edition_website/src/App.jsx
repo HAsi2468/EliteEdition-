@@ -691,7 +691,8 @@ export default function App() {
         skuCode: item.skuCode || '',
         imageUrl: item.imageUrl || '',
         currentlyAvailableStock: item.inventorySnapshots?.inventory || 0,
-        qty: item.inventorySnapshots?.inventory || 0
+        qty: item.inventorySnapshots?.inventory || 0,
+        brandCodes: item.brandCodes || [],
       };
       setEditingItem(adapted);
     } else {
