@@ -4,6 +4,7 @@ import { Camera, CameraOff, RefreshCw, Volume2 } from 'lucide-react';
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 
 export default function CameraBarcodeScanner({ onScan, onClose }) {
+  const regionId = 'reader-camera-scanner-viewport';
   const [cameraActive, setCameraActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [lastScannedCode, setLastScannedCode] = useState('');
