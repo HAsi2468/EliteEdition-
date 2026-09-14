@@ -124,13 +124,24 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
       const sku = value;
       setImageError(false);
       
-      const matchedCatalog = catalogItems.find(c => c.skuCode && c.skuCode.trim().toLowerCase() === sku.trim().toLowerCase());
+      const matchedCatalog = catalogItems.find(c => matchSkuOrBrandCode(c, sku));
       const extractedSize = extractSizeFromSku(sku);
 
+      let masterSku = sku;
       if (matchedCatalog) {
+        const baseCatalogSku = (matchedCatalog.skuCode || '').trim();
+        const catExtractedSize = extractSizeFromSku(baseCatalogSku);
+        if (catExtractedSize) {
+          masterSku = baseCatalogSku;
+        } else if (extractedSize) {
+          masterSku = `${baseCatalogSku}_${extractedSize}`;
+        } else {
+          masterSku = baseCatalogSku;
+        }
+
         setFormData(prev => ({
           ...prev,
-          skuCode: sku,
+          skuCode: masterSku,
           itemName: matchedCatalog.description || prev.itemName,
           party: matchedCatalog.brand || prev.party,
           categoryName: matchedCatalog.categoryName || prev.categoryName,

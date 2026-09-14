@@ -93,53 +93,85 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
 
   // Resolve Effective Size from Catalog / Inventory / SKU code
   const resolveEffectiveSize = (sourceObj, skuCode) => {
+    if (sourceObj && Array.isArray(sourceObj.brandCodes) && skuCode) {
+      const matchedBc = sourceObj.brandCodes.find(bc => {
+        if (typeof bc === 'string') return bc.trim().toLowerCase() === skuCode.trim().toLowerCase();
+        return bc && bc.code && String(bc.code).trim().toLowerCase() === skuCode.trim().toLowerCase();
+      });
+      if (matchedBc && typeof matchedBc === 'object' && matchedBc.size && String(matchedBc.size).trim()) {
+        return String(matchedBc.size).trim().toUpperCase();
+      }
+    }
+    const extracted = extractSizeFromSku(skuCode);
+    if (extracted) return extracted;
+
     if (sourceObj) {
       if (typeof sourceObj.size === 'string' && sourceObj.size.trim() && sourceObj.size.trim().toUpperCase() !== 'N/A') {
-        return sourceObj.size.trim().toUpperCase();
+        const firstSize = sourceObj.size.split(',')[0].trim();
+        if (firstSize) return firstSize.toUpperCase();
       }
       if (Array.isArray(sourceObj.size) && sourceObj.size.length > 0) {
         const validFirst = sourceObj.size.find(s => typeof s === 'string' && s.trim() && s.trim().toUpperCase() !== 'N/A');
         if (validFirst) return validFirst.trim().toUpperCase();
       }
     }
-    return extractSizeFromSku(skuCode) || 'N/A';
+    return 'N/A';
+  };
+
+  // Resolve Master SKU Code so brand barcodes combine under Master SKU
+  const resolveMasterSku = (matchedInventory, matchedCatalog, inputSku, resolvedSize) => {
+    if (matchedInventory && matchedInventory.skuCode) {
+      return matchedInventory.skuCode;
+    }
+    if (matchedCatalog && matchedCatalog.skuCode) {
+      const baseCatalogSku = matchedCatalog.skuCode.trim();
+      const extractedSize = extractSizeFromSku(baseCatalogSku);
+      if (extractedSize) {
+        return baseCatalogSku;
+      }
+      if (resolvedSize && resolvedSize !== 'N/A') {
+        return `${baseCatalogSku}_${resolvedSize.toUpperCase()}`;
+      }
+      return baseCatalogSku;
+    }
+    return inputSku.trim();
   };
 
   // SKU Autocomplete Handler for a Row
   const handleSkuChange = (index, value) => {
     const skuRaw = value.trim();
     const updated = [...formRows];
-    updated[index].skuCode = value;
 
     if (!skuRaw) {
+      updated[index].skuCode = value;
       setFormRows(updated);
       return;
     }
 
     const matchedInventory = storeInventory.find(item => matchSkuOrBrandCode(item, skuRaw));
     const matchedCatalog = catalogItems.find(item => matchSkuOrBrandCode(item, skuRaw));
+    const effectiveSize = resolveEffectiveSize(matchedInventory || matchedCatalog, skuRaw);
+    const masterSku = resolveMasterSku(matchedInventory, matchedCatalog, skuRaw, effectiveSize);
+
+    updated[index].skuCode = masterSku;
+    updated[index].size = effectiveSize;
 
     if (matchedInventory) {
-      updated[index].skuCode = matchedInventory.skuCode || value;
-      updated[index].itemName = matchedInventory.itemName || updated[index].itemName || skuRaw;
-      updated[index].size = resolveEffectiveSize(matchedInventory, skuRaw);
+      updated[index].itemName = matchedInventory.itemName || updated[index].itemName || masterSku;
       updated[index].purchasePrice = updated[index].purchasePrice || matchedInventory.purchasePrice || 0;
       updated[index].salePrice = updated[index].salePrice || matchedInventory.salePrice || 0;
       updated[index].party = updated[index].party || resolveVendorName(matchedInventory.party) || '';
       updated[index].imageUrl = matchedInventory.imageUrl || matchedCatalog?.imageUrl || '';
       updated[index].status = 'UPDATE';
     } else if (matchedCatalog) {
-      updated[index].skuCode = matchedCatalog.skuCode || value;
-      updated[index].itemName = matchedCatalog.description || updated[index].itemName || skuRaw;
-      updated[index].size = resolveEffectiveSize(matchedCatalog, skuRaw);
+      updated[index].itemName = matchedCatalog.description || updated[index].itemName || masterSku;
       updated[index].purchasePrice = updated[index].purchasePrice || matchedCatalog.basePrice || 0;
       updated[index].salePrice = updated[index].salePrice || matchedCatalog.price || 0;
       updated[index].party = updated[index].party || resolveVendorName(matchedCatalog.brand) || '';
       updated[index].imageUrl = matchedCatalog.imageUrl || '';
       updated[index].status = 'CATALOG_MATCH';
     } else {
-      updated[index].size = extractSizeFromSku(skuRaw) || 'N/A';
-      if (!updated[index].itemName) updated[index].itemName = skuRaw;
+      if (!updated[index].itemName) updated[index].itemName = masterSku;
       updated[index].status = 'NEW';
     }
 
@@ -171,20 +203,21 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     setFormRows(prev => {
       const matchedInventory = storeInventory.find(item => matchSkuOrBrandCode(item, cleanSku));
       const matchedCatalog = catalogItems.find(item => matchSkuOrBrandCode(item, cleanSku));
-      const masterSku = matchedInventory?.skuCode || matchedCatalog?.skuCode || cleanSku;
+      const size = resolveEffectiveSize(matchedInventory || matchedCatalog, cleanSku);
+      const masterSku = resolveMasterSku(matchedInventory, matchedCatalog, cleanSku, size);
 
       const existingIndex = prev.findIndex(r => r.skuCode && (r.skuCode.trim().toLowerCase() === cleanSku.toLowerCase() || r.skuCode.trim().toLowerCase() === masterSku.toLowerCase()));
       if (existingIndex !== -1) {
         const updated = [...prev];
         updated[existingIndex] = {
           ...updated[existingIndex],
+          skuCode: masterSku,
+          size,
           qty: (updated[existingIndex].qty || 0) + 1
         };
         return updated;
       } else {
-
-        let itemName = cleanSku;
-        let size = resolveEffectiveSize(matchedInventory || matchedCatalog, cleanSku);
+        let itemName = masterSku;
         let purchasePrice = matchedInventory?.purchasePrice || matchedCatalog?.basePrice || 0;
         let salePrice = matchedInventory?.salePrice || matchedCatalog?.price || 0;
         let party = resolveVendorName(bulkVendor) || (prev[0]?.party || '');
@@ -206,7 +239,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
         return [
           ...validRows,
           {
-            skuCode: cleanSku,
+            skuCode: masterSku,
             itemName,
             size,
             qty: 1,
