@@ -184,6 +184,116 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
     }
   };
 
+  // Stock Overview Style Thermal Barcode Sticker Printing (50mm x 25mm 2-up format)
+  const printStockBarcode = (item) => {
+    const sku = item.skuCode || item.sku || 'NO-SKU';
+    const size = Array.isArray(item.size) ? item.size.join('/') : (item.size || 'N/A');
+
+    const countStr = window.prompt(`How many barcode stickers to print for SKU "${sku}"?`, "1");
+    if (countStr === null) return;
+
+    const count = parseInt(countStr, 10);
+    if (isNaN(count) || count <= 0) {
+      alert("Please enter a valid positive number.");
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    const totalSheets = Math.ceil(count / 2);
+    let sheetsHtml = '';
+    
+    for (let i = 0; i < totalSheets; i++) {
+      const idx1 = i * 2;
+      const idx2 = i * 2 + 1;
+      
+      const sticker1Html = `
+        <div class="sticker">
+          <div class="title">ELITE ONLINE</div>
+          <div class="barcode-container">
+            <svg class="barcode-img" id="barcode_${idx1}"></svg>
+          </div>
+          <div class="footer-row">
+            <span class="sku-text">${sku}</span>
+            <span class="size-text">Size: ${size}</span>
+          </div>
+        </div>
+      `;
+      
+      const sticker2Html = idx2 < count 
+        ? `
+          <div class="sticker">
+            <div class="title">ELITE ONLINE</div>
+            <div class="barcode-container">
+              <svg class="barcode-img" id="barcode_${idx2}"></svg>
+            </div>
+            <div class="footer-row">
+              <span class="sku-text">${sku}</span>
+              <span class="size-text">Size: ${size}</span>
+            </div>
+          </div>
+        `
+        : `<div class="sticker" style="visibility: hidden;"></div>`;
+        
+      sheetsHtml += `
+        <div class="sheet">
+          ${sticker1Html}
+          ${sticker2Html}
+        </div>
+      `;
+    }
+
+    let barcodeScripts = '';
+    for (let j = 0; j < count; j++) {
+      barcodeScripts += `
+        JsBarcode("#barcode_${j}", "${sku}", {
+          format: "CODE128",
+          displayValue: false,
+          margin: 0,
+          background: "transparent",
+          lineColor: "#000",
+          width: 2,
+          height: 40
+        });
+      `;
+    }
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Print Barcodes - ${sku}</title>
+        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+        <style>
+          @page { size: 100mm 25mm; margin: 0; }
+          body { margin: 0; padding: 0; font-family: sans-serif; background: white; color: black; }
+          .sheet { display: flex; width: 100mm; height: 25mm; box-sizing: border-box; overflow: hidden; page-break-after: always; }
+          .sheet:last-child { page-break-after: avoid; }
+          .sticker { flex: 1; width: 50mm; height: 25mm; box-sizing: border-box; padding: 2.2mm 3.5mm 1.5mm 3.5mm; display: flex; flex-direction: column; align-items: center; justify-content: space-between; overflow: hidden; }
+          .title { font-size: 8.5pt; font-weight: bold; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+          .barcode-container { display: flex; align-items: center; justify-content: center; height: 12.5mm; width: 100%; }
+          .barcode-img { max-width: 44mm; height: 11mm; }
+          .footer-row { display: flex; justify-content: space-between; width: 100%; font-size: 7.5pt; font-weight: 500; }
+          .sku-text { font-family: monospace; font-weight: bold; }
+          .size-text { font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        ${sheetsHtml}
+        <script>
+          try { ${barcodeScripts} } catch(e) { console.error(e); }
+          window.onload = function() {
+            setTimeout(function() { window.print(); window.close(); }, 300);
+          }
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   // Thermal Barcode Label Printing with All Product Details & Images
   const handlePrintBarcodes = (targetItems) => {
     const printList = Array.isArray(targetItems) ? targetItems : [targetItems];
@@ -624,7 +734,14 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
                     </td>
                     <td className="text-center">
                       <div style={styles.actionGroup}>
-
+                        <button
+                          onClick={() => printStockBarcode(item)}
+                          className="btn-icon"
+                          title="Print Stock Barcode Sticker"
+                          style={{ color: '#2563eb' }}
+                        >
+                          <Printer size={15} />
+                        </button>
                         <button
                           onClick={() => onEdit(item)}
                           className="btn-icon"

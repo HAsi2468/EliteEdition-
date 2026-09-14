@@ -162,7 +162,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
       const uId = currentUser?._id || currentUser?.id;
       const res = await api.getCommunicationGroups(uId);
       if (res.success && res.data) {
-        setGroups(res.data);
+        setGroups((prev) => {
+          const serverMap = new Map();
+          res.data.forEach((g) => serverMap.set(String(g._id), g));
+
+          // Retain local direct rooms if server hasn't returned them yet
+          prev.forEach((g) => {
+            if (g.type === 'direct' && !serverMap.has(String(g._id))) {
+              serverMap.set(String(g._id), g);
+            }
+          });
+
+          return Array.from(serverMap.values());
+        });
         setActiveGroup((prev) => {
           if (!prev) return res.data.length > 0 ? res.data[0] : null;
           const updated = res.data.find((g) => String(g._id) === String(prev._id));

@@ -11,16 +11,17 @@ const getGroups = async (req, res) => {
     const userId = req.user ? req.user._id : req.query.userId;
     let currentUser = null;
 
-    if (userId) {
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
       currentUser = await User.findById(userId);
     }
 
-    const currentUserId = currentUser ? currentUser._id : (userId ? new mongoose.Types.ObjectId(userId) : null);
+    const currentUserId = currentUser ? currentUser._id : (userId && mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : null);
+    const currentUserIdStr = currentUserId ? String(currentUserId) : (userId ? String(userId) : null);
 
     let query = { isArchived: { $ne: true } };
 
-    if (currentUserId) {
-      const userMemberFilter = { $in: [currentUserId, String(currentUserId)] };
+    if (currentUserId || currentUserIdStr) {
+      const userMemberFilter = { $in: [currentUserId, currentUserIdStr].filter(Boolean) };
       query = {
         isArchived: { $ne: true },
         $or: [
@@ -32,13 +33,13 @@ const getGroups = async (req, res) => {
     }
 
     let rooms = await ChatRoom.find(query)
-      .populate('members', 'name email role permissions department')
+      .populate('members', 'name username email role permissions department')
       .sort({ updatedAt: -1 });
 
     if (rooms.length === 0) {
       await syncCommunicationGroups();
       rooms = await ChatRoom.find(query)
-        .populate('members', 'name email role permissions')
+        .populate('members', 'name username email role permissions department')
         .sort({ updatedAt: -1 });
     }
 
@@ -273,18 +274,30 @@ const createOrGetDirectRoom = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Current user ID and Target user ID are required' });
     }
 
-    const currentUserId = new mongoose.Types.ObjectId(rawCurrentUserId);
-    const targetObjId = new mongoose.Types.ObjectId(targetUserId);
+    const currentUserId = mongoose.Types.ObjectId.isValid(rawCurrentUserId) ? new mongoose.Types.ObjectId(rawCurrentUserId) : rawCurrentUserId;
+    const targetObjId = mongoose.Types.ObjectId.isValid(targetUserId) ? new mongoose.Types.ObjectId(targetUserId) : targetUserId;
+
+    const strCurrent = String(currentUserId);
+    const strTarget = String(targetObjId);
 
     let query;
-    if (String(currentUserId) === String(targetObjId)) {
-      query = { type: 'direct', members: [currentUserId] };
+    if (strCurrent === strTarget) {
+      query = {
+        type: 'direct',
+        members: { $in: [currentUserId, strCurrent] }
+      };
     } else {
-      query = { type: 'direct', members: { $all: [currentUserId, targetObjId], $size: 2 } };
+      query = {
+        type: 'direct',
+        $and: [
+          { members: { $in: [currentUserId, strCurrent] } },
+          { members: { $in: [targetObjId, strTarget] } }
+        ]
+      };
     }
 
     // Check if direct room already exists between these 2 users
-    let room = await ChatRoom.findOne(query).populate('members', 'name email role permissions department');
+    let room = await ChatRoom.findOne(query).populate('members', 'name username email role permissions department');
 
     if (!room) {
       const u1 = await User.findById(currentUserId);
@@ -293,19 +306,19 @@ const createOrGetDirectRoom = async (req, res) => {
       const name1 = u1 ? (u1.name || u1.username) : 'User';
       const name2 = u2 ? (u2.name || u2.username) : 'User';
 
-      const membersArr = String(currentUserId) === String(targetObjId)
+      const membersArr = strCurrent === strTarget
         ? [currentUserId]
         : [currentUserId, targetObjId];
 
       room = await ChatRoom.create({
-        name: String(currentUserId) === String(targetObjId) ? `${name1} (Self)` : `${name1} & ${name2}`,
+        name: strCurrent === strTarget ? `${name1} (Self)` : `${name1} & ${name2}`,
         type: 'direct',
         members: membersArr,
         department: u2 ? (u2.department || 'General') : 'General',
         permissionScope: 'direct_msg'
       });
 
-      room = await ChatRoom.findById(room._id).populate('members', 'name email role permissions department');
+      room = await ChatRoom.findById(room._id).populate('members', 'name username email role permissions department');
     }
 
     res.json({ success: true, data: room });
