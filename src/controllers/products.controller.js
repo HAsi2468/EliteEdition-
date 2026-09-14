@@ -1336,7 +1336,7 @@ async function fetchBrandReportHourWise(req, res) {
 
 const createProduct = async (req, res) => {
   try {
-    const { skuCode, description, imageUrl, size } = req.body;
+    const { skuCode, description, imageUrl, size, brand, brandCodes, price, basePrice, categoryName, hsnCode } = req.body;
 
     if (!skuCode) {
       return res.status(400).json({ error: 'skuCode is required' });
@@ -1353,6 +1353,12 @@ const createProduct = async (req, res) => {
       skuCode: skuCode.trim(),
       description,
       imageUrl,
+      brand,
+      brandCodes: brandCodes || [],
+      price,
+      basePrice,
+      categoryName,
+      hsnCode,
       size: sizeArray,
       enabled: true,
       skuType: 'GOODS',
@@ -1385,7 +1391,7 @@ const deleteProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { skuCode, description, imageUrl, size } = req.body;
+    const { skuCode, description, imageUrl, size, brand, brandCodes, price, basePrice, categoryName, hsnCode } = req.body;
 
     const product = await db.InventoryProduct.findById(id);
     if (!product) {
@@ -1401,12 +1407,14 @@ const updateProduct = async (req, res) => {
       product.skuCode = skuClean;
     }
 
-    if (description !== undefined) {
-      product.description = description;
-    }
-    if (imageUrl !== undefined) {
-      product.imageUrl = imageUrl;
-    }
+    if (description !== undefined) product.description = description;
+    if (imageUrl !== undefined) product.imageUrl = imageUrl;
+    if (brand !== undefined) product.brand = brand;
+    if (brandCodes !== undefined) product.brandCodes = brandCodes;
+    if (price !== undefined) product.price = price;
+    if (basePrice !== undefined) product.basePrice = basePrice;
+    if (categoryName !== undefined) product.categoryName = categoryName;
+    if (hsnCode !== undefined) product.hsnCode = hsnCode;
 
     if (size !== undefined) {
       let sizeArray = [];

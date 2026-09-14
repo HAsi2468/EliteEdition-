@@ -80,6 +80,10 @@ const inventoryProductSchema = new mongoose.Schema(
 			type: [String],
 			default: [],
 		},
+		brandCodes: {
+			type: [mongoose.Schema.Types.Mixed],
+			default: [],
+		},
 		customFieldValues: {
 			type: mongoose.Schema.Types.Mixed,
 			default: null,

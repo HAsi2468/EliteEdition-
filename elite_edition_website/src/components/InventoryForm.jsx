@@ -57,6 +57,9 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
   const [catalogItems, setCatalogItems] = useState([]);
   const [imageError, setImageError] = useState(false);
 
+  // Dynamic Brand-Wise Barcodes / SKU Codes for multi-brand selling
+  const [brandCodes, setBrandCodes] = useState([]);
+
   useEffect(() => {
     const loadFormData = async () => {
       try {
@@ -92,8 +95,26 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
         currentlyAvailableStock: item.currentlyAvailableStock ?? item.qty ?? 0,
         challanNo: item.challanNo || '',
       });
+
+      setBrandCodes(Array.isArray(item.brandCodes) ? item.brandCodes : []);
     }
   }, [item]);
+
+  const handleAddBrandCodeRow = () => {
+    setBrandCodes(prev => [...prev, { brand: 'ANOUK', code: '' }]);
+  };
+
+  const handleRemoveBrandCodeRow = (idx) => {
+    setBrandCodes(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleUpdateBrandCode = (idx, field, value) => {
+    setBrandCodes(prev => {
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], [field]: value };
+      return updated;
+    });
+  };
 
   // Handle Input Changes
   const handleChange = (e) => {
@@ -119,6 +140,9 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
           hsnCode: matchedCatalog.hsnCode || prev.hsnCode,
           imageUrl: matchedCatalog.imageUrl || prev.imageUrl,
         }));
+        if (Array.isArray(matchedCatalog.brandCodes) && matchedCatalog.brandCodes.length > 0) {
+          setBrandCodes(matchedCatalog.brandCodes);
+        }
       } else {
         setFormData(prev => ({
           ...prev,
@@ -170,8 +194,12 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
       return;
     }
 
+    // Filter valid brand codes
+    const validBrandCodes = brandCodes.filter(bc => bc.code && bc.code.trim());
+
     const payload = {
       ...formData,
+      brandCodes: validBrandCodes,
       description: formData.itemName,
       brand: formData.party,
       basePrice: Number(formData.purchasePrice) || 0.0,
@@ -446,6 +474,86 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                   placeholder="https://example.com/image.jpg"
                   style={styles.input}
                 />
+              </div>
+
+              {/* Row 6: Brand-Wise Barcodes / SKU Codes */}
+              <div style={{ marginTop: '0.85rem', background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <label style={{ ...styles.label, margin: 0, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Tag size={14} color="#059669" />
+                    Brand-Wise SKU Codes / Barcodes (Multi-Brand Selling)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddBrandCodeRow}
+                    style={{
+                      background: '#ecfdf5',
+                      color: '#047857',
+                      border: '1px solid #a7f3d0',
+                      padding: '0.35rem 0.65rem',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Plus size={13} />
+                    <span>+ Add Brand Code</span>
+                  </button>
+                </div>
+                <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0 0 0.6rem 0' }}>
+                  Link brand-specific barcodes (e.g. ANOUK: ANK-301-L, MYNTRA: MYN-301-L) to this design. Scanning any linked barcode will manage stock for this master item.
+                </p>
+
+                {brandCodes.length === 0 ? (
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic', padding: '0.3rem 0' }}>
+                    No additional brand codes linked yet. Click "+ Add Brand Code" to add multi-brand barcodes.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    {brandCodes.map((bc, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          placeholder="Brand (e.g. ANOUK)"
+                          value={bc.brand || ''}
+                          onChange={(e) => handleUpdateBrandCode(idx, 'brand', e.target.value)}
+                          list="form-brand-suggestions"
+                          style={{ ...styles.input, flex: 1, padding: '0.45rem 0.6rem', fontSize: '0.8rem' }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Brand SKU / Barcode (e.g. ANK-301-L)"
+                          value={bc.code || ''}
+                          onChange={(e) => handleUpdateBrandCode(idx, 'code', e.target.value)}
+                          style={{ ...styles.input, flex: 1.5, padding: '0.45rem 0.6rem', fontSize: '0.8rem', fontFamily: 'monospace' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveBrandCodeRow(idx)}
+                          style={{
+                            background: '#fef2f2',
+                            color: '#dc2626',
+                            border: '1px solid #fecaca',
+                            borderRadius: '6px',
+                            padding: '0.45rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}
+                          title="Remove Brand Barcode"
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

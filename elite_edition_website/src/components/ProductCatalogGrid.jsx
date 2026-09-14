@@ -539,6 +539,15 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
                     </td>
                     <td>
                       <span style={styles.skuBadge}>{item.skuCode}</span>
+                      {Array.isArray(item.brandCodes) && item.brandCodes.length > 0 && (
+                        <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', marginTop: '4px' }}>
+                          {item.brandCodes.map((bc, bIdx) => (
+                            <span key={bIdx} style={{ fontSize: '0.68rem', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '1px 5px', fontWeight: 600 }}>
+                              {typeof bc === 'string' ? bc : `${bc.brand ? bc.brand + ': ' : ''}${bc.code}`}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <span style={styles.brandBadge}>{item.brand || 'ANOUK'}</span>

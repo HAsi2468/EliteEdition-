@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { X, Plus, Trash2, CheckCircle, Sparkles, AlertCircle, Scan, Image as ImageIcon, Camera } from 'lucide-react';
 import { api } from '../services/api';
-import { extractSizeFromSku } from '../utils/skuHelper';
+import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 import CameraBarcodeScanner from './CameraBarcodeScanner';
 
@@ -116,10 +116,11 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
       return;
     }
 
-    const matchedInventory = storeInventory.find(item => item.skuCode && item.skuCode.trim().toLowerCase() === skuRaw.toLowerCase());
-    const matchedCatalog = catalogItems.find(item => item.skuCode && item.skuCode.trim().toLowerCase() === skuRaw.toLowerCase());
+    const matchedInventory = storeInventory.find(item => matchSkuOrBrandCode(item, skuRaw));
+    const matchedCatalog = catalogItems.find(item => matchSkuOrBrandCode(item, skuRaw));
 
     if (matchedInventory) {
+      updated[index].skuCode = matchedInventory.skuCode || value;
       updated[index].itemName = matchedInventory.itemName || updated[index].itemName || skuRaw;
       updated[index].size = resolveEffectiveSize(matchedInventory, skuRaw);
       updated[index].purchasePrice = updated[index].purchasePrice || matchedInventory.purchasePrice || 0;
@@ -128,6 +129,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
       updated[index].imageUrl = matchedInventory.imageUrl || matchedCatalog?.imageUrl || '';
       updated[index].status = 'UPDATE';
     } else if (matchedCatalog) {
+      updated[index].skuCode = matchedCatalog.skuCode || value;
       updated[index].itemName = matchedCatalog.description || updated[index].itemName || skuRaw;
       updated[index].size = resolveEffectiveSize(matchedCatalog, skuRaw);
       updated[index].purchasePrice = updated[index].purchasePrice || matchedCatalog.basePrice || 0;
@@ -167,7 +169,11 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     playSuccessBeep();
 
     setFormRows(prev => {
-      const existingIndex = prev.findIndex(r => r.skuCode && r.skuCode.trim().toLowerCase() === cleanSku.toLowerCase());
+      const matchedInventory = storeInventory.find(item => matchSkuOrBrandCode(item, cleanSku));
+      const matchedCatalog = catalogItems.find(item => matchSkuOrBrandCode(item, cleanSku));
+      const masterSku = matchedInventory?.skuCode || matchedCatalog?.skuCode || cleanSku;
+
+      const existingIndex = prev.findIndex(r => r.skuCode && (r.skuCode.trim().toLowerCase() === cleanSku.toLowerCase() || r.skuCode.trim().toLowerCase() === masterSku.toLowerCase()));
       if (existingIndex !== -1) {
         const updated = [...prev];
         updated[existingIndex] = {
@@ -176,8 +182,6 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
         };
         return updated;
       } else {
-        const matchedInventory = storeInventory.find(item => item.skuCode && item.skuCode.trim().toLowerCase() === cleanSku.toLowerCase());
-        const matchedCatalog = catalogItems.find(item => item.skuCode && item.skuCode.trim().toLowerCase() === cleanSku.toLowerCase());
 
         let itemName = cleanSku;
         let size = resolveEffectiveSize(matchedInventory || matchedCatalog, cleanSku);

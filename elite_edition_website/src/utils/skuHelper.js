@@ -48,3 +48,44 @@ export function extractSizeFromSku(skuCode) {
 export function normalizeSkuCode(skuCode) {
   return extractBaseSku(skuCode).toUpperCase();
 }
+
+/**
+ * Checks if input SKU / barcode matches item Master SKU or any linked Brand SKU/Barcode.
+ *
+ * @param {object} item
+ * @param {string} inputSku
+ * @returns {boolean}
+ */
+export function matchSkuOrBrandCode(item, inputSku) {
+  if (!item || !inputSku) return false;
+  const cleanInput = String(inputSku).trim().toLowerCase();
+  if (!cleanInput) return false;
+
+  // 1. Check Master SKU Code
+  const masterSku = String(item.skuCode || item.sku || '').trim().toLowerCase();
+  if (masterSku === cleanInput) return true;
+
+  // 2. Check brandCodes array (objects [{ brand, code }] or strings)
+  if (Array.isArray(item.brandCodes)) {
+    for (const bc of item.brandCodes) {
+      if (typeof bc === 'string' && bc.trim().toLowerCase() === cleanInput) {
+        return true;
+      }
+      if (bc && typeof bc === 'object' && bc.code && String(bc.code).trim().toLowerCase() === cleanInput) {
+        return true;
+      }
+    }
+  }
+
+  // 3. Check legacy brandSkus
+  if (Array.isArray(item.brandSkus)) {
+    for (const bs of item.brandSkus) {
+      if (String(bs).trim().toLowerCase() === cleanInput) return true;
+    }
+  } else if (typeof item.brandSkus === 'string') {
+    const splitSkus = item.brandSkus.split(',').map(s => s.trim().toLowerCase());
+    if (splitSkus.includes(cleanInput)) return true;
+  }
+
+  return false;
+}

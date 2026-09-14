@@ -54,6 +54,10 @@ const inventorySchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    brandCodes: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
   },
   {
     timestamps: {

@@ -4,6 +4,8 @@ import { X, QrCode, ClipboardList, Info, AlertTriangle, Camera, Check } from 'lu
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 import CameraBarcodeScanner from './CameraBarcodeScanner';
 
+import { matchSkuOrBrandCode } from '../utils/skuHelper';
+
 export default function StockOutForm({ items = [], parties = [], prefilledItem, onSubmit, onClose }) {
   const [skuCode, setSkuCode] = useState('');
   const [selectedParty, setSelectedParty] = useState('');
@@ -33,16 +35,14 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     }
   }, [prefilledItem]);
 
-  // Look up item dynamically as the SKU is typed/scanned
+  // Look up item dynamically as the SKU is typed/scanned (checks Master SKU & Brand SKU codes)
   useEffect(() => {
     if (!skuCode.trim()) {
       setMatchedItem(null);
       return;
     }
 
-    const found = (items || []).find(
-      (item) => (item?.skuCode || '').toLowerCase().trim() === skuCode.toLowerCase().trim()
-    );
+    const found = (items || []).find((item) => matchSkuOrBrandCode(item, skuCode));
 
     if (found) {
       setMatchedItem(found);
@@ -57,20 +57,18 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     const cleanSku = (scannedCode || '').trim();
     if (!cleanSku) return;
 
-    const found = (items || []).find(
-      (item) => (item?.skuCode || '').toLowerCase().trim() === cleanSku.toLowerCase()
-    );
+    const found = (items || []).find((item) => matchSkuOrBrandCode(item, cleanSku));
 
     if (!found) {
-      setError(`SKU "${cleanSku}" not found in current inventory.`);
+      setError(`SKU / Barcode "${cleanSku}" not found in current inventory.`);
       playErrorBeep();
       return;
     }
 
     const available = found.currentlyAvailableStock || 0;
 
-    // Check if same SKU is scanned again -> increment quantity out
-    if (skuCode.toLowerCase().trim() === cleanSku.toLowerCase()) {
+    // Check if same SKU or brand barcode is scanned again -> increment quantity out
+    if (matchedItem && (matchedItem._id === found._id || matchSkuOrBrandCode(matchedItem, cleanSku))) {
       if (qtyOut + 1 > available) {
         setError(`Cannot outward ${qtyOut + 1} units. Only ${available} available in stock.`);
         playErrorBeep();
@@ -82,11 +80,11 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     } else {
       // New SKU scanned -> switch to this SKU with qty 1
       if (available <= 0) {
-        setError(`SKU "${cleanSku}" has 0 available stock.`);
+        setError(`SKU "${found.skuCode || cleanSku}" has 0 available stock.`);
         playErrorBeep();
         return;
       }
-      setSkuCode(cleanSku);
+      setSkuCode(found.skuCode || cleanSku);
       setMatchedItem(found);
       setQtyOut(1);
       playSuccessBeep();
