@@ -380,6 +380,30 @@ const createGroup = async (req, res) => {
 };
 
 /**
+ * Update members of an existing group
+ */
+const updateGroupMembers = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { memberIds = [] } = req.body;
+
+    const room = await ChatRoom.findById(groupId);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Group not found' });
+    }
+
+    room.members = memberIds.map((id) => new mongoose.Types.ObjectId(id));
+    await room.save();
+
+    const populatedRoom = await ChatRoom.findById(groupId).populate('members', 'name email role permissions department');
+    res.json({ success: true, data: populatedRoom.members });
+  } catch (error) {
+    console.error('Error updating group members:', error);
+    res.status(500).json({ success: false, message: 'Failed to update group members', error: error.message });
+  }
+};
+
+/**
  * Delete / Archive a communication group permanently & clean up messages
  */
 const deleteGroup = async (req, res) => {
@@ -428,6 +452,7 @@ module.exports = {
   getGroups,
   getGroupMessages,
   getGroupMembers,
+  updateGroupMembers,
   syncGroups,
   postActivityEvent,
   acknowledgeMessage,

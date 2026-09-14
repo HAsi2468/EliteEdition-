@@ -1781,6 +1781,13 @@ export const api = {
     return request(`/communication/groups/${groupId}/members`);
   },
 
+  async updateGroupMembers(groupId, memberIds) {
+    return request(`/communication/groups/${groupId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ memberIds }),
+    });
+  },
+
   async syncCommunicationGroups() {
     return request('/communication/groups/sync', { method: 'POST' });
   },

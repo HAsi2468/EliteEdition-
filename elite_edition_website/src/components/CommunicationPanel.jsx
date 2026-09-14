@@ -56,23 +56,25 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [userSearch, setUserSearch] = useState('');
 
-  // Detailed Admin Custom Group Creator Modal State
+  // Group creation & member selection state
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
-  const [newGroupDesc, setNewGroupDesc] = useState('');
   const [newGroupDept, setNewGroupDept] = useState('Production');
-  const [newGroupCompany, setNewGroupCompany] = useState('Elite Digital Print');
-  const [newGroupScope, setNewGroupScope] = useState('jobcards_list');
-  const [selectedModules, setSelectedModules] = useState(['Job Card']);
-  const [selectedActions, setSelectedActions] = useState(['CREATE', 'UPDATE', 'DELETE', 'STAGE_CHANGE']);
+  const [newGroupDesc, setNewGroupDesc] = useState('');
+  const [selectedMemberIds, setSelectedMemberIds] = useState([]);
+  const [staffSearch, setStaffSearch] = useState('');
   const [creatingGroup, setCreatingGroup] = useState(false);
 
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [syncing, setSyncing] = useState(false);
+
+  // Group members view & edit state
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [groupMembers, setGroupMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [isEditingMembers, setIsEditingMembers] = useState(false);
+  const [editMemberIds, setEditMemberIds] = useState([]);
 
   const socketRef = useRef(null);
   const chatBottomRef = useRef(null);
@@ -83,24 +85,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
   useEffect(() => {
     activeGroupIdRef.current = activeGroup?._id;
   }, [activeGroup?._id]);
-
-  const ERP_MODULE_CARDS = [
-    { id: 'Job Card', title: '📋 Job Cards & Stage Tracking', scope: 'jobcards_list', desc: 'Job Card creation, stage movements & production logs' },
-    { id: 'Fabric Inventory', title: '📦 Fabric Inventory & Rolls', scope: 'jobcards_fabric', desc: 'Roll inward/outward, stock adjustments & vendor challans' },
-    { id: 'Billing Invoice', title: '🧾 Billing & Invoices', scope: 'jobcards_billing', desc: 'GST Invoice generation, billing receipts & ledger edits' },
-    { id: 'Design Catalog', title: '🎨 Design Master & Artworks', scope: 'jobcards_catalogue', desc: 'Design additions, artwork pattern approvals & PKD releases' },
-    { id: 'Stitching Challan', title: '🧵 Stitching & Garments', scope: 'jobcards_stitching_challan', desc: 'Stitching challan issuances, garment production & finishing' },
-    { id: 'Raw Material', title: '🛠️ Raw Material (Paper & Inks)', scope: 'inventory', desc: 'Paper roll inward/outward, ink usage & SKU updates' },
-    { id: 'Expense Log', title: '💵 Operational Expenses', scope: 'jobcards_expense', desc: 'Daily petty cash, maintenance receipts & vendor payments' },
-    { id: 'Quality Complaint', title: '⚠️ Quality & Complaints', scope: 'jobcards_complain', desc: 'Shade defects, printing complaints & resolution logs' },
-  ];
-
-  const ACTION_OPTIONS = [
-    { id: 'CREATE', label: '➕ Record Added', desc: 'When a new item is created' },
-    { id: 'UPDATE', label: '✏️ Record Edited', desc: 'When details are modified' },
-    { id: 'DELETE', label: '🗑️ Record Deleted', desc: 'When an item is removed' },
-    { id: 'STAGE_CHANGE', label: '🔄 Stage Shift', desc: 'When workflow status changes' }
-  ];
 
   // Initialize Socket.io connection & fetch groups
   useEffect(() => {
@@ -270,14 +254,42 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
     }
   };
 
+  const handleOpenCreateGroupModal = async () => {
+    setShowCreateGroupModal(true);
+    setLoadingUsers(true);
+    setStaffSearch('');
+    try {
+      const uId = currentUser?._id || currentUser?.id;
+      const res = await api.getCommunicationUsers(uId);
+      if (res.success && res.data) {
+        setAllUsers(res.data);
+        setSelectedMemberIds(res.data.map((u) => String(u._id)));
+      }
+    } catch (err) {
+      console.error('Failed to fetch users for group creation:', err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const toggleMemberSelection = (userId) => {
+    setSelectedMemberIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleSelectAllMembers = () => {
+    setSelectedMemberIds(allUsers.map((u) => String(u._id)));
+  };
+
+  const handleDeselectAllMembers = () => {
+    setSelectedMemberIds([]);
+  };
+
   const handleCreateGroupSubmit = async (e) => {
     e.preventDefault();
     if (!newGroupName.trim()) {
       alert('Please enter a group name.');
-      return;
-    }
-    if (selectedModules.length === 0) {
-      alert('Please select at least one subscribed ERP module.');
       return;
     }
 
@@ -288,10 +300,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
         name: newGroupName.trim(),
         description: newGroupDesc.trim(),
         department: newGroupDept,
-        companyEntity: newGroupCompany,
-        permissionScope: newGroupScope,
-        subscribedModules: selectedModules,
-        subscribedActions: selectedActions,
+        memberIds: selectedMemberIds,
         userId: myId
       });
 
@@ -300,6 +309,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
         setShowCreateGroupModal(false);
         setNewGroupName('');
         setNewGroupDesc('');
+        setSelectedMemberIds([]);
         setRosterTab('groups');
         setActiveGroup(newGroup);
         setGroups((prev) => {
@@ -400,15 +410,45 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
     if (!activeGroup) return;
     setShowMembersModal(true);
     setLoadingMembers(true);
+    setIsEditingMembers(false);
     try {
-      const res = await api.getCommunicationMembers(activeGroup._id);
-      if (res.success && res.data) {
-        setGroupMembers(res.data);
+      const uId = currentUser?._id || currentUser?.id;
+      const [membersRes, usersRes] = await Promise.all([
+        api.getCommunicationMembers(activeGroup._id),
+        api.getCommunicationUsers(uId)
+      ]);
+      if (membersRes.success && membersRes.data) {
+        setGroupMembers(membersRes.data);
+        setEditMemberIds(membersRes.data.map((m) => String(m._id || m)));
+      }
+      if (usersRes.success && usersRes.data) {
+        setAllUsers(usersRes.data);
       }
     } catch (err) {
       console.error('Failed to fetch group members:', err);
     } finally {
       setLoadingMembers(false);
+    }
+  };
+
+  const toggleEditMember = (userId) => {
+    setEditMemberIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleSaveMembers = async () => {
+    if (!activeGroup) return;
+    try {
+      const res = await api.updateGroupMembers(activeGroup._id, editMemberIds);
+      if (res.success && res.data) {
+        setGroupMembers(res.data);
+        setIsEditingMembers(false);
+        alert('Group members updated successfully!');
+        await fetchGroups(false);
+      }
+    } catch (err) {
+      alert('Failed to update group members: ' + err.message);
     }
   };
 
@@ -463,23 +503,21 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
       case 'CREATE':
         return { bg: '#dcfce7', color: '#15803d', border: '#86efac' };
       case 'UPDATE':
-        return { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' };
+        return { bg: '#dbeafe', color: '#1d4ed8', border: '#93c5fd' };
       case 'DELETE':
         return { bg: '#fee2e2', color: '#b91c1c', border: '#fca5a5' };
-      case 'STATUS_CHANGE':
-      case 'STAGE_ADVANCE':
       case 'STAGE_CHANGE':
-        return { bg: '#f3e8ff', color: '#6b21a8', border: '#d8b4fe' };
+        return { bg: '#fef3c7', color: '#b45309', border: '#fde68a' };
       default:
-        return { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1' };
+        return { bg: '#f3f4f6', color: '#4b5563', border: '#e5e7eb' };
     }
   };
 
-  const formatTime = (dtStr) => {
-    if (!dtStr) return '';
+  const formatTime = (isoString) => {
+    if (!isoString) return '';
     try {
-      const dt = new Date(dtStr);
-      return dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+      const date = new Date(isoString);
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } catch (e) {
       return '';
     }
@@ -565,73 +603,67 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
     return elements;
   };
 
-  const toggleModuleSelection = (modId) => {
-    if (selectedModules.includes(modId)) {
-      setSelectedModules(selectedModules.filter((m) => m !== modId));
-    } else {
-      setSelectedModules([...selectedModules, modId]);
-    }
-  };
-
-  const toggleActionSelection = (actId) => {
-    if (selectedActions.includes(actId)) {
-      setSelectedActions(selectedActions.filter((a) => a !== actId));
-    } else {
-      setSelectedActions([...selectedActions, actId]);
-    }
-  };
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 105px)', gap: '0.75rem', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 70px)', padding: '0.75rem', gap: '0.75rem', background: 'var(--bg-main)', boxSizing: 'border-box' }}>
       
-      {/* ── HEADER BAR ── */}
-      <div className="glass-panel" style={{ padding: '0.75rem 1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '12px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ width: 36, height: 36, borderRadius: '10px', background: 'linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px var(--primary-glow)', flexShrink: 0 }}>
-            <MessageSquare size={18} />
+      {/* ── TOP HEADER / ACTION BAR ── */}
+      <div className="glass-panel" style={{ padding: '0.65rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '12px', background: 'var(--bg-card)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div style={{ width: 36, height: 36, borderRadius: '10px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(37,99,235,0.25)' }}>
+            <MessageSquare size={20} />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+            <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
               Inter-Department Communication &amp; Activity Stream
             </h2>
             <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-              Authority groups, screen activity subscriptions (Add/Edit/Delete), 1-on-1 private DMs &amp; SOS alerts
+              Real-time department group chat, 1-on-1 private DMs &amp; SOS alerts
             </p>
           </div>
         </div>
 
-        {currentUser?.role === 'admin' && (
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {currentUser?.role === 'admin' && (
             <button
-              onClick={handleSyncGroups}
-              disabled={syncing}
-              className="btn-secondary"
-              style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', gap: '0.4rem', borderRadius: '8px' }}
-              title="Re-synchronize department access groups based on current user authorities"
+              onClick={handleOpenCreateGroupModal}
+              className="btn-primary"
+              style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', gap: '0.4rem', borderRadius: '8px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' }}
+              title="Create a new custom communication group with members"
             >
-              <RefreshCw size={13} className={syncing ? 'spin-loader' : ''} />
-              <span>{syncing ? 'Syncing...' : 'Sync Groups'}</span>
+              <PlusCircle size={14} />
+              <span>+ Create Group</span>
             </button>
+          )}
 
-            <button
-              onClick={async () => {
-                if (!window.confirm('Are you sure you want to force a hard reload for ALL connected users across the company? Connected browsers will clear caches and reload immediately.')) return;
-                try {
-                  await api.forceReloadAllUsers();
-                  alert('⚡ Hard reload signal sent to all connected users!');
-                } catch (err) {
-                  alert('Failed to send reload signal: ' + err.message);
-                }
-              }}
-              className="btn-secondary"
-              style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', gap: '0.4rem', borderRadius: '8px', color: '#f59e0b', borderColor: '#f59e0b40' }}
-              title="Force clear cache & hard reload all connected users instantly"
-            >
-              <Zap size={13} color="#f59e0b" />
-              <span>Hard Refresh All Users</span>
-            </button>
-          </div>
-        )}
+          <button
+            onClick={handleSyncGroups}
+            disabled={syncing}
+            className="btn-secondary"
+            style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', gap: '0.4rem', borderRadius: '8px' }}
+            title="Re-synchronize department access groups based on current user authorities"
+          >
+            <RefreshCw size={13} className={syncing ? 'spin-loader' : ''} />
+            <span>{syncing ? 'Syncing...' : 'Sync Groups'}</span>
+          </button>
+
+          <button
+            onClick={async () => {
+              if (!window.confirm('Are you sure you want to force a hard reload for ALL connected users across the company? Connected browsers will clear caches and reload immediately.')) return;
+              try {
+                await api.forceReloadAllUsers();
+                alert('⚡ Hard reload signal sent to all connected users!');
+              } catch (err) {
+                alert('Failed to send reload signal: ' + err.message);
+              }
+            }}
+            className="btn-secondary"
+            style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', gap: '0.4rem', borderRadius: '8px', color: '#f59e0b', borderColor: '#f59e0b40' }}
+            title="Force clear cache & hard reload all connected users instantly"
+          >
+            <Zap size={13} color="#f59e0b" />
+            <span>Hard Refresh All Users</span>
+          </button>
+        </div>
       </div>
 
       {/* ── MAIN SPLIT VIEW (LEFT = ROSTER | RIGHT = CHAT / STREAM) ── */}
@@ -689,7 +721,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
             </button>
           </div>
 
-          {/* Search Bar & New DM Button */}
+          {/* Search Bar & New DM / Group Button */}
           <div style={{ padding: '0.55rem 0.65rem', borderBottom: '1px solid var(--border-light)', display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
             <div style={{ position: 'relative', flex: 1 }}>
               <Search size={13} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -702,7 +734,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
               />
             </div>
 
-            {rosterTab === 'direct' && (
+            {rosterTab === 'direct' ? (
               <button
                 onClick={handleOpenNewDmModal}
                 className="btn-primary"
@@ -712,7 +744,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
                 <Plus size={13} />
                 <span>New</span>
               </button>
-            )}
+            ) : currentUser?.role === 'admin' ? (
+              <button
+                onClick={handleOpenCreateGroupModal}
+                className="btn-primary"
+                style={{ padding: '0.35rem 0.6rem', height: '30px', fontSize: '0.72rem', borderRadius: '6px', gap: '3px' }}
+                title="Create a new communication group with staff members"
+              >
+                <Plus size={13} />
+                <span>Group</span>
+              </button>
+            ) : null}
           </div>
 
           {/* Roster Channels List */}
@@ -725,7 +767,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
             ) : filteredGroups.length === 0 ? (
               <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
                 {rosterTab === 'groups' ? (
-                  'No active department groups found.'
+                  <div>
+                    <div>No active groups found.</div>
+                    {currentUser?.role === 'admin' && (
+                      <button
+                        onClick={handleOpenCreateGroupModal}
+                        style={{ marginTop: '0.5rem', background: 'none', border: 'none', color: '#2563eb', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                      >
+                        + Create New Group
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <div>
                     <div>No direct messages yet.</div>
@@ -743,7 +795,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
                 const isActive = activeGroup && String(activeGroup._id) === String(group._id);
                 const isDirect = group.type === 'direct';
                 const colleague = isDirect ? getDMColleague(group) : null;
-                const displayName = isDirect ? (colleague ? (colleague.name || colleague.username) : group.name) : group.name;
+                const colleagueName = colleague ? (typeof colleague === 'object' ? (colleague.name || colleague.username || colleague.email) : group.name) : group.name;
+                const displayName = isDirect ? (colleagueName || group.name || 'Private DM') : group.name;
                 const deptCol = isDirect ? '#2563eb' : getDeptColor(group.department);
 
                 return (
@@ -766,7 +819,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                         {isDirect ? (
                           <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', color: '#fff', fontSize: '0.65rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {displayName.charAt(0).toUpperCase()}
+                            {(displayName || 'D').charAt(0).toUpperCase()}
                           </div>
                         ) : (
                           <Building2 size={13} color={deptCol} />
@@ -824,14 +877,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
               {(() => {
                 const isDirect = activeGroup.type === 'direct';
                 const colleague = isDirect ? getDMColleague(activeGroup) : null;
-                const displayName = isDirect ? (colleague ? (colleague.name || colleague.username) : activeGroup.name) : activeGroup.name;
+                const colleagueName = colleague ? (typeof colleague === 'object' ? (colleague.name || colleague.username || colleague.email) : activeGroup.name) : activeGroup.name;
+                const displayName = isDirect ? (colleagueName || activeGroup.name || 'Private DM') : activeGroup.name;
 
                 return (
                   <div style={{ padding: '0.65rem 1rem', borderBottom: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-th, #f8fafc)', flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                       {isDirect ? (
                         <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.9rem', fontWeight: 800, boxShadow: '0 3px 10px rgba(37,99,235,0.3)' }}>
-                          {displayName.charAt(0).toUpperCase()}
+                          {(displayName || 'D').charAt(0).toUpperCase()}
                         </div>
                       ) : (
                         <div style={{ width: 34, height: 34, borderRadius: '8px', background: `${getDeptColor(activeGroup.department)}15`, border: `1.5px solid ${getDeptColor(activeGroup.department)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: getDeptColor(activeGroup.department) }}>
@@ -852,7 +906,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
                           {isDirect ? (
                             <span>Role: <strong>{colleague?.role || 'Staff'}</strong> · Private Direct Conversation</span>
                           ) : (
-                            <span>{activeGroup.description || `Scope: ${activeGroup.permissionScope || 'general'}`}</span>
+                            <span>{activeGroup.description || `Department: ${activeGroup.department || 'General'}`}</span>
                           )}
                         </p>
                       </div>
@@ -922,193 +976,135 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
                 {loadingMessages ? (
                   <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                     <RefreshCw size={20} className="spin-loader" style={{ marginBottom: '0.5rem' }} />
-                    <div>Loading stream...</div>
+                    <div>Loading stream history...</div>
                   </div>
                 ) : messages.length === 0 ? (
-                  <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
-                    <Bot size={32} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
-                    <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>No messages logged yet</div>
-                    <p style={{ fontSize: '0.78rem', margin: '0.25rem 0 0' }}>
-                      Start typing below to send a message.
-                    </p>
+                  <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    <MessageSquare size={32} style={{ marginBottom: '0.5rem', opacity: 0.4 }} />
+                    <div>No messages in this stream yet. Start the conversation below!</div>
                   </div>
                 ) : (
-                  messages.map((msg, index) => {
-                    const isSystem = msg.msgType === 'system_activity';
-                    const isUrgentMsg = msg.priority === 'urgent';
-                    const senderName = msg.senderId?.name || msg.senderId?.username || 'User';
-                    const senderRole = msg.senderId?.role || 'user';
-                    const isMe = currentUser && String(msg.senderId?._id || msg.senderId) === String(currentUser.id || currentUser._id);
-                    const acks = msg.acknowledgments || [];
+                  messages.map((msg) => {
+                    const isMe = String(msg.senderId?._id || msg.senderId) === String(currentUser?.id || currentUser?._id);
+                    const isSystemActivity = msg.msgType === 'system_activity';
 
-                    if (isSystem) {
-                      const meta = msg.activityMeta || {};
-                      const badgeStyle = getActionBadgeStyle(meta.action);
-
+                    if (isSystemActivity) {
+                      const actBadge = getActionBadgeStyle(msg.actionType);
                       return (
                         <div
-                          key={msg._id || index}
+                          key={msg._id}
                           style={{
+                            alignSelf: 'center',
+                            width: '100%',
+                            maxWidth: '720px',
                             background: 'var(--bg-card)',
-                            border: isUrgentMsg ? '1.5px solid #ef4444' : '1px solid var(--border-light)',
-                            borderLeft: `4px solid ${isUrgentMsg ? '#ef4444' : getDeptColor(activeGroup.department)}`,
+                            border: `1px solid ${actBadge.border}`,
+                            borderLeft: `4px solid ${actBadge.color}`,
                             borderRadius: '10px',
-                            padding: '0.75rem 0.95rem',
-                            margin: '0.2rem 0',
-                            boxShadow: isUrgentMsg ? '0 4px 14px rgba(239, 68, 68, 0.2)' : 'var(--shadow-sm)'
+                            padding: '0.75rem 1rem',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                            margin: '0.2rem 0'
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-                              <div style={{ width: 22, height: 22, borderRadius: '50%', background: isUrgentMsg ? '#fee2e2' : 'rgba(37,99,235,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isUrgentMsg ? '#dc2626' : 'var(--primary)' }}>
-                                {isUrgentMsg ? <AlertTriangle size={13} /> : <Bot size={13} />}
-                              </div>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.02em' }}>
-                                SYSTEM ACTIVITY BOT
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', background: actBadge.bg, color: actBadge.color, border: `1px solid ${actBadge.border}` }}>
+                                {msg.actionType || 'ACTIVITY'}
                               </span>
-                              {isUrgentMsg && (
-                                <span style={{ fontSize: '0.62rem', fontWeight: 900, background: '#ef4444', color: '#fff', padding: '1px 6px', borderRadius: '4px' }}>
-                                  🚨 URGENT SOS
-                                </span>
-                              )}
-                              <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '1px 6px', borderRadius: '4px', background: badgeStyle.bg, color: badgeStyle.color, border: `1px solid ${badgeStyle.border}` }}>
-                                {meta.action || 'ACTIVITY'}
+                              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                {msg.moduleName} — {msg.screenName}
                               </span>
-                              {meta.module && (
-                                <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-main)', padding: '1px 5px', borderRadius: '3px' }}>
-                                  {meta.module}
-                                </span>
-                              )}
                             </div>
-                            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                              {formatDateLabel(msg.createdAt)} · {formatTime(msg.createdAt)}
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                              {formatTime(msg.createdAt)}
                             </span>
                           </div>
 
-                          <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 500, lineHeight: 1.4 }}>
-                            {renderContentWithMentions(msg.content)}
+                          <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)', lineHeight: 1.4, marginBottom: '0.4rem' }}>
+                            {msg.content}
                           </div>
 
-                          {meta.recordRef && (
-                            <div style={{ marginTop: '0.45rem', paddingTop: '0.4rem', borderTop: '1px dashed var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                                Reference Record: <strong style={{ color: 'var(--text-primary)' }}>#{meta.recordRef}</strong>
-                              </span>
-                              <button
-                                onClick={() => handleRecordClick(meta)}
-                                style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
-                              >
-                                <span>Open Module</span>
-                                <ExternalLink size={12} />
-                              </button>
+                          {msg.recordReference && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem', color: '#2563eb', fontWeight: 700 }}>
+                              <ExternalLink size={12} />
+                              <span>Ref: {msg.recordReference.recordCode || msg.recordReference.recordId}</span>
                             </div>
                           )}
 
-                          {/* Action & Acknowledgment Bar */}
-                          <div style={{ marginTop: '0.55rem', paddingTop: '0.45rem', borderTop: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
-                            <div style={{ display: 'flex', gap: '0.35rem' }}>
-                              <button
-                                onClick={() => handleAcknowledge(msg._id, 'acknowledged')}
-                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.68rem', fontWeight: 700, borderRadius: '4px', border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
-                              >
-                                <ThumbsUp size={11} /> Acknowledge
-                              </button>
-                              <button
-                                onClick={() => handleAcknowledge(msg._id, 'in_progress')}
-                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.68rem', fontWeight: 700, borderRadius: '4px', border: '1px solid #fef08a', background: '#fefce8', color: '#a16207', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
-                              >
-                                <PlayCircle size={11} /> In Progress
-                              </button>
-                              <button
-                                onClick={() => handleAcknowledge(msg._id, 'completed')}
-                                style={{ padding: '0.2rem 0.5rem', fontSize: '0.68rem', fontWeight: 700, borderRadius: '4px', border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#15803d', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
-                              >
-                                <CheckCircle size={11} /> Done
-                              </button>
-                            </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.5rem', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)' }}>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              Actor: <strong>{msg.senderName || msg.senderId?.name || 'System Bot'}</strong>
+                            </span>
 
-                            {/* Live Acknowledgments List */}
-                            {acks.length > 0 && (
-                              <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                                {acks.map((a, aIdx) => (
-                                  <span key={aIdx} style={{ fontSize: '0.62rem', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: a.action === 'completed' ? '#dcfce7' : a.action === 'in_progress' ? '#fef9c3' : '#dbeafe', color: a.action === 'completed' ? '#166534' : a.action === 'in_progress' ? '#854d0e' : '#1e40af' }}>
-                                    ✓ {a.userName} ({a.action})
-                                  </span>
-                                ))}
-                              </div>
-                            )}
+                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                              {(msg.acknowledgments || []).some((a) => String(a.user) === String(currentUser?.id || currentUser?._id)) ? (
+                                <span style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  <CheckCircle size={13} /> Acknowledged
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleAcknowledge(msg._id, 'acknowledged')}
+                                  style={{ background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.2)', color: '#2563eb', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', cursor: 'pointer' }}
+                                >
+                                  Acknowledge
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
                     }
 
-                    // Standard Human Message Bubble
                     return (
                       <div
-                        key={msg._id || index}
+                        key={msg._id}
                         style={{
+                          alignSelf: isMe ? 'flex-end' : 'flex-start',
+                          maxWidth: '70%',
                           display: 'flex',
                           flexDirection: 'column',
-                          alignItems: isMe ? 'flex-end' : 'flex-start',
-                          margin: '0.15rem 0'
+                          alignItems: isMe ? 'flex-end' : 'flex-start'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '2px', padding: '0 4px' }}>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-primary)' }}>{senderName}</span>
-                          <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>({senderRole})</span>
-                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>· {formatTime(msg.createdAt)}</span>
-                          {isUrgentMsg && (
-                            <span style={{ fontSize: '0.6rem', fontWeight: 900, background: '#ef4444', color: '#fff', padding: '1px 5px', borderRadius: '3px' }}>
-                              🚨 SOS URGENT
-                            </span>
-                          )}
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '2px', fontWeight: 600 }}>
+                          {msg.senderId?.name || msg.senderName || 'Staff Member'} · {formatTime(msg.createdAt)}
                         </div>
 
                         <div
                           style={{
-                            maxWidth: '75%',
-                            padding: '0.6rem 0.85rem',
-                            borderRadius: isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                            background: isUrgentMsg
-                              ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)'
-                              : isMe
-                              ? 'linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%)'
-                              : 'var(--bg-card)',
-                            color: isMe || isUrgentMsg ? '#ffffff' : 'var(--text-primary)',
-                            border: isUrgentMsg ? '1px solid #ef4444' : isMe ? 'none' : '1px solid var(--border-light)',
-                            boxShadow: isUrgentMsg ? '0 4px 14px rgba(239,68,68,0.3)' : isMe ? '0 3px 10px var(--primary-glow)' : 'var(--shadow-sm)',
+                            background: isMe ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'var(--bg-card)',
+                            color: isMe ? '#ffffff' : 'var(--text-primary)',
+                            padding: '0.65rem 0.9rem',
+                            borderRadius: isMe ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
+                            border: isMe ? 'none' : '1px solid var(--border-light)',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                             fontSize: '0.85rem',
-                            lineHeight: 1.4,
+                            lineHeight: 1.45,
                             wordBreak: 'break-word'
                           }}
                         >
-                          {/* Image / Attachment Preview */}
                           {msg.attachment && msg.attachment.fileUrl && (
-                            <div style={{ marginBottom: '0.4rem' }}>
-                              {msg.attachment.fileType === 'image' || msg.attachment.fileUrl.startsWith('data:image') ? (
-                                <div style={{ borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)', cursor: 'zoom-in', maxWith: 220, maxHeight: 180 }}>
-                                  <img
-                                    src={msg.attachment.fileUrl}
-                                    alt="attachment"
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                    onClick={() => setZoomImg(msg.attachment.fileUrl)}
-                                  />
-                                </div>
+                            <div style={{ marginBottom: '0.5rem' }}>
+                              {msg.attachment.fileType === 'image' ? (
+                                <img
+                                  src={msg.attachment.fileUrl}
+                                  alt="Attachment"
+                                  onClick={() => setZoomImg(msg.attachment.fileUrl)}
+                                  style={{ maxWidth: '100%', maxHeight: '220px', borderRadius: '8px', cursor: 'zoom-in', objectFit: 'cover' }}
+                                />
                               ) : (
                                 <a
                                   href={msg.attachment.fileUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  style={{ color: isMe || isUrgentMsg ? '#fff' : 'var(--primary)', fontSize: '0.75rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  download={msg.attachment.fileName}
+                                  style={{ color: isMe ? '#fff' : '#2563eb', fontWeight: 700, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'underline' }}
                                 >
-                                  <FileText size={14} />
-                                  <span>{msg.attachment.fileName || 'Download Attachment'}</span>
+                                  <FileText size={14} /> {msg.attachment.fileName}
                                 </a>
                               )}
                             </div>
                           )}
 
-                          {renderContentWithMentions(msg.content)}
+                          {msg.content}
                         </div>
                       </div>
                     );
@@ -1117,10 +1113,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
                 <div ref={chatBottomRef} />
               </div>
 
-              {/* Attachment Preview Badge */}
+              {/* Attachment Preview Banner */}
               {attachedFile && (
-                <div style={{ padding: '0.4rem 1rem', background: '#f1f5f9', borderTop: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.75rem', color: '#1e293b', fontWeight: 700 }}>
+                <div style={{ padding: '0.4rem 0.9rem', background: '#eff6ff', borderTop: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#1d4ed8' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <Paperclip size={14} color="#2563eb" />
                     <span>Attached: {attachedFile.fileName}</span>
                   </div>
@@ -1197,23 +1193,23 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
         </div>
       </div>
 
-      {/* ── DETAILED ADMIN CREATE CUSTOM ACTIVITY GROUP FORM MODAL ── */}
+      {/* ── CREATE GROUP & SELECT MEMBERS MODAL ── */}
       {showCreateGroupModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: 680, maxHeight: '90vh', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.2s ease-out', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 580, maxHeight: '90vh', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.2s ease-out', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}>
             
             {/* Modal Header */}
             <div style={{ padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: '#fff' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <div style={{ width: 36, height: 36, borderRadius: '10px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-                  <Sliders size={20} />
+                  <Users size={20} />
                 </div>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.01em', color: '#fff' }}>
-                    Create Screen Activity Communication Group
+                    Create New Group & Assign Members
                   </h3>
                   <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8', fontWeight: 500 }}>
-                    Configure automatic screen event streaming, module subscriptions &amp; team access
+                    Enter group details and select staff members to include in this group
                   </p>
                 </div>
               </div>
@@ -1226,223 +1222,173 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
               </button>
             </div>
 
-            {/* Modal Scrollable Form Content */}
-            <form onSubmit={handleCreateGroupSubmit} style={{ padding: '1.3rem 1.4rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+            {/* Modal Form */}
+            <form onSubmit={handleCreateGroupSubmit} style={{ padding: '1.2rem 1.4rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               
-              {/* SECTION 1: GENERAL DETAILS */}
-              <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
-                <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Info size={15} color="var(--primary)" />
-                  <span>1. General Information</span>
-                </h4>
+              {/* Group Name & Department */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                    Group Name *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Stitching & Production Team"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'var(--bg-input)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
+                    required
+                  />
+                </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                      Group Name *
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Stitching & Production Live Activity Stream"
-                      value={newGroupName}
-                      onChange={(e) => setNewGroupName(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'var(--bg-card)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                      Detailed Group Description
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Live automated logs for garment production, stitching challan releases & defect reports"
-                      value={newGroupDesc}
-                      onChange={(e) => setNewGroupDesc(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'var(--bg-card)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
-                    />
-                  </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                    Department Category
+                  </label>
+                  <select
+                    value={newGroupDept}
+                    onChange={(e) => setNewGroupDept(e.target.value)}
+                    style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="Production">Production</option>
+                    <option value="Stitching">Stitching</option>
+                    <option value="Billing">Billing</option>
+                    <option value="Fabric">Fabric</option>
+                    <option value="E-Commerce">E-Commerce</option>
+                    <option value="Design">Design</option>
+                    <option value="Inventory">Inventory</option>
+                    <option value="Quality">Quality</option>
+                    <option value="Finance">Finance</option>
+                    <option value="General">General</option>
+                  </select>
                 </div>
               </div>
 
-              {/* SECTION 2: DEPARTMENT & VIEW ACCESS SCOPE */}
-              <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
-                <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Shield size={15} color="var(--primary)" />
-                  <span>2. Department Category &amp; Access Authority Scope</span>
-                </h4>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.85rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                      Target Company Scope
-                    </label>
-                    <select
-                      value={newGroupCompany}
-                      onChange={(e) => setNewGroupCompany(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'var(--bg-card)', color: 'var(--text-primary)' }}
-                    >
-                      <option value="Elite Digital Print">Elite Digital Print</option>
-                      <option value="Elite Online">Elite Online</option>
-                      <option value="Elite Fabtex">Elite Fabtex</option>
-                      <option value="Elite Stitching">Elite Stitching</option>
-                      <option value="">All Authorized Companies</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                      Department Category
-                    </label>
-                    <select
-                      value={newGroupDept}
-                      onChange={(e) => setNewGroupDept(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'var(--bg-card)', color: 'var(--text-primary)' }}
-                    >
-                      <option value="Production">Production</option>
-                      <option value="Stitching">Stitching</option>
-                      <option value="Billing">Billing</option>
-                      <option value="Fabric">Fabric</option>
-                      <option value="E-Commerce">E-Commerce</option>
-                      <option value="Design">Design</option>
-                      <option value="Inventory">Inventory</option>
-                      <option value="Quality">Quality</option>
-                      <option value="Finance">Finance</option>
-                      <option value="General">General</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                      View Access Permission Scope
-                    </label>
-                    <select
-                      value={newGroupScope}
-                      onChange={(e) => setNewGroupScope(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'var(--bg-card)', color: 'var(--text-primary)' }}
-                    >
-                      <option value="jobcards_list">Job Cards Access (jobcards_list)</option>
-                      <option value="jobcards_fabric">Fabric Store Access (jobcards_fabric)</option>
-                      <option value="jobcards_billing">Billing Access (jobcards_billing)</option>
-                      <option value="stitching">Stitching Access (stitching)</option>
-                      <option value="sales">Sales & Orders Access (sales)</option>
-                      <option value="returns">Returns Access (returns)</option>
-                      <option value="inventory">Warehouse Inventory (inventory)</option>
-                      <option value="jobcards_catalogue">Design Catalog Access (jobcards_catalogue)</option>
-                      <option value="jobcards_expense">Expense Log Access (jobcards_expense)</option>
-                      <option value="jobcards_complain">Quality Complaints (jobcards_complain)</option>
-                      <option value="general">All Authorized Staff (General)</option>
-                    </select>
-                  </div>
-                </div>
+              {/* Group Description */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  Group Description (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Group for garment production tracking and team coordination"
+                  value={newGroupDesc}
+                  onChange={(e) => setNewGroupDesc(e.target.value)}
+                  style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'var(--bg-input)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
+                />
               </div>
 
-              {/* SECTION 3: SUBSCRIBED ERP MODULES */}
-              <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
-                <h4 style={{ margin: '0 0 0.4rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Layers size={15} color="var(--primary)" />
-                  <span>3. Subscribed ERP Screens / Modules</span>
-                </h4>
-                <p style={{ margin: '0 0 0.75rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  Activities performed on checked screens will automatically post live cards into this group.
-                </p>
+              {/* Staff Member Selection Section */}
+              <div style={{ background: 'var(--bg-main)', padding: '0.9rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Users size={14} color="var(--primary)" />
+                      <span>Select Group Members ({selectedMemberIds.length} / {allUsers.length})</span>
+                    </h4>
+                  </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  {ERP_MODULE_CARDS.map((mod) => {
-                    const isChecked = selectedModules.includes(mod.id);
-                    return (
-                      <div
-                        key={mod.id}
-                        onClick={() => toggleModuleSelection(mod.id)}
-                        style={{
-                          padding: '0.6rem 0.75rem',
-                          borderRadius: '8px',
-                          border: isChecked ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
-                          background: isChecked ? '#eff6ff' : 'var(--bg-card)',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: '8px',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {}}
-                          style={{ marginTop: '2px', cursor: 'pointer' }}
-                        />
-                        <div>
-                          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: isChecked ? '#1d4ed8' : 'var(--text-primary)' }}>
-                            {mod.title}
-                          </div>
-                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
-                            {mod.desc}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button
+                      type="button"
+                      onClick={handleSelectAllMembers}
+                      style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Select All
+                    </button>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>·</span>
+                    <button
+                      type="button"
+                      onClick={handleDeselectAllMembers}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Deselect All
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {/* SECTION 4: TRIGGER OPERATIONS */}
-              <div style={{ background: 'var(--bg-main)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
-                <h4 style={{ margin: '0 0 0.4rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Zap size={15} color="var(--primary)" />
-                  <span>4. Subscribed Activity Operations</span>
-                </h4>
-                <p style={{ margin: '0 0 0.75rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                  Choose which user actions trigger activity cards.
-                </p>
+                {/* Staff Search */}
+                <div style={{ position: 'relative', marginBottom: '0.6rem' }}>
+                  <Search size={13} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    placeholder="Filter staff by name or department..."
+                    value={staffSearch}
+                    onChange={(e) => setStaffSearch(e.target.value)}
+                    style={{ width: '100%', paddingLeft: '28px', fontSize: '0.78rem', height: '32px', background: 'var(--bg-card)', border: '1px solid var(--border-light)', borderRadius: '6px', boxSizing: 'border-box' }}
+                  />
+                </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  {ACTION_OPTIONS.map((act) => {
-                    const isChecked = selectedActions.includes(act.id);
-                    return (
-                      <div
-                        key={act.id}
-                        onClick={() => toggleActionSelection(act.id)}
-                        style={{
-                          padding: '0.6rem 0.75rem',
-                          borderRadius: '8px',
-                          border: isChecked ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
-                          background: isChecked ? '#eff6ff' : 'var(--bg-card)',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: '8px',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {}}
-                          style={{ marginTop: '2px', cursor: 'pointer' }}
-                        />
-                        <div>
-                          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: isChecked ? '#1d4ed8' : 'var(--text-primary)' }}>
-                            {act.label}
+                {/* Staff Checkboxes List */}
+                <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  {loadingUsers ? (
+                    <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                      <RefreshCw size={16} className="spin-loader" />
+                      <div>Loading staff list...</div>
+                    </div>
+                  ) : (
+                    allUsers
+                      .filter((u) => {
+                        const term = staffSearch.toLowerCase().trim();
+                        if (!term) return true;
+                        return (
+                          (u.name || '').toLowerCase().includes(term) ||
+                          (u.username || '').toLowerCase().includes(term) ||
+                          (u.email || '').toLowerCase().includes(term) ||
+                          (u.department || '').toLowerCase().includes(term)
+                        );
+                      })
+                      .map((u) => {
+                        const isChecked = selectedMemberIds.includes(String(u._id));
+                        return (
+                          <div
+                            key={u._id}
+                            onClick={() => toggleMemberSelection(String(u._id))}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.45rem 0.65rem',
+                              borderRadius: '6px',
+                              background: isChecked ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-card)',
+                              border: isChecked ? '1px solid #2563eb' : '1px solid var(--border-light)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}}
+                                style={{ cursor: 'pointer' }}
+                              />
+                              <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', color: '#fff', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {(u.name || u.username || 'U').charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{u.name || u.username}</div>
+                                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{u.email}</div>
+                              </div>
+                            </div>
+
+                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-main)', padding: '1px 6px', borderRadius: '4px' }}>
+                              {u.department || 'General'}
+                            </span>
                           </div>
-                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            {act.desc}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        );
+                      })
+                  )}
                 </div>
               </div>
 
               {/* Submit Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.4rem' }}>
                 <button
                   type="button"
                   onClick={() => setShowCreateGroupModal(false)}
                   className="btn-secondary"
-                  style={{ fontSize: '0.82rem', padding: '0.5rem 1rem', borderRadius: '8px' }}
+                  style={{ fontSize: '0.82rem', padding: '0.45rem 0.95rem', borderRadius: '8px' }}
                 >
                   Cancel
                 </button>
@@ -1450,9 +1396,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
                   type="submit"
                   disabled={creatingGroup}
                   className="btn-primary"
-                  style={{ fontSize: '0.82rem', padding: '0.5rem 1.25rem', borderRadius: '8px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}
+                  style={{ fontSize: '0.82rem', padding: '0.45rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' }}
                 >
-                  {creatingGroup ? 'Creating Group...' : 'Create Activity Group'}
+                  {creatingGroup ? 'Creating Group...' : 'Create Group'}
                 </button>
               </div>
             </form>
@@ -1551,28 +1497,80 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
       {/* ── MEMBERS AUTHORITIES MODAL ── */}
       {showMembersModal && activeGroup && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: 520, borderRadius: '14px', overflow: 'hidden', animation: 'slideUp 0.2s ease-out' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 540, borderRadius: '14px', overflow: 'hidden', animation: 'slideUp 0.2s ease-out' }}>
             <div style={{ padding: '1rem 1.2rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-th)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Users size={18} color="var(--primary)" />
                 <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  Authorized Members — {activeGroup.name}
+                  Members — {activeGroup.name}
                 </h3>
               </div>
-              <button onClick={() => setShowMembersModal(false)} className="btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '6px' }}>
-                Close
-              </button>
+              
+              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                {currentUser?.role === 'admin' && (
+                  <button
+                    onClick={() => setIsEditingMembers(!isEditingMembers)}
+                    className="btn-secondary"
+                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.74rem', borderRadius: '6px', color: '#2563eb', borderColor: '#2563eb40' }}
+                  >
+                    {isEditingMembers ? 'View Members' : 'Edit Members'}
+                  </button>
+                )}
+                <button onClick={() => setShowMembersModal(false)} className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.74rem', borderRadius: '6px' }}>
+                  Close
+                </button>
+              </div>
             </div>
 
             <div style={{ padding: '1rem', maxHeight: '60vh', overflowY: 'auto' }}>
               {loadingMembers ? (
                 <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
                   <RefreshCw size={18} className="spin-loader" />
-                  <div style={{ fontSize: '0.8rem', marginTop: '0.4rem' }}>Loading group authorities...</div>
+                  <div style={{ fontSize: '0.8rem', marginTop: '0.4rem' }}>Loading group members...</div>
+                </div>
+              ) : isEditingMembers ? (
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.6rem' }}>
+                    Select / Unselect staff members to update group membership ({editMemberIds.length} selected):
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '240px', overflowY: 'auto' }}>
+                    {allUsers.map((u) => {
+                      const isChecked = editMemberIds.includes(String(u._id));
+                      return (
+                        <div
+                          key={u._id}
+                          onClick={() => toggleEditMember(String(u._id))}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0.45rem 0.65rem',
+                            borderRadius: '6px',
+                            background: isChecked ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-main)',
+                            border: isChecked ? '1px solid #2563eb' : '1px solid var(--border-light)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <input type="checkbox" checked={isChecked} onChange={() => {}} style={{ cursor: 'pointer' }} />
+                            <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>{u.name || u.username}</div>
+                          </div>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{u.email}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={handleSaveMembers}
+                    className="btn-primary"
+                    style={{ marginTop: '0.8rem', width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px' }}
+                  >
+                    Save Group Members
+                  </button>
                 </div>
               ) : groupMembers.length === 0 ? (
                 <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', padding: '1rem' }}>
-                  No individual members assigned. System auto-includes all users with <code>{activeGroup.permissionScope}</code> permission.
+                  No members assigned yet. Click "Edit Members" to add staff members to this group.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

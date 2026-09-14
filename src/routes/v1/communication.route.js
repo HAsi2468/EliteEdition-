@@ -9,6 +9,7 @@ router.delete('/groups/:groupId', communicationController.deleteGroup);
 router.post('/groups/sync', communicationController.syncGroups);
 router.get('/groups/:groupId/messages', communicationController.getGroupMessages);
 router.get('/groups/:groupId/members', communicationController.getGroupMembers);
+router.post('/groups/:groupId/members', communicationController.updateGroupMembers);
 router.post('/activity', communicationController.postActivityEvent);
 router.post('/messages/:messageId/acknowledge', communicationController.acknowledgeMessage);
 router.get('/users', communicationController.getUsersForDM);
