@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Edit2, Trash2, Search, Plus, SlidersHorizontal, RefreshCw, Eye, Tag, Printer, Building2 } from 'lucide-react';
 import BrandManagerModal from './BrandManagerModal';
 
-export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onSync }) {
+export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onSync, onOpenManager }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sizeFilter, setSizeFilter] = useState('All');
   const [brandFilter, setBrandFilter] = useState('All');

@@ -1623,6 +1623,7 @@ export default function App() {
               onEdit={triggerEditModal}
               onDelete={handleDeleteItem}
               onSync={handleSyncCatalog}
+              onOpenManager={(tab) => triggerManagerModal(tab || 'brands')}
             />
           ) : activeTab === 'returns' ? (
             <ReturnsManager />

@@ -1,4 +1,5 @@
-import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw, Building2, Tag } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw, Building2, Tag, Search, Check } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function CatalogManagerModal({ initialTab = 'vendors', context = 'elite_online', onClose }) {
@@ -18,6 +19,9 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
     }
   });
   const [newBrandInput, setNewBrandInput] = useState('');
+  const [brandSearchTerm, setBrandSearchTerm] = useState('');
+  const [editingBrandTag, setEditingBrandTag] = useState(null);
+  const [editingBrandInputValue, setEditingBrandInputValue] = useState('');
 
   // Loading states
   const [loading, setLoading] = useState(false);
@@ -81,6 +85,8 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
   // --- BRAND ACTION HANDLERS ---
   const handleAddBrandTag = (e) => {
     e.preventDefault();
+    setError('');
+    setSuccess('');
     const trimmed = newBrandInput.trim().toUpperCase();
     if (!trimmed) return;
     if (customBrands.some(b => b.toLowerCase() === trimmed.toLowerCase())) {
@@ -91,18 +97,48 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
     setCustomBrands(updated);
     try {
       localStorage.setItem('elite_managed_brands', JSON.stringify(updated));
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('elite_brands_updated', { detail: updated }));
     } catch (e) {}
     setNewBrandInput('');
     setSuccess(`Brand "${trimmed}" added successfully.`);
   };
 
   const handleDeleteBrandTag = (brandName) => {
+    if (!window.confirm(`Are you sure you want to delete brand "${brandName}"?`)) return;
+    setError('');
+    setSuccess('');
     const updated = customBrands.filter(b => b.toLowerCase() !== brandName.toLowerCase());
     setCustomBrands(updated);
     try {
       localStorage.setItem('elite_managed_brands', JSON.stringify(updated));
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('elite_brands_updated', { detail: updated }));
     } catch (e) {}
     setSuccess(`Brand "${brandName}" removed.`);
+  };
+
+  const handleSaveEditedBrandTag = (oldBrandName) => {
+    setError('');
+    setSuccess('');
+    const trimmed = editingBrandInputValue.trim().toUpperCase();
+    if (!trimmed) {
+      setError('Brand name cannot be empty.');
+      return;
+    }
+    if (trimmed !== oldBrandName.toUpperCase() && customBrands.some(b => b.toLowerCase() === trimmed.toLowerCase())) {
+      setError(`Brand "${trimmed}" already exists.`);
+      return;
+    }
+    const updated = customBrands.map(b => (b.toLowerCase() === oldBrandName.toLowerCase() ? trimmed : b));
+    setCustomBrands(updated);
+    try {
+      localStorage.setItem('elite_managed_brands', JSON.stringify(updated));
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('elite_brands_updated', { detail: updated }));
+    } catch (e) {}
+    setEditingBrandTag(null);
+    setSuccess(`Updated brand "${oldBrandName}" to "${trimmed}".`);
   };
 
   // 1. Vendors
@@ -369,20 +405,68 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
                       </div>
                     </form>
 
-                    <div style={{ marginTop: '1.25rem' }}>
+                    {/* Search & Filter Bar */}
+                    <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '0.4rem 0.75rem', gap: '0.5rem' }}>
+                      <Search size={15} color="var(--text-muted)" />
+                      <input
+                        type="text"
+                        value={brandSearchTerm}
+                        onChange={(e) => setBrandSearchTerm(e.target.value)}
+                        placeholder="Filter catalog brands..."
+                        style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-primary)', fontSize: '0.85rem', flex: 1 }}
+                      />
+                      {brandSearchTerm && (
+                        <button onClick={() => setBrandSearchTerm('')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }} title="Clear Search">
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ marginTop: '0.75rem' }}>
                       <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.04em' }}>
-                        ACTIVE CATALOG BRANDS ({customBrands.length})
+                        ACTIVE CATALOG BRANDS ({customBrands.filter(b => b.toLowerCase().includes(brandSearchTerm.toLowerCase())).length})
                       </h4>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        {customBrands.map((brand, idx) => (
-                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '0.4rem 0.75rem', borderRadius: '8px' }}>
-                            <Tag size={13} color="#34d399" />
-                            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#34d399' }}>{brand}</span>
-                            <button type="button" onClick={() => handleDeleteBrandTag(brand)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', marginLeft: '0.2rem' }} title={`Delete ${brand}`}>
-                              <Trash2 size={13} color="#f87171" />
-                            </button>
-                          </div>
-                        ))}
+                        {customBrands
+                          .filter(b => b.toLowerCase().includes(brandSearchTerm.toLowerCase()))
+                          .map((brand, idx) => {
+                            const isEditing = editingBrandTag === brand;
+                            if (isEditing) {
+                              return (
+                                <div key={`edit-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid #3b82f6', padding: '0.3rem 0.5rem', borderRadius: '8px' }}>
+                                  <input
+                                    type="text"
+                                    value={editingBrandInputValue}
+                                    onChange={(e) => setEditingBrandInputValue(e.target.value)}
+                                    style={{ border: 'none', background: 'transparent', outline: 'none', color: '#ffffff', fontSize: '0.85rem', fontWeight: 700, width: '110px' }}
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSaveEditedBrandTag(brand);
+                                      if (e.key === 'Escape') setEditingBrandTag(null);
+                                    }}
+                                  />
+                                  <button type="button" onClick={() => handleSaveEditedBrandTag(brand)} style={{ background: '#3b82f6', border: 'none', borderRadius: '4px', padding: '0.2rem 0.4rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Save">
+                                    <Check size={13} color="#ffffff" />
+                                  </button>
+                                  <button type="button" onClick={() => setEditingBrandTag(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', display: 'flex' }} title="Cancel">
+                                    <X size={13} color="#94a3b8" />
+                                  </button>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '0.4rem 0.75rem', borderRadius: '8px' }}>
+                                <Tag size={13} color="#34d399" />
+                                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#34d399' }}>{brand}</span>
+                                <button type="button" onClick={() => { setEditingBrandTag(brand); setEditingBrandInputValue(brand); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', marginLeft: '0.2rem' }} title={`Rename ${brand}`}>
+                                  <Edit2 size={13} color="#60a5fa" />
+                                </button>
+                                <button type="button" onClick={() => handleDeleteBrandTag(brand)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }} title={`Delete ${brand}`}>
+                                  <Trash2 size={13} color="#f87171" />
+                                </button>
+                              </div>
+                            );
+                          })}
                       </div>
                     </div>
                   </div>
@@ -801,6 +885,11 @@ const styles = {
     gap: '1rem',
     maxHeight: '92vh',
     height: 'auto',
+    backgroundColor: '#0f172a',
+    color: '#f8fafc',
+    borderRadius: '16px',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.75)',
   },
   header: {
     display: 'flex',
