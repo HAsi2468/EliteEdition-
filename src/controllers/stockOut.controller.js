@@ -13,9 +13,39 @@ const createStockOut = async (req, res) => {
       const qty = parseInt(qtyOut, 10) || 1;
       const cleanSku = (skuCode || '').trim();
       
-      const inventoryItem = await db.Inventory.findOne({
+      let inventoryItem = await db.Inventory.findOne({
         skuCode: { $regex: new RegExp(`^${cleanSku}$`, 'i') }
       });
+
+      if (!inventoryItem) {
+        const matchedProd = await db.Product.findOne({
+          $or: [
+            { 'brandCodes': cleanSku },
+            { 'brandCodes.code': cleanSku }
+          ]
+        }).lean() || await db.InventoryProduct.findOne({
+          $or: [
+            { 'brandCodes': cleanSku },
+            { 'brandCodes.code': cleanSku }
+          ]
+        }).lean();
+
+        if (matchedProd && matchedProd.skuCode) {
+          const masterSku = matchedProd.skuCode.trim();
+          inventoryItem = await db.Inventory.findOne({
+            skuCode: { $regex: new RegExp(`^${masterSku}$`, 'i') }
+          });
+        }
+      }
+
+      if (!inventoryItem) {
+        inventoryItem = await db.Inventory.findOne({
+          $or: [
+            { 'brandCodes': cleanSku },
+            { 'brandCodes.code': cleanSku }
+          ]
+        });
+      }
       
       if (!inventoryItem) continue;
 
