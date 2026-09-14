@@ -413,9 +413,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
   };
 
   const getDMColleague = (group) => {
-    if (!group || group.type !== 'direct' || !group.members) return null;
-    const myId = currentUser?.id || currentUser?._id;
-    return group.members.find((m) => String(m._id || m) !== String(myId)) || group.members[0];
+    if (!group || group.type !== 'direct' || !group.members || group.members.length === 0) return null;
+    const myId = String(currentUser?._id || currentUser?.id || '');
+    
+    const otherMember = group.members.find((m) => {
+      const memberId = String(typeof m === 'object' ? (m._id || m.id) : m);
+      return memberId && memberId !== myId;
+    });
+
+    return otherMember || group.members[0] || null;
   };
 
   const filteredGroups = groups.filter((g) => {
@@ -1502,6 +1508,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
                 ) : (
                   allUsers
                     .filter((u) => {
+                      const myId = String(currentUser?._id || currentUser?.id || '');
+                      const uId = String(u._id || u.id || '');
+                      if (myId && uId === myId) return false;
+
                       const term = userSearch.toLowerCase().trim();
                       if (!term) return true;
                       return (

@@ -20,32 +20,15 @@ const getGroups = async (req, res) => {
     let query = { isArchived: { $ne: true } };
 
     if (currentUserId) {
-      if (currentUser && currentUser.role === 'admin') {
-        // Admin can see all group channels, but for direct 1-on-1 DMs, only see DMs they belong to
-        query = {
-          isArchived: { $ne: true },
-          $or: [
-            { type: 'group' },
-            { type: 'direct', members: currentUserId }
-          ]
-        };
-      } else {
-        // Non-admin users see direct DMs where they are a member, and groups matching membership or permissions
-        query = {
-          isArchived: { $ne: true },
-          $or: [
-            { type: 'direct', members: currentUserId },
-            { 
-              type: 'group',
-              $or: [
-                { members: currentUserId },
-                { isSystemGroup: true, permissionScope: { $in: currentUser?.permissions || [] } },
-                { isSystemGroup: { $ne: true } }
-              ]
-            }
-          ]
-        };
-      }
+      const userMemberFilter = { $in: [currentUserId, String(currentUserId)] };
+      query = {
+        isArchived: { $ne: true },
+        $or: [
+          { type: 'direct', members: userMemberFilter },
+          { type: 'group' },
+          { type: { $exists: false } }
+        ]
+      };
     }
 
     let rooms = await ChatRoom.find(query)
