@@ -67,28 +67,33 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
           console.warn('Failed to parse managed brands', e);
         }
 
-        // Merge vendor businessNames/names with managed brands
-        const mergedVendors = [...(vData || [])];
-        const existingNames = new Set(mergedVendors.map(v => (v.businessName || v.name || '').trim().toLowerCase()));
+        // Merge vendor businessNames/names with managed brands case-insensitively
+        const mergedVendors = [];
+        const existingKeys = new Set();
+
+        const addVendorItem = (bName, cName) => {
+          if (!bName || typeof bName !== 'string') return;
+          const trimmedB = bName.trim();
+          if (!trimmedB || trimmedB.toUpperCase() === 'ALL') return;
+          const key = trimmedB.toUpperCase();
+          if (!existingKeys.has(key)) {
+            existingKeys.add(key);
+            mergedVendors.push({ businessName: key, name: cName || key });
+          }
+        };
+
+        (vData || []).forEach(v => {
+          addVendorItem(v.businessName || v.name, v.name);
+        });
 
         (managedBrands || []).forEach(b => {
           const name = typeof b === 'string' ? b : (b?.name || '');
-          if (name && !existingNames.has(name.trim().toLowerCase())) {
-            existingNames.add(name.trim().toLowerCase());
-            mergedVendors.push({ businessName: name, name: name });
-          }
+          addVendorItem(name);
         });
 
-        // Also add unique brand/party from catalog & inventory items
         (cData || []).concat(invData || []).forEach(item => {
-          if (item.brand && !existingNames.has(item.brand.trim().toLowerCase())) {
-            existingNames.add(item.brand.trim().toLowerCase());
-            mergedVendors.push({ businessName: item.brand, name: item.brand });
-          }
-          if (item.party && !existingNames.has(item.party.trim().toLowerCase())) {
-            existingNames.add(item.party.trim().toLowerCase());
-            mergedVendors.push({ businessName: item.party, name: item.party });
-          }
+          if (item.brand) addVendorItem(item.brand);
+          if (item.party) addVendorItem(item.party);
         });
 
         setVendorsList(mergedVendors);

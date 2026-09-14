@@ -101,22 +101,30 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
     } catch (e) {}
   };
 
-  // Extract unique brands from catalog items + brandCodes + custom managed brands
-  const catalogBrandSet = new Set();
+  // Extract unique brands case-insensitively, ignoring 'ALL' / 'All'
+  const brandMap = new Map();
+  const addBrandCandidate = (val) => {
+    if (!val || typeof val !== 'string') return;
+    const trimmed = val.trim();
+    if (!trimmed || trimmed.toUpperCase() === 'ALL') return;
+    const key = trimmed.toUpperCase();
+    if (!brandMap.has(key)) {
+      brandMap.set(key, key);
+    }
+  };
+
   (items || []).forEach(item => {
-    if (item.brand && typeof item.brand === 'string') catalogBrandSet.add(item.brand.trim());
+    if (item.brand) addBrandCandidate(item.brand);
     if (Array.isArray(item.brandCodes)) {
       item.brandCodes.forEach(bc => {
         const b = typeof bc === 'object' ? bc.brand : bc;
-        if (b && typeof b === 'string') catalogBrandSet.add(b.trim());
+        addBrandCandidate(b);
       });
     }
   });
-  (customBrands || []).forEach(b => {
-    if (b && typeof b === 'string') catalogBrandSet.add(b.trim());
-  });
+  (customBrands || []).forEach(b => addBrandCandidate(b));
 
-  const sortedCatalogBrands = Array.from(catalogBrandSet).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  const sortedCatalogBrands = Array.from(brandMap.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   const allBrands = ['All', ...sortedCatalogBrands];
 
   // Get unique sizes for the filter dropdown

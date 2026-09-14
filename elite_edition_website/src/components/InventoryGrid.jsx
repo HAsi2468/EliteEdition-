@@ -78,21 +78,30 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
   // Unique sizes & vendors/brands for Overview dropdowns
   const sizes = ['All', ...new Set(safeItems.map(item => item.size).filter(Boolean))];
   
-  const allVendorSet = new Set();
+  const vendorMap = new Map();
+  const addVendorCandidate = (val) => {
+    if (!val || typeof val !== 'string') return;
+    const trimmed = val.trim();
+    if (!trimmed || trimmed.toUpperCase() === 'ALL') return;
+    const key = trimmed.toUpperCase();
+    if (!vendorMap.has(key)) {
+      vendorMap.set(key, key);
+    }
+  };
+
   safeItems.forEach(item => {
-    if (item.party && typeof item.party === 'string') allVendorSet.add(item.party.trim());
+    if (item.party) addVendorCandidate(item.party);
+    if (item.brand) addVendorCandidate(item.brand);
     if (Array.isArray(item.brandCodes)) {
       item.brandCodes.forEach(bc => {
         const b = typeof bc === 'object' ? bc.brand : bc;
-        if (b && typeof b === 'string') allVendorSet.add(b.trim());
+        addVendorCandidate(b);
       });
     }
   });
-  (customBrands || []).forEach(b => {
-    if (b && typeof b === 'string') allVendorSet.add(b.trim());
-  });
+  (customBrands || []).forEach(b => addVendorCandidate(b));
 
-  const sortedVendors = Array.from(allVendorSet).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  const sortedVendors = Array.from(vendorMap.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   const vendors = ['All', ...sortedVendors];
 
   // Overview Metrics

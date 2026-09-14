@@ -61,26 +61,28 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
       }
     } catch (e) {}
 
-    const merged = [...(parties || [])];
-    const existing = new Set(merged.map(p => (p.businessName || p.name || '').trim().toLowerCase()));
+    const merged = [];
+    const existingKeys = new Set();
 
+    const addPartyCandidate = (bName, cName) => {
+      if (!bName || typeof bName !== 'string') return;
+      const trimmedB = bName.trim();
+      if (!trimmedB || trimmedB.toUpperCase() === 'ALL') return;
+      const key = trimmedB.toUpperCase();
+      if (!existingKeys.has(key)) {
+        existingKeys.add(key);
+        merged.push({ businessName: key, name: cName || key });
+      }
+    };
+
+    (parties || []).forEach(p => addPartyCandidate(p.businessName || p.name, p.name));
     (managedBrands || []).forEach(b => {
       const name = typeof b === 'string' ? b : (b?.name || '');
-      if (name && !existing.has(name.trim().toLowerCase())) {
-        existing.add(name.trim().toLowerCase());
-        merged.push({ businessName: name, name: name });
-      }
+      addPartyCandidate(name);
     });
-
     (items || []).forEach(item => {
-      if (item.brand && !existing.has(item.brand.trim().toLowerCase())) {
-        existing.add(item.brand.trim().toLowerCase());
-        merged.push({ businessName: item.brand, name: item.brand });
-      }
-      if (item.party && !existing.has(item.party.trim().toLowerCase())) {
-        existing.add(item.party.trim().toLowerCase());
-        merged.push({ businessName: item.party, name: item.party });
-      }
+      if (item.brand) addPartyCandidate(item.brand);
+      if (item.party) addPartyCandidate(item.party);
     });
 
     setAllParties(merged);
