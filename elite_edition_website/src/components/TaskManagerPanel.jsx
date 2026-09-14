@@ -29,7 +29,9 @@ import {
   LayoutGrid,
   List,
   ArrowRight,
-  ExternalLink
+  ExternalLink,
+  User,
+  UserPlus
 } from 'lucide-react';
 
 export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
@@ -40,16 +42,15 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [deptFilter, setDeptFilter] = useState('all');
+  const [assigneeFilter, setAssigneeFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Task Creation Modal
+  // Task Creation Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
-  const [newDept, setNewDept] = useState('Production');
   const [newPriority, setNewPriority] = useState('medium');
   const [newStatus, setNewStatus] = useState('To Do');
   const [newProjectRef, setNewProjectRef] = useState('');
@@ -57,10 +58,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [newDueDate, setNewDueDate] = useState('');
   const [newEstHours, setNewEstHours] = useState('');
   const [selectedAssigneeIds, setSelectedAssigneeIds] = useState([]);
+  const [staffSearch, setStaffSearch] = useState('');
 
   // Selected Task Detail Drawer State
   const [selectedTask, setSelectedTask] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [newChecklistText, setNewChecklistText] = useState('');
   const [newCommentText, setNewCommentText] = useState('');
   const [timerLogDesc, setTimerLogDesc] = useState('');
@@ -75,8 +76,6 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     { id: 'In Review', label: 'In Review', color: '#7c3aed', bg: '#f3e8ff' },
     { id: 'Done', label: 'Done', color: '#16a34a', bg: '#f0fdf4' },
   ];
-
-  const DEPARTMENTS = ['Production', 'Fabric', 'Billing', 'Stitching', 'General', 'Design', 'Inventory', 'CRM'];
 
   const myId = String(currentUser?._id || currentUser?.id || '');
   const myName = currentUser?.name || currentUser?.username || 'Staff';
@@ -106,12 +105,36 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       }
       if (usersRes.success && usersRes.data) {
         setAllUsers(usersRes.data);
+        // Default assigned to current logged-in user if creating task
+        setSelectedAssigneeIds([myId]);
       }
     } catch (err) {
       console.error('Failed to fetch task management data:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOpenCreateModal = () => {
+    setShowCreateModal(true);
+    setStaffSearch('');
+    if (myId && !selectedAssigneeIds.includes(myId)) {
+      setSelectedAssigneeIds([myId]);
+    }
+  };
+
+  const toggleAssigneeSelection = (userId) => {
+    setSelectedAssigneeIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleSelectAllStaff = () => {
+    setSelectedAssigneeIds(allUsers.map((u) => String(u._id)));
+  };
+
+  const handleDeselectAllStaff = () => {
+    setSelectedAssigneeIds([]);
   };
 
   const handleCreateTaskSubmit = async (e) => {
@@ -126,7 +149,6 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       const res = await api.createTask({
         title: newTitle.trim(),
         description: newDesc.trim(),
-        department: newDept,
         priority: newPriority,
         status: newStatus,
         projectRef: newProjectRef.trim(),
@@ -153,14 +175,13 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const resetCreateForm = () => {
     setNewTitle('');
     setNewDesc('');
-    setNewDept('Production');
     setNewPriority('medium');
     setNewStatus('To Do');
     setNewProjectRef('');
     setNewClientName('');
     setNewDueDate('');
     setNewEstHours('');
-    setSelectedAssigneeIds([]);
+    setSelectedAssigneeIds([myId]);
   };
 
   const handleStatusChange = async (task, newStatusVal) => {
@@ -179,6 +200,25 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       }
     } catch (err) {
       alert('Cannot change status: ' + err.message);
+    }
+  };
+
+  const handleUpdateAssignees = async (task, newAssigneeIds) => {
+    try {
+      const res = await api.updateTask(task._id, {
+        assignees: newAssigneeIds,
+        userId: myId,
+        userName: myName
+      });
+
+      if (res.success && res.data) {
+        setTasks((prev) => prev.map((t) => (String(t._id) === String(task._id) ? res.data : t)));
+        if (selectedTask && String(selectedTask._id) === String(task._id)) {
+          setSelectedTask(res.data);
+        }
+      }
+    } catch (err) {
+      alert('Failed to update task assignees: ' + err.message);
     }
   };
 
@@ -290,9 +330,15 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
   // Filter tasks logic
   const filteredTasks = tasks.filter((t) => {
-    if (deptFilter !== 'all' && t.department !== deptFilter) return false;
     if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+    if (assigneeFilter !== 'all') {
+      const hasAssignee = (t.assignees || []).some((a) => {
+        const aId = String(typeof a === 'object' ? (a._id || a.id) : a);
+        return aId === assigneeFilter;
+      });
+      if (!hasAssignee) return false;
+    }
 
     const term = searchQuery.toLowerCase().trim();
     if (!term) return true;
@@ -301,8 +347,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       (t.title || '').toLowerCase().includes(term) ||
       (t.description || '').toLowerCase().includes(term) ||
       (t.projectRef || '').toLowerCase().includes(term) ||
-      (t.clientName || '').toLowerCase().includes(term) ||
-      (t.department || '').toLowerCase().includes(term)
+      (t.clientName || '').toLowerCase().includes(term)
     );
   });
 
@@ -313,18 +358,6 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       case 'medium': return { label: 'MED', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' };
       case 'low': return { label: 'LOW', color: '#64748b', bg: '#f1f5f9', border: '#e2e8f0' };
       default: return { label: 'MED', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' };
-    }
-  };
-
-  const getDeptColor = (dept) => {
-    switch ((dept || '').toLowerCase()) {
-      case 'production': return '#2563eb';
-      case 'fabric': return '#0284c7';
-      case 'billing': return '#16a34a';
-      case 'stitching': return '#7c3aed';
-      case 'design': return '#db2777';
-      case 'inventory': return '#0891b2';
-      default: return '#2563eb';
     }
   };
 
@@ -341,6 +374,18 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     return `${h}:${m}:${s}`;
   };
 
+  const getAssignerName = (task) => {
+    if (!task) return 'Admin';
+    if (task.createdBy && typeof task.createdBy === 'object') {
+      return task.createdBy.name || task.createdBy.username || 'Admin';
+    }
+    if (task.auditLogs && task.auditLogs.length > 0) {
+      const createdLog = task.auditLogs.find((l) => l.fieldChanged === 'Task Created') || task.auditLogs[0];
+      if (createdLog && createdLog.userName) return createdLog.userName;
+    }
+    return 'Admin';
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '0.75rem', background: 'var(--bg-main)', boxSizing: 'border-box' }}>
       
@@ -354,14 +399,14 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-                TASK — TaskOPad Workforce &amp; Job Operations
+                TASK — TaskOPad Workforce Operations
               </h2>
               <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '1px 7px', borderRadius: '10px', textTransform: 'uppercase' }}>
                 TaskOPad Engine
               </span>
             </div>
             <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-              Kanban boards, live time tracking timers, checklists, dependencies &amp; ERP integrations
+              Assign tasks by &amp; to staff, live time tracking, Kanban boards &amp; checklists
             </p>
           </div>
         </div>
@@ -403,7 +448,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
           </div>
 
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={handleOpenCreateModal}
             className="btn-primary"
             style={{ fontSize: '0.8rem', padding: '0.45rem 0.95rem', gap: '0.4rem', borderRadius: '8px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', boxShadow: '0 4px 12px rgba(37,99,235,0.25)' }}
           >
@@ -429,15 +474,15 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           
-          {/* Dept Filter */}
+          {/* Filter by Assignee */}
           <select
-            value={deptFilter}
-            onChange={(e) => setDeptFilter(e.target.value)}
+            value={assigneeFilter}
+            onChange={(e) => setAssigneeFilter(e.target.value)}
             style={{ fontSize: '0.75rem', height: '32px', padding: '0 0.5rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', color: 'var(--text-primary)', fontWeight: 600 }}
           >
-            <option value="all">All Departments</option>
-            {DEPARTMENTS.map((d) => (
-              <option key={d} value={d}>{d}</option>
+            <option value="all">Filter by Assignee: All Staff</option>
+            {allUsers.map((u) => (
+              <option key={u._id} value={u._id}>{u.name || u.username}</option>
             ))}
           </select>
 
@@ -519,6 +564,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                         const completedCheck = (t.checklist || []).filter((c) => c.completed).length;
                         const totalCheck = (t.checklist || []).length;
                         const loggedHours = calculateTotalLoggedHours(t.timeLogs);
+                        const assignerName = getAssignerName(t);
 
                         return (
                           <div
@@ -543,8 +589,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                                 {pri.label}
                               </span>
                               
-                              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: getDeptColor(t.department), background: `${getDeptColor(t.department)}15`, padding: '1px 6px', borderRadius: '4px' }}>
-                                {t.department || 'General'}
+                              {/* Assigned By Pill */}
+                              <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#475569', background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
+                                By: <strong>{assignerName}</strong>
                               </span>
                             </div>
 
@@ -558,6 +605,20 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                                   <ExternalLink size={10} />
                                   <span>{t.projectRef}</span>
                                 </div>
+                              )}
+                            </div>
+
+                            {/* Assigned To Row */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)' }}>Assigned To:</span>
+                              {(t.assignees || []).length === 0 ? (
+                                <span style={{ fontSize: '0.65rem', color: '#94a3b8', italic: 'true' }}>Unassigned</span>
+                              ) : (
+                                (t.assignees || []).map((a) => (
+                                  <span key={a._id || a} style={{ fontSize: '0.64rem', fontWeight: 800, background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '1px 6px', borderRadius: '10px' }}>
+                                    {typeof a === 'object' ? (a.name || a.username) : 'Staff'}
+                                  </span>
+                                ))
                               )}
                             </div>
 
@@ -633,10 +694,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                   <th style={{ padding: '0.65rem 0.85rem' }}>Task Title</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Status</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Priority</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Department</th>
+                  <th style={{ padding: '0.65rem 0.85rem' }}>Assigned By</th>
+                  <th style={{ padding: '0.65rem 0.85rem' }}>Assigned To</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Project Ref</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Hours Logged</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Due Date</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -650,6 +711,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 ) : (
                   filteredTasks.map((t) => {
                     const pri = getPriorityBadge(t.priority);
+                    const assignerName = getAssignerName(t);
                     return (
                       <tr
                         key={t._id}
@@ -669,17 +731,23 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                             {pri.label}
                           </span>
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', color: getDeptColor(t.department), fontWeight: 700 }}>
-                          {t.department}
+                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#475569' }}>
+                          {assignerName}
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                          <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                            {(t.assignees || []).map((a) => (
+                              <span key={a._id || a} style={{ fontSize: '0.65rem', fontWeight: 700, background: '#eff6ff', color: '#2563eb', padding: '1px 6px', borderRadius: '4px' }}>
+                                {typeof a === 'object' ? (a.name || a.username) : 'Staff'}
+                              </span>
+                            ))}
+                          </div>
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', color: '#2563eb', fontWeight: 700 }}>
                           {t.projectRef || '-'}
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600 }}>
                           {calculateTotalLoggedHours(t.timeLogs)}h {t.estimatedHours ? `/ ${t.estimatedHours}h` : ''}
-                        </td>
-                        <td style={{ padding: '0.65rem 0.85rem', color: 'var(--text-muted)' }}>
-                          {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : '-'}
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>
                           <button
@@ -759,13 +827,13 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       {/* ── CREATE TASK MODAL ── */}
       {showCreateModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: 580, maxHeight: '90vh', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.2s ease-out', background: '#ffffff' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 620, maxHeight: '90vh', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.2s ease-out', background: '#ffffff' }}>
             
             <div style={{ padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color: '#fff' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <CheckSquare size={20} color="#38bdf8" />
                 <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#fff' }}>
-                  Create New TaskOPad Task
+                  Create &amp; Assign New Task
                 </h3>
               </div>
               <button onClick={() => setShowCreateModal(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
@@ -785,7 +853,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   required
-                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)' }}
+                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.82rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)' }}
                 />
               </div>
 
@@ -795,27 +863,23 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="Enter detailed markdown task requirements..."
+                  placeholder="Enter detailed task instructions..."
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)' }}
+                  style={{ width: '100%', padding: '0.55rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)' }}
                 />
               </div>
 
+              {/* Assigned By & Priority */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
                 <div>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
-                    Department
+                    Assigned By (Creator)
                   </label>
-                  <select
-                    value={newDept}
-                    onChange={(e) => setNewDept(e.target.value)}
-                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)' }}
-                  >
-                    {DEPARTMENTS.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
+                  <div style={{ padding: '0.55rem', fontSize: '0.8rem', fontWeight: 700, borderRadius: '6px', background: '#f1f5f9', border: '1px solid var(--border-light)', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <User size={14} />
+                    <span>{myName}</span>
+                  </div>
                 </div>
 
                 <div>
@@ -825,13 +889,76 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                   <select
                     value={newPriority}
                     onChange={(e) => setNewPriority(e.target.value)}
-                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)' }}
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)' }}
                   >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
                     <option value="high">High</option>
                     <option value="urgent">Urgent</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Assigned To Staff Selection Checkboxes */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Assigned To Staff Members ({selectedAssigneeIds.length} selected)
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button type="button" onClick={handleSelectAllStaff} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}>
+                      Select All
+                    </button>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>|</span>
+                    <button type="button" onClick={handleDeselectAllStaff} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}>
+                      Deselect All
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ position: 'relative', marginBottom: '0.4rem' }}>
+                  <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search staff members..."
+                    value={staffSearch}
+                    onChange={(e) => setStaffSearch(e.target.value)}
+                    style={{ width: '100%', paddingLeft: '26px', fontSize: '0.74rem', height: '28px', background: '#f8fafc', border: '1px solid var(--border-light)', borderRadius: '6px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div style={{ maxHeight: 150, overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '0.4rem', display: 'flex', flexDirection: 'column', gap: '3px', background: '#ffffff' }}>
+                  {allUsers
+                    .filter((u) => {
+                      const term = staffSearch.toLowerCase().trim();
+                      if (!term) return true;
+                      return (u.name || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term);
+                    })
+                    .map((u) => {
+                      const isChecked = selectedAssigneeIds.includes(String(u._id));
+                      return (
+                        <div
+                          key={u._id}
+                          onClick={() => toggleAssigneeSelection(String(u._id))}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0.35rem 0.55rem',
+                            borderRadius: '6px',
+                            background: isChecked ? '#eff6ff' : 'transparent',
+                            border: isChecked ? '1px solid #bfdbfe' : '1px solid transparent',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <input type="checkbox" checked={isChecked} onChange={() => {}} style={{ cursor: 'pointer' }} />
+                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>{u.name || u.username}</span>
+                          </div>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{u.email}</span>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
 
@@ -870,7 +997,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 className="btn-primary"
                 style={{ marginTop: '0.5rem', padding: '0.6rem', fontSize: '0.85rem', borderRadius: '8px' }}
               >
-                {creating ? 'Creating Task...' : 'Create Task'}
+                {creating ? 'Creating Task...' : 'Create & Assign Task'}
               </button>
             </form>
           </div>
@@ -995,9 +1122,45 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>Department</label>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: getDeptColor(selectedTask.department) }}>
-                    {selectedTask.department}
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>Assigned By</label>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
+                    {getAssignerName(selectedTask)}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>Assigned To</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {allUsers.map((u) => {
+                      const isAssigned = (selectedTask.assignees || []).some(
+                        (a) => String(typeof a === 'object' ? (a._id || a.id) : a) === String(u._id)
+                      );
+                      return (
+                        <div
+                          key={u._id}
+                          onClick={() => {
+                            const currentIds = (selectedTask.assignees || []).map((a) => String(typeof a === 'object' ? (a._id || a.id) : a));
+                            const updated = isAssigned ? currentIds.filter((id) => id !== String(u._id)) : [...currentIds, String(u._id)];
+                            handleUpdateAssignees(selectedTask, updated);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '3px 6px',
+                            borderRadius: '5px',
+                            background: isAssigned ? '#eff6ff' : '#ffffff',
+                            border: isAssigned ? '1px solid #bfdbfe' : '1px solid var(--border-light)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <input type="checkbox" checked={isAssigned} onChange={() => {}} style={{ cursor: 'pointer' }} />
+                          <span style={{ fontSize: '0.75rem', fontWeight: isAssigned ? 700 : 500, color: isAssigned ? '#2563eb' : 'var(--text-primary)' }}>
+                            {u.name || u.username}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
