@@ -1,9 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw, Building2, Tag, Search, Check } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function CatalogManagerModal({ initialTab = 'vendors', context = 'elite_online', onClose }) {
   const [activeTab, setActiveTab] = useState(initialTab || 'brands'); // 'brands', 'vendors', 'parties', 'products', 'history'
+
+  // Scroll preservation reference
+  const scrollPosRef = useRef(0);
+
+  useEffect(() => {
+    scrollPosRef.current = window.scrollY || document.documentElement.scrollTop || 0;
+    return () => {
+      const targetY = scrollPosRef.current;
+      if (typeof window !== 'undefined' && targetY > 0) {
+        window.scrollTo({ top: targetY, behavior: 'instant' });
+        setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 30);
+        setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 100);
+        setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 300);
+      }
+    };
+  }, []);
+
+  const handleModalClose = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+    const targetY = scrollPosRef.current || window.scrollY || 0;
+    if (onClose) onClose();
+
+    if (typeof window !== 'undefined' && targetY > 0) {
+      window.scrollTo({ top: targetY, behavior: 'instant' });
+      requestAnimationFrame(() => window.scrollTo({ top: targetY, behavior: 'instant' }));
+      setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 30);
+      setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 100);
+      setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 300);
+    }
+  };
 
   // Data States
   const [vendors, setVendors] = useState([]);
@@ -321,7 +355,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
         {/* Header */}
         <div style={styles.header}>
           <h2 style={styles.title}>Manager Control Panel</h2>
-          <button onClick={onClose} style={styles.closeBtn}>
+          <button type="button" onClick={handleModalClose} style={styles.closeBtn}>
             <X size={18} />
           </button>
         </div>

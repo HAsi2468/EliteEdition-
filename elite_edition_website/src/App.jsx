@@ -531,11 +531,12 @@ export default function App() {
       }
       setIsFormOpen(false);
       triggerGlobalDataRefresh();
-      fetchData();
+      await fetchData();
     } catch (err) {
       alert(err.message || 'Failed to create item.');
     } finally {
       setLoading(false);
+      restoreSavedScrollPos();
     }
   };
 
@@ -568,6 +569,7 @@ export default function App() {
       alert(err.message || 'Failed to update item.');
     } finally {
       setLoading(false);
+      restoreSavedScrollPos();
     }
   };
 
@@ -583,6 +585,7 @@ export default function App() {
         alert(err.message || 'Failed to delete product from catalog.');
       } finally {
         setLoading(false);
+        restoreSavedScrollPos();
       }
     } else if (activeTab === 'inventory') {
       if (!window.confirm('Are you sure you want to delete this inventory item?')) return;
@@ -595,6 +598,7 @@ export default function App() {
         alert(err.message || 'Failed to delete inventory item.');
       } finally {
         setLoading(false);
+        restoreSavedScrollPos();
       }
     }
   };
@@ -622,6 +626,7 @@ export default function App() {
       alert(err.message || 'Failed to process bulk inward.');
     } finally {
       setLoading(false);
+      restoreSavedScrollPos();
     }
   };
 
@@ -636,20 +641,43 @@ export default function App() {
       alert(err.message || 'Failed to submit outward transaction.');
     } finally {
       setLoading(false);
+      restoreSavedScrollPos();
     }
   };
 
+  const savedModalScrollRef = useRef(0);
+
+  // Disable browser automatic scroll restoration & track scroll Y continuously
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    const handleScroll = () => {
+      if (!isFormOpen && !isStockOutOpen && !isManagerOpen && !isBulkInwardOpen) {
+        const y = window.scrollY || document.documentElement.scrollTop || 0;
+        if (y > 0) {
+          savedModalScrollRef.current = y;
+        }
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isFormOpen, isStockOutOpen, isManagerOpen, isBulkInwardOpen]);
+
   const triggerStockOutModal = (item = null) => {
+    savedModalScrollRef.current = window.scrollY || document.documentElement.scrollTop || 0;
     setStockOutItem(item);
     setIsStockOutOpen(true);
   };
 
   const triggerAddModal = () => {
+    savedModalScrollRef.current = window.scrollY || document.documentElement.scrollTop || 0;
     setEditingItem(null);
     setIsFormOpen(true);
   };
 
   const triggerEditModal = (item) => {
+    savedModalScrollRef.current = window.scrollY || document.documentElement.scrollTop || 0;
     if (activeTab === 'catalog') {
       const adapted = {
         _id: item._id,
@@ -671,8 +699,28 @@ export default function App() {
   };
 
   const triggerManagerModal = (tabName = 'vendors') => {
+    savedModalScrollRef.current = window.scrollY || document.documentElement.scrollTop || 0;
     setManagerTab(tabName);
     setIsManagerOpen(true);
+  };
+
+  const restoreSavedScrollPos = (explicitPos = null) => {
+    const targetY = explicitPos !== null ? explicitPos : (savedModalScrollRef.current || 0);
+    if (typeof window === 'undefined') return;
+
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+
+    const doScroll = () => {
+      window.scrollTo({ top: targetY, behavior: 'instant' });
+    };
+
+    doScroll();
+    requestAnimationFrame(doScroll);
+    setTimeout(doScroll, 30);
+    setTimeout(doScroll, 100);
+    setTimeout(doScroll, 300);
   };
 
   // Update server endpoint dynamically
@@ -1724,6 +1772,7 @@ export default function App() {
           onClose={() => {
             setIsFormOpen(false);
             setEditingItem(null);
+            restoreSavedScrollPos();
           }}
         />
       )}
@@ -1737,6 +1786,7 @@ export default function App() {
           onClose={() => {
             setIsStockOutOpen(false);
             setStockOutItem(null);
+            restoreSavedScrollPos();
           }}
         />
       )}
@@ -1746,7 +1796,10 @@ export default function App() {
           initialTab={managerTab}
           onClose={() => {
             setIsManagerOpen(false);
-            fetchData();
+            fetchData().finally(() => {
+              restoreSavedScrollPos();
+            });
+            restoreSavedScrollPos();
           }}
         />
       )}
@@ -1754,7 +1807,10 @@ export default function App() {
       {isBulkInwardOpen && (
         <BulkInwardModal
           onSubmit={handleBulkInwardSubmit}
-          onClose={() => setIsBulkInwardOpen(false)}
+          onClose={() => {
+            setIsBulkInwardOpen(false);
+            restoreSavedScrollPos();
+          }}
         />
       )}
 

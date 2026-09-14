@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { X, Building2, Plus, Trash2, CheckCircle, Tag, Sparkles, Search, Edit2, Check, AlertCircle } from 'lucide-react';
 
 export default function BrandManagerModal({ 
@@ -15,6 +15,40 @@ export default function BrandManagerModal({
   const [success, setSuccess] = useState('');
   const [editingBrand, setEditingBrand] = useState(null); // Brand name being edited
   const [editInputValue, setEditInputValue] = useState('');
+
+  // Scroll preservation reference
+  const scrollPosRef = useRef(0);
+
+  useEffect(() => {
+    scrollPosRef.current = window.scrollY || document.documentElement.scrollTop || 0;
+    return () => {
+      const targetY = scrollPosRef.current;
+      if (typeof window !== 'undefined' && targetY > 0) {
+        window.scrollTo({ top: targetY, behavior: 'instant' });
+        setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 30);
+        setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 100);
+        setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 300);
+      }
+    };
+  }, []);
+
+  const handleModalClose = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+    const targetY = scrollPosRef.current || window.scrollY || 0;
+    if (onClose) onClose();
+
+    if (typeof window !== 'undefined' && targetY > 0) {
+      window.scrollTo({ top: targetY, behavior: 'instant' });
+      requestAnimationFrame(() => window.scrollTo({ top: targetY, behavior: 'instant' }));
+      setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 30);
+      setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 100);
+      setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 300);
+    }
+  };
 
   // Internal custom brands state synced with localStorage
   const [customBrands, setCustomBrands] = useState(() => {
@@ -40,12 +74,12 @@ export default function BrandManagerModal({
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        onClose();
+        handleModalClose(e);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, []);
 
   const safeExisting = useMemo(() => {
     return Array.isArray(existingBrands) ? existingBrands.filter(Boolean) : [];
@@ -160,7 +194,7 @@ export default function BrandManagerModal({
   };
 
   return (
-    <div className="modal-overlay" style={styles.overlay} onClick={onClose}>
+    <div className="modal-overlay" style={styles.overlay} onClick={handleModalClose}>
       <div style={styles.container} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div style={styles.header}>
@@ -171,7 +205,7 @@ export default function BrandManagerModal({
             </div>
             <h2 style={styles.title}>Manage Catalog Brands</h2>
           </div>
-          <button onClick={onClose} style={styles.closeBtn} title="Close Modal (Esc)">
+          <button type="button" onClick={handleModalClose} style={styles.closeBtn} title="Close Modal (Esc)">
             <X size={18} />
           </button>
         </div>
@@ -340,7 +374,7 @@ export default function BrandManagerModal({
 
         {/* Footer */}
         <div style={styles.footer}>
-          <button type="button" onClick={onClose} style={styles.doneBtn}>
+          <button type="button" onClick={handleModalClose} style={styles.doneBtn}>
             <CheckCircle size={15} />
             <span>Done</span>
           </button>

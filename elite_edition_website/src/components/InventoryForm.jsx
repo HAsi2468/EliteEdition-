@@ -1,9 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Sparkles, Layers, Tag, Building2, Barcode, DollarSign, Image as ImageIcon, CheckCircle, FileCode } from 'lucide-react';
 import { api } from '../services/api';
 import { extractSizeFromSku } from '../utils/skuHelper';
 
 export default function InventoryForm({ item, onSubmit, onClose }) {
+  const scrollPosRef = useRef(0);
+
+  useEffect(() => {
+    scrollPosRef.current = window.scrollY || document.documentElement.scrollTop || 0;
+    return () => {
+      const targetY = scrollPosRef.current;
+      if (typeof window !== 'undefined' && targetY > 0) {
+        window.scrollTo({ top: targetY, behavior: 'instant' });
+        setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 30);
+        setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 100);
+        setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 300);
+      }
+    };
+  }, []);
+
+  const handleModalClose = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+    const targetY = scrollPosRef.current || window.scrollY || 0;
+    if (onClose) onClose();
+
+    if (typeof window !== 'undefined' && targetY > 0) {
+      window.scrollTo({ top: targetY, behavior: 'instant' });
+      requestAnimationFrame(() => window.scrollTo({ top: targetY, behavior: 'instant' }));
+      setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 30);
+      setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 100);
+      setTimeout(() => window.scrollTo({ top: targetY, behavior: 'instant' }), 300);
+    }
+  };
+
   const [formData, setFormData] = useState({
     skuCode: '',
     itemName: '',
@@ -179,7 +212,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
               Manage product SKU, brand, category, description, sizes, pricing, and image URL.
             </p>
           </div>
-          <button onClick={onClose} style={styles.closeBtn} title="Close Form">
+          <button type="button" onClick={handleModalClose} style={styles.closeBtn} title="Close Form">
             <X size={20} />
           </button>
         </div>
@@ -419,7 +452,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
 
           {/* Modal Footer */}
           <div className="inventory-footer" style={styles.footer}>
-            <button type="button" onClick={onClose} style={styles.cancelBtn}>
+            <button type="button" onClick={handleModalClose} style={styles.cancelBtn}>
               Cancel
             </button>
             <button type="submit" style={styles.submitBtn}>

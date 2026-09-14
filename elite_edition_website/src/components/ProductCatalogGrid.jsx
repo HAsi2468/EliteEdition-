@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Edit2, Trash2, Search, Plus, SlidersHorizontal, RefreshCw, Eye, Tag, Printer, Building2 } from 'lucide-react';
 import BrandManagerModal from './BrandManagerModal';
 
@@ -10,6 +10,49 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
   const [syncing, setSyncing] = useState(false);
   const [showBrandManager, setShowBrandManager] = useState(false);
+  const savedBrandManagerScrollRef = useRef(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!showBrandManager) {
+        const y = window.scrollY || document.documentElement.scrollTop || 0;
+        if (y > 0) {
+          savedBrandManagerScrollRef.current = y;
+        }
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [showBrandManager]);
+
+  const handleOpenBrandManager = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+    savedBrandManagerScrollRef.current = window.scrollY || document.documentElement.scrollTop || 0;
+    setShowBrandManager(true);
+  };
+
+  const handleCloseBrandManager = () => {
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+    const targetY = savedBrandManagerScrollRef.current || 0;
+    setShowBrandManager(false);
+    
+    const doScroll = () => {
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: targetY, behavior: 'instant' });
+      }
+    };
+
+    doScroll();
+    requestAnimationFrame(doScroll);
+    setTimeout(doScroll, 30);
+    setTimeout(doScroll, 100);
+    setTimeout(doScroll, 300);
+  };
 
   // Managed custom brands in localStorage
   const [customBrands, setCustomBrands] = useState(() => {
@@ -398,7 +441,8 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
 
         <div className="catalog-action-group" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <button 
-            onClick={() => setShowBrandManager(true)}
+            type="button"
+            onClick={handleOpenBrandManager}
             className="btn-secondary" 
             style={{ ...styles.addBtn, background: '#e0e7ff', color: '#4338ca', borderColor: '#c7d2fe', fontWeight: 700 }}
             title="Manage Brands & Dynamic Dropdown Values"
@@ -571,7 +615,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
           customBrands={customBrands || []}
           onAddBrand={handleAddBrand}
           onDeleteBrand={handleDeleteBrand}
-          onClose={() => setShowBrandManager(false)}
+          onClose={handleCloseBrandManager}
         />
       )}
     </div>
