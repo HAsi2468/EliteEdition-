@@ -65,8 +65,9 @@ const setupSockets = (io) => {
           msgType: 'human',
           priority: priority === 'urgent' ? 'urgent' : 'normal',
           attachment: attachment || undefined,
-          mentions: mentions,
-          recordMentions: recordMentions,
+          readBy: [senderId]
+        });
+
         // Update room updatedAt timestamp
         await ChatRoom.findByIdAndUpdate(roomId, { updatedAt: new Date() });
 
