@@ -461,16 +461,6 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
             <span>Print All Barcodes ({filteredItems.length})</span>
           </button>
 
-          <button 
-            onClick={handleSyncTrigger} 
-            disabled={syncing} 
-            className="btn-secondary" 
-            style={{ ...styles.addBtn, background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd', fontWeight: 700 }}
-          >
-            <RefreshCw size={16} className={syncing ? 'spin-loader' : ''} />
-            <span>Sync Catalog</span>
-          </button>
-          
           <button onClick={onAdd} className="btn-success" style={styles.primaryAddBtn}>
             <Plus size={16} />
             Add Product
