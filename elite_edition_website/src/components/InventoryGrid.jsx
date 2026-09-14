@@ -825,9 +825,6 @@ export default function InventoryGrid({
                           </span>
                         </div>
                       </th>
-                      <th style={{ padding: '0.85rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em' }}>
-                        ACTIONS
-                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -911,53 +908,6 @@ export default function InventoryGrid({
                             }}>
                               {stockLabel}
                             </span>
-                          </td>
-
-                          <td style={{ padding: '0.85rem 1rem' }}>
-                            <div style={styles.actionsCell}>
-                              <button
-                                onClick={() => onStockOut(item)}
-                                style={styles.tblActionBtn('#b91c1c', '#fee2e2', '#fca5a5')}
-                                title="Outward Dispatch Item"
-                              >
-                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
-                                  <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
-                                  <polyline points="17 18 23 18 23 12"/>
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => printBarcode(item)}
-                                style={styles.tblActionBtn('#0f172a', '#f1f5f9', '#cbd5e1')}
-                                title="Print Barcode Sticker"
-                              >
-                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
-                                  <polyline points="6 9 6 2 18 2 18 9"/>
-                                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-                                  <rect x="6" y="14" width="12" height="8"/>
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => onEdit(item)}
-                                style={styles.tblActionBtn('#0284c7', '#e0f2fe', '#38bdf8')}
-                                title="Edit Item Details"
-                              >
-                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
-                                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => onDelete(item._id)}
-                                style={styles.tblActionBtn('#e11d48', '#ffe4e6', '#fb7185')}
-                                title="Delete Item"
-                              >
-                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e11d48" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
-                                  <polyline points="3 6 5 6 21 6"/>
-                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                  <line x1="10" y1="11" x2="10" y2="17"/>
-                                  <line x1="14" y1="11" x2="14" y2="17"/>
-                                </svg>
-                              </button>
-                            </div>
                           </td>
                         </tr>
                       );
@@ -1166,6 +1116,9 @@ export default function InventoryGrid({
                           </span>
                         </div>
                       </th>
+                      <th style={{ padding: '0.85rem 1rem', textAlign: 'center', fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.04em', color: '#ffffff' }}>
+                        ACTIONS
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1230,6 +1183,54 @@ export default function InventoryGrid({
                           </td>
                           <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontSize: '0.9rem', fontWeight: 800, color: '#d97706' }}>
                             ₹ {totalPurchase.toFixed(2)}
+                          </td>
+                          <td style={{ padding: '0.85rem 1rem' }}>
+                            <div style={styles.actionsCell}>
+                              <button
+                                onClick={() => onStockOut(item)}
+                                style={styles.tblActionBtn('#b91c1c', '#fee2e2', '#fca5a5')}
+                                title="Outward Dispatch Item"
+                              >
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                  <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
+                                  <polyline points="17 18 23 18 23 12"/>
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => printBarcode(item)}
+                                style={styles.tblActionBtn('#0f172a', '#f1f5f9', '#cbd5e1')}
+                                title="Print Barcode Sticker"
+                              >
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                  <polyline points="6 9 6 2 18 2 18 9"/>
+                                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                                  <rect x="6" y="14" width="12" height="8"/>
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => onEdit(item)}
+                                style={styles.tblActionBtn('#0284c7', '#e0f2fe', '#38bdf8')}
+                                title="Edit Item Details"
+                              >
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                                </svg>
+                              </button>
+                              {onDelete && (
+                                <button
+                                  onClick={() => onDelete(item._id || item.id)}
+                                  style={styles.tblActionBtn('#e11d48', '#ffe4e6', '#fb7185')}
+                                  title="Delete Item"
+                                >
+                                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e11d48" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, display: 'block' }}>
+                                    <polyline points="3 6 5 6 21 6"/>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                    <line x1="10" y1="11" x2="10" y2="17"/>
+                                    <line x1="14" y1="11" x2="14" y2="17"/>
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
