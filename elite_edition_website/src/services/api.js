@@ -1763,9 +1763,9 @@ export const api = {
   },
 
   // ── Authority-Based Inter-Department Communication ───────────────────────
-  async getCommunicationGroups() {
+  async getCommunicationGroups(userId) {
     const user = this.getCurrentUser();
-    const uId = user ? (user._id || user.id) : '';
+    const uId = userId || (user ? (user._id || user.id) : '');
     const qs = uId ? `?userId=${uId}` : '';
     return request(`/communication/groups${qs}`);
   },
@@ -1799,9 +1799,9 @@ export const api = {
     });
   },
 
-  async getCommunicationUsers() {
+  async getCommunicationUsers(userId) {
     const user = this.getCurrentUser();
-    const uId = user ? (user._id || user.id) : '';
+    const uId = userId || (user ? (user._id || user.id) : '');
     const qs = uId ? `?userId=${uId}` : '';
     return request(`/communication/users${qs}`);
   },

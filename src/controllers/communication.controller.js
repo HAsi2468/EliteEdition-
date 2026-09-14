@@ -293,11 +293,15 @@ const createOrGetDirectRoom = async (req, res) => {
     const currentUserId = new mongoose.Types.ObjectId(rawCurrentUserId);
     const targetObjId = new mongoose.Types.ObjectId(targetUserId);
 
+    let query;
+    if (String(currentUserId) === String(targetObjId)) {
+      query = { type: 'direct', members: [currentUserId] };
+    } else {
+      query = { type: 'direct', members: { $all: [currentUserId, targetObjId], $size: 2 } };
+    }
+
     // Check if direct room already exists between these 2 users
-    let room = await ChatRoom.findOne({
-      type: 'direct',
-      members: { $all: [currentUserId, targetObjId], $size: 2 }
-    }).populate('members', 'name email role permissions department');
+    let room = await ChatRoom.findOne(query).populate('members', 'name email role permissions department');
 
     if (!room) {
       const u1 = await User.findById(currentUserId);
@@ -306,10 +310,14 @@ const createOrGetDirectRoom = async (req, res) => {
       const name1 = u1 ? (u1.name || u1.username) : 'User';
       const name2 = u2 ? (u2.name || u2.username) : 'User';
 
+      const membersArr = String(currentUserId) === String(targetObjId)
+        ? [currentUserId]
+        : [currentUserId, targetObjId];
+
       room = await ChatRoom.create({
-        name: `${name1} & ${name2}`,
+        name: String(currentUserId) === String(targetObjId) ? `${name1} (Self)` : `${name1} & ${name2}`,
         type: 'direct',
-        members: [currentUserId, targetObjId],
+        members: membersArr,
         department: u2 ? (u2.department || 'General') : 'General',
         permissionScope: 'direct_msg'
       });

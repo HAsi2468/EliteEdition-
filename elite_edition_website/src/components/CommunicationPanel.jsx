@@ -173,17 +173,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
   const fetchGroups = async (showLoader = true) => {
     if (showLoader) setLoadingGroups(true);
     try {
-      const res = await api.getCommunicationGroups();
+      const uId = currentUser?._id || currentUser?.id;
+      const res = await api.getCommunicationGroups(uId);
       if (res.success && res.data) {
         setGroups(res.data);
-        // Only set active group on initial load or if activeGroup was deleted
         setActiveGroup((prev) => {
-          if (!prev && res.data.length > 0) return res.data[0];
-          if (prev) {
-            const exists = res.data.find((g) => String(g._id) === String(prev._id));
-            if (!exists) return res.data.length > 0 ? res.data[0] : null;
-          }
-          return prev;
+          if (!prev) return res.data.length > 0 ? res.data[0] : null;
+          const updated = res.data.find((g) => String(g._id) === String(prev._id));
+          return updated || prev;
         });
       }
     } catch (err) {
@@ -241,7 +238,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
     setShowNewDmModal(true);
     setLoadingUsers(true);
     try {
-      const res = await api.getCommunicationUsers();
+      const uId = currentUser?._id || currentUser?.id;
+      const res = await api.getCommunicationUsers(uId);
       if (res.success && res.data) {
         setAllUsers(res.data);
       }
@@ -257,10 +255,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
       const myId = currentUser?._id || currentUser?.id;
       const res = await api.createOrGetDirectRoom(targetUser._id, myId);
       if (res.success && res.data) {
+        const dmRoom = res.data;
         setShowNewDmModal(false);
-        await fetchGroups(false);
-        setActiveGroup(res.data);
         setRosterTab('direct');
+        setActiveGroup(dmRoom);
+        setGroups((prev) => {
+          const exists = prev.some((g) => String(g._id) === String(dmRoom._id));
+          return exists ? prev : [dmRoom, ...prev];
+        });
+        await fetchGroups(false);
       }
     } catch (err) {
       alert('Failed to open direct message: ' + err.message);
@@ -293,12 +296,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
       });
 
       if (res.success && res.data) {
+        const newGroup = res.data;
         setShowCreateGroupModal(false);
         setNewGroupName('');
         setNewGroupDesc('');
-        await fetchGroups(false);
-        setActiveGroup(res.data);
         setRosterTab('groups');
+        setActiveGroup(newGroup);
+        setGroups((prev) => {
+          const exists = prev.some((g) => String(g._id) === String(newGroup._id));
+          return exists ? prev : [newGroup, ...prev];
+        });
+        await fetchGroups(false);
       }
     } catch (err) {
       alert('Failed to create group: ' + err.message);
