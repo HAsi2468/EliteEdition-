@@ -578,34 +578,6 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
               </div>
             </div>
 
-            <div style={styles.rowTwo}>
-              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                <button onClick={handleExportOverviewCSV} style={styles.exportBtn} title="Export CSV Overview">
-                  <Download size={15} />
-                  <span>Export CSV</span>
-                </button>
-                <button onClick={() => onStockOut(null)} style={styles.outwardBtn}>
-                  <TrendingDown size={15} />
-                  <span>Outward Dispatch</span>
-                </button>
-                <button onClick={onBulkInward} style={styles.bulkInwardBtn}>
-                  <Sparkles size={15} />
-                  <span>Bulk Inward</span>
-                </button>
-                <button onClick={onAdd} style={styles.addSkuBtn}>
-                  <Plus size={15} />
-                  <span>Add SKU</span>
-                </button>
-                <button 
-                  onClick={() => onOpenManager('brands')} 
-                  style={{ ...styles.exportBtn, background: '#e0e7ff', color: '#4338ca', borderColor: '#c7d2fe', fontWeight: 700 }} 
-                  title="Manage Brands & Vendors"
-                >
-                  <Building2 size={15} />
-                  <span>Manage Brands</span>
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Main Inventory Overview Data Table */}
