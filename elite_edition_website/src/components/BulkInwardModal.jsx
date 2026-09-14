@@ -277,19 +277,20 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '1rem',
+        padding: '0.5rem',
         boxSizing: 'border-box'
       }}
       onClick={onClose}
     >
       <div
+        className="bulk-inward-modal-content"
         style={styles.modalContent}
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* Header */}
-        <div style={styles.header}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+        <div className="bulk-inward-header" style={styles.header}>
+          <div className="bulk-inward-title-group" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
             <div style={styles.headerBadge}>
               <Sparkles size={22} color="#059669" />
             </div>
@@ -300,7 +301,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
           </div>
           
           {/* Quick Scanner & Camera Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <div className="bulk-inward-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={() => setShowCameraScanner(!showCameraScanner)}
@@ -312,13 +313,13 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                 alignItems: 'center',
                 gap: '0.35rem'
               }}
-              title="Toggle Mobile Camera Scanner (30% Screen Height)"
+              title="Toggle Mobile Camera Scanner"
             >
               <Camera size={16} />
               <span>{showCameraScanner ? 'Close Camera' : '📷 Camera Scan'}</span>
             </button>
 
-            <form onSubmit={handleScanSubmit} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '260px' }}>
+            <form className="bulk-inward-scan-form" onSubmit={handleScanSubmit} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '260px' }}>
               <div style={{ position: 'relative', width: '100%' }}>
                 <Scan size={15} color="#475569" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
@@ -357,7 +358,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
         <div style={styles.formContainer}>
           
           {/* Quick Set Header Bar */}
-          <div style={styles.quickSetPanel}>
+          <div className="bulk-inward-quickset" style={styles.quickSetPanel}>
             <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#d97706', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
               ⚡ Quick Set All Rows:
             </span>
@@ -591,7 +592,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
         </div>
 
         {/* Footer */}
-        <div style={styles.footer}>
+        <div className="bulk-inward-footer" style={styles.footer}>
           <div style={styles.statsSummary}>
             <CheckCircle size={18} color="#059669" />
             <span style={{ fontSize: '0.88rem', color: '#059669', fontWeight: 600 }}>
@@ -599,7 +600,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
             </span>
           </div>
           
-          <div style={{ display: 'flex', gap: '0.85rem' }}>
+          <div className="bulk-inward-btn-group" style={{ display: 'flex', gap: '0.85rem' }}>
             <button type="button" onClick={onClose} style={styles.cancelBtn}>
               Cancel
             </button>
@@ -612,6 +613,75 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
       </div>
     </div>
   );
+}
+
+// Inject Responsive Mobile CSS Styles for Bulk Inward Modal
+if (typeof document !== 'undefined') {
+  const styleElId = 'bulk-inward-modal-responsive-style';
+  if (!document.getElementById(styleElId)) {
+    const styleEl = document.createElement('style');
+    styleEl.id = styleElId;
+    styleEl.innerHTML = `
+      @media (max-width: 768px) {
+        .bulk-inward-modal-content {
+          width: 95vw !important;
+          max-width: 95vw !important;
+          padding: 0.85rem !important;
+          max-height: 94vh !important;
+          border-radius: 12px !important;
+          box-sizing: border-box !important;
+        }
+        .bulk-inward-header {
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 0.65rem !important;
+          margin-bottom: 0.65rem !important;
+          padding-bottom: 0.65rem !important;
+        }
+        .bulk-inward-title-group {
+          width: 100% !important;
+        }
+        .bulk-inward-header-actions {
+          width: 100% !important;
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 0.4rem !important;
+        }
+        .bulk-inward-scan-form {
+          width: 100% !important;
+        }
+        .bulk-inward-quickset {
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 0.5rem !important;
+          padding: 0.65rem !important;
+        }
+        .bulk-inward-footer {
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 0.65rem !important;
+          padding-top: 0.65rem !important;
+        }
+        .bulk-inward-footer > div {
+          width: 100% !important;
+        }
+        .bulk-inward-btn-group {
+          width: 100% !important;
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          gap: 0.5rem !important;
+        }
+        .bulk-inward-btn-group button {
+          width: 100% !important;
+          justify-content: center !important;
+          font-size: 0.8rem !important;
+          padding: 0.55rem 0.4rem !important;
+          white-space: nowrap !important;
+        }
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
 }
 
 const styles = {

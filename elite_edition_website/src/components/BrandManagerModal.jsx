@@ -390,6 +390,45 @@ export default function BrandManagerModal({
   return modalMarkup;
 }
 
+// Inject Responsive Mobile CSS Styles for Brand Manager Modal
+if (typeof document !== 'undefined') {
+  const styleElId = 'brand-manager-modal-responsive-style';
+  if (!document.getElementById(styleElId)) {
+    const styleEl = document.createElement('style');
+    styleEl.id = styleElId;
+    styleEl.innerHTML = `
+      @media (max-width: 768px) {
+        .brand-manager-container {
+          width: 95vw !important;
+          max-width: 95vw !important;
+          max-height: 92vh !important;
+          border-radius: 12px !important;
+          box-sizing: border-box !important;
+        }
+        .brand-manager-header {
+          padding: 0.75rem !important;
+        }
+        .brand-manager-stats-strip {
+          padding: 0.5rem !important;
+          gap: 0.25rem !important;
+        }
+        .brand-manager-add-form {
+          flex-direction: column !important;
+          gap: 0.5rem !important;
+        }
+        .brand-manager-add-form button {
+          width: 100% !important;
+          justify-content: center !important;
+        }
+        .brand-manager-grid {
+          grid-template-columns: 1fr !important;
+        }
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
+}
+
 const styles = {
   overlay: {
     position: 'fixed',

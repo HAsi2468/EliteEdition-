@@ -356,7 +356,7 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
 
   const modalMarkup = (
     <div className="modal-overlay" style={styles.overlay} onClick={handleModalClose}>
-      <div className="modal-content" style={styles.content} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-content catalog-manager-container" style={styles.content} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div style={styles.header}>
           <h2 style={styles.title}>Manager Control Panel</h2>
@@ -370,9 +370,9 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
         {success && <div style={styles.success}>{success}</div>}
 
         {/* Tab Layout Container */}
-        <div style={styles.layout}>
+        <div className="catalog-manager-layout" style={styles.layout}>
           {/* Left Navigation Tabs */}
-          <nav style={styles.sidebar}>
+          <nav className="catalog-manager-sidebar" style={styles.sidebar}>
             <button
               onClick={() => setActiveTab('brands')}
               style={{ ...styles.tabBtn, ...(activeTab === 'brands' ? styles.tabBtnActive : {}) }}
@@ -864,6 +864,51 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return ReactDOM.createPortal(modalMarkup, document.body);
+  }
+  return modalMarkup;
+}
+
+// Inject Responsive Mobile CSS Styles for Catalog Manager Modal
+if (typeof document !== 'undefined') {
+  const styleElId = 'catalog-manager-modal-responsive-style';
+  if (!document.getElementById(styleElId)) {
+    const styleEl = document.createElement('style');
+    styleEl.id = styleElId;
+    styleEl.innerHTML = `
+      @media (max-width: 768px) {
+        .catalog-manager-container {
+          width: 96vw !important;
+          max-width: 96vw !important;
+          padding: 0.85rem !important;
+          max-height: 94vh !important;
+          border-radius: 12px !important;
+          box-sizing: border-box !important;
+        }
+        .catalog-manager-layout {
+          flex-direction: column !important;
+          gap: 0.75rem !important;
+        }
+        .catalog-manager-sidebar {
+          width: 100% !important;
+          flex-direction: row !important;
+          overflow-x: auto !important;
+          -webkit-overflow-scrolling: touch !important;
+          border-right: none !important;
+          border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+          padding-right: 0 !important;
+          padding-bottom: 0.5rem !important;
+        }
+        .catalog-manager-sidebar button {
+          flex: 0 0 auto !important;
+          white-space: nowrap !important;
+        }
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
 }
 
 // Styles configuration object remains exactly the same
