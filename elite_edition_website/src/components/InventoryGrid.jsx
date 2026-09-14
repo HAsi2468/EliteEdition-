@@ -439,34 +439,6 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
             </span>
           </button>
         </div>
-
-        {/* Global Quick Action Shortcut */}
-        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-          {activeSubTab === 'overview' && (
-            <>
-              <button onClick={onBulkInward} style={styles.bulkInwardHeaderBtn}>
-                <Sparkles size={15} />
-                <span>Bulk Inward</span>
-              </button>
-              <button onClick={onAdd} style={styles.addSkuHeaderBtn}>
-                <Plus size={15} />
-                <span>Add SKU</span>
-              </button>
-            </>
-          )}
-          {activeSubTab === 'inward' && (
-            <button onClick={onBulkInward} style={styles.bulkInwardHeaderBtn}>
-              <Sparkles size={15} />
-              <span>+ Add Inward Stock</span>
-            </button>
-          )}
-          {activeSubTab === 'outward' && (
-            <button onClick={() => onStockOut(null)} style={styles.outwardHeaderBtn}>
-              <TrendingDown size={15} />
-              <span>+ Dispatch Stock Out</span>
-            </button>
-          )}
-        </div>
       </div>
 
 
