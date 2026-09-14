@@ -1124,20 +1124,24 @@ export default function InventoryGrid({
                   </thead>
                   <tbody>
                     {filteredInwardItems.map((item, idx) => {
-                      const dtStr = (item.created_date_time || item.date)
-                        ? new Date(item.created_date_time || item.date).toLocaleString('en-IN', {
-                            day: '2-digit', month: 'short', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit', hour12: true
-                          })
+                      const rawDt = item.created_date_time || item.date;
+                      const dtObj = rawDt ? new Date(rawDt) : null;
+                      const dateStr = dtObj
+                        ? dtObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
                         : 'N/A';
+                      const timeStr = dtObj
+                        ? dtObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                        : '';
+
                       const totalQty = item.qty || item.total || 0;
                       const buyPrice = Number(item.purchasePrice || 0);
                       const totalPurchase = Number(item.totalPurchaseAmount || (buyPrice * totalQty));
 
                       return (
                         <tr key={item.id || item._id || idx} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                          <td style={{ padding: '0.55rem 0.5rem', fontSize: '0.74rem', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                            {dtStr}
+                          <td style={{ padding: '0.55rem 0.5rem', fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>{dateStr}</div>
+                            {timeStr && <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', lineHeight: 1.2 }}>{timeStr}</div>}
                           </td>
                           <td style={{ padding: '0.55rem 0.5rem' }}>
                             <div style={{ ...styles.itemImgWrapper, width: '36px', height: '36px', borderRadius: '8px' }}>
@@ -1186,29 +1190,29 @@ export default function InventoryGrid({
                             ₹ {totalPurchase.toFixed(2)}
                           </td>
                           <td style={{ padding: '0.55rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'center' }}>
                               {/* Display / View Item Button */}
                               <button
                                 type="button"
                                 onClick={() => setViewingItem(item)}
                                 style={{
-                                  padding: '0.32rem 0.48rem',
+                                  width: '32px',
+                                  height: '32px',
+                                  padding: 0,
                                   background: '#eff6ff',
                                   border: '1px solid #bfdbfe',
                                   color: '#2563eb',
-                                  borderRadius: '6px',
-                                  fontSize: '0.73rem',
-                                  fontWeight: 700,
+                                  borderRadius: '8px',
                                   cursor: 'pointer',
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '0.25rem',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                                  justifyContent: 'center',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                  transition: 'all 0.15s ease'
                                 }}
                                 title="Display Item Details"
                               >
-                                <Eye size={13} />
-                                <span>Display</span>
+                                <Eye size={15} />
                               </button>
 
                               {/* Edit Button */}
@@ -1216,23 +1220,23 @@ export default function InventoryGrid({
                                 type="button"
                                 onClick={() => onEdit(item)}
                                 style={{
-                                  padding: '0.32rem 0.48rem',
+                                  width: '32px',
+                                  height: '32px',
+                                  padding: 0,
                                   background: '#f0fdf4',
                                   border: '1px solid #bbf7d0',
                                   color: '#16a34a',
-                                  borderRadius: '6px',
-                                  fontSize: '0.73rem',
-                                  fontWeight: 700,
+                                  borderRadius: '8px',
                                   cursor: 'pointer',
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '0.25rem',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                                  justifyContent: 'center',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                  transition: 'all 0.15s ease'
                                 }}
                                 title="Edit Item Details"
                               >
-                                <Edit2 size={13} />
-                                <span>Edit</span>
+                                <Edit2 size={15} />
                               </button>
 
                               {/* Delete Button */}
@@ -1241,23 +1245,23 @@ export default function InventoryGrid({
                                   type="button"
                                   onClick={() => onDelete(item._id || item.id)}
                                   style={{
-                                    padding: '0.32rem 0.48rem',
+                                    width: '32px',
+                                    height: '32px',
+                                    padding: 0,
                                     background: '#fef2f2',
                                     border: '1px solid #fecaca',
                                     color: '#dc2626',
-                                    borderRadius: '6px',
-                                    fontSize: '0.73rem',
-                                    fontWeight: 700,
+                                    borderRadius: '8px',
                                     cursor: 'pointer',
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '0.25rem',
-                                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                                    justifyContent: 'center',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                    transition: 'all 0.15s ease'
                                   }}
                                   title="Delete Item"
                                 >
-                                  <Trash2 size={13} />
-                                  <span>Delete</span>
+                                  <Trash2 size={15} />
                                 </button>
                               )}
                             </div>
@@ -1509,12 +1513,15 @@ export default function InventoryGrid({
                   </thead>
                   <tbody>
                     {filteredOutwardItems.map((item, idx) => {
-                      const dtStr = (item.created_date_time || item.createdAt || item.date)
-                        ? new Date(item.created_date_time || item.createdAt || item.date).toLocaleString('en-IN', {
-                            day: '2-digit', month: 'short', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit', hour12: true
-                          })
+                      const rawDt = item.created_date_time || item.createdAt || item.date;
+                      const dtObj = rawDt ? new Date(rawDt) : null;
+                      const dateStr = dtObj
+                        ? dtObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
                         : 'N/A';
+                      const timeStr = dtObj
+                        ? dtObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                        : '';
+
                       const totalQty = item.total || item.qty || 0;
                       const buyPrice = Number(item.purchasePrice || 0);
                       const sellPrice = Number(item.salePrice || 0);
@@ -1524,8 +1531,9 @@ export default function InventoryGrid({
 
                       return (
                         <tr key={item.sku || item.id || idx} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#fffbfb' }}>
-                          <td style={{ padding: '0.55rem 0.5rem', fontSize: '0.74rem', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                            {dtStr}
+                          <td style={{ padding: '0.55rem 0.5rem', fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>{dateStr}</div>
+                            {timeStr && <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', lineHeight: 1.2 }}>{timeStr}</div>}
                           </td>
                           <td style={{ padding: '0.55rem 0.5rem' }}>
                             <div style={{ ...styles.itemImgWrapper, width: '36px', height: '36px', borderRadius: '8px' }}>
