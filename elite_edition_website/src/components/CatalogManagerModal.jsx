@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw } from 'lucide-react';
+import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw, Building2 } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function CatalogManagerModal({ initialTab = 'vendors', context = 'elite_online', onClose }) {
-  const [activeTab, setActiveTab] = useState(initialTab); // 'vendors', 'parties', 'products', 'history'
+  const [activeTab, setActiveTab] = useState(initialTab === 'brands' ? 'vendors' : initialTab);
 
   // Data States
   const [vendors, setVendors] = useState([]);
@@ -267,10 +267,10 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
           <nav style={styles.sidebar}>
             <button
               onClick={() => setActiveTab('vendors')}
-              style={{ ...styles.tabBtn, ...(activeTab === 'vendors' ? styles.tabBtnActive : {}) }}
+              style={{ ...styles.tabBtn, ...(activeTab === 'vendors' || activeTab === 'brands' ? styles.tabBtnActive : {}) }}
             >
-              <UserCheck size={16} />
-              <span>Vendors</span>
+              <Building2 size={16} />
+              <span>Brands & Vendors</span>
             </button>
             {context !== 'elite_print' && (
               <button

@@ -3,7 +3,7 @@ import {
   Edit2, Trash2, Printer, Search, Plus, Minus, SlidersHorizontal, 
   TrendingDown, MoreVertical, Sparkles, Package, AlertTriangle, 
   CheckCircle2, XCircle, DollarSign, Download, Filter, Calendar,
-  RefreshCw, FileText, TrendingUp, Layers3, IndianRupee, ArrowDownRight, ArrowUpRight
+  RefreshCw, FileText, TrendingUp, Layers3, IndianRupee, ArrowDownRight, ArrowUpRight, Building2
 } from 'lucide-react';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
@@ -596,8 +596,13 @@ export default function InventoryGrid({ items, onEdit, onDelete, onAdd, onStockO
                   <Plus size={15} />
                   <span>Add SKU</span>
                 </button>
-                <button onClick={() => onOpenManager('vendors')} style={styles.moreBtn} title="Manage Vendors">
-                  <MoreVertical size={16} />
+                <button 
+                  onClick={() => onOpenManager('brands')} 
+                  style={{ ...styles.exportBtn, background: '#e0e7ff', color: '#4338ca', borderColor: '#c7d2fe', fontWeight: 700 }} 
+                  title="Manage Brands & Vendors"
+                >
+                  <Building2 size={15} />
+                  <span>Manage Brands</span>
                 </button>
               </div>
             </div>
