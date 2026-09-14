@@ -881,16 +881,26 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
           </div>
 
           {/* Date Filter & Control Header */}
-          <div style={{ ...styles.controlHeader, padding: '0.6rem 0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.65rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flex: 1, minWidth: '280px', flexWrap: 'wrap' }}>
+          <div style={{
+            ...styles.controlHeader,
+            padding: '0.45rem 0.85rem',
+            display: 'flex',
+            alignItems: 'center',
+            justify: 'space-between',
+            flexWrap: 'nowrap',
+            gap: '0.5rem',
+            overflowX: 'auto',
+            whiteSpace: 'nowrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
               {/* Search Box */}
-              <div style={{ ...styles.searchBox, maxWidth: '280px', padding: '0.45rem 0.75rem' }}>
-                <Search size={15} color="#64748b" style={{ flexShrink: 0 }} />
+              <div style={{ ...styles.searchBox, minWidth: '180px', maxWidth: '240px', padding: '0.35rem 0.65rem' }}>
+                <Search size={14} color="#64748b" style={{ flexShrink: 0 }} />
                 <input
                   type="text"
                   value={inwardSearchTerm}
                   onChange={(e) => setInwardSearchTerm(e.target.value)}
-                  placeholder="Search inward SKU, item name, vendor..."
+                  placeholder="Search inward SKU, item..."
                   style={styles.searchInput}
                 />
               </div>
@@ -913,25 +923,25 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
               />
             </div>
 
-            <div className="inv-row-two-actions" style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <button onClick={() => fetchInwardData()} style={styles.refreshBtn} title="Refresh Inward Log">
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
+              <button onClick={() => fetchInwardData()} style={{ ...styles.refreshBtn, padding: '0.45rem 0.75rem' }} title="Refresh Inward Log">
                 <RefreshCw size={14} className={inwardLoading ? 'spin' : ''} />
                 <span>Refresh</span>
               </button>
-              <button onClick={() => setShowVendorManager(true)} style={styles.vendorBtn} title="Manage Vendors & Suppliers">
+              <button onClick={() => setShowVendorManager(true)} style={{ ...styles.vendorBtn, padding: '0.45rem 0.75rem' }} title="Manage Vendors & Suppliers">
                 <Building2 size={14} />
                 <span>Manage Vendors</span>
               </button>
               <button 
                 onClick={handleDownloadInwardPdf} 
                 disabled={downloadingInwardPdf} 
-                style={styles.pdfBtn}
+                style={{ ...styles.pdfBtn, padding: '0.45rem 0.75rem' }}
                 title="Download Official Inward PDF Report"
               >
                 <FileText size={14} />
                 <span>{downloadingInwardPdf ? 'PDF...' : 'Download PDF'}</span>
               </button>
-              <button onClick={onBulkInward} style={styles.addInwardStockBtn} title="Add Inward Stock">
+              <button onClick={onBulkInward} style={{ ...styles.addInwardStockBtn, padding: '0.45rem 0.85rem' }} title="Add Inward Stock">
                 <Sparkles size={14} />
                 <span>+ Add Inward Stock</span>
               </button>
@@ -1109,16 +1119,26 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
           </div>
 
           {/* Date Filter & Control Header */}
-          <div style={{ ...styles.controlHeader, padding: '0.6rem 0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.65rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flex: 1, minWidth: '280px', flexWrap: 'wrap' }}>
+          <div style={{
+            ...styles.controlHeader,
+            padding: '0.45rem 0.85rem',
+            display: 'flex',
+            alignItems: 'center',
+            justify: 'space-between',
+            flexWrap: 'nowrap',
+            gap: '0.5rem',
+            overflowX: 'auto',
+            whiteSpace: 'nowrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
               {/* Search Box */}
-              <div style={{ ...styles.searchBox, maxWidth: '280px', padding: '0.45rem 0.75rem' }}>
-                <Search size={15} color="#64748b" style={{ flexShrink: 0 }} />
+              <div style={{ ...styles.searchBox, minWidth: '180px', maxWidth: '240px', padding: '0.35rem 0.65rem' }}>
+                <Search size={14} color="#64748b" style={{ flexShrink: 0 }} />
                 <input
                   type="text"
                   value={outwardSearchTerm}
                   onChange={(e) => setOutwardSearchTerm(e.target.value)}
-                  placeholder="Search outward SKU, item name, party..."
+                  placeholder="Search outward SKU, item..."
                   style={styles.searchInput}
                 />
               </div>
@@ -1141,25 +1161,25 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
               />
             </div>
 
-            <div className="inv-row-two-actions" style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <button onClick={() => fetchOutwardData()} style={styles.refreshBtn} title="Refresh Outward Log">
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
+              <button onClick={() => fetchOutwardData()} style={{ ...styles.refreshBtn, padding: '0.45rem 0.75rem' }} title="Refresh Outward Log">
                 <RefreshCw size={14} className={outwardLoading ? 'spin' : ''} />
                 <span>Refresh</span>
               </button>
-              <button onClick={() => setShowPartyManager(true)} style={styles.partyBtn} title="Manage Recipient Parties">
+              <button onClick={() => setShowPartyManager(true)} style={{ ...styles.partyBtn, padding: '0.45rem 0.75rem' }} title="Manage Recipient Parties">
                 <Building2 size={14} />
                 <span>Manage Parties</span>
               </button>
               <button 
                 onClick={handleDownloadOutwardPdf} 
                 disabled={downloadingOutwardPdf} 
-                style={styles.pdfBtn}
+                style={{ ...styles.pdfBtn, padding: '0.45rem 0.75rem' }}
                 title="Download Official Outward PDF Report"
               >
                 <FileText size={14} />
                 <span>{downloadingOutwardPdf ? 'PDF...' : 'Download PDF'}</span>
               </button>
-              <button onClick={() => onStockOut(null)} style={styles.outwardHeaderBtn}>
+              <button onClick={() => onStockOut(null)} style={{ ...styles.outwardHeaderBtn, padding: '0.45rem 0.85rem' }}>
                 <TrendingDown size={14} />
                 <span>+ Dispatch Stock Out</span>
               </button>
