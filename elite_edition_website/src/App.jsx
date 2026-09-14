@@ -1612,7 +1612,7 @@ export default function App() {
               onEdit={triggerEditModal}
               onDelete={handleDeleteItem}
               onStockOut={triggerStockOutModal}
-              onOpenManager={() => triggerManagerModal('vendors')}
+              onOpenManager={(tab) => triggerManagerModal(tab || 'brands')}
               onBulkInward={() => setIsBulkInwardOpen(true)}
               onQuickStockUpdate={handleQuickStockUpdate}
             />

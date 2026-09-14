@@ -1,15 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw, Building2 } from 'lucide-react';
+import { X, Edit2, Trash2, Plus, RefreshCw, UserCheck, Users, ShoppingBag, History, Save, RotateCw, Building2, Tag } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function CatalogManagerModal({ initialTab = 'vendors', context = 'elite_online', onClose }) {
-  const [activeTab, setActiveTab] = useState(initialTab === 'brands' ? 'vendors' : initialTab);
+  const [activeTab, setActiveTab] = useState(initialTab || 'brands'); // 'brands', 'vendors', 'parties', 'products', 'history'
 
   // Data States
   const [vendors, setVendors] = useState([]);
   const [parties, setParties] = useState([]);
   const [products, setProducts] = useState([]);
   const [history, setHistory] = useState([]);
+  const [customBrands, setCustomBrands] = useState(() => {
+    try {
+      const saved = localStorage.getItem('elite_managed_brands');
+      return saved ? JSON.parse(saved) : ['ANOUK', 'ELITE EDITION', 'HERA', 'MYNTRA'];
+    } catch (e) {
+      return ['ANOUK', 'ELITE EDITION', 'HERA', 'MYNTRA'];
+    }
+  });
+  const [newBrandInput, setNewBrandInput] = useState('');
 
   // Loading states
   const [loading, setLoading] = useState(false);
@@ -70,7 +78,32 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
     }
   };
 
-  // --- CRUD ACTION HANDLERS ---
+  // --- BRAND ACTION HANDLERS ---
+  const handleAddBrandTag = (e) => {
+    e.preventDefault();
+    const trimmed = newBrandInput.trim().toUpperCase();
+    if (!trimmed) return;
+    if (customBrands.some(b => b.toLowerCase() === trimmed.toLowerCase())) {
+      setError('This brand already exists.');
+      return;
+    }
+    const updated = [...customBrands, trimmed];
+    setCustomBrands(updated);
+    try {
+      localStorage.setItem('elite_managed_brands', JSON.stringify(updated));
+    } catch (e) {}
+    setNewBrandInput('');
+    setSuccess(`Brand "${trimmed}" added successfully.`);
+  };
+
+  const handleDeleteBrandTag = (brandName) => {
+    const updated = customBrands.filter(b => b.toLowerCase() !== brandName.toLowerCase());
+    setCustomBrands(updated);
+    try {
+      localStorage.setItem('elite_managed_brands', JSON.stringify(updated));
+    } catch (e) {}
+    setSuccess(`Brand "${brandName}" removed.`);
+  };
 
   // 1. Vendors
   const handleVendorSubmit = async (e) => {
@@ -266,11 +299,18 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
           {/* Left Navigation Tabs */}
           <nav style={styles.sidebar}>
             <button
+              onClick={() => setActiveTab('brands')}
+              style={{ ...styles.tabBtn, ...(activeTab === 'brands' ? styles.tabBtnActive : {}) }}
+            >
+              <Tag size={16} />
+              <span>Catalog Brands</span>
+            </button>
+            <button
               onClick={() => setActiveTab('vendors')}
-              style={{ ...styles.tabBtn, ...(activeTab === 'vendors' || activeTab === 'brands' ? styles.tabBtnActive : {}) }}
+              style={{ ...styles.tabBtn, ...(activeTab === 'vendors' ? styles.tabBtnActive : {}) }}
             >
               <Building2 size={16} />
-              <span>Brands & Vendors</span>
+              <span>Vendors & Suppliers</span>
             </button>
             {context !== 'elite_print' && (
               <button
@@ -310,7 +350,43 @@ export default function CatalogManagerModal({ initialTab = 'vendors', context = 
               </div>
             ) : (
               <>
-                {/* 1. VENDORS TAB */}
+                {/* 0. BRANDS TAB */}
+                {activeTab === 'brands' && (
+                  <div style={styles.tabContent}>
+                    <form onSubmit={handleAddBrandTag} style={styles.inlineForm}>
+                      <h4 style={styles.formTitle}>ADD NEW CATALOG BRAND</h4>
+                      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', marginTop: '0.5rem' }}>
+                        <input
+                          type="text"
+                          value={newBrandInput}
+                          onChange={(e) => setNewBrandInput(e.target.value)}
+                          placeholder="Type brand name (e.g. ZARA, HERA, MYNTRA)..."
+                          style={{ ...styles.formInput, flex: 1 }}
+                        />
+                        <button type="submit" style={styles.submitBtn}>
+                          <Plus size={15} /> Add Brand
+                        </button>
+                      </div>
+                    </form>
+
+                    <div style={{ marginTop: '1.25rem' }}>
+                      <h4 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.75rem', letterSpacing: '0.04em' }}>
+                        ACTIVE CATALOG BRANDS ({customBrands.length})
+                      </h4>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        {customBrands.map((brand, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '0.4rem 0.75rem', borderRadius: '8px' }}>
+                            <Tag size={13} color="#34d399" />
+                            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#34d399' }}>{brand}</span>
+                            <button type="button" onClick={() => handleDeleteBrandTag(brand)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', marginLeft: '0.2rem' }} title={`Delete ${brand}`}>
+                              <Trash2 size={13} color="#f87171" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {activeTab === 'vendors' && (
                   <div style={styles.tabContent}>
                     {/* Add / Edit Form */}
