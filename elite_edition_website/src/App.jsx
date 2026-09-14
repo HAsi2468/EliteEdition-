@@ -522,6 +522,7 @@ export default function App() {
           imageUrl: formData.imageUrl,
           categoryName: formData.categoryName || '',
           hsnCode: formData.hsnCode || '',
+          brandCodes: formData.brandCodes || [],
         };
         const newProduct = await api.createProductCatalog(payload);
         setCatalogItems(prev => [newProduct, ...prev]);
@@ -555,6 +556,7 @@ export default function App() {
           imageUrl: formData.imageUrl,
           categoryName: formData.categoryName || '',
           hsnCode: formData.hsnCode || '',
+          brandCodes: formData.brandCodes || [],
         };
         await api.updateProductCatalog(editingItem._id, payload);
       } else if (activeTab === 'inventory') {

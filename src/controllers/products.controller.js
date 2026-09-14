@@ -1349,22 +1349,32 @@ const createProduct = async (req, res) => {
       sizeArray = size.split(',').map(s => s.trim()).filter(Boolean);
     }
 
-    const newProduct = await db.InventoryProduct.create({
-      skuCode: skuCode.trim(),
-      description,
-      imageUrl,
-      brand,
-      brandCodes: brandCodes || [],
-      price,
-      basePrice,
-      categoryName,
-      hsnCode,
+    const cleanSku = skuCode.trim();
+
+    const productPayload = {
+      skuCode: cleanSku,
+      description: description || cleanSku,
+      imageUrl: imageUrl || '',
+      brand: brand || '',
+      brandCodes: Array.isArray(brandCodes) ? brandCodes : [],
+      price: price !== undefined ? price : 0,
+      basePrice: basePrice !== undefined ? basePrice : 0,
+      categoryName: categoryName || '',
+      hsnCode: hsnCode || '',
       size: sizeArray,
       enabled: true,
       skuType: 'GOODS',
-    });
+    };
 
-    res.status(201).json({ ...newProduct.toObject(), id: newProduct._id.toString() });
+    let createdProduct = await db.Product.create(productPayload).catch(() => null);
+    let createdInvProduct = await db.InventoryProduct.create(productPayload).catch(() => null);
+
+    if (!createdProduct && !createdInvProduct) {
+      return res.status(400).json({ error: 'Product with this skuCode already exists' });
+    }
+
+    const result = createdProduct || createdInvProduct;
+    res.status(201).json({ ...result.toObject(), id: result._id.toString() });
   } catch (error) {
     logger.error('Error creating product: %o', error);
     if (error.code === 11000) {
@@ -1377,11 +1387,26 @@ const createProduct = async (req, res) => {
 const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await db.InventoryProduct.findByIdAndDelete(id);
-    if (!deleted) {
+    let deletedProduct = await db.Product.findByIdAndDelete(id).catch(() => null);
+    let deletedInv = await db.InventoryProduct.findByIdAndDelete(id).catch(() => null);
+
+    if (!deletedProduct && !deletedInv) {
+      const match = await db.Product.findById(id) || await db.InventoryProduct.findById(id);
+      if (match && match.skuCode) {
+        await db.Product.deleteMany({ skuCode: match.skuCode }).catch(() => {});
+        await db.InventoryProduct.deleteMany({ skuCode: match.skuCode }).catch(() => {});
+        return res.json({ message: 'Product deleted successfully', id });
+      }
       return res.status(404).json({ error: 'Product not found' });
     }
-    res.json({ message: 'Product deleted successfully', id: deleted._id.toString() });
+
+    const skuToDelete = (deletedProduct && deletedProduct.skuCode) || (deletedInv && deletedInv.skuCode);
+    if (skuToDelete) {
+      await db.Product.deleteMany({ skuCode: skuToDelete }).catch(() => {});
+      await db.InventoryProduct.deleteMany({ skuCode: skuToDelete }).catch(() => {});
+    }
+
+    res.json({ message: 'Product deleted successfully', id });
   } catch (error) {
     logger.error('Error deleting product: %o', error);
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
@@ -1393,41 +1418,73 @@ const updateProduct = async (req, res) => {
     const { id } = req.params;
     const { skuCode, description, imageUrl, size, brand, brandCodes, price, basePrice, categoryName, hsnCode } = req.body;
 
-    const product = await db.InventoryProduct.findById(id);
-    if (!product) {
+    let product = await db.Product.findById(id).catch(() => null);
+    let invProduct = await db.InventoryProduct.findById(id).catch(() => null);
+
+    if (!product && !invProduct && skuCode) {
+      product = await db.Product.findOne({ skuCode: skuCode.trim() }).catch(() => null);
+      invProduct = await db.InventoryProduct.findOne({ skuCode: skuCode.trim() }).catch(() => null);
+    }
+
+    if (!product && !invProduct) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    if (skuCode) {
-      const skuClean = skuCode.trim();
-      const existingProduct = await db.Product.findOne({ skuCode: skuClean, _id: { $ne: id } });
-      if (existingProduct) {
-        return res.status(400).json({ error: 'Product with this SKU code already exists' });
-      }
-      product.skuCode = skuClean;
-    }
-
-    if (description !== undefined) product.description = description;
-    if (imageUrl !== undefined) product.imageUrl = imageUrl;
-    if (brand !== undefined) product.brand = brand;
-    if (brandCodes !== undefined) product.brandCodes = brandCodes;
-    if (price !== undefined) product.price = price;
-    if (basePrice !== undefined) product.basePrice = basePrice;
-    if (categoryName !== undefined) product.categoryName = categoryName;
-    if (hsnCode !== undefined) product.hsnCode = hsnCode;
-
+    let sizeArray = undefined;
     if (size !== undefined) {
-      let sizeArray = [];
       if (Array.isArray(size)) {
         sizeArray = size;
       } else if (typeof size === 'string') {
         sizeArray = size.split(',').map(s => s.trim()).filter(Boolean);
       }
-      product.size = sizeArray;
     }
 
-    await product.save();
-    res.json({ ...product.toObject(), id: product._id.toString() });
+    const cleanSku = skuCode ? skuCode.trim() : undefined;
+    const targetSku = cleanSku || (product && product.skuCode) || (invProduct && invProduct.skuCode);
+
+    if (targetSku) {
+      if (!product) product = await db.Product.findOne({ skuCode: targetSku }).catch(() => null);
+      if (!invProduct) invProduct = await db.InventoryProduct.findOne({ skuCode: targetSku }).catch(() => null);
+    }
+
+    const applyUpdates = (target) => {
+      if (cleanSku !== undefined) target.skuCode = cleanSku;
+      if (description !== undefined) target.description = description;
+      if (imageUrl !== undefined) target.imageUrl = imageUrl;
+      if (brand !== undefined) target.brand = brand;
+      if (brandCodes !== undefined) target.brandCodes = brandCodes;
+      if (price !== undefined) target.price = price;
+      if (basePrice !== undefined) target.basePrice = basePrice;
+      if (categoryName !== undefined) target.categoryName = categoryName;
+      if (hsnCode !== undefined) target.hsnCode = hsnCode;
+      if (sizeArray !== undefined) target.size = sizeArray;
+    };
+
+    let savedResult = null;
+    if (product) {
+      applyUpdates(product);
+      await product.save();
+      savedResult = product;
+    }
+
+    if (invProduct) {
+      applyUpdates(invProduct);
+      await invProduct.save();
+      if (!savedResult) savedResult = invProduct;
+    }
+
+    // Sync across both collections if it only existed in one
+    if (product && !invProduct && targetSku) {
+      const obj = product.toObject();
+      delete obj._id;
+      await db.InventoryProduct.create(obj).catch(() => {});
+    } else if (invProduct && !product && targetSku) {
+      const obj = invProduct.toObject();
+      delete obj._id;
+      await db.Product.create(obj).catch(() => {});
+    }
+
+    res.json({ ...savedResult.toObject(), id: savedResult._id.toString() });
   } catch (error) {
     logger.error('Error updating product: %o', error);
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
