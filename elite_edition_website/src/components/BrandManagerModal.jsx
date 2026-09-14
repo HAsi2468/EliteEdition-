@@ -1,9 +1,18 @@
 import React, { useState } from 'react';
 import { X, Building2, Plus, Trash2, CheckCircle, Tag, Sparkles } from 'lucide-react';
 
-export default function BrandManagerModal({ existingBrands, customBrands, onAddBrand, onDeleteBrand, onClose }) {
+export default function BrandManagerModal({ 
+  existingBrands = [], 
+  customBrands = [], 
+  onAddBrand, 
+  onDeleteBrand, 
+  onClose 
+}) {
   const [newBrandName, setNewBrandName] = useState('');
   const [error, setError] = useState('');
+
+  const safeExisting = Array.isArray(existingBrands) ? existingBrands : [];
+  const safeCustom = Array.isArray(customBrands) ? customBrands : [];
 
   const handleAdd = (e) => {
     e.preventDefault();
@@ -14,19 +23,21 @@ export default function BrandManagerModal({ existingBrands, customBrands, onAddB
       return;
     }
 
-    const allCurrent = [...existingBrands, ...customBrands].map(b => b.toLowerCase());
+    const allCurrent = [...safeExisting, ...safeCustom].map(b => (b || '').toLowerCase());
     if (allCurrent.includes(trimmed.toLowerCase())) {
       setError('This brand already exists.');
       return;
     }
 
-    onAddBrand(trimmed.toUpperCase());
+    if (onAddBrand) {
+      onAddBrand(trimmed.toUpperCase());
+    }
     setNewBrandName('');
   };
 
   return (
-    <div style={styles.overlay}>
-      <div style={styles.container}>
+    <div className="modal-overlay" style={styles.overlay} onClick={onClose}>
+      <div style={styles.container} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div style={styles.header}>
           <div style={styles.headerTitleGroup}>
@@ -49,7 +60,7 @@ export default function BrandManagerModal({ existingBrands, customBrands, onAddB
           {/* Add Brand Form */}
           <form onSubmit={handleAdd} style={styles.addForm}>
             <div style={styles.inputGroup}>
-              <Building2 size={18} color="#059669" style={{ marginLeft: '10px' }} />
+              <Building2 size={18} color="#10b981" style={{ marginLeft: '10px' }} />
               <input
                 type="text"
                 value={newBrandName}
@@ -67,34 +78,36 @@ export default function BrandManagerModal({ existingBrands, customBrands, onAddB
 
           {/* Brands List */}
           <div style={styles.sectionTitle}>
-            <span>ALL ACTIVE BRANDS ({existingBrands.length + customBrands.length})</span>
+            <span>ALL ACTIVE BRANDS ({safeExisting.length + safeCustom.length})</span>
           </div>
 
           <div style={styles.brandsGrid}>
             {/* Custom Brands First */}
-            {customBrands.map((brand, idx) => (
+            {safeCustom.map((brand, idx) => (
               <div key={`custom-${idx}`} style={styles.brandChipCustom}>
                 <div style={styles.brandChipLeft}>
-                  <Tag size={13} color="#059669" />
-                  <span style={styles.brandName}>{brand}</span>
+                  <Tag size={13} color="#34d399" />
+                  <span style={styles.brandNameCustom}>{brand}</span>
                   <span style={styles.customBadge}>Custom</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onDeleteBrand(brand)}
-                  style={styles.deleteBtn}
-                  title={`Delete ${brand}`}
-                >
-                  <Trash2 size={14} color="#ef4444" />
-                </button>
+                {onDeleteBrand && (
+                  <button
+                    type="button"
+                    onClick={() => onDeleteBrand(brand)}
+                    style={styles.deleteBtn}
+                    title={`Delete ${brand}`}
+                  >
+                    <Trash2 size={14} color="#f87171" />
+                  </button>
+                )}
               </div>
             ))}
 
             {/* Catalog Brands */}
-            {existingBrands.map((brand, idx) => (
+            {safeExisting.map((brand, idx) => (
               <div key={`cat-${idx}`} style={styles.brandChip}>
                 <div style={styles.brandChipLeft}>
-                  <Tag size={13} color="#64748b" />
+                  <Tag size={13} color="#94a3b8" />
                   <span style={styles.brandName}>{brand}</span>
                 </div>
                 <span style={styles.catBadge}>Catalog</span>
@@ -122,21 +135,21 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: 'rgba(3, 7, 18, 0.75)',
     backdropFilter: 'blur(6px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 99999,
+    zIndex: 100000,
     padding: '1.25rem',
   },
   container: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#1e293b',
     borderRadius: '16px',
     width: '100%',
     maxWidth: '560px',
-    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-    border: '1px solid #e2e8f0',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
@@ -144,8 +157,8 @@ const styles = {
   },
   header: {
     padding: '1.25rem 1.5rem',
-    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-    borderBottom: '1px solid #e2e8f0',
+    background: '#0f172a',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
@@ -158,36 +171,37 @@ const styles = {
   badge: {
     display: 'inline-flex',
     alignItems: 'center',
-    backgroundColor: '#d1fae5',
-    color: '#047857',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    color: '#34d399',
     fontSize: '0.7rem',
     fontWeight: '700',
     padding: '0.2rem 0.6rem',
     borderRadius: '20px',
     letterSpacing: '0.05em',
     width: 'fit-content',
+    border: '1px solid rgba(16, 185, 129, 0.3)',
   },
   title: {
     fontSize: '1.2rem',
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#f8fafc',
     margin: 0,
   },
   subtitle: {
     fontSize: '0.8rem',
-    color: '#64748b',
+    color: '#94a3b8',
     margin: 0,
   },
   closeBtn: {
-    background: '#ffffff',
-    border: '1px solid #cbd5e1',
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
     borderRadius: '50%',
     width: '32px',
     height: '32px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#64748b',
+    color: '#94a3b8',
     cursor: 'pointer',
   },
   body: {
@@ -205,9 +219,9 @@ const styles = {
   inputGroup: {
     display: 'flex',
     alignItems: 'center',
-    border: '1px solid #cbd5e1',
+    border: '1px solid rgba(255, 255, 255, 0.15)',
     borderRadius: '8px',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#0f172a',
     overflow: 'hidden',
     gap: '0.5rem',
   },
@@ -215,14 +229,14 @@ const styles = {
     flex: 1,
     border: 'none',
     outline: 'none',
-    padding: '0.6rem 0.5rem',
+    padding: '0.65rem 0.5rem',
     fontSize: '0.875rem',
     backgroundColor: 'transparent',
-    color: '#0f172a',
+    color: '#f8fafc',
     fontWeight: '600',
   },
   addBtn: {
-    backgroundColor: '#059669',
+    backgroundColor: '#10b981',
     color: '#ffffff',
     border: 'none',
     padding: '0.65rem 1rem',
@@ -235,16 +249,16 @@ const styles = {
   },
   errorText: {
     fontSize: '0.75rem',
-    color: '#dc2626',
+    color: '#f87171',
     fontWeight: '600',
     marginLeft: '4px',
   },
   sectionTitle: {
     fontSize: '0.75rem',
     fontWeight: '700',
-    color: '#64748b',
+    color: '#94a3b8',
     letterSpacing: '0.05em',
-    borderBottom: '1px solid #f1f5f9',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
     paddingBottom: '0.35rem',
   },
   brandsGrid: {
@@ -256,8 +270,8 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8fafc',
-    border: '1px solid #e2e8f0',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
     padding: '0.4rem 0.75rem',
     borderRadius: '8px',
     gap: '0.75rem',
@@ -267,8 +281,8 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#ecfdf5',
-    border: '1px solid #a7f3d0',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    border: '1px solid rgba(16, 185, 129, 0.3)',
     padding: '0.4rem 0.75rem',
     borderRadius: '8px',
     gap: '0.75rem',
@@ -281,20 +295,24 @@ const styles = {
   },
   brandName: {
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#cbd5e1',
+  },
+  brandNameCustom: {
+    fontWeight: '700',
+    color: '#34d399',
   },
   catBadge: {
     fontSize: '0.65rem',
-    color: '#64748b',
-    backgroundColor: '#e2e8f0',
+    color: '#94a3b8',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     padding: '0.15rem 0.4rem',
     borderRadius: '4px',
     fontWeight: '600',
   },
   customBadge: {
     fontSize: '0.65rem',
-    color: '#047857',
-    backgroundColor: '#d1fae5',
+    color: '#34d399',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
     padding: '0.15rem 0.4rem',
     borderRadius: '4px',
     fontWeight: '700',
@@ -309,16 +327,16 @@ const styles = {
   },
   footer: {
     padding: '1rem 1.5rem',
-    borderTop: '1px solid #e2e8f0',
+    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
     display: 'flex',
     justifyContent: 'flex-end',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#0f172a',
   },
   doneBtn: {
     padding: '0.55rem 1.5rem',
     borderRadius: '8px',
     border: 'none',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#10b981',
     color: '#ffffff',
     fontSize: '0.85rem',
     fontWeight: '600',
