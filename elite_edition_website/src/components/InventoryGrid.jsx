@@ -49,9 +49,51 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
   const [outwardError, setOutwardError] = useState('');
   const [downloadingOutwardPdf, setDownloadingOutwardPdf] = useState(false);
 
-  // Unique sizes & vendors for Overview dropdowns
+  // Managed custom brands in localStorage + Event Listener for real-time updates from Manage Brands
+  const [customBrands, setCustomBrands] = useState(() => {
+    try {
+      const saved = localStorage.getItem('elite_managed_brands');
+      return saved ? JSON.parse(saved) : ['ANOUK', 'ELITE EDITION', 'HERA', 'MYNTRA'];
+    } catch (err) {
+      return ['ANOUK', 'ELITE EDITION', 'HERA', 'MYNTRA'];
+    }
+  });
+
+  useEffect(() => {
+    const handleBrandsUpdated = () => {
+      try {
+        const saved = localStorage.getItem('elite_managed_brands');
+        if (saved) setCustomBrands(JSON.parse(saved));
+      } catch (e) {}
+    };
+
+    window.addEventListener('storage', handleBrandsUpdated);
+    window.addEventListener('elite_brands_updated', handleBrandsUpdated);
+    return () => {
+      window.removeEventListener('storage', handleBrandsUpdated);
+      window.removeEventListener('elite_brands_updated', handleBrandsUpdated);
+    };
+  }, []);
+
+  // Unique sizes & vendors/brands for Overview dropdowns
   const sizes = ['All', ...new Set(safeItems.map(item => item.size).filter(Boolean))];
-  const vendors = ['All', ...new Set(safeItems.map(item => item.party).filter(Boolean))];
+  
+  const allVendorSet = new Set();
+  safeItems.forEach(item => {
+    if (item.party && typeof item.party === 'string') allVendorSet.add(item.party.trim());
+    if (Array.isArray(item.brandCodes)) {
+      item.brandCodes.forEach(bc => {
+        const b = typeof bc === 'object' ? bc.brand : bc;
+        if (b && typeof b === 'string') allVendorSet.add(b.trim());
+      });
+    }
+  });
+  (customBrands || []).forEach(b => {
+    if (b && typeof b === 'string') allVendorSet.add(b.trim());
+  });
+
+  const sortedVendors = Array.from(allVendorSet).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  const vendors = ['All', ...sortedVendors];
 
   // Overview Metrics
   const totalSkus = safeItems.length;
@@ -153,7 +195,12 @@ export default function InventoryGrid({ items = [], onEdit, onDelete, onAdd, onS
       const stock = Number(item.currentlyAvailableStock) || 0;
       const matchSearch = matchSearchQuery(item, searchTerm, ['itemName', 'party', 'skuCode', 'category', 'notes']);
       const matchSize = sizeFilter === 'All' || item.size === sizeFilter;
-      const matchVendor = vendorFilter === 'All' || item.party === vendorFilter;
+      const matchVendor = vendorFilter === 'All' || 
+        (item.party && item.party.trim().toLowerCase() === vendorFilter.trim().toLowerCase()) ||
+        (Array.isArray(item.brandCodes) && item.brandCodes.some(bc => {
+          const bName = typeof bc === 'object' ? bc.brand : bc;
+          return bName && bName.trim().toLowerCase() === vendorFilter.trim().toLowerCase();
+        }));
       
       let matchStatus = true;
       if (stockStatusFilter === 'instock') matchStatus = stock > 0;

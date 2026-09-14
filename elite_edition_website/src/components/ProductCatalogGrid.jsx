@@ -55,7 +55,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
     setTimeout(doScroll, 300);
   };
 
-  // Managed custom brands in localStorage
+  // Managed custom brands in localStorage + Event Listener for real-time updates from Manage Brands
   const [customBrands, setCustomBrands] = useState(() => {
     try {
       const saved = localStorage.getItem('elite_managed_brands');
@@ -65,11 +65,29 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
     }
   });
 
+  useEffect(() => {
+    const handleBrandsUpdated = () => {
+      try {
+        const saved = localStorage.getItem('elite_managed_brands');
+        if (saved) setCustomBrands(JSON.parse(saved));
+      } catch (e) {}
+    };
+
+    window.addEventListener('storage', handleBrandsUpdated);
+    window.addEventListener('elite_brands_updated', handleBrandsUpdated);
+    return () => {
+      window.removeEventListener('storage', handleBrandsUpdated);
+      window.removeEventListener('elite_brands_updated', handleBrandsUpdated);
+    };
+  }, []);
+
   const handleAddBrand = (brandName) => {
     const updated = [...customBrands, brandName];
     setCustomBrands(updated);
     try {
       localStorage.setItem('elite_managed_brands', JSON.stringify(updated));
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('elite_brands_updated', { detail: updated }));
     } catch (e) {}
   };
 
@@ -78,13 +96,28 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
     setCustomBrands(updated);
     try {
       localStorage.setItem('elite_managed_brands', JSON.stringify(updated));
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('elite_brands_updated', { detail: updated }));
     } catch (e) {}
   };
 
-  // Extract unique brands from catalog items + custom brands
-  const catalogBrands = Array.from(new Set(items.map(item => item.brand).filter(Boolean)));
-  const customOnlyBrands = customBrands.filter(b => !catalogBrands.some(cb => cb.toLowerCase() === b.toLowerCase()));
-  const allBrands = ['All', ...catalogBrands.sort(), ...customOnlyBrands.sort()];
+  // Extract unique brands from catalog items + brandCodes + custom managed brands
+  const catalogBrandSet = new Set();
+  (items || []).forEach(item => {
+    if (item.brand && typeof item.brand === 'string') catalogBrandSet.add(item.brand.trim());
+    if (Array.isArray(item.brandCodes)) {
+      item.brandCodes.forEach(bc => {
+        const b = typeof bc === 'object' ? bc.brand : bc;
+        if (b && typeof b === 'string') catalogBrandSet.add(b.trim());
+      });
+    }
+  });
+  (customBrands || []).forEach(b => {
+    if (b && typeof b === 'string') catalogBrandSet.add(b.trim());
+  });
+
+  const sortedCatalogBrands = Array.from(catalogBrandSet).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  const allBrands = ['All', ...sortedCatalogBrands];
 
   // Get unique sizes for the filter dropdown
   const sizes = ['All', ...new Set(items.flatMap(item => item.size || []).filter(Boolean))];
@@ -108,7 +141,10 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
       
       const matchBrand = brandFilter === 'All' || 
         (item.brand && item.brand.trim().toLowerCase() === brandFilter.trim().toLowerCase()) ||
-        (Array.isArray(item.brandCodes) && item.brandCodes.some(bc => (typeof bc === 'object' ? bc.brand : bc)?.trim().toLowerCase() === brandFilter.trim().toLowerCase()));
+        (Array.isArray(item.brandCodes) && item.brandCodes.some(bc => {
+          const bName = typeof bc === 'object' ? bc.brand : bc;
+          return bName && bName.trim().toLowerCase() === brandFilter.trim().toLowerCase();
+        }));
 
       return matchSearch && matchSize && matchBrand;
     })
