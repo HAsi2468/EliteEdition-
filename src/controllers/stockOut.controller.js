@@ -3,36 +3,40 @@ const logger = require('../config/logger');
 
 const createStockOut = async (req, res) => {
   try {
-    const { skuCode, party, qtyOut } = req.body;
-    
-    if (!skuCode || !party) {
-      return res.status(400).json({ error: 'skuCode and party are required' });
+    const itemsToProcess = Array.isArray(req.body) ? req.body : (req.body.items || [req.body]);
+    const results = [];
+
+    for (const item of itemsToProcess) {
+      const { skuCode, party, qtyOut } = item;
+      if (!skuCode || !party) continue;
+
+      const qty = parseInt(qtyOut, 10) || 1;
+      const cleanSku = (skuCode || '').trim();
+      
+      const inventoryItem = await db.Inventory.findOne({
+        skuCode: { $regex: new RegExp(`^${cleanSku}$`, 'i') }
+      });
+      
+      if (!inventoryItem) continue;
+
+      if (inventoryItem.currentlyAvailableStock >= qty) {
+        inventoryItem.currentlyAvailableStock -= qty;
+        await inventoryItem.save();
+
+        const stockOutLog = await db.StockOut.create({
+          skuCode: inventoryItem.skuCode,
+          party,
+          qtyOut: qty,
+        });
+        results.push(stockOutLog);
+      }
     }
 
-    const qty = qtyOut || 1;
-
-    // Find inventory item by SKU
-    const inventoryItem = await db.Inventory.findOne({ skuCode });
-    if (!inventoryItem) {
-      return res.status(404).json({ error: 'Item with this SKU not found in inventory' });
+    if (results.length === 0) {
+      return res.status(400).json({ error: 'Failed to process outward. Check SKU availability and party.' });
     }
 
-    // Decrement stock
-    if (inventoryItem.currentlyAvailableStock < qty) {
-      return res.status(400).json({ error: 'Not enough stock available' });
-    }
-
-    inventoryItem.currentlyAvailableStock -= qty;
-    await inventoryItem.save();
-
-    // Log stock out
-    const stockOutLog = await db.StockOut.create({
-      skuCode,
-      party,
-      qtyOut: qty,
-    });
-
-    res.status(201).json(stockOutLog);
+    res.status(201).json(Array.isArray(req.body) ? results : results[0]);
   } catch (error) {
     logger.error('Error creating stock out: %o', error);
     res.status(500).json({ error: 'Internal Server Error', details: error.message });

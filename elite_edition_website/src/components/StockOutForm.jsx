@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, QrCode, ClipboardList, Info, AlertTriangle } from 'lucide-react';
+import { X, QrCode, ClipboardList, Info, AlertTriangle, Camera, Check } from 'lucide-react';
+import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
+import CameraBarcodeScanner from './CameraBarcodeScanner';
 
 export default function StockOutForm({ items, parties, prefilledItem, onSubmit, onClose }) {
   const [skuCode, setSkuCode] = useState('');
@@ -8,13 +10,14 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
   const [useCustomParty, setUseCustomParty] = useState(false);
   const [qtyOut, setQtyOut] = useState(1);
   const [error, setError] = useState('');
+  const [showCameraScanner, setShowCameraScanner] = useState(false);
 
   // Auto-filled info based on SKU Code
   const [matchedItem, setMatchedItem] = useState(null);
 
   const skuInputRef = useRef(null);
 
-  // Auto-focus the SKU input field on mount for barcode scanners
+  // Auto-focus the SKU input field on mount for hardware barcode scanners
   useEffect(() => {
     if (skuInputRef.current) {
       skuInputRef.current.focus();
@@ -25,7 +28,6 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
   useEffect(() => {
     if (prefilledItem) {
       setSkuCode(prefilledItem.skuCode || '');
-      // Auto-set matching item details
       setMatchedItem(prefilledItem);
     }
   }, [prefilledItem]);
@@ -43,10 +45,60 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
 
     if (found) {
       setMatchedItem(found);
+      setError('');
     } else {
       setMatchedItem(null);
     }
   }, [skuCode, items]);
+
+  // Process a Scanned Barcode (via hardware scanner or mobile camera)
+  const processBarcodeScan = (scannedCode) => {
+    const cleanSku = (scannedCode || '').trim();
+    if (!cleanSku) return;
+
+    const found = items.find(
+      (item) => (item.skuCode || '').toLowerCase().trim() === cleanSku.toLowerCase()
+    );
+
+    if (!found) {
+      setError(`SKU "${cleanSku}" not found in current inventory.`);
+      playErrorBeep();
+      return;
+    }
+
+    const available = found.currentlyAvailableStock || 0;
+
+    // Check if same SKU is scanned again -> increment quantity out
+    if (skuCode.toLowerCase().trim() === cleanSku.toLowerCase()) {
+      if (qtyOut + 1 > available) {
+        setError(`Cannot outward ${qtyOut + 1} units. Only ${available} available in stock.`);
+        playErrorBeep();
+        return;
+      }
+      setQtyOut(prev => prev + 1);
+      playSuccessBeep();
+      setError('');
+    } else {
+      // New SKU scanned -> switch to this SKU with qty 1
+      if (available <= 0) {
+        setError(`SKU "${cleanSku}" has 0 available stock.`);
+        playErrorBeep();
+        return;
+      }
+      setSkuCode(cleanSku);
+      setMatchedItem(found);
+      setQtyOut(1);
+      playSuccessBeep();
+      setError('');
+    }
+  };
+
+  const handleManualScanSubmit = (e) => {
+    e.preventDefault();
+    if (skuCode) {
+      processBarcodeScan(skuCode);
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -54,18 +106,21 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
 
     if (!skuCode.trim()) {
       setError('Please scan or enter a SKU Code.');
+      playErrorBeep();
       return;
     }
 
     const partyValue = useCustomParty ? customParty.trim() : selectedParty.trim();
     if (!partyValue) {
       setError('Please select or specify a recipient party.');
+      playErrorBeep();
       return;
     }
 
     const qtyVal = Number(qtyOut);
     if (isNaN(qtyVal) || qtyVal <= 0) {
       setError('Quantity out must be a positive number.');
+      playErrorBeep();
       return;
     }
 
@@ -74,12 +129,16 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
       const available = matchedItem.currentlyAvailableStock || 0;
       if (qtyVal > available) {
         setError(`Cannot outward ${qtyVal} units. Only ${available} units are available in stock.`);
+        playErrorBeep();
         return;
       }
     } else {
       setError('Warning: The SKU code entered does not match any current inventory items. Outward cannot be processed.');
+      playErrorBeep();
       return;
     }
+
+    playSuccessBeep();
 
     onSubmit({
       skuCode: skuCode.trim(),
@@ -91,14 +150,41 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
   return (
     <div className="modal-overlay">
       <div className="modal-content" style={styles.content}>
+        
+        {/* Header */}
         <div style={styles.header}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <ClipboardList size={20} color="var(--primary)" />
-            <h3 style={styles.title}>Outward</h3>
+            <h3 style={styles.title}>Dispatch Outward Stock</h3>
           </div>
-          <button onClick={onClose} style={styles.closeBtn}>
-            <X size={18} />
-          </button>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              onClick={() => setShowCameraScanner(!showCameraScanner)}
+              style={{
+                background: showCameraScanner ? '#dc2626' : '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                padding: '0.35rem 0.65rem',
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+              title="Toggle Mobile Camera Scanner (30% Screen Height)"
+            >
+              <Camera size={15} />
+              <span>{showCameraScanner ? 'Close Camera' : '📷 Camera Scan'}</span>
+            </button>
+
+            <button onClick={onClose} style={styles.closeBtn}>
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -106,6 +192,14 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
             <AlertTriangle size={16} style={{ flexShrink: 0 }} />
             <span>{error}</span>
           </div>
+        )}
+
+        {/* Embedded Camera Scanner (30% screen height preview) */}
+        {showCameraScanner && (
+          <CameraBarcodeScanner
+            onScan={(code) => processBarcodeScan(code)}
+            onClose={() => setShowCameraScanner(false)}
+          />
         )}
 
         <form onSubmit={handleSubmit} style={styles.form}>
@@ -117,6 +211,12 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
                 type="text"
                 value={skuCode}
                 onChange={(e) => setSkuCode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    processBarcodeScan(skuCode);
+                  }
+                }}
                 placeholder="Scan code or type SKU..."
                 required
                 disabled={!!prefilledItem}
@@ -124,6 +224,9 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
               />
               <QrCode size={18} color="var(--primary)" style={styles.scanIcon} />
             </div>
+            <p style={{ fontSize: '0.7rem', color: '#94a3b8', margin: '0.2rem 0 0 2px' }}>
+              💡 Scanning the same barcode multiple times auto-increments quantity.
+            </p>
           </div>
 
           {/* Dynamic Matched Item Card */}
@@ -144,7 +247,7 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
                   <div style={styles.matchedMeta}>
                     <span>Size: <strong>{matchedItem.size}</strong></span>
                     <span style={{ margin: '0 0.5rem' }}>|</span>
-                    <span>Party: <strong>{matchedItem.party}</strong></span>
+                    <span>Vendor: <strong>{matchedItem.party}</strong></span>
                   </div>
                 </div>
               </div>
@@ -206,8 +309,9 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
               value={qtyOut}
               onChange={(e) => setQtyOut(Math.max(1, parseInt(e.target.value) || ''))}
               min="1"
+              max={matchedItem ? (matchedItem.currentlyAvailableStock || 1) : 9999}
               required
-              style={{ width: '100%' }}
+              style={{ width: '100%', fontSize: '1.05rem', fontWeight: 'bold' }}
             />
           </div>
 
@@ -221,7 +325,7 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
               style={styles.submitBtn}
               disabled={matchedItem && (matchedItem.currentlyAvailableStock || 0) < Number(qtyOut)}
             >
-              Outward
+              Outward Dispatch
             </button>
           </div>
         </form>
@@ -233,8 +337,10 @@ export default function StockOutForm({ items, parties, prefilledItem, onSubmit, 
 const styles = {
   content: {
     padding: '1.5rem',
-    maxWidth: '460px',
+    maxWidth: '520px',
     width: '95%',
+    maxHeight: '90vh',
+    overflowY: 'auto',
   },
   header: {
     display: 'flex',

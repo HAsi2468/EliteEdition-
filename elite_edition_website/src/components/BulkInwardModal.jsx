@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, CheckCircle, Sparkles, AlertCircle, Scan, Image as ImageIcon } from 'lucide-react';
+import { X, Plus, Trash2, CheckCircle, Sparkles, AlertCircle, Scan, Image as ImageIcon, Camera } from 'lucide-react';
 import { api } from '../services/api';
 import { extractSizeFromSku } from '../utils/skuHelper';
+import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
+import CameraBarcodeScanner from './CameraBarcodeScanner';
 
 export default function BulkInwardModal({ onSubmit, onClose }) {
   const [error, setError] = useState('');
+  const [showCameraScanner, setShowCameraScanner] = useState(false);
   
   // Master Reference Lists
   const [vendorsList, setVendorsList] = useState([]);
@@ -155,65 +158,69 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     setFormRows(updated);
   };
 
-  // Barcode / SKU Scan Handler
+  // Process a Scanned Barcode (USB scanner or Camera scanner)
+  const processScannedSku = (skuRaw) => {
+    const cleanSku = (skuRaw || '').trim();
+    if (!cleanSku) return;
+
+    playSuccessBeep();
+
+    setFormRows(prev => {
+      const existingIndex = prev.findIndex(r => r.skuCode && r.skuCode.trim().toLowerCase() === cleanSku.toLowerCase());
+      if (existingIndex !== -1) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          qty: (updated[existingIndex].qty || 0) + 1
+        };
+        return updated;
+      } else {
+        const matchedInventory = storeInventory.find(item => item.skuCode && item.skuCode.trim().toLowerCase() === cleanSku.toLowerCase());
+        const matchedCatalog = catalogItems.find(item => item.skuCode && item.skuCode.trim().toLowerCase() === cleanSku.toLowerCase());
+
+        let itemName = cleanSku;
+        let size = resolveEffectiveSize(matchedInventory || matchedCatalog, cleanSku);
+        let purchasePrice = matchedInventory?.purchasePrice || matchedCatalog?.basePrice || 0;
+        let salePrice = matchedInventory?.salePrice || matchedCatalog?.price || 0;
+        let party = resolveVendorName(bulkVendor) || (prev[0]?.party || '');
+        let challanNo = bulkChallanNo || (prev[0]?.challanNo || '');
+        let imageUrl = matchedCatalog?.imageUrl || matchedInventory?.imageUrl || '';
+        let status = 'NEW';
+
+        if (matchedInventory) {
+          itemName = matchedInventory.itemName || itemName;
+          party = party || resolveVendorName(matchedInventory.party) || '';
+          status = 'UPDATE';
+        } else if (matchedCatalog) {
+          itemName = matchedCatalog.description || itemName;
+          party = party || resolveVendorName(matchedCatalog.brand) || '';
+          status = 'CATALOG_MATCH';
+        }
+
+        const validRows = prev.filter(r => r.skuCode && r.skuCode.trim() !== '');
+        return [
+          ...validRows,
+          {
+            skuCode: cleanSku,
+            itemName,
+            size,
+            qty: 1,
+            purchasePrice,
+            salePrice,
+            party,
+            challanNo,
+            imageUrl,
+            status
+          }
+        ];
+      }
+    });
+  };
+
+  // Barcode / SKU Form Submit Handler
   const handleScanSubmit = (e) => {
     e.preventDefault();
-    const skuRaw = scanSkuInput.trim();
-    if (!skuRaw) return;
-
-    // Check if SKU already exists in form rows -> increment quantity
-    const existingIndex = formRows.findIndex(r => r.skuCode.toLowerCase() === skuRaw.toLowerCase());
-    if (existingIndex !== -1) {
-      const updated = [...formRows];
-      updated[existingIndex].qty += 1;
-      setFormRows(updated);
-    } else {
-      // Create new row with scanned SKU
-      const matchedInventory = storeInventory.find(item => item.skuCode && item.skuCode.trim().toLowerCase() === skuRaw.toLowerCase());
-      const matchedCatalog = catalogItems.find(item => item.skuCode && item.skuCode.trim().toLowerCase() === skuRaw.toLowerCase());
-
-      let itemName = skuRaw;
-      let size = resolveEffectiveSize(matchedInventory || matchedCatalog, skuRaw);
-      let purchasePrice = bulkPurchasePrice ? parseFloat(bulkPurchasePrice) : 0;
-      let salePrice = bulkSalePrice ? parseFloat(bulkSalePrice) : 0;
-      let party = resolveVendorName(bulkVendor) || (formRows[0]?.party || '');
-      let challanNo = bulkChallanNo || (formRows[0]?.challanNo || '');
-      let imageUrl = matchedCatalog?.imageUrl || matchedInventory?.imageUrl || '';
-      let status = 'NEW';
-
-      if (matchedInventory) {
-        itemName = matchedInventory.itemName || itemName;
-        purchasePrice = purchasePrice || matchedInventory.purchasePrice || 0;
-        salePrice = salePrice || matchedInventory.salePrice || 0;
-        party = party || resolveVendorName(matchedInventory.party) || '';
-        imageUrl = imageUrl || matchedInventory.imageUrl || '';
-        status = 'UPDATE';
-      } else if (matchedCatalog) {
-        itemName = matchedCatalog.description || itemName;
-        purchasePrice = purchasePrice || matchedCatalog.basePrice || 0;
-        salePrice = salePrice || matchedCatalog.price || 0;
-        party = party || resolveVendorName(matchedCatalog.brand) || '';
-        imageUrl = imageUrl || matchedCatalog.imageUrl || '';
-        status = 'CATALOG_MATCH';
-      }
-
-      setFormRows(prev => [
-        ...prev.filter(r => r.skuCode.trim() !== ''),
-        {
-          skuCode: skuRaw,
-          itemName,
-          size,
-          qty: 1,
-          purchasePrice,
-          salePrice,
-          party,
-          challanNo,
-          imageUrl,
-          status
-        }
-      ]);
-    }
-
+    processScannedSku(scanSkuInput);
     setScanSkuInput('');
   };
 
@@ -237,6 +244,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
 
     if (validRows.length === 0) {
       setError('Please add at least one valid item row with a SKU Code and Quantity.');
+      playErrorBeep();
       return;
     }
 
@@ -244,6 +252,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     const missingVendorRows = validRows.filter(r => !r.party || !r.party.trim());
     if (missingVendorRows.length > 0) {
       setError('Please select or specify Vendor / Business Name for all item rows.');
+      playErrorBeep();
       return;
     }
 
@@ -264,14 +273,31 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
               <Sparkles size={22} color="#059669" />
             </div>
             <div>
-              <h3 style={styles.title}>Multi-Item Inward Entry Form</h3>
-              <p style={styles.subtitle}>Enter multiple SKUs, quantities, images, and challan details in one interactive form.</p>
+              <h3 style={styles.title}>Inward Stock Entry</h3>
+              <p style={styles.subtitle}>Scan or enter SKUs to auto-increment quantities with sound confirmation.</p>
             </div>
           </div>
           
-          {/* Quick Scanner Box */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <form onSubmit={handleScanSubmit} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '300px' }}>
+          {/* Quick Scanner & Camera Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setShowCameraScanner(!showCameraScanner)}
+              style={{
+                ...styles.scanBtn,
+                background: showCameraScanner ? '#dc2626' : '#10b981',
+                padding: '0.45rem 0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+              title="Toggle Mobile Camera Scanner (30% Screen Height)"
+            >
+              <Camera size={16} />
+              <span>{showCameraScanner ? 'Close Camera' : '📷 Camera Scan'}</span>
+            </button>
+
+            <form onSubmit={handleScanSubmit} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '260px' }}>
               <div style={{ position: 'relative', width: '100%' }}>
                 <Scan size={15} color="#475569" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
@@ -296,6 +322,14 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
             <AlertCircle size={18} style={{ flexShrink: 0 }} />
             <span>{error}</span>
           </div>
+        )}
+
+        {/* Embedded Mobile Camera Scanner (occupies 30% screen height) */}
+        {showCameraScanner && (
+          <CameraBarcodeScanner
+            onScan={(code) => processScannedSku(code)}
+            onClose={() => setShowCameraScanner(false)}
+          />
         )}
 
         {/* MAIN FORM VIEW */}
