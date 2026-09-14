@@ -603,16 +603,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
         {currentUser?.role === 'admin' && (
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <button
-              onClick={() => setShowCreateGroupModal(true)}
-              className="btn-primary"
-              style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', gap: '0.4rem', borderRadius: '8px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' }}
-              title="Create custom activity group with screen trigger rules"
-            >
-              <PlusCircle size={14} />
-              <span>+ Create Activity Group</span>
-            </button>
-
-            <button
               onClick={handleSyncGroups}
               disabled={syncing}
               className="btn-secondary"
