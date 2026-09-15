@@ -1738,11 +1738,11 @@ export default function App() {
             <UnicommerceHub />
           ) : activeTab === 'myntra' ? (
             <MyntraHub />
-          ) : activeTab === 'communication' ? (
-            <CommunicationPanel currentUser={currentUser} onNavigateTab={(tab) => setActiveTab(tab)} />
+          ) : activeTab === 'communication' || activeTab === 'workspace' ? (
+            <CommunicationPanel currentUser={currentUser} initialMainTab="chat" onNavigateTab={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'task_management' ? (
-            <TaskManagerPanel currentUser={currentUser} onNavigateTab={(tab) => setActiveTab(tab)} />
-          ) : activeTab === 'workspace' ? null : activeTab === 'admin' ? (
+            <CommunicationPanel currentUser={currentUser} initialMainTab="task" onNavigateTab={(tab) => setActiveTab(tab)} />
+          ) : activeTab === 'admin' ? (
             <AdminPanel />
           ) : (
             <div style={styles.noAccessContainer}>

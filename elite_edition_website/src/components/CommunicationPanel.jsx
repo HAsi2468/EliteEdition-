@@ -40,7 +40,8 @@ import {
   CheckSquare
 } from 'lucide-react';
 
-export default function CommunicationPanel({ currentUser, onNavigateTab }) {
+export default function CommunicationPanel({ currentUser, onNavigateTab, initialMainTab = 'chat' }) {
+  const [mainTab, setMainTab] = useState(initialMainTab); // 'chat' | 'task'
   const [groups, setGroups] = useState([]);
   const [activeGroup, setActiveGroup] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -466,6 +467,23 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
     }
   };
 
+  useEffect(() => {
+    fetchGroups(true);
+    fetchUsersForDMList();
+  }, [currentUser]);
+
+  const fetchUsersForDMList = async () => {
+    try {
+      const uId = currentUser?._id || currentUser?.id;
+      const res = await api.getCommunicationUsers(uId);
+      if (res.success && res.data) {
+        setAllUsers(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch users for DM list:', err);
+    }
+  };
+
   const getDMColleague = (group) => {
     if (!group || group.type !== 'direct' || !group.members || group.members.length === 0) return null;
     const myId = String(currentUser?._id || currentUser?.id || '');
@@ -475,16 +493,25 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
       return memberId && memberId !== myId;
     });
 
-    if (!otherMember) otherMember = group.members[0];
-
-    // If otherMember is string ID or lacks details, attempt lookup in allUsers
-    const otherId = String(typeof otherMember === 'object' ? (otherMember._id || otherMember.id) : otherMember);
-    if (allUsers && allUsers.length > 0) {
+    const otherId = String(typeof otherMember === 'object' ? (otherMember._id || otherMember.id) : (otherMember || ''));
+    if (allUsers && allUsers.length > 0 && otherId && otherId !== myId) {
       const matched = allUsers.find((u) => String(u._id || u.id) === otherId);
       if (matched) return matched;
     }
 
-    return otherMember || null;
+    if (otherMember && typeof otherMember === 'object') {
+      const oId = String(otherMember._id || otherMember.id || '');
+      if (oId !== myId) return otherMember;
+    }
+
+    if (group.name && group.name.includes('&')) {
+      const myName = currentUser?.name || currentUser?.username || '';
+      const parts = group.name.split('&').map((s) => s.trim());
+      const partnerName = parts.find((p) => !myName || !p.toLowerCase().includes(myName.toLowerCase()));
+      if (partnerName) return { name: partnerName };
+    }
+
+    return null;
   };
 
   const handleRosterTabChange = (tab) => {
@@ -495,8 +522,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
         if (!activeGroup || activeGroup.type !== 'direct') {
           setActiveGroup(dmRooms[0]);
         }
-      } else {
-        setActiveGroup(null);
       }
     } else if (tab === 'groups') {
       const groupRooms = groups.filter((g) => g.type !== 'direct');
@@ -508,25 +533,64 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
     }
   };
 
-  const filteredGroups = groups.filter((g) => {
-    if (rosterTab === 'groups' && g.type === 'direct') return false;
-    if (rosterTab === 'direct' && g.type !== 'direct') return false;
-
+  const filteredGroups = useMemo(() => {
     const term = searchQuery.toLowerCase().trim();
-    if (!term) return true;
 
-    if (g.type === 'direct') {
-      const colleague = getDMColleague(g);
-      const cName = colleague ? (colleague.name || colleague.username || '').toLowerCase() : '';
-      return cName.includes(term);
+    if (rosterTab === 'groups') {
+      return groups.filter((g) => {
+        if (g.type === 'direct') return false;
+        if (!term) return true;
+        return (
+          (g.name || '').toLowerCase().includes(term) ||
+          (g.department || '').toLowerCase().includes(term) ||
+          (g.permissionScope || '').toLowerCase().includes(term)
+        );
+      });
     }
 
-    return (
-      (g.name || '').toLowerCase().includes(term) ||
-      (g.department || '').toLowerCase().includes(term) ||
-      (g.permissionScope || '').toLowerCase().includes(term)
-    );
-  });
+    if (rosterTab === 'direct') {
+      const myId = String(currentUser?._id || currentUser?.id || '');
+      const activeDmRooms = groups.filter((g) => g.type === 'direct');
+
+      const existingDmUserIds = new Set();
+      activeDmRooms.forEach((room) => {
+        const colleague = getDMColleague(room);
+        if (colleague) {
+          const cId = String(colleague._id || colleague.id || '');
+          if (cId) existingDmUserIds.add(cId);
+        }
+      });
+
+      const contactUsers = (allUsers || []).filter((u) => {
+        const uId = String(u._id || u.id || '');
+        return uId && uId !== myId && !existingDmUserIds.has(uId);
+      }).map((u) => ({
+        _id: `contact_${u._id || u.id}`,
+        isVirtualContact: true,
+        user: u,
+        name: u.name || u.username || u.email || 'Colleague',
+        type: 'direct',
+        department: u.department || 'General'
+      }));
+
+      const combined = [...activeDmRooms, ...contactUsers];
+
+      if (!term) return combined;
+
+      return combined.filter((item) => {
+        if (item.isVirtualContact) {
+          return (item.name || '').toLowerCase().includes(term) ||
+                 (item.user?.department || '').toLowerCase().includes(term) ||
+                 (item.user?.role || '').toLowerCase().includes(term);
+        }
+        const colleague = getDMColleague(item);
+        const cName = colleague ? (colleague.name || colleague.username || '').toLowerCase() : (item.name || '').toLowerCase();
+        return cName.includes(term);
+      });
+    }
+
+    return groups;
+  }, [groups, allUsers, rosterTab, searchQuery, currentUser]);
 
   const getDeptColor = (dept) => {
     switch ((dept || '').toLowerCase()) {
@@ -650,24 +714,75 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 70px)', padding: '0.75rem', gap: '0.75rem', background: 'var(--bg-main)', boxSizing: 'border-box' }}>
       
-      {/* ── TOP HEADER / ACTION BAR ── */}
-      <div className="glass-panel" style={{ padding: '0.65rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '12px', background: 'var(--bg-card)' }}>
+      {/* ── TOP HEADER / ACTION BAR WITH 2 DEPARTMENTS SWITCHER ── */}
+      <div className="glass-panel" style={{ padding: '0.65rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '12px', background: 'var(--bg-card)', flexWrap: 'wrap', gap: '0.65rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <div style={{ width: 36, height: 36, borderRadius: '10px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(37,99,235,0.25)' }}>
-            <MessageSquare size={20} />
+            {mainTab === 'chat' ? <MessageSquare size={20} /> : <CheckSquare size={20} />}
           </div>
           <div>
             <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
               Inter-Department Communication &amp; Activity Stream
             </h2>
             <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-              Real-time department group chat, 1-on-1 private DMs &amp; SOS alerts
+              {mainTab === 'chat'
+                ? 'Department 1: Group Chat, Direct Messages & SOS Alerts'
+                : 'Department 2: Task Creation, Department Assignments & Progress Board'}
             </p>
           </div>
         </div>
 
+        {/* 🌟 2-DEPARTMENT PRIMARY SWITCHER: 1) Chat | 2) Task 🌟 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border-light, #cbd5e1)' }}>
+          <button
+            type="button"
+            onClick={() => { setMainTab('chat'); setRosterTab('groups'); }}
+            style={{
+              padding: '0.45rem 1.1rem',
+              fontSize: '0.82rem',
+              fontWeight: 800,
+              borderRadius: '7px',
+              border: 'none',
+              background: mainTab === 'chat' ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'transparent',
+              color: mainTab === 'chat' ? '#ffffff' : 'var(--text-muted, #475569)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              boxShadow: mainTab === 'chat' ? '0 2px 8px rgba(37,99,235,0.3)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <MessageSquare size={15} />
+            <span>1) Chat</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setMainTab('task'); }}
+            style={{
+              padding: '0.45rem 1.1rem',
+              fontSize: '0.82rem',
+              fontWeight: 800,
+              borderRadius: '7px',
+              border: 'none',
+              background: mainTab === 'task' ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'transparent',
+              color: mainTab === 'task' ? '#ffffff' : 'var(--text-muted, #475569)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              boxShadow: mainTab === 'task' ? '0 2px 8px rgba(37,99,235,0.3)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <CheckSquare size={15} />
+            <span>2) Task</span>
+          </button>
+        </div>
+
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          {currentUser?.role === 'admin' && (
+          {mainTab === 'chat' && currentUser?.role === 'admin' && (
             <button
               onClick={handleOpenCreateGroupModal}
               className="btn-primary"
@@ -679,16 +794,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
             </button>
           )}
 
-          <button
-            onClick={handleSyncGroups}
-            disabled={syncing}
-            className="btn-secondary"
-            style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', gap: '0.4rem', borderRadius: '8px' }}
-            title="Re-synchronize department access groups based on current user authorities"
-          >
-            <RefreshCw size={13} className={syncing ? 'spin-loader' : ''} />
-            <span>{syncing ? 'Syncing...' : 'Sync Groups'}</span>
-          </button>
+          {mainTab === 'chat' && (
+            <button
+              onClick={handleSyncGroups}
+              disabled={syncing}
+              className="btn-secondary"
+              style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', gap: '0.4rem', borderRadius: '8px' }}
+              title="Re-synchronize department access groups based on current user authorities"
+            >
+              <RefreshCw size={13} className={syncing ? 'spin-loader' : ''} />
+              <span>{syncing ? 'Syncing...' : 'Sync Groups'}</span>
+            </button>
+          )}
 
           <button
             onClick={async () => {
@@ -710,7 +827,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
         </div>
       </div>
 
-      {/* ── MAIN SPLIT VIEW (LEFT = ROSTER | RIGHT = CHAT / TASK STREAM) ── */}
+      {/* ── MAIN CONTENT VIEW (IF TASK MODE SELECTED: FULL TASK PANEL | IF CHAT MODE: SPLIT ROSTER & STREAM) ── */}
+      {mainTab === 'task' ? (
+        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
+        </div>
+      ) : (
       <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr', gap: '0.75rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         
         {/* ════ LEFT COLUMN: GROUPS & DM ROSTER ════ */}
@@ -859,9 +981,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
               </div>
             ) : (
               filteredGroups.map((group) => {
-                const isActive = activeGroup && String(activeGroup._id) === String(group._id);
+                const isVirtual = group.isVirtualContact;
+                const isActive = !isVirtual && activeGroup && String(activeGroup._id) === String(group._id);
                 const isDirect = group.type === 'direct';
-                const colleague = isDirect ? getDMColleague(group) : null;
+                const colleague = isDirect ? (isVirtual ? group.user : getDMColleague(group)) : null;
                 const colleagueName = colleague ? (typeof colleague === 'object' ? (colleague.name || colleague.username || colleague.email) : group.name) : group.name;
                 const displayName = isDirect ? (colleagueName || group.name || 'Private DM') : group.name;
                 const deptCol = isDirect ? '#2563eb' : getDeptColor(group.department);
@@ -869,7 +992,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
                 return (
                   <div
                     key={group._id}
-                    onClick={() => setActiveGroup(group)}
+                    onClick={() => {
+                      if (isVirtual && group.user) {
+                        handleStartDirectChat(group.user);
+                      } else {
+                        setActiveGroup(group);
+                      }
+                    }}
                     style={{
                       padding: '0.55rem 0.65rem',
                       borderRadius: '8px',
@@ -1281,6 +1410,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab }) {
           )}
         </div>
       </div>
+      )}
 
       {/* ── CREATE GROUP & SELECT MEMBERS MODAL ── */}
       {showCreateGroupModal && (

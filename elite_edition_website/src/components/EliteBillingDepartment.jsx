@@ -3362,6 +3362,15 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                     );
                   })}
                 </tbody>
+                <tfoot>
+                  <tr style={{ background: '#f8fafc', borderTop: '2px solid #cbd5e1', fontWeight: 800 }}>
+                    <td colSpan={4} style={{ padding: '0.65rem', textAlign: 'right', color: '#475569', fontSize: '0.8rem' }}>Total Qty:</td>
+                    <td style={{ padding: '0.65rem 0.6rem', textAlign: 'right', color: '#6d28d9', fontSize: '0.9rem', fontWeight: 900 }}>
+                      {(viewInvoiceModal.items || []).reduce((sum, item) => sum + (parseFloat(item.qty) || 0), 0).toFixed(2)} {viewInvoiceModal.items?.[0]?.unit || 'MTR'}
+                    </td>
+                    <td colSpan={2} style={{ padding: '0.65rem' }}></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
 

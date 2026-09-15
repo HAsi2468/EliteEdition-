@@ -312,17 +312,48 @@ const syncChallanStatusForInvoice = async (invoice) => {
   if (!invoice) return;
 
   const activeIdsSet = new Set();
-  if (Array.isArray(invoice.items) && invoice.items.length > 0) {
-    invoice.items.forEach(it => {
-      if (it.challanId) activeIdsSet.add(String(it.challanId));
-    });
-  } else if (Array.isArray(invoice.linkedChallanIds)) {
+
+  if (Array.isArray(invoice.linkedChallanIds)) {
     invoice.linkedChallanIds.forEach(id => {
       if (id) activeIdsSet.add(String(id));
     });
   }
 
+  if (Array.isArray(invoice.items)) {
+    invoice.items.forEach(it => {
+      if (it.challanId) activeIdsSet.add(String(it.challanId));
+    });
+  }
+
+  // Fallback: check linkedChallanNos or items[].ourChallanNo by numeric challanNo
+  const challanNosToLookup = new Set();
+  if (Array.isArray(invoice.linkedChallanNos)) {
+    invoice.linkedChallanNos.forEach(noStr => {
+      const num = parseInt(String(noStr).replace(/[^0-9]/g, ''), 10);
+      if (num) challanNosToLookup.add(num);
+    });
+  }
+  if (Array.isArray(invoice.items)) {
+    invoice.items.forEach(it => {
+      if (it.ourChallanNo) {
+        const num = parseInt(String(it.ourChallanNo).replace(/[^0-9]/g, ''), 10);
+        if (num) challanNosToLookup.add(num);
+      }
+    });
+  }
+
+  if (challanNosToLookup.size > 0) {
+    const numList = Array.from(challanNosToLookup);
+    const fChs = await FabricChallan.find({ challanNo: { $in: numList } }, '_id').lean();
+    fChs.forEach(fc => activeIdsSet.add(String(fc._id)));
+    const sChs = await StitchingChallan.find({ challanNo: { $in: numList } }, '_id').lean();
+    sChs.forEach(sc => activeIdsSet.add(String(sc._id)));
+  }
+
   const activeIds = Array.from(activeIdsSet);
+  const activeObjectIds = activeIds
+    .filter(id => mongoose.Types.ObjectId.isValid(id))
+    .map(id => new mongoose.Types.ObjectId(id));
 
   const queryInv = {
     $or: [
@@ -350,13 +381,13 @@ const syncChallanStatusForInvoice = async (invoice) => {
     );
   }
 
-  if (activeIds.length > 0) {
+  if (activeObjectIds.length > 0) {
     await FabricChallan.updateMany(
-      { _id: { $in: activeIds } },
+      { _id: { $in: activeObjectIds } },
       { $set: { status: 'INVOICED', invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
     );
     await StitchingChallan.updateMany(
-      { _id: { $in: activeIds } },
+      { _id: { $in: activeObjectIds } },
       { $set: { status: 'INVOICED', invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
     );
   }
@@ -1203,6 +1234,22 @@ const downloadInvoicePdf = async (req, res) => {
           Y = minBottomY;
         }
 
+        if (isLastPage) {
+          const grandTotalQty = (items || []).reduce((s, i) => s + (parseFloat(i.qty) || 0), 0);
+          let qtyUnit = (items && items[0] && (items[0].unit || items[0].qtyUnit)) || 'MTR';
+          if (/meter|mtr/i.test(qtyUnit)) qtyUnit = 'MTR';
+          const subRowH = 18;
+          doc.rect(PAD, Y, CW, subRowH).fill(PRPL).stroke(S200);
+          drawColSeps(Y, subRowH);
+          doc.fillColor(PRP).fontSize(8.5).font('Helvetica-Bold')
+            .text('Total Qty:', colX[0] + 3, Y + 4, { width: colX[5] - colX[0] - 6, align: 'right' });
+          doc.fillColor(PRP).fontSize(9).font('Helvetica-Bold')
+            .text(`${grandTotalQty.toFixed(2)} ${qtyUnit}`, colX[5] + 2, Y + 4, { width: COL[5] - 4, align: 'center' });
+          doc.fillColor(PRP).fontSize(9).font('Helvetica-Bold')
+            .text(Number(totalTaxable || 0).toFixed(2), colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
+          Y += subRowH;
+        }
+
         return Y;
       };
 
@@ -1252,9 +1299,15 @@ const downloadInvoicePdf = async (req, res) => {
           .text(roStr, colX[8] + 2, Y + 4, { width: COL[8] - 4, align: 'right' });
         Y += roH;
 
+        const grandTotalQty = (items || []).reduce((s, i) => s + (parseFloat(i.qty) || 0), 0);
+        let qtyUnit = (items && items[0] && (items[0].unit || items[0].qtyUnit)) || 'MTR';
+        if (/meter|mtr/i.test(qtyUnit)) qtyUnit = 'MTR';
+        const formattedTotalQty = `${grandTotalQty.toFixed(2)} ${qtyUnit}`;
+
         const totH = 22;
         doc.rect(PAD, Y, CW, totH).fill(PRP);
-        doc.fillColor(WHT).fontSize(10).font('Helvetica-Bold')
+        doc.fillColor(WHT).fontSize(9.5).font('Helvetica-Bold')
+          .text(formattedTotalQty, colX[5] + 2, Y + 6, { width: COL[5] - 4, align: 'center' })
           .text('Total', colX[6] - 20, Y + 6, { width: COL[6] + COL[7] + 16, align: 'right' })
           .text(`Rs. ${Number(invoice.grandTotal||0).toFixed(2)}`, colX[8] + 2, Y + 6, { width: COL[8]-4, align: 'right' });
         Y += totH;

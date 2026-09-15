@@ -252,8 +252,11 @@ const acknowledgeMessage = async (req, res) => {
  */
 const getUsersForDM = async (req, res) => {
   try {
-    const currentUserId = req.user ? req.user._id : req.query.userId;
-    const query = currentUserId ? { _id: { $ne: new mongoose.Types.ObjectId(currentUserId) } } : {};
+    const rawUserId = req.user ? req.user._id : req.query.userId;
+    let query = {};
+    if (rawUserId && mongoose.Types.ObjectId.isValid(rawUserId)) {
+      query = { _id: { $ne: new mongoose.Types.ObjectId(rawUserId) } };
+    }
     const users = await User.find(query).select('name username email role department').sort({ name: 1 });
     res.json({ success: true, data: users });
   } catch (error) {
