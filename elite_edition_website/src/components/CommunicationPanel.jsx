@@ -714,79 +714,84 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 70px)', padding: '0.75rem', gap: '0.75rem', background: 'var(--bg-main)', boxSizing: 'border-box' }}>
       
-      {/* ── TOP HEADER / ACTION BAR WITH 2 DEPARTMENTS SWITCHER ── */}
-      <div className="glass-panel" style={{ padding: '0.65rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '12px', background: 'var(--bg-card)', flexWrap: 'wrap', gap: '0.65rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-          <div style={{ width: 36, height: 36, borderRadius: '10px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(37,99,235,0.25)' }}>
-            {mainTab === 'chat' ? <MessageSquare size={20} /> : <CheckSquare size={20} />}
+      {/* ── TOP HEADER / ACTION BAR WITH PRIMARY TAB SWITCHER ── */}
+      <div className="glass-panel" style={{ padding: '0.75rem 1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '14px', background: 'var(--bg-card)', flexWrap: 'wrap', gap: '0.75rem', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ width: 40, height: 40, borderRadius: '11px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 14px rgba(37,99,235,0.3)' }}>
+            {mainTab === 'chat' ? <MessageSquare size={21} /> : <CheckSquare size={21} />}
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-              Inter-Department Communication &amp; Activity Stream
-            </h2>
-            <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.015em' }}>
+                Inter-Department Communication &amp; Activity Stream
+              </h2>
+              <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px', background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                LIVE SYNC
+              </span>
+            </div>
+            <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
               {mainTab === 'chat'
-                ? 'Department 1: Group Chat, Direct Messages & SOS Alerts'
-                : 'Department 2: Task Creation, Department Assignments & Progress Board'}
+                ? 'Group Channels, Direct Messages & Real-Time Activity Stream'
+                : 'Task Management, Department Assignments & Progress Tracking'}
             </p>
           </div>
         </div>
 
-        {/* 🌟 2-DEPARTMENT PRIMARY SWITCHER: 1) Chat | 2) Task 🌟 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--bg-input, #f1f5f9)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border-light, #cbd5e1)' }}>
+        {/* 🌟 PRIMARY TAB SWITCHER: Chat | Tasks 🌟 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--bg-input, #f1f5f9)', padding: '5px', borderRadius: '12px', border: '1px solid var(--border-light, #cbd5e1)' }}>
           <button
             type="button"
             onClick={() => { setMainTab('chat'); setRosterTab('groups'); }}
             style={{
-              padding: '0.45rem 1.1rem',
-              fontSize: '0.82rem',
+              padding: '0.5rem 1.25rem',
+              fontSize: '0.84rem',
               fontWeight: 800,
-              borderRadius: '7px',
+              borderRadius: '9px',
               border: 'none',
               background: mainTab === 'chat' ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'transparent',
               color: mainTab === 'chat' ? '#ffffff' : 'var(--text-muted, #475569)',
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.45rem',
-              boxShadow: mainTab === 'chat' ? '0 2px 8px rgba(37,99,235,0.3)' : 'none',
-              transition: 'all 0.15s ease'
+              gap: '0.5rem',
+              boxShadow: mainTab === 'chat' ? '0 3px 10px rgba(37,99,235,0.35)' : 'none',
+              transition: 'all 0.18s ease'
             }}
           >
-            <MessageSquare size={15} />
-            <span>1) Chat</span>
+            <MessageSquare size={16} />
+            <span>Chat</span>
           </button>
 
           <button
             type="button"
             onClick={() => { setMainTab('task'); }}
             style={{
-              padding: '0.45rem 1.1rem',
-              fontSize: '0.82rem',
+              padding: '0.5rem 1.25rem',
+              fontSize: '0.84rem',
               fontWeight: 800,
-              borderRadius: '7px',
+              borderRadius: '9px',
               border: 'none',
               background: mainTab === 'task' ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'transparent',
               color: mainTab === 'task' ? '#ffffff' : 'var(--text-muted, #475569)',
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.45rem',
-              boxShadow: mainTab === 'task' ? '0 2px 8px rgba(37,99,235,0.3)' : 'none',
-              transition: 'all 0.15s ease'
+              gap: '0.5rem',
+              boxShadow: mainTab === 'task' ? '0 3px 10px rgba(37,99,235,0.35)' : 'none',
+              transition: 'all 0.18s ease'
             }}
           >
-            <CheckSquare size={15} />
-            <span>2) Task</span>
+            <CheckSquare size={16} />
+            <span>Tasks</span>
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.55rem', alignItems: 'center' }}>
           {mainTab === 'chat' && currentUser?.role === 'admin' && (
             <button
               onClick={handleOpenCreateGroupModal}
               className="btn-primary"
-              style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', gap: '0.4rem', borderRadius: '8px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' }}
+              style={{ fontSize: '0.78rem', padding: '0.45rem 0.9rem', gap: '0.4rem', borderRadius: '9px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', fontWeight: 700 }}
               title="Create a new custom communication group with members"
             >
               <PlusCircle size={14} />
@@ -799,7 +804,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               onClick={handleSyncGroups}
               disabled={syncing}
               className="btn-secondary"
-              style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', gap: '0.4rem', borderRadius: '8px' }}
+              style={{ fontSize: '0.78rem', padding: '0.45rem 0.9rem', gap: '0.4rem', borderRadius: '9px', fontWeight: 700 }}
               title="Re-synchronize department access groups based on current user authorities"
             >
               <RefreshCw size={13} className={syncing ? 'spin-loader' : ''} />
@@ -818,11 +823,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               }
             }}
             className="btn-secondary"
-            style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', gap: '0.4rem', borderRadius: '8px', color: '#f59e0b', borderColor: '#f59e0b40' }}
+            style={{ fontSize: '0.78rem', padding: '0.45rem 0.9rem', gap: '0.4rem', borderRadius: '9px', color: '#d97706', borderColor: '#f59e0b40', fontWeight: 700 }}
             title="Force clear cache & hard reload all connected users instantly"
           >
-            <Zap size={13} color="#f59e0b" />
-            <span>Hard Refresh All Users</span>
+            <Zap size={13} color="#d97706" />
+            <span>Hard Refresh All</span>
           </button>
         </div>
       </div>
