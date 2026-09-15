@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api, getBaseUrl } from '../services/api';
 import { io } from 'socket.io-client';
 import TaskManagerPanel from './TaskManagerPanel';
