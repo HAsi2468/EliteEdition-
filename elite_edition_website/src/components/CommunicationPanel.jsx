@@ -52,6 +52,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [isUrgent, setIsUrgent] = useState(false);
   const [attachedFile, setAttachedFile] = useState(null);
   const [zoomImg, setZoomImg] = useState(null);
+  const [isMobileScreen, setIsMobileScreen] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileScreen(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // New DM modal state
   const [showNewDmModal, setShowNewDmModal] = useState(false);
@@ -838,10 +847,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
         </div>
       ) : (
-      <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr', gap: '0.75rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ display: isMobileScreen ? 'flex' : 'grid', flexDirection: isMobileScreen ? 'column' : 'initial', gridTemplateColumns: isMobileScreen ? '1fr' : '290px 1fr', gap: '0.75rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         
         {/* ════ LEFT COLUMN: GROUPS & DM ROSTER ════ */}
-        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', borderRadius: '12px', overflow: 'hidden' }}>
+        <div className="glass-panel" style={{ display: (isMobileScreen && activeGroup && rosterTab !== 'tasks') ? 'none' : 'flex', flexDirection: 'column', height: '100%', borderRadius: '12px', overflow: 'hidden' }}>
           
           {/* Dual Roster Mode Switcher Pills (Groups vs Personal DMs) */}
           <div style={{ padding: '0.5rem 0.65rem', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-th)', display: 'flex', gap: '4px', flexShrink: 0 }}>
@@ -1070,7 +1079,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         </div>
 
         {/* ════ RIGHT COLUMN: CHAT STREAM / TASK MANAGER / ACTIVITY FEED ════ */}
-        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', height: '100%', borderRadius: '12px', overflow: 'hidden' }}>
+        <div className="glass-panel" style={{ display: (isMobileScreen && !activeGroup && rosterTab !== 'tasks') ? 'none' : 'flex', flexDirection: 'column', height: '100%', borderRadius: '12px', overflow: 'hidden' }}>
           
           {rosterTab === 'tasks' ? (
             <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
@@ -1086,6 +1095,29 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 return (
                   <div style={{ padding: '0.65rem 1rem', borderBottom: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-th, #f8fafc)', flexShrink: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                      {isMobileScreen && activeGroup && (
+                        <button
+                          onClick={() => setActiveGroup(null)}
+                          style={{
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            color: '#2563eb',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            padding: '0.35rem 0.65rem',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            marginRight: '6px',
+                            flexShrink: 0
+                          }}
+                          title="Back to conversation list"
+                        >
+                          ← Channels
+                        </button>
+                      )}
                       {isDirect ? (
                         <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.9rem', fontWeight: 800, boxShadow: '0 3px 10px rgba(37,99,235,0.3)' }}>
                           {(displayName || 'D').charAt(0).toUpperCase()}

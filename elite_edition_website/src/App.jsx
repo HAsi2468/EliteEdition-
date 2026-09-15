@@ -995,6 +995,32 @@ export default function App() {
               <ChevronRight size={14} color="#6366f1" />
             </button>
 
+            {hasWorkspaceAccess && (
+              <button
+                onClick={() => { setActiveTab('communication'); setMobileMenuOpen(false); }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.65rem 0.75rem',
+                  borderRadius: '8px',
+                  background: (activeTab === 'communication' || activeTab === 'workspace') ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'rgba(56, 189, 248, 0.1)',
+                  border: (activeTab === 'communication' || activeTab === 'workspace') ? 'none' : '1px solid rgba(56, 189, 248, 0.3)',
+                  color: (activeTab === 'communication' || activeTab === 'workspace') ? '#ffffff' : '#38bdf8',
+                  fontSize: '0.84rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  marginTop: '0.4rem'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <MessageSquare size={16} />
+                  <span>Inter-Dept Communication</span>
+                </div>
+                <ChevronRight size={14} />
+              </button>
+            )}
+
             {/* Modules List inside Mobile Drawer */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.75rem' }}>
               {activeTab === 'workspace' ? (
@@ -1971,6 +1997,65 @@ export default function App() {
                   </div>
                 );
               })}
+
+              {hasWorkspaceAccess && (
+                <div
+                  onClick={() => {
+                    setActiveTab('communication');
+                    setShowCompanyQuickSheet(false);
+                    setMobileMenuOpen(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0.85rem 1rem',
+                    borderRadius: '14px',
+                    border: (activeTab === 'communication' || activeTab === 'workspace') ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                    background: (activeTab === 'communication' || activeTab === 'workspace') ? '#eff6ff' : '#ffffff',
+                    cursor: 'pointer',
+                    boxShadow: (activeTab === 'communication' || activeTab === 'workspace') ? '0 4px 14px rgba(37,99,235,0.25)' : '0 1px 3px rgba(0,0,0,0.03)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                    <div style={{
+                      width: '42px',
+                      height: '42px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      boxShadow: '0 3px 10px rgba(37,99,235,0.4)'
+                    }}>
+                      <MessageSquare size={20} color="#ffffff" />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
+                          Inter-Dept Communication
+                        </span>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
+                          CHAT &amp; TASKS
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
+                        Real-time Team Chat, Channels &amp; Task Stream
+                      </div>
+                    </div>
+                  </div>
+                  {(activeTab === 'communication' || activeTab === 'workspace') ? (
+                    <span style={{ padding: '0.28rem 0.75rem', borderRadius: '20px', background: '#2563eb', color: '#ffffff', fontSize: '0.75rem', fontWeight: 800 }}>
+                      Active ✓
+                    </span>
+                  ) : (
+                    <ChevronRight size={18} color="#94a3b8" />
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
