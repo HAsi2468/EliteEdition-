@@ -32,6 +32,35 @@ const userSchema = new mongoose.Schema(
 			type: [String],
 			default: [],
 		},
+		department: {
+			type: String,
+			default: 'General',
+		},
+		canManageTasks: {
+			type: Boolean,
+			default: true,
+		},
+		canBroadcastChat: {
+			type: Boolean,
+			default: true,
+		},
+		canExportReports: {
+			type: Boolean,
+			default: true,
+		},
+		canDeleteRecords: {
+			type: Boolean,
+			default: true,
+		},
+		canViewFinancials: {
+			type: Boolean,
+			default: true,
+		},
+		status: {
+			type: String,
+			enum: ['Active', 'Inactive'],
+			default: 'Active',
+		},
 		created_date_time: {
 			type: Date,
 			default: Date.now,

@@ -22,7 +22,22 @@ async function getUserById(id) {
 }
 
 async function createUser(req) {
-  const { email, name, password, role, permissions, isMainAdmin, allowedCompanies } = req.body;
+  const {
+    email,
+    name,
+    password,
+    role,
+    permissions,
+    isMainAdmin,
+    allowedCompanies,
+    department,
+    canManageTasks,
+    canBroadcastChat,
+    canExportReports,
+    canDeleteRecords,
+    canViewFinancials,
+    status
+  } = req.body;
   // Validate required role field
   if (!role) {
     throw new ApiError(httpStatus.BAD_REQUEST, '`role` is required');
@@ -42,6 +57,13 @@ async function createUser(req) {
     isMainAdmin: Boolean(isMainAdmin),
     allowedCompanies: Array.isArray(allowedCompanies) ? allowedCompanies : ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex'],
     permissions: permissions || [],
+    department: department || 'General',
+    canManageTasks: canManageTasks !== undefined ? Boolean(canManageTasks) : true,
+    canBroadcastChat: canBroadcastChat !== undefined ? Boolean(canBroadcastChat) : true,
+    canExportReports: canExportReports !== undefined ? Boolean(canExportReports) : true,
+    canDeleteRecords: canDeleteRecords !== undefined ? Boolean(canDeleteRecords) : true,
+    canViewFinancials: canViewFinancials !== undefined ? Boolean(canViewFinancials) : true,
+    status: status || 'Active',
   });
 
   const createdUser = createdUserDoc.toObject();
