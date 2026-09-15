@@ -25,6 +25,12 @@ setupSockets(io);
 app.set('socketio', io);
 
 const { syncCommunicationGroups } = require('./utils/syncCommunicationGroups');
+const { checkOverdueTasks } = require('./controllers/task.controller');
+
+// Run overdue task check every 60 seconds
+setInterval(() => {
+  checkOverdueTasks(io).catch(err => console.error('Overdue timer check failed:', err));
+}, 60000);
 
 const port = process.env.PORT || 3001;
 server.listen(port, '0.0.0.0', async () => {

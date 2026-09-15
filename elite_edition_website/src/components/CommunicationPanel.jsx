@@ -139,6 +139,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }
     });
 
+    socket.on('overdue-task-alert', (data) => {
+      if (data && data.message) {
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification('🚨 OVERDUE TASK ALERT', {
+            body: data.message,
+            icon: '/pwa-192x192.png'
+          });
+        }
+      }
+    });
+
     socket.on('activity-notification', () => {
       fetchGroups(false);
     });

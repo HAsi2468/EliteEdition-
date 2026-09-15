@@ -24,6 +24,10 @@ const taskSchema = new mongoose.Schema(
     dueDate: {
       type: Date,
     },
+    overdueNotified: {
+      type: Boolean,
+      default: false,
+    },
     department: {
       type: String,
       default: 'General',

@@ -62,6 +62,9 @@ const getTasks = async (req, res) => {
       .skip(skip)
       .limit(limitNum);
 
+    // Trigger async overdue tasks check
+    checkOverdueTasks(req.app.get('socketio')).catch(e => console.error('Overdue check error:', e));
+
     res.json({
       success: true,
       data: tasks,
@@ -506,6 +509,64 @@ const addComment = async (req, res) => {
   }
 };
 
+/**
+ * Check for tasks that have passed their due date without being marked as 'Done'
+ */
+const checkOverdueTasks = async (io) => {
+  try {
+    const now = new Date();
+    const overdueTasks = await Task.find({
+      dueDate: { $ne: null, $lt: now },
+      status: { $ne: 'Done' },
+      overdueNotified: { $ne: true }
+    })
+    .populate('assignees', 'name email role')
+    .populate('createdBy', 'name email role');
+
+    if (overdueTasks.length === 0) return;
+
+    const { publishActivity } = require('../utils/activityEvent');
+
+    for (const task of overdueTasks) {
+      task.overdueNotified = true;
+      await task.save();
+
+      const dueDateStr = task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'due date';
+      const desc = `🚨 **OVERDUE TASK ALERT**: Task "${task.title}" was due on ${dueDateStr} and is NOT finished!`;
+
+      await publishActivity({
+        actorId: task.createdBy ? (task.createdBy._id || task.createdBy) : null,
+        actorName: 'System Alert',
+        action: 'OVERDUE_ALERT',
+        module: 'Task Management',
+        recordRef: task.projectRef || task.title,
+        recordId: String(task._id),
+        permissionScope: 'jobcards',
+        department: task.department || 'General',
+        description: desc
+      });
+
+      if (io) {
+        const recipientIds = new Set([
+          ...(task.assignees || []).map(a => String(a._id || a)),
+          task.createdBy ? String(task.createdBy._id || task.createdBy) : null
+        ].filter(Boolean));
+
+        recipientIds.forEach(uId => {
+          io.to(`user_${uId}`).emit('overdue-task-alert', {
+            taskId: task._id,
+            title: task.title,
+            dueDate: task.dueDate,
+            message: `🚨 Task "${task.title}" is OVERDUE! It was due on ${dueDateStr} and is not finished yet.`
+          });
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error checking overdue tasks:', err);
+  }
+};
+
 module.exports = {
   getTasks,
   getTaskById,
@@ -517,5 +578,6 @@ module.exports = {
   addManualTimeLog,
   addChecklistItem,
   toggleChecklistItem,
-  addComment
+  addComment,
+  checkOverdueTasks
 };

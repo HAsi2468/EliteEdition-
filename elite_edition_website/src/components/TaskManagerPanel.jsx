@@ -549,11 +549,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                     ) : (
                       colTasks.map((t) => {
                         const pri = getPriorityBadge(t.priority);
-                        const activeTimer = (t.liveTimers || []).find((lt) => String(lt.user) === myId && lt.isRunning);
                         const completedCheck = (t.checklist || []).filter((c) => c.completed).length;
                         const totalCheck = (t.checklist || []).length;
-                        const loggedHours = calculateTotalLoggedHours(t.timeLogs);
                         const assignerName = getAssignerName(t);
+                        const isOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done';
 
                         return (
                           <div
@@ -561,11 +560,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                             onClick={() => setSelectedTask(t)}
                             style={{
                               background: '#ffffff',
-                              border: activeTimer ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
+                              border: isOverdue ? '1.5px solid #ef4444' : '1px solid var(--border-light)',
                               borderRadius: '10px',
                               padding: '0.75rem',
                               cursor: 'pointer',
-                              boxShadow: activeTimer ? '0 4px 14px rgba(37,99,235,0.15)' : '0 2px 6px rgba(0,0,0,0.03)',
+                              boxShadow: isOverdue ? '0 4px 14px rgba(239,68,68,0.12)' : '0 2px 6px rgba(0,0,0,0.03)',
                               transition: 'transform 0.15s ease, box-shadow 0.15s ease',
                               display: 'flex',
                               flexDirection: 'column',
@@ -574,9 +573,16 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                           >
                             {/* Badges Row */}
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <span style={{ fontSize: '0.6rem', fontWeight: 800, color: pri.color, background: pri.bg, border: `1px solid ${pri.border}`, padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                                {pri.label}
-                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '0.6rem', fontWeight: 800, color: pri.color, background: pri.bg, border: `1px solid ${pri.border}`, padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                                  {pri.label}
+                                </span>
+                                {isOverdue && (
+                                  <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#ef4444', background: '#fef2f2', border: '1px solid #fca5a5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                                    🚨 OVERDUE
+                                  </span>
+                                )}
+                              </div>
                               
                               {/* Assigned By Pill */}
                               <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#475569', background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
@@ -611,7 +617,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                               )}
                             </div>
 
-                            {/* Checklist & Hours Meta */}
+                            {/* Checklist & Due Date Meta */}
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--text-muted)', paddingTop: '2px' }}>
                               {totalCheck > 0 ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600, color: completedCheck === totalCheck ? '#16a34a' : 'var(--text-muted)' }}>
@@ -620,42 +626,22 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                                 </div>
                               ) : <span />}
 
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
-                                <Clock size={12} />
-                                <span>{loggedHours}h {t.estimatedHours ? `/ ${t.estimatedHours}h` : ''}</span>
-                              </div>
+                              {t.dueDate && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 700, color: isOverdue ? '#ef4444' : 'var(--text-muted)' }}>
+                                  <Calendar size={11} />
+                                  <span>Due: {new Date(t.dueDate).toLocaleDateString()}</span>
+                                </div>
+                              )}
                             </div>
 
-                            {/* Footer: Live Timer Button & Move Dropdown */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '3px', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)' }}>
-                              
-                              {/* Timer Control */}
-                              {activeTimer ? (
-                                <button
-                                  onClick={(e) => handleStopTimer(t._id, e)}
-                                  style={{ background: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '5px', padding: '2px 8px', fontSize: '0.68rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}
-                                  title="Stop live timer"
-                                >
-                                  <Square size={10} fill="#ffffff" />
-                                  <span>{formatElapsedTimer(activeTimer.startTime)}</span>
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={(e) => handleStartTimer(t._id, e)}
-                                  style={{ background: 'rgba(37,99,235,0.08)', color: '#2563eb', border: '1px solid rgba(37,99,235,0.2)', borderRadius: '5px', padding: '2px 7px', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer' }}
-                                  title="Start live timer for this task"
-                                >
-                                  <Play size={10} fill="#2563eb" />
-                                  <span>Start Timer</span>
-                                </button>
-                              )}
-
+                            {/* Footer: Move Dropdown */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: '3px', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)' }}>
                               {/* Status Quick Shift Select */}
                               <select
                                 value={t.status}
                                 onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => handleStatusChange(t, e.target.value)}
-                                style={{ fontSize: '0.65rem', padding: '1px 4px', borderRadius: '4px', border: '1px solid var(--border-light)', background: '#ffffff', cursor: 'pointer', fontWeight: 700 }}
+                                style={{ fontSize: '0.65rem', padding: '1px 6px', borderRadius: '4px', border: '1px solid var(--border-light)', background: '#ffffff', cursor: 'pointer', fontWeight: 700 }}
                               >
                                 {KANBAN_COLUMNS.map((c) => (
                                   <option key={c.id} value={c.id}>{c.label}</option>
@@ -951,33 +937,17 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
-                    Project / Job Card Ref
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. @JC-1004"
-                    value={newProjectRef}
-                    onChange={(e) => setNewProjectRef(e.target.value)}
-                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
-                    Estimated Hours
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    placeholder="e.g. 4.5"
-                    value={newEstHours}
-                    onChange={(e) => setNewEstHours(e.target.value)}
-                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)' }}
-                  />
-                </div>
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                  Project / Job Card Ref
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. @JC-1004"
+                  value={newProjectRef}
+                  onChange={(e) => setNewProjectRef(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)' }}
+                />
               </div>
 
               <button
@@ -1152,14 +1122,6 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                     })}
                   </div>
                 </div>
-
-                <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>Hours Logged</label>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#16a34a' }}>
-                    {calculateTotalLoggedHours(selectedTask.timeLogs)}h {selectedTask.estimatedHours ? `/ ${selectedTask.estimatedHours}h` : ''}
-                  </div>
-                </div>
-
               </div>
 
             </div>
