@@ -105,8 +105,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       }
       if (usersRes.success && usersRes.data) {
         setAllUsers(usersRes.data);
-        // Default assigned to current logged-in user if creating task
-        setSelectedAssigneeIds([myId]);
+        setSelectedAssigneeIds([]);
       }
     } catch (err) {
       console.error('Failed to fetch task management data:', err);
@@ -118,9 +117,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const handleOpenCreateModal = () => {
     setShowCreateModal(true);
     setStaffSearch('');
-    if (myId && !selectedAssigneeIds.includes(myId)) {
-      setSelectedAssigneeIds([myId]);
-    }
+    setSelectedAssigneeIds([]);
   };
 
   const toggleAssigneeSelection = (userId) => {
@@ -181,7 +178,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     setNewClientName('');
     setNewDueDate('');
     setNewEstHours('');
-    setSelectedAssigneeIds([myId]);
+    setSelectedAssigneeIds([]);
   };
 
   const handleStatusChange = async (task, newStatusVal) => {
