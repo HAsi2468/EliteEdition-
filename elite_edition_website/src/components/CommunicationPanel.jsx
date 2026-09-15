@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api, getBaseUrl } from '../services/api';
-import { io } from 'socket.io-client';
+import { useSocket } from '../contexts/SocketContext';
 import TaskManagerPanel from './TaskManagerPanel';
 import {
   MessageSquare,
@@ -88,7 +88,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [isEditingMembers, setIsEditingMembers] = useState(false);
   const [editMemberIds, setEditMemberIds] = useState([]);
 
-  const socketRef = useRef(null);
+  const socket = useSocket();
   const chatBottomRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -98,16 +98,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     activeGroupIdRef.current = activeGroup?._id;
   }, [activeGroup?._id]);
 
-  // Initialize Socket.io connection & fetch groups
+  // Initialize Socket.io connection listeners & fetch groups
   useEffect(() => {
     fetchGroups();
 
-    const baseUrl = getBaseUrl().replace(/\/v1\/?$/, '');
-    const socket = io(baseUrl, {
-      transports: ['websocket', 'polling'],
-      reconnectionAttempts: 5,
-    });
-    socketRef.current = socket;
+    if (!socket) return;
 
     if (currentUser) {
       const uId = currentUser.id || currentUser._id;
@@ -116,18 +111,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }
     }
 
-    socket.on('receive-message', (msg) => {
+    const handleReceiveMessage = (msg) => {
       const currentActiveId = activeGroupIdRef.current;
       if (currentActiveId && String(msg.roomId) === String(currentActiveId)) {
         setMessages((prev) => {
-          if (prev.some((m) => String(m._id) === String(msg._id))) return prev;
-          return [...prev, msg];
+          // Filter out optimistic placeholder if real message arrives
+          const filtered = prev.filter((m) => !(m.isOptimistic && m.content === msg.content));
+          if (filtered.some((m) => String(m._id) === String(msg._id))) return filtered;
+          return [...filtered, msg];
         });
       }
       fetchGroups(false);
-    });
+    };
 
-    socket.on('message-acknowledged', (data) => {
+    const handleAck = (data) => {
       if (data && data.messageId) {
         setMessages((prev) =>
           prev.map((m) =>
@@ -137,38 +134,75 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           )
         );
       }
-    });
+    };
 
-    socket.on('overdue-task-alert', (data) => {
-      if (data && data.message) {
-        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-          new Notification('🚨 OVERDUE TASK ALERT', {
-            body: data.message,
-            icon: '/pwa-192x192.png'
-          });
-        }
-      }
-    });
-
-    socket.on('activity-notification', () => {
+    const handleActivity = () => {
       fetchGroups(false);
-    });
+    };
+
+    const handleReaction = (data) => {
+      if (data && data.messageId) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            String(m._id) === String(data.messageId)
+              ? { ...m, reactions: data.reactions }
+              : m
+          )
+        );
+      }
+    };
+
+    const handleEdited = (data) => {
+      if (data && data.messageId) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            String(m._id) === String(data.messageId)
+              ? { ...m, content: data.newContent, isEdited: true }
+              : m
+          )
+        );
+      }
+    };
+
+    const handleDeleted = (data) => {
+      if (data && data.messageId) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            String(m._id) === String(data.messageId)
+              ? { ...m, content: 'This message was deleted', isDeleted: true, attachment: null }
+              : m
+          )
+        );
+      }
+    };
+
+    socket.on('receive-message', handleReceiveMessage);
+    socket.on('message-acknowledged', handleAck);
+    socket.on('activity-notification', handleActivity);
+    socket.on('message-reaction-updated', handleReaction);
+    socket.on('message-edited', handleEdited);
+    socket.on('message-deleted', handleDeleted);
 
     return () => {
-      socket.disconnect();
+      socket.off('receive-message', handleReceiveMessage);
+      socket.off('message-acknowledged', handleAck);
+      socket.off('activity-notification', handleActivity);
+      socket.off('message-reaction-updated', handleReaction);
+      socket.off('message-edited', handleEdited);
+      socket.off('message-deleted', handleDeleted);
     };
-  }, [currentUser]);
+  }, [socket, currentUser]);
 
   // Join socket room when active group changes & fetch messages explicitly with loader
   useEffect(() => {
     if (!activeGroup) return;
 
-    if (socketRef.current) {
-      socketRef.current.emit('join-room', activeGroup._id);
+    if (socket) {
+      socket.emit('join-room', activeGroup._id);
     }
 
     fetchGroupMessages(activeGroup._id, msgFilter, true);
-  }, [activeGroup?._id, msgFilter]);
+  }, [socket, activeGroup?._id, msgFilter]);
 
   // Auto-scroll to chat bottom
   useEffect(() => {
@@ -391,11 +425,30 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       return;
     }
 
-    if (socketRef.current) {
-      socketRef.current.emit('send-message', {
+    const messageText = inputMessage.trim() || (attachedFile ? `Attached ${attachedFile.fileName}` : '');
+
+    // Optimistic UI update for instant response
+    const tempMsg = {
+      _id: 'temp_' + Date.now(),
+      roomId: activeGroup._id,
+      senderId: typeof currentUser === 'object' ? currentUser : { _id: senderId, name: 'You' },
+      content: messageText,
+      createdAt: new Date().toISOString(),
+      type: 'text',
+      msgType: 'human',
+      priority: isUrgent ? 'urgent' : 'normal',
+      attachment: attachedFile || undefined,
+      readBy: [senderId],
+      isOptimistic: true
+    };
+
+    setMessages((prev) => [...prev, tempMsg]);
+
+    if (socket) {
+      socket.emit('send-message', {
         roomId: activeGroup._id,
         senderId,
-        content: inputMessage.trim() || (attachedFile ? `Attached ${attachedFile.fileName}` : ''),
+        content: messageText,
         priority: isUrgent ? 'urgent' : 'normal',
         attachment: attachedFile || undefined,
       });

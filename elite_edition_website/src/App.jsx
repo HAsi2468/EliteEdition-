@@ -73,6 +73,7 @@ import {
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
+import { useSocket } from './contexts/SocketContext';
 
 
 
@@ -99,6 +100,7 @@ export default function App() {
   };
 
   const initialNav = getSavedNavState();
+  const socket = useSocket();
   const [isAuthenticated, setIsAuthenticated] = useState(api.isAuthenticated());
   const [currentUser, setCurrentUser] = useState(() => api.getCurrentUser());
   const [activeTab, setActiveTab] = useState(initialNav.tab);
@@ -435,6 +437,79 @@ export default function App() {
       };
     }
   }, [isAuthenticated]);
+
+  // Global Socket.io Real-Time Push Notification & Multi-Department Listener
+  useEffect(() => {
+    if (!socket || !isAuthenticated) return;
+
+    if (currentUser) {
+      const uId = currentUser.id || currentUser._id;
+      if (uId) {
+        socket.emit('register-user', uId);
+      }
+    }
+
+    const handleActivity = (data) => {
+      console.log('⚡ Real-time Socket Activity:', data);
+      if (data && data.description) {
+        triggerPushNotification(
+          data.title || `⚡ Activity Log (${data.module || 'System'})`,
+          data.description,
+          'info',
+          data.actionTab || 'communication'
+        );
+      }
+      triggerGlobalDataRefresh();
+    };
+
+    const handleOverdue = (data) => {
+      if (data && data.message) {
+        triggerPushNotification('🚨 OVERDUE TASK ALERT', data.message, 'warning', 'communication');
+      }
+      triggerGlobalDataRefresh();
+    };
+
+    const handleMention = (data) => {
+      if (data && data.content) {
+        triggerPushNotification(`💬 Mentioned by ${data.senderName || 'Colleague'}`, data.content, 'info', 'communication');
+      }
+    };
+
+    const handleJobStageUpdate = (data) => {
+      if (data && data.jobNo) {
+        triggerPushNotification('⚙️ Job Stage Updated', `Job #${data.jobNo} moved to '${data.newStage}'`, 'success', 'jobcards_list');
+      }
+      triggerGlobalDataRefresh();
+    };
+
+    const handleDataUpdate = () => {
+      triggerGlobalDataRefresh();
+    };
+
+    socket.on('activity-notification', handleActivity);
+    socket.on('overdue-task-alert', handleOverdue);
+    socket.on('mention-notification', handleMention);
+    socket.on('job-stage-updated', handleJobStageUpdate);
+    socket.on('task-updated', handleDataUpdate);
+    socket.on('task-deleted', handleDataUpdate);
+    socket.on('proof-status-updated', handleDataUpdate);
+    socket.on('global-room-updated', handleDataUpdate);
+    socket.on('invoice-updated', handleDataUpdate);
+    socket.on('inventory-updated', handleDataUpdate);
+
+    return () => {
+      socket.off('activity-notification', handleActivity);
+      socket.off('overdue-task-alert', handleOverdue);
+      socket.off('mention-notification', handleMention);
+      socket.off('job-stage-updated', handleJobStageUpdate);
+      socket.off('task-updated', handleDataUpdate);
+      socket.off('task-deleted', handleDataUpdate);
+      socket.off('proof-status-updated', handleDataUpdate);
+      socket.off('global-room-updated', handleDataUpdate);
+      socket.off('invoice-updated', handleDataUpdate);
+      socket.off('inventory-updated', handleDataUpdate);
+    };
+  }, [socket, isAuthenticated, currentUser?._id]);
 
   const fetchData = async () => {
     setLoading(true);

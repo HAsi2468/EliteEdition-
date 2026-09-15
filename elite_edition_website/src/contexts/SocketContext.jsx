@@ -10,8 +10,7 @@ export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
-    // Get the base API URL and format it to target the socket server
-    // (If API is http://3.7.174.180:3001/v1, socket server is on http://3.7.174.180:3001)
+    // Determine socket server URL relative to HTTPS origin or API base
     const apiUrl = getBaseUrl();
     let socketUrl = apiUrl.replace(/\/v1\/?$/, '');
     if (!socketUrl || !socketUrl.startsWith('http')) {
@@ -22,13 +21,28 @@ export const SocketProvider = ({ children }) => {
       transports: ['websocket', 'polling'],
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 3000,
-      timeout: 10000
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000
+    });
+
+    newSocket.on('connect', () => {
+      console.log('⚡ Socket connected successfully:', newSocket.id);
+      try {
+        const rawUser = localStorage.getItem('elite_user');
+        if (rawUser) {
+          const u = JSON.parse(rawUser);
+          const uId = u.id || u._id;
+          if (uId) {
+            newSocket.emit('register-user', uId);
+          }
+        }
+      } catch (e) {}
     });
 
     newSocket.on('connect_error', () => {
-      // Suppress noisy console error logs when socket is offline or reconnecting
+      // Suppress noisy logs during network switching
     });
 
     newSocket.on('force-system-reload', (data) => {
@@ -54,3 +68,4 @@ export const SocketProvider = ({ children }) => {
     </SocketContext.Provider>
   );
 };
+
