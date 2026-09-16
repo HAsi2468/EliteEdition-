@@ -1072,47 +1072,18 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                       marginTop: '1.25rem'
                     }}
                   >
-                    {mainImg && !failedImages.has(d._id) ? (
+                    {mainImg ? (
                       <img
                         src={mainImg}
+                        alt={d.designName}
                         style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
                         onClick={(evt) => setZoomImg(evt.target.src || mainImg)}
                         onError={(e) => {
-                          const step = parseInt(e.target.dataset.fallbackStep || '0', 10);
-                          const getOrigin = () => {
-                            const baseUrl = getBaseUrl();
-                            if (baseUrl && baseUrl.startsWith('http')) {
-                              try { return new URL(baseUrl).origin; } catch (err) {}
-                            }
-                            if (typeof window !== 'undefined') {
-                              const hn = window.location.hostname;
-                              if ((hn === 'localhost' || hn === '127.0.0.1') && window.location.port && window.location.port !== '3001') {
-                                return `${window.location.protocol}//${hn}:3001`;
-                              }
-                              return window.location.origin;
-                            }
-                            return '';
-                          };
-                          const prefix = '/v1/designs';
-
-                          if (step === 0 && cleanName) {
-                            e.target.dataset.fallbackStep = '1';
-                            e.target.src = origin ? `${origin}${prefix}/${cleanName}.jpg` : `${prefix}/${cleanName}.jpg`;
-                          } else if (step === 1 && cleanName) {
-                            e.target.dataset.fallbackStep = '2';
-                            e.target.src = origin ? `${origin}${prefix}/${cleanName}.jpeg` : `${prefix}/${cleanName}.jpeg`;
-                          } else if (step === 2 && cleanName) {
-                            e.target.dataset.fallbackStep = '3';
-                            e.target.src = origin ? `${origin}${prefix}/${cleanName}.png` : `${prefix}/${cleanName}.png`;
-                          } else if (step === 3 && d.imageUrl && d.imageUrl.includes('drive.google.com')) {
-                            e.target.dataset.fallbackStep = '4';
-                            const fileMatch = d.imageUrl.match(/([-\w]{25,})/);
-                            if (fileMatch) e.target.src = `https://drive.google.com/uc?export=view&id=${fileMatch[1]}`;
-                            else {
-                              setFailedImages(prev => new Set(prev).add(d._id));
-                            }
-                          } else {
-                            setFailedImages(prev => new Set(prev).add(d._id));
+                          const name = (d.designName || '').trim();
+                          if (name && !e.target.dataset.retried) {
+                            e.target.dataset.retried = 'true';
+                            const origin = getBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : '');
+                            e.target.src = origin ? `${origin}/v1/designs/${name}.jpg` : `/v1/designs/${name}.jpg`;
                           }
                         }}
                       />

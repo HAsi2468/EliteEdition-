@@ -102,7 +102,11 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Serve design images under both /v1/designs and /designs with automatic fallback generator
 const imagesDir = path.join(__dirname, '../../elite_edition_images');
-app.use(['/v1/designs', '/designs'], express.static(imagesDir));
+app.use(['/v1/designs', '/designs'], express.static(imagesDir, {
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  }
+}));
 app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res, next) => {
   const filename = req.params.filename || '';
   const cleanName = filename.replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '').trim();
@@ -233,7 +237,9 @@ app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res, next) => {
 </svg>`;
 
   res.setHeader('Content-Type', 'image/svg+xml');
-  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.send(svg);
 });
 
