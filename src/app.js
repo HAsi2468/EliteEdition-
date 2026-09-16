@@ -102,11 +102,14 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Serve design images under both /v1/designs and /designs with automatic fallback generator
 const imagesDir = path.join(__dirname, '../../elite_edition_images');
-app.use(['/v1/designs', '/designs'], express.static(imagesDir, {
-  setHeaders: (res) => {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+app.get('/v1/designs/download-zip', (req, res) => {
+  const zipFile = path.join(__dirname, '../uploads/elite_edition_images.zip');
+  if (fs.existsSync(zipFile)) {
+    return res.download(zipFile, 'elite_edition_images.zip');
   }
-}));
+  res.status(404).json({ error: 'Zip file not found' });
+});
+
 app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res, next) => {
   const rawFilename = req.params.filename || '';
   let filename = rawFilename;
