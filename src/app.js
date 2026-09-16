@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 require('./polyfills/crypto');
 const helmet = require('helmet');
 const xss = require('xss-clean');
