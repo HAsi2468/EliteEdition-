@@ -26,6 +26,7 @@ const storage = multer.diskStorage({
       else if (file.mimetype === 'image/webp') ext = '.webp';
       else ext = '.jpg';
     }
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, file.fieldname + '-' + uniqueSuffix + ext);
   }
 });
@@ -36,7 +37,18 @@ router.post('/', upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No image file provided' });
   }
-  // The static route in app.js is app.use('/designs', ...)
+
+  const designName = (req.body?.designName || req.query?.designName || '').trim();
+  if (designName) {
+    const ext = path.extname(req.file.filename) || '.jpg';
+    const namedPath = path.join(uploadDir, `${designName}${ext}`);
+    try {
+      fs.copyFileSync(req.file.path, namedPath);
+    } catch (e) {
+      console.warn('Failed to copy uploaded file to designName path:', e.message);
+    }
+  }
+
   const fileUrl = `/designs/${req.file.filename}`;
   res.json({ url: fileUrl });
 });
