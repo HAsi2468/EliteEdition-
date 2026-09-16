@@ -135,6 +135,10 @@ app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res) => {
   res.send(svg);
 });
 
+// Serve frontend static build assets
+const websiteDistPath = path.join(__dirname, '../elite_edition_website_dist');
+app.use(express.static(websiteDistPath));
+
 // v1 api routes
 app.use('/v1', routes);
 
