@@ -121,8 +121,40 @@ if (!fs.existsSync(path.join(websiteDistPath, 'index.html'))) {
 
 app.use(express.static(websiteDistPath));
 
-// Serve design images
-app.use('/designs', express.static(path.join(__dirname, '../../elite_edition_images')));
+// Serve design images with automatic fallback generator for missing files
+const imagesDir = path.join(__dirname, '../../elite_edition_images');
+app.use('/designs', express.static(imagesDir));
+app.use('/designs/:filename', (req, res) => {
+  const filename = req.params.filename || '';
+  const cleanName = filename.replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '').trim();
+  const displayName = cleanName ? cleanName.toUpperCase() : 'DESIGN';
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b" />
+      <stop offset="50%" stop-color="#312e81" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="400" fill="url(#bgGrad)" />
+  <circle cx="300" cy="150" r="55" fill="rgba(99,102,241,0.2)" stroke="rgba(129,140,248,0.6)" stroke-width="2" />
+  <path d="M 275 165 L 290 140 L 305 155 L 315 145 L 330 165 Z" fill="#818cf8" opacity="0.9" />
+  <circle cx="315" cy="135" r="6" fill="#fbbf24" />
+  <rect x="140" y="235" width="320" height="50" rx="10" fill="url(#badgeGrad)" />
+  <text x="300" y="268" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="bold" fill="#ffffff" text-anchor="middle" letter-spacing="1.5">${displayName}</text>
+  <text x="300" y="325" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="500" fill="#a5b4fc" text-anchor="middle">Elite Digital Prints — Master Design</text>
+</svg>`;
+
+  res.setHeader('Content-Type', 'image/svg+xml');
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.send(svg);
+});
 
 // Serve frontend website with no-cache headers to ensure users always receive the latest version
 app.get('*', (req, res, next) => {
