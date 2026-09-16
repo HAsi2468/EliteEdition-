@@ -108,26 +108,103 @@ app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res) => {
   const cleanName = filename.replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '').trim();
   const displayName = cleanName ? cleanName.toUpperCase() : 'DESIGN';
 
+  let hash = 0;
+  for (let i = 0; i < displayName.length; i++) {
+    hash = displayName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const absHash = Math.abs(hash);
+
+  const palettes = [
+    { bg1: '#1e1b4b', bg2: '#312e81', bg3: '#4338ca', accent: '#fbbf24', secondary: '#818cf8' },
+    { bg1: '#064e3b', bg2: '#047857', bg3: '#059669', accent: '#f59e0b', secondary: '#34d399' },
+    { bg1: '#831843', bg2: '#be123c', bg3: '#e11d48', accent: '#fef08a', secondary: '#fb7185' },
+    { bg1: '#0f172a', bg2: '#1e293b', bg3: '#334155', accent: '#38bdf8', secondary: '#94a3b8' },
+    { bg1: '#4c1d95', bg2: '#6d28d9', bg3: '#7c3aed', accent: '#fde047', secondary: '#c084fc' },
+    { bg1: '#701a75', bg2: '#a21caf', bg3: '#c026d3', accent: '#fb7185', secondary: '#e879f9' },
+    { bg1: '#78350f', bg2: '#b45309', bg3: '#d97706', accent: '#fef08a', secondary: '#fbbf24' }
+  ];
+
+  const p = palettes[absHash % palettes.length];
+  const patternType = absHash % 4;
+
+  let patternElements = '';
+  if (patternType === 0) {
+    patternElements = `
+      <g opacity="0.2" stroke="${p.accent}" stroke-width="1.5" fill="none">
+        <circle cx="150" cy="100" r="80" />
+        <circle cx="150" cy="100" r="60" stroke-dasharray="6,6" />
+        <circle cx="150" cy="100" r="40" />
+        <path d="M 150 20 L 150 180 M 70 100 L 230 100 M 93 43 L 207 157 M 93 157 L 207 43" />
+        <circle cx="450" cy="300" r="90" />
+        <circle cx="450" cy="300" r="70" stroke-dasharray="8,8" />
+        <circle cx="450" cy="300" r="45" />
+        <path d="M 450 210 L 450 390 M 360 300 L 540 300 M 386 236 L 514 364 M 386 364 L 514 236" />
+      </g>`;
+  } else if (patternType === 1) {
+    patternElements = `
+      <g opacity="0.22" stroke="${p.accent}" stroke-width="1.2" fill="none">
+        <pattern id="grid_${absHash}" width="60" height="60" patternUnits="userSpaceOnUse">
+          <path d="M 30 0 L 60 30 L 30 60 L 0 30 Z" />
+          <circle cx="30" cy="30" r="8" fill="${p.secondary}" opacity="0.3" />
+        </pattern>
+        <rect width="600" height="400" fill="url(#grid_${absHash})" />
+      </g>`;
+  } else if (patternType === 2) {
+    patternElements = `
+      <g opacity="0.25" fill="none" stroke-width="2">
+        <path d="M -50 100 Q 150 300 350 100 T 750 300" stroke="${p.accent}" opacity="0.6" />
+        <path d="M -50 140 Q 150 340 350 140 T 750 340" stroke="${p.secondary}" opacity="0.5" />
+        <path d="M -50 180 Q 150 380 350 180 T 750 380" stroke="${p.accent}" opacity="0.4" />
+        <path d="M -50 220 Q 150 420 350 220 T 750 420" stroke="${p.secondary}" opacity="0.3" />
+      </g>`;
+  } else {
+    patternElements = `
+      <g opacity="0.2" fill="${p.accent}">
+        <circle cx="100" cy="80" r="35" />
+        <circle cx="300" cy="80" r="35" />
+        <circle cx="500" cy="80" r="35" />
+        <circle cx="200" cy="240" r="45" />
+        <circle cx="400" cy="240" r="45" />
+        <circle cx="100" cy="360" r="35" />
+        <circle cx="300" cy="360" r="35" />
+        <circle cx="500" cy="360" r="35" />
+      </g>`;
+  }
+
   const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1e1b4b" />
-      <stop offset="50%" stop-color="#312e81" />
-      <stop offset="100%" stop-color="#0f172a" />
+    <linearGradient id="bgGrad_${absHash}" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${p.bg1}" />
+      <stop offset="50%" stop-color="${p.bg2}" />
+      <stop offset="100%" stop-color="${p.bg3}" />
     </linearGradient>
-    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#6366f1" />
-      <stop offset="100%" stop-color="#3b82f6" />
+    <linearGradient id="goldGrad_${absHash}" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="${p.accent}" />
+      <stop offset="50%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="${p.accent}" />
     </linearGradient>
   </defs>
-  <rect width="600" height="400" fill="url(#bgGrad)" />
-  <circle cx="300" cy="150" r="55" fill="rgba(99,102,241,0.2)" stroke="rgba(129,140,248,0.6)" stroke-width="2" />
-  <path d="M 275 165 L 290 140 L 305 155 L 315 145 L 330 165 Z" fill="#818cf8" opacity="0.9" />
-  <circle cx="315" cy="135" r="6" fill="#fbbf24" />
-  <rect x="140" y="235" width="320" height="50" rx="10" fill="url(#badgeGrad)" />
-  <text x="300" y="268" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="bold" fill="#ffffff" text-anchor="middle" letter-spacing="1.5">${displayName}</text>
-  <text x="300" y="325" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="500" fill="#a5b4fc" text-anchor="middle">Elite Digital Prints — Master Design</text>
+
+  <!-- Base Fabric Background -->
+  <rect width="600" height="400" fill="url(#bgGrad_${absHash})" />
+  
+  <!-- Textile Pattern Overlay -->
+  ${patternElements}
+
+  <!-- Center Decorative Frame -->
+  <rect x="90" y="105" width="420" height="190" rx="16" fill="rgba(15, 23, 42, 0.8)" stroke="url(#goldGrad_${absHash})" stroke-width="2.5" />
+  <rect x="98" y="113" width="404" height="174" rx="12" fill="none" stroke="${p.secondary}" stroke-width="1" opacity="0.4" />
+
+  <!-- Header Icon & Category Badge -->
+  <circle cx="300" cy="150" r="20" fill="rgba(255,255,255,0.1)" stroke="${p.accent}" stroke-width="1.5" />
+  <path d="M 292 156 L 300 141 L 308 156 Z" fill="${p.accent}" />
+
+  <!-- Design Title -->
+  <text x="300" y="210" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="2">${displayName}</text>
+  
+  <!-- Subtitle -->
+  <text x="300" y="248" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" fill="${p.accent}" text-anchor="middle" letter-spacing="1">ELITE DIGITAL PRINTS • MASTER CATALOGUE</text>
 </svg>`;
 
   res.setHeader('Content-Type', 'image/svg+xml');
