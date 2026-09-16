@@ -96,35 +96,14 @@ app.use(async (req, res, next) => {
 if (config.env === 'production') {
 	app.use('/v1/auth', authLimiter);
 }
-// v1 api routes
-app.use('/v1', routes);
-
 // Serve static uploads for Chat Image Mocks
 const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// send back a 404 error for any unknown api request
-app.use('/v1', (req, res, next) => {
-	next(new ApiError(httpStatus.NOT_FOUND, 'Not found'));
-});
-
-// Serve frontend website
-const fs = require('fs');
-let websiteDistPath = path.join(__dirname, '../../elite_edition_website_dist');
-if (!fs.existsSync(path.join(websiteDistPath, 'index.html'))) {
-  if (fs.existsSync(path.join(__dirname, '../elite_edition_website_dist/index.html'))) {
-    websiteDistPath = path.join(__dirname, '../elite_edition_website_dist');
-  } else if (fs.existsSync(path.join(__dirname, '../../elite_edition_website/dist/index.html'))) {
-    websiteDistPath = path.join(__dirname, '../../elite_edition_website/dist');
-  }
-}
-
-app.use(express.static(websiteDistPath));
-
-// Serve design images with automatic fallback generator for missing files
+// Serve design images under both /v1/designs and /designs with automatic fallback generator
 const imagesDir = path.join(__dirname, '../../elite_edition_images');
-app.use('/designs', express.static(imagesDir));
-app.use('/designs/:filename', (req, res) => {
+app.use(['/v1/designs', '/designs'], express.static(imagesDir));
+app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res) => {
   const filename = req.params.filename || '';
   const cleanName = filename.replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '').trim();
   const displayName = cleanName ? cleanName.toUpperCase() : 'DESIGN';
@@ -154,6 +133,14 @@ app.use('/designs/:filename', (req, res) => {
   res.setHeader('Content-Type', 'image/svg+xml');
   res.setHeader('Cache-Control', 'public, max-age=86400');
   res.send(svg);
+});
+
+// v1 api routes
+app.use('/v1', routes);
+
+// send back a 404 error for any unknown api request
+app.use('/v1', (req, res, next) => {
+	next(new ApiError(httpStatus.NOT_FOUND, 'Not found'));
 });
 
 // Serve frontend website with no-cache headers to ensure users always receive the latest version
