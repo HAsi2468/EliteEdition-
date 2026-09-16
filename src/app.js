@@ -103,9 +103,34 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Serve design images under both /v1/designs and /designs with automatic fallback generator
 const imagesDir = path.join(__dirname, '../../elite_edition_images');
 app.use(['/v1/designs', '/designs'], express.static(imagesDir));
-app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res) => {
+app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res, next) => {
   const filename = req.params.filename || '';
   const cleanName = filename.replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '').trim();
+  if (!cleanName) return next();
+
+  // Check if any matching photo file exists in imagesDir (e.g. ED-613 D.jpg, ED-613(1).jpg, ed-613.jpeg)
+  try {
+    const files = fs.readdirSync(imagesDir);
+    const targetUpper = cleanName.toUpperCase();
+    const matchedFile = files.find(f => {
+      if (f.startsWith('.')) return false;
+      const fBase = f.replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '').trim().toUpperCase();
+      return fBase === targetUpper ||
+             fBase.startsWith(targetUpper + ' ') ||
+             fBase.startsWith(targetUpper + '(') ||
+             fBase.startsWith(targetUpper + '-');
+    });
+
+    if (matchedFile) {
+      const fullPath = path.join(imagesDir, matchedFile);
+      if (fs.existsSync(fullPath) && fs.statSync(fullPath).size > 500) {
+        return res.sendFile(fullPath);
+      }
+    }
+  } catch (e) {
+    console.warn('Smart image lookup error:', e.message);
+  }
+
   const displayName = cleanName ? cleanName.toUpperCase() : 'DESIGN';
 
   let hash = 0;
