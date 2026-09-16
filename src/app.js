@@ -108,7 +108,10 @@ app.use(['/v1/designs', '/designs'], express.static(imagesDir, {
   }
 }));
 app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res, next) => {
-  const filename = req.params.filename || '';
+  const rawFilename = req.params.filename || '';
+  let filename = rawFilename;
+  try { filename = decodeURIComponent(rawFilename); } catch (e) {}
+  
   const cleanName = filename.replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '').trim();
   if (!cleanName) return next();
 

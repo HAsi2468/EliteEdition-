@@ -49,13 +49,15 @@ function convertDriveUrl(link, designName = '') {
     if (cleanPath.startsWith('/designs/')) {
       cleanPath = `/v1${cleanPath}`;
     }
-    return origin ? `${origin}${cleanPath}` : cleanPath;
+    const finalUrl = origin ? `${origin}${cleanPath}` : cleanPath;
+    return encodeURI(finalUrl);
   }
 
   // Handle bare design file names or ED- prefixes without path e.g. "ED-01.jpg" or "ED-708"
   if (!trimmed.startsWith('http') && !trimmed.startsWith('data:') && !trimmed.includes('/')) {
     const cleanPath = trimmed.includes('.') ? `${prefix}/${trimmed}` : `${prefix}/${trimmed}.jpg`;
-    return origin ? `${origin}${cleanPath}` : cleanPath;
+    const finalUrl = origin ? `${origin}${cleanPath}` : cleanPath;
+    return encodeURI(finalUrl);
   }
 
   // Handle Google Drive Links
@@ -78,10 +80,11 @@ function convertDriveUrl(link, designName = '') {
   }
 
   if (trimmed.startsWith('http')) {
-    return trimmed;
+    return encodeURI(trimmed);
   }
 
-  return origin ? `${origin}/${trimmed.replace(/^\//, '')}` : trimmed;
+  const finalUrl = origin ? `${origin}/${trimmed.replace(/^\//, '')}` : trimmed;
+  return encodeURI(finalUrl);
 }
 
 // Image compression helper
