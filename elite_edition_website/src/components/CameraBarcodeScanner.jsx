@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, CameraOff, RefreshCw, Volume2 } from 'lucide-react';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { Camera, CameraOff, RefreshCw, Volume2, Zap, ZapOff, CheckCircle2 } from 'lucide-react';
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 
 export default function CameraBarcodeScanner({ onScan, onClose }) {
@@ -8,17 +8,37 @@ export default function CameraBarcodeScanner({ onScan, onClose }) {
   const [cameraActive, setCameraActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [lastScannedCode, setLastScannedCode] = useState('');
-  const scannerRef = useRef(null);
+  const [cameras, setCameras] = useState([]);
+  const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
+  const [torchOn, setTorchOn] = useState(false);
+  const [hasTorchSupport, setHasTorchSupport] = useState(false);
+
   const html5QrcodeScannerRef = useRef(null);
   const lastScanTimeRef = useRef(0);
   const lastCodeRef = useRef('');
 
   const onScanRef = useRef(onScan);
-
-  // Keep ref updated on every render without triggering useEffect re-runs
   useEffect(() => {
     onScanRef.current = onScan;
   });
+
+  // Fetch available camera devices on mount
+  useEffect(() => {
+    Html5Qrcode.getCameras().then((devices) => {
+      if (devices && devices.length > 0) {
+        setCameras(devices);
+        // Prefer back/environment camera if identified by label
+        const backCamIdx = devices.findIndex(d => 
+          (d.label || '').toLowerCase().includes('back') || 
+          (d.label || '').toLowerCase().includes('rear') ||
+          (d.label || '').toLowerCase().includes('environment')
+        );
+        if (backCamIdx > -1) {
+          setSelectedCameraIndex(backCamIdx);
+        }
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -30,23 +50,56 @@ export default function CameraBarcodeScanner({ onScan, onClose }) {
         const viewportEl = document.getElementById(regionId);
         if (!viewportEl) return;
 
-        const html5Qrcode = new Html5Qrcode(regionId);
+        // Cleanup existing scanner instance if switching cameras
+        if (html5QrcodeScannerRef.current) {
+          try {
+            if (html5QrcodeScannerRef.current.isScanning) {
+              await html5QrcodeScannerRef.current.stop();
+            }
+            html5QrcodeScannerRef.current.clear();
+          } catch (e) {}
+        }
+
+        // Configure supported 1D & 2D barcode formats explicitly for fast detection
+        const formatsToSupport = [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODE_93,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.DATA_MATRIX,
+          Html5QrcodeSupportedFormats.ITF
+        ];
+
+        const html5Qrcode = new Html5Qrcode(regionId, {
+          formatsToSupport,
+          verbose: false,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true // Native GPU/NPU acceleration on mobile
+          }
+        });
         html5QrcodeScannerRef.current = html5Qrcode;
 
         const config = {
-          fps: 15,
+          fps: 20, // Increased frame rate for fast mobile capture
           qrbox: (viewfinderWidth, viewfinderHeight) => {
-            const minDim = Math.min(viewfinderWidth, viewfinderHeight);
-            return {
-              width: Math.floor(viewfinderWidth * 0.85),
-              height: Math.floor(Math.min(minDim * 0.7, 130))
-            };
+            const w = Math.floor(viewfinderWidth * 0.88);
+            const h = Math.floor(Math.min(viewfinderHeight * 0.65, 150));
+            return { width: Math.max(w, 220), height: Math.max(h, 100) };
           },
           aspectRatio: 1.777778
         };
 
+        // Determine camera target (device ID or facingMode environment)
+        const cameraTarget = (cameras.length > 0 && cameras[selectedCameraIndex]) 
+          ? cameras[selectedCameraIndex].id 
+          : { facingMode: 'environment' };
+
         await html5Qrcode.start(
-          { facingMode: 'environment' },
+          cameraTarget,
           config,
           (decodedText) => {
             const now = Date.now();
@@ -61,6 +114,13 @@ export default function CameraBarcodeScanner({ onScan, onClose }) {
             lastScanTimeRef.current = now;
             lastCodeRef.current = cleanText;
 
+            // Trigger haptic vibration feedback on mobile phones
+            try {
+              if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                navigator.vibrate(80);
+              }
+            } catch (e) {}
+
             if (isMounted) {
               setLastScannedCode(cleanText);
               playSuccessBeep();
@@ -69,24 +129,30 @@ export default function CameraBarcodeScanner({ onScan, onClose }) {
               }
             }
           },
-          (errorMessage) => {
-            // Frame scan failure - normal when no barcode present
+          () => {
+            // Frame scan failure - normal when no barcode present in frame
           }
         );
 
         if (isMounted) {
           setCameraActive(true);
+          // Check if torch/flashlight feature is available on current stream
+          try {
+            const track = html5Qrcode.getRunningTrack();
+            if (track && track.getCapabilities && track.getCapabilities().torch) {
+              setHasTorchSupport(true);
+            }
+          } catch (e) {}
         }
       } catch (err) {
         console.error('Camera initialization error:', err);
         if (isMounted) {
-          setErrorMsg('Camera access denied or unavailable. Please check permissions.');
+          setErrorMsg('Camera access denied or unavailable. Please check browser camera permissions.');
           playErrorBeep();
         }
       }
     };
 
-    // Small delay to ensure DOM container is attached before starting Html5Qrcode
     timer = setTimeout(() => {
       startScanner();
     }, 50);
@@ -104,45 +170,102 @@ export default function CameraBarcodeScanner({ onScan, onClose }) {
           } else {
             try { scanner.clear(); } catch (e) {}
           }
-        } catch (e) {
-          // ignore synchronous cleanup errors
-        }
+        } catch (e) {}
       }
     };
-  }, []); // Run ONLY ONCE on mount
+  }, [selectedCameraIndex, cameras]);
+
+  const handleToggleTorch = async () => {
+    const scanner = html5QrcodeScannerRef.current;
+    if (!scanner || !scanner.isScanning) return;
+    try {
+      const nextTorch = !torchOn;
+      await scanner.applyVideoConstraints({ advanced: [{ torch: nextTorch }] });
+      setTorchOn(nextTorch);
+    } catch (e) {
+      console.warn('Torch toggle failed:', e);
+    }
+  };
+
+  const handleSwitchCamera = () => {
+    if (cameras.length > 1) {
+      setSelectedCameraIndex((prev) => (prev + 1) % cameras.length);
+    }
+  };
 
   return (
     <div style={styles.scannerWrapper}>
+      {/* Header bar */}
       <div style={styles.topHeader}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
           <Camera size={16} color="#10b981" />
-          <span style={styles.headerTitle}>Mobile Camera Barcode Scanner</span>
-          <span style={styles.heightBadge}>30% Height View</span>
+          <span style={styles.headerTitle}>Mobile Barcode Scanner</span>
+          <span style={styles.statusBadge}>
+            {cameraActive ? '⚡ Live HD Scan' : 'Connecting...'}
+          </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {lastScannedCode && (
-            <div style={styles.lastScannedBadge}>
-              <Volume2 size={13} color="#10b981" />
-              <span>Scanned: {lastScannedCode}</span>
-            </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          {/* Torch / Flashlight Toggle */}
+          {hasTorchSupport && (
+            <button
+              onClick={handleToggleTorch}
+              style={{ ...styles.iconBtn, background: torchOn ? 'rgba(234, 179, 8, 0.25)' : 'rgba(255,255,255,0.08)', color: torchOn ? '#facc15' : '#94a3b8' }}
+              title="Toggle Flashlight / Torch"
+            >
+              {torchOn ? <Zap size={14} /> : <ZapOff size={14} />}
+            </button>
           )}
+
+          {/* Camera Switcher (if phone has multiple rear lenses) */}
+          {cameras.length > 1 && (
+            <button
+              onClick={handleSwitchCamera}
+              style={styles.iconBtn}
+              title={`Switch Camera (${selectedCameraIndex + 1}/${cameras.length})`}
+            >
+              <RefreshCw size={14} />
+            </button>
+          )}
+
+          {/* Close Scanner */}
           {onClose && (
-            <button onClick={onClose} style={styles.closeBtn} title="Close Camera">
-              <CameraOff size={15} />
+            <button onClick={onClose} style={styles.closeBtn} title="Close Camera Scanner">
+              <CameraOff size={14} />
             </button>
           )}
         </div>
       </div>
 
+      {/* Camera Viewport & Laser Scan Effect */}
       <div style={styles.cameraViewportContainer}>
         {errorMsg ? (
           <div style={styles.errorBox}>
-            <p style={{ margin: 0, fontSize: '0.85rem' }}>{errorMsg}</p>
+            <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600 }}>{errorMsg}</p>
+            <span style={{ fontSize: '0.75rem', opacity: 0.8, marginTop: '0.3rem', display: 'block' }}>
+              Ensure camera permissions are set to Allow in browser settings.
+            </span>
           </div>
         ) : (
-          <div id={regionId} style={styles.viewportRegion} />
+          <>
+            <div id={regionId} style={styles.viewportRegion} />
+            {/* Animated Laser Scanning Beam Effect */}
+            {cameraActive && (
+              <div className="barcode-laser-beam" />
+            )}
+          </>
         )}
       </div>
+
+      {/* Footer Scanned Code Banner */}
+      {lastScannedCode && (
+        <div style={styles.lastScannedBanner}>
+          <CheckCircle2 size={16} color="#10b981" />
+          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#ecfdf5' }}>
+            Scanned SKU: <span style={{ color: '#34d399', textDecoration: 'underline' }}>{lastScannedCode}</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -150,52 +273,52 @@ export default function CameraBarcodeScanner({ onScan, onClose }) {
 const styles = {
   scannerWrapper: {
     background: '#0f172a',
-    borderRadius: '10px',
-    border: '1px solid rgba(16, 185, 129, 0.3)',
+    borderRadius: '12px',
+    border: '1px solid rgba(16, 185, 129, 0.4)',
     overflow: 'hidden',
     marginBottom: '1rem',
-    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
+    boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.4), 0 0 15px rgba(16, 185, 129, 0.15)',
   },
   topHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '0.45rem 0.75rem',
+    padding: '0.5rem 0.85rem',
     background: '#1e293b',
     borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
   },
   headerTitle: {
-    fontSize: '0.8rem',
-    fontWeight: '600',
-    color: '#e2e8f0',
+    fontSize: '0.82rem',
+    fontWeight: '700',
+    color: '#f8fafc',
   },
-  heightBadge: {
-    fontSize: '0.68rem',
-    fontWeight: '600',
+  statusBadge: {
+    fontSize: '0.66rem',
+    fontWeight: '700',
     background: 'rgba(16, 185, 129, 0.15)',
     color: '#34d399',
-    padding: '0.15rem 0.4rem',
+    padding: '0.15rem 0.45rem',
     borderRadius: '4px',
     border: '1px solid rgba(16, 185, 129, 0.25)',
   },
-  lastScannedBadge: {
+  iconBtn: {
+    background: 'rgba(255, 255, 255, 0.08)',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
+    color: '#cbd5e1',
+    borderRadius: '6px',
+    padding: '0.3rem 0.5rem',
+    cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
-    gap: '0.3rem',
-    fontSize: '0.75rem',
-    fontWeight: '700',
-    color: '#34d399',
-    background: 'rgba(16, 185, 129, 0.15)',
-    padding: '0.2rem 0.5rem',
-    borderRadius: '6px',
-    border: '1px solid rgba(16, 185, 129, 0.3)',
+    justifyContent: 'center',
+    transition: 'all 0.15s ease',
   },
   closeBtn: {
-    background: 'rgba(239, 68, 68, 0.15)',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
-    color: '#f87171',
+    background: 'rgba(239, 68, 68, 0.18)',
+    border: '1px solid rgba(239, 68, 68, 0.35)',
+    color: '#fca5a5',
     borderRadius: '6px',
-    padding: '0.25rem 0.45rem',
+    padding: '0.3rem 0.55rem',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -203,9 +326,9 @@ const styles = {
   cameraViewportContainer: {
     position: 'relative',
     width: '100%',
-    height: '30vh',
-    minHeight: '180px',
-    maxHeight: '220px',
+    height: '32vh',
+    minHeight: '200px',
+    maxHeight: '260px',
     overflow: 'hidden',
     background: '#000000',
     display: 'flex',
@@ -217,8 +340,19 @@ const styles = {
     height: '100%',
   },
   errorBox: {
-    padding: '1rem',
+    padding: '1.5rem 1rem',
     color: '#fca5a5',
     textAlign: 'center',
+    background: 'rgba(239, 68, 68, 0.1)',
+  },
+  lastScannedBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.45rem',
+    padding: '0.5rem 0.85rem',
+    background: 'rgba(16, 185, 129, 0.18)',
+    borderTop: '1px solid rgba(16, 185, 129, 0.3)',
   }
 };
+

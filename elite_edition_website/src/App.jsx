@@ -18,6 +18,7 @@ import CommunicationPanel from './components/CommunicationPanel';
 import TaskManagerPanel from './components/TaskManagerPanel';
 import EliteModalDialog from './components/EliteModalDialog';
 import CompanySettingsPanel from './components/CompanySettingsPanel';
+import { matchSkuOrBrandCode } from './utils/skuHelper';
 import EliteBillingDepartment from './components/EliteBillingDepartment';
 import CompanyDevelopmentWorkspace from './components/CompanyDevelopmentWorkspace';
 import DigitalPrintComplainModule from './components/DigitalPrintComplainModule';
@@ -214,12 +215,15 @@ export default function App() {
     if (!currentUser) return false;
     if (currentUser.role === 'admin' || currentUser.isMainAdmin || currentUser.email === 'harshitsidapara2468@gmail.com') return true;
     if (Array.isArray(currentUser.allowedCompanies) && currentUser.allowedCompanies.length > 0) {
+      if (companyName === 'EON' || companyName === 'Elite Online') {
+        return currentUser.allowedCompanies.includes('EON') || currentUser.allowedCompanies.includes('Elite Online');
+      }
       return currentUser.allowedCompanies.includes(companyName);
     }
     return true;
   };
 
-  const hasEliteEditionAccess = !currentUser || currentUser.role === 'admin' || isCompanyAllowed('Elite Online') || (currentUser.permissions && currentUser.permissions.some(p => ELITE_ONLINE_PERMISSIONS.includes(p)));
+  const hasEliteEditionAccess = !currentUser || currentUser.role === 'admin' || isCompanyAllowed('EON') || (currentUser.permissions && currentUser.permissions.some(p => ELITE_ONLINE_PERMISSIONS.includes(p)));
   const hasDigitalPrintAccess = !currentUser || currentUser.role === 'admin' || isCompanyAllowed('Elite Digital Print') || (currentUser.permissions && currentUser.permissions.some(p => (EDP_PERMISSIONS.includes(p) || p.startsWith('jobcards')) && !p.startsWith('stitching_')));
   const hasStitchingAccess = !currentUser || currentUser.role === 'admin' || isCompanyAllowed('Elite Stitching') || (currentUser.permissions && currentUser.permissions.some(p => STITCHING_PERMISSIONS.includes(p) || p.startsWith('stitching_')));
   const hasWorkspaceAccess = !currentUser || currentUser.role === 'admin' || !currentUser.permissions || currentUser.permissions.length === 0 || currentUser.permissions.includes('workspace');
@@ -395,6 +399,7 @@ export default function App() {
   // Modal states
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [formMode, setFormMode] = useState('inventory'); // 'inventory' or 'catalog'
   const [isStockOutOpen, setIsStockOutOpen] = useState(false);
   const [stockOutItem, setStockOutItem] = useState(null);
   const [isManagerOpen, setIsManagerOpen] = useState(false);
@@ -424,7 +429,7 @@ export default function App() {
       fetchData();
       const intervalId = setInterval(() => {
         fetchData();
-      }, 10000); // 10s auto-sync
+      }, 60000); // 60s auto-sync fallback (real-time updates handled via Socket.io)
 
       const handleDataRefresh = () => {
         fetchData();
@@ -519,7 +524,7 @@ export default function App() {
       const [inventoryResult, catalogResult, salesResult, partiesResult, userResult] = await Promise.allSettled([
         api.getInventory(),
         api.getProductsCatalog(),
-        api.getSales({ limit: 1000 }),
+        api.getSales({ limit: 200 }),
         api.getParties(),
         api.refreshCurrentUser(),
       ]);
@@ -583,34 +588,65 @@ export default function App() {
     }
   };
 
+  // Ensure missing SKU is saved to Master Product Catalog
+  const ensureSkuSavedToCatalog = async (itemOrData) => {
+    try {
+      const skuCode = (itemOrData.skuCode || '').trim();
+      if (!skuCode) return;
+
+      const existsInCatalog = catalogItems.some(c => 
+        (c.skuCode && c.skuCode.trim().toLowerCase() === skuCode.toLowerCase()) ||
+        matchSkuOrBrandCode(c, skuCode)
+      );
+
+      if (!existsInCatalog) {
+        const catPayload = {
+          skuCode: skuCode,
+          description: itemOrData.itemName || itemOrData.description || skuCode,
+          brand: itemOrData.party || itemOrData.brand || 'ELITE EDITION',
+          size: itemOrData.size || '',
+          basePrice: Number(itemOrData.purchasePrice ?? itemOrData.basePrice) || 0.0,
+          price: Number(itemOrData.salePrice ?? itemOrData.price) || 0.0,
+          imageUrl: itemOrData.imageUrl || '',
+          categoryName: itemOrData.categoryName || 'KURTA SET',
+          hsnCode: itemOrData.hsnCode || '',
+          brandCodes: itemOrData.brandCodes || [],
+        };
+        const newCat = await api.createProductCatalog(catPayload).catch(err => null);
+        if (newCat) {
+          setCatalogItems(prev => [newCat, ...prev]);
+        }
+      }
+    } catch (e) {
+      console.warn('ensureSkuSavedToCatalog error:', e);
+    }
+  };
+
   // CRUD Handler Functions
   const handleAddSubmit = async (formData) => {
     setLoading(true);
     try {
-      if (activeTab === 'catalog') {
-        const payload = {
-          skuCode: formData.skuCode,
-          description: formData.itemName || formData.description,
-          brand: formData.party || formData.brand,
-          size: formData.size,
-          basePrice: formData.purchasePrice ?? formData.basePrice,
-          price: formData.salePrice ?? formData.price,
-          imageUrl: formData.imageUrl,
-          categoryName: formData.categoryName || '',
-          hsnCode: formData.hsnCode || '',
-          brandCodes: formData.brandCodes || [],
-        };
-        const newProduct = await api.createProductCatalog(payload);
-        setCatalogItems(prev => [newProduct, ...prev]);
-      } else if (activeTab === 'inventory') {
-        const newItem = await api.createInventory(formData);
-        setItems(prev => [newItem, ...prev]);
+      const payload = {
+        skuCode: formData.skuCode,
+        description: formData.itemName || formData.description || formData.skuCode,
+        brand: formData.party || formData.brand || 'ELITE EDITION',
+        size: formData.size,
+        basePrice: Number(formData.purchasePrice ?? formData.basePrice) || 0.0,
+        price: Number(formData.salePrice ?? formData.price) || 0.0,
+        imageUrl: formData.imageUrl || '',
+        categoryName: formData.categoryName || 'KURTA SET',
+        hsnCode: formData.hsnCode || '',
+        brandCodes: formData.brandCodes || [],
+      };
+      const newProduct = await api.createProductCatalog(payload);
+      if (newProduct) {
+        setCatalogItems(prev => [newProduct, ...prev.filter(c => c._id !== newProduct._id && c.skuCode !== newProduct.skuCode)]);
       }
       setIsFormOpen(false);
       triggerGlobalDataRefresh();
       await fetchData();
     } catch (err) {
-      alert(err.message || 'Failed to create item.');
+      alert(err.message || 'Failed to create product in catalog.');
     } finally {
       setLoading(false);
       restoreSavedScrollPos();
@@ -698,6 +734,11 @@ export default function App() {
     setLoading(true);
     try {
       const res = await api.bulkInward(parsedItems);
+      if (Array.isArray(parsedItems)) {
+        for (const item of parsedItems) {
+          await ensureSkuSavedToCatalog(item);
+        }
+      }
       alert(res.message || 'Bulk inward completed successfully!');
       setIsBulkInwardOpen(false);
       triggerGlobalDataRefresh();
@@ -750,31 +791,44 @@ export default function App() {
     setIsStockOutOpen(true);
   };
 
-  const triggerAddModal = () => {
+  const triggerAddModal = (targetMode) => {
     savedModalScrollRef.current = window.scrollY || document.documentElement.scrollTop || 0;
     setEditingItem(null);
+    const resolvedMode = (targetMode === 'catalog' || targetMode === 'inventory')
+      ? targetMode
+      : (activeTab === 'catalog' ? 'catalog' : 'inventory');
+    setFormMode(resolvedMode);
     setIsFormOpen(true);
   };
 
   const triggerEditModal = (item) => {
     savedModalScrollRef.current = window.scrollY || document.documentElement.scrollTop || 0;
-    if (activeTab === 'catalog') {
+    const titleOrDescription = item.description || item.itemName || item.name || item.title || item.productName || item.skuCode || '';
+    const isCatalog = activeTab === 'catalog' || catalogItems.some(c => c._id === item._id) || 'basePrice' in item;
+    setFormMode(isCatalog ? 'catalog' : 'inventory');
+    if (isCatalog) {
       const adapted = {
         _id: item._id,
-        itemName: item.description || '',
-        party: item.brand || 'Uniware',
+        itemName: titleOrDescription,
+        description: titleOrDescription,
+        party: item.brand || item.party || 'ANOUK',
+        brand: item.brand || item.party || 'ANOUK',
         size: Array.isArray(item.size) ? item.size.join(', ') : item.size || '',
-        purchasePrice: item.basePrice || 0.0,
-        salePrice: item.price || 0.0,
-        skuCode: item.skuCode || '',
+        purchasePrice: item.basePrice ?? item.purchasePrice ?? 0.0,
+        salePrice: item.price ?? item.salePrice ?? 0.0,
+        skuCode: item.skuCode || item.sku || '',
         imageUrl: item.imageUrl || '',
-        currentlyAvailableStock: item.inventorySnapshots?.inventory || 0,
-        qty: item.inventorySnapshots?.inventory || 0,
+        currentlyAvailableStock: item.inventorySnapshots?.inventory ?? item.currentlyAvailableStock ?? item.qty ?? 0,
+        qty: item.inventorySnapshots?.inventory ?? item.currentlyAvailableStock ?? item.qty ?? 0,
         brandCodes: item.brandCodes || [],
       };
       setEditingItem(adapted);
     } else {
-      setEditingItem(item);
+      setEditingItem({
+        ...item,
+        itemName: titleOrDescription,
+        description: titleOrDescription,
+      });
     }
     setIsFormOpen(true);
   };
@@ -1877,6 +1931,7 @@ export default function App() {
       {isFormOpen && (
         <InventoryForm
           item={editingItem}
+          isCatalog={formMode === 'catalog'}
           onSubmit={editingItem ? handleEditSubmit : handleAddSubmit}
           onClose={() => {
             setIsFormOpen(false);

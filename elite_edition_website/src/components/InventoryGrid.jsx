@@ -1570,7 +1570,7 @@ export default function InventoryGrid({
       {activeSubTab === 'catalog' && (
         <ProductCatalogGrid
           items={catalogItems}
-          onAdd={onAdd}
+          onAdd={() => onAdd && onAdd('catalog')}
           onEdit={onEdit}
           onDelete={onDelete}
           onSync={onSyncCatalog}

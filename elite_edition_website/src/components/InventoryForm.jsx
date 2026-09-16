@@ -4,7 +4,7 @@ import { X, Sparkles, Layers, Tag, Building2, Barcode, DollarSign, Image as Imag
 import { api } from '../services/api';
 import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
 
-export default function InventoryForm({ item, onSubmit, onClose }) {
+export default function InventoryForm({ item, isCatalog = true, onSubmit, onClose }) {
   const scrollPosRef = useRef(0);
 
   useEffect(() => {
@@ -439,13 +439,17 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
           <div style={styles.headerTitleGroup}>
             <div style={styles.badge}>
               <Sparkles size={14} style={{ marginRight: '6px' }} />
-              PRODUCT MASTER MANAGEMENT
+              {isCatalog ? 'PRODUCT CATALOG MANAGEMENT' : 'STOCK INVENTORY MANAGEMENT'}
             </div>
             <h2 style={styles.title}>
-              {item ? 'Edit Product Details' : 'Add New Product to Catalog'}
+              {item 
+                ? (isCatalog ? 'Edit Product Catalog Details' : 'Edit Stock Item') 
+                : (isCatalog ? 'Add New Product to Catalog' : 'Add Stock Item to Inventory')}
             </h2>
             <p style={styles.subtitle}>
-              Manage product SKU, brand, category, description, sizes, pricing, and image URL.
+              {isCatalog 
+                ? 'Manage product SKU, brand, category, description, sizes, pricing, and image URL in Product Catalog.' 
+                : 'Record physical stock inward/inventory level in your warehouse Stock Overview.'}
             </p>
           </div>
           <button type="button" onClick={handleModalClose} style={styles.closeBtn} title="Close Form">

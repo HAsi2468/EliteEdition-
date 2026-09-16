@@ -756,5 +756,72 @@ body {
   }
 }
 
+/* ═══════════════════════════════════════════════════
+   BARCODE LASER SCANNER BEAM & MOBILE PHONE STYLING
+   ═══════════════════════════════════════════════════ */
+.barcode-laser-beam {
+  position: absolute;
+  top: 15%;
+  left: 5%;
+  width: 90%;
+  height: 3px;
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0) 0%, #34d399 50%, rgba(16, 185, 129, 0) 100%);
+  box-shadow: 0 0 15px #10b981, 0 0 5px #34d399;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 10;
+  animation: laserScanMove 2s infinite ease-in-out;
+}
+
+@keyframes laserScanMove {
+  0% { top: 15%; opacity: 0.9; }
+  50% { top: 80%; opacity: 1; }
+  100% { top: 15%; opacity: 0.9; }
+}
+
+/* Html5Qrcode video canvas container responsive overrides */
+#reader-camera-scanner-viewport video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 8px !important;
+}
+
+#reader-camera-scanner-viewport canvas {
+  display: none !important;
+}
+
+/* Mobile Phone UI Optimizations (max-width: 768px) */
+@media (max-width: 768px) {
+  body {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .app-header {
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  button, input, select, textarea {
+    font-size: 15px !important;
+  }
+
+  .modal-dialog, .modal-content, [role="dialog"] {
+    max-width: 96vw !important;
+    margin: 0.5rem auto !important;
+    border-radius: 16px !important;
+  }
+
+  /* Improve mobile table horizontal scrolling touch UX */
+  .table-responsive, table {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Barcode Scanner modal viewport on mobile phones */
+  #reader-camera-scanner-viewport {
+    min-height: 220px !important;
+  }
+}
+
 
 

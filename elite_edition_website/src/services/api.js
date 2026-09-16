@@ -309,7 +309,7 @@ export const api = {
 
   // Products Catalog
   async getProductsCatalog() {
-    return request('/products/list?limit=2000');
+    return request('/products/list?limit=10000');
   },
 
   async createProductCatalog(data) {

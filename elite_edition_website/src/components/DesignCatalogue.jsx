@@ -15,26 +15,50 @@ import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import PKDOrdersImportModal from './PKDOrdersImportModal';
 import DesignMaster from './DesignMaster';
 
-// Copy convertDriveUrl helper
-function convertDriveUrl(link) {
-  if (!link || !link.trim()) return '';
+function convertDriveUrl(link, designName = '') {
+  const getOrigin = () => {
+    const baseUrl = getBaseUrl();
+    if (baseUrl && baseUrl.startsWith('http')) {
+      try { return new URL(baseUrl).origin; } catch (e) {}
+    }
+    if (typeof window !== 'undefined') {
+      const hn = window.location.hostname;
+      if ((hn === 'localhost' || hn === '127.0.0.1') && window.location.port && window.location.port !== '3001') {
+        return `${window.location.protocol}//${hn}:3001`;
+      }
+      return window.location.origin;
+    }
+    return '';
+  };
+
+  const origin = getOrigin();
+  const prefix = '/v1/designs';
+
+  if (!link || !link.trim()) {
+    if (designName) {
+      return origin ? `${origin}${prefix}/${designName}.jpg` : `${prefix}/${designName}.jpg`;
+    }
+    return '';
+  }
   const trimmed = link.trim();
   if (trimmed.startsWith('data:')) return trimmed;
 
-  // Handle local uploaded files e.g. "uploads/chat-123.jpg" or "/uploads/chat-123.jpg"
-  if (trimmed.includes('uploads/')) {
-    const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-    const baseUrl = getBaseUrl();
-    if (baseUrl && baseUrl.startsWith('http')) {
-      try {
-        const url = new URL(baseUrl);
-        return `${url.origin}${cleanPath}`;
-      } catch (e) {}
+  // Handle local uploaded files e.g. "uploads/chat-123.jpg" or "/designs/ED-01.jpg"
+  if (trimmed.includes('uploads/') || trimmed.includes('designs/')) {
+    let cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    if (cleanPath.startsWith('/designs/')) {
+      cleanPath = `/v1${cleanPath}`;
     }
-    return cleanPath;
+    return origin ? `${origin}${cleanPath}` : cleanPath;
   }
 
-  // Handle Google Drive Links - extract File ID & use high-res CORS-free thumbnail endpoint
+  // Handle bare design file names or ED- prefixes without path e.g. "ED-01.jpg" or "ED-708"
+  if (!trimmed.startsWith('http') && !trimmed.startsWith('data:') && !trimmed.includes('/')) {
+    const cleanPath = trimmed.includes('.') ? `${prefix}/${trimmed}` : `${prefix}/${trimmed}.jpg`;
+    return origin ? `${origin}${cleanPath}` : cleanPath;
+  }
+
+  // Handle Google Drive Links
   if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
     let fileId = '';
     const dMatch = trimmed.match(/\/d\/([-\w]{20,})/);
@@ -57,7 +81,7 @@ function convertDriveUrl(link) {
     return trimmed;
   }
 
-  return trimmed;
+  return origin ? `${origin}/${trimmed.replace(/^\//, '')}` : trimmed;
 }
 
 // Image compression helper
@@ -350,6 +374,7 @@ function DesignImageField({ label, name, value, onChange, placeholder }) {
 export default function DesignCatalogue({ department, initialSubTab = 'catalogue' }) {
   const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
   const [designs, setDesigns] = useState([]);
+  const [failedImages, setFailedImages] = useState(new Set());
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -990,8 +1015,8 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
             {designs
               .filter(d => matchSearchQuery(d, search, ['designNo', 'designName', 'category', 'colors', 'fabric', 'partyName', 'notes']))
               .map(d => {
-              const mainImg = convertDriveUrl(d.imageUrl);
-              const subImg = convertDriveUrl(d.imageUrl2);
+              const mainImg = convertDriveUrl(d.imageUrl, d.designName);
+              const subImg = convertDriveUrl(d.imageUrl2, d.designName ? `${d.designName}-2` : '');
 
               return (
                 <div
@@ -1047,37 +1072,76 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                       marginTop: '1.25rem'
                     }}
                   >
-                    {mainImg ? (
+                    {mainImg && !failedImages.has(d._id) ? (
                       <img
                         src={mainImg}
-                        alt={d.designName}
                         style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
-                        onClick={() => setZoomImg(mainImg)}
+                        onClick={(evt) => setZoomImg(evt.target.src || mainImg)}
                         onError={(e) => {
-                          if (d.imageUrl && !e.target.dataset.retried) {
-                            e.target.dataset.retried = 'true';
-                            if (d.imageUrl.startsWith('data:')) {
-                              e.target.src = d.imageUrl;
-                            } else if (d.imageUrl.includes('drive.google.com')) {
-                              const fileMatch = d.imageUrl.match(/([-\w]{25,})/);
-                              if (fileMatch) e.target.src = `https://drive.google.com/uc?export=view&id=${fileMatch[1]}`;
+                          const step = parseInt(e.target.dataset.fallbackStep || '0', 10);
+                          const getOrigin = () => {
+                            const baseUrl = getBaseUrl();
+                            if (baseUrl && baseUrl.startsWith('http')) {
+                              try { return new URL(baseUrl).origin; } catch (err) {}
+                            }
+                            if (typeof window !== 'undefined') {
+                              const hn = window.location.hostname;
+                              if ((hn === 'localhost' || hn === '127.0.0.1') && window.location.port && window.location.port !== '3001') {
+                                return `${window.location.protocol}//${hn}:3001`;
+                              }
+                              return window.location.origin;
+                            }
+                            return '';
+                          };
+                          const prefix = '/v1/designs';
+
+                          if (step === 0 && cleanName) {
+                            e.target.dataset.fallbackStep = '1';
+                            e.target.src = origin ? `${origin}${prefix}/${cleanName}.jpg` : `${prefix}/${cleanName}.jpg`;
+                          } else if (step === 1 && cleanName) {
+                            e.target.dataset.fallbackStep = '2';
+                            e.target.src = origin ? `${origin}${prefix}/${cleanName}.jpeg` : `${prefix}/${cleanName}.jpeg`;
+                          } else if (step === 2 && cleanName) {
+                            e.target.dataset.fallbackStep = '3';
+                            e.target.src = origin ? `${origin}${prefix}/${cleanName}.png` : `${prefix}/${cleanName}.png`;
+                          } else if (step === 3 && d.imageUrl && d.imageUrl.includes('drive.google.com')) {
+                            e.target.dataset.fallbackStep = '4';
+                            const fileMatch = d.imageUrl.match(/([-\w]{25,})/);
+                            if (fileMatch) e.target.src = `https://drive.google.com/uc?export=view&id=${fileMatch[1]}`;
+                            else {
+                              setFailedImages(prev => new Set(prev).add(d._id));
                             }
                           } else {
-                            e.target.style.display = 'none';
-                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                            setFailedImages(prev => new Set(prev).add(d._id));
                           }
                         }}
                       />
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'var(--text-muted)', gap: '0.4rem' }}>
-                        <Image size={24} style={{ opacity: 0.3 }} />
-                        <span style={{ fontSize: '0.7rem' }}>No Design Image</span>
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '100%',
+                        height: '100%',
+                        background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%)',
+                        color: 'var(--text-muted)',
+                        gap: '0.45rem',
+                        padding: '1rem',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{
+                          width: 42, height: 42, borderRadius: 10,
+                          background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8',
+                          boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
+                        }}>
+                          <Image size={22} />
+                        </div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.02em' }}>{d.designName}</span>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', opacity: 0.8, fontWeight: 500 }}>No Image Uploaded</span>
                       </div>
                     )}
-                    <div style={{ display: 'none', position: 'absolute', inset: 0, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#000', color: 'var(--text-muted)', gap: '0.4rem' }}>
-                      <Image size={24} style={{ opacity: 0.3 }} />
-                      <span style={{ fontSize: '0.7rem', padding: '0.5rem', textAlign: 'center' }}>⚠️ Unable to load image link</span>
-                    </div>
 
                     {/* Small Sub image thumbnail inside card if available */}
                     {subImg && (

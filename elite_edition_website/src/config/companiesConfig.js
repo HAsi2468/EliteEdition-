@@ -6,15 +6,15 @@
 export const COMPANIES = [
   {
     id: 'elite_online',
-    code: 'EO',
-    name: 'Elite Online',
+    code: 'EON',
+    name: 'EON',
     type: 'E-Commerce Store & Operations',
     iconName: 'Store',
     defaultTab: 'dashboard',
     badgeColor: '#6366f1',
     iconColor: '#6366f1',
     gradient: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-    description: 'Online store inventory, catalog, sales orders & return management.'
+    description: 'EON store inventory, catalog, sales orders & return management.'
   },
   {
     id: 'digital_print',
