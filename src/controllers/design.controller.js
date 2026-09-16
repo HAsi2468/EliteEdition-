@@ -24,6 +24,7 @@ const getAll = async (req, res) => {
       if (!filter.category) {
         filter.category = { $ne: 'Stitching' };
       }
+      filter.designName = { $regex: '^ED-', $options: 'i' };
     }
 
     if (search) {

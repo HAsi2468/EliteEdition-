@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Sparkles, Layers, Tag, Building2, Barcode, DollarSign, Image as ImageIcon, CheckCircle, FileCode, Plus } from 'lucide-react';
+import { X, Sparkles, Layers, Tag, Building2, Barcode, DollarSign, Image as ImageIcon, CheckCircle, FileCode, Plus, Search, AlertTriangle } from 'lucide-react';
 import { api } from '../services/api';
-import { extractSizeFromSku } from '../utils/skuHelper';
+import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
 
 export default function InventoryForm({ item, onSubmit, onClose }) {
   const scrollPosRef = useRef(0);
@@ -56,6 +56,8 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
   const [vendorsList, setVendorsList] = useState([]);
   const [catalogItems, setCatalogItems] = useState([]);
   const [imageError, setImageError] = useState(false);
+  const [isFetchingUniware, setIsFetchingUniware] = useState(false);
+  const [uniwareSearchStatus, setUniwareSearchStatus] = useState(null);
 
   // Dynamic Brand-Wise Barcodes / SKU Codes for multi-brand selling
   const [brandCodes, setBrandCodes] = useState([]);
@@ -82,11 +84,30 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
         ? item.size.join(', ') 
         : (item.size || '');
 
+      const sku = item.skuCode || item.sku || '';
+      let titleOrName = item.description || item.itemName || item.name || item.title || item.productName || '';
+
+      // If title is missing, search in catalogItems reference data for matching SKU description
+      if (!titleOrName && sku && catalogItems && catalogItems.length > 0) {
+        const catMatch = catalogItems.find(c => matchSkuOrBrandCode(c, sku));
+        if (catMatch) {
+          titleOrName = catMatch.description || catMatch.itemName || catMatch.name || '';
+        }
+      }
+
+      // Final fallback to SKU code so field is never empty when editing
+      if (!titleOrName && sku) {
+        titleOrName = sku;
+      }
+
+      const brandOrParty = item.brand || item.party || 'ANOUK';
+      const category = item.categoryName || item.category || 'KURTA SET';
+
       setFormData({
-        skuCode: item.skuCode || '',
-        itemName: item.description || item.itemName || '',
-        party: item.brand || item.party || 'ANOUK',
-        categoryName: item.categoryName || 'KURTA SET',
+        skuCode: sku,
+        itemName: titleOrName,
+        party: brandOrParty,
+        categoryName: category,
         size: formattedSize,
         purchasePrice: item.basePrice ?? item.purchasePrice ?? 0.0,
         salePrice: item.price ?? item.salePrice ?? 0.0,
@@ -99,11 +120,11 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
       const rawBrandCodes = Array.isArray(item.brandCodes) ? item.brandCodes : [];
       const normalizedBrandCodes = rawBrandCodes.map(bc => {
         if (typeof bc === 'string') {
-          return { brand: item.brand || item.party || 'ANOUK', code: bc, size: formattedSize };
+          return { brand: brandOrParty, code: bc, size: formattedSize };
         }
         if (bc && typeof bc === 'object') {
           return {
-            brand: bc.brand || item.brand || item.party || 'ANOUK',
+            brand: bc.brand || brandOrParty,
             code: bc.code || '',
             size: bc.size || formattedSize
           };
@@ -113,7 +134,7 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
 
       setBrandCodes(normalizedBrandCodes);
     }
-  }, [item]);
+  }, [item, catalogItems]);
 
   const handleAddBrandCodeRow = () => {
     setBrandCodes(prev => [...prev, { brand: 'ANOUK', code: '' }]);
@@ -129,6 +150,110 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
       updated[idx] = { ...updated[idx], [field]: value };
       return updated;
     });
+  };
+
+  // Fetch / Auto-Fill details from Uniware catalog by SKU code
+  const handleFetchUniwareDetails = async () => {
+    const rawSku = (formData.skuCode || '').trim();
+    if (!rawSku) {
+      setUniwareSearchStatus({
+        type: 'warning',
+        message: '⚠️ Please enter SKU Code or scan barcode first.',
+      });
+      return;
+    }
+
+    setIsFetchingUniware(true);
+    setUniwareSearchStatus(null);
+    setImageError(false);
+
+    try {
+      let currentCatalog = catalogItems;
+      if (!currentCatalog || currentCatalog.length === 0) {
+        currentCatalog = await api.getProductsCatalog().catch(() => []);
+        setCatalogItems(currentCatalog);
+      }
+
+      let matchedCatalog = currentCatalog.find(c => matchSkuOrBrandCode(c, rawSku));
+
+      if (!matchedCatalog) {
+        const freshCatalog = await api.getProductsCatalog().catch(() => []);
+        if (freshCatalog && freshCatalog.length > 0) {
+          setCatalogItems(freshCatalog);
+          matchedCatalog = freshCatalog.find(c => matchSkuOrBrandCode(c, rawSku));
+        }
+      }
+
+      if (!matchedCatalog && currentCatalog) {
+        const queryUpper = rawSku.toUpperCase();
+        matchedCatalog = currentCatalog.find(c => {
+          const sCode = (c.skuCode || c.itemSKUCode || '').toUpperCase();
+          if (sCode === queryUpper || queryUpper.startsWith(sCode) || sCode.startsWith(queryUpper)) return true;
+          if (Array.isArray(c.brandCodes)) {
+            return c.brandCodes.some(bc => (bc.code || '').toUpperCase() === queryUpper);
+          }
+          return false;
+        });
+      }
+
+      if (matchedCatalog) {
+        const baseCatalogSku = (matchedCatalog.skuCode || rawSku).trim();
+        const extractedSize = extractSizeFromSku(rawSku) || (Array.isArray(matchedCatalog.size) ? matchedCatalog.size[0] : matchedCatalog.size) || '';
+
+        let masterSku = baseCatalogSku;
+        const catExtractedSize = extractSizeFromSku(baseCatalogSku);
+        if (!catExtractedSize && extractedSize && !baseCatalogSku.includes(`_${extractedSize}`)) {
+          masterSku = `${baseCatalogSku}_${extractedSize}`;
+        }
+
+        const formattedSize = Array.isArray(matchedCatalog.size)
+          ? matchedCatalog.size.join(', ')
+          : (matchedCatalog.size || extractedSize || '');
+
+        setFormData(prev => ({
+          ...prev,
+          skuCode: masterSku,
+          itemName: matchedCatalog.description || matchedCatalog.itemName || matchedCatalog.name || prev.itemName,
+          party: matchedCatalog.brand || matchedCatalog.party || prev.party,
+          categoryName: matchedCatalog.categoryName || matchedCatalog.category || prev.categoryName,
+          size: formattedSize || prev.size,
+          purchasePrice: matchedCatalog.basePrice ?? matchedCatalog.purchasePrice ?? prev.purchasePrice,
+          salePrice: matchedCatalog.price ?? matchedCatalog.salePrice ?? prev.salePrice,
+          hsnCode: matchedCatalog.hsnCode || prev.hsnCode,
+          imageUrl: matchedCatalog.imageUrl || prev.imageUrl,
+        }));
+
+        if (Array.isArray(matchedCatalog.brandCodes) && matchedCatalog.brandCodes.length > 0) {
+          setBrandCodes(matchedCatalog.brandCodes);
+        }
+
+        const foundBrand = matchedCatalog.brand || matchedCatalog.party || 'Uniware';
+        setUniwareSearchStatus({
+          type: 'success',
+          message: `✅ Found & auto-filled details for "${foundBrand}" SKU: ${masterSku}`,
+        });
+      } else {
+        const extractedSize = extractSizeFromSku(rawSku);
+        if (extractedSize) {
+          setFormData(prev => ({
+            ...prev,
+            size: prev.size || extractedSize,
+          }));
+        }
+        setUniwareSearchStatus({
+          type: 'warning',
+          message: `⚠️ SKU "${rawSku}" not found in Uniware catalog. You can manually enter details.`,
+        });
+      }
+    } catch (err) {
+      console.error('Uniware fetch error:', err);
+      setUniwareSearchStatus({
+        type: 'warning',
+        message: '⚠️ Error fetching Uniware details. Please check network connection.',
+      });
+    } finally {
+      setIsFetchingUniware(false);
+    }
   };
 
   // Handle Input Changes
@@ -239,21 +364,72 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
       qty: Number(formData.currentlyAvailableStock) || 0,
     };
 
+    // Auto-save product to Catalog database if SKU is not in catalog
+    const cleanSku = formData.skuCode.trim();
+    const existsInCatalog = catalogItems.some(c => 
+      (c.skuCode && c.skuCode.trim().toLowerCase() === cleanSku.toLowerCase()) ||
+      matchSkuOrBrandCode(c, cleanSku)
+    );
+
+    if (!existsInCatalog && cleanSku) {
+      const catPayload = {
+        skuCode: cleanSku,
+        description: formData.itemName || cleanSku,
+        brand: primaryBrand,
+        size: formData.size,
+        basePrice: Number(formData.purchasePrice) || 0.0,
+        price: Number(formData.salePrice) || 0.0,
+        imageUrl: formData.imageUrl || '',
+        categoryName: formData.categoryName || '',
+        hsnCode: formData.hsnCode || '',
+        brandCodes: validBrandCodes,
+      };
+      api.createProductCatalog(catPayload).catch(err => {
+        console.warn('Auto catalog save notice:', err.message);
+      });
+    }
+
     onSubmit(payload);
   };
 
-  // Managed brands array for datalist dropdown
-  const managedBrands = (() => {
+  // Managed brands array for dropdown selection - synchronized with Brand Manager
+  const [managedBrands, setManagedBrands] = useState(() => {
     try {
       const saved = localStorage.getItem('elite_managed_brands');
-      const custom = saved ? JSON.parse(saved) : ['ANOUK', 'ELITE EDITION', 'HERA', 'MYNTRA'];
-      const catBrands = catalogItems.map(c => c.brand).filter(Boolean);
-      const vBrands = vendorsList.map(v => v.businessName || v.name).filter(Boolean);
-      return Array.from(new Set([...custom, ...catBrands, ...vBrands])).sort();
+      const defaultBrands = ['ANOUK', 'EON', 'ELITE EDITION', 'HERA', 'KALINI', 'MYNTRA', 'SANGRIA'];
+      const savedBrands = saved ? JSON.parse(saved) : defaultBrands;
+      const catBrands = (catalogItems || [])
+        .map(c => (c.brand || c.party || '').trim().toUpperCase())
+        .filter(b => b && b !== 'ALL');
+      const setOfBrands = new Set([...defaultBrands, ...savedBrands, ...catBrands]);
+      return Array.from(setOfBrands).map(b => b.trim().toUpperCase()).filter(Boolean).sort();
     } catch (e) {
-      return ['ANOUK', 'ELITE EDITION', 'HERA', 'MYNTRA'];
+      return ['ANOUK', 'EON', 'ELITE EDITION', 'HERA', 'KALINI', 'MYNTRA', 'SANGRIA'];
     }
-  })();
+  });
+
+  useEffect(() => {
+    const syncBrands = () => {
+      try {
+        const saved = localStorage.getItem('elite_managed_brands');
+        const defaultBrands = ['ANOUK', 'EON', 'ELITE EDITION', 'HERA', 'KALINI', 'MYNTRA', 'SANGRIA'];
+        const savedBrands = saved ? JSON.parse(saved) : defaultBrands;
+        const catBrands = (catalogItems || [])
+          .map(c => (c.brand || c.party || '').trim().toUpperCase())
+          .filter(b => b && b !== 'ALL');
+        const setOfBrands = new Set([...defaultBrands, ...savedBrands, ...catBrands]);
+        setManagedBrands(Array.from(setOfBrands).map(b => b.trim().toUpperCase()).filter(Boolean).sort());
+      } catch (e) {}
+    };
+
+    syncBrands();
+    window.addEventListener('storage', syncBrands);
+    window.addEventListener('elite_brands_updated', syncBrands);
+    return () => {
+      window.removeEventListener('storage', syncBrands);
+      window.removeEventListener('elite_brands_updated', syncBrands);
+    };
+  }, [catalogItems]);
 
   return (
     <div style={styles.overlay}>
@@ -353,6 +529,32 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                     required
                     autoComplete="off"
                   />
+                  <button
+                    type="button"
+                    onClick={handleFetchUniwareDetails}
+                    disabled={isFetchingUniware}
+                    style={styles.uniwareSearchBtn}
+                    title="Search Uniware catalog to auto-fill product details"
+                  >
+                    <Search size={13} className={isFetchingUniware ? 'spin-loader' : ''} />
+                    <span>{isFetchingUniware ? 'Searching Uniware...' : '⚡ Search Uniware & Auto-Fill'}</span>
+                  </button>
+                  {uniwareSearchStatus && (
+                    <div
+                      style={
+                        uniwareSearchStatus.type === 'success'
+                          ? styles.uniwareStatusSuccess
+                          : styles.uniwareStatusWarning
+                      }
+                    >
+                      {uniwareSearchStatus.type === 'success' ? (
+                        <CheckCircle size={13} style={{ flexShrink: 0 }} />
+                      ) : (
+                        <AlertTriangle size={13} style={{ flexShrink: 0 }} />
+                      )}
+                      <span>{uniwareSearchStatus.message}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div style={styles.fieldCol}>
@@ -372,8 +574,25 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                 </div>
               </div>
 
-              {/* Row 2: Category & HSN Code */}
+              {/* Row 2: Brand & Category */}
               <div className="inventory-form-row-2col" style={styles.formRow2Col}>
+                <div style={styles.fieldCol}>
+                  <label style={styles.label}>
+                    <Building2 size={14} color="#059669" />
+                    Primary Brand / Party *
+                  </label>
+                  <select
+                    name="party"
+                    value={formData.party}
+                    onChange={handleChange}
+                    style={{ ...styles.input, cursor: 'pointer' }}
+                  >
+                    {managedBrands.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
                     <Layers size={14} color="#059669" />
@@ -398,7 +617,10 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                     <option value="TOP" />
                   </datalist>
                 </div>
+              </div>
 
+              {/* Row 3: HSN Code & Size */}
+              <div className="inventory-form-row-2col" style={styles.formRow2Col}>
                 <div style={styles.fieldCol}>
                   <label style={styles.label}>
                     <FileCode size={14} color="#059669" />
@@ -413,22 +635,21 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                     style={styles.input}
                   />
                 </div>
-              </div>
 
-              {/* Row 3: Size(s) */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>
-                  Product Size(s) *
-                </label>
-                <input
-                  type="text"
-                  name="size"
-                  value={formData.size}
-                  onChange={handleChange}
-                  placeholder="e.g., L or S, M, L, XL, 2XL"
-                  style={styles.input}
-                  required
-                />
+                <div style={styles.fieldCol}>
+                  <label style={styles.label}>
+                    Product Size(s) *
+                  </label>
+                  <input
+                    type="text"
+                    name="size"
+                    value={formData.size}
+                    onChange={handleChange}
+                    placeholder="e.g., L or S, M, L, XL, 2XL"
+                    style={styles.input}
+                    required
+                  />
+                </div>
               </div>
 
               {/* Row 4: Base Price & Sale Price */}
@@ -523,14 +744,22 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                     {brandCodes.map((bc, idx) => (
                       <div key={idx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <input
-                          type="text"
-                          placeholder="Brand (e.g. ANOUK)"
-                          value={bc.brand || ''}
+                        <select
+                          value={bc.brand || 'ANOUK'}
                           onChange={(e) => handleUpdateBrandCode(idx, 'brand', e.target.value)}
-                          list="form-brand-suggestions"
-                          style={{ ...styles.input, flex: 1, padding: '0.45rem 0.6rem', fontSize: '0.8rem' }}
-                        />
+                          style={{
+                            ...styles.input,
+                            flex: 1,
+                            padding: '0.45rem 0.6rem',
+                            fontSize: '0.8rem',
+                            backgroundColor: '#ffffff',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {managedBrands.map(b => (
+                            <option key={b} value={b}>{b}</option>
+                          ))}
+                        </select>
                         <input
                           type="text"
                           placeholder="Brand SKU / Barcode (e.g. ANK-301-L)"
@@ -562,6 +791,12 @@ export default function InventoryForm({ item, onSubmit, onClose }) {
                   </div>
                 )}
               </div>
+
+              <datalist id="form-brand-suggestions">
+                {managedBrands.map(b => (
+                  <option key={b} value={b} />
+                ))}
+              </datalist>
             </div>
           </div>
 
@@ -896,6 +1131,49 @@ const styles = {
     gap: '0.5rem',
     boxShadow: '0 4px 6px -1px rgba(5, 150, 105, 0.3)',
     transition: 'all 0.15s ease',
+  },
+  uniwareSearchBtn: {
+    marginTop: '0.35rem',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.4rem',
+    padding: '0.45rem 0.75rem',
+    borderRadius: '6px',
+    border: '1px solid #059669',
+    backgroundColor: '#ecfdf5',
+    color: '#047857',
+    fontSize: '0.78rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    width: '100%',
+  },
+  uniwareStatusSuccess: {
+    marginTop: '0.35rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    padding: '0.4rem 0.65rem',
+    borderRadius: '6px',
+    backgroundColor: '#f0fdf4',
+    border: '1px solid #bbf7d0',
+    color: '#15803d',
+    fontSize: '0.75rem',
+    fontWeight: '500',
+  },
+  uniwareStatusWarning: {
+    marginTop: '0.35rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    padding: '0.4rem 0.65rem',
+    borderRadius: '6px',
+    backgroundColor: '#fffbeb',
+    border: '1px solid #fde68a',
+    color: '#b45309',
+    fontSize: '0.75rem',
+    fontWeight: '500',
   },
 };
 

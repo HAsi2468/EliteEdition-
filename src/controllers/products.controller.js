@@ -86,10 +86,14 @@ const getOrders = async (
     }
 
     const collection = useInventoryTable ? db.InventoryProduct : db.Product;
+    const finalSort = Object.keys(sortClause).length > 0 ? sortClause : { _id: -1 };
+    const parsedLimit = Number(limit) || 10000;
+    const parsedOffset = Number(offset) || 0;
+
     const products = await collection.find(whereClause)
-      .sort(sortClause)
-      .skip(offset)
-      .limit(limit)
+      .sort(finalSort)
+      .skip(parsedOffset)
+      .limit(parsedLimit)
       .lean();
 
     return products.map((p) => ({ ...p, id: p._id.toString() }));

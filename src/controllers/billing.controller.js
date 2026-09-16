@@ -333,11 +333,25 @@ const syncChallanStatusForInvoice = async (invoice) => {
       if (num) challanNosToLookup.add(num);
     });
   }
+  if (invoice.ourChallanNo) {
+    const parts = String(invoice.ourChallanNo).split(/[,;\s]+/);
+    parts.forEach(p => {
+      const num = parseInt(p.replace(/[^0-9]/g, ''), 10);
+      if (num) challanNosToLookup.add(num);
+    });
+  }
   if (Array.isArray(invoice.items)) {
     invoice.items.forEach(it => {
       if (it.ourChallanNo) {
         const num = parseInt(String(it.ourChallanNo).replace(/[^0-9]/g, ''), 10);
         if (num) challanNosToLookup.add(num);
+      }
+      if (it.description && it.description.includes('Challan ')) {
+        const match = it.description.match(/Challan\s+([A-Z0-9-]+)/i);
+        if (match) {
+          const num = parseInt(match[1].replace(/[^0-9]/g, ''), 10);
+          if (num) challanNosToLookup.add(num);
+        }
       }
     });
   }

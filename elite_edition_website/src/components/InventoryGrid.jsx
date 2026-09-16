@@ -105,30 +105,26 @@ export default function InventoryGrid({
   // Unique sizes & vendors/brands for Overview dropdowns
   const sizes = ['All', ...new Set(safeItems.map(item => item.size).filter(Boolean))];
   
-  const vendorMap = new Map();
-  const addVendorCandidate = (val) => {
+  const brandSet = new Set();
+  const addBrandCandidate = (val) => {
     if (!val || typeof val !== 'string') return;
-    const trimmed = val.trim();
-    if (!trimmed || trimmed.toUpperCase() === 'ALL') return;
-    const key = trimmed.toUpperCase();
-    if (!vendorMap.has(key)) {
-      vendorMap.set(key, key);
-    }
+    const trimmed = val.trim().toUpperCase();
+    if (!trimmed || trimmed === 'ALL') return;
+    brandSet.add(trimmed);
   };
 
   safeItems.forEach(item => {
-    if (item.party) addVendorCandidate(item.party);
-    if (item.brand) addVendorCandidate(item.brand);
+    if (item.brand) addBrandCandidate(item.brand);
     if (Array.isArray(item.brandCodes)) {
       item.brandCodes.forEach(bc => {
         const b = typeof bc === 'object' ? bc.brand : bc;
-        addVendorCandidate(b);
+        addBrandCandidate(b);
       });
     }
   });
-  (customBrands || []).forEach(b => addVendorCandidate(b));
+  (customBrands || []).forEach(b => addBrandCandidate(b));
 
-  const sortedVendors = Array.from(vendorMap.values()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  const sortedVendors = Array.from(brandSet).sort((a, b) => a.localeCompare(b));
   const vendors = ['All', ...sortedVendors];
 
   // Overview Metrics
@@ -693,18 +689,6 @@ export default function InventoryGrid({
                 </div>
               </div>
             </div>
-
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #10b981' }}>
-              <div style={styles.statIconWrap('#10b981', '#ecfdf5')}>
-                <DollarSign size={22} color="#10b981" />
-              </div>
-              <div>
-                <div style={styles.statLabel}>TOTAL BUY VALUATION</div>
-                <div style={{ ...styles.statVal, color: '#059669' }}>
-                  ₹ {totalBuyValuation.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Search, Filters & Action Toolbar */}
@@ -964,18 +948,6 @@ export default function InventoryGrid({
                 <div style={styles.statLabel}>TOTAL UNITS RECEIVED</div>
                 <div style={{ ...styles.statVal, color: '#1d4ed8' }}>
                   {(inwardData.totalQty || 0).toLocaleString()} <span style={styles.statSubText}>units</span>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #f59e0b' }}>
-              <div style={styles.statIconWrap('#f59e0b', '#fffbeb')}>
-                <IndianRupee size={22} color="#f59e0b" />
-              </div>
-              <div>
-                <div style={styles.statLabel}>TOTAL PURCHASE COST</div>
-                <div style={{ ...styles.statVal, color: '#b45309' }}>
-                  ₹ {(inwardData.totalPurchase || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                 </div>
               </div>
             </div>
@@ -1320,30 +1292,6 @@ export default function InventoryGrid({
                 <div style={styles.statLabel}>TOTAL UNITS DISPATCHED</div>
                 <div style={{ ...styles.statVal, color: '#dc2626' }}>
                   {(outwardData.totalQty || 0).toLocaleString()} <span style={styles.statSubText}>units</span>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #3b82f6' }}>
-              <div style={styles.statIconWrap('#3b82f6', '#eff6ff')}>
-                <IndianRupee size={22} color="#3b82f6" />
-              </div>
-              <div>
-                <div style={styles.statLabel}>TOTAL SALE REVENUE</div>
-                <div style={{ ...styles.statVal, color: '#1d4ed8' }}>
-                  ₹ {(outwardData.totalSell || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ ...styles.statCard, borderLeft: `4px solid ${(outwardData.totalProfit || 0) >= 0 ? '#10b981' : '#ef4444'}` }}>
-              <div style={styles.statIconWrap((outwardData.totalProfit || 0) >= 0 ? '#10b981' : '#ef4444', (outwardData.totalProfit || 0) >= 0 ? '#ecfdf5' : '#fef2f2')}>
-                <TrendingUp size={22} color={(outwardData.totalProfit || 0) >= 0 ? '#10b981' : '#ef4444'} />
-              </div>
-              <div>
-                <div style={styles.statLabel}>ESTIMATED GROSS PROFIT</div>
-                <div style={{ ...styles.statVal, color: (outwardData.totalProfit || 0) >= 0 ? '#059669' : '#dc2626' }}>
-                  ₹ {(outwardData.totalProfit || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                 </div>
               </div>
             </div>
