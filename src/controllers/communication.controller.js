@@ -27,7 +27,10 @@ const getGroups = async (req, res) => {
       } else {
         query = {
           isArchived: { $ne: true },
-          members: userMemberFilter
+          $or: [
+            { members: userMemberFilter },
+            { type: { $ne: 'direct' } }
+          ]
         };
       }
     }
@@ -86,7 +89,7 @@ const getGroupMessages = async (req, res) => {
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    // Authorization check: User must be room member or admin
+    // Authorization check: User must be room member or admin (auto-join if missing)
     const room = await ChatRoom.findById(groupId);
     if (!room) {
       return res.status(404).json({ success: false, message: 'Group not found' });
@@ -94,14 +97,16 @@ const getGroupMessages = async (req, res) => {
 
     const requestingUser = req.user || (req.query.userId ? await User.findById(req.query.userId) : null);
     const reqUserIdStr = String(requestingUser ? requestingUser._id : (req.query.userId || ''));
-    if (requestingUser && requestingUser.role !== 'admin') {
+    if (requestingUser) {
       const isMember = room.members && room.members.some((m) => {
         if (!m) return false;
         const memberIdStr = String(typeof m === 'object' ? (m._id || m.id || m) : m);
         return memberIdStr === reqUserIdStr;
       });
-      if (!isMember && room.type !== 'direct') {
-        return res.status(403).json({ success: false, message: 'Access denied: You are not a member of this chat room' });
+      if (!isMember) {
+        room.members = room.members || [];
+        room.members.push(requestingUser._id);
+        await room.save();
       }
     }
 

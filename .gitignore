@@ -119,3 +119,8 @@ dist
 elite_edition_website/node_modules/
 elite_edition_website/dist/
 elite_edition_website/.git/
+
+# Local MongoDB Backups
+backups/
+*.json.gz
+

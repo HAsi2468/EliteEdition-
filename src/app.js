@@ -10,7 +10,8 @@ const httpStatus = require('http-status').default;
 const config = require('./config/config');
 const morgan = require('./config/morgan');
 const jwt = require('./config/jwt');
-const { authLimiter } = require('./middlewares/rateLimiter');
+const mongoSanitize = require('express-mongo-sanitize');
+const { authLimiter, apiLimiter } = require('./middlewares/rateLimiter');
 const routes = require('./routes/v1');
 require('./schedule/fetchFromAPISScheduler');
 require('./schedule/myntraScheduler').startMyntraScheduler();
@@ -26,7 +27,20 @@ if (config.env !== 'test') {
 }
 
 // set security HTTP headers
-// app.use(helmet());
+app.use(
+	helmet({
+		contentSecurityPolicy: false,
+		crossOriginResourcePolicy: { policy: 'cross-origin' },
+		crossOriginEmbedderPolicy: false,
+		hsts: {
+			maxAge: 31536000,
+			includeSubDomains: true,
+			preload: true,
+		},
+		frameguard: { action: 'sameorigin' },
+		noSniff: true,
+	})
+);
 
 // parse json request body
 app.use(express.json({ limit: '50mb' }));
@@ -34,8 +48,8 @@ app.use(express.json({ limit: '50mb' }));
 // parse urlencoded request body
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// sanitize request data
-// app.use(xss()); // disabled due to incompatibility with Node/Express version
+// sanitize request data against MongoDB Operator Injection
+app.use(mongoSanitize());
 
 // gzip compression
 app.use(compression());
@@ -93,9 +107,10 @@ app.use(async (req, res, next) => {
 
 
 
-// limit repeated failed requests to auth endpoints
+// limit repeated failed requests to auth endpoints & apply global API rate limiter in production
 if (config.env === 'production') {
 	app.use('/v1/auth', authLimiter);
+	app.use('/v1', apiLimiter);
 }
 // Serve static uploads for Chat Image Mocks
 const path = require('path');

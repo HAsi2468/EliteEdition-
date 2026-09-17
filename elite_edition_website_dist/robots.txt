@@ -1,0 +1,9 @@
+# Robots.txt for Elite Edition Enterprise ERP
+User-agent: *
+Allow: /
+Allow: /v1/designs/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /private/
+
+Sitemap: https://erp.eliteedition.in/sitemap.xml

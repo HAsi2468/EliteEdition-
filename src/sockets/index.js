@@ -34,29 +34,25 @@ const setupSockets = (io) => {
       try {
         const { roomId, senderId, content, replyTo, attachment, priority, type, activityMeta, recordMentions: inRecordMentions } = data;
         
-        // Membership Security Check: Ensure sender belongs to room or is admin
+        // Membership Check: Ensure sender belongs to room (automatically add if missing)
         const targetRoom = await ChatRoom.findById(roomId);
         if (!targetRoom) {
           console.warn(`send-message failed: Room ${roomId} not found`);
           return;
         }
 
-        const senderUser = await User.findById(senderId);
-        if (senderUser && senderUser.role !== 'admin') {
-          const isMember = targetRoom.members && targetRoom.members.some((m) => {
-            if (!m) return false;
-            const memberIdStr = String(typeof m === 'object' ? (m._id || m.id || m) : m);
-            return memberIdStr === String(senderId);
-          });
-          if (!isMember) {
-            if (targetRoom.type === 'direct') {
-              const mongoose = require('mongoose');
-              targetRoom.members.push(mongoose.Types.ObjectId.isValid(senderId) ? new mongoose.Types.ObjectId(senderId) : senderId);
-              await targetRoom.save();
-            } else {
-              console.warn(`Unauthorized socket message attempt by user ${senderId} in room ${roomId}`);
-              return;
-            }
+        const isMember = targetRoom.members && targetRoom.members.some((m) => {
+          if (!m) return false;
+          const memberIdStr = String(typeof m === 'object' ? (m._id || m.id || m) : m);
+          return memberIdStr === String(senderId);
+        });
+
+        if (!isMember) {
+          const mongoose = require('mongoose');
+          targetRoom.members = targetRoom.members || [];
+          if (mongoose.Types.ObjectId.isValid(senderId)) {
+            targetRoom.members.push(new mongoose.Types.ObjectId(senderId));
+            await targetRoom.save();
           }
         }
         

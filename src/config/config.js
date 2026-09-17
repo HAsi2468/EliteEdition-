@@ -72,10 +72,7 @@ module.exports = {
 	},
 	mongoose: {
 		url: envVars.MONGODB_URL,
-		options: {
-			useNewUrlParser: true,
-			useUnifiedTopology: true,
-		},
+		options: {},
 	},
 	email: {
 		smtp: {

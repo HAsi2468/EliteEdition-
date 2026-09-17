@@ -1,10 +1,10 @@
-const { performDatabaseR2Backup } = require('../controllers/backup.controller');
+const { performBackup } = require('../scripts/backup_mongodb');
 const logger = require('../config/logger');
 
 let backupInterval = null;
 
 /**
- * Initialize automatic daily database backup scheduler
+ * Initialize automatic daily database backup scheduler (local 30-day retention + cloud sync)
  * Runs once every 24 hours (86,400,000 ms)
  */
 function startDbBackupScheduler() {
@@ -14,31 +14,32 @@ function startDbBackupScheduler() {
 
   // Run initial background backup 2 minutes after server startup
   setTimeout(() => {
-    logger.info('[R2 DB Backup] Running initial database backup to Cloudflare R2...');
-    performDatabaseR2Backup()
+    logger.info('[Automated DB Backup] Running initial database backup...');
+    performBackup()
       .then((res) => {
-        logger.info(`[R2 DB Backup] Initial backup successful: ${res.publicUrl} (${res.sizeBytes} bytes)`);
+        logger.info(`[Automated DB Backup] Initial backup successful: ${res.fileName} (${res.sizeMB} MB)`);
       })
       .catch((err) => {
-        logger.error(`[R2 DB Backup] Initial backup failed: ${err.message}`);
+        logger.error(`[Automated DB Backup] Initial backup failed: ${err.message}`);
       });
   }, 2 * 60 * 1000);
 
   // Repeat every 24 hours
   backupInterval = setInterval(() => {
-    logger.info('[R2 DB Backup] Starting scheduled daily database backup to Cloudflare R2...');
-    performDatabaseR2Backup()
+    logger.info('[Automated DB Backup] Starting scheduled daily multi-destination backup...');
+    performBackup()
       .then((res) => {
-        logger.info(`[R2 DB Backup] Daily backup successful: ${res.publicUrl} (${res.sizeBytes} bytes)`);
+        logger.info(`[Automated DB Backup] Daily backup successful: ${res.fileName} (${res.sizeMB} MB)`);
       })
       .catch((err) => {
-        logger.error(`[R2 DB Backup] Daily backup failed: ${err.message}`);
+        logger.error(`[Automated DB Backup] Daily backup failed: ${err.message}`);
       });
   }, TWENTY_FOUR_HOURS);
 
-  logger.info('[R2 DB Backup] Daily database backup scheduler initialized.');
+  logger.info('[Automated DB Backup] Daily multi-destination backup scheduler initialized.');
 }
 
 module.exports = {
   startDbBackupScheduler,
 };
+
