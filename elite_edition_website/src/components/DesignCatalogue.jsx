@@ -211,17 +211,33 @@ function DesignImageField({ label, name, value, onChange, placeholder }) {
   const [mode, setMode] = useState(raw && !raw.startsWith('data:') ? 'url' : 'file'); // 'file' or 'url'
   const fileInputRef = useRef(null);
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
+  const processAndUploadFile = async (file) => {
     if (!file) return;
     try {
+      // 1. Try R2 / Server Upload first
       const options = { maxSizeMB: 1.5, maxWidthOrHeight: 2048, useWebWorker: true };
       const compressedFile = await imageCompression(file, options);
       const res = await api.uploadImage(compressedFile);
-      onChange({ target: { name, value: res.url } });
+      if (res && res.url) {
+        onChange({ target: { name, value: res.url } });
+        return;
+      }
     } catch (err) {
-      alert('Failed to upload image: ' + err.message);
+      console.warn('[DesignImageField] Server upload failed, falling back to local compressed Base64:', err.message);
     }
+
+    // 2. Base64 Fallback if server upload fails or R2 unavailable
+    try {
+      const base64 = await compressAndConvertToBase64(file);
+      onChange({ target: { name, value: base64 } });
+    } catch (fallbackErr) {
+      alert('Failed to process image file: ' + fallbackErr.message);
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    await processAndUploadFile(file);
   };
 
   const handleClear = () => {
@@ -258,14 +274,7 @@ function DesignImageField({ label, name, value, onChange, placeholder }) {
             e.preventDefault();
             const file = e.dataTransfer.files[0];
             if (file && file.type.startsWith('image/')) {
-              try {
-                const options = { maxSizeMB: 1.5, maxWidthOrHeight: 2048, useWebWorker: true };
-                const compressedFile = await imageCompression(file, options);
-                const res = await api.uploadImage(compressedFile);
-                onChange({ target: { name, value: res.url } });
-              } catch (err) {
-                alert('Failed to upload image: ' + err.message);
-              }
+              await processAndUploadFile(file);
             }
           }}
           style={{

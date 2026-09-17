@@ -32,14 +32,103 @@ import {
   ArrowRight,
   ExternalLink,
   User,
-  UserPlus
+  UserPlus,
+  Trophy,
+  Mic,
+  MicOff,
+  Repeat,
+  BarChart2,
+  CalendarRange,
+  Wand2,
+  Award,
+  Zap,
+  TrendingUp,
+  Star
 } from 'lucide-react';
+
+const TASK_TEMPLATES = [
+  {
+    id: 'digital_print_qc',
+    name: '🎨 Digital Print Audit SOP',
+    category: 'Production',
+    title: 'Digital Print Audit & CMYK Calibration',
+    desc: 'Verify color fidelity, DPI resolution, nozzle alignment, and print proof generation before running bulk production.',
+    priority: 'high',
+    estHours: 1.5,
+    checklist: [
+      'Verify CMYK color profile matching job card sample',
+      'Check design resolution (Minimum 300 DPI required)',
+      'Run printhead nozzle test & check alignment',
+      'Generate digital print proof and attach to Job Card'
+    ]
+  },
+  {
+    id: 'stitching_qc',
+    name: '🪡 Stitching & Finishing QC SOP',
+    category: 'Quality Assurance',
+    title: 'Stitching & Finishing Quality Inspection',
+    desc: 'Comprehensive post-production audit for seam strength, thread shade matching, and garment packaging.',
+    priority: 'medium',
+    estHours: 2.0,
+    checklist: [
+      'Inspect seam tension and stitch density (12 SPI min)',
+      'Verify thread color and shade accuracy',
+      'Check zipper/button alignment and functional clearance',
+      'Pack finished order in protective poly sleeve'
+    ]
+  },
+  {
+    id: 'fabric_inward',
+    name: '📦 Fabric Inward Quality Inspection',
+    category: 'Inventory',
+    title: 'Fabric Inward Goods Inspection & Tagging',
+    desc: 'Audit newly arrived fabric rolls for weight, GSM density, weaving flaws, and barcode tagging.',
+    priority: 'high',
+    estHours: 1.0,
+    checklist: [
+      'Weigh incoming fabric rolls & verify supplier bill',
+      'Measure GSM density using GSM cutter scale',
+      'Scan fabric for weave defects, stains, or shade variation',
+      'Generate & attach store inventory QR/Barcode tag'
+    ]
+  },
+  {
+    id: 'machine_maint',
+    name: '🛠️ Machine Preventive Maintenance SOP',
+    category: 'Maintenance',
+    title: 'Weekly Production Machinery Maintenance',
+    desc: 'Routine cleaning, rail lubrication, sensor testing, and calibration of digital printing & cutting machinery.',
+    priority: 'urgent',
+    estHours: 3.0,
+    checklist: [
+      'Clean printhead capping station & wiper blades',
+      'Lubricate linear motion rails and gear tracks',
+      'Test ink level float sensors and vacuum suction pump',
+      'Run bi-directional alignment calibration print'
+    ]
+  },
+  {
+    id: 'billing_audit',
+    name: '📄 Billing & Invoice Verification SOP',
+    category: 'Finance',
+    title: 'Billing Audit & Client Payment Processing',
+    desc: 'Cross-check finished job card quantities against rates, generate GST tax invoice, and send digital link.',
+    priority: 'medium',
+    estHours: 0.5,
+    checklist: [
+      'Match delivered quantity with signed Job Card receipt',
+      'Calculate applicable GST tax rate and discount terms',
+      'Generate official Billing Invoice & payment link',
+      'File digital invoice copy in accounting records'
+    ]
+  }
+];
 
 export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [tasks, setTasks] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState('kanban'); // 'kanban' | 'list' | 'timesheets'
+  const [activeView, setActiveView] = useState('kanban'); // 'kanban' | 'list' | 'timeline' | 'leaderboard' | 'timesheets'
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,6 +149,87 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [newEstHours, setNewEstHours] = useState('');
   const [selectedAssigneeIds, setSelectedAssigneeIds] = useState([]);
   const [staffSearch, setStaffSearch] = useState('');
+  
+  // Feature 4: Task Template Library state
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [templateChecklist, setTemplateChecklist] = useState([]);
+
+  // Feature 5: Voice-to-Task Creation state
+  const [isListening, setIsListening] = useState(false);
+  const [voiceTarget, setVoiceTarget] = useState('title'); // 'title' | 'desc'
+  const recognitionRef = useRef(null);
+
+  // Feature 8: Automated Recurring Tasks state
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceFreq, setRecurrenceFreq] = useState('daily'); // 'daily' | 'weekly' | 'monthly'
+
+  // Speech Recognition Handler
+  const startVoiceInput = (targetField = 'title') => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Voice Speech-to-Text is not supported in this browser window. Please use Google Chrome, Safari, or Microsoft Edge.');
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) recognitionRef.current.stop();
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setVoiceTarget(targetField);
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join('');
+        
+        if (targetField === 'title') {
+          setNewTitle(transcript);
+        } else {
+          setNewDesc(transcript);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error('Failed to start speech recognition:', err);
+      setIsListening(false);
+    }
+  };
+
+  // Apply Template SOP
+  const handleApplyTemplate = (templateId) => {
+    setSelectedTemplateId(templateId);
+    if (!templateId) return;
+    const tmpl = TASK_TEMPLATES.find((t) => t.id === templateId);
+    if (tmpl) {
+      setNewTitle(tmpl.title);
+      setNewDesc(tmpl.desc);
+      setNewPriority(tmpl.priority);
+      setNewEstHours(String(tmpl.estHours));
+      setTemplateChecklist([...tmpl.checklist]);
+    }
+  };
 
   // Selected Task Detail Drawer State
   const [selectedTask, setSelectedTask] = useState(null);
@@ -188,11 +358,28 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         estimatedHours: parseFloat(newEstHours) || 0,
         assignees: selectedAssigneeIds,
         createdBy: myId,
-        createdByName: myName
+        createdByName: myName,
+        recurrence: isRecurring ? { isRecurring: true, frequency: recurrenceFreq } : { isRecurring: false }
       });
 
       if (res.success && res.data) {
-        setTasks((prev) => [res.data, ...prev]);
+        let createdTask = res.data;
+
+        // If template checklist items exist, add them to the created task
+        if (templateChecklist && templateChecklist.length > 0) {
+          for (const itemText of templateChecklist) {
+            try {
+              const checkRes = await api.addTaskChecklistItem(createdTask._id, { text: itemText });
+              if (checkRes.success && checkRes.data) {
+                createdTask = checkRes.data;
+              }
+            } catch (cErr) {
+              console.error('Failed to add template checklist item:', cErr);
+            }
+          }
+        }
+
+        setTasks((prev) => [createdTask, ...prev]);
         setShowCreateModal(false);
         resetCreateForm();
       }
@@ -213,6 +400,10 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     setNewDueDate('');
     setNewEstHours('');
     setSelectedAssigneeIds([]);
+    setSelectedTemplateId('');
+    setTemplateChecklist([]);
+    setIsRecurring(false);
+    setRecurrenceFreq('daily');
   };
 
   const handleStatusChange = async (task, newStatusVal) => {
@@ -467,10 +658,12 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           
           {/* View Switcher Pills */}
-          <div style={{ display: 'flex', background: '#f8fafc', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+          <div style={{ display: 'flex', background: '#f8fafc', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-light)', flexWrap: 'wrap', gap: '2px' }}>
             {[
               { id: 'kanban', label: 'Kanban Board', icon: LayoutGrid },
               { id: 'list', label: 'List View', icon: List },
+              { id: 'timeline', label: '📊 Timeline / Gantt', icon: CalendarRange },
+              { id: 'leaderboard', label: '🏆 Leaderboard', icon: Trophy },
               { id: 'timesheets', label: 'Timesheets', icon: Clock },
             ].map((v) => {
               const IconComp = v.icon;
@@ -484,7 +677,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                     border: 'none',
                     fontSize: '0.74rem',
                     fontWeight: 700,
-                    padding: '0.35rem 0.7rem',
+                    padding: '0.35rem 0.65rem',
                     borderRadius: '6px',
                     cursor: 'pointer',
                     display: 'flex',
@@ -664,10 +857,15 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                           >
                             {/* Badges Row */}
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                                 <span style={{ fontSize: '0.6rem', fontWeight: 800, color: pri.color, background: pri.bg, border: `1px solid ${pri.border}`, padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
                                   {pri.label}
                                 </span>
+                                {t.recurrence && t.recurrence.isRecurring && (
+                                  <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#7c3aed', background: '#f3e8ff', border: '1px solid #ddd6fe', padding: '1px 6px', borderRadius: '4px' }}>
+                                    🔄 {t.recurrence.frequency ? t.recurrence.frequency.toUpperCase() : 'RECURRING'}
+                                  </span>
+                                )}
                                 {isOverdue && (
                                   <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#ef4444', background: '#fef2f2', border: '1px solid #fca5a5', padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
                                     🚨 OVERDUE
@@ -820,7 +1018,14 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                         style={{ borderBottom: '1px solid var(--border-light)', cursor: 'pointer', transition: 'background 0.15s' }}
                       >
                         <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {t.title}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{t.title}</span>
+                            {t.recurrence && t.recurrence.isRecurring && (
+                              <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#7c3aed', background: '#f3e8ff', padding: '1px 5px', borderRadius: '4px' }}>
+                                🔄 {t.recurrence.frequency}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem' }}>
                           <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: 'rgba(37,99,235,0.1)', color: '#2563eb' }}>
@@ -865,6 +1070,341 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 )}
               </tbody>
             </table>
+          </div>
+
+        ) : activeView === 'timeline' ? (
+
+          /* ════ VIEW 3: GANTT CHART & TIMELINE VIEW ════ */
+          <div className="glass-panel" style={{ height: '100%', borderRadius: '12px', overflow: 'auto', background: '#ffffff', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CalendarRange size={18} color="#2563eb" />
+                  <span>14-Day Gantt Schedule &amp; Production Timeline</span>
+                </h3>
+                <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  Interactive visual timeline showing start dates, due dates, and real-time sub-task completion progress.
+                </p>
+              </div>
+            </div>
+
+            {/* Timeline Table */}
+            <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'auto', border: '1px solid var(--border-light)', borderRadius: '10px' }}>
+              {(() => {
+                const today = new Date();
+                const calendarDays = Array.from({ length: 14 }).map((_, i) => {
+                  const d = new Date(today);
+                  d.setDate(today.getDate() + i);
+                  return d;
+                });
+
+                return (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', minWidth: 1000 }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-light)' }}>
+                        <th style={{ width: 280, padding: '0.6rem 0.8rem', textAlign: 'left', color: 'var(--text-muted)', position: 'sticky', left: 0, background: '#f8fafc', zIndex: 2 }}>
+                          Task &amp; Assignees
+                        </th>
+                        {calendarDays.map((date, idx) => {
+                          const isToday = idx === 0;
+                          return (
+                            <th key={idx} style={{ padding: '0.5rem 0.3rem', textAlign: 'center', borderLeft: '1px solid var(--border-light)', background: isToday ? '#eff6ff' : '#f8fafc' }}>
+                              <div style={{ fontSize: '0.62rem', color: isToday ? '#2563eb' : 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800 }}>
+                                {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                              </div>
+                              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: isToday ? '#1d4ed8' : 'var(--text-primary)' }}>
+                                {date.getDate()} {date.toLocaleDateString('en-US', { month: 'short' })}
+                              </div>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredTasks.length === 0 ? (
+                        <tr>
+                          <td colSpan={15} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                            No tasks scheduled in timeline.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredTasks.map((t) => {
+                          const pri = getPriorityBadge(t.priority);
+                          const totalCheck = (t.checklist || []).length;
+                          const completedCheck = (t.checklist || []).filter((c) => c.completed).length;
+                          const progressPct = totalCheck > 0 ? Math.round((completedCheck / totalCheck) * 100) : (t.status === 'Done' ? 100 : 25);
+
+                          // Calculate start day index and duration span
+                          const created = t.createdAt ? new Date(t.createdAt) : today;
+                          const due = t.dueDate ? new Date(t.dueDate) : new Date(today.getTime() + 86400000 * 3);
+                          
+                          let startIdx = calendarDays.findIndex(d => d.toDateString() === created.toDateString());
+                          if (startIdx < 0) startIdx = 0;
+
+                          let endIdx = calendarDays.findIndex(d => d.toDateString() === due.toDateString());
+                          if (endIdx < 0) endIdx = Math.min(startIdx + 2, 13);
+                          const spanDays = Math.max(1, endIdx - startIdx + 1);
+
+                          return (
+                            <tr key={t._id} onClick={() => setSelectedTask(t)} style={{ borderBottom: '1px solid var(--border-light)', cursor: 'pointer' }}>
+                              {/* Task Info Cell */}
+                              <td style={{ padding: '0.6rem 0.8rem', position: 'sticky', left: 0, background: '#ffffff', zIndex: 1, borderRight: '1px solid var(--border-light)' }}>
+                                <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 260 }}>
+                                  {t.title}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px' }}>
+                                  <span style={{ fontSize: '0.6rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: pri.bg, color: pri.color }}>
+                                    {t.priority.toUpperCase()}
+                                  </span>
+                                  <span style={{ fontSize: '0.6rem', fontWeight: 800, padding: '1px 5px', borderRadius: '4px', background: 'rgba(37,99,235,0.1)', color: '#2563eb' }}>
+                                    {t.status}
+                                  </span>
+                                </div>
+                              </td>
+
+                              {/* Calendar Day Grid Cells */}
+                              {calendarDays.map((_, dayIdx) => {
+                                const isBarStart = dayIdx === startIdx;
+                                const isInsideBar = dayIdx >= startIdx && dayIdx < (startIdx + spanDays);
+
+                                return (
+                                  <td key={dayIdx} style={{ borderLeft: '1px solid var(--border-light)', padding: '0.2rem', verticalAlign: 'middle', position: 'relative' }}>
+                                    {isBarStart && (
+                                      <div
+                                        style={{
+                                          position: 'absolute',
+                                          top: '50%',
+                                          transform: 'translateY(-50%)',
+                                          left: '4px',
+                                          width: `calc(${spanDays * 100}% + ${(spanDays - 1) * 2}px - 8px)`,
+                                          height: '24px',
+                                          borderRadius: '6px',
+                                          background: t.status === 'Done' ? 'linear-gradient(90deg, #16a34a, #22c55e)' : t.status === 'In Progress' ? 'linear-gradient(90deg, #0284c7, #38bdf8)' : 'linear-gradient(90deg, #2563eb, #60a5fa)',
+                                          color: '#ffffff',
+                                          padding: '0 8px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          boxShadow: '0 2px 6px rgba(37,99,235,0.2)',
+                                          zIndex: 5,
+                                          fontSize: '0.65rem',
+                                          fontWeight: 800
+                                        }}
+                                      >
+                                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          {t.title}
+                                        </span>
+                                        <span style={{ background: 'rgba(255,255,255,0.25)', padding: '1px 5px', borderRadius: '4px', fontSize: '0.6rem' }}>
+                                          {progressPct}%
+                                        </span>
+                                      </div>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
+          </div>
+
+        ) : activeView === 'leaderboard' ? (
+
+          /* ════ VIEW 4: STAFF PRODUCTIVITY LEADERBOARD ════ */
+          <div className="glass-panel" style={{ height: '100%', borderRadius: '12px', overflowY: 'auto', background: '#ffffff', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+            
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Trophy size={20} color="#d97706" />
+                  <span>Staff Productivity &amp; Performance Leaderboard</span>
+                </h3>
+                <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                  Real-time workforce rankings calculated from task completions, billable hours logged, and on-time performance.
+                </p>
+              </div>
+            </div>
+
+            {/* Compute Leaderboard Statistics */}
+            {(() => {
+              const staffStats = allUsers.map((user) => {
+                const uId = String(user._id);
+                const userTasks = tasks.filter((t) =>
+                  (t.assignees || []).some((a) => String(typeof a === 'object' ? (a._id || a.id) : a) === uId)
+                );
+                const completed = userTasks.filter((t) => t.status === 'Done');
+
+                let totalLoggedHours = 0;
+                tasks.forEach((t) => {
+                  (t.timeLogs || []).forEach((log) => {
+                    if (String(log.userId) === uId || log.userName === user.name) {
+                      totalLoggedHours += (log.hours || 0);
+                    }
+                  });
+                });
+
+                const onTimeCount = completed.filter((t) => {
+                  if (!t.dueDate) return true;
+                  return new Date(t.updatedAt || t.createdAt) <= new Date(t.dueDate);
+                }).length;
+
+                const onTimeRate = completed.length > 0 ? Math.round((onTimeCount / completed.length) * 100) : 100;
+                const score = (completed.length * 15) + (totalLoggedHours * 3) + Math.round(onTimeRate * 0.5);
+
+                return {
+                  user,
+                  totalAssigned: userTasks.length,
+                  completedCount: completed.length,
+                  hoursLogged: totalLoggedHours.toFixed(1),
+                  onTimeRate,
+                  score
+                };
+              }).sort((a, b) => b.score - a.score);
+
+              const topThree = staffStats.slice(0, 3);
+
+              return (
+                <>
+                  {/* Top 3 Winners Podium Cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                    
+                    {topThree[0] && (
+                      <div style={{ padding: '1.2rem', borderRadius: '14px', background: 'linear-gradient(135deg, #fefce8 0%, #fef3c7 100%)', border: '2px solid #fde047', boxShadow: '0 8px 20px rgba(234,179,8,0.18)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' }}>
+                        <div style={{ position: 'absolute', top: '-12px', background: '#eab308', color: '#fff', fontSize: '0.65rem', fontWeight: 900, padding: '2px 10px', borderRadius: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          🥇 1st Place Champion
+                        </div>
+                        <div style={{ width: 50, height: 50, borderRadius: '50%', background: '#f59e0b', color: '#fff', fontSize: '1.4rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '6px', border: '3px solid #ffffff', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>
+                          {(topThree[0].user.name || 'U').charAt(0)}
+                        </div>
+                        <h4 style={{ margin: '8px 0 2px', fontSize: '1rem', fontWeight: 800, color: '#78350f' }}>
+                          {topThree[0].user.name || topThree[0].user.username}
+                        </h4>
+                        <div style={{ fontSize: '0.72rem', color: '#b45309', fontWeight: 600 }}>{topThree[0].user.email}</div>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                          <span style={{ background: '#ffffff', color: '#92400e', padding: '3px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                            ✅ {topThree[0].completedCount} Done
+                          </span>
+                          <span style={{ background: '#ffffff', color: '#92400e', padding: '3px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                            ⏱️ {topThree[0].hoursLogged}h Logged
+                          </span>
+                        </div>
+                        <div style={{ marginTop: '10px', fontSize: '1.1rem', fontWeight: 900, color: '#854d0e' }}>
+                          🔥 {topThree[0].score} Pts
+                        </div>
+                      </div>
+                    )}
+
+                    {topThree[1] && (
+                      <div style={{ padding: '1.2rem', borderRadius: '14px', background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', border: '2px solid #cbd5e1', boxShadow: '0 6px 16px rgba(100,116,139,0.15)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' }}>
+                        <div style={{ position: 'absolute', top: '-12px', background: '#64748b', color: '#fff', fontSize: '0.65rem', fontWeight: 900, padding: '2px 10px', borderRadius: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          🥈 2nd Place
+                        </div>
+                        <div style={{ width: 46, height: 46, borderRadius: '50%', background: '#64748b', color: '#fff', fontSize: '1.2rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '6px', border: '3px solid #ffffff' }}>
+                          {(topThree[1].user.name || 'U').charAt(0)}
+                        </div>
+                        <h4 style={{ margin: '8px 0 2px', fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
+                          {topThree[1].user.name || topThree[1].user.username}
+                        </h4>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>{topThree[1].user.email}</div>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                          <span style={{ background: '#ffffff', color: '#334155', padding: '3px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                            ✅ {topThree[1].completedCount} Done
+                          </span>
+                          <span style={{ background: '#ffffff', color: '#334155', padding: '3px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                            ⏱️ {topThree[1].hoursLogged}h Logged
+                          </span>
+                        </div>
+                        <div style={{ marginTop: '10px', fontSize: '1rem', fontWeight: 900, color: '#334155' }}>
+                          ⚡ {topThree[1].score} Pts
+                        </div>
+                      </div>
+                    )}
+
+                    {topThree[2] && (
+                      <div style={{ padding: '1.2rem', borderRadius: '14px', background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)', border: '2px solid #fdba74', boxShadow: '0 6px 16px rgba(194,65,12,0.15)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' }}>
+                        <div style={{ position: 'absolute', top: '-12px', background: '#c2410c', color: '#fff', fontSize: '0.65rem', fontWeight: 900, padding: '2px 10px', borderRadius: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          🥉 3rd Place
+                        </div>
+                        <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#ea580c', color: '#fff', fontSize: '1.1rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '6px', border: '3px solid #ffffff' }}>
+                          {(topThree[2].user.name || 'U').charAt(0)}
+                        </div>
+                        <h4 style={{ margin: '8px 0 2px', fontSize: '0.95rem', fontWeight: 800, color: '#7c2d12' }}>
+                          {topThree[2].user.name || topThree[2].user.username}
+                        </h4>
+                        <div style={{ fontSize: '0.72rem', color: '#9a3412', fontWeight: 600 }}>{topThree[2].user.email}</div>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                          <span style={{ background: '#ffffff', color: '#9a3412', padding: '3px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                            ✅ {topThree[2].completedCount} Done
+                          </span>
+                          <span style={{ background: '#ffffff', color: '#9a3412', padding: '3px 8px', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 800 }}>
+                            ⏱️ {topThree[2].hoursLogged}h Logged
+                          </span>
+                        </div>
+                        <div style={{ marginTop: '10px', fontSize: '1rem', fontWeight: 900, color: '#9a3412' }}>
+                          ⭐ {topThree[2].score} Pts
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+
+                  {/* Full Staff Rankings Table */}
+                  <div style={{ border: '1px solid var(--border-light)', borderRadius: '10px', overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-light)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                          <th style={{ padding: '0.65rem 0.85rem' }}>Rank</th>
+                          <th style={{ padding: '0.65rem 0.85rem' }}>Staff User</th>
+                          <th style={{ padding: '0.65rem 0.85rem' }}>Completed Tasks</th>
+                          <th style={{ padding: '0.65rem 0.85rem' }}>Hours Logged</th>
+                          <th style={{ padding: '0.65rem 0.85rem' }}>On-Time Rate</th>
+                          <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Performance Score</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {staffStats.map((item, index) => {
+                          const rankPill = index === 0 ? '🥇 #1' : index === 1 ? '🥈 #2' : index === 2 ? '🥉 #3' : `#${index + 1}`;
+                          return (
+                            <tr key={item.user._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                              <td style={{ padding: '0.65rem 0.85rem', fontWeight: 900, color: index < 3 ? '#2563eb' : 'var(--text-muted)' }}>
+                                {rankPill}
+                              </td>
+                              <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {item.user.name || item.user.username}
+                              </td>
+                              <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700 }}>
+                                <span style={{ color: '#16a34a' }}>{item.completedCount}</span> / {item.totalAssigned} tasks
+                              </td>
+                              <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb' }}>
+                                {item.hoursLogged} hrs
+                              </td>
+                              <td style={{ padding: '0.65rem 0.85rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <div style={{ flex: 1, height: '6px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', maxWidth: 80 }}>
+                                    <div style={{ width: `${item.onTimeRate}%`, height: '100%', background: item.onTimeRate >= 80 ? '#16a34a' : '#d97706' }} />
+                                  </div>
+                                  <span style={{ fontWeight: 800, fontSize: '0.72rem' }}>{item.onTimeRate}%</span>
+                                </div>
+                              </td>
+                              <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 900, color: '#1e293b', fontSize: '0.85rem' }}>
+                                {item.score} pts
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              );
+            })()}
+
           </div>
 
         ) : (
@@ -944,10 +1484,60 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
             <form onSubmit={handleCreateTaskSubmit} style={{ padding: '1.2rem 1.4rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               
+              {/* Feature 4: Task Template Library SOP Picker */}
+              <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '10px', border: '1px dashed #bfdbfe' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Wand2 size={14} color="#2563eb" />
+                    <span>📚 Task Template SOP Library</span>
+                  </label>
+                  {selectedTemplateId && (
+                    <span style={{ fontSize: '0.65rem', color: '#16a34a', fontWeight: 800 }}>
+                      ✓ Template Loaded ({templateChecklist.length} SOP steps)
+                    </span>
+                  )}
+                </div>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => handleApplyTemplate(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.78rem', fontWeight: 700, borderRadius: '6px', border: '1px solid #bfdbfe', background: '#ffffff', color: '#1e293b' }}
+                >
+                  <option value="">Select SOP Template to Auto-Fill (Optional)...</option>
+                  {TASK_TEMPLATES.map((tmpl) => (
+                    <option key={tmpl.id} value={tmpl.id}>
+                      {tmpl.name} ({tmpl.category})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Task Title & Feature 5: Voice-to-Task */}
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
-                  Task Title *
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Task Title *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => startVoiceInput('title')}
+                    style={{
+                      background: isListening && voiceTarget === 'title' ? '#fee2e2' : '#eff6ff',
+                      border: `1px solid ${isListening && voiceTarget === 'title' ? '#fca5a5' : '#bfdbfe'}`,
+                      color: isListening && voiceTarget === 'title' ? '#dc2626' : '#2563eb',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    {isListening && voiceTarget === 'title' ? <MicOff size={11} className="pulse-mic" /> : <Mic size={11} />}
+                    <span>{isListening && voiceTarget === 'title' ? '🔴 Listening... Speak Title' : '🎤 Voice Input'}</span>
+                  </button>
+                </div>
                 <input
                   type="text"
                   placeholder="e.g. Prepare Fabric Printing Output Batch #102"
@@ -958,17 +1548,72 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 />
               </div>
 
+              {/* Description & Voice Input */}
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
-                  Description &amp; Work Instructions
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Description &amp; Work Instructions
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => startVoiceInput('desc')}
+                    style={{
+                      background: isListening && voiceTarget === 'desc' ? '#fee2e2' : '#eff6ff',
+                      border: `1px solid ${isListening && voiceTarget === 'desc' ? '#fca5a5' : '#bfdbfe'}`,
+                      color: isListening && voiceTarget === 'desc' ? '#dc2626' : '#2563eb',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    {isListening && voiceTarget === 'desc' ? <MicOff size={11} className="pulse-mic" /> : <Mic size={11} />}
+                    <span>{isListening && voiceTarget === 'desc' ? '🔴 Listening... Speak Details' : '🎤 Voice Input'}</span>
+                  </button>
+                </div>
                 <textarea
                   rows={3}
-                  placeholder="Enter detailed task instructions..."
+                  placeholder="Enter detailed task instructions or dictate using voice input..."
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
                   style={{ width: '100%', padding: '0.55rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)' }}
                 />
+              </div>
+
+              {/* Feature 8: Automated Recurring Task Setup */}
+              <div style={{ background: '#fcf5ff', padding: '0.7rem 0.85rem', borderRadius: '10px', border: '1px solid #e9d5ff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    id="recurringTaskToggle"
+                    checked={isRecurring}
+                    onChange={(e) => setIsRecurring(e.target.checked)}
+                    style={{ width: 16, height: 16, cursor: 'pointer' }}
+                  />
+                  <label htmlFor="recurringTaskToggle" style={{ fontSize: '0.78rem', fontWeight: 800, color: '#6b21a8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Repeat size={14} color="#7c3aed" />
+                    <span>🔄 Automated Recurring Task Schedule</span>
+                  </label>
+                </div>
+
+                {isRecurring && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#7c3aed' }}>Repeat Frequency:</span>
+                    <select
+                      value={recurrenceFreq}
+                      onChange={(e) => setRecurrenceFreq(e.target.value)}
+                      style={{ fontSize: '0.75rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', border: '1px solid #ddd6fe', background: '#ffffff', color: '#6b21a8', cursor: 'pointer' }}
+                    >
+                      <option value="daily">📅 Daily (Every Morning)</option>
+                      <option value="weekly">📅 Weekly (Every Monday)</option>
+                      <option value="monthly">📅 Monthly (1st of Month)</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Assigned By & Priority */}

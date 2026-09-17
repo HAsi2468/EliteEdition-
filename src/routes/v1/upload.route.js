@@ -6,9 +6,16 @@ const { isR2Configured, uploadToR2 } = require('../../utils/r2Storage');
 
 const router = express.Router();
 
-const uploadDir = path.join(__dirname, '../../../../elite_edition_images');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+let uploadDir = path.join(__dirname, '../../../../elite_edition_images');
+try {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+} catch (e) {
+  uploadDir = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
 }
 
 const memoryStorage = multer.memoryStorage();

@@ -743,13 +743,20 @@ export const api = {
     formData.append('image', file);
     if (folder) formData.append('folder', folder);
     
+    const token = localStorage.getItem('elite_auth_token');
+    const headers = {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    };
+
     const response = await fetch(`${getBaseUrl()}/upload`, {
       method: 'POST',
+      headers,
       body: formData
     });
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP error! status: ${response.status}`);
     }
     return response.json();
   },
