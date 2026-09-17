@@ -58,6 +58,12 @@ import {
 
 export default function CommunicationPanel({ currentUser, onNavigateTab, initialMainTab = 'chat' }) {
   const [mainTab, setMainTab] = useState(initialMainTab); // 'chat' | 'task'
+
+  useEffect(() => {
+    if (initialMainTab) {
+      setMainTab(initialMainTab);
+    }
+  }, [initialMainTab]);
   const [groups, setGroups] = useState([]);
   const [activeGroup, setActiveGroup] = useState(null);
   const [messages, setMessages] = useState([]);

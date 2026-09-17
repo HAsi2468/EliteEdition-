@@ -2058,13 +2058,9 @@ export default function App() {
             <UnicommerceHub />
           ) : activeTab === 'myntra' ? (
             <MyntraHub />
-          ) : activeTab === 'communication' || activeTab === 'workspace' ? (
-            <CommunicationPanel currentUser={currentUser} initialMainTab="chat" onNavigateTab={(tab) => setActiveTab(tab)} />
-          ) : activeTab === 'task_management' ? (
-            <CommunicationPanel currentUser={currentUser} initialMainTab="task" onNavigateTab={(tab) => setActiveTab(tab)} />
           ) : activeTab === 'admin' ? (
             <AdminPanel />
-          ) : (
+          ) : ['communication', 'workspace', 'task_management'].includes(activeTab) ? null : (
             <div style={styles.noAccessContainer}>
               <ShieldAlert size={48} color="var(--primary)" />
               <h3 style={{ marginTop: '1rem', color: 'var(--text-primary)' }}>Access Restricted</h3>
@@ -2075,9 +2071,9 @@ export default function App() {
           )}
           </Suspense>
 
-          {/* Persistent Workspace / Chat (always mounted to listen for socket notifications & record history) */}
-          <div style={{ display: activeTab === 'workspace' ? 'block' : 'none', height: '100%' }}>
-            <Workspace currentUser={currentUser} />
+          {/* Persistent CommunicationPanel (Chat & Task Manager - preserved across tab navigation) */}
+          <div style={{ display: (activeTab === 'communication' || activeTab === 'task_management' || activeTab === 'workspace') ? 'block' : 'none', height: '100%' }}>
+            <CommunicationPanel currentUser={currentUser} initialMainTab={activeTab === 'task_management' ? 'task' : 'chat'} onNavigateTab={(tab) => setActiveTab(tab)} />
           </div>
         </section>
       </main>

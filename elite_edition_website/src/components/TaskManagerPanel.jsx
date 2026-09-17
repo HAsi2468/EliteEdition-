@@ -125,6 +125,7 @@ const TASK_TEMPLATES = [
 ];
 
 export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
+  const { socket } = useSocket() || {};
   const [tasks, setTasks] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
