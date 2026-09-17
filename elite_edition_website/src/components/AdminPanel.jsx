@@ -73,12 +73,32 @@ export default function AdminPanel() {
     role: 'user',
     isMainAdmin: false,
     department: 'General',
-    status: 'Active',
     canManageTasks: true,
     canBroadcastChat: true,
     canExportReports: true,
     canDeleteRecords: true,
     canViewFinancials: true,
+    canCreateJobCards: true,
+    canEditJobCards: true,
+    canDeleteJobCards: true,
+    canAdvanceJobStage: true,
+    canViewJobCosts: true,
+    canCreateDesigns: true,
+    canEditDesigns: true,
+    canDeleteDesigns: true,
+    canViewDesignCosts: true,
+    canAddFabricInward: true,
+    canIssueFabricOutward: true,
+    canTransferFabricLot: true,
+    canDeleteFabricLogs: true,
+    canViewFabricPrices: true,
+    canCreateInvoices: true,
+    canEditInvoiceRates: true,
+    canCancelInvoices: true,
+    canRecordPayments: true,
+    canCreateStitchingJobs: true,
+    canIssueStitchingChallans: true,
+    canManageWorkerRates: true,
     allowedCompanies: ['Elite Online', 'Elite Digital Print', 'Elite Stitching', 'Elite Edition', 'Elite Fabtex'],
     permissions: []
   });
@@ -391,6 +411,27 @@ export default function AdminPanel() {
       canExportReports: user.canExportReports !== undefined ? Boolean(user.canExportReports) : true,
       canDeleteRecords: user.canDeleteRecords !== undefined ? Boolean(user.canDeleteRecords) : true,
       canViewFinancials: user.canViewFinancials !== undefined ? Boolean(user.canViewFinancials) : true,
+      canCreateJobCards: user.canCreateJobCards !== undefined ? Boolean(user.canCreateJobCards) : true,
+      canEditJobCards: user.canEditJobCards !== undefined ? Boolean(user.canEditJobCards) : true,
+      canDeleteJobCards: user.canDeleteJobCards !== undefined ? Boolean(user.canDeleteJobCards) : true,
+      canAdvanceJobStage: user.canAdvanceJobStage !== undefined ? Boolean(user.canAdvanceJobStage) : true,
+      canViewJobCosts: user.canViewJobCosts !== undefined ? Boolean(user.canViewJobCosts) : true,
+      canCreateDesigns: user.canCreateDesigns !== undefined ? Boolean(user.canCreateDesigns) : true,
+      canEditDesigns: user.canEditDesigns !== undefined ? Boolean(user.canEditDesigns) : true,
+      canDeleteDesigns: user.canDeleteDesigns !== undefined ? Boolean(user.canDeleteDesigns) : true,
+      canViewDesignCosts: user.canViewDesignCosts !== undefined ? Boolean(user.canViewDesignCosts) : true,
+      canAddFabricInward: user.canAddFabricInward !== undefined ? Boolean(user.canAddFabricInward) : true,
+      canIssueFabricOutward: user.canIssueFabricOutward !== undefined ? Boolean(user.canIssueFabricOutward) : true,
+      canTransferFabricLot: user.canTransferFabricLot !== undefined ? Boolean(user.canTransferFabricLot) : true,
+      canDeleteFabricLogs: user.canDeleteFabricLogs !== undefined ? Boolean(user.canDeleteFabricLogs) : true,
+      canViewFabricPrices: user.canViewFabricPrices !== undefined ? Boolean(user.canViewFabricPrices) : true,
+      canCreateInvoices: user.canCreateInvoices !== undefined ? Boolean(user.canCreateInvoices) : true,
+      canEditInvoiceRates: user.canEditInvoiceRates !== undefined ? Boolean(user.canEditInvoiceRates) : true,
+      canCancelInvoices: user.canCancelInvoices !== undefined ? Boolean(user.canCancelInvoices) : true,
+      canRecordPayments: user.canRecordPayments !== undefined ? Boolean(user.canRecordPayments) : true,
+      canCreateStitchingJobs: user.canCreateStitchingJobs !== undefined ? Boolean(user.canCreateStitchingJobs) : true,
+      canIssueStitchingChallans: user.canIssueStitchingChallans !== undefined ? Boolean(user.canIssueStitchingChallans) : true,
+      canManageWorkerRates: user.canManageWorkerRates !== undefined ? Boolean(user.canManageWorkerRates) : true,
       allowedCompanies: Array.isArray(user.allowedCompanies) && user.allowedCompanies.length > 0 ? user.allowedCompanies : ALL_COMPANY_NAMES,
       permissions: user.permissions || []
     });
@@ -414,6 +455,27 @@ export default function AdminPanel() {
       canExportReports: true,
       canDeleteRecords: true,
       canViewFinancials: true,
+      canCreateJobCards: true,
+      canEditJobCards: true,
+      canDeleteJobCards: true,
+      canAdvanceJobStage: true,
+      canViewJobCosts: true,
+      canCreateDesigns: true,
+      canEditDesigns: true,
+      canDeleteDesigns: true,
+      canViewDesignCosts: true,
+      canAddFabricInward: true,
+      canIssueFabricOutward: true,
+      canTransferFabricLot: true,
+      canDeleteFabricLogs: true,
+      canViewFabricPrices: true,
+      canCreateInvoices: true,
+      canEditInvoiceRates: true,
+      canCancelInvoices: true,
+      canRecordPayments: true,
+      canCreateStitchingJobs: true,
+      canIssueStitchingChallans: true,
+      canManageWorkerRates: true,
       allowedCompanies: ALL_COMPANY_NAMES,
       permissions: []
     });
@@ -1141,59 +1203,212 @@ export default function AdminPanel() {
                     </div>
 
                     {/* Action & Operational Privileges Card */}
-                    <div style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', marginBottom: '0.3rem', letterSpacing: '0.04em' }}>
-                        ⚙️ Granular Action & Operational Privileges
+                    <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                        <div>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            ⚙️ Granular Micro-Level Action & Operational Privileges
+                          </div>
+                          <p style={{ fontSize: '0.73rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                            Configure exact functional capabilities (Create, Edit, Delete, Stage Advances, Costing & Rates) per user within each screen.
+                          </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => setFormData(p => ({
+                              ...p,
+                              canManageTasks: true, canBroadcastChat: true, canExportReports: true, canDeleteRecords: true, canViewFinancials: true,
+                              canCreateJobCards: true, canEditJobCards: true, canDeleteJobCards: true, canAdvanceJobStage: true, canViewJobCosts: true,
+                              canCreateDesigns: true, canEditDesigns: true, canDeleteDesigns: true, canViewDesignCosts: true,
+                              canAddFabricInward: true, canIssueFabricOutward: true, canTransferFabricLot: true, canDeleteFabricLogs: true, canViewFabricPrices: true,
+                              canCreateInvoices: true, canEditInvoiceRates: true, canCancelInvoices: true, canRecordPayments: true,
+                              canCreateStitchingJobs: true, canIssueStitchingChallans: true, canManageWorkerRates: true
+                            }))}
+                            className="btn-secondary"
+                            style={{ padding: '0.25rem 0.55rem', fontSize: '0.72rem', fontWeight: 700 }}
+                          >
+                            Enable All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormData(p => ({
+                              ...p,
+                              canManageTasks: false, canBroadcastChat: false, canExportReports: false, canDeleteRecords: false, canViewFinancials: false,
+                              canCreateJobCards: false, canEditJobCards: false, canDeleteJobCards: false, canAdvanceJobStage: false, canViewJobCosts: false,
+                              canCreateDesigns: false, canEditDesigns: false, canDeleteDesigns: false, canViewDesignCosts: false,
+                              canAddFabricInward: false, canIssueFabricOutward: false, canTransferFabricLot: false, canDeleteFabricLogs: false, canViewFabricPrices: false,
+                              canCreateInvoices: false, canEditInvoiceRates: false, canCancelInvoices: false, canRecordPayments: false,
+                              canCreateStitchingJobs: false, canIssueStitchingChallans: false, canManageWorkerRates: false
+                            }))}
+                            className="btn-secondary"
+                            style={{ padding: '0.25rem 0.55rem', fontSize: '0.72rem', fontWeight: 700, color: '#dc2626' }}
+                          >
+                            Disable All
+                          </button>
+                        </div>
                       </div>
-                      <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0 0 0.65rem 0' }}>
-                        Configure key action capabilities beyond screen visibility.
-                      </p>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#ffffff', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', cursor: 'pointer', fontWeight: formData.canManageTasks ? 700 : 500 }}>
-                          <input
-                            type="checkbox"
-                            checked={formData.canManageTasks}
-                            onChange={e => setFormData(p => ({ ...p, canManageTasks: e.target.checked }))}
-                          />
-                          <span>📋 Task Creation & Assignment</span>
-                        </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginTop: '0.75rem' }}>
+                        
+                        {/* Section 1: System & General */}
+                        <div style={{ background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span>🌟 System & General Operations</span>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem' }}>
+                            <label style={styles.microLabel(formData.canManageTasks)}>
+                              <input type="checkbox" checked={formData.canManageTasks} onChange={e => setFormData(p => ({ ...p, canManageTasks: e.target.checked }))} />
+                              <span>📋 Task Creation & Assignment</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canBroadcastChat)}>
+                              <input type="checkbox" checked={formData.canBroadcastChat} onChange={e => setFormData(p => ({ ...p, canBroadcastChat: e.target.checked }))} />
+                              <span>💬 Chat Broadcast Announcements</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canExportReports)}>
+                              <input type="checkbox" checked={formData.canExportReports} onChange={e => setFormData(p => ({ ...p, canExportReports: e.target.checked }))} />
+                              <span>📥 Excel & PDF Report Export</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canDeleteRecords)}>
+                              <input type="checkbox" checked={formData.canDeleteRecords} onChange={e => setFormData(p => ({ ...p, canDeleteRecords: e.target.checked }))} />
+                              <span>⚠️ Edit & Delete Master Data</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canViewFinancials)}>
+                              <input type="checkbox" checked={formData.canViewFinancials} onChange={e => setFormData(p => ({ ...p, canViewFinancials: e.target.checked }))} />
+                              <span>💰 Purchase Cost & Margin Visibility</span>
+                            </label>
+                          </div>
+                        </div>
 
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#ffffff', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', cursor: 'pointer', fontWeight: formData.canBroadcastChat ? 700 : 500 }}>
-                          <input
-                            type="checkbox"
-                            checked={formData.canBroadcastChat}
-                            onChange={e => setFormData(p => ({ ...p, canBroadcastChat: e.target.checked }))}
-                          />
-                          <span>💬 Chat Broadcast Announcements</span>
-                        </label>
+                        {/* Section 2: Job Cards & Digital Print */}
+                        <div style={{ background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span>📦 Digital Printing & Job Cards</span>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem' }}>
+                            <label style={styles.microLabel(formData.canCreateJobCards)}>
+                              <input type="checkbox" checked={formData.canCreateJobCards} onChange={e => setFormData(p => ({ ...p, canCreateJobCards: e.target.checked }))} />
+                              <span>➕ Create New Job Cards</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canEditJobCards)}>
+                              <input type="checkbox" checked={formData.canEditJobCards} onChange={e => setFormData(p => ({ ...p, canEditJobCards: e.target.checked }))} />
+                              <span>✏️ Edit Job Card Details</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canAdvanceJobStage)}>
+                              <input type="checkbox" checked={formData.canAdvanceJobStage} onChange={e => setFormData(p => ({ ...p, canAdvanceJobStage: e.target.checked }))} />
+                              <span>⚡ Production Stage Transition</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canViewJobCosts)}>
+                              <input type="checkbox" checked={formData.canViewJobCosts} onChange={e => setFormData(p => ({ ...p, canViewJobCosts: e.target.checked }))} />
+                              <span>💰 View Printing Costs & Margins</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canDeleteJobCards)}>
+                              <input type="checkbox" checked={formData.canDeleteJobCards} onChange={e => setFormData(p => ({ ...p, canDeleteJobCards: e.target.checked }))} />
+                              <span>🗑️ Delete Job Cards</span>
+                            </label>
+                          </div>
+                        </div>
 
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#ffffff', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', cursor: 'pointer', fontWeight: formData.canExportReports ? 700 : 500 }}>
-                          <input
-                            type="checkbox"
-                            checked={formData.canExportReports}
-                            onChange={e => setFormData(p => ({ ...p, canExportReports: e.target.checked }))}
-                          />
-                          <span>📥 Excel & PDF Report Export</span>
-                        </label>
+                        {/* Section 3: Design Catalogue */}
+                        <div style={{ background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span>🎨 Design Catalogue & Assets</span>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem' }}>
+                            <label style={styles.microLabel(formData.canCreateDesigns)}>
+                              <input type="checkbox" checked={formData.canCreateDesigns} onChange={e => setFormData(p => ({ ...p, canCreateDesigns: e.target.checked }))} />
+                              <span>🎨 Create & Upload Designs</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canEditDesigns)}>
+                              <input type="checkbox" checked={formData.canEditDesigns} onChange={e => setFormData(p => ({ ...p, canEditDesigns: e.target.checked }))} />
+                              <span>✏️ Edit Design & Swap Images</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canViewDesignCosts)}>
+                              <input type="checkbox" checked={formData.canViewDesignCosts} onChange={e => setFormData(p => ({ ...p, canViewDesignCosts: e.target.checked }))} />
+                              <span>💵 View Design Meter Costs</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canDeleteDesigns)}>
+                              <input type="checkbox" checked={formData.canDeleteDesigns} onChange={e => setFormData(p => ({ ...p, canDeleteDesigns: e.target.checked }))} />
+                              <span>🗑️ Delete Designs</span>
+                            </label>
+                          </div>
+                        </div>
 
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#ffffff', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', cursor: 'pointer', fontWeight: formData.canDeleteRecords ? 700 : 500 }}>
-                          <input
-                            type="checkbox"
-                            checked={formData.canDeleteRecords}
-                            onChange={e => setFormData(p => ({ ...p, canDeleteRecords: e.target.checked }))}
-                          />
-                          <span>✏️ Edit & Delete Master Data</span>
-                        </label>
+                        {/* Section 4: Fabric Inventory */}
+                        <div style={{ background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#16a34a', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span>🧵 Fabric Inventory & Stock Control</span>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem' }}>
+                            <label style={styles.microLabel(formData.canAddFabricInward)}>
+                              <input type="checkbox" checked={formData.canAddFabricInward} onChange={e => setFormData(p => ({ ...p, canAddFabricInward: e.target.checked }))} />
+                              <span>📥 Inward Fabric Rolls & Lots</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canIssueFabricOutward)}>
+                              <input type="checkbox" checked={formData.canIssueFabricOutward} onChange={e => setFormData(p => ({ ...p, canIssueFabricOutward: e.target.checked }))} />
+                              <span>📦 Issue Fabric Outward</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canTransferFabricLot)}>
+                              <input type="checkbox" checked={formData.canTransferFabricLot} onChange={e => setFormData(p => ({ ...p, canTransferFabricLot: e.target.checked }))} />
+                              <span>🔄 Lot Stock Transfers & Rebalance</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canViewFabricPrices)}>
+                              <input type="checkbox" checked={formData.canViewFabricPrices} onChange={e => setFormData(p => ({ ...p, canViewFabricPrices: e.target.checked }))} />
+                              <span>🏷️ View Supplier Fabric Prices</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canDeleteFabricLogs)}>
+                              <input type="checkbox" checked={formData.canDeleteFabricLogs} onChange={e => setFormData(p => ({ ...p, canDeleteFabricLogs: e.target.checked }))} />
+                              <span>🗑️ Delete Inventory Logs</span>
+                            </label>
+                          </div>
+                        </div>
 
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#ffffff', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', cursor: 'pointer', fontWeight: formData.canViewFinancials ? 700 : 500 }}>
-                          <input
-                            type="checkbox"
-                            checked={formData.canViewFinancials}
-                            onChange={e => setFormData(p => ({ ...p, canViewFinancials: e.target.checked }))}
-                          />
-                          <span>💰 Purchase Cost & Margin Visibility</span>
-                        </label>
+                        {/* Section 5: Billing & Invoicing */}
+                        <div style={{ background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#7c3aed', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span>🧾 Billing, Invoices & GST Accounts</span>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem' }}>
+                            <label style={styles.microLabel(formData.canCreateInvoices)}>
+                              <input type="checkbox" checked={formData.canCreateInvoices} onChange={e => setFormData(p => ({ ...p, canCreateInvoices: e.target.checked }))} />
+                              <span>🧾 Generate Tax Invoices & Challans</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canEditInvoiceRates)}>
+                              <input type="checkbox" checked={formData.canEditInvoiceRates} onChange={e => setFormData(p => ({ ...p, canEditInvoiceRates: e.target.checked }))} />
+                              <span>✏️ Edit Billed Rates & Discounts</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canRecordPayments)}>
+                              <input type="checkbox" checked={formData.canRecordPayments} onChange={e => setFormData(p => ({ ...p, canRecordPayments: e.target.checked }))} />
+                              <span>💳 Record Payment Receipts</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canCancelInvoices)}>
+                              <input type="checkbox" checked={formData.canCancelInvoices} onChange={e => setFormData(p => ({ ...p, canCancelInvoices: e.target.checked }))} />
+                              <span>🚫 Cancel / Void Tax Invoices</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Section 6: Stitching */}
+                        <div style={{ background: '#ffffff', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ea580c', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <span>✂️ Garment Stitching Department</span>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.45rem' }}>
+                            <label style={styles.microLabel(formData.canCreateStitchingJobs)}>
+                              <input type="checkbox" checked={formData.canCreateStitchingJobs} onChange={e => setFormData(p => ({ ...p, canCreateStitchingJobs: e.target.checked }))} />
+                              <span>✂️ Create Stitching Job Cards</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canIssueStitchingChallans)}>
+                              <input type="checkbox" checked={formData.canIssueStitchingChallans} onChange={e => setFormData(p => ({ ...p, canIssueStitchingChallans: e.target.checked }))} />
+                              <span>📜 Issue Cutting & Stitching Challans</span>
+                            </label>
+                            <label style={styles.microLabel(formData.canManageWorkerRates)}>
+                              <input type="checkbox" checked={formData.canManageWorkerRates} onChange={e => setFormData(p => ({ ...p, canManageWorkerRates: e.target.checked }))} />
+                              <span>💰 Manage Piece-Rate Worker Wages</span>
+                            </label>
+                          </div>
+                        </div>
+
                       </div>
                     </div>
 
@@ -1928,6 +2143,20 @@ const styles = {
     margin: '0 0 0.25rem 2px',
     fontWeight: 500
   },
+  microLabel: (checked) => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.45rem',
+    background: checked ? '#f0f9ff' : '#ffffff',
+    padding: '0.4rem 0.55rem',
+    borderRadius: '6px',
+    border: checked ? '1px solid #93c5fd' : '1px solid #e2e8f0',
+    fontSize: '0.74rem',
+    cursor: 'pointer',
+    fontWeight: checked ? 700 : 500,
+    color: checked ? '#1e40af' : '#334155',
+    transition: 'all 0.15s ease'
+  }),
   checkboxGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
