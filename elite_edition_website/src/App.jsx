@@ -71,10 +71,12 @@ import {
   PanelLeftOpen,
   Clock,
   Sparkles,
+  Sliders,
   Bot
 } from 'lucide-react';
 
 import NotificationToastContainer, { triggerPushNotification, triggerGlobalDataRefresh, requestNotificationPermission, NotificationHistoryDrawer, getNotificationHistory } from './components/NotificationToast';
+import WebDevicePermissionsModal from './components/WebDevicePermissionsModal';
 import { useSocket } from './contexts/SocketContext';
 
 
@@ -464,12 +466,12 @@ export default function App() {
     }
   }, [isAuthenticated]);
 
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchData();
-      const intervalId = setInterval(() => {
-        fetchData();
-      }, 60000); // 60s auto-sync fallback (real-time updates handled via Socket.io)
+      // NO MORE 60s background polling! 100% Real-time Socket.io events across all screens!
 
       const handleDataRefresh = () => {
         fetchData();
@@ -477,7 +479,6 @@ export default function App() {
       window.addEventListener('elite-data-refresh', handleDataRefresh);
 
       return () => {
-        clearInterval(intervalId);
         window.removeEventListener('elite-data-refresh', handleDataRefresh);
       };
     }
@@ -556,12 +557,32 @@ export default function App() {
     socket.on('overdue-task-alert', handleOverdue);
     socket.on('mention-notification', handleMention);
     socket.on('job-stage-updated', handleJobStageUpdate);
+    socket.on('job-updated', handleDataUpdate);
+    socket.on('job-created', handleDataUpdate);
+    socket.on('job-deleted', handleDataUpdate);
+    socket.on('design-updated', handleDataUpdate);
+    socket.on('design-created', handleDataUpdate);
+    socket.on('design-deleted', handleDataUpdate);
+    socket.on('invoice-updated', handleDataUpdate);
+    socket.on('invoice-created', handleDataUpdate);
+    socket.on('invoice-deleted', handleDataUpdate);
+    socket.on('complaint-updated', handleDataUpdate);
+    socket.on('complaint-created', handleDataUpdate);
+    socket.on('complaint-deleted', handleDataUpdate);
+    socket.on('expense-updated', handleDataUpdate);
+    socket.on('expense-created', handleDataUpdate);
+    socket.on('expense-deleted', handleDataUpdate);
+    socket.on('inventory-updated', handleDataUpdate);
+    socket.on('inventory-created', handleDataUpdate);
+    socket.on('inventory-deleted', handleDataUpdate);
+    socket.on('sales-updated', handleDataUpdate);
+    socket.on('sales-created', handleDataUpdate);
+    socket.on('sales-deleted', handleDataUpdate);
     socket.on('task-updated', handleDataUpdate);
     socket.on('task-deleted', handleDataUpdate);
+    socket.on('task-created', handleDataUpdate);
     socket.on('proof-status-updated', handleDataUpdate);
     socket.on('global-room-updated', handleDataUpdate);
-    socket.on('invoice-updated', handleDataUpdate);
-    socket.on('inventory-updated', handleDataUpdate);
 
     return () => {
       socket.off('receive-message', handleReceiveMessage);
@@ -569,12 +590,32 @@ export default function App() {
       socket.off('overdue-task-alert', handleOverdue);
       socket.off('mention-notification', handleMention);
       socket.off('job-stage-updated', handleJobStageUpdate);
+      socket.off('job-updated', handleDataUpdate);
+      socket.off('job-created', handleDataUpdate);
+      socket.off('job-deleted', handleDataUpdate);
+      socket.off('design-updated', handleDataUpdate);
+      socket.off('design-created', handleDataUpdate);
+      socket.off('design-deleted', handleDataUpdate);
+      socket.off('invoice-updated', handleDataUpdate);
+      socket.off('invoice-created', handleDataUpdate);
+      socket.off('invoice-deleted', handleDataUpdate);
+      socket.off('complaint-updated', handleDataUpdate);
+      socket.off('complaint-created', handleDataUpdate);
+      socket.off('complaint-deleted', handleDataUpdate);
+      socket.off('expense-updated', handleDataUpdate);
+      socket.off('expense-created', handleDataUpdate);
+      socket.off('expense-deleted', handleDataUpdate);
+      socket.off('inventory-updated', handleDataUpdate);
+      socket.off('inventory-created', handleDataUpdate);
+      socket.off('inventory-deleted', handleDataUpdate);
+      socket.off('sales-updated', handleDataUpdate);
+      socket.off('sales-created', handleDataUpdate);
+      socket.off('sales-deleted', handleDataUpdate);
       socket.off('task-updated', handleDataUpdate);
       socket.off('task-deleted', handleDataUpdate);
+      socket.off('task-created', handleDataUpdate);
       socket.off('proof-status-updated', handleDataUpdate);
       socket.off('global-room-updated', handleDataUpdate);
-      socket.off('invoice-updated', handleDataUpdate);
-      socket.off('inventory-updated', handleDataUpdate);
     };
   }, [socket, isAuthenticated, currentUser?._id]);
 
@@ -1125,7 +1166,11 @@ export default function App() {
             )}
           </button>
 
-          <button onClick={fetchData} className="btn-icon" title="Reload Data">
+          <button onClick={() => setShowPermissionsModal(true)} className="btn-icon" title="Device Hardware & Web API Permissions Hub">
+            <Sliders size={15} color="var(--primary)" />
+          </button>
+
+          <button onClick={fetchData} className="btn-icon" title="Real-Time Socket Sync">
             <RefreshCw size={15} className={loading ? 'spin-loader' : ''} />
           </button>
 
@@ -2304,6 +2349,13 @@ export default function App() {
 
       {/* Global Elite Glassmorphic Modal Dialog */}
       <EliteModalDialog />
+
+      {/* Hardware & Web Device Permissions Hub Modal */}
+      <WebDevicePermissionsModal
+        isOpen={showPermissionsModal}
+        onClose={() => setShowPermissionsModal(false)}
+        currentUser={currentUser}
+      />
     </div>
   );
 }
