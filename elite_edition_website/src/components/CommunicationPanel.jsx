@@ -1685,7 +1685,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     }
 
                     const isAudioMsg = msg.type === 'audio-voice' || (msg.attachment && msg.attachment.fileType === 'audio');
-                    const isRecordCard = msg.type === 'record-card' || msg.activityMeta;
+                    const isRecordCard = msg.type === 'record-card' || Boolean(msg.activityMeta && msg.activityMeta.module);
 
                     return (
                       <div
@@ -1756,11 +1756,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           )}
 
                           {/* Quick Share Record Card */}
-                          {isRecordCard && msg.activityMeta && (
+                          {isRecordCard && msg.activityMeta && msg.activityMeta.module && (
                             <div style={{ background: isMe ? 'rgba(255,255,255,0.15)' : 'var(--bg-main)', padding: '0.55rem 0.75rem', borderRadius: '8px', border: isMe ? '1px solid rgba(255,255,255,0.3)' : '1px solid var(--border-light)', marginBottom: '0.35rem' }}>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '4px' }}>
                                 <span style={{ fontSize: '0.66rem', fontWeight: 800, color: isMe ? '#fff' : '#2563eb', textTransform: 'uppercase' }}>
-                                  🃏 {msg.activityMeta.module || 'RECORD CARD'}
+                                  🃏 {msg.activityMeta.module}
                                 </span>
                                 <button
                                   type="button"
