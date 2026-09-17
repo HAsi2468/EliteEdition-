@@ -22,17 +22,13 @@ const getGroups = async (req, res) => {
 
     if (currentUserId || currentUserIdStr) {
       const userMemberFilter = { $in: [currentUserId, currentUserIdStr].filter(Boolean) };
-      if (currentUser && currentUser.role === 'admin') {
-        query = { isArchived: { $ne: true } };
-      } else {
-        query = {
-          isArchived: { $ne: true },
-          $or: [
-            { members: userMemberFilter },
-            { type: { $ne: 'direct' } }
-          ]
-        };
-      }
+      query = {
+        isArchived: { $ne: true },
+        $or: [
+          { type: { $ne: 'direct' } },
+          { members: userMemberFilter }
+        ]
+      };
     }
 
     let rooms = await ChatRoom.find(query)
