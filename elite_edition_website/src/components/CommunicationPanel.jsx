@@ -1210,19 +1210,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             </button>
           )}
 
-          {mainTab === 'chat' && (
-            <button
-              onClick={handleSyncGroups}
-              disabled={syncing}
-              className="btn-secondary"
-              style={{ fontSize: '0.78rem', padding: '0.45rem 0.9rem', gap: '0.4rem', borderRadius: '9px', fontWeight: 700 }}
-              title="Re-synchronize department access groups based on current user authorities"
-            >
-              <RefreshCw size={13} className={syncing ? 'spin-loader' : ''} />
-              <span>{syncing ? 'Syncing...' : 'Sync Groups'}</span>
-            </button>
-          )}
-
           <button
             onClick={async () => {
               if (!window.confirm('Are you sure you want to force a hard reload for ALL connected users across the company? Connected browsers will clear caches and reload immediately.')) return;
@@ -1300,29 +1287,6 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             >
               <User size={13} />
               <span>Personal DMs</span>
-            </button>
-
-            <button
-              onClick={() => setRosterTab('tasks')}
-              style={{
-                flex: 1,
-                padding: '0.35rem 0.45rem',
-                fontSize: '0.74rem',
-                fontWeight: 800,
-                borderRadius: '6px',
-                border: rosterTab === 'tasks' ? '1px solid #2563eb' : '1px solid transparent',
-                background: rosterTab === 'tasks' ? '#2563eb' : 'transparent',
-                color: rosterTab === 'tasks' ? '#ffffff' : 'var(--text-muted)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '4px',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <CheckSquare size={13} />
-              <span>Task</span>
             </button>
           </div>
 
