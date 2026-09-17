@@ -358,9 +358,12 @@ const syncChallanStatusForInvoice = async (invoice) => {
 
   if (challanNosToLookup.size > 0) {
     const numList = Array.from(challanNosToLookup);
-    const fChs = await FabricChallan.find({ challanNo: { $in: numList } }, '_id').lean();
+    const strList = numList.map(n => String(n));
+    const edpList = numList.map(n => `EDP-${n}`);
+    const matchFilter = { $in: [...numList, ...strList, ...edpList] };
+    const fChs = await FabricChallan.find({ challanNo: matchFilter }, '_id').lean();
     fChs.forEach(fc => activeIdsSet.add(String(fc._id)));
-    const sChs = await StitchingChallan.find({ challanNo: { $in: numList } }, '_id').lean();
+    const sChs = await StitchingChallan.find({ challanNo: matchFilter }, '_id').lean();
     sChs.forEach(sc => activeIdsSet.add(String(sc._id)));
   }
 
@@ -385,24 +388,24 @@ const syncChallanStatusForInvoice = async (invoice) => {
   if (toUnlinkFabric.length > 0) {
     await FabricChallan.updateMany(
       { _id: { $in: toUnlinkFabric } },
-      { $set: { status: 'PENDING' }, $unset: { invoiceId: 1, invoiceNo: 1 } }
+      { $set: { status: 'PENDING', billingStatus: 'PENDING', isBilled: false }, $unset: { invoiceId: 1, invoiceNo: 1 } }
     );
   }
   if (toUnlinkStitching.length > 0) {
     await StitchingChallan.updateMany(
       { _id: { $in: toUnlinkStitching } },
-      { $set: { status: 'PENDING' }, $unset: { invoiceId: 1, invoiceNo: 1 } }
+      { $set: { status: 'PENDING', billingStatus: 'PENDING', isBilled: false }, $unset: { invoiceId: 1, invoiceNo: 1 } }
     );
   }
 
   if (activeObjectIds.length > 0) {
     await FabricChallan.updateMany(
       { _id: { $in: activeObjectIds } },
-      { $set: { status: 'INVOICED', invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
+      { $set: { status: 'INVOICED', billingStatus: 'INVOICED', isBilled: true, invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
     );
     await StitchingChallan.updateMany(
       { _id: { $in: activeObjectIds } },
-      { $set: { status: 'INVOICED', invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
+      { $set: { status: 'INVOICED', billingStatus: 'INVOICED', isBilled: true, invoiceId: invoice._id, invoiceNo: invoice.invoiceNo } }
     );
   }
 };
