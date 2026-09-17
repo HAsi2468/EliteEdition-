@@ -144,22 +144,31 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     if (!socket) return;
 
-    if (currentUser) {
-      const uId = currentUser.id || currentUser._id;
+    const uId = currentUser?._id || currentUser?.id;
+
+    const handleConnect = () => {
       if (uId) {
         socket.emit('register-user', uId);
       }
-    }
+      if (activeGroupIdRef.current) {
+        socket.emit('join-room', activeGroupIdRef.current);
+      }
+    };
+
+    handleConnect();
 
     const handleReceiveMessage = (msg) => {
       const currentActiveId = activeGroupIdRef.current;
       if (currentActiveId && String(msg.roomId) === String(currentActiveId)) {
         setMessages((prev) => {
           // Filter out optimistic placeholder if real message arrives
-          const filtered = prev.filter((m) => !(m.isOptimistic && m.content === msg.content));
+          const filtered = prev.filter((m) => !(m.isOptimistic && (m.content === msg.content || String(m._id) === String(msg._id))));
           if (filtered.some((m) => String(m._id) === String(msg._id))) return filtered;
           return [...filtered, msg];
         });
+        if (socket && uId) {
+          socket.emit('read-room-messages', { roomId: currentActiveId, userId: uId });
+        }
       }
       fetchGroups(false);
     };
@@ -246,6 +255,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }
     };
 
+    socket.on('connect', handleConnect);
     socket.on('receive-message', handleReceiveMessage);
     socket.on('message-acknowledged', handleAck);
     socket.on('activity-notification', handleActivity);
@@ -256,6 +266,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     socket.on('room-messages-read', handleRoomMessagesRead);
 
     return () => {
+      socket.off('connect', handleConnect);
       socket.off('receive-message', handleReceiveMessage);
       socket.off('message-acknowledged', handleAck);
       socket.off('activity-notification', handleActivity);
@@ -640,21 +651,37 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       scopeVal = 'complain';
     }
 
-    const messageText = `Shared Record @${refVal} (${cardTitle})`;
+    const actMeta = {
+      action: 'SHARE_RECORD',
+      module: shareRecordCategory === 'jobcard' ? 'Job Card' : shareRecordCategory === 'design' ? 'Design' : shareRecordCategory === 'invoice' ? 'Invoice' : 'Complaint',
+      recordRef: refVal,
+      recordId: item._id,
+      permissionScope: scopeVal
+    };
+
+    const tempMsg = {
+      _id: 'temp_' + Date.now(),
+      roomId: activeGroup._id,
+      senderId: typeof currentUser === 'object' ? currentUser : { _id: myId, name: 'You' },
+      content: cardTitle,
+      createdAt: new Date().toISOString(),
+      type: 'record-card',
+      msgType: 'human',
+      activityMeta: actMeta,
+      recordMentions: [{ recordType: shareRecordCategory, recordRef: refVal }],
+      readBy: [myId],
+      isOptimistic: true
+    };
+
+    setMessages((prev) => [...prev, tempMsg]);
 
     if (socket) {
       socket.emit('send-message', {
         roomId: activeGroup._id,
         senderId: myId,
-        content: messageText,
+        content: cardTitle,
         type: 'record-card',
-        activityMeta: {
-          action: 'SHARE_RECORD',
-          module: shareRecordCategory === 'jobcard' ? 'Job Card' : shareRecordCategory === 'design' ? 'Design' : shareRecordCategory === 'invoice' ? 'Invoice' : 'Complaint',
-          recordRef: refVal,
-          recordId: item._id,
-          permissionScope: scopeVal
-        },
+        activityMeta: actMeta,
         recordMentions: [{ recordType: shareRecordCategory, recordRef: refVal }]
       });
     }
@@ -1008,13 +1035,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const handleRecordClick = (meta) => {
     if (!onNavigateTab || !meta) return;
     const scope = (meta.permissionScope || meta.module || '').toLowerCase();
-    if (scope.includes('jobcard')) onNavigateTab('jobcards_list');
+    if (scope.includes('jobcard') || scope.includes('job card')) onNavigateTab('jobcards');
+    else if (scope.includes('catalogue') || scope.includes('design')) onNavigateTab('catalog');
+    else if (scope.includes('billing') || scope.includes('invoice')) onNavigateTab('ee_invoices');
+    else if (scope.includes('complain') || scope.includes('complaint')) onNavigateTab('ee_complaints');
     else if (scope.includes('fabric')) onNavigateTab('jobcards_fabric');
-    else if (scope.includes('billing')) onNavigateTab('jobcards_billing');
     else if (scope.includes('inventory')) onNavigateTab('inventory');
-    else if (scope.includes('complain')) onNavigateTab('jobcards_complain');
     else if (scope.includes('stitching')) onNavigateTab('jobcards_stitching_challan');
     else if (scope.includes('expense')) onNavigateTab('jobcards_expense');
+    else onNavigateTab('jobcards');
   };
 
   const renderContentWithMentions = (text) => {

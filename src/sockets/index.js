@@ -40,7 +40,11 @@ const setupSockets = (io) => {
 
         const senderUser = await User.findById(senderId);
         if (senderUser && senderUser.role !== 'admin') {
-          const isMember = targetRoom.members && targetRoom.members.some(m => String(m) === String(senderId));
+          const isMember = targetRoom.members && targetRoom.members.some((m) => {
+            if (!m) return false;
+            const memberIdStr = String(typeof m === 'object' ? (m._id || m.id || m) : m);
+            return memberIdStr === String(senderId);
+          });
           if (!isMember) {
             console.warn(`Unauthorized socket message attempt by user ${senderId} in room ${roomId}`);
             return;
@@ -105,6 +109,16 @@ const setupSockets = (io) => {
 
         // Broadcast to everyone in the room (including sender)
         io.to(roomId).emit('receive-message', populatedMessage);
+
+        // Also broadcast directly to personal channels of all room members so they get real-time messages & unread updates instantly
+        if (targetRoom.members && targetRoom.members.length > 0) {
+          targetRoom.members.forEach((m) => {
+            const mIdStr = String(typeof m === 'object' ? (m._id || m.id || m) : m);
+            if (mIdStr) {
+              io.to(`user_${mIdStr}`).emit('receive-message', populatedMessage);
+            }
+          });
+        }
 
         // Emit direct notification to each mentioned user
         if (mentions.length > 0) {
