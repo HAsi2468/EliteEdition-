@@ -1170,8 +1170,17 @@ export default function App() {
             <Sliders size={15} color="var(--primary)" />
           </button>
 
-          <button onClick={fetchData} className="btn-icon" title="Real-Time Socket Sync">
-            <RefreshCw size={15} className={loading ? 'spin-loader' : ''} />
+          <button
+            onClick={() => {
+              fetchData();
+              if (typeof window !== 'undefined' && window.showToast) {
+                window.showToast('🔄 Live data refreshed across all departments', 'info');
+              }
+            }}
+            className={`btn-icon master-refresh-btn ${loading ? 'is-refreshing' : ''}`}
+            title="Master Refresh — Re-sync all live socket data"
+          >
+            <RefreshCw size={16} className={loading ? 'spin-loader' : ''} />
           </button>
 
           <div style={styles.divider}></div>

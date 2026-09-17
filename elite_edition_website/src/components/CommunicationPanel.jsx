@@ -44,6 +44,8 @@ import {
   PinOff,
   Folder,
   Volume2,
+  VolumeX,
+  Smile,
   Play,
   Pause,
   Eye,
@@ -127,6 +129,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [showInRoomSearch, setShowInRoomSearch] = useState(false);
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
   const [playingAudioId, setPlayingAudioId] = useState(null);
+  const [chatSoundMuted, setChatSoundMuted] = useState(() => typeof localStorage !== 'undefined' && localStorage.getItem('elite_chat_sound_muted') === 'true');
 
   const socket = useSocket();
   const chatBottomRef = useRef(null);
@@ -692,6 +695,21 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   // ── REACTION, PIN & EXPORT CHAT HANDLERS ──
   const handleToggleReaction = (messageId, emoji) => {
     const userId = currentUser?.id || currentUser?._id;
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m._id !== messageId) return m;
+        const currentReactions = { ...(m.reactions || {}) };
+        const userList = currentReactions[emoji] || [];
+        const uName = currentUser?.name || 'Staff';
+        if (userList.includes(uName)) {
+          currentReactions[emoji] = userList.filter((u) => u !== uName);
+          if (currentReactions[emoji].length === 0) delete currentReactions[emoji];
+        } else {
+          currentReactions[emoji] = [...userList, uName];
+        }
+        return { ...m, reactions: currentReactions };
+      })
+    );
     if (socket && activeGroup) {
       socket.emit('toggle-reaction', { messageId, emoji, userId, roomId: activeGroup._id });
     }
@@ -1562,6 +1580,31 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         ))}
                       </div>
 
+                      {/* In-Stream Search Toggle */}
+                      <button
+                        onClick={() => setShowInRoomSearch(!showInRoomSearch)}
+                        className="btn-secondary"
+                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px', background: showInRoomSearch ? 'rgba(56,189,248,0.15)' : undefined, borderColor: showInRoomSearch ? 'var(--primary)' : undefined }}
+                        title="Search keywords inside this message stream"
+                      >
+                        <Search size={13} color={showInRoomSearch ? 'var(--primary)' : 'currentColor'} />
+                        <span>Search</span>
+                      </button>
+
+                      {/* Audio Chime Mute/Unmute Toggle */}
+                      <button
+                        onClick={() => {
+                          const next = !chatSoundMuted;
+                          setChatSoundMuted(next);
+                          if (typeof localStorage !== 'undefined') localStorage.setItem('elite_chat_sound_muted', String(next));
+                        }}
+                        className="btn-secondary"
+                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', borderRadius: '6px' }}
+                        title={chatSoundMuted ? "Unmute Chat Sound Chimes" : "Mute Chat Sound Chimes"}
+                      >
+                        {chatSoundMuted ? <VolumeX size={13} color="#ef4444" /> : <Volume2 size={13} color="#10b981" />}
+                      </button>
+
                       <button
                         onClick={() => setShowGalleryModal(true)}
                         className="btn-secondary"
@@ -1610,6 +1653,26 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 );
               })()}
 
+              {/* In-Room Live Search Input Banner */}
+              {showInRoomSearch && (
+                <div style={{ padding: '0.5rem 1rem', background: 'var(--bg-card)', borderBottom: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Search size={14} color="var(--primary)" />
+                  <input
+                    type="text"
+                    placeholder="Search keywords, record references, or staff names in this chat..."
+                    value={inRoomQuery}
+                    onChange={(e) => setInRoomQuery(e.target.value)}
+                    style={{ flex: 1, border: '1px solid var(--border-light)', borderRadius: '6px', padding: '0.4rem 0.75rem', fontSize: '0.8rem', background: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none' }}
+                    autoFocus
+                  />
+                  {inRoomQuery && (
+                    <button onClick={() => setInRoomQuery('')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Pinned Messages Banner */}
               {messages.some((m) => m.isPinned) && (
                 <div style={{ background: '#fef3c7', borderBottom: '1px solid #fde68a', padding: '0.45rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: '#92400e', fontWeight: 700, flexShrink: 0 }}>
@@ -1631,18 +1694,42 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
               {/* Messages & Activity Stream Container */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--bg-main)' }}>
-                {loadingMessages ? (
-                  <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    <RefreshCw size={20} className="spin-loader" style={{ marginBottom: '0.5rem' }} />
-                    <div>Loading stream history...</div>
-                  </div>
-                ) : messages.length === 0 ? (
-                  <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    <MessageSquare size={32} style={{ marginBottom: '0.5rem', opacity: 0.4 }} />
-                    <div>No messages in this stream yet. Start the conversation below!</div>
-                  </div>
-                ) : (
-                  (showPinnedOnly ? messages.filter((m) => m.isPinned) : messages).map((msg) => {
+                {(() => {
+                  let filteredList = showPinnedOnly ? messages.filter((m) => m.isPinned) : messages;
+                  if (msgFilter === 'human') filteredList = filteredList.filter((m) => m.msgType !== 'system_activity');
+                  if (msgFilter === 'system_activity') filteredList = filteredList.filter((m) => m.msgType === 'system_activity');
+                  if (msgFilter === 'urgent') filteredList = filteredList.filter((m) => m.isUrgent);
+                  if (msgFilter === 'media') filteredList = filteredList.filter((m) => m.attachment);
+
+                  if (inRoomQuery.trim()) {
+                    const q = inRoomQuery.toLowerCase();
+                    filteredList = filteredList.filter(
+                      (m) =>
+                        (m.content || '').toLowerCase().includes(q) ||
+                        (m.senderName || m.senderId?.name || '').toLowerCase().includes(q) ||
+                        (m.moduleName || '').toLowerCase().includes(q)
+                    );
+                  }
+
+                  if (loadingMessages) {
+                    return (
+                      <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                        <RefreshCw size={20} className="spin-loader" style={{ marginBottom: '0.5rem' }} />
+                        <div>Loading stream history...</div>
+                      </div>
+                    );
+                  }
+
+                  if (filteredList.length === 0) {
+                    return (
+                      <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                        <MessageSquare size={32} style={{ marginBottom: '0.5rem', opacity: 0.4 }} />
+                        <div>{inRoomQuery ? `No messages found matching "${inRoomQuery}"` : 'No messages in this stream yet. Start the conversation below!'}</div>
+                      </div>
+                    );
+                  }
+
+                  return filteredList.map((msg) => {
                     const isMe = String(msg.senderId?._id || msg.senderId) === String(currentUser?.id || currentUser?._id);
                     const isSystemActivity = msg.msgType === 'system_activity';
 
@@ -1731,6 +1818,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           <span>{msg.senderId?.name || msg.senderName || 'Staff Member'}</span>
                           <span>·</span>
                           <span>{formatTime(msg.createdAt)}</span>
+                          {isMe && <CheckCheck size={13} color="#38bdf8" style={{ marginLeft: '2px' }} />}
                           {msg.isPinned && (
                             <span style={{ color: '#d97706', fontWeight: 800, background: '#fef3c7', padding: '1px 4px', borderRadius: '3px', fontSize: '0.62rem' }}>
                               📌 PINNED
@@ -1830,13 +1918,15 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           {renderContentWithMentions(msg.content)}
 
                           {/* Reaction Badges */}
-                          {msg.reactions && msg.reactions.length > 0 && (
+                          {msg.reactions && (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '5px' }}>
                               {Object.entries(
-                                msg.reactions.reduce((acc, r) => {
-                                  acc[r.emoji] = (acc[r.emoji] || 0) + 1;
-                                  return acc;
-                                }, {})
+                                Array.isArray(msg.reactions)
+                                  ? msg.reactions.reduce((acc, r) => {
+                                      acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                                      return acc;
+                                    }, {})
+                                  : Object.fromEntries(Object.entries(msg.reactions).map(([e, users]) => [e, users.length]))
                               ).map(([emoji, count]) => (
                                 <span
                                   key={emoji}
@@ -1891,11 +1981,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             </div>
                           )}
                         </div>
-
                       </div>
                     );
-                  })
-                )}
+                  });
+                })()}
                 <div ref={chatBottomRef} />
               </div>
 

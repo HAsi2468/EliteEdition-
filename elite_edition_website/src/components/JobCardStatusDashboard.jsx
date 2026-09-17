@@ -359,18 +359,8 @@ export default function JobCardStatusDashboard({ onSelectCard, department = 'dig
             </div>
           </div>
 
-          {/* Quick Refresh & PDF Export Actions */}
+          {/* PDF Export Action */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <button
-              onClick={fetchCards}
-              disabled={loading}
-              title="Refresh Status Metrics"
-              style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-            >
-              <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
-              <span>Refresh</span>
-            </button>
-
             <button
               onClick={handleDownloadPdfReport}
               title="Download Pending Status PDF Report"
