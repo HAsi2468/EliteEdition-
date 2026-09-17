@@ -62,6 +62,7 @@ import {
   Menu,
   X,
   Bell,
+  BellRing,
   Users,
   Scissors,
   Building,
@@ -416,6 +417,8 @@ export default function App() {
     return getNotificationHistory().filter(h => !h.read).length;
   });
 
+  const [notificationPerm, setNotificationPerm] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'));
+
   useEffect(() => {
     const handleNotifUpdate = () => {
       setUnreadNotifCount(getNotificationHistory().filter(h => !h.read).length);
@@ -423,6 +426,43 @@ export default function App() {
     window.addEventListener('elite-notification-history-update', handleNotifUpdate);
     return () => window.removeEventListener('elite-notification-history-update', handleNotifUpdate);
   }, []);
+
+  // Auto-request push notification permission as soon as user logs in or reloads page
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    if ('Notification' in window && Notification.permission === 'default') {
+      const askPerm = async () => {
+        try {
+          const res = await requestNotificationPermission();
+          setNotificationPerm(res);
+        } catch (e) {
+          console.warn('Deferred notification prompt:', e);
+        }
+      };
+
+      const handleUserInteraction = () => {
+        askPerm();
+        window.removeEventListener('click', handleUserInteraction);
+        window.removeEventListener('keydown', handleUserInteraction);
+      };
+
+      window.addEventListener('click', handleUserInteraction);
+      window.addEventListener('keydown', handleUserInteraction);
+
+      const timer = setTimeout(() => {
+        if (Notification.permission === 'default') {
+          askPerm();
+        }
+      }, 1500);
+
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('click', handleUserInteraction);
+        window.removeEventListener('keydown', handleUserInteraction);
+      };
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -894,6 +934,55 @@ export default function App() {
 
   return (
     <div style={styles.appContainer} className="app-container">
+      {/* ── Auto Push Notification Request Banner ── */}
+      {isAuthenticated && notificationPerm !== 'granted' && notificationPerm !== 'dismissed' && (
+        <div style={{
+          background: 'linear-gradient(90deg, #2563eb 0%, #1d4ed8 100%)',
+          color: '#ffffff',
+          padding: '0.45rem 1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '0.78rem',
+          fontWeight: 700,
+          boxShadow: '0 2px 8px rgba(37,99,235,0.3)',
+          zIndex: 9999,
+          position: 'relative'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <BellRing size={16} color="#ffffff" />
+            <span>Enable Push Notifications to receive real-time Chat, Personal DM, Job Card & Task Alerts instantly!</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              onClick={async () => {
+                const res = await requestNotificationPermission();
+                setNotificationPerm(res);
+              }}
+              style={{
+                background: '#ffffff',
+                color: '#2563eb',
+                border: 'none',
+                padding: '0.3rem 0.8rem',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+              }}
+            >
+              Enable Notifications Now 🔔
+            </button>
+            <button
+              onClick={() => setNotificationPerm('dismissed')}
+              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Navbar */}
       <header className="glass-panel app-header" style={styles.header}>
         <div style={styles.headerLeft} className="header-left-wrap">
