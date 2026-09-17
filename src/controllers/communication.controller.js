@@ -93,13 +93,14 @@ const getGroupMessages = async (req, res) => {
     }
 
     const requestingUser = req.user || (req.query.userId ? await User.findById(req.query.userId) : null);
+    const reqUserIdStr = String(requestingUser ? requestingUser._id : (req.query.userId || ''));
     if (requestingUser && requestingUser.role !== 'admin') {
       const isMember = room.members && room.members.some((m) => {
         if (!m) return false;
         const memberIdStr = String(typeof m === 'object' ? (m._id || m.id || m) : m);
-        return memberIdStr === String(requestingUser._id);
+        return memberIdStr === reqUserIdStr;
       });
-      if (!isMember) {
+      if (!isMember && room.type !== 'direct') {
         return res.status(403).json({ success: false, message: 'Access denied: You are not a member of this chat room' });
       }
     }

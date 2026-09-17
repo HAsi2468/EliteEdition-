@@ -147,13 +147,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     activeGroupIdRef.current = activeGroup?._id;
   }, [activeGroup?._id]);
 
-  // Initialize Socket.io connection listeners & fetch groups
+  // Initialize Socket.io connection listeners & fetch groups & user directory
   useEffect(() => {
     fetchGroups();
 
-    if (!socket) return;
-
     const uId = currentUser?._id || currentUser?.id;
+    if (uId) {
+      api.getCommunicationUsers(uId).then((res) => {
+        if (res.success && res.data) {
+          setAllUsers(res.data);
+        }
+      }).catch((e) => console.warn('Failed to fetch initial staff users:', e));
+    }
+
+    if (!socket) return;
 
     const handleConnect = () => {
       if (uId) {
@@ -400,7 +407,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const handleStartDirectChat = async (targetUser) => {
     try {
       const myId = currentUser?._id || currentUser?.id;
-      const res = await api.createOrGetDirectRoom(targetUser._id, myId);
+      const targetId = targetUser._id || targetUser.id;
+      const res = await api.createOrGetDirectRoom(targetId, myId);
       if (res.success && res.data) {
         const dmRoom = res.data;
         setShowNewDmModal(false);
@@ -410,6 +418,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           const exists = prev.some((g) => String(g._id) === String(dmRoom._id));
           return exists ? prev : [dmRoom, ...prev];
         });
+        if (socket && dmRoom._id) {
+          socket.emit('join-room', dmRoom._id);
+        }
+        fetchGroupMessages(dmRoom._id, msgFilter, true);
         await fetchGroups(false);
       }
     } catch (err) {
@@ -1383,6 +1395,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         handleStartDirectChat(group.user);
                       } else {
                         setActiveGroup(group);
+                        if (socket && group._id) {
+                          socket.emit('join-room', group._id);
+                        }
+                        fetchGroupMessages(group._id, msgFilter, true);
                       }
                     }}
                     style={{

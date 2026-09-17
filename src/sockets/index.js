@@ -36,7 +36,10 @@ const setupSockets = (io) => {
         
         // Membership Security Check: Ensure sender belongs to room or is admin
         const targetRoom = await ChatRoom.findById(roomId);
-        if (!targetRoom) return;
+        if (!targetRoom) {
+          console.warn(`send-message failed: Room ${roomId} not found`);
+          return;
+        }
 
         const senderUser = await User.findById(senderId);
         if (senderUser && senderUser.role !== 'admin') {
@@ -46,8 +49,14 @@ const setupSockets = (io) => {
             return memberIdStr === String(senderId);
           });
           if (!isMember) {
-            console.warn(`Unauthorized socket message attempt by user ${senderId} in room ${roomId}`);
-            return;
+            if (targetRoom.type === 'direct') {
+              const mongoose = require('mongoose');
+              targetRoom.members.push(mongoose.Types.ObjectId.isValid(senderId) ? new mongoose.Types.ObjectId(senderId) : senderId);
+              await targetRoom.save();
+            } else {
+              console.warn(`Unauthorized socket message attempt by user ${senderId} in room ${roomId}`);
+              return;
+            }
           }
         }
         
