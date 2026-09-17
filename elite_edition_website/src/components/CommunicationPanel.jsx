@@ -68,7 +68,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [activeGroup, setActiveGroup] = useState(null);
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
+  const [roomDrafts, setRoomDrafts] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Auto-restore draft message per room/DM conversation
+  useEffect(() => {
+    if (!activeGroup?._id) return;
+    setInputMessage(roomDrafts[activeGroup._id] || '');
+  }, [activeGroup?._id]);
   const [msgFilter, setMsgFilter] = useState('all'); // 'all' | 'human' | 'system_activity' | 'urgent' | 'media'
   const [rosterTab, setRosterTab] = useState('groups'); // 'groups' | 'direct'
   const [isUrgent, setIsUrgent] = useState(false);
@@ -186,6 +193,23 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           socket.emit('read-room-messages', { roomId: currentActiveId, userId: uId });
         }
       }
+
+      setGroups((prevGroups) => {
+        return prevGroups.map((g) => {
+          if (String(g._id) === String(msg.roomId)) {
+            const isCurrentActive = currentActiveId && String(g._id) === String(currentActiveId);
+            const newUnread = isCurrentActive ? 0 : (g.unreadCount || 0) + 1;
+            return {
+              ...g,
+              lastMessage: msg,
+              unreadCount: newUnread,
+              updatedAt: msg.createdAt || new Date().toISOString()
+            };
+          }
+          return g;
+        }).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+      });
+
       fetchGroups(false);
     };
 
@@ -805,6 +829,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         content: messageText,
         priority: isUrgent ? 'urgent' : 'normal',
         attachment: attachedFile || undefined,
+      });
+    }
+
+    if (activeGroup?._id) {
+      setRoomDrafts((prev) => {
+        const copy = { ...prev };
+        delete copy[activeGroup._id];
+        return copy;
       });
     }
 
@@ -2064,7 +2096,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       type="text"
                       placeholder={`Message channel or ask @EliteAI JC-1004...`}
                       value={inputMessage}
-                      onChange={(e) => setInputMessage(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setInputMessage(val);
+                        if (activeGroup?._id) {
+                          setRoomDrafts((prev) => ({ ...prev, [activeGroup._id]: val }));
+                        }
+                      }}
                       style={{ flex: 1, padding: '0.55rem 0.85rem', fontSize: '0.85rem', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
                     />
 
