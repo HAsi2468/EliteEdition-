@@ -357,14 +357,13 @@ const syncChallanStatusForInvoice = async (invoice) => {
   }
 
   if (challanNosToLookup.size > 0) {
-    const numList = Array.from(challanNosToLookup);
-    const strList = numList.map(n => String(n));
-    const edpList = numList.map(n => `EDP-${n}`);
-    const matchFilter = { $in: [...numList, ...strList, ...edpList] };
-    const fChs = await FabricChallan.find({ challanNo: matchFilter }, '_id').lean();
-    fChs.forEach(fc => activeIdsSet.add(String(fc._id)));
-    const sChs = await StitchingChallan.find({ challanNo: matchFilter }, '_id').lean();
-    sChs.forEach(sc => activeIdsSet.add(String(sc._id)));
+    const numList = Array.from(challanNosToLookup).map(n => parseInt(String(n).replace(/[^0-9]/g, ''), 10)).filter(n => !isNaN(n) && n > 0);
+    if (numList.length > 0) {
+      const fChs = await FabricChallan.find({ challanNo: { $in: numList } }, '_id').lean();
+      fChs.forEach(fc => activeIdsSet.add(String(fc._id)));
+      const sChs = await StitchingChallan.find({ challanNo: { $in: numList } }, '_id').lean();
+      sChs.forEach(sc => activeIdsSet.add(String(sc._id)));
+    }
   }
 
   const activeIds = Array.from(activeIdsSet);
