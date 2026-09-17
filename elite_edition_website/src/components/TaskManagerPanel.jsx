@@ -427,11 +427,19 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
           <div style={{ width: 38, height: 38, borderRadius: '10px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}>
             <CheckSquare size={22} />
           </div>
-            <div>
-              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-                Task
-              </h2>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+              Workforce Task Manager
+            </h2>
+            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>{filteredTasks.length} Tasks Listed</span>
+              {tasks.filter(t => t.activeTimer && t.activeTimer.startTime).length > 0 && (
+                <span style={{ color: '#16a34a', background: '#dcfce7', border: '1px solid #86efac', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
+                  ⏱️ {tasks.filter(t => t.activeTimer && t.activeTimer.startTime).length} Active Timers
+                </span>
+              )}
             </div>
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -651,25 +659,60 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                               )}
                             </div>
 
-                            {/* Checklist & Due Date Meta */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--text-muted)', paddingTop: '2px' }}>
-                              {totalCheck > 0 ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 600, color: completedCheck === totalCheck ? '#16a34a' : 'var(--text-muted)' }}>
-                                  <CheckSquare size={12} />
-                                  <span>{completedCheck}/{totalCheck}</span>
+                            {/* Sub-Task Checklist Visual Progress Bar */}
+                            {totalCheck > 0 && (
+                              <div style={{ marginTop: '2px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '2px' }}>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <CheckSquare size={11} color={completedCheck === totalCheck ? '#16a34a' : 'var(--primary)'} />
+                                    <span>Checklist</span>
+                                  </span>
+                                  <span>{completedCheck}/{totalCheck} ({Math.round((completedCheck / totalCheck) * 100)}%)</span>
                                 </div>
-                              ) : <span />}
+                                <div style={{ width: '100%', height: '4px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <div style={{ width: `${(completedCheck / totalCheck) * 100}%`, height: '100%', background: completedCheck === totalCheck ? '#16a34a' : '#2563eb', transition: 'width 0.3s ease' }} />
+                                </div>
+                              </div>
+                            )}
 
-                              {t.dueDate && (
+                            {/* Due Date & Time Log Meta */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--text-muted)', paddingTop: '2px' }}>
+                              {t.dueDate ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 700, color: isOverdue ? '#ef4444' : 'var(--text-muted)' }}>
                                   <Calendar size={11} />
                                   <span>Due: {new Date(t.dueDate).toLocaleDateString()}</span>
                                 </div>
+                              ) : <span />}
+
+                              {t.estimatedHours > 0 && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '0.64rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                                  <Clock size={10} />
+                                  <span>Est: {t.estimatedHours}h</span>
+                                </div>
                               )}
                             </div>
 
-                            {/* Footer: Move Dropdown */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: '3px', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)' }}>
+                            {/* Footer: One-Tap Quick Advance & Move Select */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '3px', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)' }}>
+                              {t.status !== 'Done' ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const nextMap = { 'Backlog': 'To Do', 'To Do': 'In Progress', 'In Progress': 'In Review', 'In Review': 'Done' };
+                                    if (nextMap[t.status]) handleStatusChange(t, nextMap[t.status]);
+                                  }}
+                                  style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#2563eb', fontSize: '0.64rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                  title={`Advance to ${t.status === 'In Review' ? 'Done' : 'Next Stage'}`}
+                                >
+                                  <span>{t.status === 'In Review' ? '✓ Mark Done' : `➔ ${t.status === 'Backlog' ? 'To Do' : t.status === 'To Do' ? 'In Progress' : 'In Review'}`}</span>
+                                </button>
+                              ) : (
+                                <span style={{ fontSize: '0.64rem', color: '#16a34a', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                  <CheckCircle2 size={12} /> Done
+                                </span>
+                              )}
+
                               {/* Status Quick Shift Select */}
                               <select
                                 value={t.status}
