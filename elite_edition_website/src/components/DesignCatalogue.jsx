@@ -214,24 +214,24 @@ function DesignImageField({ label, name, value, onChange, placeholder }) {
   const processAndUploadFile = async (file) => {
     if (!file) return;
     try {
-      // 1. Try R2 / Server Upload first
-      const options = { maxSizeMB: 1.5, maxWidthOrHeight: 2048, useWebWorker: true };
-      const compressedFile = await imageCompression(file, options);
-      const res = await api.uploadImage(compressedFile);
-      if (res && res.url) {
-        onChange({ target: { name, value: res.url } });
-        return;
-      }
-    } catch (err) {
-      console.warn('[DesignImageField] Server upload failed, falling back to local compressed Base64:', err.message);
-    }
-
-    // 2. Base64 Fallback if server upload fails or R2 unavailable
-    try {
+      // 1. Convert file to compressed Base64 immediately so preview loads 100% instantly
       const base64 = await compressAndConvertToBase64(file);
       onChange({ target: { name, value: base64 } });
-    } catch (fallbackErr) {
-      alert('Failed to process image file: ' + fallbackErr.message);
+
+      // 2. Try background server upload
+      try {
+        const options = { maxSizeMB: 1.5, maxWidthOrHeight: 2048, useWebWorker: true };
+        const compressedFile = await imageCompression(file, options);
+        const res = await api.uploadImage(compressedFile);
+        if (res && res.url) {
+          // If server upload returned a CDN or server URL, upgrade to it
+          onChange({ target: { name, value: res.url } });
+        }
+      } catch (uploadErr) {
+        console.warn('[DesignImageField] Background server upload warning:', uploadErr.message);
+      }
+    } catch (err) {
+      alert('Failed to process image file: ' + err.message);
     }
   };
 

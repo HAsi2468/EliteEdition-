@@ -133,23 +133,28 @@ app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res, next) => {
     return res.redirect(302, r2Url);
   }
 
-  // Check if any matching photo file exists in imagesDir (e.g. ED-613 D.jpg, ED-613(1).jpg, ed-613.jpeg)
+  // Check if any matching photo file exists in imagesDir or uploads (e.g. ED-613 D.jpg, image-123.jpg)
   try {
-    const files = fs.readdirSync(imagesDir);
-    const targetUpper = cleanName.toUpperCase();
-    const matchedFile = files.find(f => {
-      if (f.startsWith('.')) return false;
-      const fBase = f.replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '').trim().toUpperCase();
-      return fBase === targetUpper ||
-             fBase.startsWith(targetUpper + ' ') ||
-             fBase.startsWith(targetUpper + '(') ||
-             fBase.startsWith(targetUpper + '-');
-    });
+    const searchDirs = [imagesDir, path.join(__dirname, '../uploads'), path.join(process.cwd(), 'uploads')];
+    for (const sDir of searchDirs) {
+      if (!fs.existsSync(sDir)) continue;
+      const files = fs.readdirSync(sDir);
+      const targetUpper = cleanName.toUpperCase();
+      const matchedFile = files.find(f => {
+        if (f.startsWith('.')) return false;
+        const fBase = f.replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '').trim().toUpperCase();
+        return fBase === targetUpper ||
+               fBase === filename.toUpperCase() ||
+               fBase.startsWith(targetUpper + ' ') ||
+               fBase.startsWith(targetUpper + '(') ||
+               fBase.startsWith(targetUpper + '-');
+      });
 
-    if (matchedFile) {
-      const fullPath = path.join(imagesDir, matchedFile);
-      if (fs.existsSync(fullPath) && fs.statSync(fullPath).size > 500) {
-        return res.sendFile(fullPath);
+      if (matchedFile) {
+        const fullPath = path.join(sDir, matchedFile);
+        if (fs.existsSync(fullPath) && fs.statSync(fullPath).size > 100) {
+          return res.sendFile(fullPath);
+        }
       }
     }
   } catch (e) {
