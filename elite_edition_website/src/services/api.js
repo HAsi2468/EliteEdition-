@@ -774,7 +774,7 @@ export const api = {
     formData.append('file', file);
     formData.append('folder', folder);
 
-    const response = await fetch(`${getBaseUrl()}/chat-task/upload`, {
+    const response = await fetch(`${getBaseUrl()}/workspace/upload`, {
       method: 'POST',
       body: formData
     });
