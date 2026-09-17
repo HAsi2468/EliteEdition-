@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
+import { useSocket } from '../contexts/SocketContext';
 import {
   CheckSquare,
   Clock,
@@ -83,6 +84,39 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   useEffect(() => {
     fetchInitialData();
   }, []);
+
+  // ── REAL-TIME SOCKET EVENT LISTENERS ──
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleTaskCreated = (newTask) => {
+      setTasks((prev) => {
+        if (prev.some((t) => String(t._id) === String(newTask._id))) return prev;
+        return [newTask, ...prev];
+      });
+    };
+
+    const handleTaskUpdated = (updatedTask) => {
+      setTasks((prev) => prev.map((t) => (String(t._id) === String(updatedTask._id) ? updatedTask : t)));
+      setSelectedTask((prev) => (prev && String(prev._id) === String(updatedTask._id) ? updatedTask : prev));
+    };
+
+    const handleTaskDeleted = (deletedData) => {
+      const delId = deletedData._id || deletedData.taskId;
+      setTasks((prev) => prev.filter((t) => String(t._id) !== String(delId)));
+      setSelectedTask((prev) => (prev && String(prev._id) === String(delId) ? null : prev));
+    };
+
+    socket.on('task-created', handleTaskCreated);
+    socket.on('task-updated', handleTaskUpdated);
+    socket.on('task-deleted', handleTaskDeleted);
+
+    return () => {
+      socket.off('task-created', handleTaskCreated);
+      socket.off('task-updated', handleTaskUpdated);
+      socket.off('task-deleted', handleTaskDeleted);
+    };
+  }, [socket]);
 
   // Timer ticker interval
   useEffect(() => {
