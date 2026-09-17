@@ -47,6 +47,13 @@ export default function WebDevicePermissionsModal({ isOpen, onClose, currentUser
   useEffect(() => {
     if (isOpen) {
       refreshPermissions();
+      const handlePermChange = () => refreshPermissions();
+      window.addEventListener('focus', handlePermChange);
+      window.addEventListener('elite-permission-change', handlePermChange);
+      return () => {
+        window.removeEventListener('focus', handlePermChange);
+        window.removeEventListener('elite-permission-change', handlePermChange);
+      };
     }
   }, [isOpen]);
 
@@ -214,7 +221,7 @@ export default function WebDevicePermissionsModal({ isOpen, onClose, currentUser
                 <div style={styles.permDesc}>Real-time OS desktop banners & floating popups for Chat, DMs & Tasks</div>
               </div>
             </div>
-            <button onClick={requestNotificationPermission} className="btn-secondary" style={styles.actionBtn}>
+            <button onClick={async () => { await requestNotificationPermission(); refreshPermissions(); }} className="btn-secondary" style={styles.actionBtn}>
               {permStates.notifications === 'granted' ? 'Active ✓' : 'Enable'}
             </button>
           </div>

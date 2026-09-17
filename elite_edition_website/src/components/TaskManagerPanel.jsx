@@ -631,6 +631,14 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     return 'Admin';
   };
 
+  const isAdmin = (currentUser?.role || '').toLowerCase() === 'admin' || currentUser?.username === 'admin';
+
+  useEffect(() => {
+    if (!isAdmin && ['timeline', 'leaderboard', 'timesheets'].includes(activeView)) {
+      setActiveView('kanban');
+    }
+  }, [isAdmin, activeView]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '0.75rem', background: 'var(--bg-main)', boxSizing: 'border-box' }}>
       
@@ -663,9 +671,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
             {[
               { id: 'kanban', label: 'Kanban Board', icon: LayoutGrid },
               { id: 'list', label: 'List View', icon: List },
-              { id: 'timeline', label: '📊 Timeline / Gantt', icon: CalendarRange },
-              { id: 'leaderboard', label: '🏆 Leaderboard', icon: Trophy },
-              { id: 'timesheets', label: 'Timesheets', icon: Clock },
+              ...(isAdmin ? [
+                { id: 'timeline', label: '📊 Timeline / Gantt', icon: CalendarRange },
+                { id: 'leaderboard', label: '🏆 Leaderboard', icon: Trophy },
+                { id: 'timesheets', label: 'Timesheets', icon: Clock },
+              ] : [])
             ].map((v) => {
               const IconComp = v.icon;
               return (

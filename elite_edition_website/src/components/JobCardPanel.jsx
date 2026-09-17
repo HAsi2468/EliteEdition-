@@ -138,16 +138,23 @@ function convertDriveUrl(link) {
     return link;
   }
   
+  // Handle local uploaded files e.g. "uploads/chat-123.jpg" or "/designs/ED-01.jpg"
+  if (link.includes('uploads/') || link.includes('designs/')) {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    let cleanPath = link.startsWith('/') ? link : `/${link}`;
+    return origin ? `${origin}${cleanPath}` : cleanPath;
+  }
+  
   // If it's a Google Drive link
   if (link.includes('drive.google.com') || link.includes('googleusercontent') || link.includes('lh3.google')) {
-    if (link.includes('uc?export') || link.includes('lh3.google') || link.includes('googleusercontent')) return link;
+    if (link.includes('thumbnail?id=') || link.includes('lh3.googleusercontent.com')) return link;
     const fileMatch = link.match(/\/d\/([-\w]{20,})/);
-    if (fileMatch) return `https://drive.google.com/uc?export=view&id=${fileMatch[1]}`;
+    if (fileMatch) return `https://drive.google.com/thumbnail?id=${fileMatch[1]}&sz=w1000`;
     const openMatch = link.match(/[?&]id=([-\w]{20,})/);
-    if (openMatch) return `https://drive.google.com/uc?export=view&id=${openMatch[1]}`;
+    if (openMatch) return `https://drive.google.com/thumbnail?id=${openMatch[1]}&sz=w1000`;
     if (link.includes('/folders/')) return '';
     const idMatch = link.match(/([-\w]{25,})/);
-    return idMatch ? `https://drive.google.com/uc?export=view&id=${idMatch[1]}` : link;
+    return idMatch ? `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1000` : link;
   }
   
   // If it's any other external link (e.g. starts with http)

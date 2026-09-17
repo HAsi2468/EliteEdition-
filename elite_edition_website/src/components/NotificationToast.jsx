@@ -132,20 +132,35 @@ export const requestNotificationPermission = async () => {
     return 'unsupported';
   }
   if (Notification.permission === 'granted') {
+    window.dispatchEvent(new CustomEvent('elite-permission-change', { detail: 'granted' }));
     triggerPushNotification('Push Notifications Active 🔔', 'Real-time alerts active for Chat, Tasks, Job Cards, and Sales.', 'info');
     return 'granted';
   }
   try {
-    const perm = await Notification.requestPermission();
-    if (perm === 'granted') {
-      triggerPushNotification('Notifications Enabled! 🎉', 'You will now receive real-time popups for Chat, Tasks, and Operations.', 'success');
-    } else if (perm === 'denied') {
-      alert('Notification permission is currently BLOCKED in your browser.\n\nTo enable notifications:\n1. Click the Lock/Settings icon 🔒 next to the website URL at the top left of your browser bar.\n2. Change "Notifications" from Block to Allow.\n3. Refresh the page.');
+    let perm = Notification.permission;
+    if (typeof Notification.requestPermission === 'function') {
+      const result = Notification.requestPermission();
+      if (result && typeof result.then === 'function') {
+        perm = await result;
+      } else {
+        perm = await new Promise((resolve) => Notification.requestPermission(resolve));
+      }
     }
-    return perm;
+    const finalPerm = perm || Notification.permission;
+    window.dispatchEvent(new CustomEvent('elite-permission-change', { detail: finalPerm }));
+    if (finalPerm === 'granted' || Notification.permission === 'granted') {
+      triggerPushNotification('Notifications Enabled! 🎉', 'You will now receive real-time popups for Chat, Tasks, and Operations.', 'success');
+      return 'granted';
+    } else if (finalPerm === 'denied' || Notification.permission === 'denied') {
+      alert('Notification permission is currently BLOCKED in your browser.\n\nTo enable notifications:\n1. Click the Lock/Settings icon 🔒 next to the website URL at the top left of your browser bar.\n2. Change "Notifications" from Block to Allow.\n3. Refresh the page.');
+      return 'denied';
+    }
+    return finalPerm || Notification.permission;
   } catch (e) {
     console.error('Failed to request notification permission:', e);
-    return Notification.permission;
+    const curr = Notification.permission;
+    window.dispatchEvent(new CustomEvent('elite-permission-change', { detail: curr }));
+    return curr;
   }
 };
 
@@ -215,7 +230,30 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
     if (isOpen) refreshHistory();
     const handleUpdate = () => refreshHistory();
     window.addEventListener('elite-notification-history-update', handleUpdate);
-    return () => window.removeEventListener('elite-notification-history-update', handleUpdate);
+    
+    const updatePerm = () => {
+      if ('Notification' in window) {
+        setPermStatus(Notification.permission);
+      }
+    };
+    updatePerm();
+
+    window.addEventListener('focus', updatePerm);
+    window.addEventListener('elite-permission-change', updatePerm);
+
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'notifications' }).then((status) => {
+        status.onchange = () => {
+          updatePerm();
+        };
+      }).catch(() => {});
+    }
+
+    return () => {
+      window.removeEventListener('elite-notification-history-update', handleUpdate);
+      window.removeEventListener('focus', updatePerm);
+      window.removeEventListener('elite-permission-change', updatePerm);
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
