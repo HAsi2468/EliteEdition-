@@ -359,6 +359,8 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     }
   };
 
+  const [quickScope, setQuickScope] = useState('all'); // 'all' | 'my_tasks' | 'due_today' | 'overdue'
+
   // Filter tasks logic
   const filteredTasks = tasks.filter((t) => {
     if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
@@ -369,6 +371,26 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         return aId === assigneeFilter;
       });
       if (!hasAssignee) return false;
+    }
+
+    if (quickScope === 'my_tasks') {
+      const isMine = (t.assignees || []).some((a) => {
+        const aId = String(typeof a === 'object' ? (a._id || a.id) : a);
+        return aId === myId;
+      });
+      if (!isMine && String(t.createdBy?._id || t.createdBy) !== myId) return false;
+    }
+
+    if (quickScope === 'due_today') {
+      if (!t.dueDate) return false;
+      const todayStr = new Date().toDateString();
+      const dueStr = new Date(t.dueDate).toDateString();
+      if (todayStr !== dueStr) return false;
+    }
+
+    if (quickScope === 'overdue') {
+      const isOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done';
+      if (!isOverdue) return false;
     }
 
     const term = searchQuery.toLowerCase().trim();
@@ -384,11 +406,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
   const getPriorityBadge = (priority) => {
     switch ((priority || '').toLowerCase()) {
-      case 'urgent': return { label: 'URGENT', color: '#dc2626', bg: '#fee2e2', border: '#fca5a5' };
-      case 'high': return { label: 'HIGH', color: '#d97706', bg: '#fef3c7', border: '#fde68a' };
-      case 'medium': return { label: 'MED', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' };
-      case 'low': return { label: 'LOW', color: '#64748b', bg: '#f1f5f9', border: '#e2e8f0' };
-      default: return { label: 'MED', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' };
+      case 'urgent': return { label: '🔥 URGENT', color: '#dc2626', bg: '#fee2e2', border: '#fca5a5' };
+      case 'high': return { label: '⚡ HIGH', color: '#d97706', bg: '#fef3c7', border: '#fde68a' };
+      case 'medium': return { label: '🟡 MED', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' };
+      case 'low': return { label: '🟢 LOW', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' };
+      default: return { label: '🟡 MED', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' };
     }
   };
 
@@ -503,8 +525,35 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
           />
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Quick Scope Filter Pills */}
+          <div style={{ display: 'flex', background: '#f8fafc', padding: '2px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+            {[
+              { id: 'all', label: 'All Tasks' },
+              { id: 'my_tasks', label: '👤 Mine' },
+              { id: 'due_today', label: '⏰ Due Today' },
+              { id: 'overdue', label: '🚨 Overdue' },
+            ].map((scope) => (
+              <button
+                key={scope.id}
+                onClick={() => setQuickScope(scope.id)}
+                style={{
+                  background: quickScope === scope.id ? '#2563eb' : 'transparent',
+                  color: quickScope === scope.id ? '#ffffff' : 'var(--text-muted)',
+                  border: 'none',
+                  fontSize: '0.72rem',
+                  fontWeight: quickScope === scope.id ? 800 : 600,
+                  padding: '0.25rem 0.55rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {scope.label}
+              </button>
+            ))}
+          </div>
+
           {/* Filter by Assignee */}
           <select
             value={assigneeFilter}
