@@ -2,19 +2,17 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { isR2Configured, uploadToR2 } = require('../../utils/r2Storage');
 
 const router = express.Router();
 
-// Define storage location - we want it to go to ../../elite_edition_images 
-// so it gets served under /designs statically
 const uploadDir = path.join(__dirname, '../../../../elite_edition_images');
-
-// Ensure directory exists
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-const storage = multer.diskStorage({
+const memoryStorage = multer.memoryStorage();
+const diskStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadDir);
   },
@@ -31,14 +29,62 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage: storage });
+// Dynamic multer middleware depending on R2 availability
+const upload = multer({
+  storage: isR2Configured() ? memoryStorage : diskStorage,
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB max per image/file
+});
 
-router.post('/', upload.single('image'), (req, res) => {
+router.post('/', upload.single('image'), async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: 'No image file provided' });
+    return res.status(400).json({ error: 'No image or attachment file provided' });
   }
 
+  const folder = (req.body?.folder || req.query?.folder || 'designs').trim();
   const designName = (req.body?.designName || req.query?.designName || '').trim();
+
+  // 1. Cloudflare R2 Upload Path
+  if (isR2Configured()) {
+    try {
+      let ext = path.extname(req.file.originalname);
+      if (!ext || ext === '.') {
+        if (req.file.mimetype === 'image/jpeg') ext = '.jpg';
+        else if (req.file.mimetype === 'image/png') ext = '.png';
+        else if (req.file.mimetype === 'image/webp') ext = '.webp';
+        else if (req.file.mimetype === 'application/pdf') ext = '.pdf';
+        else ext = '.bin';
+      }
+
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const rawBase = path.basename(req.file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `${rawBase || 'file'}-${uniqueSuffix}${ext}`;
+
+      // Upload file to R2 under specified folder (e.g. "Complaints/Digital_Print" or "designs")
+      const r2Url = await uploadToR2({
+        buffer: req.file.buffer,
+        fileName: filename,
+        mimeType: req.file.mimetype,
+        folder: folder
+      });
+
+      // If designName is provided and folder is designs, also upload named version e.g. "ED-709.jpg"
+      if (designName && folder === 'designs') {
+        await uploadToR2({
+          buffer: req.file.buffer,
+          fileName: `${designName}${ext}`,
+          mimeType: req.file.mimetype,
+          folder: 'designs'
+        }).catch(err => console.warn('[R2] Failed to save designName copy:', err.message));
+      }
+
+      return res.json({ url: r2Url, filename, folder });
+    } catch (err) {
+      console.error('[Cloudflare R2] Upload error:', err);
+      return res.status(500).json({ error: 'Failed to upload file to Cloudflare R2: ' + err.message });
+    }
+  }
+
+  // 2. Fallback Local Disk Path
   if (designName) {
     const ext = path.extname(req.file.filename) || '.jpg';
     const namedPath = path.join(uploadDir, `${designName}${ext}`);
@@ -50,7 +96,8 @@ router.post('/', upload.single('image'), (req, res) => {
   }
 
   const fileUrl = `/designs/${req.file.filename}`;
-  res.json({ url: fileUrl });
+  res.json({ url: fileUrl, folder });
 });
+
 
 module.exports = router;

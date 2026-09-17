@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const BillingInvoice = require('../db/models/billingInvoice.model');
 const BillingCustomer = require('../db/models/billingCustomer.model');
 const BillingItem = require('../db/models/billingItem.model');

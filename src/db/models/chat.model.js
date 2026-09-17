@@ -88,7 +88,7 @@ const chatMessageSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['text', 'task-card'],
+      enum: ['text', 'task-card', 'record-card', 'audio-voice'],
       default: 'text',
     },
     taskId: {
@@ -110,8 +110,10 @@ const chatMessageSchema = new mongoose.Schema(
       fileName: { type: String },
       fileType: { type: String },
       fileUrl: { type: String },
-      fileSize: { type: Number }
+      fileSize: { type: Number },
+      durationSec: { type: Number }
     },
+
     readBy: [
       {
         type: mongoose.Schema.Types.ObjectId,

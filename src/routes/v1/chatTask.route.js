@@ -8,13 +8,16 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+const { isR2Configured, uploadToR2, getPresignedR2UploadUrl } = require('../../utils/r2Storage');
+
 // Ensure uploads dir exists
 const uploadsDir = path.join(__dirname, '../../../uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-const storage = multer.diskStorage({
+const memoryStorage = multer.memoryStorage();
+const diskStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadsDir);
   },
@@ -23,84 +26,54 @@ const storage = multer.diskStorage({
     cb(null, 'chat-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage: isR2Configured() ? memoryStorage : diskStorage,
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit per attachment
+});
 
 const router = express.Router();
 
-const DEFAULT_AUTO_GROUPS = [
-  { name: '[EDP] Billing & Invoicing', description: 'GST Invoicing, Accounts & Receivables Group', type: 'group' },
-  { name: '[EDP] Fabric Inventory', description: 'Fabric Inward, Outward & Dispatch Challans Group', type: 'group' },
-  { name: '[EDP] Job Cards', description: 'Digital Printing & Production Job Cards Group', type: 'group' },
-  { name: '[EDP] Design Room', description: 'Design Library, Master Assets & Patterns Group', type: 'group' },
-  { name: '[ST] Stitching Department', description: 'Stitching Production & Fabric Challans Group', type: 'group' },
-  { name: '[EE] E-Commerce Inventory', description: 'Elite Edition Online Inventory & Dispatch Group', type: 'group' }
-];
 
-async function ensureAutoScreenGroupsExist() {
-  try {
-    for (const grp of DEFAULT_AUTO_GROUPS) {
-      const existing = await ChatRoom.findOne({ name: grp.name });
-      if (!existing) {
-        await ChatRoom.create({
-          name: grp.name,
-          type: 'group',
-          description: grp.description,
-          members: []
-        });
-      }
-    }
-  } catch (err) {
-    console.error('Error ensuring auto screen groups exist:', err);
-  }
-}
-
-// Generate Pre-signed URL for S3
-router.post('/presign', async (req, res) => {
-  try {
-    const { fileType } = req.body;
-    if (!config.aws.accessKeyId) {
-      return res.status(500).json({ success: false, message: 'AWS credentials not configured' });
-    }
-
-    const s3Client = new S3Client({
-      region: config.aws.region,
-      credentials: {
-        accessKeyId: config.aws.accessKeyId,
-        secretAccessKey: config.aws.secretAccessKey,
-      },
-    });
-
-    const fileExtension = fileType.split('/')[1] || 'jpg';
-    const fileName = `uploads/${crypto.randomUUID()}.${fileExtension}`;
-
-    const command = new PutObjectCommand({
-      Bucket: config.aws.bucketName,
-      Key: fileName,
-      ContentType: fileType,
-    });
-
-    // URL valid for 60 seconds
-    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 60 });
-
-    res.json({
-      success: true,
-      data: {
-        uploadUrl: signedUrl,
-        fileUrl: `https://${config.aws.bucketName}.s3.${config.aws.region}.amazonaws.com/${fileName}`
-      }
-    });
-  } catch (error) {
-    console.error('Error generating presigned URL:', error);
-    res.status(500).json({ success: false, message: 'Failed to generate presigned URL', error: error.message });
-  }
-});
-
-// Mock Upload Route
-router.post('/upload', upload.single('file'), (req, res) => {
+// Upload Route for Chat & Workspace (Cloudflare R2 Storage)
+router.post('/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
+
+    const targetFolder = (req.body?.folder || req.query?.folder || 'Chat').trim();
+
+    // If R2 is configured and file was stored in memory/disk, upload to R2
+    if (isR2Configured()) {
+      const fileBuffer = req.file.buffer || fs.readFileSync(req.file.path);
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = path.extname(req.file.originalname) || '.bin';
+      const rawBase = path.basename(req.file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+      const fileName = `${rawBase || 'file'}-${uniqueSuffix}${ext}`;
+      
+      const r2Url = await uploadToR2({
+        buffer: fileBuffer,
+        fileName,
+        mimeType: req.file.mimetype,
+        folder: targetFolder
+      });
+
+      // Cleanup local temp file if it was saved on disk
+      if (req.file.path && fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path); } catch (e) {}
+      }
+
+      return res.json({
+        success: true,
+        fileUrl: r2Url,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        fileType: req.file.mimetype,
+        folder: targetFolder
+      });
+    }
+
+    // Fallback local file URL
     const host = req.get('host');
     const protocol = req.protocol;
     const fileUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
@@ -109,13 +82,69 @@ router.post('/upload', upload.single('file'), (req, res) => {
       fileUrl,
       fileName: req.file.originalname,
       fileSize: req.file.size,
-      fileType: req.file.mimetype
+      fileType: req.file.mimetype,
+      folder: targetFolder
     });
   } catch (error) {
-    console.error('Error handling mock upload:', error);
-    res.status(500).json({ success: false, message: 'Failed to upload file' });
+    console.error('Error handling upload:', error);
+    res.status(500).json({ success: false, message: 'Failed to upload file: ' + error.message });
   }
 });
+
+// List R2 Chat & Workspace Attachments
+router.get('/r2-attachments', async (req, res) => {
+  try {
+    const { listR2Objects } = require('../../utils/r2Storage');
+    const items = await listR2Objects({ folder: 'Chat' });
+
+    const roomGroups = {};
+    items.forEach(item => {
+      const parts = item.key.split('/');
+      const roomName = parts.length > 2 ? parts[1] : 'General';
+      if (!roomGroups[roomName]) {
+        roomGroups[roomName] = { roomName, fileCount: 0, totalSizeBytes: 0, files: [] };
+      }
+      roomGroups[roomName].fileCount += 1;
+      roomGroups[roomName].totalSizeBytes += (item.sizeBytes || 0);
+      roomGroups[roomName].files.push(item);
+    });
+
+    res.json({
+      success: true,
+      totalFiles: items.length,
+      rooms: Object.values(roomGroups),
+      rawFiles: items
+    });
+  } catch (err) {
+    console.error('Error listing chat R2 attachments:', err);
+    res.status(500).json({ success: false, message: 'Failed to list R2 chat attachments', error: err.message });
+  }
+});
+
+// Clear R2 Chat Attachments by Room/Folder
+router.delete('/r2-attachments', async (req, res) => {
+  try {
+    const { roomName = 'General' } = req.query;
+    const { deleteR2Folder } = require('../../utils/r2Storage');
+
+    const cleanRoom = String(roomName).trim().replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_');
+    const targetFolder = `Chat/${cleanRoom}`;
+
+    const deletedCount = await deleteR2Folder(targetFolder);
+
+    res.json({
+      success: true,
+      message: `Successfully cleared ${deletedCount} chat file(s) from Cloudflare R2 under folder "${targetFolder}".`,
+      roomName: cleanRoom,
+      folder: targetFolder,
+      deletedCount
+    });
+  } catch (err) {
+    console.error('Error clearing chat R2 attachments:', err);
+    res.status(500).json({ success: false, message: 'Failed to clear R2 chat attachments', error: err.message });
+  }
+});
+
 
 router.get('/rooms', async (req, res) => {
   try {
@@ -295,14 +324,15 @@ router.get('/rooms/:roomId/messages', async (req, res) => {
     const limitVal = parseInt(limit, 10);
 
     const messages = await ChatMessage.find(query)
-      .populate('senderId', 'name email')
+      .populate('senderId', 'name username email')
+      .populate('readBy', 'name username email')
       .populate({
         path: 'reactions.user',
         select: 'name username email'
       })
       .populate({
         path: 'replyTo',
-        populate: { path: 'senderId', select: 'name email' }
+        populate: { path: 'senderId', select: 'name username email' }
       })
       .populate({
         path: 'taskId',
@@ -311,7 +341,7 @@ router.get('/rooms/:roomId/messages', async (req, res) => {
           { path: 'comments.sender', select: 'name username email' }
         ]
       })
-      .sort({ createdAt: -1 }) // Newest first for cursor limit query
+      .sort({ createdAt: -1 })
       .limit(limitVal);
 
     // Reverse to return chronological order (oldest first)

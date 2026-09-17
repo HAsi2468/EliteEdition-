@@ -29,10 +29,10 @@ const setupSockets = (io) => {
       io.emit('presence-sync', getOnlineUserIds());
     });
 
-    // Handle sending a standard text message (supports quoted replies, attachments, mentions, priority)
+    // Handle sending a standard text message (supports quoted replies, attachments, mentions, priority, voice notes, record cards)
     socket.on('send-message', async (data) => {
       try {
-        const { roomId, senderId, content, replyTo, attachment, priority } = data;
+        const { roomId, senderId, content, replyTo, attachment, priority, type, activityMeta, recordMentions: inRecordMentions } = data;
         
         // Parse user mentions
         const mentionRegex = /@(\w+)/g;
@@ -45,15 +45,19 @@ const setupSockets = (io) => {
         }
 
         // Parse record mentions e.g. @JC-1004, @DES-55, @INV-201
-        const recordMentions = [];
-        const recordRegex = /@(JC|DES|INV)-([a-zA-Z0-9_-]+)/gi;
-        const recordMatches = [...content.matchAll(recordRegex)];
-        recordMatches.forEach((m) => {
-          const prefix = m[1].toUpperCase();
-          const refVal = m[0].replace(/^@/, '');
-          const rType = prefix === 'JC' ? 'jobcard' : prefix === 'DES' ? 'design' : 'invoice';
-          recordMentions.push({ recordType: rType, recordRef: refVal });
-        });
+        const recordMentions = inRecordMentions || [];
+        if (!inRecordMentions) {
+          const recordRegex = /@(JC|DES|INV)-([a-zA-Z0-9_-]+)/gi;
+          const recordMatches = [...content.matchAll(recordRegex)];
+          recordMatches.forEach((m) => {
+            const prefix = m[1].toUpperCase();
+            const refVal = m[0].replace(/^@/, '');
+            const rType = prefix === 'JC' ? 'jobcard' : prefix === 'DES' ? 'design' : 'invoice';
+            recordMentions.push({ recordType: rType, recordRef: refVal });
+          });
+        }
+
+        const msgType = type || (attachment && attachment.fileType === 'audio' ? 'audio-voice' : 'text');
 
         // Save message to MongoDB
         const newMessage = await ChatMessage.create({
@@ -61,10 +65,12 @@ const setupSockets = (io) => {
           senderId,
           content,
           replyTo: replyTo || null,
-          type: 'text',
+          type: msgType,
           msgType: 'human',
           priority: priority === 'urgent' ? 'urgent' : 'normal',
           attachment: attachment || undefined,
+          activityMeta: activityMeta || undefined,
+          recordMentions: recordMentions.length > 0 ? recordMentions : undefined,
           readBy: [senderId]
         });
 
@@ -73,6 +79,7 @@ const setupSockets = (io) => {
 
         const populatedMessage = await ChatMessage.findById(newMessage._id)
           .populate('senderId', 'name username email')
+          .populate('readBy', 'name username email')
           .populate({
             path: 'reactions.user',
             select: 'name username email'
@@ -99,10 +106,67 @@ const setupSockets = (io) => {
             }
           });
         }
+
+        // ── @EliteAI Bot Handler ──
+        if (content && (content.includes('@EliteAI') || content.includes('@bot'))) {
+          setTimeout(async () => {
+            try {
+              let botReply = "🤖 **EliteAI Assistant:** How can I assist you with production, job cards, or reports today?";
+              const query = content.replace(/@EliteAI|@bot/gi, '').trim();
+
+              const jcMatch = query.match(/(?:JC-?|job card\s*)(\d+)/i);
+              if (jcMatch) {
+                const jcNo = jcMatch[1];
+                const JobCardModel = require('../db/models').JobCard;
+                const card = await JobCardModel.findOne({ jobNo: new RegExp(jcNo, 'i') });
+                if (card) {
+                  botReply = `🤖 **EliteAI Status Report for JC-${card.jobNo}:**\n` +
+                    `• **Party:** ${card.party || 'N/A'}\n` +
+                    `• **Design:** ${card.designName || card.designNo || 'N/A'}\n` +
+                    `• **Fabric:** ${card.fabric || 'N/A'}\n` +
+                    `• **Stage:** ${card.productionStage || 'Order Received'}\n` +
+                    `• **Quantity:** ${card.totalMtr ? card.totalMtr + 'm' : '0m'}`;
+                } else {
+                  botReply = `🤖 **EliteAI:** Sorry, I could not find any Job Card matching **#${jcNo}**.`;
+                }
+              } else if (query.toLowerCase().includes('summary') || query.toLowerCase().includes('summarize')) {
+                const recentMsgs = await ChatMessage.find({ roomId })
+                  .sort({ createdAt: -1 })
+                  .limit(10)
+                  .populate('senderId', 'name username');
+                
+                const texts = recentMsgs.map(m => `• **${m.senderId?.name || 'User'}**: ${m.content}`).reverse();
+                botReply = `🤖 **EliteAI Room Summary (Last 10 messages):**\n\n${texts.join('\n')}`;
+              } else if (query.toLowerCase().includes('help')) {
+                botReply = `🤖 **EliteAI Command Guide:**\n` +
+                  `• \`@EliteAI JC-1004\` - Get live status of Job Card #1004\n` +
+                  `• \`@EliteAI summarize\` - Summarize recent discussions in this channel\n` +
+                  `• \`@EliteAI help\` - Show this command list`;
+              }
+
+              const botMsg = await ChatMessage.create({
+                roomId,
+                senderId,
+                content: botReply,
+                type: 'text',
+                msgType: 'human',
+                readBy: [senderId]
+              });
+
+              const populatedBotMsg = await ChatMessage.findById(botMsg._id)
+                .populate('senderId', 'name username email');
+              
+              io.to(roomId).emit('receive-message', populatedBotMsg);
+            } catch (err) {
+              console.error('Error handling @EliteAI bot response:', err);
+            }
+          }, 600);
+        }
       } catch (error) {
         console.error('Error saving message:', error);
       }
     });
+
 
     // Handle typing indicators
     socket.on('typing', (data) => {

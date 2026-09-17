@@ -37,8 +37,22 @@ import {
   PlusCircle,
   Sliders,
   Trash2,
-  CheckSquare
+  CheckSquare,
+  Mic,
+  Square,
+  Pin,
+  PinOff,
+  Folder,
+  Volume2,
+  Play,
+  Pause,
+  Eye,
+  Check,
+  CheckCheck,
+  Share2,
+  FilePlus
 } from 'lucide-react';
+
 
 export default function CommunicationPanel({ currentUser, onNavigateTab, initialMainTab = 'chat' }) {
   const [mainTab, setMainTab] = useState(initialMainTab); // 'chat' | 'task'
@@ -87,6 +101,32 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [isEditingMembers, setIsEditingMembers] = useState(false);
   const [editMemberIds, setEditMemberIds] = useState([]);
+
+  // ── NEW CHAT ENHANCEMENT STATES ──
+  // Voice Recording
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
+  const recordingSecondsRef = useRef(0);
+
+  // Quick Share Record Cards Modal
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareRecordCategory, setShareRecordCategory] = useState('jobcard'); // 'jobcard' | 'design' | 'invoice' | 'complaint'
+  const [shareRecordSearch, setShareRecordSearch] = useState('');
+  const [shareRecordItems, setShareRecordItems] = useState([]);
+  const [loadingShareItems, setLoadingShareItems] = useState(false);
+
+  // Shared Media & Document Gallery Modal
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
+  const [galleryTab, setGalleryTab] = useState('all'); // 'all' | 'image' | 'document' | 'audio'
+
+  // In-room search & pinned messages filter
+  const [inRoomQuery, setInRoomQuery] = useState('');
+  const [showInRoomSearch, setShowInRoomSearch] = useState(false);
+  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
+  const [playingAudioId, setPlayingAudioId] = useState(null);
 
   const socket = useSocket();
   const chatBottomRef = useRef(null);
@@ -176,12 +216,44 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }
     };
 
+    const handlePinUpdated = (data) => {
+      if (data && data.messageId) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            String(m._id) === String(data.messageId)
+              ? { ...m, isPinned: data.isPinned }
+              : m
+          )
+        );
+      }
+    };
+
+    const handleRoomMessagesRead = (data) => {
+      if (data && data.userId && data.roomId) {
+        const currentActiveId = activeGroupIdRef.current;
+        if (currentActiveId && String(data.roomId) === String(currentActiveId)) {
+          setMessages((prev) =>
+            prev.map((m) => {
+              const myId = String(currentUser?._id || currentUser?.id || '');
+              const readArr = m.readBy ? m.readBy.map((u) => String(typeof u === 'object' ? (u._id || u.id) : u)) : [];
+              if (!readArr.includes(String(data.userId))) {
+                return { ...m, readBy: [...(m.readBy || []), data.userId] };
+              }
+              return m;
+            })
+          );
+        }
+      }
+    };
+
     socket.on('receive-message', handleReceiveMessage);
     socket.on('message-acknowledged', handleAck);
     socket.on('activity-notification', handleActivity);
     socket.on('message-reaction-updated', handleReaction);
     socket.on('message-edited', handleEdited);
     socket.on('message-deleted', handleDeleted);
+    socket.on('message-pin-updated', handlePinUpdated);
+    socket.on('room-messages-read', handleRoomMessagesRead);
 
     return () => {
       socket.off('receive-message', handleReceiveMessage);
@@ -190,6 +262,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       socket.off('message-reaction-updated', handleReaction);
       socket.off('message-edited', handleEdited);
       socket.off('message-deleted', handleDeleted);
+      socket.off('message-pin-updated', handlePinUpdated);
+      socket.off('room-messages-read', handleRoomMessagesRead);
     };
   }, [socket, currentUser]);
 
@@ -394,26 +468,243 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   };
 
-  const handleFileUpload = (e) => {
+  const [uploadingFile, setUploadingFile] = useState(false);
+
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert('File size exceeds 5MB limit.');
+    if (file.size > 100 * 1024 * 1024) {
+      alert('File size exceeds 100MB limit.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setAttachedFile({
-        fileName: file.name,
-        fileType: file.type.startsWith('image/') ? 'image' : 'document',
-        fileUrl: reader.result,
-        fileSize: file.size,
-      });
-    };
-    reader.readAsDataURL(file);
+    setUploadingFile(true);
+    try {
+      let uploadFile = file;
+      if (file.type && file.type.startsWith('image/')) {
+        try {
+          const imageCompression = (await import('browser-image-compression')).default;
+          uploadFile = await imageCompression(file, { maxSizeMB: 2, maxWidthOrHeight: 2560, useWebWorker: true });
+        } catch (err) {
+          uploadFile = file;
+        }
+      }
+
+      const roomName = activeGroup?.name || 'General';
+      const res = await api.uploadChatAttachment(uploadFile, roomName);
+      if (res && res.fileUrl) {
+        setAttachedFile({
+          fileName: res.fileName || file.name,
+          fileType: file.type.startsWith('image/') ? 'image' : file.type.startsWith('audio/') ? 'audio' : 'document',
+          fileUrl: res.fileUrl,
+          fileSize: res.fileSize || file.size,
+        });
+      } else {
+        alert('Failed to upload attachment to Cloudflare R2.');
+      }
+    } catch (err) {
+      alert('File upload failed: ' + err.message);
+    } finally {
+      setUploadingFile(false);
+    }
   };
+
+  // ── AUDIO VOICE NOTE RECORDING HANDLERS ──
+  const startAudioRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        if (audioBlob.size === 0) return;
+
+        const audioFile = new File([audioBlob], `voice_note_${Date.now()}.webm`, { type: 'audio/webm' });
+        setUploadingFile(true);
+        try {
+          const roomName = activeGroup?.name || 'General';
+          const res = await api.uploadChatAttachment(audioFile, roomName);
+          if (res && res.fileUrl) {
+            setAttachedFile({
+              fileName: `Voice Note (${recordingSecondsRef.current || 5}s)`,
+              fileType: 'audio',
+              fileUrl: res.fileUrl,
+              fileSize: res.fileSize || audioBlob.size,
+              durationSec: recordingSecondsRef.current || 5
+            });
+          }
+        } catch (err) {
+          alert('Failed to upload voice note: ' + err.message);
+        } finally {
+          setUploadingFile(false);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecordingAudio(true);
+      setRecordingSeconds(0);
+      recordingSecondsRef.current = 0;
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => {
+          recordingSecondsRef.current = prev + 1;
+          return prev + 1;
+        });
+      }, 1000);
+    } catch (err) {
+      alert('Microphone access denied or not supported: ' + err.message);
+    }
+  };
+
+  const stopAudioRecording = () => {
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecordingAudio(false);
+  };
+
+  const cancelAudioRecording = () => {
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.onstop = null;
+      if (mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+    }
+    setIsRecordingAudio(false);
+    setRecordingSeconds(0);
+  };
+
+  // ── QUICK SHARE RECORD CARDS HANDLERS ──
+  const handleOpenShareModal = async (cat = 'jobcard') => {
+    setShareRecordCategory(cat);
+    setShowShareModal(true);
+    fetchShareRecordItems(cat);
+  };
+
+  const fetchShareRecordItems = async (cat) => {
+    setLoadingShareItems(true);
+    setShareRecordItems([]);
+    try {
+      if (cat === 'jobcard') {
+        const res = await api.getJobCards();
+        if (res.success && res.data) setShareRecordItems(res.data.slice(0, 30));
+      } else if (cat === 'design') {
+        const res = await api.getDesignCatalogue();
+        if (res.success && res.data) setShareRecordItems(res.data.slice(0, 30));
+      } else if (cat === 'invoice') {
+        const res = await api.getBillingInvoices();
+        if (res.success && res.data) setShareRecordItems(res.data.slice(0, 30));
+      } else if (cat === 'complaint') {
+        const res = await api.getComplaints();
+        if (res.success && res.data) setShareRecordItems(res.data.slice(0, 30));
+      }
+    } catch (err) {
+      console.error('Failed to fetch share items:', err);
+    } finally {
+      setLoadingShareItems(false);
+    }
+  };
+
+  const handleShareRecordToChat = (item) => {
+    if (!activeGroup) return;
+    const myId = currentUser?.id || currentUser?._id;
+    let cardTitle = '';
+    let refVal = '';
+    let scopeVal = '';
+
+    if (shareRecordCategory === 'jobcard') {
+      refVal = `JC-${item.jobNo}`;
+      cardTitle = `Job Card #${item.jobNo} — ${item.party || 'Client'}`;
+      scopeVal = 'jobcards';
+    } else if (shareRecordCategory === 'design') {
+      refVal = `DES-${item.designNo || item.designName}`;
+      cardTitle = `Design: ${item.designName || item.designNo}`;
+      scopeVal = 'catalogue';
+    } else if (shareRecordCategory === 'invoice') {
+      refVal = `INV-${item.invoiceNo}`;
+      cardTitle = `Invoice #${item.invoiceNo} — ₹${item.totalAmount || 0}`;
+      scopeVal = 'billing';
+    } else if (shareRecordCategory === 'complaint') {
+      refVal = `CMP-${item.complaintNo || (item._id ? item._id.substring(0, 6) : 'REF')}`;
+      cardTitle = `Complaint #${item.complaintNo || 'Ref'} — ${item.departmentName || 'General'}`;
+      scopeVal = 'complain';
+    }
+
+    const messageText = `Shared Record @${refVal} (${cardTitle})`;
+
+    if (socket) {
+      socket.emit('send-message', {
+        roomId: activeGroup._id,
+        senderId: myId,
+        content: messageText,
+        type: 'record-card',
+        activityMeta: {
+          action: 'SHARE_RECORD',
+          module: shareRecordCategory === 'jobcard' ? 'Job Card' : shareRecordCategory === 'design' ? 'Design' : shareRecordCategory === 'invoice' ? 'Invoice' : 'Complaint',
+          recordRef: refVal,
+          recordId: item._id,
+          permissionScope: scopeVal
+        },
+        recordMentions: [{ recordType: shareRecordCategory, recordRef: refVal }]
+      });
+    }
+
+    setShowShareModal(false);
+  };
+
+  // ── REACTION, PIN & EXPORT CHAT HANDLERS ──
+  const handleToggleReaction = (messageId, emoji) => {
+    const userId = currentUser?.id || currentUser?._id;
+    if (socket && activeGroup) {
+      socket.emit('toggle-reaction', { messageId, emoji, userId, roomId: activeGroup._id });
+    }
+  };
+
+  const handleTogglePin = (messageId) => {
+    if (socket && activeGroup) {
+      socket.emit('toggle-pin-message', { messageId, roomId: activeGroup._id });
+    }
+  };
+
+  const handleExportChatLog = () => {
+    if (!messages || messages.length === 0) {
+      alert('No messages in this channel to export.');
+      return;
+    }
+    const channelName = activeGroup?.name || 'Chat_History';
+    let textContent = `====================================================\n`;
+    textContent += `ELITE EDITION — CHAT TRANSCRIPT FOR CHANNEL: ${channelName}\n`;
+    textContent += `Exported At: ${new Date().toLocaleString()}\n`;
+    textContent += `====================================================\n\n`;
+
+    messages.forEach((m) => {
+      const sender = typeof m.senderId === 'object' ? (m.senderId.name || m.senderId.username || 'User') : 'User';
+      const timeStr = new Date(m.createdAt).toLocaleString();
+      textContent += `[${timeStr}] ${sender}: ${m.content}\n`;
+      if (m.attachment && m.attachment.fileUrl) {
+        textContent += `   [Attachment: ${m.attachment.fileName} (${m.attachment.fileUrl})]\n`;
+      }
+    });
+
+    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${channelName.replace(/[^a-zA-Z0-9_-]/g, '_')}_chat_history.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -1242,6 +1533,26 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         ))}
                       </div>
 
+                      <button
+                        onClick={() => setShowGalleryModal(true)}
+                        className="btn-secondary"
+                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px' }}
+                        title="View Cloudflare R2 Media & Document Gallery for this room"
+                      >
+                        <Folder size={13} />
+                        <span>Gallery</span>
+                      </button>
+
+                      <button
+                        onClick={handleExportChatLog}
+                        className="btn-secondary"
+                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px' }}
+                        title="Export chat transcript as a text file"
+                      >
+                        <FileText size={13} />
+                        <span>Export</span>
+                      </button>
+
                       {!isDirect && (
                         <button
                           onClick={handleOpenMembers}
@@ -1270,6 +1581,25 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 );
               })()}
 
+              {/* Pinned Messages Banner */}
+              {messages.some((m) => m.isPinned) && (
+                <div style={{ background: '#fef3c7', borderBottom: '1px solid #fde68a', padding: '0.45rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: '#92400e', fontWeight: 700, flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Pin size={14} color="#d97706" />
+                    <span>📌 Pinned Banner ({messages.filter((m) => m.isPinned).length}):</span>
+                    <span style={{ fontWeight: 600, color: '#78350f' }}>
+                      {messages.filter((m) => m.isPinned)[0]?.content?.substring(0, 75)}...
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setShowPinnedOnly(!showPinnedOnly)}
+                    style={{ background: 'none', border: 'none', color: '#b45309', fontWeight: 800, cursor: 'pointer', fontSize: '0.72rem' }}
+                  >
+                    {showPinnedOnly ? 'Show All Messages' : 'View Pinned Only →'}
+                  </button>
+                </div>
+              )}
+
               {/* Messages & Activity Stream Container */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--bg-main)' }}>
                 {loadingMessages ? (
@@ -1283,7 +1613,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     <div>No messages in this stream yet. Start the conversation below!</div>
                   </div>
                 ) : (
-                  messages.map((msg) => {
+                  (showPinnedOnly ? messages.filter((m) => m.isPinned) : messages).map((msg) => {
                     const isMe = String(msg.senderId?._id || msg.senderId) === String(currentUser?.id || currentUser?._id);
                     const isSystemActivity = msg.msgType === 'system_activity';
 
@@ -1354,19 +1684,29 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       );
                     }
 
+                    const isAudioMsg = msg.type === 'audio-voice' || (msg.attachment && msg.attachment.fileType === 'audio');
+                    const isRecordCard = msg.type === 'record-card' || msg.activityMeta;
+
                     return (
                       <div
                         key={msg._id}
                         style={{
                           alignSelf: isMe ? 'flex-end' : 'flex-start',
-                          maxWidth: '70%',
+                          maxWidth: '72%',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: isMe ? 'flex-end' : 'flex-start'
                         }}
                       >
-                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '2px', fontWeight: 600 }}>
-                          {msg.senderId?.name || msg.senderName || 'Staff Member'} · {formatTime(msg.createdAt)}
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '2px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>{msg.senderId?.name || msg.senderName || 'Staff Member'}</span>
+                          <span>·</span>
+                          <span>{formatTime(msg.createdAt)}</span>
+                          {msg.isPinned && (
+                            <span style={{ color: '#d97706', fontWeight: 800, background: '#fef3c7', padding: '1px 4px', borderRadius: '3px', fontSize: '0.62rem' }}>
+                              📌 PINNED
+                            </span>
+                          )}
                         </div>
 
                         <div
@@ -1379,11 +1719,66 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                             fontSize: '0.85rem',
                             lineHeight: 1.45,
-                            wordBreak: 'break-word'
+                            wordBreak: 'break-word',
+                            position: 'relative'
                           }}
                         >
-                          {msg.attachment && msg.attachment.fileUrl && (
-                            <div style={{ marginBottom: '0.5rem' }}>
+                          {/* Audio Voice Player Card */}
+                          {isAudioMsg && msg.attachment && msg.attachment.fileUrl && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.4rem 0.65rem', background: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(37,99,235,0.08)', borderRadius: '10px', marginBottom: '0.35rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (playingAudioId === msg._id) {
+                                    setPlayingAudioId(null);
+                                  } else {
+                                    setPlayingAudioId(msg._id);
+                                    const audio = new Audio(msg.attachment.fileUrl);
+                                    audio.play();
+                                    audio.onended = () => setPlayingAudioId(null);
+                                  }
+                                }}
+                                style={{ background: isMe ? '#ffffff' : '#2563eb', color: isMe ? '#2563eb' : '#ffffff', border: 'none', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}
+                              >
+                                {playingAudioId === msg._id ? <Pause size={15} /> : <Play size={15} />}
+                              </button>
+
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '0.76rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <Volume2 size={13} />
+                                  <span>Voice Note</span>
+                                </div>
+                                <div style={{ fontSize: '0.66rem', opacity: 0.85 }}>
+                                  {msg.attachment.durationSec || 5} sec · Cloudflare R2 Audio
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Quick Share Record Card */}
+                          {isRecordCard && msg.activityMeta && (
+                            <div style={{ background: isMe ? 'rgba(255,255,255,0.15)' : 'var(--bg-main)', padding: '0.55rem 0.75rem', borderRadius: '8px', border: isMe ? '1px solid rgba(255,255,255,0.3)' : '1px solid var(--border-light)', marginBottom: '0.35rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '4px' }}>
+                                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: isMe ? '#fff' : '#2563eb', textTransform: 'uppercase' }}>
+                                  🃏 {msg.activityMeta.module || 'RECORD CARD'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRecordClick(msg.activityMeta)}
+                                  style={{ background: isMe ? '#ffffff' : '#2563eb', color: isMe ? '#2563eb' : '#ffffff', border: 'none', padding: '2px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer' }}
+                                >
+                                  Open →
+                                </button>
+                              </div>
+                              <div style={{ fontSize: '0.8rem', fontWeight: 800 }}>
+                                {msg.activityMeta.recordRef || msg.content}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Image Attachment */}
+                          {msg.attachment && msg.attachment.fileUrl && !isAudioMsg && (
+                            <div style={{ marginBottom: '0.4rem' }}>
                               {msg.attachment.fileType === 'image' ? (
                                 <img
                                   src={msg.attachment.fileUrl}
@@ -1403,8 +1798,71 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             </div>
                           )}
 
-                          {msg.content}
+                          {renderContentWithMentions(msg.content)}
+
+                          {/* Reaction Badges */}
+                          {msg.reactions && msg.reactions.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '5px' }}>
+                              {Object.entries(
+                                msg.reactions.reduce((acc, r) => {
+                                  acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                                  return acc;
+                                }, {})
+                              ).map(([emoji, count]) => (
+                                <span
+                                  key={emoji}
+                                  onClick={() => handleToggleReaction(msg._id, emoji)}
+                                  style={{ fontSize: '0.7rem', background: isMe ? 'rgba(255,255,255,0.22)' : 'var(--bg-main)', border: isMe ? '1px solid rgba(255,255,255,0.3)' : '1px solid var(--border-light)', borderRadius: '10px', padding: '1px 6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                >
+                                  <span>{emoji}</span>
+                                  <span style={{ fontWeight: 800, fontSize: '0.64rem' }}>{count}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
+
+                        {/* Hover Reaction Bar & Pin Button */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', opacity: 0.85 }}>
+                          <div style={{ display: 'flex', gap: '1px', background: 'var(--bg-card)', padding: '1px 4px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                            {['👍', '❤️', '🔥', '🎉', '✅'].map((emo) => (
+                              <button
+                                key={emo}
+                                type="button"
+                                onClick={() => handleToggleReaction(msg._id, emo)}
+                                style={{ background: 'none', border: 'none', fontSize: '0.72rem', cursor: 'pointer', padding: '1px 3px' }}
+                              >
+                                {emo}
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePin(msg._id)}
+                              style={{ background: 'none', border: 'none', color: msg.isPinned ? '#d97706' : 'var(--text-muted)', cursor: 'pointer', padding: '1px 3px', display: 'flex', alignItems: 'center' }}
+                              title={msg.isPinned ? 'Unpin message' : 'Pin message'}
+                            >
+                              {msg.isPinned ? <PinOff size={11} /> : <Pin size={11} />}
+                            </button>
+                          </div>
+
+                          {/* Read Receipts Indicator */}
+                          {isMe && (
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '4px' }}>
+                              {msg.readBy && msg.readBy.length > 1 ? (
+                                <span style={{ color: '#2563eb', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }} title={`Read by ${msg.readBy.length - 1} team members`}>
+                                  <CheckCheck size={13} />
+                                  <span>Read</span>
+                                </span>
+                              ) : (
+                                <span style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                  <Check size={12} />
+                                  <span>Sent</span>
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
                       </div>
                     );
                   })
@@ -1417,7 +1875,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 <div style={{ padding: '0.4rem 0.9rem', background: '#eff6ff', borderTop: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#1d4ed8' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <Paperclip size={14} color="#2563eb" />
-                    <span>Attached: {attachedFile.fileName}</span>
+                    <span>Attached ({attachedFile.fileType}): {attachedFile.fileName}</span>
                   </div>
                   <button onClick={() => setAttachedFile(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
                     <X size={14} />
@@ -1426,62 +1884,97 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               )}
 
               {/* Hidden File Input */}
-              <input type="file" ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} accept="image/*,.pdf,.doc,.docx" />
+              <input type="file" ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} accept="image/*,.pdf,.doc,.docx,audio/*" />
 
               {/* Chat Input Form */}
-              <form onSubmit={handleSendMessage} style={{ padding: '0.65rem 0.9rem', background: 'var(--bg-card)', borderTop: '1px solid var(--border-light)', display: 'flex', gap: '0.5rem', alignItems: 'center', flexShrink: 0 }}>
-                {/* Paperclip Button */}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center' }}
-                  title="Attach photo or document"
-                >
-                  <Paperclip size={18} />
-                </button>
+              <form onSubmit={handleSendMessage} style={{ padding: '0.65rem 0.9rem', background: 'var(--bg-card)', borderTop: '1px solid var(--border-light)', display: 'flex', gap: '0.45rem', alignItems: 'center', flexShrink: 0 }}>
+                {isRecordingAudio ? (
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fee2e2', border: '1px solid #fca5a5', padding: '0.4rem 0.8rem', borderRadius: '8px', color: '#b91c1c', fontWeight: 800, fontSize: '0.82rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
+                      <span>Recording Voice Note... {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:{String(recordingSeconds % 60).padStart(2, '0')}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <button type="button" onClick={cancelAudioRecording} style={{ background: 'none', border: 'none', color: '#dc2626', fontWeight: 700, cursor: 'pointer', fontSize: '0.78rem' }}>Cancel</button>
+                      <button type="button" onClick={stopAudioRecording} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '0.25rem 0.75rem', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', fontSize: '0.78rem' }}>Attach Audio →</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Audio Record Button */}
+                    <button
+                      type="button"
+                      onClick={startAudioRecording}
+                      style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center' }}
+                      title="Record Voice Note"
+                    >
+                      <Mic size={18} />
+                    </button>
 
-                {/* Urgent SOS Toggle */}
-                <button
-                  type="button"
-                  onClick={() => setIsUrgent(!isUrgent)}
-                  style={{
-                    background: isUrgent ? '#ef4444' : 'transparent',
-                    color: isUrgent ? '#ffffff' : '#dc2626',
-                    border: '1px solid #fca5a5',
-                    borderRadius: '6px',
-                    padding: '0.3rem 0.6rem',
-                    fontSize: '0.72rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    boxShadow: isUrgent ? '0 0 10px rgba(239,68,68,0.4)' : 'none',
-                    transition: 'all 0.15s ease'
-                  }}
-                  title="Toggle Urgent SOS High Priority Alert"
-                >
-                  <AlertTriangle size={13} />
-                  <span>{isUrgent ? 'SOS ON' : 'SOS'}</span>
-                </button>
+                    {/* Quick Share Record Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenShareModal('jobcard')}
+                      style={{ background: 'none', border: 'none', color: '#8b5cf6', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center' }}
+                      title="Share Job Card, Design, Invoice or Complaint Card"
+                    >
+                      <Share2 size={18} />
+                    </button>
 
-                <input
-                  type="text"
-                  placeholder={`Type message or mention @JC-1004...`}
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  style={{ flex: 1, padding: '0.55rem 0.85rem', fontSize: '0.85rem', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
-                />
+                    {/* Paperclip Button */}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center' }}
+                      title="Attach photo or document (up to 100MB Cloudflare R2)"
+                    >
+                      <Paperclip size={18} />
+                    </button>
 
-                <button
-                  type="submit"
-                  disabled={!inputMessage.trim() && !attachedFile}
-                  className="btn-primary"
-                  style={{ padding: '0.55rem 1.1rem', fontSize: '0.82rem', height: '36px', gap: '0.35rem', borderRadius: '8px', opacity: (!inputMessage.trim() && !attachedFile) ? 0.6 : 1 }}
-                >
-                  <Send size={14} />
-                  <span>Send</span>
-                </button>
+                    {/* Urgent SOS Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setIsUrgent(!isUrgent)}
+                      style={{
+                        background: isUrgent ? '#ef4444' : 'transparent',
+                        color: isUrgent ? '#ffffff' : '#dc2626',
+                        border: '1px solid #fca5a5',
+                        borderRadius: '6px',
+                        padding: '0.3rem 0.6rem',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: isUrgent ? '0 0 10px rgba(239,68,68,0.4)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                      title="Toggle Urgent SOS High Priority Alert"
+                    >
+                      <AlertTriangle size={13} />
+                      <span>{isUrgent ? 'SOS ON' : 'SOS'}</span>
+                    </button>
+
+                    <input
+                      type="text"
+                      placeholder={`Message channel or ask @EliteAI JC-1004...`}
+                      value={inputMessage}
+                      onChange={(e) => setInputMessage(e.target.value)}
+                      style={{ flex: 1, padding: '0.55rem 0.85rem', fontSize: '0.85rem', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
+                    />
+
+                    <button
+                      type="submit"
+                      disabled={!inputMessage.trim() && !attachedFile}
+                      className="btn-primary"
+                      style={{ padding: '0.55rem 1.1rem', fontSize: '0.82rem', height: '36px', gap: '0.35rem', borderRadius: '8px', opacity: (!inputMessage.trim() && !attachedFile) ? 0.6 : 1 }}
+                    >
+                      <Send size={14} />
+                      <span>Send</span>
+                    </button>
+                  </>
+                )}
               </form>
             </>
           ) : (
@@ -1920,6 +2413,262 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             <button onClick={() => setZoomImg(null)} style={{ position: 'absolute', top: -12, right: -12, background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
               <X size={16} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── QUICK SHARE RECORD CARDS MODAL ── */}
+      {showShareModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 540, borderRadius: '14px', overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.2s ease-out' }}>
+            <div style={{ padding: '1rem 1.2rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-th)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Share2 size={18} color="#8b5cf6" />
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Quick Share Record to Chat Stream
+                </h3>
+              </div>
+              <button onClick={() => setShowShareModal(false)} className="btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '6px' }}>
+                Cancel
+              </button>
+            </div>
+
+            {/* Category Switcher Pills */}
+            <div style={{ padding: '0.6rem 1rem', borderBottom: '1px solid var(--border-light)', display: 'flex', gap: '0.4rem', background: 'var(--bg-main)' }}>
+              {[
+                { id: 'jobcard', label: '📋 Job Cards' },
+                { id: 'design', label: '🎨 Designs' },
+                { id: 'invoice', label: '🧾 Invoices' },
+                { id: 'complaint', label: '⚠️ Complaints' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setShareRecordCategory(tab.id);
+                    fetchShareRecordItems(tab.id);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '0.35rem 0.5rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    borderRadius: '6px',
+                    border: shareRecordCategory === tab.id ? '1px solid #8b5cf6' : '1px solid var(--border-light)',
+                    background: shareRecordCategory === tab.id ? '#8b5cf6' : 'var(--bg-card)',
+                    color: shareRecordCategory === tab.id ? '#ffffff' : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ padding: '0.75rem 1rem' }}>
+              <div style={{ position: 'relative', marginBottom: '0.65rem' }}>
+                <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  placeholder={`Search ${shareRecordCategory} records...`}
+                  value={shareRecordSearch}
+                  onChange={(e) => setShareRecordSearch(e.target.value)}
+                  style={{ width: '100%', paddingLeft: '32px', fontSize: '0.8rem', height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '6px', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ maxHeight: '42vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {loadingShareItems ? (
+                  <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
+                    <RefreshCw size={18} className="spin-loader" />
+                    <div style={{ fontSize: '0.78rem', marginTop: '0.4rem' }}>Loading records...</div>
+                  </div>
+                ) : shareRecordItems.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                    No records found for {shareRecordCategory}.
+                  </div>
+                ) : (
+                  shareRecordItems
+                    .filter((item) => {
+                      const term = shareRecordSearch.toLowerCase().trim();
+                      if (!term) return true;
+                      const text = JSON.stringify(item).toLowerCase();
+                      return text.includes(term);
+                    })
+                    .map((item) => (
+                      <div
+                        key={item._id}
+                        onClick={() => handleShareRecordToChat(item)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.55rem 0.8rem',
+                          borderRadius: '8px',
+                          background: 'var(--bg-card)',
+                          border: '1px solid var(--border-light)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                            {shareRecordCategory === 'jobcard' && `Job Card #${item.jobNo} — ${item.party || 'Client'}`}
+                            {shareRecordCategory === 'design' && `Design: ${item.designName || item.designNo}`}
+                            {shareRecordCategory === 'invoice' && `Invoice #${item.invoiceNo} — ₹${item.totalAmount || 0}`}
+                            {shareRecordCategory === 'complaint' && `Complaint #${item.complaintNo || 'Ref'} — ${item.departmentName || 'General'}`}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                            {shareRecordCategory === 'jobcard' && `Stage: ${item.productionStage || 'Order Received'} · ${item.totalMtr ? item.totalMtr + 'm' : ''}`}
+                            {shareRecordCategory === 'design' && `Category: ${item.category || 'General'}`}
+                            {shareRecordCategory === 'invoice' && `Party: ${item.partyName || 'Client'} · Date: ${formatDateLabel(item.createdAt)}`}
+                            {shareRecordCategory === 'complaint' && `Status: ${item.status || 'Pending'} · Issue: ${item.issueType || 'General'}`}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.72rem', borderRadius: '6px', background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)' }}
+                        >
+                          Share Card →
+                        </button>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SHARED MEDIA & DOCUMENT GALLERY MODAL ── */}
+      {showGalleryModal && activeGroup && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 720, maxHeight: '85vh', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.2s ease-out' }}>
+            <div style={{ padding: '1rem 1.2rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-th)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Folder size={18} color="#2563eb" />
+                <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Cloudflare R2 Media & Document Gallery — {activeGroup.name}
+                </h3>
+              </div>
+              <button onClick={() => setShowGalleryModal(false)} className="btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '6px' }}>
+                Close
+              </button>
+            </div>
+
+            {/* Gallery Tabs */}
+            <div style={{ padding: '0.5rem 1rem', borderBottom: '1px solid var(--border-light)', display: 'flex', gap: '0.4rem', background: 'var(--bg-main)' }}>
+              {[
+                { id: 'all', label: 'All Shared Files' },
+                { id: 'image', label: '🖼️ Images' },
+                { id: 'document', label: '📄 Documents / PDFs' },
+                { id: 'audio', label: '🎙️ Voice Notes' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setGalleryTab(tab.id)}
+                  style={{
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    borderRadius: '6px',
+                    border: galleryTab === tab.id ? '1px solid #2563eb' : '1px solid var(--border-light)',
+                    background: galleryTab === tab.id ? '#2563eb' : 'var(--bg-card)',
+                    color: galleryTab === tab.id ? '#ffffff' : 'var(--text-primary)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Gallery Grid */}
+            <div style={{ padding: '1rem', overflowY: 'auto', flex: 1 }}>
+              {(() => {
+                const attachedMsgs = messages.filter((m) => {
+                  if (!m.attachment || !m.attachment.fileUrl) return false;
+                  if (galleryTab === 'all') return true;
+                  if (galleryTab === 'image') return m.attachment.fileType === 'image';
+                  if (galleryTab === 'document') return m.attachment.fileType === 'document' || m.attachment.fileType === 'pdf';
+                  if (galleryTab === 'audio') return m.type === 'audio-voice' || m.attachment.fileType === 'audio';
+                  return true;
+                });
+
+                if (attachedMsgs.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      <Folder size={36} style={{ marginBottom: '0.5rem', opacity: 0.4 }} />
+                      <div>No files or media found for category "{galleryTab}".</div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
+                    {attachedMsgs.map((m) => {
+                      const att = m.attachment;
+                      const isImg = att.fileType === 'image';
+                      const isAudio = m.type === 'audio-voice' || att.fileType === 'audio';
+
+                      return (
+                        <div
+                          key={m._id}
+                          style={{
+                            borderRadius: '10px',
+                            border: '1px solid var(--border-light)',
+                            background: 'var(--bg-card)',
+                            overflow: 'hidden',
+                            display: 'flex',
+                            flexDirection: 'column'
+                          }}
+                        >
+                          {isImg ? (
+                            <img
+                              src={att.fileUrl}
+                              alt={att.fileName}
+                              onClick={() => setZoomImg(att.fileUrl)}
+                              style={{ width: '100%', height: '110px', objectFit: 'cover', cursor: 'zoom-in' }}
+                            />
+                          ) : (
+                            <div style={{ height: '110px', background: isAudio ? '#eff6ff' : '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0.5rem', textContent: 'center' }}>
+                              {isAudio ? <Volume2 size={28} color="#2563eb" /> : <FileText size={28} color="#64748b" />}
+                              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px', textAlign: 'center', wordBreak: 'break-all' }}>
+                                {att.fileName || 'File'}
+                              </span>
+                            </div>
+                          )}
+
+                          <div style={{ padding: '0.5rem 0.65rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <div>
+                              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {att.fileName}
+                              </div>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                Shared by: {m.senderId?.name || 'Staff'} · {formatDateLabel(m.createdAt)}
+                              </div>
+                            </div>
+
+                            <div style={{ marginTop: '0.4rem', display: 'flex', gap: '0.4rem' }}>
+                              <a
+                                href={att.fileUrl}
+                                download={att.fileName}
+                                className="btn-primary"
+                                style={{ flex: 1, padding: '0.25rem', fontSize: '0.68rem', textAlign: 'center', textDecoration: 'none', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                Download
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         </div>
       )}

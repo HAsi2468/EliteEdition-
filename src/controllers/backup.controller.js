@@ -1,4 +1,7 @@
 const mongoose = require('mongoose');
+const zlib = require('zlib');
+const { uploadToR2, listR2Objects, isR2Configured } = require('../utils/r2Storage');
+const logger = require('../config/logger');
 
 // Helper to construct date filter on query
 const buildDateFilter = (startDate, endDate) => {
@@ -20,6 +23,116 @@ const buildDateFilter = (startDate, endDate) => {
       { invoiceDate: dateCond }
     ]
   };
+};
+
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+/**
+ * Stream all collections in MongoDB database to a gzipped JSON temp file, then upload directly to Cloudflare R2
+ */
+const performDatabaseR2Backup = async () => {
+  if (!isR2Configured()) {
+    throw new Error('Cloudflare R2 is not configured in environment variables');
+  }
+
+  const db = mongoose.connection.db;
+  if (!db) {
+    throw new Error('Database connection is not ready');
+  }
+
+  const now = new Date();
+  const dateStr = now.toISOString().replace(/[:.]/g, '-');
+  const fileName = `db_backup_${dateStr}.json.gz`;
+  const tmpFilePath = path.join(os.tmpdir(), fileName);
+
+  const collections = await db.listCollections().toArray();
+
+  await new Promise((resolve, reject) => {
+    const writeStream = fs.createWriteStream(tmpFilePath);
+    const gzip = zlib.createGzip();
+
+    gzip.pipe(writeStream);
+    gzip.on('error', reject);
+    writeStream.on('error', reject);
+    writeStream.on('finish', resolve);
+
+    gzip.write(`{\n  "meta": {\n    "exportDate": "${now.toISOString()}",\n    "databaseName": "${db.databaseName}",\n    "totalCollections": ${collections.length}\n  },\n  "data": {\n`);
+
+    (async () => {
+      for (let i = 0; i < collections.length; i++) {
+        const col = collections[i];
+        const isLast = i === collections.length - 1;
+        gzip.write(`    "${col.name}": [\n`);
+
+        try {
+          const cursor = db.collection(col.name).find({});
+          let isFirstDoc = true;
+          for await (const doc of cursor) {
+            const prefix = isFirstDoc ? '      ' : ',\n      ';
+            isFirstDoc = false;
+            gzip.write(prefix + JSON.stringify(doc));
+          }
+        } catch (err) {
+          logger.warn(`Backup cursor warning on ${col.name}: ${err.message}`);
+        }
+        gzip.write(`\n    ]${isLast ? '' : ','}\n`);
+      }
+      gzip.write('  }\n}\n');
+      gzip.end();
+    })().catch(reject);
+  });
+
+  const compressedBuffer = fs.readFileSync(tmpFilePath);
+  const sizeBytes = compressedBuffer.length;
+
+  const publicUrl = await uploadToR2({
+    buffer: compressedBuffer,
+    fileName,
+    mimeType: 'application/gzip',
+    folder: 'backups/mongodb',
+  });
+
+  // Cleanup temp file
+  try {
+    fs.unlinkSync(tmpFilePath);
+  } catch (e) {}
+
+  return {
+    fileName,
+    sizeBytes,
+    publicUrl,
+    timestamp: now.toISOString(),
+    collectionsCount: collections.length,
+  };
+};
+
+const triggerR2Backup = async (req, res) => {
+  try {
+    const result = await performDatabaseR2Backup();
+    return res.status(200).json({
+      success: true,
+      message: 'Database successfully backed up and uploaded to Cloudflare R2!',
+      data: result,
+    });
+  } catch (error) {
+    console.error('R2 Data Backup Error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Database R2 backup failed' });
+  }
+};
+
+const listR2Backups = async (req, res) => {
+  try {
+    const backups = await listR2Objects({ folder: 'backups/mongodb' });
+    return res.status(200).json({
+      success: true,
+      data: backups,
+    });
+  } catch (error) {
+    console.error('List R2 Backups Error:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Failed to list R2 backups' });
+  }
 };
 
 const getDepartmentBackup = async (req, res) => {
@@ -109,5 +222,9 @@ const getDepartmentBackup = async (req, res) => {
 };
 
 module.exports = {
-  getDepartmentBackup
+  getDepartmentBackup,
+  performDatabaseR2Backup,
+  triggerR2Backup,
+  listR2Backups,
 };
+

@@ -1274,12 +1274,12 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
               )}
 
               <FormField
-                label={department === 'stitching' ? "Design Name (e.g. PKD-1001)" : "Design Name (e.g. ED1, ED2)"}
+                label={department === 'stitching' ? "Design Name (e.g. PKD-1001)" : "Design Name (e.g. ED-709, ED-710)"}
                 name="designName"
                 value={formVal.designName}
                 onChange={handleFormChange}
                 required
-                placeholder={department === 'stitching' ? "PKD-1001" : "ED1"}
+                placeholder={department === 'stitching' ? "PKD-1001" : "e.g. ED-709"}
               />
 
               {department === 'stitching' && (

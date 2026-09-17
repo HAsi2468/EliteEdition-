@@ -38,6 +38,11 @@ const envVarsSchema = Joi.object()
 		AWS_ACCESS_KEY_ID: Joi.string().description('AWS access key'),
 		AWS_SECRET_ACCESS_KEY: Joi.string().description('AWS secret key'),
 		AWS_S3_BUCKET: Joi.string().description('S3 bucket name'),
+		R2_ACCOUNT_ID: Joi.string().description('Cloudflare Account ID for R2'),
+		R2_ACCESS_KEY_ID: Joi.string().description('Cloudflare R2 Access Key ID'),
+		R2_SECRET_ACCESS_KEY: Joi.string().description('Cloudflare R2 Secret Access Key'),
+		R2_BUCKET_NAME: Joi.string().description('Cloudflare R2 Bucket Name'),
+		R2_PUBLIC_URL: Joi.string().description('Cloudflare R2 Public URL or Custom Domain'),
 	})
 	.unknown();
 
@@ -88,5 +93,12 @@ module.exports = {
 		accessKeyId: envVars.AWS_ACCESS_KEY_ID,
 		secretAccessKey: envVars.AWS_SECRET_ACCESS_KEY,
 		bucketName: envVars.AWS_S3_BUCKET,
+	},
+	r2: {
+		accountId: envVars.R2_ACCOUNT_ID,
+		accessKeyId: envVars.R2_ACCESS_KEY_ID,
+		secretAccessKey: envVars.R2_SECRET_ACCESS_KEY,
+		bucketName: envVars.R2_BUCKET_NAME,
+		publicUrl: envVars.R2_PUBLIC_URL,
 	},
 };

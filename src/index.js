@@ -26,6 +26,10 @@ app.set('socketio', io);
 
 const { syncCommunicationGroups } = require('./utils/syncCommunicationGroups');
 const { checkOverdueTasks } = require('./controllers/task.controller');
+const { startDbBackupScheduler } = require('./schedule/dbBackupScheduler');
+
+// Start automated daily database backup to Cloudflare R2
+startDbBackupScheduler();
 
 // Run overdue task check every 60 seconds
 setInterval(() => {

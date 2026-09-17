@@ -619,4 +619,74 @@ const lookupOrderDetails = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getNextNumber, getOne, create, update, remove, clearAll, getAnalytics, lookupOrderDetails, addComment };
+// List all Cloudflare R2 Complaint Attachments grouped by Department
+const listR2ComplaintAttachments = async (req, res) => {
+  try {
+    const { listR2Objects } = require('../utils/r2Storage');
+    const items = await listR2Objects({ folder: 'Complaints' });
+
+    // Group files by Department subfolder
+    const departmentGroups = {};
+    items.forEach(item => {
+      // Key format: Complaints/Department_Name/filename.ext
+      const parts = item.key.split('/');
+      const deptName = parts.length > 2 ? parts[1] : 'General';
+      if (!departmentGroups[deptName]) {
+        departmentGroups[deptName] = { department: deptName, fileCount: 0, totalSizeBytes: 0, files: [] };
+      }
+      departmentGroups[deptName].fileCount += 1;
+      departmentGroups[deptName].totalSizeBytes += (item.sizeBytes || 0);
+      departmentGroups[deptName].files.push(item);
+    });
+
+    res.json({
+      success: true,
+      totalFiles: items.length,
+      departments: Object.values(departmentGroups),
+      rawFiles: items
+    });
+  } catch (err) {
+    logger.error('complaint.listR2ComplaintAttachments error: %o', err);
+    res.status(500).json({ error: err.message || 'Failed to list R2 complaint attachments' });
+  }
+};
+
+// Clear/Delete R2 Complaint Attachments by Department (e.g. Complaints/Digital_Print)
+const clearR2ComplaintDepartmentAttachments = async (req, res) => {
+  try {
+    const { department = 'General' } = req.query;
+    const { deleteR2Folder } = require('../utils/r2Storage');
+
+    const cleanDept = String(department).trim().replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_');
+    const targetFolder = `Complaints/${cleanDept}`;
+
+    const deletedCount = await deleteR2Folder(targetFolder);
+
+    res.json({
+      success: true,
+      message: `Successfully cleared ${deletedCount} attachment file(s) from Cloudflare R2 under folder "${targetFolder}".`,
+      department: cleanDept,
+      folder: targetFolder,
+      deletedCount
+    });
+  } catch (err) {
+    logger.error('complaint.clearR2ComplaintDepartmentAttachments error: %o', err);
+    res.status(500).json({ error: err.message || 'Failed to clear R2 department attachments' });
+  }
+};
+
+module.exports = {
+  getAll,
+  getNextNumber,
+  getOne,
+  create,
+  update,
+  remove,
+  clearAll,
+  getAnalytics,
+  lookupOrderDetails,
+  addComment,
+  listR2ComplaintAttachments,
+  clearR2ComplaintDepartmentAttachments,
+};
+

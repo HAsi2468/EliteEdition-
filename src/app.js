@@ -119,6 +119,20 @@ app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res, next) => {
   const cleanName = filename.replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '').trim();
   if (!cleanName) return next();
 
+  // Bypass image serving middleware for reserved API subpaths
+  const reservedApiSubpaths = ['next-number', 'categories', 'import-pkd-orders', 'download-zip'];
+  if (reservedApiSubpaths.includes(cleanName.toLowerCase())) {
+    return next();
+  }
+
+  // If Cloudflare R2 CDN public URL is configured, redirect image request directly to R2
+  if (config.r2 && config.r2.publicUrl) {
+    const ext = path.extname(filename) || '.jpg';
+    const cleanExt = ext.startsWith('.') ? ext : `.${ext}`;
+    const r2Url = `${config.r2.publicUrl.replace(/\/+$/, '')}/designs/${encodeURIComponent(cleanName)}${cleanExt}`;
+    return res.redirect(302, r2Url);
+  }
+
   // Check if any matching photo file exists in imagesDir (e.g. ED-613 D.jpg, ED-613(1).jpg, ed-613.jpeg)
   try {
     const files = fs.readdirSync(imagesDir);

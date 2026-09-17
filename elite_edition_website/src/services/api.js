@@ -737,10 +737,11 @@ export const api = {
     return request(`/jobPrintLogs/${id}`, { method: 'DELETE' });
   },
 
-  // ─── Design Catalogue ──────────────────────────────────────────────────────
-  async uploadImage(file) {
+  // ─── Design Catalogue & Cloudflare R2 Uploads ──────────────────────────────────────
+  async uploadImage(file, folder = 'designs') {
     const formData = new FormData();
     formData.append('image', file);
+    if (folder) formData.append('folder', folder);
     
     const response = await fetch(`${getBaseUrl()}/upload`, {
       method: 'POST',
@@ -752,6 +753,39 @@ export const api = {
     }
     return response.json();
   },
+
+  async uploadComplaintAttachment(file, department = 'Digital_Print') {
+    const cleanDept = String(department || 'General')
+      .trim()
+      .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+      .replace(/\s+/g, '_');
+    const folder = `Complaints/${cleanDept}`;
+    return this.uploadImage(file, folder);
+  },
+
+  async uploadChatAttachment(file, roomName = 'General') {
+    const cleanRoom = String(roomName || 'General')
+      .trim()
+      .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+      .replace(/\s+/g, '_');
+    const folder = `Chat/${cleanRoom}`;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+
+    const response = await fetch(`${getBaseUrl()}/chat-task/upload`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error(`Chat upload error! status: ${response.status}`);
+    }
+    return response.json();
+  },
+
+
 
   async getDesigns(params = {}) {
     const query = new URLSearchParams();

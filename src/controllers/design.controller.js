@@ -107,22 +107,22 @@ const remove = async (req, res) => {
   }
 };
 
-// Get next sequential design number (PKD-1001, PKD-1002 for stitching, ED-1, ED-2 for digital_print)
+// Get next sequential design number (PKD-1001 for stitching, ED-709 for digital_print)
 const getNextDesignNumber = async (req, res) => {
   try {
-    const { department = 'stitching' } = req.query;
+    const { department = 'digital_print' } = req.query;
     const prefix = department === 'stitching' ? 'PKD' : 'ED';
 
     const filter = department === 'stitching'
-      ? { $or: [{ department: 'stitching' }, { category: /stitching/i }, { designName: /^PKD-/i }] }
-      : { department: { $ne: 'stitching' }, designName: /^ED-/i };
+      ? { $or: [{ department: 'stitching' }, { category: /stitching/i }, { designName: /^PKD/i }] }
+      : { department: { $ne: 'stitching' }, designName: /^ED/i };
 
     const designs = await db.Design.find(filter, { designName: 1 }).lean();
 
     let maxNo = department === 'stitching' ? 1000 : 0;
     designs.forEach(d => {
       if (!d.designName) return;
-      const match = String(d.designName).match(new RegExp(`^${prefix}-(\\d+)`, 'i'));
+      const match = String(d.designName).match(new RegExp(`^${prefix}[-_\\s]*(\\d+)`, 'i'));
       if (match) {
         const num = parseInt(match[1], 10);
         if (!isNaN(num) && num > maxNo) maxNo = num;
