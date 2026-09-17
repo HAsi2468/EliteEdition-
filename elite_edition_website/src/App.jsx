@@ -454,6 +454,26 @@ export default function App() {
       }
     }
 
+    const handleReceiveMessage = (msg) => {
+      if (!msg) return;
+      const myId = String(currentUser?._id || currentUser?.id || '');
+      const senderObj = msg.senderId;
+      const senderIdStr = String(typeof senderObj === 'object' ? (senderObj?._id || senderObj?.id || senderObj) : senderObj);
+
+      // Do not trigger notification for messages sent by current user
+      if (myId && senderIdStr === myId) return;
+
+      const senderName = typeof senderObj === 'object' ? (senderObj?.name || senderObj?.username || 'Colleague') : 'Colleague';
+      const msgContent = msg.type === 'record-card' ? `🃏 Shared Record Card: ${msg.content}` : (msg.attachment ? `📎 [${msg.attachment.fileType || 'Attachment'}] ${msg.content}` : msg.content);
+
+      triggerPushNotification(
+        `💬 Chat from ${senderName}`,
+        msgContent,
+        'info',
+        'communication'
+      );
+    };
+
     const handleActivity = (data) => {
       console.log('⚡ Real-time Socket Activity:', data);
       if (data && data.description) {
@@ -491,6 +511,7 @@ export default function App() {
       triggerGlobalDataRefresh();
     };
 
+    socket.on('receive-message', handleReceiveMessage);
     socket.on('activity-notification', handleActivity);
     socket.on('overdue-task-alert', handleOverdue);
     socket.on('mention-notification', handleMention);
@@ -503,6 +524,7 @@ export default function App() {
     socket.on('inventory-updated', handleDataUpdate);
 
     return () => {
+      socket.off('receive-message', handleReceiveMessage);
       socket.off('activity-notification', handleActivity);
       socket.off('overdue-task-alert', handleOverdue);
       socket.off('mention-notification', handleMention);
