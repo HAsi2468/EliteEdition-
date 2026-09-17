@@ -34,6 +34,19 @@ const setupSockets = (io) => {
       try {
         const { roomId, senderId, content, replyTo, attachment, priority, type, activityMeta, recordMentions: inRecordMentions } = data;
         
+        // Membership Security Check: Ensure sender belongs to room or is admin
+        const targetRoom = await ChatRoom.findById(roomId);
+        if (!targetRoom) return;
+
+        const senderUser = await User.findById(senderId);
+        if (senderUser && senderUser.role !== 'admin') {
+          const isMember = targetRoom.members && targetRoom.members.some(m => String(m) === String(senderId));
+          if (!isMember) {
+            console.warn(`Unauthorized socket message attempt by user ${senderId} in room ${roomId}`);
+            return;
+          }
+        }
+        
         // Parse user mentions
         const mentionRegex = /@(\w+)/g;
         const matches = [...content.matchAll(mentionRegex)];
