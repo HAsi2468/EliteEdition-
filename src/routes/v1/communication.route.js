@@ -8,6 +8,7 @@ router.post('/groups', communicationController.createGroup);
 router.delete('/groups/:groupId', communicationController.deleteGroup);
 router.post('/groups/sync', communicationController.syncGroups);
 router.get('/groups/:groupId/messages', communicationController.getGroupMessages);
+router.post('/groups/:groupId/messages', communicationController.postGroupMessage);
 router.get('/groups/:groupId/members', communicationController.getGroupMembers);
 router.post('/groups/:groupId/members', communicationController.updateGroupMembers);
 router.post('/activity', communicationController.postActivityEvent);

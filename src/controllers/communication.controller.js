@@ -8,17 +8,17 @@ const { publishActivity } = require('../utils/activityEvent');
  */
 const getGroups = async (req, res) => {
   try {
-    const userId = req.user ? req.user._id : req.query.userId;
+    const rawUserId = req.user ? req.user._id : (req.headers['x-user-id'] || req.query.userId || req.body?.userId);
     let currentUser = null;
 
-    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-      currentUser = await User.findById(userId);
+    if (rawUserId && mongoose.Types.ObjectId.isValid(rawUserId)) {
+      currentUser = await User.findById(rawUserId);
     }
 
-    const currentUserId = currentUser ? currentUser._id : (userId && mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : null);
-    const currentUserIdStr = currentUserId ? String(currentUserId) : (userId ? String(userId) : null);
+    const currentUserId = currentUser ? currentUser._id : (rawUserId && mongoose.Types.ObjectId.isValid(rawUserId) ? new mongoose.Types.ObjectId(rawUserId) : null);
+    const currentUserIdStr = currentUserId ? String(currentUserId) : (rawUserId ? String(rawUserId) : null);
 
-    let query = { isArchived: { $ne: true } };
+    let query;
 
     if (currentUserId || currentUserIdStr) {
       const userMemberFilter = { $in: [currentUserId, currentUserIdStr].filter(Boolean) };
@@ -28,6 +28,12 @@ const getGroups = async (req, res) => {
           { type: { $ne: 'direct' } },
           { members: userMemberFilter }
         ]
+      };
+    } else {
+      // If user identity is missing, do NOT expose direct 1-on-1 messages of other users
+      query = {
+        isArchived: { $ne: true },
+        type: { $ne: 'direct' }
       };
     }
 
@@ -85,21 +91,28 @@ const getGroupMessages = async (req, res) => {
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    // Authorization check: User must be room member or admin (auto-join if missing)
     const room = await ChatRoom.findById(groupId);
     if (!room) {
       return res.status(404).json({ success: false, message: 'Group not found' });
     }
 
-    const requestingUser = req.user || (req.query.userId ? await User.findById(req.query.userId) : null);
-    const reqUserIdStr = String(requestingUser ? requestingUser._id : (req.query.userId || ''));
-    if (requestingUser) {
+    const rawReqUserId = req.user ? req.user._id : (req.headers['x-user-id'] || req.query.userId || req.body?.userId);
+    const requestingUser = rawReqUserId ? await User.findById(rawReqUserId) : null;
+    const reqUserIdStr = String(requestingUser ? requestingUser._id : (rawReqUserId || ''));
+
+    if (requestingUser && reqUserIdStr) {
       const isMember = room.members && room.members.some((m) => {
         if (!m) return false;
         const memberIdStr = String(typeof m === 'object' ? (m._id || m.id || m) : m);
         return memberIdStr === reqUserIdStr;
       });
+
       if (!isMember) {
+        if (room.type === 'direct') {
+          // Do NOT allow non-members to view or auto-join private 1-on-1 direct rooms
+          return res.status(403).json({ success: false, message: 'Access denied to direct message conversation' });
+        }
+        // Auto-join public/authority group rooms if user has access
         room.members = room.members || [];
         room.members.push(requestingUser._id);
         await room.save();
@@ -107,8 +120,10 @@ const getGroupMessages = async (req, res) => {
     }
 
     const query = { roomId: groupId };
-    if (msgType && ['human', 'system_activity'].includes(msgType)) {
-      query.msgType = msgType;
+    if (msgType === 'human') {
+      query.$or = [{ msgType: 'human' }, { msgType: { $exists: false } }, { msgType: null }, { msgType: '' }];
+    } else if (msgType === 'system_activity') {
+      query.msgType = 'system_activity';
     }
 
     const total = await ChatMessage.countDocuments(query);
@@ -142,6 +157,122 @@ const getGroupMessages = async (req, res) => {
   } catch (error) {
     console.error('Error fetching group messages:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch messages', error: error.message });
+  }
+};
+
+/**
+ * Send a message to a communication group via HTTP POST endpoint
+ */
+const postGroupMessage = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const rawSenderId = req.user ? req.user._id : (req.headers['x-user-id'] || req.body.senderId || req.body.userId || req.query.userId);
+
+    if (!rawSenderId) {
+      return res.status(400).json({ success: false, message: 'Sender ID is required' });
+    }
+
+    const { content, replyTo, attachment, priority, type, activityMeta, recordMentions: inRecordMentions } = req.body;
+
+    if (!content && !attachment) {
+      return res.status(400).json({ success: false, message: 'Message content or attachment is required' });
+    }
+
+    const targetRoom = await ChatRoom.findById(groupId);
+    if (!targetRoom) {
+      return res.status(404).json({ success: false, message: 'Group not found' });
+    }
+
+    const senderObjId = mongoose.Types.ObjectId.isValid(rawSenderId) ? new mongoose.Types.ObjectId(rawSenderId) : rawSenderId;
+    const strSender = String(senderObjId);
+
+    const isMember = targetRoom.members && targetRoom.members.some((m) => {
+      if (!m) return false;
+      const memberIdStr = String(typeof m === 'object' ? (m._id || m.id || m) : m);
+      return memberIdStr === strSender;
+    });
+
+    if (!isMember) {
+      if (targetRoom.type === 'direct') {
+        return res.status(403).json({ success: false, message: 'You are not a member of this direct conversation' });
+      }
+      targetRoom.members = targetRoom.members || [];
+      targetRoom.members.push(senderObjId);
+      await targetRoom.save();
+    }
+
+    // Parse user mentions
+    const mentionRegex = /@(\w+)/g;
+    const matches = [...(content || '').matchAll(mentionRegex)];
+    const usernames = matches.map(m => m[1]);
+    const mentions = [];
+    if (usernames.length > 0) {
+      const matchedUsers = await User.find({ username: { $in: usernames } });
+      matchedUsers.forEach(u => mentions.push(u._id));
+    }
+
+    // Parse record mentions
+    const recordMentions = inRecordMentions || [];
+    if (!inRecordMentions && content) {
+      const recordRegex = /@(JC|DES|INV)-([a-zA-Z0-9_-]+)/gi;
+      const recordMatches = [...content.matchAll(recordRegex)];
+      recordMatches.forEach((m) => {
+        const prefix = m[1].toUpperCase();
+        const refVal = m[0].replace(/^@/, '');
+        const rType = prefix === 'JC' ? 'jobcard' : prefix === 'DES' ? 'design' : 'invoice';
+        recordMentions.push({ recordType: rType, recordRef: refVal });
+      });
+    }
+
+    const msgType = type || (attachment && attachment.fileType === 'audio' ? 'audio-voice' : 'text');
+
+    const newMessage = await ChatMessage.create({
+      roomId: groupId,
+      senderId: senderObjId,
+      content: content || (attachment ? `Attached ${attachment.fileName || 'file'}` : ''),
+      replyTo: replyTo || null,
+      type: msgType,
+      msgType: 'human',
+      priority: priority === 'urgent' ? 'urgent' : 'normal',
+      attachment: attachment || undefined,
+      activityMeta: activityMeta || undefined,
+      recordMentions: recordMentions.length > 0 ? recordMentions : undefined,
+      readBy: [senderObjId]
+    });
+
+    await ChatRoom.findByIdAndUpdate(groupId, { updatedAt: new Date() });
+
+    const populatedMessage = await ChatMessage.findById(newMessage._id)
+      .populate('senderId', 'name username email role')
+      .populate('readBy', 'name username email')
+      .populate({
+        path: 'reactions.user',
+        select: 'name username email'
+      })
+      .populate({
+        path: 'replyTo',
+        populate: { path: 'senderId', select: 'name username email' }
+      })
+      .populate('mentions', 'name username email');
+
+    // Broadcast via Socket.IO if available
+    const io = req.app.get('io') || global.io;
+    if (io) {
+      io.to(String(groupId)).emit('receive-message', populatedMessage);
+      if (targetRoom.members && targetRoom.members.length > 0) {
+        targetRoom.members.forEach((m) => {
+          const mIdStr = String(typeof m === 'object' ? (m._id || m.id || m) : m);
+          if (mIdStr) {
+            io.to(`user_${mIdStr}`).emit('receive-message', populatedMessage);
+          }
+        });
+      }
+    }
+
+    res.json({ success: true, data: populatedMessage });
+  } catch (error) {
+    console.error('Error in postGroupMessage endpoint:', error);
+    res.status(500).json({ success: false, message: 'Failed to send message', error: error.message });
   }
 };
 
@@ -487,6 +618,7 @@ const forceReloadAllUsers = async (req, res) => {
 module.exports = {
   getGroups,
   getGroupMessages,
+  postGroupMessage,
   getGroupMembers,
   updateGroupMembers,
   syncGroups,
