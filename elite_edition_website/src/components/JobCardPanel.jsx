@@ -834,8 +834,8 @@ function compressAndConvertToBase64(file, maxWidth = 900, maxHeight = 900, quali
 }
 
 // ─── Image URL field with live preview / direct upload ─────────────────────────
-function ImageField({ label, name, form, onChange, index }) {
-  const raw = form[name] || '';
+function ImageField({ label, name, form, onChange, index, value, placeholder = "Paste Google Drive or image URL..." }) {
+  const raw = (form && name in form) ? (form[name] || '') : (value || '');
   const [mode, setMode] = useState(raw && !raw.startsWith('data:') ? 'url' : 'file'); // 'file' or 'url'
   const fileInputRef = useRef(null);
 
@@ -848,15 +848,32 @@ function ImageField({ label, name, form, onChange, index }) {
     }
   }, [raw]);
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
+  const processAndUploadFile = async (file) => {
     if (!file) return;
     try {
+      // 1. Convert file to compressed Base64 immediately so preview loads 100% instantly
       const base64 = await compressAndConvertToBase64(file);
       onChange({ target: { name, value: base64 } });
+
+      // 2. Try background server upload
+      try {
+        const options = { maxSizeMB: 1.5, maxWidthOrHeight: 2048, useWebWorker: true };
+        const compressedFile = await imageCompression(file, options);
+        const res = await api.uploadImage(compressedFile);
+        if (res && res.url) {
+          onChange({ target: { name, value: res.url } });
+        }
+      } catch (uploadErr) {
+        console.warn('[ImageField] Background server upload warning:', uploadErr.message);
+      }
     } catch (err) {
       alert('Failed to process image file: ' + err.message);
     }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    await processAndUploadFile(file);
   };
 
   const handleClear = () => {
@@ -865,7 +882,50 @@ function ImageField({ label, name, form, onChange, index }) {
   };
 
   const isBase64 = raw.startsWith('data:');
-  const previewUrl = isBase64 ? raw : (convertDriveUrl(raw) || raw);
+  const directUrl = isBase64 ? raw : convertDriveUrl(raw);
+
+  const handleImgError = (e) => {
+    const currentSrc = e.target.src || '';
+    if (!e.target.dataset.retried) {
+      e.target.dataset.retried = '1';
+      if (currentSrc.endsWith('.jpg')) {
+        e.target.src = currentSrc.slice(0, -4) + '.jpeg';
+        return;
+      } else if (currentSrc.endsWith('.jpeg')) {
+        e.target.src = currentSrc.slice(0, -5) + '.jpg';
+        return;
+      } else if (currentSrc.endsWith('.png')) {
+        e.target.src = currentSrc.slice(0, -4) + '.jpeg';
+        return;
+      } else if (!currentSrc.includes('.')) {
+        e.target.src = currentSrc + '.jpeg';
+        return;
+      }
+    } else if (e.target.dataset.retried === '1') {
+      e.target.dataset.retried = '2';
+      if (currentSrc.endsWith('.jpeg')) {
+        e.target.src = currentSrc.slice(0, -5) + '.png';
+        return;
+      } else if (currentSrc.endsWith('.jpg')) {
+        e.target.src = currentSrc.slice(0, -4) + '.png';
+        return;
+      }
+    }
+    if (raw && (raw.includes('drive.google.com') || raw.includes('googleusercontent'))) {
+      const idMatch = raw.match(/\/d\/([-\w]{20,})/) || raw.match(/[?&]id=([-\w]{20,})/) || raw.match(/([-\w]{25,})/);
+      if (idMatch && idMatch[1]) {
+        const fid = idMatch[1];
+        if (currentSrc.includes('lh3.googleusercontent.com')) {
+          e.target.src = `https://drive.google.com/thumbnail?id=${fid}&sz=w1000`;
+          return;
+        } else if (currentSrc.includes('thumbnail?id=')) {
+          e.target.src = `https://drive.google.com/uc?export=view&id=${fid}`;
+          return;
+        }
+      }
+    }
+    e.target.style.display = 'none';
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: '1 1 auto', minWidth: 220 }}>
@@ -881,7 +941,7 @@ function ImageField({ label, name, form, onChange, index }) {
           }}
           style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', outline: 'none' }}
         >
-          {mode === 'file' ? 'Paste URL instead' : 'Upload File instead'}
+          {mode === 'file' ? 'Paste Image URL instead' : 'Upload Image File instead'}
         </button>
       </div>
 
@@ -893,12 +953,7 @@ function ImageField({ label, name, form, onChange, index }) {
             e.preventDefault();
             const file = e.dataTransfer.files[0];
             if (file && file.type.startsWith('image/')) {
-              try {
-                const base64 = await compressAndConvertToBase64(file);
-                onChange({ target: { name, value: base64 } });
-              } catch (err) {
-                alert('Failed to process image file: ' + err.message);
-              }
+              await processAndUploadFile(file);
             }
           }}
           style={{
@@ -926,61 +981,15 @@ function ImageField({ label, name, form, onChange, index }) {
             accept="image/*"
             style={{ display: 'none' }}
           />
-          {previewUrl ? (
+          {directUrl ? (
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <img
-                src={previewUrl}
-                alt={`Selected preview ${index}`}
+                src={directUrl}
+                alt={`Selected preview ${index || ''}`}
                 referrerPolicy="no-referrer"
-                style={{ maxHeight: '100px', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px' }}
-                onError={(e) => {
-                  const currentSrc = e.target.src || '';
-                  if (!e.target.dataset.retried) {
-                    e.target.dataset.retried = '1';
-                    if (currentSrc.endsWith('.jpg')) {
-                      e.target.src = currentSrc.slice(0, -4) + '.jpeg';
-                      return;
-                    } else if (currentSrc.endsWith('.jpeg')) {
-                      e.target.src = currentSrc.slice(0, -5) + '.jpg';
-                      return;
-                    } else if (currentSrc.endsWith('.png')) {
-                      e.target.src = currentSrc.slice(0, -4) + '.jpeg';
-                      return;
-                    } else if (!currentSrc.includes('.')) {
-                      e.target.src = currentSrc + '.jpeg';
-                      return;
-                    }
-                  } else if (e.target.dataset.retried === '1') {
-                    e.target.dataset.retried = '2';
-                    if (currentSrc.endsWith('.jpeg')) {
-                      e.target.src = currentSrc.slice(0, -5) + '.png';
-                      return;
-                    } else if (currentSrc.endsWith('.jpg')) {
-                      e.target.src = currentSrc.slice(0, -4) + '.png';
-                      return;
-                    }
-                  }
-                  if (raw && (raw.includes('drive.google.com') || raw.includes('googleusercontent'))) {
-                    const idMatch = raw.match(/\/d\/([-\w]{20,})/) || raw.match(/[?&]id=([-\w]{20,})/) || raw.match(/([-\w]{25,})/);
-                    if (idMatch && idMatch[1]) {
-                      const fid = idMatch[1];
-                      if (currentSrc.includes('lh3.googleusercontent.com')) {
-                        e.target.src = `https://drive.google.com/thumbnail?id=${fid}&sz=w1000`;
-                        return;
-                      } else if (currentSrc.includes('thumbnail?id=')) {
-                        e.target.src = `https://drive.google.com/uc?export=view&id=${fid}`;
-                        return;
-                      }
-                    }
-                  }
-                  e.target.style.display = 'none';
-                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
-                }}
+                style={{ maxHeight: '110px', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px' }}
+                onError={handleImgError}
               />
-              <div style={{ display: 'none', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', padding: '0.4rem', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600 }}>
-                <span>🖼️ Image File Attached</span>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', opacity: 0.8 }}>Click Browse to re-upload image file</span>
-              </div>
               <button
                 type="button"
                 onClick={(e) => {
@@ -990,9 +999,9 @@ function ImageField({ label, name, form, onChange, index }) {
                 style={{
                   position: 'absolute', top: -8, right: -8,
                   background: 'var(--danger)', color: 'var(--text-primary)', border: 'none',
-                  borderRadius: '50%', width: '18px', height: '18px',
+                  borderRadius: '50%', width: '20px', height: '20px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '9px', cursor: 'pointer'
+                  fontSize: '10px', cursor: 'pointer'
                 }}
               >
                 ✕
@@ -1000,61 +1009,58 @@ function ImageField({ label, name, form, onChange, index }) {
             </div>
           ) : (
             <>
-              <Image size={20} style={{ color: 'var(--text-muted)', opacity: 0.6 }} />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                Drag & Drop or <strong style={{ color: 'var(--primary)' }}>Browse</strong> to upload
+              <Image size={24} style={{ color: 'var(--text-muted)', opacity: 0.6 }} />
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                Drag & Drop or <strong style={{ color: 'var(--primary)' }}>Browse</strong> to upload image
+              </span>
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', opacity: 0.7 }}>
+                Supports JPG, PNG (automatically compressed client-side)
               </span>
             </>
           )}
         </div>
       ) : (
-        <>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
           <input
-            type="text" name={name} value={raw} onChange={onChange}
-            placeholder="Paste image URL (web link, CDN, Drive, base64)…"
-            style={{ padding: '0.5rem 0.7rem', fontSize: '0.82rem', fontWeight: 500,
-              borderColor: previewUrl ? 'rgba(52,211,153,0.4)' : undefined }}
+            type="text"
+            name={name}
+            value={raw}
+            onChange={onChange}
+            placeholder={placeholder}
+            style={{
+              padding: '0.5rem 0.7rem', fontSize: '0.82rem', fontWeight: 500,
+              borderColor: directUrl ? 'rgba(52,211,153,0.4)' : undefined
+            }}
           />
-
-          {previewUrl && (
-            <div style={{ borderRadius: 'var(--radius-sm)', overflow: 'hidden',
-              border: '1px solid var(--border-light)', background: 'rgba(255,255,255,0.03)',
-              padding: '0.4rem', textAlign: 'center', position: 'relative' }}>
-              <img
-                src={previewUrl}
-                alt={`Image ${index} preview`}
-                referrerPolicy="no-referrer"
-                style={{ maxWidth: '100%', maxHeight: 130, objectFit: 'contain', borderRadius: 4, display: 'block', margin: '0 auto' }}
-                onError={e => {
-                  const currentSrc = e.target.src || '';
-                  if (raw && (raw.includes('drive.google.com') || raw.includes('googleusercontent'))) {
-                    const idMatch = raw.match(/\/d\/([-\w]{20,})/) || raw.match(/[?&]id=([-\w]{20,})/) || raw.match(/([-\w]{25,})/);
-                    if (idMatch && idMatch[1]) {
-                      const fid = idMatch[1];
-                      if (currentSrc.includes('lh3.googleusercontent.com')) {
-                        e.target.src = `https://drive.google.com/thumbnail?id=${fid}&sz=w1000`;
-                        return;
-                      } else if (currentSrc.includes('thumbnail?id=')) {
-                        e.target.src = `https://drive.google.com/uc?export=view&id=${fid}`;
-                        return;
-                      }
-                    }
-                  }
-                  e.target.style.display = 'none';
-                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
-                }}
-              />
-              <div style={{ display: 'none', flexDirection: 'column', alignItems: 'center', gap: '0.25rem',
-                padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.72rem' }}>
-                <span>🖼️ Image Link Added</span>
-                <span style={{ color: 'var(--text-muted)', opacity: 0.75 }}>Image URL saved for job card &amp; printing</span>
-              </div>
-              <div style={{ position: 'absolute', top: 4, right: 4, fontSize: '0.6rem',
-                background: 'rgba(52,211,153,0.2)', color: '#34d399', padding: '1px 5px',
-                borderRadius: 4, fontWeight: 700 }}>✓ URL OK</div>
+          {raw.includes('/folders/') && (
+            <div style={{ fontSize: '0.7rem', color: 'var(--warning)', display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+              ⚠️ Folder link detected. Copy direct link of individual files in Drive instead.
             </div>
           )}
-        </>
+          {directUrl && (
+            <div style={{
+              display: 'inline-flex',
+              gap: '0.8rem',
+              alignItems: 'center',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border-light)',
+              background: 'rgba(255,255,255,0.02)',
+              padding: '0.5rem',
+              position: 'relative'
+            }}>
+              <img
+                src={directUrl}
+                alt={`Image ${index || ''} preview`}
+                referrerPolicy="no-referrer"
+                style={{ height: '70px', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px', background: '#000' }}
+                onError={handleImgError}
+              />
+              <div style={{ position: 'absolute', top: 4, right: 4, fontSize: '0.6rem',
+                background: 'rgba(52,211,153,0.2)', color: '#34d399', padding: '1px 5px',
+                borderRadius: 4, fontWeight: 700 }}>✓ Preview OK</div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
