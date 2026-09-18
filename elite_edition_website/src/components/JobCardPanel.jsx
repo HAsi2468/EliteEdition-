@@ -1522,6 +1522,32 @@ function JobCardForm({ card, onSave, onClose, department }) {
                               referrerPolicy="no-referrer"
                               style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }}
                               onError={(e) => {
+                                const currentSrc = e.target.src || '';
+                                if (!e.target.dataset.retried) {
+                                  e.target.dataset.retried = '1';
+                                  if (currentSrc.endsWith('.jpeg')) {
+                                    e.target.src = currentSrc.slice(0, -5) + '.jpg';
+                                    return;
+                                  } else if (currentSrc.endsWith('.jpg')) {
+                                    e.target.src = currentSrc.slice(0, -4) + '.jpeg';
+                                    return;
+                                  } else if (currentSrc.endsWith('.png')) {
+                                    e.target.src = currentSrc.slice(0, -4) + '.jpg';
+                                    return;
+                                  } else if (!currentSrc.includes('.')) {
+                                    e.target.src = currentSrc + '.jpg';
+                                    return;
+                                  }
+                                } else if (e.target.dataset.retried === '1') {
+                                  e.target.dataset.retried = '2';
+                                  if (currentSrc.endsWith('.jpg')) {
+                                    e.target.src = currentSrc.slice(0, -4) + '.png';
+                                    return;
+                                  } else if (currentSrc.endsWith('.jpeg')) {
+                                    e.target.src = currentSrc.slice(0, -5) + '.png';
+                                    return;
+                                  }
+                                }
                                 const fidMatch = d.imageUrl?.match(/\/d\/([-\w]{20,})/) || d.imageUrl?.match(/[?&]id=([-\w]{20,})/) || d.imageUrl?.match(/([-\w]{25,})/);
                                 if (fidMatch && fidMatch[1]) {
                                   e.target.src = `https://lh3.googleusercontent.com/d/${fidMatch[1]}=s200`;
@@ -1538,6 +1564,32 @@ function JobCardForm({ card, onSave, onClose, department }) {
                               referrerPolicy="no-referrer"
                               style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }}
                               onError={(e) => {
+                                const currentSrc = e.target.src || '';
+                                if (!e.target.dataset.retried) {
+                                  e.target.dataset.retried = '1';
+                                  if (currentSrc.endsWith('.jpeg')) {
+                                    e.target.src = currentSrc.slice(0, -5) + '.jpg';
+                                    return;
+                                  } else if (currentSrc.endsWith('.jpg')) {
+                                    e.target.src = currentSrc.slice(0, -4) + '.jpeg';
+                                    return;
+                                  } else if (currentSrc.endsWith('.png')) {
+                                    e.target.src = currentSrc.slice(0, -4) + '.jpg';
+                                    return;
+                                  } else if (!currentSrc.includes('.')) {
+                                    e.target.src = currentSrc + '.jpg';
+                                    return;
+                                  }
+                                } else if (e.target.dataset.retried === '1') {
+                                  e.target.dataset.retried = '2';
+                                  if (currentSrc.endsWith('.jpg')) {
+                                    e.target.src = currentSrc.slice(0, -4) + '.png';
+                                    return;
+                                  } else if (currentSrc.endsWith('.jpeg')) {
+                                    e.target.src = currentSrc.slice(0, -5) + '.png';
+                                    return;
+                                  }
+                                }
                                 const fidMatch = d.imageUrl2?.match(/\/d\/([-\w]{20,})/) || d.imageUrl2?.match(/[?&]id=([-\w]{20,})/) || d.imageUrl2?.match(/([-\w]{25,})/);
                                 if (fidMatch && fidMatch[1]) {
                                   e.target.src = `https://lh3.googleusercontent.com/d/${fidMatch[1]}=s200`;
