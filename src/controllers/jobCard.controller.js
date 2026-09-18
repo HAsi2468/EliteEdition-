@@ -247,10 +247,11 @@ const getAllJobCards = async (req, res) => {
         .lean();
     } else {
       const order = sortOrder === 'desc' ? -1 : 1;
-      const sort = { [sortBy]: order };
       cards = await db.JobCard.find(filter)
         .collation({ locale:'en', numericOrdering:true })
         .sort(sort).skip(skip).limit(Number(limit)).lean();
+    }
+
     const { normalizeImageUrl } = require('../utils/imageUrlHelper');
     const normalizedCards = (cards || []).map(c => ({
       ...c,
@@ -267,8 +268,11 @@ const getAllJobCards = async (req, res) => {
 
 const getJobCard = async (req, res) => {
   try {
+    const { normalizeImageUrl } = require('../utils/imageUrlHelper');
     const card = await db.JobCard.findById(req.params.id).lean();
     if (!card) return res.status(404).json({ error: 'Job card not found' });
+    card.imageUrl1 = normalizeImageUrl(card.imageUrl1 || card.imageUrl, card.designName || card.designNo);
+    card.imageUrl2 = normalizeImageUrl(card.imageUrl2, card.designName ? `${card.designName}-2` : '');
     res.json(card);
   } catch (err) { res.status(500).json({ error: 'Internal Server Error' }); }
 };
@@ -323,6 +327,11 @@ const createJobCard = async (req, res) => {
     if (body.deliveryDate) body.deliveryDate = normalizeDateStr(body.deliveryDate);
 
     syncDesignImage(body).catch(e => logger.warn('syncDesignImage failed: %s', e.message));
+
+    const { normalizeImageUrl } = require('../utils/imageUrlHelper');
+    if (body.imageUrl1) body.imageUrl1 = normalizeImageUrl(body.imageUrl1, body.designName || body.designNo);
+    if (body.imageUrl2) body.imageUrl2 = normalizeImageUrl(body.imageUrl2, body.designName ? `${body.designName}-2` : '');
+    if (body.imageUrl) body.imageUrl = normalizeImageUrl(body.imageUrl, body.designName || body.designNo);
 
     const creatorName = req.user?.name || body.userName || body.createdBy || 'Staff User';
     const creatorId = req.user?._id || body.userId || body.createdById;
@@ -403,6 +412,11 @@ const updateJobCard = async (req, res) => {
     targetId = existingCard._id;
 
     syncDesignImage(body, existingCard).catch(e => logger.warn('syncDesignImage failed: %s', e.message));
+
+    const { normalizeImageUrl } = require('../utils/imageUrlHelper');
+    if (body.imageUrl1) body.imageUrl1 = normalizeImageUrl(body.imageUrl1, body.designName || body.designNo);
+    if (body.imageUrl2) body.imageUrl2 = normalizeImageUrl(body.imageUrl2, body.designName ? `${body.designName}-2` : '');
+    if (body.imageUrl) body.imageUrl = normalizeImageUrl(body.imageUrl, body.designName || body.designNo);
 
     if (body.panna && body.pass && body.totalMtr && body.machineName)
       body.expTime = calcExpTime(body.panna, body.pass, body.totalMtr, body.machineName);

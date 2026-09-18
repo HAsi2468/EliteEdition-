@@ -12,6 +12,57 @@ import DateRangePicker from './DateRangePicker';
 import VendorPartyManagerModal from './VendorPartyManagerModal';
 import ProductCatalogGrid from './ProductCatalogGrid';
 
+const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
+
+function convertDriveUrl(link) {
+  if (!link || typeof link !== 'string' || !link.trim()) return '';
+  const trimmed = link.trim();
+  if (trimmed.startsWith('data:')) return trimmed;
+
+  if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
+    if (trimmed.includes('/folders/')) return '';
+    let fid = '';
+    const fileMatch = trimmed.match(/\/d\/([-\w]{20,})/);
+    if (fileMatch) fid = fileMatch[1];
+    if (!fid) {
+      const openMatch = trimmed.match(/[?&]id=([-\w]{20,})/);
+      if (openMatch) fid = openMatch[1];
+    }
+    if (!fid) {
+      const idMatch = trimmed.match(/([-\w]{25,})/);
+      if (idMatch) fid = idMatch[1];
+    }
+    if (fid) return `https://lh3.googleusercontent.com/d/${fid}=s1000`;
+  }
+
+  if (trimmed.includes('/designs/')) {
+    const filename = trimmed.split('/designs/')[1].replace(/^\/+/, '');
+    return `${R2_PUBLIC_BASE}/designs/${filename}`;
+  }
+  if (trimmed.includes('/uploads/')) {
+    const filename = trimmed.split('/uploads/')[1].replace(/^\/+/, '');
+    return `${R2_PUBLIC_BASE}/uploads/${filename}`;
+  }
+
+  if (trimmed.startsWith('https://')) return encodeURI(trimmed);
+
+  if (trimmed.includes('3.7.174.180') || trimmed.startsWith('http://')) {
+    const clean = trimmed.replace(/^http:\/\/[^\/]+/, '');
+    if (clean.includes('/designs/') || clean.includes('/uploads/')) {
+      const sub = clean.startsWith('/') ? clean.substring(1) : clean;
+      return `${R2_PUBLIC_BASE}/${sub}`;
+    }
+    return encodeURI(trimmed.replace('http://', 'https://'));
+  }
+
+  if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
+    const filename = trimmed.includes('.') ? trimmed : `${trimmed}.jpg`;
+    return `${R2_PUBLIC_BASE}/designs/${encodeURIComponent(filename)}`;
+  }
+
+  return encodeURI(trimmed);
+}
+
 export default function InventoryGrid({ 
   items = [], 
   catalogItems = [],
@@ -1637,7 +1688,7 @@ export default function InventoryGrid({
             <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                 {viewingItem.imageUrl ? (
-                  <img src={viewingItem.imageUrl} alt={viewingItem.itemName} style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover', border: '1px solid #cbd5e1' }} />
+                  <img src={convertDriveUrl(viewingItem.imageUrl, viewingItem.skuCode || viewingItem.sku)} alt={viewingItem.itemName} style={{ width: '80px', height: '80px', borderRadius: '12px', objectFit: 'cover', border: '1px solid #cbd5e1' }} />
                 ) : (
                   <div style={{ width: '80px', height: '80px', borderRadius: '12px', background: '#f1f5f9', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', fontWeight: 800, color: '#94a3b8' }}>
                     {viewingItem.itemName ? viewingItem.itemName[0].toUpperCase() : 'E'}

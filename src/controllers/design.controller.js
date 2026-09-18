@@ -87,8 +87,14 @@ const getOne = async (req, res) => {
 
 const create = async (req, res) => {
   try {
-    const doc = await db.Design.create(req.body);
-    res.status(201).json(doc);
+    const body = { ...req.body };
+    if (body.imageUrl) body.imageUrl = normalizeImageUrl(body.imageUrl, body.designName);
+    if (body.imageUrl2) body.imageUrl2 = normalizeImageUrl(body.imageUrl2, body.designName ? `${body.designName}-2` : '');
+    const doc = await db.Design.create(body);
+    const result = doc.toObject ? doc.toObject() : doc;
+    result.imageUrl = normalizeImageUrl(result.imageUrl, result.designName);
+    result.imageUrl2 = normalizeImageUrl(result.imageUrl2, result.designName ? `${result.designName}-2` : '');
+    res.status(201).json(result);
   } catch (err) {
     logger.error('design.create error: %o', err);
     if (err.code === 11000) return res.status(400).json({ error: `Design name "${req.body.designName}" already exists.` });
@@ -98,8 +104,13 @@ const create = async (req, res) => {
 
 const update = async (req, res) => {
   try {
-    const doc = await db.Design.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true }).lean();
+    const body = { ...req.body };
+    if (body.imageUrl) body.imageUrl = normalizeImageUrl(body.imageUrl, body.designName);
+    if (body.imageUrl2) body.imageUrl2 = normalizeImageUrl(body.imageUrl2, body.designName ? `${body.designName}-2` : '');
+    const doc = await db.Design.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true }).lean();
     if (!doc) return res.status(404).json({ error: 'Design not found' });
+    doc.imageUrl = normalizeImageUrl(doc.imageUrl, doc.designName);
+    doc.imageUrl2 = normalizeImageUrl(doc.imageUrl2, doc.designName ? `${doc.designName}-2` : '');
     res.json(doc);
   } catch (err) {
     logger.error('design.update error: %o', err);

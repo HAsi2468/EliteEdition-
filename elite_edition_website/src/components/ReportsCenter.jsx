@@ -1238,7 +1238,7 @@ export default function ReportsCenter({ department }) {
                     <tr key={item.sku || idx}>
                       <td>
                         {item.imageUrl ? (
-                          <img src={item.imageUrl} alt={item.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
+                          <img src={convertDriveUrl(item.imageUrl, item.sku)} alt={item.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
                         ) : (
                           <div style={styles.noPhoto}>N/A</div>
                         )}
@@ -1292,7 +1292,7 @@ export default function ReportsCenter({ department }) {
                         <td style={{ fontSize: '12px', color: '#64748B', whiteSpace: 'nowrap' }}>{dtStr}</td>
                         <td>
                           {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
+                            <img src={convertDriveUrl(item.imageUrl, item.sku)} alt={item.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
                           ) : (
                             <div style={styles.noPhoto}>N/A</div>
                           )}
@@ -1341,7 +1341,7 @@ export default function ReportsCenter({ department }) {
                       <tr key={item.sku || idx}>
                         <td>
                           {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
+                            <img src={convertDriveUrl(item.imageUrl, item.sku)} alt={item.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
                           ) : (
                             <div style={styles.noPhoto}>N/A</div>
                           )}
@@ -1389,7 +1389,7 @@ export default function ReportsCenter({ department }) {
                     <tr key={row.itemSKUCode || idx}>
                       <td>
                         {row.productImage ? (
-                          <img src={row.productImage} alt={row.itemSKUCode} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
+                          <img src={convertDriveUrl(row.productImage, row.itemSKUCode)} alt={row.itemSKUCode} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
                         ) : (
                           <div style={styles.noPhoto}>N/A</div>
                         )}
@@ -1439,7 +1439,7 @@ export default function ReportsCenter({ department }) {
                           <tr key={prod.sku || idx}>
                             <td>
                               {prod.imageUrl ? (
-                                <img src={prod.imageUrl} alt={prod.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
+                                <img src={convertDriveUrl(prod.imageUrl, prod.sku)} alt={prod.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
                               ) : (
                                 <div style={styles.noPhoto}>N/A</div>
                               )}
@@ -1537,7 +1537,7 @@ export default function ReportsCenter({ department }) {
                               <tr key={prod.sku || idx}>
                                 <td>
                                   {prod.imageUrl ? (
-                                    <img src={prod.imageUrl} alt={prod.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
+                                    <img src={convertDriveUrl(prod.imageUrl, prod.sku)} alt={prod.sku} style={styles.productImg} onError={(e) => { e.target.style.display = 'none'; }} />
                                   ) : (
                                     <div style={styles.noPhoto}>N/A</div>
                                   )}

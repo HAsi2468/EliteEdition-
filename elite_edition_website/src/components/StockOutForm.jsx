@@ -6,6 +6,57 @@ import CameraBarcodeScanner from './CameraBarcodeScanner';
 import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
 import VendorPartyManagerModal from './VendorPartyManagerModal';
 
+const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
+
+function convertDriveUrl(link) {
+  if (!link || typeof link !== 'string' || !link.trim()) return '';
+  const trimmed = link.trim();
+  if (trimmed.startsWith('data:')) return trimmed;
+
+  if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
+    if (trimmed.includes('/folders/')) return '';
+    let fid = '';
+    const fileMatch = trimmed.match(/\/d\/([-\w]{20,})/);
+    if (fileMatch) fid = fileMatch[1];
+    if (!fid) {
+      const openMatch = trimmed.match(/[?&]id=([-\w]{20,})/);
+      if (openMatch) fid = openMatch[1];
+    }
+    if (!fid) {
+      const idMatch = trimmed.match(/([-\w]{25,})/);
+      if (idMatch) fid = idMatch[1];
+    }
+    if (fid) return `https://lh3.googleusercontent.com/d/${fid}=s1000`;
+  }
+
+  if (trimmed.includes('/designs/')) {
+    const filename = trimmed.split('/designs/')[1].replace(/^\/+/, '');
+    return `${R2_PUBLIC_BASE}/designs/${filename}`;
+  }
+  if (trimmed.includes('/uploads/')) {
+    const filename = trimmed.split('/uploads/')[1].replace(/^\/+/, '');
+    return `${R2_PUBLIC_BASE}/uploads/${filename}`;
+  }
+
+  if (trimmed.startsWith('https://')) return encodeURI(trimmed);
+
+  if (trimmed.includes('3.7.174.180') || trimmed.startsWith('http://')) {
+    const clean = trimmed.replace(/^http:\/\/[^\/]+/, '');
+    if (clean.includes('/designs/') || clean.includes('/uploads/')) {
+      const sub = clean.startsWith('/') ? clean.substring(1) : clean;
+      return `${R2_PUBLIC_BASE}/${sub}`;
+    }
+    return encodeURI(trimmed.replace('http://', 'https://'));
+  }
+
+  if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
+    const filename = trimmed.includes('.') ? trimmed : `${trimmed}.jpg`;
+    return `${R2_PUBLIC_BASE}/designs/${encodeURIComponent(filename)}`;
+  }
+
+  return encodeURI(trimmed);
+}
+
 export default function StockOutForm({ items = [], parties = [], prefilledItem, onSubmit, onClose }) {
   const [defaultParty, setDefaultParty] = useState('');
   const [customParty, setCustomParty] = useState('');
@@ -559,7 +610,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                       <td style={{ padding: '0.65rem 0.75rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           {row.imageUrl ? (
-                            <img src={row.imageUrl} alt="Thumbnail" style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover', border: '1px solid #e2e8f0' }} />
+                            <img src={convertDriveUrl(row.imageUrl, row.skuCode || row.sku)} alt="Thumbnail" style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover', border: '1px solid #e2e8f0' }} />
                           ) : (
                             <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>
                               {row.itemName ? row.itemName[0].toUpperCase() : '?'}
