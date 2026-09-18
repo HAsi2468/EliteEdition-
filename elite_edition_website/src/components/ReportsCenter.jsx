@@ -21,14 +21,8 @@ import {
 } from 'lucide-react';
 import DateRangePicker from './DateRangePicker';
 
-function convertDriveUrl(link, designName = '') {
-  if (!link || typeof link !== 'string' || !link.trim()) {
-    if (designName && typeof designName === 'string' && designName.trim()) {
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      return `${origin}/v1/designs/${encodeURIComponent(designName.trim())}.jpg`;
-    }
-    return '';
-  }
+function convertDriveUrl(link) {
+  if (!link || typeof link !== 'string' || !link.trim()) return '';
   const trimmed = link.trim();
   if (trimmed.startsWith('data:')) return trimmed;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';

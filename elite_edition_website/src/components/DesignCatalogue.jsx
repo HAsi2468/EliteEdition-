@@ -15,14 +15,8 @@ import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import PKDOrdersImportModal from './PKDOrdersImportModal';
 import DesignMaster from './DesignMaster';
 
-function convertDriveUrl(link, designName = '') {
-  if (!link || !link.trim()) {
-    if (designName) {
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      return `${origin}/v1/designs/${designName}.jpg`;
-    }
-    return '';
-  }
+function convertDriveUrl(link) {
+  if (!link || typeof link !== 'string' || !link.trim()) return '';
   const trimmed = link.trim();
   if (trimmed.startsWith('data:')) return trimmed;
 

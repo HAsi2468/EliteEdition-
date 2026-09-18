@@ -1,23 +1,14 @@
 const config = require('../config/config');
 
 /**
- * Normalizes any image URL or design name into a clean, secure Cloudflare R2 or HTTPS endpoint.
- * Eliminates all insecure HTTP IP URLs (e.g., http://3.7.174.180:3001/...) to prevent Mixed Content errors.
+ * Normalizes any image URL into a clean, secure Cloudflare R2 or HTTPS endpoint.
+ * Returns empty string '' if url is falsy/empty, preventing 404 GET requests.
  * 
  * @param {string} url - The raw image URL or path
- * @param {string} [designName] - Optional design number/name fallback (e.g. ED-476, PKD-1001)
- * @returns {string} Normalized R2 / HTTPS URL
+ * @returns {string} Normalized R2 / HTTPS URL or empty string
  */
-function normalizeImageUrl(url, designName = '') {
+function normalizeImageUrl(url) {
   if (!url || typeof url !== 'string' || !url.trim()) {
-    if (designName && typeof designName === 'string' && designName.trim()) {
-      const name = designName.trim();
-      const r2Base = (config.r2 && config.r2.publicUrl) ? config.r2.publicUrl.replace(/\/+$/, '') : '';
-      if (r2Base) {
-        return `${r2Base}/designs/${encodeURIComponent(name)}.jpg`;
-      }
-      return `/v1/designs/${encodeURIComponent(name)}.jpg`;
-    }
     return '';
   }
 
@@ -58,10 +49,6 @@ function normalizeImageUrl(url, designName = '') {
     }
     if (trimmed.startsWith('https://')) {
       return trimmed;
-    }
-    if (designName) {
-      const ext = (trimmed.match(/\.(jpg|jpeg|png|webp|gif|svg)$/i) || [])[0] || '.jpg';
-      return `${r2Base}/designs/${encodeURIComponent(designName)}${ext}`;
     }
   }
 

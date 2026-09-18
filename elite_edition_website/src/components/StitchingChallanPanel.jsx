@@ -7,14 +7,8 @@ import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 
-function convertDriveUrl(link, designName = '') {
-  if (!link || !link.trim()) {
-    if (designName && designName.trim()) {
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      return `${origin}/v1/designs/${encodeURIComponent(designName.trim())}.jpg`;
-    }
-    return '';
-  }
+function convertDriveUrl(link) {
+  if (!link || typeof link !== 'string' || !link.trim()) return '';
   const trimmed = link.trim();
   if (trimmed.startsWith('data:')) return trimmed;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
