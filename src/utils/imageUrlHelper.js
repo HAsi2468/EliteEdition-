@@ -72,7 +72,7 @@ function normalizeImageUrl(url) {
   }
 
   if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
-    const filename = trimmed.includes('.') ? trimmed : `${trimmed}.jpg`;
+    const filename = trimmed.includes('.') ? trimmed : `${trimmed}.jpeg`;
     return `/v1/designs/${encodeURIComponent(filename)}`;
   }
 

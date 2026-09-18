@@ -66,7 +66,7 @@ function convertDriveUrl(link) {
 
   // 5. Bare design filenames e.g. "ED-01.jpg"
   if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
-    const filename = trimmed.includes('.') ? trimmed : `${trimmed}.jpg`;
+    const filename = trimmed.includes('.') ? trimmed : `${trimmed}.jpeg`;
     return `${R2_PUBLIC_BASE}/designs/${encodeURIComponent(filename)}`;
   }
 
