@@ -136,7 +136,7 @@ function convertDriveUrl(link) {
       const idMatch = trimmed.match(/([-\w]{25,})/);
       if (idMatch) fid = idMatch[1];
     }
-    if (fid) return `https://lh3.googleusercontent.com/d/${fid}=s1000`;
+    if (fid) return `https://drive.google.com/thumbnail?id=${fid}&sz=w1000`;
   }
 
   // 2. Extract relative path for /designs/ or /uploads/ and point to Cloudflare R2 CDN
@@ -223,32 +223,38 @@ export function triggerJobCardPrint(cardOrCards) {
     const names = extractDesignNames(keyStr);
     const showTwoImages = names.length >= 2;
 
-    const img1 = convertDriveUrl(imageUrl1);
-    const img2 = showTwoImages ? convertDriveUrl(imageUrl2) : '';
+    let img1 = convertDriveUrl(imageUrl1);
+    let img2 = showTwoImages ? convertDriveUrl(imageUrl2) : '';
+
+    if (!img1 && (card.designName || card.designNo)) {
+      img1 = convertDriveUrl(card.designName || card.designNo);
+    }
+
+    const retryScript = `if(!this.dataset.retried){this.dataset.retried=1;if(this.src.endsWith('.jpg'))this.src=this.src.slice(0,-4)+'.jpeg';else if(this.src.endsWith('.jpeg'))this.src=this.src.slice(0,-5)+'.jpg';else if(this.src.endsWith('.png'))this.src=this.src.slice(0,-4)+'.jpeg';}`;
 
     let imgAreaHtml = '';
     if (img1 && img2) {
       imgAreaHtml = `
       <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
         <div style="flex: 1; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-          <img src="${img1}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
+          <img src="${img1}" crossorigin="anonymous" referrerpolicy="no-referrer" style="max-width: 100%; max-height: 136px; object-fit: contain;" onerror="${retryScript}" />
         </div>
         <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-          <img src="${img2}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
+          <img src="${img2}" crossorigin="anonymous" referrerpolicy="no-referrer" style="max-width: 100%; max-height: 136px; object-fit: contain;" onerror="${retryScript}" />
         </div>
       </div>`;
     } else if (img1) {
       imgAreaHtml = `
       <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
         <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-          <img src="${img1}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
+          <img src="${img1}" crossorigin="anonymous" referrerpolicy="no-referrer" style="max-width: 100%; max-height: 136px; object-fit: contain;" onerror="${retryScript}" />
         </div>
       </div>`;
     } else if (img2) {
       imgAreaHtml = `
       <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
         <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-          <img src="${img2}" style="max-width: 100%; max-height: 136px; object-fit: contain;" />
+          <img src="${img2}" crossorigin="anonymous" referrerpolicy="no-referrer" style="max-width: 100%; max-height: 136px; object-fit: contain;" onerror="${retryScript}" />
         </div>
       </div>`;
     } else {
