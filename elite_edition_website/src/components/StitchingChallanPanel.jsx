@@ -7,6 +7,66 @@ import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 
+function convertDriveUrl(link, designName = '') {
+  if (!link || !link.trim()) {
+    if (designName && designName.trim()) {
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      return `${origin}/v1/designs/${encodeURIComponent(designName.trim())}.jpg`;
+    }
+    return '';
+  }
+  const trimmed = link.trim();
+  if (trimmed.startsWith('data:')) return trimmed;
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const isHttpsPage = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
+  if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
+    if (trimmed.includes('/folders/')) return '';
+    let fid = '';
+    const fileMatch = trimmed.match(/\/d\/([-\w]{20,})/);
+    if (fileMatch) fid = fileMatch[1];
+    if (!fid) {
+      const openMatch = trimmed.match(/[?&]id=([-\w]{20,})/);
+      if (openMatch) fid = openMatch[1];
+    }
+    if (!fid) {
+      const idMatch = trimmed.match(/([-\w]{25,})/);
+      if (idMatch) fid = idMatch[1];
+    }
+    if (fid) return `https://lh3.googleusercontent.com/d/${fid}=s1000`;
+  }
+
+  if (trimmed.includes('3.7.174.180') || (trimmed.startsWith('http://') && (trimmed.includes('/designs/') || trimmed.includes('/uploads/')))) {
+    const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
+    let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
+    return origin ? `${origin}${cleanPath}` : cleanPath;
+  }
+
+  if (trimmed.startsWith('https://')) return encodeURI(trimmed);
+
+  if (isHttpsPage && trimmed.startsWith('http://')) {
+    if (trimmed.includes('/designs/') || trimmed.includes('/uploads/')) {
+      const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
+      let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
+      return origin ? `${origin}${cleanPath}` : cleanPath;
+    }
+    return encodeURI(trimmed.replace('http://', 'https://'));
+  }
+
+  if (trimmed.includes('/designs/') || trimmed.includes('/uploads/')) {
+    const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
+    let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
+    return origin ? `${origin}${cleanPath}` : cleanPath;
+  }
+
+  if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
+    const cleanPath = trimmed.includes('.') ? `/v1/designs/${encodeURIComponent(trimmed)}` : `/v1/designs/${encodeURIComponent(trimmed)}.jpg`;
+    return origin ? `${origin}${cleanPath}` : cleanPath;
+  }
+
+  return encodeURI(trimmed);
+}
+
 const MAX_ITEMS = 30;
 
 const DEFAULT_ITEM = () => ({

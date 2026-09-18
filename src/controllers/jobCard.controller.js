@@ -251,8 +251,14 @@ const getAllJobCards = async (req, res) => {
       cards = await db.JobCard.find(filter)
         .collation({ locale:'en', numericOrdering:true })
         .sort(sort).skip(skip).limit(Number(limit)).lean();
-    }
-    res.json({ data: cards, total, page: Number(page), pages: Math.ceil(total/Number(limit)) });
+    const { normalizeImageUrl } = require('../utils/imageUrlHelper');
+    const normalizedCards = (cards || []).map(c => ({
+      ...c,
+      imageUrl1: normalizeImageUrl(c.imageUrl1 || c.imageUrl, c.designName || c.designNo),
+      imageUrl2: normalizeImageUrl(c.imageUrl2, c.designName ? `${c.designName}-2` : ''),
+    }));
+
+    res.json({ data: normalizedCards, total, page: Number(page), pages: Math.ceil(total/Number(limit)) });
   } catch (err) {
     logger.error('getAllJobCards error: %o', err);
     res.status(500).json({ error: 'Internal Server Error' });

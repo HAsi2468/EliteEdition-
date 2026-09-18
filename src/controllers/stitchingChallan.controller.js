@@ -143,12 +143,21 @@ const getChallans = async (req, res) => {
       ];
     }
 
+    const { normalizeImageUrl } = require('../utils/imageUrlHelper');
     const challans = await db.StitchingChallan.find(filter)
       .sort({ challanNum: -1 })
       .limit(parseInt(limit))
       .lean();
 
-    res.json({ success: true, data: challans });
+    const normalized = (challans || []).map(ch => ({
+      ...ch,
+      items: (ch.items || []).map(it => ({
+        ...it,
+        imageUrl: normalizeImageUrl(it.imageUrl, it.designNo)
+      }))
+    }));
+
+    res.json({ success: true, data: normalized });
   } catch (error) {
     logger.error('stitchingChallan.getChallans error: %o', error);
     res.status(500).json({ success: false, error: error.message });
@@ -158,8 +167,15 @@ const getChallans = async (req, res) => {
 // ── GET /stitching-challan/:id ────────────────────────────────────────────────
 const getOneChallan = async (req, res) => {
   try {
+    const { normalizeImageUrl } = require('../utils/imageUrlHelper');
     const challan = await db.StitchingChallan.findById(req.params.id).lean();
     if (!challan) return res.status(404).json({ success: false, error: 'Challan not found' });
+    if (challan.items && Array.isArray(challan.items)) {
+      challan.items = challan.items.map(it => ({
+        ...it,
+        imageUrl: normalizeImageUrl(it.imageUrl, it.designNo)
+      }));
+    }
     res.json({ success: true, data: challan });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

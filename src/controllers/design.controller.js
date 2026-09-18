@@ -1,5 +1,6 @@
 const db = require('../db/models');
 const logger = require('../config/logger');
+const { normalizeImageUrl } = require('../utils/imageUrlHelper');
 
 const getAll = async (req, res) => {
   try {
@@ -58,7 +59,14 @@ const getAll = async (req, res) => {
       db.Design.find(filter).collation({ locale: "en_US", numericOrdering: true }).sort(sort).skip(skip).limit(Number(limit)).lean(),
       db.Design.countDocuments(filter),
     ]);
-    res.json({ data: docs, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+
+    const normalizedDocs = docs.map(d => ({
+      ...d,
+      imageUrl: normalizeImageUrl(d.imageUrl, d.designName),
+      imageUrl2: normalizeImageUrl(d.imageUrl2, d.designName ? `${d.designName}-2` : ''),
+    }));
+
+    res.json({ data: normalizedDocs, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
   } catch (err) {
     logger.error('design.getAll error: %o', err);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -69,6 +77,8 @@ const getOne = async (req, res) => {
   try {
     const doc = await db.Design.findById(req.params.id).lean();
     if (!doc) return res.status(404).json({ error: 'Design not found' });
+    doc.imageUrl = normalizeImageUrl(doc.imageUrl, doc.designName);
+    doc.imageUrl2 = normalizeImageUrl(doc.imageUrl2, doc.designName ? `${doc.designName}-2` : '');
     res.json(doc);
   } catch (err) {
     res.status(500).json({ error: 'Internal Server Error' });

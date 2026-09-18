@@ -10,6 +10,66 @@ import ScreenGroupRoster from './ScreenGroupRoster';
 import { dispatchScreenGroupEvent } from '../services/screenGroupService';
 import { triggerEliteAlert } from './EliteModalDialog';
 import DateRangePicker from './DateRangePicker';
+
+function convertDriveUrl(link, designName = '') {
+  if (!link || typeof link !== 'string' || !link.trim()) {
+    if (designName && typeof designName === 'string' && designName.trim()) {
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      return `${origin}/v1/designs/${encodeURIComponent(designName.trim())}.jpg`;
+    }
+    return '';
+  }
+  const trimmed = link.trim();
+  if (trimmed.startsWith('data:')) return trimmed;
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const isHttpsPage = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
+  if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
+    if (trimmed.includes('/folders/')) return '';
+    let fid = '';
+    const fileMatch = trimmed.match(/\/d\/([-\w]{20,})/);
+    if (fileMatch) fid = fileMatch[1];
+    if (!fid) {
+      const openMatch = trimmed.match(/[?&]id=([-\w]{20,})/);
+      if (openMatch) fid = openMatch[1];
+    }
+    if (!fid) {
+      const idMatch = trimmed.match(/([-\w]{25,})/);
+      if (idMatch) fid = idMatch[1];
+    }
+    if (fid) return `https://lh3.googleusercontent.com/d/${fid}=s1000`;
+  }
+
+  if (trimmed.includes('3.7.174.180') || (trimmed.startsWith('http://') && (trimmed.includes('/designs/') || trimmed.includes('/uploads/')))) {
+    const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
+    let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
+    return origin ? `${origin}${cleanPath}` : cleanPath;
+  }
+
+  if (trimmed.startsWith('https://')) return encodeURI(trimmed);
+
+  if (isHttpsPage && trimmed.startsWith('http://')) {
+    if (trimmed.includes('/designs/') || trimmed.includes('/uploads/')) {
+      const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
+      let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
+      return origin ? `${origin}${cleanPath}` : cleanPath;
+    }
+    return encodeURI(trimmed.replace('http://', 'https://'));
+  }
+
+  if (trimmed.includes('/designs/') || trimmed.includes('/uploads/')) {
+    const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
+    let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
+    return origin ? `${origin}${cleanPath}` : cleanPath;
+  }
+
+  if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
+    const cleanPath = trimmed.includes('.') ? `/v1/designs/${encodeURIComponent(trimmed)}` : `/v1/designs/${encodeURIComponent(trimmed)}.jpg`;
+    return origin ? `${origin}${cleanPath}` : cleanPath;
+  }
+
+  return encodeURI(trimmed);
+}
 import {
   FileText,
   Plus,
@@ -2272,7 +2332,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                     <td style={{ padding: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                       <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                         {it.imageUrl && (
-                          <img src={it.imageUrl} alt="Design" style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--border-light)' }} />
+                          <img src={convertDriveUrl(it.imageUrl, it.itemName)} alt="Design" style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--border-light)' }} onError={e => { e.target.style.display = 'none'; }} />
                         )}
                         <input
                           type="text"
@@ -3331,7 +3391,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                         <td style={{ padding: '0.7rem 0.6rem', color: '#64748b', fontWeight: 700 }}>{idx + 1}</td>
                         <td style={{ padding: '0.7rem 0.6rem' }}>
                           {it.imageUrl ? (
-                            <img src={it.imageUrl} alt="Item" style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover', border: '1px solid #cbd5e1' }} />
+                            <img src={convertDriveUrl(it.imageUrl, it.itemName)} alt="Item" style={{ width: 38, height: 38, borderRadius: 6, objectFit: 'cover', border: '1px solid #cbd5e1' }} onError={e => { e.target.style.display = 'none'; }} />
                           ) : (
                             <div style={{ width: 38, height: 38, borderRadius: 6, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#64748b', fontWeight: 600 }}>No Img</div>
                           )}
