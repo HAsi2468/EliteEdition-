@@ -30,9 +30,6 @@ self.addEventListener('fetch', (event) => {
     event.request.url.includes('socket.io') ||
     isHtml
   ) {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
-    );
     return;
   }
 

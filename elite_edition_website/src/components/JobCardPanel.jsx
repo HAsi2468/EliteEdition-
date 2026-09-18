@@ -118,52 +118,57 @@ function calcExpTime(panna, passText, totalMtr, machineName) {
 // Accepts any Drive share / view / open link and returns a direct embeddable URL
 function convertDriveUrl(link) {
   if (!link || !link.trim()) return '';
-  if (link.startsWith('data:')) return link;
-  
-  // If it's a local relative path — always resolve to absolute using window.location.origin
-  // This is critical for the print popup window which opens as a blank page
-  if (link.startsWith('/')) {
-    try {
-      return `${window.location.origin}${link}`;
-    } catch (e) {
-      // Fallback to getBaseUrl origin
-      const baseUrl = getBaseUrl();
-      if (baseUrl && baseUrl.startsWith('http')) {
-        try {
-          const url = new URL(baseUrl);
-          return `${url.origin}${link}`;
-        } catch (e2) {}
-      }
-    }
-    return link;
+  const trimmed = link.trim();
+  if (trimmed.startsWith('data:')) return trimmed;
+
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const isHttpsPage = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
+  // 1. Google Drive Links: convert to direct Google CDN lh3 embed links
+  if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
+    if (trimmed.includes('/folders/')) return '';
+    const fileMatch = trimmed.match(/\/d\/([-\w]{20,})/);
+    if (fileMatch) return `https://lh3.googleusercontent.com/d/${fileMatch[1]}=s1000`;
+    const openMatch = trimmed.match(/[?&]id=([-\w]{20,})/);
+    if (openMatch) return `https://lh3.googleusercontent.com/d/${openMatch[1]}=s1000`;
+    const idMatch = trimmed.match(/([-\w]{25,})/);
+    return idMatch ? `https://lh3.googleusercontent.com/d/${idMatch[1]}=s1000` : trimmed;
   }
-  
-  // Handle local uploaded files e.g. "uploads/chat-123.jpg" or "/designs/ED-01.jpg"
-  if (link.includes('uploads/') || link.includes('designs/')) {
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    let cleanPath = link.startsWith('/') ? link : `/${link}`;
+
+  // 2. Insecure IP Backend URLs e.g. "http://3.7.174.180:3001/designs/ED-476(1).jpg" -> convert to relative origin route
+  if (trimmed.includes('3.7.174.180') || (trimmed.startsWith('http://') && (trimmed.includes('/designs/') || trimmed.includes('/uploads/')))) {
+    const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
+    let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
     return origin ? `${origin}${cleanPath}` : cleanPath;
   }
-  
-  // If it's a Google Drive link
-  if (link.includes('drive.google.com') || link.includes('googleusercontent') || link.includes('lh3.google')) {
-    if (link.includes('thumbnail?id=') || link.includes('lh3.googleusercontent.com')) return link;
-    const fileMatch = link.match(/\/d\/([-\w]{20,})/);
-    if (fileMatch) return `https://drive.google.com/thumbnail?id=${fileMatch[1]}&sz=w1000`;
-    const openMatch = link.match(/[?&]id=([-\w]{20,})/);
-    if (openMatch) return `https://drive.google.com/thumbnail?id=${openMatch[1]}&sz=w1000`;
-    if (link.includes('/folders/')) return '';
-    const idMatch = link.match(/([-\w]{25,})/);
-    return idMatch ? `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1000` : link;
+
+  // 3. Full HTTPS external URLs (Cloudflare R2, AWS S3, Custom CDN, etc.) -> keep 100% UNTOUCHED!
+  if (trimmed.startsWith('https://') || (trimmed.startsWith('http://') && !isHttpsPage)) {
+    return trimmed;
   }
-  
-  // If it's any other external link (e.g. starts with http)
-  if (link.startsWith('http')) {
-    return link;
+
+  // 4. Insecure HTTP on HTTPS page -> upgrade to HTTPS
+  if (isHttpsPage && trimmed.startsWith('http://')) {
+    return trimmed.replace('http://', 'https://');
   }
-  
-  // Fallback
-  return link;
+
+  // 5. Local relative paths or bare design filenames e.g. "ED-01.jpg" or "/designs/ED-01.jpg"
+  if (trimmed.includes('/designs/') || trimmed.includes('/uploads/')) {
+    const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
+    let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
+    return origin ? `${origin}${cleanPath}` : cleanPath;
+  }
+
+  if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
+    const cleanPath = trimmed.includes('.') ? `/v1/designs/${trimmed}` : `/v1/designs/${trimmed}.jpg`;
+    return origin ? `${origin}${cleanPath}` : cleanPath;
+  }
+
+  if (trimmed.startsWith('/')) {
+    return origin ? `${origin}${trimmed}` : trimmed;
+  }
+
+  return trimmed;
 }
 
 // ─── Extract multiple design names helper ────────────────────────────────────
@@ -617,8 +622,8 @@ function JobCardPrintView({ card, onClose, onShare }) {
       let img2 = card.imageUrl2 || '';
 
       try {
-        // Look up in catalog if no image or if image is a Drive link
-        if ((!img1 || img1.includes('drive.google.com')) && names[0]) {
+        // Look up in catalog if no image attached
+        if (!img1 && names[0]) {
           const res1 = await api.getDesigns({ search: names[0], limit: 5 });
           if (res1 && res1.data && res1.data.length > 0) {
             const matched1 = res1.data.find(d =>
@@ -820,11 +825,20 @@ function compressAndConvertToBase64(file, maxWidth = 900, maxHeight = 900, quali
   });
 }
 
-// ─── Image URL field with live Drive preview / direct upload ──────────────────
+// ─── Image URL field with live preview / direct upload ─────────────────────────
 function ImageField({ label, name, form, onChange, index }) {
   const raw = form[name] || '';
   const [mode, setMode] = useState(raw && !raw.startsWith('data:') ? 'url' : 'file'); // 'file' or 'url'
   const fileInputRef = useRef(null);
+
+  // Keep mode in sync when raw value is set programmatically (e.g. when selecting a Design No. from autocomplete)
+  useEffect(() => {
+    if (raw && !raw.startsWith('data:')) {
+      setMode('url');
+    } else if (raw && raw.startsWith('data:')) {
+      setMode('file');
+    }
+  }, [raw]);
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
@@ -843,8 +857,7 @@ function ImageField({ label, name, form, onChange, index }) {
   };
 
   const isBase64 = raw.startsWith('data:');
-  const previewUrl = isBase64 ? raw : convertDriveUrl(raw);
-  const isDriveFolder = raw.includes('/folders/');
+  const previewUrl = isBase64 ? raw : (convertDriveUrl(raw) || raw);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: '1 1 auto', minWidth: 220 }}>
@@ -910,15 +923,30 @@ function ImageField({ label, name, form, onChange, index }) {
               <img
                 src={previewUrl}
                 alt={`Selected preview ${index}`}
+                referrerPolicy="no-referrer"
                 style={{ maxHeight: '100px', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px' }}
                 onError={(e) => {
+                  const currentSrc = e.target.src || '';
+                  if (raw && (raw.includes('drive.google.com') || raw.includes('googleusercontent'))) {
+                    const idMatch = raw.match(/\/d\/([-\w]{20,})/) || raw.match(/[?&]id=([-\w]{20,})/) || raw.match(/([-\w]{25,})/);
+                    if (idMatch && idMatch[1]) {
+                      const fid = idMatch[1];
+                      if (currentSrc.includes('lh3.googleusercontent.com')) {
+                        e.target.src = `https://drive.google.com/thumbnail?id=${fid}&sz=w1000`;
+                        return;
+                      } else if (currentSrc.includes('thumbnail?id=')) {
+                        e.target.src = `https://drive.google.com/uc?export=view&id=${fid}`;
+                        return;
+                      }
+                    }
+                  }
                   e.target.style.display = 'none';
                   if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
                 }}
               />
-              <div style={{ display: 'none', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', padding: '0.4rem', color: '#ef4444', fontSize: '0.75rem', fontWeight: 600 }}>
-                <span>🔒 Image URL Restricted / Unavailable</span>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Click Browse to re-upload image file</span>
+              <div style={{ display: 'none', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', padding: '0.4rem', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600 }}>
+                <span>🖼️ Image File Attached</span>
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', opacity: 0.8 }}>Click Browse to re-upload image file</span>
               </div>
               <button
                 type="button"
@@ -950,19 +978,10 @@ function ImageField({ label, name, form, onChange, index }) {
         <>
           <input
             type="text" name={name} value={raw} onChange={onChange}
-            placeholder="Paste Google Drive share link or direct image URL…"
+            placeholder="Paste image URL (web link, CDN, Drive, base64)…"
             style={{ padding: '0.5rem 0.7rem', fontSize: '0.82rem', fontWeight: 500,
               borderColor: previewUrl ? 'rgba(52,211,153,0.4)' : undefined }}
           />
-
-          {isDriveFolder && (
-            <div style={{ fontSize: '0.72rem', color: '#fbbf24', display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-              ⚠️ This is a <strong>folder</strong> link — open Drive, right-click an <strong>individual image file</strong> → Share → Copy link
-            </div>
-          )}
-          {raw && !isDriveFolder && !previewUrl && (
-            <div style={{ fontSize: '0.72rem', color: '#f87171' }}>⚠️ Could not parse as a Drive link. Paste the file share URL.</div>
-          )}
 
           {previewUrl && (
             <div style={{ borderRadius: 'var(--radius-sm)', overflow: 'hidden',
@@ -971,16 +990,31 @@ function ImageField({ label, name, form, onChange, index }) {
               <img
                 src={previewUrl}
                 alt={`Image ${index} preview`}
+                referrerPolicy="no-referrer"
                 style={{ maxWidth: '100%', maxHeight: 130, objectFit: 'contain', borderRadius: 4, display: 'block', margin: '0 auto' }}
                 onError={e => {
+                  const currentSrc = e.target.src || '';
+                  if (raw && (raw.includes('drive.google.com') || raw.includes('googleusercontent'))) {
+                    const idMatch = raw.match(/\/d\/([-\w]{20,})/) || raw.match(/[?&]id=([-\w]{20,})/) || raw.match(/([-\w]{25,})/);
+                    if (idMatch && idMatch[1]) {
+                      const fid = idMatch[1];
+                      if (currentSrc.includes('lh3.googleusercontent.com')) {
+                        e.target.src = `https://drive.google.com/thumbnail?id=${fid}&sz=w1000`;
+                        return;
+                      } else if (currentSrc.includes('thumbnail?id=')) {
+                        e.target.src = `https://drive.google.com/uc?export=view&id=${fid}`;
+                        return;
+                      }
+                    }
+                  }
                   e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
+                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
                 }}
               />
               <div style={{ display: 'none', flexDirection: 'column', alignItems: 'center', gap: '0.25rem',
                 padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.72rem' }}>
-                <span>🔒 Preview blocked by Drive CORS</span>
-                <span style={{ color: 'var(--text-muted)', opacity: 0.7 }}>Image will appear correctly in the printed PDF</span>
+                <span>🖼️ Image Link Added</span>
+                <span style={{ color: 'var(--text-muted)', opacity: 0.75 }}>Image URL saved for job card &amp; printing</span>
               </div>
               <div style={{ position: 'absolute', top: 4, right: 4, fontSize: '0.6rem',
                 background: 'rgba(52,211,153,0.2)', color: '#34d399', padding: '1px 5px',
@@ -1443,10 +1477,36 @@ function JobCardForm({ card, onSave, onClose, department }) {
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           {d.imageUrl && (
-                            <img src={d.imageUrl} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} />
+                            <img
+                              src={convertDriveUrl(d.imageUrl)}
+                              alt=""
+                              referrerPolicy="no-referrer"
+                              style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }}
+                              onError={(e) => {
+                                const fidMatch = d.imageUrl?.match(/\/d\/([-\w]{20,})/) || d.imageUrl?.match(/[?&]id=([-\w]{20,})/) || d.imageUrl?.match(/([-\w]{25,})/);
+                                if (fidMatch && fidMatch[1]) {
+                                  e.target.src = `https://lh3.googleusercontent.com/d/${fidMatch[1]}=s200`;
+                                } else {
+                                  e.target.style.display = 'none';
+                                }
+                              }}
+                            />
                           )}
                           {d.imageUrl2 && (
-                            <img src={d.imageUrl2} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} />
+                            <img
+                              src={convertDriveUrl(d.imageUrl2)}
+                              alt=""
+                              referrerPolicy="no-referrer"
+                              style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }}
+                              onError={(e) => {
+                                const fidMatch = d.imageUrl2?.match(/\/d\/([-\w]{20,})/) || d.imageUrl2?.match(/[?&]id=([-\w]{20,})/) || d.imageUrl2?.match(/([-\w]{25,})/);
+                                if (fidMatch && fidMatch[1]) {
+                                  e.target.src = `https://lh3.googleusercontent.com/d/${fidMatch[1]}=s200`;
+                                } else {
+                                  e.target.style.display = 'none';
+                                }
+                              }}
+                            />
                           )}
                           <div>
                             <span style={{ fontWeight:700, color:'var(--primary)' }}>{d.designName || d.designNo}</span>
@@ -1710,7 +1770,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
             )}
           </div>
           <div style={{ fontSize:'0.75rem', color:'var(--text-muted)', marginBottom:'0.6rem', lineHeight:1.5 }}>
-            📂 From your Drive folder — open it, right-click any image → <strong>Share</strong> → <strong>Copy link</strong> → paste below.
+            🖼️ Upload an image file directly or paste any image URL below.
           </div>
           <div style={{ display:'flex', gap:'1rem', flexWrap:'wrap' }}>
             <ImageField label="Image 1 — Design / Pattern" name="imageUrl1" form={form} onChange={onChange} index={1}/>

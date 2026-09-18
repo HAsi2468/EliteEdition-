@@ -285,7 +285,13 @@ app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res, next) => {
 });
 
 // Serve frontend static build assets
-const websiteDistPath = path.join(__dirname, '../elite_edition_website_dist');
+const distCandidates = [
+	path.join(__dirname, '../elite_edition_website_dist'),
+	path.join(__dirname, '../elite_edition_website/dist'),
+	path.join(process.cwd(), 'elite_edition_website_dist'),
+	path.join(process.cwd(), 'elite_edition_website/dist'),
+];
+const websiteDistPath = distCandidates.find(p => fs.existsSync(p)) || distCandidates[0];
 app.use(express.static(websiteDistPath));
 
 // v1 api routes

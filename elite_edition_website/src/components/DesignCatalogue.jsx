@@ -16,52 +16,22 @@ import PKDOrdersImportModal from './PKDOrdersImportModal';
 import DesignMaster from './DesignMaster';
 
 function convertDriveUrl(link, designName = '') {
-  const getOrigin = () => {
-    const baseUrl = getBaseUrl();
-    if (baseUrl && baseUrl.startsWith('http')) {
-      try { return new URL(baseUrl).origin; } catch (e) {}
-    }
-    if (typeof window !== 'undefined') {
-      const hn = window.location.hostname;
-      if ((hn === 'localhost' || hn === '127.0.0.1') && window.location.port && window.location.port !== '3001') {
-        return `${window.location.protocol}//${hn}:3001`;
-      }
-      return window.location.origin;
-    }
-    return '';
-  };
-
-  const origin = getOrigin();
-  const prefix = '/v1/designs';
-
   if (!link || !link.trim()) {
     if (designName) {
-      return origin ? `${origin}${prefix}/${designName}.jpg` : `${prefix}/${designName}.jpg`;
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      return `${origin}/v1/designs/${designName}.jpg`;
     }
     return '';
   }
   const trimmed = link.trim();
   if (trimmed.startsWith('data:')) return trimmed;
 
-  // Handle local uploaded files e.g. "uploads/chat-123.jpg" or "/designs/ED-01.jpg"
-  if (trimmed.includes('uploads/') || trimmed.includes('designs/')) {
-    let cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-    if (cleanPath.startsWith('/designs/')) {
-      cleanPath = `/v1${cleanPath}`;
-    }
-    const finalUrl = origin ? `${origin}${cleanPath}` : cleanPath;
-    return encodeURI(finalUrl);
-  }
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const isHttpsPage = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
-  // Handle bare design file names or ED- prefixes without path e.g. "ED-01.jpg" or "ED-708"
-  if (!trimmed.startsWith('http') && !trimmed.startsWith('data:') && !trimmed.includes('/')) {
-    const cleanPath = trimmed.includes('.') ? `${prefix}/${trimmed}` : `${prefix}/${trimmed}.jpg`;
-    const finalUrl = origin ? `${origin}${cleanPath}` : cleanPath;
-    return encodeURI(finalUrl);
-  }
-
-  // Handle Google Drive Links
+  // 1. Google Drive Links: convert to direct Google CDN lh3 embed links
   if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
+    if (trimmed.includes('/folders/')) return '';
     let fileId = '';
     const dMatch = trimmed.match(/\/d\/([-\w]{20,})/);
     if (dMatch) fileId = dMatch[1];
@@ -75,16 +45,40 @@ function convertDriveUrl(link, designName = '') {
     }
 
     if (fileId) {
-      return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+      return `https://lh3.googleusercontent.com/d/${fileId}=s1000`;
     }
   }
 
-  if (trimmed.startsWith('http')) {
+  // 2. Insecure IP Backend URLs e.g. "http://3.7.174.180:3001/designs/ED-476(1).jpg" -> convert to relative origin route
+  if (trimmed.includes('3.7.174.180') || (trimmed.startsWith('http://') && (trimmed.includes('/designs/') || trimmed.includes('/uploads/')))) {
+    const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
+    let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
+    return origin ? `${origin}${cleanPath}` : cleanPath;
+  }
+
+  // 3. Full HTTPS external URLs (Cloudflare R2, AWS S3, Custom CDN, etc.) -> keep 100% UNTOUCHED!
+  if (trimmed.startsWith('https://') || (trimmed.startsWith('http://') && !isHttpsPage)) {
     return encodeURI(trimmed);
   }
 
-  const finalUrl = origin ? `${origin}/${trimmed.replace(/^\//, '')}` : trimmed;
-  return encodeURI(finalUrl);
+  // 4. Upgrade insecure HTTP to HTTPS if website is loaded over HTTPS to prevent Mixed Content blocking
+  if (isHttpsPage && trimmed.startsWith('http://')) {
+    return encodeURI(trimmed.replace('http://', 'https://'));
+  }
+
+  // 5. Local relative paths or bare design filenames e.g. "ED-01.jpg" or "/designs/ED-01.jpg"
+  if (trimmed.includes('/designs/') || trimmed.includes('/uploads/')) {
+    const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
+    let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
+    return origin ? `${origin}${cleanPath}` : cleanPath;
+  }
+
+  if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
+    const cleanPath = trimmed.includes('.') ? `/v1/designs/${trimmed}` : `/v1/designs/${trimmed}.jpg`;
+    return origin ? `${origin}${cleanPath}` : cleanPath;
+  }
+
+  return encodeURI(trimmed);
 }
 
 // Image compression helper
@@ -405,10 +399,27 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
   const [sortBy, setSortBy] = useState('designName');
   const [sortOrder, setSortOrder] = useState('desc');
   
-  // Pagination
+  // Pagination & Infinite Scroll State
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(40);
+
+  // Reset visibleCount on search & filter changes
+  useEffect(() => {
+    setVisibleCount(40);
+  }, [search, categoryFilter, colorFilter, statusFilter, sortBy, sortOrder]);
+
+  // Infinite Scroll Event Listener for seamless performance
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+        setVisibleCount((prev) => prev + 40);
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Modal form states
   const [showForm, setShowForm] = useState(false);
@@ -1022,83 +1033,85 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
           </button>
         </div>
       ) : (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.2rem' }}>
-            {designs
-              .filter(d => matchSearchQuery(d, search, ['designNo', 'designName', 'category', 'colors', 'fabric', 'partyName', 'notes']))
-              .map(d => {
-              const mainImg = convertDriveUrl(d.imageUrl, d.designName);
-              const subImg = convertDriveUrl(d.imageUrl2, d.designName ? `${d.designName}-2` : '');
+        (() => {
+          const filteredDesigns = designs.filter(d => matchSearchQuery(d, search, ['designNo', 'designName', 'category', 'colors', 'fabric', 'partyName', 'notes']));
+          return (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.2rem' }}>
+                {filteredDesigns.slice(0, visibleCount).map(d => {
+                  const mainImg = convertDriveUrl(d.imageUrl, d.designName);
+                  const subImg = convertDriveUrl(d.imageUrl2, d.designName ? `${d.designName}-2` : '');
 
-              return (
-                <div
-                  key={d._id}
-                  className="glass-panel"
-                  style={{
-                    padding: '1rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.8rem',
-                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                    position: 'relative'
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
-                >
-                  {/* Category badge */}
-                  {d.category && (
-                    <span style={{
-                      position: 'absolute', top: 16, left: 16,
-                      background: 'rgba(139,92,246,0.25)', color: '#a78bfa',
-                      fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px',
-                      textTransform: 'uppercase', letterSpacing: '0.02em', zIndex: 2
-                    }}>
-                      {d.category}
-                    </span>
-                  )}
+                  return (
+                    <div
+                      key={d._id}
+                      className="glass-panel"
+                      style={{
+                        padding: '1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.8rem',
+                        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                        position: 'relative'
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
+                    >
+                      {/* Category badge */}
+                      {d.category && (
+                        <span style={{
+                          position: 'absolute', top: 16, left: 16,
+                          background: 'rgba(139,92,246,0.25)', color: '#a78bfa',
+                          fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px',
+                          textTransform: 'uppercase', letterSpacing: '0.02em', zIndex: 2
+                        }}>
+                          {d.category}
+                        </span>
+                      )}
 
-                  {/* Status badge */}
-                  <span style={{
-                    position: 'absolute', top: 16, right: 16,
-                    background: d.status === 'Active' ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.05)',
-                    color: d.status === 'Active' ? '#34d399' : 'var(--text-muted)',
-                    fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
-                    border: d.status === 'Active' ? '1px solid rgba(52,211,153,0.3)' : '1px solid var(--border-light)',
-                    zIndex: 2
-                  }}>
-                    {d.status}
-                  </span>
+                      {/* Status badge */}
+                      <span style={{
+                        position: 'absolute', top: 16, right: 16,
+                        background: d.status === 'Active' ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.05)',
+                        color: d.status === 'Active' ? '#34d399' : 'var(--text-muted)',
+                        fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
+                        border: d.status === 'Active' ? '1px solid rgba(52,211,153,0.3)' : '1px solid var(--border-light)',
+                        zIndex: 2
+                      }}>
+                        {d.status}
+                      </span>
 
-                  {/* Main Image View */}
-                  <div
-                    style={{
-                      height: '180px',
-                      background: '#04070d',
-                      borderRadius: 'var(--radius-sm)',
-                      overflow: 'hidden',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative',
-                      border: '1px solid var(--border-light)',
-                      marginTop: '1.25rem'
-                    }}
-                  >
-                    {mainImg ? (
-                      <img
-                        src={mainImg}
-                        alt={d.designName}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
-                        onClick={(evt) => setZoomImg(evt.target.src || mainImg)}
-                        onError={(e) => {
-                          const name = (d.designName || '').trim();
-                          if (name && !e.target.dataset.retried) {
-                            e.target.dataset.retried = 'true';
-                            const origin = getBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : '');
-                            e.target.src = origin ? `${origin}/v1/designs/${name}.jpg` : `/v1/designs/${name}.jpg`;
-                          }
+                      {/* Main Image View */}
+                      <div
+                        style={{
+                          height: '180px',
+                          background: '#04070d',
+                          borderRadius: 'var(--radius-sm)',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                          border: '1px solid var(--border-light)',
+                          marginTop: '1.25rem'
                         }}
-                      />
+                      >
+                        {mainImg ? (
+                          <img
+                            src={mainImg}
+                            alt={d.designName}
+                            loading="lazy"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
+                            onClick={(evt) => setZoomImg(evt.target.src || mainImg)}
+                            onError={(e) => {
+                              const name = (d.designName || '').trim();
+                              if (name && !e.target.dataset.retried) {
+                                e.target.dataset.retried = 'true';
+                                const origin = getBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : '');
+                                e.target.src = origin ? `${origin}/v1/designs/${name}.jpg` : `/v1/designs/${name}.jpg`;
+                              }
+                            }}
+                          />
                     ) : (
                       <div style={{
                         display: 'flex',
@@ -1245,8 +1258,24 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
             })}
           </div>
 
-          {/* Single-Page Infinite Grid */}
-        </>
+          {/* Scroll Pagination Footer */}
+              {visibleCount < filteredDesigns.length && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '2rem 0', gap: '0.6rem' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Showing {Math.min(visibleCount, filteredDesigns.length)} of {filteredDesigns.length} designs
+                  </span>
+                  <button
+                    onClick={() => setVisibleCount((prev) => prev + 40)}
+                    className="btn-secondary"
+                    style={{ padding: '0.55rem 1.6rem', fontSize: '0.82rem', borderRadius: '8px', cursor: 'pointer' }}
+                  >
+                    Scroll Down or Click to Load More Designs
+                  </button>
+                </div>
+              )}
+            </>
+          );
+        })()
       )}
 
       {/* Form Modal */}

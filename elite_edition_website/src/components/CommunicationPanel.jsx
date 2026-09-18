@@ -52,7 +52,10 @@ import {
   Check,
   CheckCheck,
   Share2,
-  FilePlus
+  FilePlus,
+  BarChart2,
+  Reply,
+  CornerUpRight
 } from 'lucide-react';
 
 
@@ -137,12 +140,31 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [galleryTab, setGalleryTab] = useState('all'); // 'all' | 'image' | 'document' | 'audio'
 
-  // In-room search & pinned messages filter
-  const [inRoomQuery, setInRoomQuery] = useState('');
-  const [showInRoomSearch, setShowInRoomSearch] = useState(false);
-  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
-  const [playingAudioId, setPlayingAudioId] = useState(null);
-  const [chatSoundMuted, setChatSoundMuted] = useState(() => typeof localStorage !== 'undefined' && localStorage.getItem('elite_chat_sound_muted') === 'true');
+  // Quoted Inline Reply state
+  const [replyToMessage, setReplyToMessage] = useState(null);
+
+  // Interactive Poll Modal State
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
+  const [pollMultiSelect, setPollMultiSelect] = useState(false);
+  const [submittingPoll, setSubmittingPoll] = useState(false);
+
+  // Cross-Room Message Forwarding Modal State
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [forwardTargetMsg, setForwardTargetMsg] = useState(null);
+  const [forwardTargetRoomId, setForwardTargetRoomId] = useState('');
+  const [forwardingMsg, setForwardingMsg] = useState(false);
+
+  // Infinite Scroll Pagination State
+  const [page, setPage] = useState(1);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
+  const chatScrollRef = useRef(null);
+
+  // Admin Clear All Data Modal State
+  const [showClearAllModal, setShowClearAllModal] = useState(false);
+  const [clearingData, setClearingData] = useState(false);
 
   const socket = useSocket();
   const chatBottomRef = useRef(null);
@@ -295,6 +317,23 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }
     };
 
+    const handlePollUpdated = (data) => {
+      if (data && data.messageId && data.pollMeta) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            String(m._id) === String(data.messageId)
+              ? { ...m, pollMeta: data.pollMeta }
+              : m
+          )
+        );
+      }
+    };
+
+    const handleDataCleared = () => {
+      setMessages([]);
+      fetchGroups(true);
+    };
+
     socket.on('connect', handleConnect);
     socket.on('receive-message', handleReceiveMessage);
     socket.on('message-acknowledged', handleAck);
@@ -304,6 +343,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     socket.on('message-deleted', handleDeleted);
     socket.on('message-pin-updated', handlePinUpdated);
     socket.on('room-messages-read', handleRoomMessagesRead);
+    socket.on('poll-updated', handlePollUpdated);
+    socket.on('communication-data-cleared', handleDataCleared);
 
     return () => {
       socket.off('connect', handleConnect);
@@ -315,6 +356,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       socket.off('message-deleted', handleDeleted);
       socket.off('message-pin-updated', handlePinUpdated);
       socket.off('room-messages-read', handleRoomMessagesRead);
+      socket.off('poll-updated', handlePollUpdated);
+      socket.off('communication-data-cleared', handleDataCleared);
     };
   }, [socket, currentUser]);
 
@@ -328,6 +371,25 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     fetchGroupMessages(activeGroup._id, msgFilter, true);
   }, [socket, activeGroup?._id, msgFilter]);
+
+  const handleSelectGroup = (targetGroup) => {
+    if (!targetGroup) return;
+    if (activeGroup?._id && inputMessage) {
+      setRoomDrafts((prev) => ({
+        ...prev,
+        [activeGroup._id]: inputMessage
+      }));
+    }
+    setActiveGroup(targetGroup);
+    if (typeof localStorage !== 'undefined' && targetGroup._id) {
+      localStorage.setItem('elite_active_chat_room_id', targetGroup._id);
+    }
+    setInputMessage(roomDrafts[targetGroup._id] || '');
+    if (socket && targetGroup._id) {
+      socket.emit('join-room', targetGroup._id);
+    }
+    fetchGroupMessages(targetGroup._id, msgFilter, true);
+  };
 
   // Auto-scroll to chat bottom
   useEffect(() => {
@@ -355,8 +417,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
           return Array.from(serverMap.values());
         });
+
+        const savedRoomId = typeof localStorage !== 'undefined' ? localStorage.getItem('elite_active_chat_room_id') : null;
+
         setActiveGroup((prev) => {
-          if (!prev) return res.data.length > 0 ? res.data[0] : null;
+          if (!prev) {
+            if (savedRoomId) {
+              const matched = res.data.find((g) => String(g._id) === String(savedRoomId));
+              if (matched) return matched;
+            }
+            return res.data.length > 0 ? res.data[0] : null;
+          }
           const updated = res.data.find((g) => String(g._id) === String(prev._id));
           return updated || prev;
         });
@@ -793,7 +864,192 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   };
 
 
-  const handleSendMessage = (e) => {
+  // Floating WhatsApp Sticky Date Divider Helper
+  const formatMessageDateHeader = (dateString) => {
+    if (!dateString) return '';
+    const d = new Date(dateString);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const msgDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+    if (msgDate.getTime() === today.getTime()) {
+      return 'Today';
+    }
+    if (msgDate.getTime() === yesterday.getTime()) {
+      return 'Yesterday';
+    }
+    return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  // Clipboard Screenshot Paste Handler
+  const handlePasteClipboard = async (e) => {
+    const items = e.clipboardData?.files;
+    if (!items || items.length === 0) return;
+    const file = items[0];
+    if (file && file.type.startsWith('image/')) {
+      e.preventDefault();
+      try {
+        const roomName = activeGroup?.name || 'General';
+        const uploadRes = await api.uploadChatAttachment(file, roomName);
+        if (uploadRes && uploadRes.fileUrl) {
+          setAttachedFile({
+            fileUrl: uploadRes.fileUrl,
+            fileName: file.name || `clipboard_${Date.now()}.png`,
+            fileType: 'image',
+            fileSize: file.size
+          });
+        }
+      } catch (err) {
+        console.error('Failed to upload pasted image:', err);
+        alert('Failed to attach pasted screenshot');
+      }
+    }
+  };
+
+  // Interactive Poll Voting Handler
+  const handleVotePoll = async (messageId, optionId) => {
+    const uId = currentUser?._id || currentUser?.id;
+    if (!uId) return;
+
+    try {
+      const res = await api.votePollMessage(messageId, optionId);
+      if (res.success && res.data) {
+        setMessages((prev) =>
+          prev.map((m) => (String(m._id) === String(messageId) ? res.data : m))
+        );
+      }
+    } catch (err) {
+      console.error('Failed to vote on poll:', err);
+    }
+  };
+
+  // Submit New Interactive Poll
+  const handleCreatePollSubmit = async (e) => {
+    e.preventDefault();
+    if (!pollQuestion.trim() || !activeGroup) return;
+    const validOpts = pollOptions.filter((o) => o.trim().length > 0);
+    if (validOpts.length < 2) {
+      alert('Please enter at least 2 poll options.');
+      return;
+    }
+
+    setSubmittingPoll(true);
+    try {
+      const formattedOptions = validOpts.map((opt, idx) => ({
+        id: `opt_${idx + 1}_${Date.now()}`,
+        text: opt.trim(),
+        votes: []
+      }));
+
+      const pollMeta = {
+        question: pollQuestion.trim(),
+        options: formattedOptions,
+        isMultiSelect: pollMultiSelect,
+        isClosed: false
+      };
+
+      const res = await api.sendCommunicationMessage(activeGroup._id, {
+        type: 'poll',
+        content: `📊 Poll: ${pollQuestion.trim()}`,
+        pollMeta
+      });
+
+      if (res.success && res.data) {
+        setMessages((prev) => [...prev, res.data]);
+        setShowPollModal(false);
+        setPollQuestion('');
+        setPollOptions(['', '']);
+        setPollMultiSelect(false);
+      }
+    } catch (err) {
+      alert('Failed to create poll: ' + err.message);
+    } finally {
+      setSubmittingPoll(false);
+    }
+  };
+
+  // Cross-Room Message Forwarding Handlers
+  const handleOpenForwardModal = (msg) => {
+    setForwardTargetMsg(msg);
+    setForwardTargetRoomId('');
+    setShowForwardModal(true);
+  };
+
+  const handleSubmitForward = async () => {
+    if (!forwardTargetMsg || !forwardTargetRoomId) {
+      alert('Please select a target channel or DM.');
+      return;
+    }
+    setForwardingMsg(true);
+    try {
+      const res = await api.forwardMessage(forwardTargetMsg._id, forwardTargetRoomId);
+      if (res.success) {
+        setShowForwardModal(false);
+        alert('Message forwarded successfully!');
+        if (String(activeGroup?._id) === String(forwardTargetRoomId)) {
+          setMessages((prev) => [...prev, res.data]);
+        }
+      }
+    } catch (err) {
+      alert('Failed to forward message: ' + err.message);
+    } finally {
+      setForwardingMsg(false);
+    }
+  };
+
+  // Infinite Scroll Handler for Older Messages
+  const handleChatScroll = async () => {
+    if (!chatScrollRef.current || loadingMoreMessages || !hasMoreMessages || !activeGroup) return;
+    if (chatScrollRef.current.scrollTop === 0) {
+      const nextPage = page + 1;
+      setLoadingMoreMessages(true);
+      const scrollHeightBefore = chatScrollRef.current.scrollHeight;
+
+      try {
+        const params = { page: nextPage, limit: 50 };
+        if (msgFilter === 'human' || msgFilter === 'system_activity') params.msgType = msgFilter;
+
+        const res = await api.getCommunicationMessages(activeGroup._id, params);
+        if (res.success && res.data) {
+          if (res.data.length < 50) setHasMoreMessages(false);
+          setMessages((prev) => [...res.data, ...prev]);
+          setPage(nextPage);
+
+          setTimeout(() => {
+            if (chatScrollRef.current) {
+              chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight - scrollHeightBefore;
+            }
+          }, 50);
+        }
+      } catch (err) {
+        console.error('Failed to load older messages:', err);
+      } finally {
+        setLoadingMoreMessages(false);
+      }
+    }
+  };
+
+  // Admin Clear All Data Handler
+  const handleClearAllData = async () => {
+    setClearingData(true);
+    try {
+      const res = await api.clearAllCommunicationData();
+      if (res.success) {
+        setMessages([]);
+        setShowClearAllModal(false);
+        alert('All communication messages and test rooms cleared cleanly!');
+        await fetchGroups(true);
+      }
+    } catch (err) {
+      alert('Failed to clear data: ' + err.message);
+    } finally {
+      setClearingData(false);
+    }
+  };
+
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     if ((!inputMessage.trim() && !attachedFile) || !activeGroup) return;
 
@@ -805,9 +1061,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     const messageText = inputMessage.trim() || (attachedFile ? `Attached ${attachedFile.fileName}` : '');
 
-    // Optimistic UI update for instant response
+    const messagePayload = {
+      roomId: activeGroup._id,
+      senderId,
+      content: messageText,
+      priority: isUrgent ? 'urgent' : 'normal',
+      replyTo: replyToMessage ? replyToMessage._id : undefined,
+      attachment: attachedFile || undefined,
+    };
+
+    const tempId = 'temp_' + Date.now();
     const tempMsg = {
-      _id: 'temp_' + Date.now(),
+      _id: tempId,
       roomId: activeGroup._id,
       senderId: typeof currentUser === 'object' ? currentUser : { _id: senderId, name: 'You' },
       content: messageText,
@@ -815,6 +1080,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       type: 'text',
       msgType: 'human',
       priority: isUrgent ? 'urgent' : 'normal',
+      replyTo: replyToMessage || undefined,
       attachment: attachedFile || undefined,
       readBy: [senderId],
       isOptimistic: true
@@ -822,15 +1088,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     setMessages((prev) => [...prev, tempMsg]);
 
-    if (socket) {
-      socket.emit('send-message', {
-        roomId: activeGroup._id,
-        senderId,
-        content: messageText,
-        priority: isUrgent ? 'urgent' : 'normal',
-        attachment: attachedFile || undefined,
-      });
-    }
+    setInputMessage('');
+    setAttachedFile(null);
+    setReplyToMessage(null);
+    setIsUrgent(false);
 
     if (activeGroup?._id) {
       setRoomDrafts((prev) => {
@@ -840,9 +1101,21 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       });
     }
 
-    setInputMessage('');
-    setAttachedFile(null);
-    setIsUrgent(false);
+    try {
+      const res = await api.sendCommunicationMessage(activeGroup._id, messagePayload);
+      if (res && res.success && res.data) {
+        const realMsg = res.data;
+        setMessages((prev) => {
+          const filtered = prev.filter((m) => m._id !== tempId && String(m._id) !== String(realMsg._id));
+          return [...filtered, realMsg];
+        });
+      }
+    } catch (err) {
+      console.warn('HTTP post message failed, falling back to socket emit:', err.message);
+      if (socket) {
+        socket.emit('send-message', messagePayload);
+      }
+    }
   };
 
   const handleAcknowledge = async (messageId, action = 'acknowledged') => {
@@ -1426,11 +1699,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       if (isVirtual && group.user) {
                         handleStartDirectChat(group.user);
                       } else {
-                        setActiveGroup(group);
-                        if (socket && group._id) {
-                          socket.emit('join-room', group._id);
-                        }
-                        fetchGroupMessages(group._id, msgFilter, true);
+                        handleSelectGroup(group);
                       }
                     }}
                     style={{
@@ -1711,12 +1980,23 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               )}
 
               {/* Messages & Activity Stream Container */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--bg-main)' }}>
+              <div
+                ref={chatScrollRef}
+                onScroll={handleChatScroll}
+                style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--bg-main)' }}
+              >
+                {loadingMoreMessages && (
+                  <div style={{ textAlign: 'center', padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                    <RefreshCw size={14} className="spin-loader" />
+                    <span>Loading older messages...</span>
+                  </div>
+                )}
+
                 {(() => {
                   let filteredList = showPinnedOnly ? messages.filter((m) => m.isPinned) : messages;
                   if (msgFilter === 'human') filteredList = filteredList.filter((m) => m.msgType !== 'system_activity');
                   if (msgFilter === 'system_activity') filteredList = filteredList.filter((m) => m.msgType === 'system_activity');
-                  if (msgFilter === 'urgent') filteredList = filteredList.filter((m) => m.isUrgent);
+                  if (msgFilter === 'urgent') filteredList = filteredList.filter((m) => m.priority === 'urgent');
                   if (msgFilter === 'media') filteredList = filteredList.filter((m) => m.attachment);
 
                   if (inRoomQuery.trim()) {
@@ -1747,264 +2027,420 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     );
                   }
 
+                  let lastDateHeader = '';
+
                   return filteredList.map((msg) => {
                     const isMe = String(msg.senderId?._id || msg.senderId) === String(currentUser?.id || currentUser?._id);
                     const isSystemActivity = msg.msgType === 'system_activity';
 
+                    // Compute Date Header
+                    const msgDateHeader = formatMessageDateHeader(msg.createdAt);
+                    const showDateHeader = msgDateHeader && msgDateHeader !== lastDateHeader;
+                    if (showDateHeader) {
+                      lastDateHeader = msgDateHeader;
+                    }
+
                     if (isSystemActivity) {
                       const actBadge = getActionBadgeStyle(msg.actionType);
                       return (
-                        <div
-                          key={msg._id}
-                          style={{
-                            alignSelf: 'center',
-                            width: '100%',
-                            maxWidth: '720px',
-                            background: 'var(--bg-card)',
-                            border: `1px solid ${actBadge.border}`,
-                            borderLeft: `4px solid ${actBadge.color}`,
-                            borderRadius: '10px',
-                            padding: '0.75rem 1rem',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-                            margin: '0.2rem 0'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', background: actBadge.bg, color: actBadge.color, border: `1px solid ${actBadge.border}` }}>
-                                {msg.actionType || 'ACTIVITY'}
+                        <React.Fragment key={msg._id}>
+                          {showDateHeader && (
+                            <div style={{ display: 'flex', justifyContent: 'center', margin: '0.75rem 0', position: 'sticky', top: 0, zIndex: 10 }}>
+                              <span style={{ padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.68rem', fontWeight: 800, background: 'rgba(15,23,42,0.75)', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+                                {msgDateHeader}
                               </span>
-                              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                                {msg.moduleName} — {msg.screenName}
-                              </span>
-                            </div>
-                            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                              {formatTime(msg.createdAt)}
-                            </span>
-                          </div>
-
-                          <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)', lineHeight: 1.4, marginBottom: '0.4rem' }}>
-                            {msg.content}
-                          </div>
-
-                          {msg.recordReference && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem', color: '#2563eb', fontWeight: 700 }}>
-                              <ExternalLink size={12} />
-                              <span>Ref: {msg.recordReference.recordCode || msg.recordReference.recordId}</span>
                             </div>
                           )}
 
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.5rem', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)' }}>
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                              Actor: <strong>{msg.senderName || msg.senderId?.name || 'System Bot'}</strong>
-                            </span>
-
-                            <div style={{ display: 'flex', gap: '0.4rem' }}>
-                              {(msg.acknowledgments || []).some((a) => String(a.user) === String(currentUser?.id || currentUser?._id)) ? (
-                                <span style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                  <CheckCircle size={13} /> Acknowledged
+                          <div
+                            style={{
+                              alignSelf: 'center',
+                              width: '100%',
+                              maxWidth: '720px',
+                              background: 'var(--bg-card)',
+                              border: `1px solid ${actBadge.border}`,
+                              borderLeft: `4px solid ${actBadge.color}`,
+                              borderRadius: '10px',
+                              padding: '0.75rem 1rem',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                              margin: '0.2rem 0'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', background: actBadge.bg, color: actBadge.color, border: `1px solid ${actBadge.border}` }}>
+                                  {msg.actionType || 'ACTIVITY'}
                                 </span>
-                              ) : (
-                                <button
-                                  onClick={() => handleAcknowledge(msg._id, 'acknowledged')}
-                                  style={{ background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.2)', color: '#2563eb', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', cursor: 'pointer' }}
-                                >
-                                  Acknowledge
-                                </button>
-                              )}
+                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                  {msg.moduleName} — {msg.screenName}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                                {formatTime(msg.createdAt)}
+                              </span>
+                            </div>
+
+                            <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)', lineHeight: 1.4, marginBottom: '0.4rem' }}>
+                              {msg.content}
+                            </div>
+
+                            {msg.recordReference && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem', color: '#2563eb', fontWeight: 700 }}>
+                                <ExternalLink size={12} />
+                                <span>Ref: {msg.recordReference.recordCode || msg.recordReference.recordId}</span>
+                              </div>
+                            )}
+
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.5rem', paddingTop: '0.4rem', borderTop: '1px solid var(--border-light)' }}>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                Actor: <strong>{msg.senderName || msg.senderId?.name || 'System Bot'}</strong>
+                              </span>
+
+                              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                {(msg.acknowledgments || []).some((a) => String(a.user) === String(currentUser?.id || currentUser?._id)) ? (
+                                  <span style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <CheckCircle size={13} /> Acknowledged
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleAcknowledge(msg._id, 'acknowledged')}
+                                    style={{ background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.2)', color: '#2563eb', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', cursor: 'pointer' }}
+                                  >
+                                    Acknowledge
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        </React.Fragment>
                       );
                     }
 
                     const isAudioMsg = msg.type === 'audio-voice' || (msg.attachment && msg.attachment.fileType === 'audio');
                     const isRecordCard = msg.type === 'record-card' || Boolean(msg.activityMeta && msg.activityMeta.module);
+                    const isPollMsg = msg.type === 'poll' || Boolean(msg.pollMeta && msg.pollMeta.question);
 
                     return (
-                      <div
-                        key={msg._id}
-                        style={{
-                          alignSelf: isMe ? 'flex-end' : 'flex-start',
-                          maxWidth: '72%',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: isMe ? 'flex-end' : 'flex-start'
-                        }}
-                      >
-                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '2px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span>{msg.senderId?.name || msg.senderName || 'Staff Member'}</span>
-                          <span>·</span>
-                          <span>{formatTime(msg.createdAt)}</span>
-                          {isMe && <CheckCheck size={13} color="#38bdf8" style={{ marginLeft: '2px' }} />}
-                          {msg.isPinned && (
-                            <span style={{ color: '#d97706', fontWeight: 800, background: '#fef3c7', padding: '1px 4px', borderRadius: '3px', fontSize: '0.62rem' }}>
-                              📌 PINNED
+                      <React.Fragment key={msg._id}>
+                        {showDateHeader && (
+                          <div style={{ display: 'flex', justifyContent: 'center', margin: '0.75rem 0', position: 'sticky', top: 0, zIndex: 10 }}>
+                            <span style={{ padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.68rem', fontWeight: 800, background: 'rgba(15,23,42,0.75)', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+                              {msgDateHeader}
                             </span>
-                          )}
-                        </div>
+                          </div>
+                        )}
 
                         <div
                           style={{
-                            background: isMe ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'var(--bg-card)',
-                            color: isMe ? '#ffffff' : 'var(--text-primary)',
-                            padding: '0.65rem 0.9rem',
-                            borderRadius: isMe ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
-                            border: isMe ? 'none' : '1px solid var(--border-light)',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                            fontSize: '0.85rem',
-                            lineHeight: 1.45,
-                            wordBreak: 'break-word',
-                            position: 'relative'
+                            alignSelf: isMe ? 'flex-end' : 'flex-start',
+                            maxWidth: '74%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: isMe ? 'flex-end' : 'flex-start'
                           }}
                         >
-                          {/* Audio Voice Player Card */}
-                          {isAudioMsg && msg.attachment && msg.attachment.fileUrl && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.4rem 0.65rem', background: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(37,99,235,0.08)', borderRadius: '10px', marginBottom: '0.35rem' }}>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (playingAudioId === msg._id) {
-                                    setPlayingAudioId(null);
-                                  } else {
-                                    setPlayingAudioId(msg._id);
-                                    const audio = new Audio(msg.attachment.fileUrl);
-                                    audio.play();
-                                    audio.onended = () => setPlayingAudioId(null);
-                                  }
-                                }}
-                                style={{ background: isMe ? '#ffffff' : '#2563eb', color: isMe ? '#2563eb' : '#ffffff', border: 'none', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}
-                              >
-                                {playingAudioId === msg._id ? <Pause size={15} /> : <Play size={15} />}
-                              </button>
-
-                              <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: '0.76rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <Volume2 size={13} />
-                                  <span>Voice Note</span>
-                                </div>
-                                <div style={{ fontSize: '0.66rem', opacity: 0.85 }}>
-                                  {msg.attachment.durationSec || 5} sec · Cloudflare R2 Audio
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Quick Share Record Card */}
-                          {isRecordCard && msg.activityMeta && msg.activityMeta.module && (
-                            <div style={{ background: isMe ? 'rgba(255,255,255,0.15)' : 'var(--bg-main)', padding: '0.55rem 0.75rem', borderRadius: '8px', border: isMe ? '1px solid rgba(255,255,255,0.3)' : '1px solid var(--border-light)', marginBottom: '0.35rem' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '4px' }}>
-                                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: isMe ? '#fff' : '#2563eb', textTransform: 'uppercase' }}>
-                                  🃏 {msg.activityMeta.module}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRecordClick(msg.activityMeta)}
-                                  style={{ background: isMe ? '#ffffff' : '#2563eb', color: isMe ? '#2563eb' : '#ffffff', border: 'none', padding: '2px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer' }}
-                                >
-                                  Open →
-                                </button>
-                              </div>
-                              <div style={{ fontSize: '0.8rem', fontWeight: 800 }}>
-                                {msg.activityMeta.recordRef || msg.content}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Image Attachment */}
-                          {msg.attachment && msg.attachment.fileUrl && !isAudioMsg && (
-                            <div style={{ marginBottom: '0.4rem' }}>
-                              {msg.attachment.fileType === 'image' ? (
-                                <img
-                                  src={msg.attachment.fileUrl}
-                                  alt="Attachment"
-                                  onClick={() => setZoomImg(msg.attachment.fileUrl)}
-                                  style={{ maxWidth: '100%', maxHeight: '220px', borderRadius: '8px', cursor: 'zoom-in', objectFit: 'cover' }}
-                                />
-                              ) : (
-                                <a
-                                  href={msg.attachment.fileUrl}
-                                  download={msg.attachment.fileName}
-                                  style={{ color: isMe ? '#fff' : '#2563eb', fontWeight: 700, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'underline' }}
-                                >
-                                  <FileText size={14} /> {msg.attachment.fileName}
-                                </a>
-                              )}
-                            </div>
-                          )}
-
-                          {renderContentWithMentions(msg.content)}
-
-                          {/* Reaction Badges */}
-                          {msg.reactions && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '5px' }}>
-                              {Object.entries(
-                                Array.isArray(msg.reactions)
-                                  ? msg.reactions.reduce((acc, r) => {
-                                      acc[r.emoji] = (acc[r.emoji] || 0) + 1;
-                                      return acc;
-                                    }, {})
-                                  : Object.fromEntries(Object.entries(msg.reactions).map(([e, users]) => [e, users.length]))
-                              ).map(([emoji, count]) => (
-                                <span
-                                  key={emoji}
-                                  onClick={() => handleToggleReaction(msg._id, emoji)}
-                                  style={{ fontSize: '0.7rem', background: isMe ? 'rgba(255,255,255,0.22)' : 'var(--bg-main)', border: isMe ? '1px solid rgba(255,255,255,0.3)' : '1px solid var(--border-light)', borderRadius: '10px', padding: '1px 6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
-                                >
-                                  <span>{emoji}</span>
-                                  <span style={{ fontWeight: 800, fontSize: '0.64rem' }}>{count}</span>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Hover Reaction Bar & Pin Button */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', opacity: 0.85 }}>
-                          <div style={{ display: 'flex', gap: '1px', background: 'var(--bg-card)', padding: '1px 4px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
-                            {['👍', '❤️', '🔥', '🎉', '✅'].map((emo) => (
-                              <button
-                                key={emo}
-                                type="button"
-                                onClick={() => handleToggleReaction(msg._id, emo)}
-                                style={{ background: 'none', border: 'none', fontSize: '0.72rem', cursor: 'pointer', padding: '1px 3px' }}
-                              >
-                                {emo}
-                              </button>
-                            ))}
-                            <button
-                              type="button"
-                              onClick={() => handleTogglePin(msg._id)}
-                              style={{ background: 'none', border: 'none', color: msg.isPinned ? '#d97706' : 'var(--text-muted)', cursor: 'pointer', padding: '1px 3px', display: 'flex', alignItems: 'center' }}
-                              title={msg.isPinned ? 'Unpin message' : 'Pin message'}
-                            >
-                              {msg.isPinned ? <PinOff size={11} /> : <Pin size={11} />}
-                            </button>
+                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '2px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span>{msg.senderId?.name || msg.senderName || 'Staff Member'}</span>
+                            <span>·</span>
+                            <span>{formatTime(msg.createdAt)}</span>
+                            {isMe && <CheckCheck size={13} color="#38bdf8" style={{ marginLeft: '2px' }} />}
+                            {msg.priority === 'urgent' && (
+                              <span style={{ color: '#ffffff', fontWeight: 800, background: '#ef4444', padding: '1px 5px', borderRadius: '4px', fontSize: '0.62rem', animation: 'pulse 1.5s infinite' }}>
+                                🚨 URGENT SOS
+                              </span>
+                            )}
+                            {msg.isPinned && (
+                              <span style={{ color: '#d97706', fontWeight: 800, background: '#fef3c7', padding: '1px 4px', borderRadius: '3px', fontSize: '0.62rem' }}>
+                                📌 PINNED
+                              </span>
+                            )}
                           </div>
 
-                          {/* Read Receipts Indicator */}
-                          {isMe && (
-                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '4px' }}>
-                              {msg.readBy && msg.readBy.length > 1 ? (
-                                <span style={{ color: '#2563eb', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }} title={`Read by ${msg.readBy.length - 1} team members`}>
-                                  <CheckCheck size={13} />
-                                  <span>Read</span>
-                                </span>
-                              ) : (
-                                <span style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                                  <Check size={12} />
-                                  <span>Sent</span>
-                                </span>
-                              )}
+                          <div
+                            style={{
+                              background: isMe ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'var(--bg-card)',
+                              color: isMe ? '#ffffff' : 'var(--text-primary)',
+                              padding: '0.65rem 0.9rem',
+                              borderRadius: isMe ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
+                              border: isMe ? 'none' : '1px solid var(--border-light)',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                              fontSize: '0.85rem',
+                              lineHeight: 1.45,
+                              wordBreak: 'break-word',
+                              position: 'relative'
+                            }}
+                          >
+                            {/* Forwarded Header */}
+                            {msg.forwardedFrom && (
+                              <div style={{ fontSize: '0.68rem', fontStyle: 'italic', fontWeight: 700, opacity: 0.9, display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px', paddingBottom: '3px', borderBottom: isMe ? '1px solid rgba(255,255,255,0.2)' : '1px solid var(--border-light)' }}>
+                                <CornerUpRight size={12} />
+                                <span>Forwarded from {msg.forwardedFrom.senderName} ({msg.forwardedFrom.originalRoomName || 'Chat'})</span>
+                              </div>
+                            )}
+
+                            {/* Quoted Reply Card */}
+                            {msg.replyTo && (
+                              <div style={{ background: isMe ? 'rgba(0,0,0,0.18)' : 'rgba(37,99,235,0.08)', borderRadius: '6px', borderLeft: isMe ? '3px solid #ffffff' : '3px solid #2563eb', padding: '4px 8px', marginBottom: '6px', fontSize: '0.74rem' }}>
+                                <div style={{ fontWeight: 800, color: isMe ? '#ffffff' : '#2563eb', fontSize: '0.7rem' }}>
+                                  {typeof msg.replyTo.senderId === 'object' ? (msg.replyTo.senderId.name || msg.replyTo.senderId.username) : 'Replying to staff'}
+                                </div>
+                                <div style={{ opacity: 0.9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {msg.replyTo.content}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Interactive Poll Card */}
+                            {isPollMsg && msg.pollMeta && (
+                              <div style={{ minWidth: 240, maxWidth: 360, background: isMe ? 'rgba(255,255,255,0.12)' : 'var(--bg-main)', borderRadius: '10px', padding: '0.65rem 0.8rem', border: isMe ? '1px solid rgba(255,255,255,0.25)' : '1px solid var(--border-light)', marginBottom: '0.35rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                                  <BarChart2 size={16} color={isMe ? '#ffffff' : '#2563eb'} />
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>{msg.pollMeta.question}</span>
+                                </div>
+
+                                {(() => {
+                                  const totalVotes = msg.pollMeta.options.reduce((sum, o) => sum + (o.votes?.length || 0), 0);
+                                  const uIdStr = String(currentUser?._id || currentUser?.id || '');
+
+                                  return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginTop: '0.5rem' }}>
+                                      {msg.pollMeta.options.map((opt) => {
+                                        const voteCount = opt.votes ? opt.votes.length : 0;
+                                        const pct = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+                                        const hasVoted = opt.votes && opt.votes.some((v) => String(typeof v === 'object' ? (v._id || v.id) : v) === uIdStr);
+
+                                        return (
+                                          <div
+                                            key={opt.id}
+                                            onClick={() => handleVotePoll(msg._id, opt.id)}
+                                            style={{
+                                              position: 'relative',
+                                              padding: '0.45rem 0.65rem',
+                                              borderRadius: '7px',
+                                              background: isMe ? 'rgba(0,0,0,0.15)' : 'var(--bg-card)',
+                                              border: hasVoted ? (isMe ? '1.5px solid #ffffff' : '1.5px solid #2563eb') : '1px solid var(--border-light)',
+                                              cursor: 'pointer',
+                                              overflow: 'hidden',
+                                              transition: 'all 0.15s ease'
+                                            }}
+                                          >
+                                            {/* Progress Bar Fill */}
+                                            <div
+                                              style={{
+                                                position: 'absolute',
+                                                left: 0,
+                                                top: 0,
+                                                bottom: 0,
+                                                width: `${pct}%`,
+                                                background: isMe ? 'rgba(255,255,255,0.25)' : 'rgba(37,99,235,0.15)',
+                                                transition: 'width 0.3s ease'
+                                              }}
+                                            />
+
+                                            <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                              <span style={{ fontSize: '0.78rem', fontWeight: hasVoted ? 800 : 600 }}>
+                                                {hasVoted ? '✓ ' : ''}{opt.text}
+                                              </span>
+                                              <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
+                                                {pct}% ({voteCount})
+                                              </span>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+
+                                      <div style={{ fontSize: '0.64rem', opacity: 0.8, marginTop: '2px', textAlign: 'right' }}>
+                                        {totalVotes} total votes · {msg.pollMeta.isMultiSelect ? 'Multiple choice' : 'Single vote'}
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            )}
+
+                            {/* Audio Voice Player Card */}
+                            {isAudioMsg && msg.attachment && msg.attachment.fileUrl && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.4rem 0.65rem', background: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(37,99,235,0.08)', borderRadius: '10px', marginBottom: '0.35rem' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (playingAudioId === msg._id) {
+                                      setPlayingAudioId(null);
+                                    } else {
+                                      setPlayingAudioId(msg._id);
+                                      const audio = new Audio(msg.attachment.fileUrl);
+                                      audio.play();
+                                      audio.onended = () => setPlayingAudioId(null);
+                                    }
+                                  }}
+                                  style={{ background: isMe ? '#ffffff' : '#2563eb', color: isMe ? '#2563eb' : '#ffffff', border: 'none', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}
+                                >
+                                  {playingAudioId === msg._id ? <Pause size={15} /> : <Play size={15} />}
+                                </button>
+
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontSize: '0.76rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Volume2 size={13} />
+                                    <span>Voice Note</span>
+                                  </div>
+                                  <div style={{ fontSize: '0.66rem', opacity: 0.85 }}>
+                                    {msg.attachment.durationSec || 5} sec · Cloudflare R2 Audio
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Quick Share Record Card */}
+                            {isRecordCard && msg.activityMeta && msg.activityMeta.module && (
+                              <div style={{ background: isMe ? 'rgba(255,255,255,0.15)' : 'var(--bg-main)', padding: '0.55rem 0.75rem', borderRadius: '8px', border: isMe ? '1px solid rgba(255,255,255,0.3)' : '1px solid var(--border-light)', marginBottom: '0.35rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '4px' }}>
+                                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: isMe ? '#fff' : '#2563eb', textTransform: 'uppercase' }}>
+                                    🃏 {msg.activityMeta.module}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRecordClick(msg.activityMeta)}
+                                    style={{ background: isMe ? '#ffffff' : '#2563eb', color: isMe ? '#2563eb' : '#ffffff', border: 'none', padding: '2px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer' }}
+                                  >
+                                    Open →
+                                  </button>
+                                </div>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 800 }}>
+                                  {msg.activityMeta.recordRef || msg.content}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Image Attachment */}
+                            {msg.attachment && msg.attachment.fileUrl && !isAudioMsg && (
+                              <div style={{ marginBottom: '0.4rem' }}>
+                                {msg.attachment.fileType === 'image' ? (
+                                  <img
+                                    src={msg.attachment.fileUrl}
+                                    alt="Attachment"
+                                    onClick={() => setZoomImg(msg.attachment.fileUrl)}
+                                    style={{ maxWidth: '100%', maxHeight: '220px', borderRadius: '8px', cursor: 'zoom-in', objectFit: 'cover' }}
+                                  />
+                                ) : (
+                                  <a
+                                    href={msg.attachment.fileUrl}
+                                    download={msg.attachment.fileName}
+                                    style={{ color: isMe ? '#fff' : '#2563eb', fontWeight: 700, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'underline' }}
+                                  >
+                                    <FileText size={14} /> {msg.attachment.fileName}
+                                  </a>
+                                )}
+                              </div>
+                            )}
+
+                            {!isPollMsg && renderContentWithMentions(msg.content)}
+
+                            {/* Reaction Badges */}
+                            {msg.reactions && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '5px' }}>
+                                {Object.entries(
+                                  Array.isArray(msg.reactions)
+                                    ? msg.reactions.reduce((acc, r) => {
+                                        acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                                        return acc;
+                                      }, {})
+                                    : Object.fromEntries(Object.entries(msg.reactions).map(([e, users]) => [e, users.length]))
+                                ).map(([emoji, count]) => (
+                                  <span
+                                    key={emoji}
+                                    onClick={() => handleToggleReaction(msg._id, emoji)}
+                                    style={{ fontSize: '0.7rem', background: isMe ? 'rgba(255,255,255,0.22)' : 'var(--bg-main)', border: isMe ? '1px solid rgba(255,255,255,0.3)' : '1px solid var(--border-light)', borderRadius: '10px', padding: '1px 6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                                  >
+                                    <span>{emoji}</span>
+                                    <span style={{ fontWeight: 800, fontSize: '0.64rem' }}>{count}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Hover Reaction Bar, Reply & Forward Buttons */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', opacity: 0.85 }}>
+                            <div style={{ display: 'flex', gap: '2px', background: 'var(--bg-card)', padding: '1px 4px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                              {['👍', '❤️', '🔥', '🎉', '✅'].map((emo) => (
+                                <button
+                                  key={emo}
+                                  type="button"
+                                  onClick={() => handleToggleReaction(msg._id, emo)}
+                                  style={{ background: 'none', border: 'none', fontSize: '0.72rem', cursor: 'pointer', padding: '1px 3px' }}
+                                >
+                                  {emo}
+                                </button>
+                              ))}
+                              
+                              <button
+                                type="button"
+                                onClick={() => setReplyToMessage(msg)}
+                                style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '1px 3px', display: 'flex', alignItems: 'center' }}
+                                title="Reply to this message"
+                              >
+                                <Reply size={11} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleOpenForwardModal(msg)}
+                                style={{ background: 'none', border: 'none', color: '#8b5cf6', cursor: 'pointer', padding: '1px 3px', display: 'flex', alignItems: 'center' }}
+                                title="Forward message to another channel/DM"
+                              >
+                                <CornerUpRight size={11} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleTogglePin(msg._id)}
+                                style={{ background: 'none', border: 'none', color: msg.isPinned ? '#d97706' : 'var(--text-muted)', cursor: 'pointer', padding: '1px 3px', display: 'flex', alignItems: 'center' }}
+                                title={msg.isPinned ? 'Unpin message' : 'Pin message'}
+                              >
+                                {msg.isPinned ? <PinOff size={11} /> : <Pin size={11} />}
+                              </button>
                             </div>
-                          )}
+
+                            {/* Read Receipts Indicator */}
+                            {isMe && (
+                              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '4px' }}>
+                                {msg.readBy && msg.readBy.length > 1 ? (
+                                  <span style={{ color: '#2563eb', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }} title={`Read by ${msg.readBy.length - 1} team members`}>
+                                    <CheckCheck size={13} />
+                                    <span>Read</span>
+                                  </span>
+                                ) : (
+                                  <span style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                                    <Check size={12} />
+                                    <span>Sent</span>
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      </React.Fragment>
                     );
                   });
                 })()}
                 <div ref={chatBottomRef} />
               </div>
+
+              {/* Quoted Inline Reply Banner */}
+              {replyToMessage && (
+                <div style={{ padding: '0.45rem 0.9rem', background: 'rgba(37,99,235,0.08)', borderTop: '1px solid #bfdbfe', borderLeft: '4px solid #2563eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem', color: '#1d4ed8', fontWeight: 600 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
+                    <Reply size={14} color="#2563eb" />
+                    <div>
+                      <span style={{ fontWeight: 800 }}>Replying to {typeof replyToMessage.senderId === 'object' ? (replyToMessage.senderId.name || replyToMessage.senderId.username) : 'Staff'}: </span>
+                      <span style={{ opacity: 0.9, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{replyToMessage.content?.substring(0, 80)}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setReplyToMessage(null)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
 
               {/* Attachment Preview Banner */}
               {attachedFile && (
@@ -2045,6 +2481,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       title="Record Voice Note"
                     >
                       <Mic size={18} />
+                    </button>
+
+                    {/* Interactive Poll Button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowPollModal(true)}
+                      style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center' }}
+                      title="Create Department Poll & Vote"
+                    >
+                      <BarChart2 size={18} />
                     </button>
 
                     {/* Quick Share Record Button */}
@@ -2094,8 +2540,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                     <input
                       type="text"
-                      placeholder={`Message channel or ask @EliteAI JC-1004...`}
+                      placeholder={`Message channel or paste screenshot (Cmd+V)...`}
                       value={inputMessage}
+                      onPaste={handlePasteClipboard}
                       onChange={(e) => {
                         const val = e.target.value;
                         setInputMessage(val);
@@ -2810,6 +3257,231 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   </div>
                 );
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CREATE POLL MODAL ── */}
+      {showPollModal && activeGroup && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 500, borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.2s ease-out' }}>
+            <div style={{ padding: '1rem 1.2rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-th)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <BarChart2 size={18} color="#10b981" />
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Create Department Poll &amp; Voting
+                </h3>
+              </div>
+              <button onClick={() => setShowPollModal(false)} className="btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '6px' }}>
+                Cancel
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePollSubmit} style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  Poll Question *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Which shift should run the high-speed printing machine today?"
+                  value={pollQuestion}
+                  onChange={(e) => setPollQuestion(e.target.value)}
+                  style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.84rem', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'var(--bg-input)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                  Poll Options (At least 2 required)
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                  {pollOptions.map((opt, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        placeholder={`Option ${idx + 1}`}
+                        value={opt}
+                        onChange={(e) => {
+                          const copy = [...pollOptions];
+                          copy[idx] = e.target.value;
+                          setPollOptions(copy);
+                        }}
+                        style={{ flex: 1, padding: '0.45rem 0.75rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                        required={idx < 2}
+                      />
+                      {pollOptions.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPollOptions([...pollOptions, ''])}
+                  style={{ marginTop: '0.5rem', background: 'none', border: 'none', color: '#2563eb', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                >
+                  <Plus size={14} />
+                  <span>+ Add Option</span>
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-main)', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                <input
+                  type="checkbox"
+                  id="pollMultiSelect"
+                  checked={pollMultiSelect}
+                  onChange={(e) => setPollMultiSelect(e.target.checked)}
+                  style={{ cursor: 'pointer' }}
+                />
+                <label htmlFor="pollMultiSelect" style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}>
+                  Allow voters to select multiple options
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.4rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowPollModal(false)}
+                  className="btn-secondary"
+                  style={{ fontSize: '0.8rem', padding: '0.45rem 0.9rem', borderRadius: '8px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingPoll}
+                  className="btn-primary"
+                  style={{ fontSize: '0.8rem', padding: '0.45rem 1.1rem', borderRadius: '8px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}
+                >
+                  {submittingPoll ? 'Publishing Poll...' : 'Publish Poll →'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── CROSS-ROOM FORWARD MESSAGE MODAL ── */}
+      {showForwardModal && forwardTargetMsg && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 460, borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.2s ease-out' }}>
+            <div style={{ padding: '1rem 1.2rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-th)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CornerUpRight size={18} color="#8b5cf6" />
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Forward Message
+                </h3>
+              </div>
+              <button onClick={() => setShowForwardModal(false)} className="btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '6px' }}>
+                Cancel
+              </button>
+            </div>
+
+            <div style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div style={{ background: 'var(--bg-main)', padding: '0.6rem 0.8rem', borderRadius: '8px', borderLeft: '3.5px solid #8b5cf6', fontSize: '0.78rem' }}>
+                <div style={{ fontWeight: 800, color: '#8b5cf6', marginBottom: '2px' }}>
+                  Original Message ({typeof forwardTargetMsg.senderId === 'object' ? (forwardTargetMsg.senderId.name || forwardTargetMsg.senderId.username) : 'Staff'}):
+                </div>
+                <div style={{ color: 'var(--text-primary)', lineHeight: 1.35 }}>
+                  {forwardTargetMsg.content}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  Select Target Channel / DM *
+                </label>
+                <select
+                  value={forwardTargetRoomId}
+                  onChange={(e) => setForwardTargetRoomId(e.target.value)}
+                  style={{ width: '100%', padding: '0.55rem 0.8rem', fontSize: '0.82rem', borderRadius: '8px', border: '1px solid var(--border-light)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                >
+                  <option value="">-- Choose Channel or DM Room --</option>
+                  {groups.map((g) => (
+                    <option key={g._id} value={g._id}>
+                      {g.type === 'direct' ? `💬 DM: ${g.name}` : `🏢 Group: ${g.name} (${g.department})`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.4rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowForwardModal(false)}
+                  className="btn-secondary"
+                  style={{ fontSize: '0.8rem', padding: '0.45rem 0.9rem', borderRadius: '8px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmitForward}
+                  disabled={forwardingMsg || !forwardTargetRoomId}
+                  className="btn-primary"
+                  style={{ fontSize: '0.8rem', padding: '0.45rem 1.1rem', borderRadius: '8px', background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', opacity: !forwardTargetRoomId ? 0.6 : 1 }}
+                >
+                  {forwardingMsg ? 'Forwarding...' : 'Forward Message →'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADMIN CLEAN SLATE DATA RESET MODAL ── */}
+      {showClearAllModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: 460, borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'slideUp 0.2s ease-out', border: '1.5px solid #fca5a5' }}>
+            <div style={{ padding: '1rem 1.2rem', borderBottom: '1px solid #fee2e2', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fef2f2' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Trash2 size={18} color="#dc2626" />
+                <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#991b1b' }}>
+                  Clean Slate: Clear All Communication Data
+                </h3>
+              </div>
+              <button onClick={() => setShowClearAllModal(false)} className="btn-secondary" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '6px' }}>
+                Cancel
+              </button>
+            </div>
+
+            <div style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <p style={{ margin: 0, fontSize: '0.84rem', color: '#7f1d1d', lineHeight: 1.45, fontWeight: 600 }}>
+                Are you sure you want to delete ALL chat messages across all channels and direct messages, and reset department groups to default authority rooms?
+              </p>
+              <div style={{ fontSize: '0.75rem', color: '#b91c1c', background: '#fee2e2', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px solid #fca5a5' }}>
+                ⚠️ <strong>WARNING:</strong> This action is permanent. All test history will be deleted and connected clients will reset their stream immediately.
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.4rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowClearAllModal(false)}
+                  className="btn-secondary"
+                  style={{ fontSize: '0.8rem', padding: '0.45rem 0.9rem', borderRadius: '8px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearAllData}
+                  disabled={clearingData}
+                  className="btn-primary"
+                  style={{ fontSize: '0.8rem', padding: '0.45rem 1.1rem', borderRadius: '8px', background: '#dc2626', color: '#fff' }}
+                >
+                  {clearingData ? 'Deleting Data...' : 'Yes, Delete All Data & Reset'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
