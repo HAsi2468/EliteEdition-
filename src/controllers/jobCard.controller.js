@@ -25,6 +25,7 @@ function convertDriveUrl(link) {
 // ─── Fetch image as Buffer for PDF embedding ──────────────────────────────────
 async function getImageBuffer(url) {
   if (!url || !url.trim()) return null;
+  const { normalizeImageUrl } = require('../utils/imageUrlHelper');
   try {
     if (url.startsWith('data:image/')) {
       return Buffer.from(url.replace(/^data:image\/\w+;base64,/, ''), 'base64');
@@ -38,17 +39,50 @@ async function getImageBuffer(url) {
       const p = path.join(__dirname, '../../../elite_edition_images', designsMatch[1]);
       if (fs.existsSync(p)) return fs.readFileSync(p);
     }
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      const r = await axios.get(convertDriveUrl(url), {
-        responseType: 'arraybuffer', timeout: 8000,
-        headers: { 'User-Agent': 'Mozilla/5.0' }
-      });
-      return Buffer.from(r.data);
-    }
     const up = path.join(__dirname, '../../uploads', url);
     if (fs.existsSync(up)) return fs.readFileSync(up);
     const dp = path.join(__dirname, '../../../elite_edition_images', url);
     if (fs.existsSync(dp)) return fs.readFileSync(dp);
+
+    // Normalize relative or design URLs (like /designs/image-xxx.jpg) to full R2 / HTTPS URL
+    let targetUrl = url;
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = normalizeImageUrl(url);
+    }
+
+    if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+      const fetchBuffer = async (u) => {
+        try {
+          const r = await axios.get(convertDriveUrl(u), {
+            responseType: 'arraybuffer',
+            timeout: 8000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+          });
+          return Buffer.from(r.data);
+        } catch (e) {
+          return null;
+        }
+      };
+
+      let buf = await fetchBuffer(targetUrl);
+      if (buf) return buf;
+
+      // Try alternate extensions on R2 (e.g. .jpg <-> .jpeg <-> .png)
+      if (targetUrl.endsWith('.jpg')) {
+        buf = await fetchBuffer(targetUrl.replace(/\.jpg$/, '.jpeg'));
+        if (buf) return buf;
+        buf = await fetchBuffer(targetUrl.replace(/\.jpg$/, '.png'));
+        if (buf) return buf;
+      } else if (targetUrl.endsWith('.jpeg')) {
+        buf = await fetchBuffer(targetUrl.replace(/\.jpeg$/, '.jpg'));
+        if (buf) return buf;
+        buf = await fetchBuffer(targetUrl.replace(/\.jpeg$/, '.png'));
+        if (buf) return buf;
+      } else if (targetUrl.endsWith('.png')) {
+        buf = await fetchBuffer(targetUrl.replace(/\.png$/, '.jpg'));
+        if (buf) return buf;
+      }
+    }
   } catch (e) {
     logger.warn('getImageBuffer failed for "%s": %s', url, e.message);
   }
@@ -300,16 +334,32 @@ function normalizeDateStr(dtStr) {
 const syncDesignImage = async (body, existingCard = null) => {
   const dName = body.designName || body.designNo || (existingCard ? (existingCard.designName || existingCard.designNo) : '');
   if (dName) {
-    const cleanName = String(dName).trim().replace(/^ED-/i, '');
+    const rawParts = String(dName).split(/[,&/+]|\band\b/i).map(s => s.trim()).filter(Boolean);
+    const names = rawParts.length > 0 ? rawParts : [String(dName).trim()];
     try {
-      const designDoc = await db.Design.findOne({
-        $or: [
-          { designName: { $regex: `^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
-          { designNo: { $regex: `^(ED-)?${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
-        ]
-      }).lean();
-      if (designDoc && (designDoc.imageUrl || designDoc.imageUrl2)) {
-        body.imageUrl1 = designDoc.imageUrl || designDoc.imageUrl2;
+      if (names[0] && !body.imageUrl1) {
+        const clean1 = names[0].replace(/^ED-/i, '');
+        const designDoc1 = await db.Design.findOne({
+          $or: [
+            { designName: { $regex: `^(ED-)?${clean1.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
+            { designNo: { $regex: `^(ED-)?${clean1.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
+          ]
+        }).lean();
+        if (designDoc1 && (designDoc1.imageUrl || designDoc1.imageUrl2)) {
+          body.imageUrl1 = designDoc1.imageUrl || designDoc1.imageUrl2;
+        }
+      }
+      if (names.length >= 2 && names[1] && !body.imageUrl2) {
+        const clean2 = names[1].replace(/^ED-/i, '');
+        const designDoc2 = await db.Design.findOne({
+          $or: [
+            { designName: { $regex: `^(ED-)?${clean2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
+            { designNo: { $regex: `^(ED-)?${clean2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }
+          ]
+        }).lean();
+        if (designDoc2) {
+          body.imageUrl2 = designDoc2.imageUrl || designDoc2.imageUrl2 || '';
+        }
       }
     } catch (e) {}
   }
@@ -326,7 +376,7 @@ const createJobCard = async (req, res) => {
     if (body.fusingDate) body.fusingDate = normalizeDateStr(body.fusingDate);
     if (body.deliveryDate) body.deliveryDate = normalizeDateStr(body.deliveryDate);
 
-    syncDesignImage(body).catch(e => logger.warn('syncDesignImage failed: %s', e.message));
+    await syncDesignImage(body).catch(e => logger.warn('syncDesignImage failed: %s', e.message));
 
     const { normalizeImageUrl } = require('../utils/imageUrlHelper');
     if (body.imageUrl1) body.imageUrl1 = normalizeImageUrl(body.imageUrl1, body.designName || body.designNo);
@@ -411,7 +461,7 @@ const updateJobCard = async (req, res) => {
     if (!existingCard) return res.status(404).json({ error: `Job card not found for ID or Job No: ${targetId}` });
     targetId = existingCard._id;
 
-    syncDesignImage(body, existingCard).catch(e => logger.warn('syncDesignImage failed: %s', e.message));
+    await syncDesignImage(body, existingCard).catch(e => logger.warn('syncDesignImage failed: %s', e.message));
 
     const { normalizeImageUrl } = require('../utils/imageUrlHelper');
     if (body.imageUrl1) body.imageUrl1 = normalizeImageUrl(body.imageUrl1, body.designName || body.designNo);
@@ -594,12 +644,13 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
   };
 
   // Resolve Design Images
-  let imageUrl1 = '';
-  let imageUrl2 = '';
+  const { normalizeImageUrl } = require('../utils/imageUrlHelper');
+  let imageUrl1 = jobCard.imageUrl1 || jobCard.imageUrl || jobCard.proofing?.artworkUrl || '';
+  let imageUrl2 = jobCard.imageUrl2 || '';
   const keyStr = jobCard.designName || jobCard.designNo || '';
   const names = extractNames(keyStr);
 
-  if (names[0]) {
+  if (!imageUrl1 && names[0]) {
     const cleanName = names[0].replace(/^ED-/i, '');
     try {
       const design1 = await db.Design.findOne({
@@ -613,7 +664,9 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
       }
     } catch (e) {}
   }
-  if (!imageUrl1) imageUrl1 = jobCard.imageUrl1 || '';
+  if (!imageUrl1 && names[0]) {
+    imageUrl1 = normalizeImageUrl('', names[0]);
+  }
 
   if (names.length >= 2 && names[1]) {
     const cleanName2 = names[1].replace(/^ED-/i, '');
@@ -626,7 +679,9 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
       }).lean();
       if (design2) imageUrl2 = design2.imageUrl || design2.imageUrl2 || '';
     } catch (e) {}
-    if (!imageUrl2) imageUrl2 = jobCard.imageUrl2 || '';
+    if (!imageUrl2) {
+      imageUrl2 = normalizeImageUrl('', names[1]);
+    }
   }
 
   const [imgBuf1, imgBuf2] = await Promise.all([getImageBuffer(imageUrl1), getImageBuffer(imageUrl2)]);

@@ -159,7 +159,7 @@ export function triggerJobCardPrint(cardOrCards) {
   const titleText = cards.length === 1 ? `Job Card ${cards[0].jobNo || ''}` : `${cards.length} Job Cards`;
 
   const pagesHtml = cards.map((card, idx) => {
-    let imageUrl1 = card.imageUrl1 || '';
+    let imageUrl1 = card.imageUrl1 || card.imageUrl || card.proofing?.artworkUrl || '';
     let imageUrl2 = card.imageUrl2 || '';
 
     const keyStr = card.designName || card.designNo || '';
@@ -169,38 +169,44 @@ export function triggerJobCardPrint(cardOrCards) {
     const design1 = names[0] || card.designName || card.designNo || '';
     const design2 = names[1] || (card.designName ? `${card.designName}-2` : '');
 
-    let img1 = convertDriveUrl(imageUrl1, design1);
-    let img2 = showTwoImages ? convertDriveUrl(imageUrl2, design2) : '';
+    const candidates1 = getImageCandidates(imageUrl1, design1);
+    const candidates2 = showTwoImages ? getImageCandidates(imageUrl2, design2) : [];
+
+    let img1 = candidates1[0] || convertDriveUrl(imageUrl1, design1) || '';
+    let img2 = showTwoImages ? (candidates2[0] || convertDriveUrl(imageUrl2, design2) || '') : '';
 
     if (!img1 && design1) {
       img1 = convertDriveUrl('', design1);
     }
 
-    const retryScript = `if(!this.dataset.retryCount){this.dataset.retryCount=1;}else{this.dataset.retryCount=parseInt(this.dataset.retryCount)+1;}const c=parseInt(this.dataset.retryCount);if(c===1){if(this.src.endsWith('.jpeg'))this.src=this.src.slice(0,-5)+'.jpg';else if(this.src.endsWith('.jpg'))this.src=this.src.slice(0,-4)+'.jpeg';else if(this.src.endsWith('.png'))this.src=this.src.slice(0,-4)+'.jpg';}else if(c===2){this.src=this.src.replace(/\\.(jpe?g|png)/i,'.png');}else if(c===3){const base=this.alt||'';if(base)this.src='${window.location.origin}/v1/designs/'+encodeURIComponent(base)+'.jpg?fallback=1';}else{this.style.display='none';}`;
+    const c1Json = JSON.stringify(candidates1).replace(/"/g, '&quot;');
+    const c2Json = JSON.stringify(candidates2).replace(/"/g, '&quot;');
+    const alt1 = (design1 || 'Design 1').replace(/"/g, '&quot;');
+    const alt2 = (design2 || 'Design 2').replace(/"/g, '&quot;');
 
     let imgAreaHtml = '';
     if (img1 && img2) {
       imgAreaHtml = `
       <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
         <div style="flex: 1; border-right: 1.2px solid #000; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-          <img src="${img1}" crossorigin="anonymous" referrerpolicy="no-referrer" style="max-width: 100%; max-height: 136px; object-fit: contain;" onerror="${retryScript}" />
+          <img src="${img1}" data-candidates="${c1Json}" data-candidate-index="0" alt="${alt1}" referrerpolicy="no-referrer" style="max-width: 100%; max-height: 136px; object-fit: contain;" onerror="handleCandidateError(this)" />
         </div>
         <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-          <img src="${img2}" crossorigin="anonymous" referrerpolicy="no-referrer" style="max-width: 100%; max-height: 136px; object-fit: contain;" onerror="${retryScript}" />
+          <img src="${img2}" data-candidates="${c2Json}" data-candidate-index="0" alt="${alt2}" referrerpolicy="no-referrer" style="max-width: 100%; max-height: 136px; object-fit: contain;" onerror="handleCandidateError(this)" />
         </div>
       </div>`;
     } else if (img1) {
       imgAreaHtml = `
       <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
         <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-          <img src="${img1}" crossorigin="anonymous" referrerpolicy="no-referrer" style="max-width: 100%; max-height: 136px; object-fit: contain;" onerror="${retryScript}" />
+          <img src="${img1}" data-candidates="${c1Json}" data-candidate-index="0" alt="${alt1}" referrerpolicy="no-referrer" style="max-width: 100%; max-height: 136px; object-fit: contain;" onerror="handleCandidateError(this)" />
         </div>
       </div>`;
     } else if (img2) {
       imgAreaHtml = `
       <div style="display: flex; width: 100%; border: 1.2px solid #000; height: 140px; margin-top: 1px;">
         <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 2px;">
-          <img src="${img2}" crossorigin="anonymous" referrerpolicy="no-referrer" style="max-width: 100%; max-height: 136px; object-fit: contain;" onerror="${retryScript}" />
+          <img src="${img2}" data-candidates="${c2Json}" data-candidate-index="0" alt="${alt2}" referrerpolicy="no-referrer" style="max-width: 100%; max-height: 136px; object-fit: contain;" onerror="handleCandidateError(this)" />
         </div>
       </div>`;
     } else {
@@ -523,35 +529,71 @@ export function triggerJobCardPrint(cardOrCards) {
   </head><body>
     ${pagesHtml}
   <script>
+    function handleCandidateError(img) {
+      try {
+        var raw = img.getAttribute('data-candidates');
+        if (!raw) return;
+        var list = JSON.parse(raw);
+        var idx = parseInt(img.dataset.candidateIndex || '0', 10) + 1;
+        if (idx < list.length) {
+          img.dataset.candidateIndex = idx;
+          img.src = list[idx];
+        } else {
+          var base = img.alt || '';
+          img.onerror = null;
+          if (base) {
+            img.src = '${window.location.origin}/v1/designs/' + encodeURIComponent(base) + '.jpg?fallback=1';
+          }
+        }
+      } catch(e) {}
+    }
+
     window.onload = function() {
-      var imgs = document.getElementsByTagName('img');
-      var loaded = 0;
-      var total = imgs.length;
+      var imgs = Array.prototype.slice.call(document.getElementsByTagName('img'));
+      var printed = false;
       function triggerPrint() {
+        if (printed) return;
+        printed = true;
         setTimeout(function() {
           window.focus();
           window.print();
-        }, 300);
+        }, 500);
       }
-      if (total === 0) {
+      if (imgs.length === 0) {
         triggerPrint();
         return;
       }
-      for (var i = 0; i < total; i++) {
-        if (imgs[i].complete) {
-          loaded++;
-          if (loaded >= total) triggerPrint();
-        } else {
-          imgs[i].onload = function() {
-            loaded++;
-            if (loaded >= total) triggerPrint();
-          };
-          imgs[i].onerror = function() {
-            loaded++;
-            if (loaded >= total) triggerPrint();
-          };
+      var timer = setTimeout(triggerPrint, 4000);
+      var pending = imgs.length;
+      function checkDone() {
+        pending--;
+        if (pending <= 0) {
+          clearTimeout(timer);
+          triggerPrint();
         }
       }
+      imgs.forEach(function(img) {
+        if (img.complete && img.naturalWidth > 0) {
+          checkDone();
+        } else {
+          img.addEventListener('load', function() { checkDone(); });
+          img.addEventListener('error', function() {
+            setTimeout(function() {
+              if (img.complete && img.naturalWidth > 0) {
+                checkDone();
+              } else {
+                var maxIdx = 0;
+                try {
+                  maxIdx = JSON.parse(img.getAttribute('data-candidates') || '[]').length;
+                } catch(e) {}
+                if (parseInt(img.dataset.candidateIndex || '0', 10) >= maxIdx) {
+                  checkDone();
+                }
+              }
+            }, 600);
+          });
+        }
+      });
     };
   </script>
   </body></html>`);
@@ -617,7 +659,11 @@ function JobCardPrintView({ card, onClose, onShare }) {
   }, [card]);
 
   const doPrint = () => {
-    triggerJobCardPrint(card);
+    triggerJobCardPrint({
+      ...card,
+      imageUrl1: resolvedImages.imageUrl1 || card.imageUrl1,
+      imageUrl2: resolvedImages.imageUrl2 || card.imageUrl2
+    });
   };
 
   return (

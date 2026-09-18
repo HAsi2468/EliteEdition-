@@ -1130,6 +1130,25 @@ export const api = {
     window.URL.revokeObjectURL(url);
   },
 
+  async downloadSingleLotPdf(lotNo, fileName) {
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
+    const safeLotNo = encodeURIComponent(String(lotNo || '').trim());
+    const response = await fetch(`${baseUrl}/fabric/report/lot-statement-pdf/${safeLotNo}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error('Failed to generate lot statement PDF');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName || `Fabric_Lot_${lotNo}_Statement.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
   async getFabricRequirement() {
     return request('/fabric/requirement');
   },

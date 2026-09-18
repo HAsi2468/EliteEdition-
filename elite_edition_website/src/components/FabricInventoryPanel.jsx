@@ -138,7 +138,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     }
     return clean;
   };
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = String(currentUser?.role || '').toLowerCase() === 'admin' || !!currentUser?.isMainAdmin || currentUser?.email === 'harshitsidapara2468@gmail.com';
   const [stock, setStock] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [fabricsList, setFabricsList] = useState([]);
@@ -625,6 +625,22 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [lotStatusFilter, setLotStatusFilter] = useState('All');
   const [expandedLotNo, setExpandedLotNo] = useState(null);
   const [lotPdfLoading, setLotPdfLoading] = useState(false);
+  const [lotDownloadingNo, setLotDownloadingNo] = useState(null);
+
+  const handleDownloadSingleLotPdf = async (lot) => {
+    if (!lot || !lot.lotNo) return;
+    try {
+      setLotDownloadingNo(lot.lotNo);
+      await api.downloadSingleLotPdf(
+        lot.lotNo,
+        `Fabric_Lot_${lot.lotNo}_Statement_${new Date().toISOString().split('T')[0]}.pdf`
+      );
+    } catch (err) {
+      alert('Failed to download Lot PDF statement: ' + err.message);
+    } finally {
+      setLotDownloadingNo(null);
+    }
+  };
 
   // PDF download filter state
   const [pdfFilter, setPdfFilter] = useState({
@@ -2143,16 +2159,18 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               </div>
 
               <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button
-                  onClick={handleAutoLotTransfer}
-                  disabled={autoTransferLoading}
-                  className="btn-primary"
-                  style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', border: 'none' }}
-                  title="Auto-rebalance negative lots using matching Fabric Quality, Panna, and Vendor"
-                >
-                  <RefreshCw size={16} className={autoTransferLoading ? 'spin-loader' : ''} />
-                  {autoTransferLoading ? 'Rebalancing...' : '⚡ Auto-Rebalance All Deficits'}
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={handleAutoLotTransfer}
+                    disabled={autoTransferLoading}
+                    className="btn-primary"
+                    style={{ gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', border: 'none' }}
+                    title="Auto-rebalance negative lots using matching Fabric Quality, Panna, and Vendor"
+                  >
+                    <RefreshCw size={16} className={autoTransferLoading ? 'spin-loader' : ''} />
+                    {autoTransferLoading ? 'Rebalancing...' : '⚡ Auto-Rebalance All Deficits'}
+                  </button>
+                )}
 
                 <button
                   onClick={async () => {
@@ -2364,6 +2382,34 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           </button>
                         )}
 
+                        {/* Download Single Lot PDF Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadSingleLotPdf(lot);
+                          }}
+                          disabled={lotDownloadingNo === lot.lotNo}
+                          className="btn-secondary"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.35rem 0.7rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            borderRadius: '6px',
+                            background: 'rgba(56, 189, 248, 0.1)',
+                            border: '1px solid rgba(56, 189, 248, 0.35)',
+                            color: '#38bdf8',
+                            cursor: 'pointer',
+                            flexShrink: 0
+                          }}
+                          title={`Download Inward & Outward Statement PDF for Lot #${lot.lotNo}`}
+                        >
+                          <FileDown size={14} className={lotDownloadingNo === lot.lotNo ? 'spin-loader' : ''} />
+                          <span>{lotDownloadingNo === lot.lotNo ? 'PDF...' : 'PDF'}</span>
+                        </button>
+
                         <button
                           className="btn-icon"
                           style={{ padding: '0.35rem', color: 'var(--text-muted)' }}
@@ -2377,6 +2423,34 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     {/* Detailed History Breakdown Drawer */}
                     {isExpanded && (
                       <div style={{ borderTop: '1px solid var(--border-light)', padding: '1.25rem', background: 'rgba(0,0,0,0.15)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                            Detailed breakdown of all receipts and dispatches for <strong>Lot #{lot.lotNo}</strong>
+                          </div>
+                          <button
+                            onClick={() => handleDownloadSingleLotPdf(lot)}
+                            disabled={lotDownloadingNo === lot.lotNo}
+                            className="btn-secondary"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.4rem',
+                              padding: '0.4rem 0.9rem',
+                              fontSize: '0.8rem',
+                              fontWeight: 700,
+                              borderRadius: '6px',
+                              background: 'rgba(56, 189, 248, 0.12)',
+                              border: '1px solid rgba(56, 189, 248, 0.35)',
+                              color: '#38bdf8',
+                              cursor: 'pointer'
+                            }}
+                            title={`Download full PDF statement for Lot #${lot.lotNo}`}
+                          >
+                            <FileDown size={15} className={lotDownloadingNo === lot.lotNo ? 'spin-loader' : ''} />
+                            <span>{lotDownloadingNo === lot.lotNo ? 'Generating PDF...' : `Download Lot #${lot.lotNo} Statement (PDF)`}</span>
+                          </button>
+                        </div>
+
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
 
                           {/* Inward Transactions Box */}
@@ -2504,16 +2578,18 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               </div>
 
               <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button
-                  onClick={handleAutoLotTransfer}
-                  disabled={autoTransferLoading}
-                  className="btn-primary"
-                  style={{ gap: '0.4rem', padding: '0.55rem 1.1rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', border: 'none' }}
-                  title="Auto-rebalance negative lots using matching Fabric Quality, Panna, and Vendor"
-                >
-                  <RefreshCw size={16} className={autoTransferLoading ? 'spin-loader' : ''} />
-                  {autoTransferLoading ? 'Rebalancing...' : '⚡ Auto-Rebalance All Deficits'}
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={handleAutoLotTransfer}
+                    disabled={autoTransferLoading}
+                    className="btn-primary"
+                    style={{ gap: '0.4rem', padding: '0.55rem 1.1rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', border: 'none' }}
+                    title="Auto-rebalance negative lots using matching Fabric Quality, Panna, and Vendor"
+                  >
+                    <RefreshCw size={16} className={autoTransferLoading ? 'spin-loader' : ''} />
+                    {autoTransferLoading ? 'Rebalancing...' : '⚡ Auto-Rebalance All Deficits'}
+                  </button>
+                )}
 
                 <button
                   onClick={() => {
