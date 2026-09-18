@@ -1528,18 +1528,43 @@ const downloadSingleLotStatementPdf = async (req, res) => {
       return isNaN(obj.getTime()) ? '—' : `${String(obj.getDate()).padStart(2, '0')}/${String(obj.getMonth() + 1).padStart(2, '0')}/${obj.getFullYear()}`;
     };
 
+    const formatNote = (str) => {
+      if (!str || typeof str !== 'string') return '—';
+      let clean = str.trim();
+      // Parse auto-shortage string: Fresh=32.75m + 3% shortage = 33.733m raw
+      const m = clean.match(/Fresh=([\d.]+)m?\s*\+\s*([\d.]+)%?\s*shortage(?:\s*=\s*[\d.]+m?\s*raw)?/i);
+      if (m) {
+        return `Fresh: ${m[1]}m (+${m[2]}% Shortage)`;
+      }
+      clean = clean.replace(/^Auto:\s*[^|]+\|\s*Lot\s*#?\d+\s*\|\s*/i, '');
+      return clean.trim() || '—';
+    };
+
+    const renderInwardTableHeader = (currY) => {
+      doc.rect(30, currY, 535, 18).fill('#059669');
+      doc.fillColor('#ffffff').fontSize(7.5).font('Helvetica-Bold');
+      doc.text('DATE', 35, currY + 5);
+      doc.text('VENDOR NAME', 105, currY + 5);
+      doc.text('CHALLAN NO.', 235, currY + 5);
+      doc.text('NOTES / REMARKS', 325, currY + 5);
+      doc.text('INWARD QTY', 485, currY + 5, { width: 75, align: 'right' });
+    };
+
+    const renderOutwardTableHeader = (currY) => {
+      doc.rect(30, currY, 535, 18).fill('#dc2626');
+      doc.fillColor('#ffffff').fontSize(7.5).font('Helvetica-Bold');
+      doc.text('DATE', 35, currY + 5);
+      doc.text('PARTY NAME', 105, currY + 5);
+      doc.text('CHALLAN / JOB NO.', 235, currY + 5);
+      doc.text('DISPATCH DETAILS / NOTES', 325, currY + 5);
+      doc.text('OUTWARD QTY', 485, currY + 5, { width: 75, align: 'right' });
+    };
+
     // Section 1: Inward Receipts
     doc.fillColor('#065f46').fontSize(10).font('Helvetica-Bold').text(`1. INWARD RECEIPTS (${inwardTxs.length})`, 30, y);
     y += 14;
 
-    // Inward Table Header
-    doc.rect(30, y, 535, 18).fill('#059669');
-    doc.fillColor('#ffffff').fontSize(7.5).font('Helvetica-Bold');
-    doc.text('DATE', 35, y + 5);
-    doc.text('VENDOR NAME', 110, y + 5);
-    doc.text('CHALLAN NO.', 240, y + 5);
-    doc.text('NOTES / REMARKS', 330, y + 5);
-    doc.text('INWARD QTY', 485, y + 5, { width: 75, align: 'right' });
+    renderInwardTableHeader(y);
     y += 18;
 
     if (inwardTxs.length === 0) {
@@ -1548,36 +1573,40 @@ const downloadSingleLotStatementPdf = async (req, res) => {
       y += 18;
     } else {
       inwardTxs.forEach((tx, idx) => {
-        if (y > 760) {
+        const cleanNote = formatNote(tx.notes);
+        doc.font('Helvetica').fontSize(7.5);
+        const textH = doc.heightOfString(cleanNote, { width: 155 });
+        const rowHeight = Math.max(18, textH + 8);
+
+        if (y + rowHeight > 770) {
           doc.addPage();
           y = 30;
+          renderInwardTableHeader(y);
+          y += 18;
         }
-        doc.rect(30, y, 535, 18).fill(idx % 2 === 0 ? '#f8fafc' : '#ffffff');
-        doc.fillColor('#0f172a').fontSize(8).font('Helvetica');
+
+        doc.rect(30, y, 535, rowHeight).fill(idx % 2 === 0 ? '#f8fafc' : '#ffffff');
+        doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica');
         doc.text(fmtDate(tx.date), 35, y + 5);
-        doc.text(tx.vendorName || '—', 110, y + 5, { width: 125, lineBreak: false });
-        doc.text(tx.challanNo || '—', 240, y + 5, { width: 85, lineBreak: false });
-        doc.text(tx.notes || '—', 330, y + 5, { width: 150, lineBreak: false });
+        doc.text(tx.vendorName || '—', 105, y + 5, { width: 125, lineBreak: false, ellipsis: true });
+        doc.text(tx.challanNo || '—', 235, y + 5, { width: 85, lineBreak: false, ellipsis: true });
+        doc.text(cleanNote, 325, y + 5, { width: 155 });
         doc.fillColor('#047857').font('Helvetica-Bold').text(`+${Number(tx.qty || 0).toFixed(2)} m`, 485, y + 5, { width: 75, align: 'right' });
-        y += 18;
+        y += rowHeight;
       });
     }
 
     y += 16;
-    if (y > 740) { doc.addPage(); y = 30; }
+    if (y > 740) {
+      doc.addPage();
+      y = 30;
+    }
 
     // Section 2: Outward Dispatches
     doc.fillColor('#991b1b').fontSize(10).font('Helvetica-Bold').text(`2. OUTWARD DISPATCHES (${outwardTxs.length})`, 30, y);
     y += 14;
 
-    // Outward Table Header
-    doc.rect(30, y, 535, 18).fill('#dc2626');
-    doc.fillColor('#ffffff').fontSize(7.5).font('Helvetica-Bold');
-    doc.text('DATE', 35, y + 5);
-    doc.text('PARTY NAME', 110, y + 5);
-    doc.text('CHALLAN / JOB NO.', 240, y + 5);
-    doc.text('DISPATCH DETAILS / NOTES', 330, y + 5);
-    doc.text('OUTWARD QTY', 485, y + 5, { width: 75, align: 'right' });
+    renderOutwardTableHeader(y);
     y += 18;
 
     if (outwardTxs.length === 0) {
@@ -1586,19 +1615,28 @@ const downloadSingleLotStatementPdf = async (req, res) => {
       y += 18;
     } else {
       outwardTxs.forEach((tx, idx) => {
-        if (y > 760) {
+        const chDisp = tx.challanNo || (tx.notes && tx.notes.match(/(EDP-\d+|Challan\s*#?\s*\d+)/i)?.[0]) || tx.jobNo || '—';
+        const cleanNote = formatNote(tx.notes);
+
+        doc.font('Helvetica').fontSize(7.5);
+        const textH = doc.heightOfString(cleanNote, { width: 155 });
+        const rowHeight = Math.max(18, textH + 8);
+
+        if (y + rowHeight > 770) {
           doc.addPage();
           y = 30;
+          renderOutwardTableHeader(y);
+          y += 18;
         }
-        const chDisp = tx.challanNo || (tx.notes && tx.notes.match(/(EDP-\d+|Challan\s*#?\s*\d+)/i)?.[0]) || tx.jobNo || '—';
-        doc.rect(30, y, 535, 18).fill(idx % 2 === 0 ? '#f8fafc' : '#ffffff');
-        doc.fillColor('#0f172a').fontSize(8).font('Helvetica');
+
+        doc.rect(30, y, 535, rowHeight).fill(idx % 2 === 0 ? '#f8fafc' : '#ffffff');
+        doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica');
         doc.text(fmtDate(tx.date), 35, y + 5);
-        doc.text(tx.partyName || '—', 110, y + 5, { width: 125, lineBreak: false });
-        doc.text(chDisp, 240, y + 5, { width: 85, lineBreak: false });
-        doc.text(tx.notes || '—', 330, y + 5, { width: 150, lineBreak: false });
+        doc.text(tx.partyName || '—', 105, y + 5, { width: 125, lineBreak: false, ellipsis: true });
+        doc.text(chDisp, 235, y + 5, { width: 85, lineBreak: false, ellipsis: true });
+        doc.text(cleanNote, 325, y + 5, { width: 155 });
         doc.fillColor('#b91c1c').font('Helvetica-Bold').text(`-${Number(tx.qty || 0).toFixed(2)} m`, 485, y + 5, { width: 75, align: 'right' });
-        y += 18;
+        y += rowHeight;
       });
     }
 
