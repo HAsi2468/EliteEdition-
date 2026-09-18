@@ -126,7 +126,7 @@ app.get('/v1/designs/download-zip', (req, res) => {
   res.status(404).json({ error: 'Zip file not found' });
 });
 
-app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res, next) => {
+app.use(['/v1/designs/:filename', '/designs/:filename'], async (req, res, next) => {
   const rawFilename = req.params.filename || '';
   let filename = rawFilename;
   try { filename = decodeURIComponent(rawFilename); } catch (e) {}
@@ -140,18 +140,7 @@ app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res, next) => {
     return next();
   }
 
-  // If fallback=1 or svg=1 is requested, skip R2 redirect so local files or SVG badge are returned
-  const isExplicitFallback = req.query.fallback === '1' || req.query.svg === '1';
-
-  // If Cloudflare R2 CDN public URL is configured and not an explicit fallback request, redirect image request directly to R2
-  if (!isExplicitFallback && config.r2 && config.r2.publicUrl) {
-    const r2Base = config.r2.publicUrl.replace(/\/+$/, '');
-    const hasExt = /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(filename);
-    const targetFile = hasExt ? filename : `${filename}.jpg`;
-    return res.redirect(302, `${r2Base}/designs/${encodeURIComponent(targetFile)}`);
-  }
-
-  // Check if any matching photo file exists in imagesDir or uploads (e.g. ED-613 D.jpg, image-123.jpg)
+  // 1. Check if any matching photo file exists locally in imagesDir or uploads
   try {
     const searchDirs = [imagesDir, path.join(__dirname, '../uploads'), path.join(process.cwd(), 'uploads')];
     for (const sDir of searchDirs) {
@@ -171,12 +160,81 @@ app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res, next) => {
       if (matchedFile) {
         const fullPath = path.join(sDir, matchedFile);
         if (fs.existsSync(fullPath) && fs.statSync(fullPath).size > 100) {
+          res.setHeader('Access-Control-Allow-Origin', '*');
           return res.sendFile(fullPath);
         }
       }
     }
   } catch (e) {
-    console.warn('Smart image lookup error:', e.message);
+    console.warn('Smart local image lookup error:', e.message);
+  }
+
+  // 2. If not found locally and not an explicit fallback request, stream directly from Cloudflare R2
+  const isExplicitFallback = req.query.fallback === '1' || req.query.svg === '1';
+  if (!isExplicitFallback && config.r2 && config.r2.publicUrl) {
+    const r2Base = config.r2.publicUrl.replace(/\/+$/, '');
+    const axios = require('axios');
+    const r2Candidates = [];
+
+    // If filename is already a multer upload key (image-178...)
+    if (cleanName.startsWith('image-')) {
+      r2Candidates.push(`designs/${encodeURIComponent(cleanName)}`);
+      r2Candidates.push(`designs/${encodeURIComponent(cleanName)}.jpg`);
+    } else if (/\.(jpg|jpeg|png|webp|gif|svg)$/i.test(filename)) {
+      r2Candidates.push(`designs/${encodeURIComponent(filename)}`);
+    }
+
+    // Check MongoDB design or jobcard record if cleanName looks like a design identifier
+    try {
+      const db = require('./db/models');
+      const dDoc = await db.Design.findOne({
+        $or: [{ designName: cleanName }, { designNo: cleanName }]
+      }).lean();
+      let matchedImgUrl = dDoc?.imageUrl || dDoc?.imageUrl1 || dDoc?.imageUrl2 || '';
+
+      if (!matchedImgUrl) {
+        const jDoc = await db.JobCard.findOne({
+          $or: [{ designName: cleanName }, { designNo: cleanName }, { jobNo: cleanName }]
+        }).lean();
+        matchedImgUrl = jDoc?.imageUrl1 || jDoc?.imageUrl || jDoc?.imageUrl2 || '';
+      }
+
+      if (matchedImgUrl) {
+        const strippedKey = matchedImgUrl.replace(/^https?:\/\/[^\/]+\//, '').replace(/^\/?designs\//, '').replace(/^\/+/, '').split('?')[0];
+        if (strippedKey) {
+          r2Candidates.unshift(`designs/${encodeURIComponent(strippedKey)}`);
+        }
+      }
+    } catch (e) {}
+
+    // Add standard extension variations on R2
+    r2Candidates.push(`designs/${encodeURIComponent(cleanName)}.jpg`);
+    r2Candidates.push(`designs/${encodeURIComponent(cleanName)}.jpeg`);
+    r2Candidates.push(`designs/${encodeURIComponent(cleanName)}.png`);
+    r2Candidates.push(`designs/${encodeURIComponent(cleanName)}.webp`);
+    r2Candidates.push(`designs/${encodeURIComponent(cleanName)}`);
+
+    // De-duplicate candidate list
+    const uniqueKeys = Array.from(new Set(r2Candidates));
+
+    for (const key of uniqueKeys) {
+      try {
+        const streamRes = await axios.get(`${r2Base}/${key}`, {
+          responseType: 'stream',
+          timeout: 4500,
+          headers: { 'User-Agent': 'Mozilla/5.0 EliteEdition-Proxy' }
+        });
+        if (streamRes.status === 200) {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+          res.setHeader('Content-Type', streamRes.headers['content-type'] || 'image/jpeg');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          return streamRes.data.pipe(res);
+        }
+      } catch (err) {
+        // Continue to next candidate
+      }
+    }
   }
 
   const displayName = cleanName ? cleanName.toUpperCase() : 'DESIGN';

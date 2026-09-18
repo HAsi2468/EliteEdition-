@@ -147,18 +147,49 @@ function StatusBadge({ status }) {
   );
 }
 
+async function resolveImageToDataUrl(candidates) {
+  if (!candidates || candidates.length === 0) return '';
+  for (const url of candidates) {
+    if (!url) continue;
+    if (url.startsWith('data:')) return url;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const blob = await res.blob();
+        if (blob.size > 100) {
+          return await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve('');
+            reader.readAsDataURL(blob);
+          });
+        }
+      }
+    } catch (e) {}
+  }
+  return '';
+}
+
 // ─── Print / PDF template (matches the physical job card layout) ─────────────
-export function triggerJobCardPrint(cardOrCards) {
+export async function triggerJobCardPrint(cardOrCards) {
   if (!cardOrCards) return;
   const cards = Array.isArray(cardOrCards) ? cardOrCards : [cardOrCards];
   if (cards.length === 0) return;
 
-  const win = window.open('', '_blank', 'width=600,height=800');
-  if (!win) return;
+  // Open window synchronously on user click to prevent popup blockers
+  const win = window.open('', '_blank', 'width=650,height=850');
+  if (win) {
+    try {
+      win.document.write(`<!DOCTYPE html><html><head><title>Preparing Job Card Print...</title><style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;align-items:center;justify-content:center;height:80vh;color:#334155;background:#fff;} .loader{text-align:center;}</style></head><body><div class="loader"><div style="font-size:1.1rem;font-weight:700;margin-bottom:6px;">Preparing Job Card Print...</div><div style="font-size:0.85rem;color:#64748b;">Loading high-resolution design image...</div></div></body></html>`);
+      win.document.close();
+    } catch (e) {}
+  }
 
-  const titleText = cards.length === 1 ? `Job Card ${cards[0].jobNo || ''}` : `${cards.length} Job Cards`;
-
-  const pagesHtml = cards.map((card, idx) => {
+  // Preload / resolve images to Data URLs in parallel
+  const preparedCards = await Promise.all(cards.map(async (card) => {
     let imageUrl1 = card.imageUrl1 || card.imageUrl || card.proofing?.artworkUrl || '';
     let imageUrl2 = card.imageUrl2 || '';
 
@@ -169,15 +200,39 @@ export function triggerJobCardPrint(cardOrCards) {
     const design1 = names[0] || card.designName || card.designNo || '';
     const design2 = names[1] || (card.designName ? `${card.designName}-2` : '');
 
+    if (!imageUrl1 && design1) {
+      imageUrl1 = `/v1/designs/${encodeURIComponent(design1)}.jpg`;
+    }
+
     const candidates1 = getImageCandidates(imageUrl1, design1);
     const candidates2 = showTwoImages ? getImageCandidates(imageUrl2, design2) : [];
 
-    let img1 = candidates1[0] || convertDriveUrl(imageUrl1, design1) || '';
-    let img2 = showTwoImages ? (candidates2[0] || convertDriveUrl(imageUrl2, design2) || '') : '';
+    const [dataUrl1, dataUrl2] = await Promise.all([
+      resolveImageToDataUrl(candidates1),
+      showTwoImages ? resolveImageToDataUrl(candidates2) : Promise.resolve('')
+    ]);
 
-    if (!img1 && design1) {
-      img1 = convertDriveUrl('', design1);
-    }
+    const finalImg1 = dataUrl1 || candidates1[0] || convertDriveUrl(imageUrl1, design1) || '';
+    const finalImg2 = showTwoImages ? (dataUrl2 || candidates2[0] || convertDriveUrl(imageUrl2, design2) || '') : '';
+
+    return {
+      card,
+      design1,
+      design2,
+      showTwoImages,
+      img1: finalImg1,
+      img2: finalImg2,
+      candidates1,
+      candidates2
+    };
+  }));
+
+  if (!win || win.closed) return;
+
+  const titleText = cards.length === 1 ? `Job Card ${cards[0].jobNo || ''}` : `${cards.length} Job Cards`;
+
+  const pagesHtml = preparedCards.map((item, idx) => {
+    const { card, design1, design2, showTwoImages, img1, img2, candidates1, candidates2 } = item;
 
     const c1Json = JSON.stringify(candidates1).replace(/"/g, '&quot;');
     const c2Json = JSON.stringify(candidates2).replace(/"/g, '&quot;');
@@ -394,6 +449,7 @@ export function triggerJobCardPrint(cardOrCards) {
   </div>`;
   }).join('\n');
 
+  win.document.open();
   win.document.write(`<!DOCTYPE html><html><head>
     <title>${titleText}</title>
     <style>
@@ -526,76 +582,76 @@ export function triggerJobCardPrint(cardOrCards) {
         margin-top: 2px;
       }
     </style>
-  </head><body>
-    ${pagesHtml}
-  <script>
-    function handleCandidateError(img) {
-      try {
-        var raw = img.getAttribute('data-candidates');
-        if (!raw) return;
-        var list = JSON.parse(raw);
-        var idx = parseInt(img.dataset.candidateIndex || '0', 10) + 1;
-        if (idx < list.length) {
-          img.dataset.candidateIndex = idx;
-          img.src = list[idx];
-        } else {
-          var base = img.alt || '';
-          img.onerror = null;
-          if (base) {
-            img.src = '${window.location.origin}/v1/designs/' + encodeURIComponent(base) + '.jpg?fallback=1';
+    <script>
+      function handleCandidateError(img) {
+        try {
+          var raw = img.getAttribute('data-candidates');
+          if (!raw) return;
+          var list = JSON.parse(raw);
+          var idx = parseInt(img.dataset.candidateIndex || '0', 10) + 1;
+          if (idx < list.length) {
+            img.dataset.candidateIndex = idx;
+            img.src = list[idx];
+          } else {
+            var base = img.alt || '';
+            img.onerror = null;
+            if (base) {
+              img.src = '${window.location.origin}/v1/designs/' + encodeURIComponent(base) + '.jpg?fallback=1';
+            }
+          }
+        } catch(e) {}
+      }
+
+      window.onload = function() {
+        var imgs = Array.prototype.slice.call(document.getElementsByTagName('img'));
+        var printed = false;
+        function triggerPrint() {
+          if (printed) return;
+          printed = true;
+          setTimeout(function() {
+            window.focus();
+            window.print();
+          }, 300);
+        }
+        if (imgs.length === 0) {
+          triggerPrint();
+          return;
+        }
+        var timer = setTimeout(triggerPrint, 3500);
+        var pending = imgs.length;
+        function checkDone() {
+          pending--;
+          if (pending <= 0) {
+            clearTimeout(timer);
+            triggerPrint();
           }
         }
-      } catch(e) {}
-    }
-
-    window.onload = function() {
-      var imgs = Array.prototype.slice.call(document.getElementsByTagName('img'));
-      var printed = false;
-      function triggerPrint() {
-        if (printed) return;
-        printed = true;
-        setTimeout(function() {
-          window.focus();
-          window.print();
-        }, 500);
-      }
-      if (imgs.length === 0) {
-        triggerPrint();
-        return;
-      }
-      var timer = setTimeout(triggerPrint, 4000);
-      var pending = imgs.length;
-      function checkDone() {
-        pending--;
-        if (pending <= 0) {
-          clearTimeout(timer);
-          triggerPrint();
-        }
-      }
-      imgs.forEach(function(img) {
-        if (img.complete && img.naturalWidth > 0) {
-          checkDone();
-        } else {
-          img.addEventListener('load', function() { checkDone(); });
-          img.addEventListener('error', function() {
-            setTimeout(function() {
-              if (img.complete && img.naturalWidth > 0) {
-                checkDone();
-              } else {
-                var maxIdx = 0;
-                try {
-                  maxIdx = JSON.parse(img.getAttribute('data-candidates') || '[]').length;
-                } catch(e) {}
-                if (parseInt(img.dataset.candidateIndex || '0', 10) >= maxIdx) {
+        imgs.forEach(function(img) {
+          if (img.complete && img.naturalWidth > 0) {
+            checkDone();
+          } else {
+            img.addEventListener('load', function() { checkDone(); });
+            img.addEventListener('error', function() {
+              setTimeout(function() {
+                if (img.complete && img.naturalWidth > 0) {
                   checkDone();
+                } else {
+                  var maxIdx = 0;
+                  try {
+                    maxIdx = JSON.parse(img.getAttribute('data-candidates') || '[]').length;
+                  } catch(e) {}
+                  if (parseInt(img.dataset.candidateIndex || '0', 10) >= maxIdx) {
+                    checkDone();
+                  }
                 }
-              }
-            }, 600);
-          });
-        }
-      });
-    };
-  </script>
+              }, 400);
+            });
+          }
+        });
+      };
+    </script>
+  </head><body>
+    ${pagesHtml}
   </body></html>`);
   win.document.close();
 }

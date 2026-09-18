@@ -90,15 +90,22 @@ export function getImageCandidates(rawUrl, designName) {
 
   const rawFilename = extractCleanFilename(raw);
 
-  // 3. If rawFilename has an extension or was specified in DB
+  // 3. If rawFilename was specified (e.g. image-178... or design.jpg)
   if (rawFilename) {
+    // Direct R2 endpoint
     add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(rawFilename)}`);
-    const baseWithoutExt = rawFilename.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '');
-    if (baseWithoutExt) {
-      add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.jpg`);
-      add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.jpeg`);
-      add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.png`);
-      add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.webp`);
+    // Same-origin backend proxy endpoint (bypasses ISP blocks, CORS restrictions, and popups)
+    add(`/v1/designs/${encodeURIComponent(rawFilename)}`);
+
+    if (!rawFilename.startsWith('image-')) {
+      const baseWithoutExt = rawFilename.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '');
+      if (baseWithoutExt) {
+        add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.jpg`);
+        add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.jpeg`);
+        add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.png`);
+        add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(baseWithoutExt)}.webp`);
+        add(`/v1/designs/${encodeURIComponent(baseWithoutExt)}.jpg`);
+      }
     }
   }
 
@@ -106,6 +113,7 @@ export function getImageCandidates(rawUrl, designName) {
   const cleanDesign = dName.replace(/\.(jpg|jpeg|png|webp|gif|svg|jfif)$/i, '').trim();
   if (cleanDesign) {
     add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(cleanDesign)}.jpg`);
+    add(`/v1/designs/${encodeURIComponent(cleanDesign)}.jpg`);
     add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(cleanDesign)}.jpeg`);
     add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(cleanDesign)}.png`);
     add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(cleanDesign)}.webp`);
@@ -118,13 +126,14 @@ export function getImageCandidates(rawUrl, designName) {
     for (const s of [stripped1, stripped2, stripped3]) {
       if (s && s !== cleanDesign) {
         add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(s)}.jpg`);
+        add(`/v1/designs/${encodeURIComponent(s)}.jpg`);
         add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(s)}.jpeg`);
         add(`${R2_PUBLIC_BASE}/designs/${encodeURIComponent(s)}.png`);
       }
     }
   }
 
-  // 5. Backend smart fallback route (guaranteed to return valid image, never 404)
+  // 5. Backend smart fallback route (guaranteed to return valid image or decorative SVG badge)
   const fallback = cleanDesign || rawFilename || 'DESIGN';
   add(`/v1/designs/${encodeURIComponent(fallback)}.jpg?fallback=1`);
 

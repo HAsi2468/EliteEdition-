@@ -10,7 +10,7 @@ const config = require('../config/config');
  */
 function normalizeImageUrl(url, designName = '') {
   if (!url || typeof url !== 'string' || !url.trim()) {
-    if (designName && typeof designName === 'string' && designName.trim()) {
+    if (designName && typeof designName === 'string' && designName.trim() && !designName.trim().endsWith('-2')) {
       const clean = designName.trim().replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '');
       const r2 = ((config.r2 && config.r2.publicUrl) || 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev').replace(/\/+$/, '');
       return `${r2}/designs/${encodeURIComponent(clean)}.jpg`;
