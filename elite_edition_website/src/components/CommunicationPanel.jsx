@@ -84,6 +84,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [isUrgent, setIsUrgent] = useState(false);
   const [attachedFile, setAttachedFile] = useState(null);
   const [zoomImg, setZoomImg] = useState(null);
+  const [showInRoomSearch, setShowInRoomSearch] = useState(false);
+  const [inRoomQuery, setInRoomQuery] = useState('');
+  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
+  const [chatSoundMuted, setChatSoundMuted] = useState(() => typeof localStorage !== 'undefined' ? localStorage.getItem('elite_chat_sound_muted') === 'true' : false);
+  const [playingAudioId, setPlayingAudioId] = useState(null);
   const [isMobileScreen, setIsMobileScreen] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
 
   useEffect(() => {
