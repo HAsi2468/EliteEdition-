@@ -115,60 +115,62 @@ function calcExpTime(panna, passText, totalMtr, machineName) {
 }
 
 // ─── Google Drive URL auto-converter ─────────────────────────────────────────
-// Accepts any Drive share / view / open link and returns a direct embeddable URL
+const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
+
 function convertDriveUrl(link) {
-  if (!link || !link.trim()) return '';
+  if (!link || typeof link !== 'string' || !link.trim()) return '';
   const trimmed = link.trim();
   if (trimmed.startsWith('data:')) return trimmed;
-
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const isHttpsPage = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
   // 1. Google Drive Links: convert to direct Google CDN lh3 embed links
   if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
     if (trimmed.includes('/folders/')) return '';
+    let fid = '';
     const fileMatch = trimmed.match(/\/d\/([-\w]{20,})/);
-    if (fileMatch) return `https://lh3.googleusercontent.com/d/${fileMatch[1]}=s1000`;
-    const openMatch = trimmed.match(/[?&]id=([-\w]{20,})/);
-    if (openMatch) return `https://lh3.googleusercontent.com/d/${openMatch[1]}=s1000`;
-    const idMatch = trimmed.match(/([-\w]{25,})/);
-    return idMatch ? `https://lh3.googleusercontent.com/d/${idMatch[1]}=s1000` : trimmed;
+    if (fileMatch) fid = fileMatch[1];
+    if (!fid) {
+      const openMatch = trimmed.match(/[?&]id=([-\w]{20,})/);
+      if (openMatch) fid = openMatch[1];
+    }
+    if (!fid) {
+      const idMatch = trimmed.match(/([-\w]{25,})/);
+      if (idMatch) fid = idMatch[1];
+    }
+    if (fid) return `https://lh3.googleusercontent.com/d/${fid}=s1000`;
   }
 
-  // 2. Insecure IP Backend URLs e.g. "http://3.7.174.180:3001/designs/ED-476(1).jpg" -> convert to relative origin route
-  if (trimmed.includes('3.7.174.180') || (trimmed.startsWith('http://') && (trimmed.includes('/designs/') || trimmed.includes('/uploads/')))) {
-    const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
-    let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
-    return origin ? `${origin}${cleanPath}` : cleanPath;
+  // 2. Extract relative path for /designs/ or /uploads/ and point to Cloudflare R2 CDN
+  if (trimmed.includes('/designs/')) {
+    const filename = trimmed.split('/designs/')[1].replace(/^\/+/, '');
+    return `${R2_PUBLIC_BASE}/designs/${filename}`;
+  }
+  if (trimmed.includes('/uploads/')) {
+    const filename = trimmed.split('/uploads/')[1].replace(/^\/+/, '');
+    return `${R2_PUBLIC_BASE}/uploads/${filename}`;
   }
 
-  // 3. Full HTTPS external URLs (Cloudflare R2, AWS S3, Custom CDN, etc.) -> keep 100% UNTOUCHED!
-  if (trimmed.startsWith('https://') || (trimmed.startsWith('http://') && !isHttpsPage)) {
-    return trimmed;
+  // 3. Full HTTPS external URLs (Cloudflare R2, AWS S3, etc.)
+  if (trimmed.startsWith('https://')) {
+    return encodeURI(trimmed);
   }
 
-  // 4. Insecure HTTP on HTTPS page -> upgrade to HTTPS
-  if (isHttpsPage && trimmed.startsWith('http://')) {
-    return trimmed.replace('http://', 'https://');
+  // 4. Insecure HTTP IP link e.g. http://3.7.174.180:3001/designs/ED-476.jpg
+  if (trimmed.includes('3.7.174.180') || trimmed.startsWith('http://')) {
+    const clean = trimmed.replace(/^http:\/\/[^\/]+/, '');
+    if (clean.includes('/designs/') || clean.includes('/uploads/')) {
+      const sub = clean.startsWith('/') ? clean.substring(1) : clean;
+      return `${R2_PUBLIC_BASE}/${sub}`;
+    }
+    return encodeURI(trimmed.replace('http://', 'https://'));
   }
 
-  // 5. Local relative paths or bare design filenames e.g. "ED-01.jpg" or "/designs/ED-01.jpg"
-  if (trimmed.includes('/designs/') || trimmed.includes('/uploads/')) {
-    const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
-    let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
-    return origin ? `${origin}${cleanPath}` : cleanPath;
-  }
-
+  // 5. Bare design filenames e.g. "ED-01.jpg"
   if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
-    const cleanPath = trimmed.includes('.') ? `/v1/designs/${trimmed}` : `/v1/designs/${trimmed}.jpg`;
-    return origin ? `${origin}${cleanPath}` : cleanPath;
+    const filename = trimmed.includes('.') ? trimmed : `${trimmed}.jpg`;
+    return `${R2_PUBLIC_BASE}/designs/${encodeURIComponent(filename)}`;
   }
 
-  if (trimmed.startsWith('/')) {
-    return origin ? `${origin}${trimmed}` : trimmed;
-  }
-
-  return trimmed;
+  return encodeURI(trimmed);
 }
 
 // ─── Extract multiple design names helper ────────────────────────────────────

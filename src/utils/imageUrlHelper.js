@@ -32,7 +32,7 @@ function normalizeImageUrl(url) {
     if (fid) return `https://lh3.googleusercontent.com/d/${fid}=s1000`;
   }
 
-  const r2Base = (config.r2 && config.r2.publicUrl) ? config.r2.publicUrl.replace(/\/+$/, '') : '';
+  const r2Base = ((config.r2 && config.r2.publicUrl) || 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev').replace(/\/+$/, '');
 
   // Extract clean path if file is under /designs/ or /uploads/
   let subPath = '';

@@ -15,13 +15,12 @@ import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import PKDOrdersImportModal from './PKDOrdersImportModal';
 import DesignMaster from './DesignMaster';
 
+const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
+
 function convertDriveUrl(link) {
   if (!link || typeof link !== 'string' || !link.trim()) return '';
   const trimmed = link.trim();
   if (trimmed.startsWith('data:')) return trimmed;
-
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const isHttpsPage = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
   // 1. Google Drive Links: convert to direct Google CDN lh3 embed links
   if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
@@ -37,39 +36,38 @@ function convertDriveUrl(link) {
       const genericMatch = trimmed.match(/([-\w]{25,})/);
       if (genericMatch) fileId = genericMatch[1];
     }
-
-    if (fileId) {
-      return `https://lh3.googleusercontent.com/d/${fileId}=s1000`;
-    }
+    if (fileId) return `https://lh3.googleusercontent.com/d/${fileId}=s1000`;
   }
 
-  // 2. Insecure IP Backend URLs e.g. "http://3.7.174.180:3001/designs/ED-476(1).jpg" -> convert to relative origin route
-  if (trimmed.includes('3.7.174.180') || (trimmed.startsWith('http://') && (trimmed.includes('/designs/') || trimmed.includes('/uploads/')))) {
-    const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
-    let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
-    return origin ? `${origin}${cleanPath}` : cleanPath;
+  // 2. Extract relative path for /designs/ or /uploads/ and point to Cloudflare R2 CDN
+  if (trimmed.includes('/designs/')) {
+    const filename = trimmed.split('/designs/')[1].replace(/^\/+/, '');
+    return `${R2_PUBLIC_BASE}/designs/${filename}`;
+  }
+  if (trimmed.includes('/uploads/')) {
+    const filename = trimmed.split('/uploads/')[1].replace(/^\/+/, '');
+    return `${R2_PUBLIC_BASE}/uploads/${filename}`;
   }
 
-  // 3. Full HTTPS external URLs (Cloudflare R2, AWS S3, Custom CDN, etc.) -> keep 100% UNTOUCHED!
-  if (trimmed.startsWith('https://') || (trimmed.startsWith('http://') && !isHttpsPage)) {
+  // 3. Full HTTPS external URLs (Cloudflare R2, AWS S3, etc.)
+  if (trimmed.startsWith('https://')) {
     return encodeURI(trimmed);
   }
 
-  // 4. Upgrade insecure HTTP to HTTPS if website is loaded over HTTPS to prevent Mixed Content blocking
-  if (isHttpsPage && trimmed.startsWith('http://')) {
+  // 4. Insecure HTTP IP link e.g. http://3.7.174.180:3001/designs/ED-476.jpg
+  if (trimmed.includes('3.7.174.180') || trimmed.startsWith('http://')) {
+    const clean = trimmed.replace(/^http:\/\/[^\/]+/, '');
+    if (clean.includes('/designs/') || clean.includes('/uploads/')) {
+      const sub = clean.startsWith('/') ? clean.substring(1) : clean;
+      return `${R2_PUBLIC_BASE}/${sub}`;
+    }
     return encodeURI(trimmed.replace('http://', 'https://'));
   }
 
-  // 5. Local relative paths or bare design filenames e.g. "ED-01.jpg" or "/designs/ED-01.jpg"
-  if (trimmed.includes('/designs/') || trimmed.includes('/uploads/')) {
-    const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
-    let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
-    return origin ? `${origin}${cleanPath}` : cleanPath;
-  }
-
+  // 5. Bare design filenames e.g. "ED-01.jpg"
   if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
-    const cleanPath = trimmed.includes('.') ? `/v1/designs/${trimmed}` : `/v1/designs/${trimmed}.jpg`;
-    return origin ? `${origin}${cleanPath}` : cleanPath;
+    const filename = trimmed.includes('.') ? trimmed : `${trimmed}.jpg`;
+    return `${R2_PUBLIC_BASE}/designs/${encodeURIComponent(filename)}`;
   }
 
   return encodeURI(trimmed);

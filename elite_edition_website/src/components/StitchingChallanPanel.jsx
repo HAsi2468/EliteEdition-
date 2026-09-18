@@ -7,12 +7,12 @@ import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 
+const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
+
 function convertDriveUrl(link) {
   if (!link || typeof link !== 'string' || !link.trim()) return '';
   const trimmed = link.trim();
   if (trimmed.startsWith('data:')) return trimmed;
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const isHttpsPage = typeof window !== 'undefined' && window.location.protocol === 'https:';
 
   if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
     if (trimmed.includes('/folders/')) return '';
@@ -30,32 +30,29 @@ function convertDriveUrl(link) {
     if (fid) return `https://lh3.googleusercontent.com/d/${fid}=s1000`;
   }
 
-  if (trimmed.includes('3.7.174.180') || (trimmed.startsWith('http://') && (trimmed.includes('/designs/') || trimmed.includes('/uploads/')))) {
-    const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
-    let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
-    return origin ? `${origin}${cleanPath}` : cleanPath;
+  if (trimmed.includes('/designs/')) {
+    const filename = trimmed.split('/designs/')[1].replace(/^\/+/, '');
+    return `${R2_PUBLIC_BASE}/designs/${filename}`;
+  }
+  if (trimmed.includes('/uploads/')) {
+    const filename = trimmed.split('/uploads/')[1].replace(/^\/+/, '');
+    return `${R2_PUBLIC_BASE}/uploads/${filename}`;
   }
 
   if (trimmed.startsWith('https://')) return encodeURI(trimmed);
 
-  if (isHttpsPage && trimmed.startsWith('http://')) {
-    if (trimmed.includes('/designs/') || trimmed.includes('/uploads/')) {
-      const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
-      let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
-      return origin ? `${origin}${cleanPath}` : cleanPath;
+  if (trimmed.includes('3.7.174.180') || trimmed.startsWith('http://')) {
+    const clean = trimmed.replace(/^http:\/\/[^\/]+/, '');
+    if (clean.includes('/designs/') || clean.includes('/uploads/')) {
+      const sub = clean.startsWith('/') ? clean.substring(1) : clean;
+      return `${R2_PUBLIC_BASE}/${sub}`;
     }
     return encodeURI(trimmed.replace('http://', 'https://'));
   }
 
-  if (trimmed.includes('/designs/') || trimmed.includes('/uploads/')) {
-    const relativePath = trimmed.substring(trimmed.search(/\/(designs|uploads)\//));
-    let cleanPath = relativePath.startsWith('/designs/') ? `/v1${relativePath}` : relativePath;
-    return origin ? `${origin}${cleanPath}` : cleanPath;
-  }
-
   if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
-    const cleanPath = trimmed.includes('.') ? `/v1/designs/${encodeURIComponent(trimmed)}` : `/v1/designs/${encodeURIComponent(trimmed)}.jpg`;
-    return origin ? `${origin}${cleanPath}` : cleanPath;
+    const filename = trimmed.includes('.') ? trimmed : `${trimmed}.jpg`;
+    return `${R2_PUBLIC_BASE}/designs/${encodeURIComponent(filename)}`;
   }
 
   return encodeURI(trimmed);
