@@ -929,6 +929,31 @@ function ImageField({ label, name, form, onChange, index }) {
                 style={{ maxHeight: '100px', maxWidth: '100%', objectFit: 'contain', borderRadius: '4px' }}
                 onError={(e) => {
                   const currentSrc = e.target.src || '';
+                  if (!e.target.dataset.retried) {
+                    e.target.dataset.retried = '1';
+                    if (currentSrc.endsWith('.jpg')) {
+                      e.target.src = currentSrc.slice(0, -4) + '.jpeg';
+                      return;
+                    } else if (currentSrc.endsWith('.jpeg')) {
+                      e.target.src = currentSrc.slice(0, -5) + '.jpg';
+                      return;
+                    } else if (currentSrc.endsWith('.png')) {
+                      e.target.src = currentSrc.slice(0, -4) + '.jpeg';
+                      return;
+                    } else if (!currentSrc.includes('.')) {
+                      e.target.src = currentSrc + '.jpeg';
+                      return;
+                    }
+                  } else if (e.target.dataset.retried === '1') {
+                    e.target.dataset.retried = '2';
+                    if (currentSrc.endsWith('.jpeg')) {
+                      e.target.src = currentSrc.slice(0, -5) + '.png';
+                      return;
+                    } else if (currentSrc.endsWith('.jpg')) {
+                      e.target.src = currentSrc.slice(0, -4) + '.png';
+                      return;
+                    }
+                  }
                   if (raw && (raw.includes('drive.google.com') || raw.includes('googleusercontent'))) {
                     const idMatch = raw.match(/\/d\/([-\w]{20,})/) || raw.match(/[?&]id=([-\w]{20,})/) || raw.match(/([-\w]{25,})/);
                     if (idMatch && idMatch[1]) {

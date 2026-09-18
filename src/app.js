@@ -142,10 +142,10 @@ app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res, next) => {
 
   // If Cloudflare R2 CDN public URL is configured, redirect image request directly to R2
   if (config.r2 && config.r2.publicUrl) {
-    const ext = path.extname(filename) || '.jpg';
-    const cleanExt = ext.startsWith('.') ? ext : `.${ext}`;
-    const r2Url = `${config.r2.publicUrl.replace(/\/+$/, '')}/designs/${encodeURIComponent(cleanName)}${cleanExt}`;
-    return res.redirect(302, r2Url);
+    const r2Base = config.r2.publicUrl.replace(/\/+$/, '');
+    const hasExt = /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(filename);
+    const targetFile = hasExt ? filename : `${filename}.jpeg`;
+    return res.redirect(302, `${r2Base}/designs/${encodeURIComponent(targetFile)}`);
   }
 
   // Check if any matching photo file exists in imagesDir or uploads (e.g. ED-613 D.jpg, image-123.jpg)
