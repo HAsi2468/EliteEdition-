@@ -13,9 +13,12 @@ router.get('/groups/:groupId/members', communicationController.getGroupMembers);
 router.post('/groups/:groupId/members', communicationController.updateGroupMembers);
 router.post('/activity', communicationController.postActivityEvent);
 router.post('/messages/:messageId/acknowledge', communicationController.acknowledgeMessage);
+router.post('/messages/:messageId/poll-vote', communicationController.votePollMessage);
+router.post('/messages/:messageId/forward', communicationController.forwardMessage);
 router.get('/users', communicationController.getUsersForDM);
 router.post('/direct', communicationController.createOrGetDirectRoom);
 router.post('/force-reload-all', communicationController.forceReloadAllUsers);
+router.post('/clear-all', communicationController.clearAllData);
 
 module.exports = router;
 

@@ -129,6 +129,7 @@ const getGroupMessages = async (req, res) => {
     const total = await ChatMessage.countDocuments(query);
     const messages = await ChatMessage.find(query)
       .populate('senderId', 'name username email role')
+      .populate('pollMeta.options.votes', 'name username email')
       .populate({
         path: 'reactions.user',
         select: 'name username email'
@@ -161,6 +162,120 @@ const getGroupMessages = async (req, res) => {
 };
 
 /**
+ * Vote on a poll option in a chat message
+ */
+const votePollMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { optionId } = req.body;
+    const rawUserId = req.user ? req.user._id : (req.headers['x-user-id'] || req.body.userId || req.query.userId);
+
+    if (!rawUserId || !optionId) {
+      return res.status(400).json({ success: false, message: 'User ID and option ID are required' });
+    }
+
+    const message = await ChatMessage.findById(messageId);
+    if (!message || message.type !== 'poll' || !message.pollMeta) {
+      return res.status(404).json({ success: false, message: 'Poll message not found' });
+    }
+
+    if (message.pollMeta.isClosed) {
+      return res.status(400).json({ success: false, message: 'This poll is closed' });
+    }
+
+    const userIdStr = String(rawUserId);
+    const isMultiSelect = !!message.pollMeta.isMultiSelect;
+
+    message.pollMeta.options.forEach((opt) => {
+      opt.votes = opt.votes || [];
+      const userIndex = opt.votes.findIndex((v) => String(v._id || v) === userIdStr);
+      if (opt.id === optionId) {
+        if (userIndex > -1) {
+          opt.votes.splice(userIndex, 1);
+        } else {
+          opt.votes.push(rawUserId);
+        }
+      } else if (!isMultiSelect) {
+        if (userIndex > -1) {
+          opt.votes.splice(userIndex, 1);
+        }
+      }
+    });
+
+    await message.save();
+
+    const updatedMessage = await ChatMessage.findById(messageId)
+      .populate('senderId', 'name username email role')
+      .populate('pollMeta.options.votes', 'name username email');
+
+    const io = req.app.get('io') || global.io;
+    if (io) {
+      io.to(String(message.roomId)).emit('poll-updated', { messageId: message._id, pollMeta: updatedMessage.pollMeta });
+    }
+
+    res.json({ success: true, data: updatedMessage });
+  } catch (error) {
+    console.error('Error voting on poll:', error);
+    res.status(500).json({ success: false, message: 'Failed to vote on poll', error: error.message });
+  }
+};
+
+/**
+ * Forward an existing message to another chat room
+ */
+const forwardMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { targetRoomId } = req.body;
+    const rawSenderId = req.user ? req.user._id : (req.headers['x-user-id'] || req.body.senderId || req.body.userId);
+
+    if (!targetRoomId || !rawSenderId) {
+      return res.status(400).json({ success: false, message: 'Target room ID and sender ID are required' });
+    }
+
+    const origMessage = await ChatMessage.findById(messageId).populate('senderId', 'name username');
+    if (!origMessage) {
+      return res.status(404).json({ success: false, message: 'Original message not found' });
+    }
+
+    const origRoom = await ChatRoom.findById(origMessage.roomId);
+
+    const forwardedMsg = await ChatMessage.create({
+      roomId: targetRoomId,
+      senderId: rawSenderId,
+      content: origMessage.content,
+      type: origMessage.type,
+      msgType: 'human',
+      attachment: origMessage.attachment || undefined,
+      pollMeta: origMessage.pollMeta || undefined,
+      activityMeta: origMessage.activityMeta || undefined,
+      recordMentions: origMessage.recordMentions || undefined,
+      forwardedFrom: {
+        senderName: origMessage.senderId ? (origMessage.senderId.name || origMessage.senderId.username) : 'Staff',
+        originalRoomName: origRoom ? origRoom.name : 'Channel'
+      },
+      readBy: [rawSenderId]
+    });
+
+    await ChatRoom.findByIdAndUpdate(targetRoomId, { updatedAt: new Date() });
+
+    const populatedMsg = await ChatMessage.findById(forwardedMsg._id)
+      .populate('senderId', 'name username email role')
+      .populate('readBy', 'name username email');
+
+    const io = req.app.get('io') || global.io;
+    if (io) {
+      io.to(String(targetRoomId)).emit('receive-message', populatedMsg);
+    }
+
+    res.json({ success: true, data: populatedMsg });
+  } catch (error) {
+    console.error('Error forwarding message:', error);
+    res.status(500).json({ success: false, message: 'Failed to forward message', error: error.message });
+  }
+};
+
+/**
  * Send a message to a communication group via HTTP POST endpoint
  */
 const postGroupMessage = async (req, res) => {
@@ -172,10 +287,10 @@ const postGroupMessage = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Sender ID is required' });
     }
 
-    const { content, replyTo, attachment, priority, type, activityMeta, recordMentions: inRecordMentions } = req.body;
+    const { content, replyTo, attachment, priority, type, activityMeta, pollMeta, recordMentions: inRecordMentions } = req.body;
 
-    if (!content && !attachment) {
-      return res.status(400).json({ success: false, message: 'Message content or attachment is required' });
+    if (!content && !attachment && type !== 'poll') {
+      return res.status(400).json({ success: false, message: 'Message content, attachment, or poll is required' });
     }
 
     const targetRoom = await ChatRoom.findById(groupId);
@@ -229,12 +344,13 @@ const postGroupMessage = async (req, res) => {
     const newMessage = await ChatMessage.create({
       roomId: groupId,
       senderId: senderObjId,
-      content: content || (attachment ? `Attached ${attachment.fileName || 'file'}` : ''),
+      content: content || (pollMeta ? pollMeta.question : attachment ? `Attached ${attachment.fileName || 'file'}` : 'Message'),
       replyTo: replyTo || null,
       type: msgType,
       msgType: 'human',
       priority: priority === 'urgent' ? 'urgent' : 'normal',
       attachment: attachment || undefined,
+      pollMeta: pollMeta || undefined,
       activityMeta: activityMeta || undefined,
       recordMentions: recordMentions.length > 0 ? recordMentions : undefined,
       readBy: [senderObjId]
@@ -615,10 +731,33 @@ const forceReloadAllUsers = async (req, res) => {
   }
 };
 
+/**
+ * Admin endpoint to clear all chat messages and reset communication department groups
+ */
+const clearAllData = async (req, res) => {
+  try {
+    await ChatMessage.deleteMany({});
+    await ChatRoom.deleteMany({ isSystemGroup: false });
+    await syncCommunicationGroups();
+
+    const io = req.app.get('io') || global.io;
+    if (io) {
+      io.emit('communication-data-cleared', { timestamp: Date.now() });
+    }
+
+    res.json({ success: true, message: 'All communication data deleted and department groups reset successfully.' });
+  } catch (error) {
+    console.error('Error clearing communication data:', error);
+    res.status(500).json({ success: false, message: 'Failed to clear communication data', error: error.message });
+  }
+};
+
 module.exports = {
   getGroups,
   getGroupMessages,
   postGroupMessage,
+  votePollMessage,
+  forwardMessage,
   getGroupMembers,
   updateGroupMembers,
   syncGroups,
@@ -629,6 +768,7 @@ module.exports = {
   createGroup,
   deleteGroup,
   forceReloadAllUsers,
+  clearAllData,
 };
 
 

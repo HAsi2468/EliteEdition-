@@ -244,6 +244,43 @@ const setupSockets = (io) => {
       }
     });
 
+    // Handle voting on poll
+    socket.on('vote-poll', async (data) => {
+      try {
+        const { messageId, optionId, userId, roomId } = data;
+        const msg = await ChatMessage.findById(messageId);
+        if (!msg || msg.type !== 'poll' || !msg.pollMeta || msg.pollMeta.isClosed) return;
+
+        const userIdStr = String(userId);
+        const isMultiSelect = !!msg.pollMeta.isMultiSelect;
+
+        msg.pollMeta.options.forEach((opt) => {
+          opt.votes = opt.votes || [];
+          const userIndex = opt.votes.findIndex((v) => String(v._id || v) === userIdStr);
+          if (opt.id === optionId) {
+            if (userIndex > -1) {
+              opt.votes.splice(userIndex, 1);
+            } else {
+              opt.votes.push(userId);
+            }
+          } else if (!isMultiSelect) {
+            if (userIndex > -1) {
+              opt.votes.splice(userIndex, 1);
+            }
+          }
+        });
+
+        await msg.save();
+
+        const updatedMsg = await ChatMessage.findById(messageId)
+          .populate('pollMeta.options.votes', 'name username email');
+
+        io.to(roomId).emit('poll-updated', { messageId, pollMeta: updatedMsg.pollMeta });
+      } catch (error) {
+        console.error('Error in vote-poll socket:', error);
+      }
+    });
+
     // Handle creating a task directly from the chat stream
     socket.on('create-task-from-chat', async (data) => {
       try {

@@ -88,7 +88,7 @@ const chatMessageSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['text', 'task-card', 'record-card', 'audio-voice'],
+      enum: ['text', 'task-card', 'record-card', 'audio-voice', 'poll'],
       default: 'text',
     },
     taskId: {
@@ -139,6 +139,31 @@ const chatMessageSchema = new mongoose.Schema(
     isPinned: {
       type: Boolean,
       default: false
+    },
+    // ── Interactive Polls & Scheduling fields ──
+    pollMeta: {
+      question: { type: String, default: '' },
+      isMultiSelect: { type: Boolean, default: false },
+      isClosed: { type: Boolean, default: false },
+      options: [
+        {
+          id: { type: String, required: true },
+          text: { type: String, required: true },
+          votes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: [] }]
+        }
+      ]
+    },
+    forwardedFrom: {
+      senderName: { type: String, default: '' },
+      originalRoomName: { type: String, default: '' }
+    },
+    isScheduled: {
+      type: Boolean,
+      default: false
+    },
+    scheduledAt: {
+      type: Date,
+      default: null
     },
     // ── Authority-Based Communication Module fields ──
     msgType: {
