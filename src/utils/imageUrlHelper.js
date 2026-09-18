@@ -67,8 +67,8 @@ function normalizeImageUrl(url, designName = '') {
     try { rawFilename = decodeURIComponent(rawFilename); } catch (e) {}
     rawFilename = rawFilename.replace(/^\/+/, '').trim();
 
-    // Default to .jpg if no extension present
-    if (!/\.[a-zA-Z0-9]+$/.test(rawFilename)) {
+    // Default to .jpg if no extension present and not a timestamped multer upload (e.g. image-178...)
+    if (!/\.[a-zA-Z0-9]+$/.test(rawFilename) && !rawFilename.startsWith('image-')) {
       rawFilename = `${rawFilename}.jpg`;
     }
 
