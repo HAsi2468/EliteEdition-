@@ -411,6 +411,12 @@ const createChallan = async (req, res) => {
     // ── Auto-create OUTWARD fabric transactions (lot-wise) ──────────────
     if (fabricName && totalMtr > 0 && Object.keys(lotGroups).length > 0) {
       try {
+        if (challan.challanNo) {
+          await FabricTransaction.deleteMany({
+            type: 'OUTWARD',
+            challanNo: 'EDP-' + challan.challanNo
+          });
+        }
         const createdTxIds = [];
         for (const [lot, groupMtr] of Object.entries(lotGroups)) {
           const lotNum = parseLotNo(lot);
@@ -614,17 +620,22 @@ const updateChallan = async (req, res) => {
 
     // ── Sync OUTWARD fabric transactions: delete old, create new ──────────────
     try {
-      // Delete old single outward link if exists (backwards compatibility)
+      // Purge any pre-existing outward transaction for this challan (by ID or matching challanNo)
       if (challan.fabricOutwardId) {
         await FabricTransaction.findByIdAndDelete(challan.fabricOutwardId);
         challan.fabricOutwardId = null;
       }
-      // Delete all old lot-wise outward links
       if (challan.fabricOutwardIds && challan.fabricOutwardIds.length > 0) {
         for (const txId of challan.fabricOutwardIds) {
           await FabricTransaction.findByIdAndDelete(txId);
         }
         challan.fabricOutwardIds = [];
+      }
+      if (challan.challanNo) {
+        await FabricTransaction.deleteMany({
+          type: 'OUTWARD',
+          challanNo: 'EDP-' + challan.challanNo
+        });
       }
 
       if (challan.fabricName && challan.totalMtr > 0 && Object.keys(lotGroups).length > 0) {

@@ -1777,8 +1777,13 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   // Group all transactions by Lot No for Lot-Wise Management View
   const lotMap = new Map();
+  const seenTxIds = new Set();
   transactions.forEach(t => {
     if (t.lotNo == null || t.lotNo === '') return;
+    const txKey = t._id ? String(t._id) : `${t.type}-${t.challanNo || ''}-${t.lotNo}-${t.qty}-${t.date}`;
+    if (seenTxIds.has(txKey)) return;
+    seenTxIds.add(txKey);
+
     const lotNoKey = String(t.lotNo).trim();
     if (!lotMap.has(lotNoKey)) {
       lotMap.set(lotNoKey, {
