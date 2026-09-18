@@ -140,11 +140,14 @@ app.use(['/v1/designs/:filename', '/designs/:filename'], (req, res, next) => {
     return next();
   }
 
-  // If Cloudflare R2 CDN public URL is configured, redirect image request directly to R2
-  if (config.r2 && config.r2.publicUrl) {
+  // If fallback=1 or svg=1 is requested, skip R2 redirect so local files or SVG badge are returned
+  const isExplicitFallback = req.query.fallback === '1' || req.query.svg === '1';
+
+  // If Cloudflare R2 CDN public URL is configured and not an explicit fallback request, redirect image request directly to R2
+  if (!isExplicitFallback && config.r2 && config.r2.publicUrl) {
     const r2Base = config.r2.publicUrl.replace(/\/+$/, '');
     const hasExt = /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(filename);
-    const targetFile = hasExt ? filename : `${filename}.jpeg`;
+    const targetFile = hasExt ? filename : `${filename}.jpg`;
     return res.redirect(302, `${r2Base}/designs/${encodeURIComponent(targetFile)}`);
   }
 

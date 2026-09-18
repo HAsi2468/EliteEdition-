@@ -14,64 +14,8 @@ import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 
 import PKDOrdersImportModal from './PKDOrdersImportModal';
 import DesignMaster from './DesignMaster';
-
-const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
-
-function convertDriveUrl(link) {
-  if (!link || typeof link !== 'string' || !link.trim()) return '';
-  const trimmed = link.trim();
-  if (trimmed.startsWith('data:')) return trimmed;
-
-  // 1. Google Drive Links: convert to direct Google CDN lh3 embed links
-  if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
-    if (trimmed.includes('/folders/')) return '';
-    let fileId = '';
-    const dMatch = trimmed.match(/\/d\/([-\w]{20,})/);
-    if (dMatch) fileId = dMatch[1];
-    if (!fileId) {
-      const idMatch = trimmed.match(/[?&]id=([-\w]{20,})/);
-      if (idMatch) fileId = idMatch[1];
-    }
-    if (!fileId) {
-      const genericMatch = trimmed.match(/([-\w]{25,})/);
-      if (genericMatch) fileId = genericMatch[1];
-    }
-    if (fileId) return `https://lh3.googleusercontent.com/d/${fileId}=s1000`;
-  }
-
-  // 2. Extract relative path for /designs/ or /uploads/ and point to Cloudflare R2 CDN
-  if (trimmed.includes('/designs/')) {
-    const filename = trimmed.split('/designs/')[1].replace(/^\/+/, '');
-    return `${R2_PUBLIC_BASE}/designs/${filename}`;
-  }
-  if (trimmed.includes('/uploads/')) {
-    const filename = trimmed.split('/uploads/')[1].replace(/^\/+/, '');
-    return `${R2_PUBLIC_BASE}/uploads/${filename}`;
-  }
-
-  // 3. Full HTTPS external URLs (Cloudflare R2, AWS S3, etc.)
-  if (trimmed.startsWith('https://')) {
-    return encodeURI(trimmed);
-  }
-
-  // 4. Insecure HTTP IP link e.g. http://3.7.174.180:3001/designs/ED-476.jpg
-  if (trimmed.includes('3.7.174.180') || trimmed.startsWith('http://')) {
-    const clean = trimmed.replace(/^http:\/\/[^\/]+/, '');
-    if (clean.includes('/designs/') || clean.includes('/uploads/')) {
-      const sub = clean.startsWith('/') ? clean.substring(1) : clean;
-      return `${R2_PUBLIC_BASE}/${sub}`;
-    }
-    return encodeURI(trimmed.replace('http://', 'https://'));
-  }
-
-  // 5. Bare design filenames e.g. "ED-01.jpg"
-  if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
-    const filename = trimmed.includes('.') ? trimmed : `${trimmed}.jpeg`;
-    return `${R2_PUBLIC_BASE}/designs/${encodeURIComponent(filename)}`;
-  }
-
-  return encodeURI(trimmed);
-}
+import { R2_PUBLIC_BASE, convertDriveUrl, getImageCandidates } from '../utils/imageUrlHelper';
+import DesignImage from './DesignImage';
 
 // Image compression helper
 function compressAndConvertToBase64(file, maxWidth = 900, maxHeight = 900, quality = 0.7) {
@@ -498,13 +442,24 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
     };
 
     loadAll(false);
-    const interval = setInterval(() => loadAll(true), 10000);
+
+    // Refresh immediately when new designs are added, edited, or deleted
     const handleDataRefresh = () => loadAll(true);
     window.addEventListener('elite-data-refresh', handleDataRefresh);
 
+    // Refresh on window focus only if at least 60 seconds have elapsed
+    let lastLoaded = Date.now();
+    const handleFocus = () => {
+      if (Date.now() - lastLoaded > 60000) {
+        lastLoaded = Date.now();
+        loadAll(true);
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+
     return () => {
-      clearInterval(interval);
       window.removeEventListener('elite-data-refresh', handleDataRefresh);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [search, categoryFilter, colorFilter, statusFilter, page, sortBy, sortOrder]);
 
@@ -1060,9 +1015,6 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.2rem' }}>
                 {filteredDesigns.slice(0, visibleCount).map(d => {
-                  const mainImg = convertDriveUrl(d.imageUrl, d.designName);
-                  const subImg = convertDriveUrl(d.imageUrl2, d.designName ? `${d.designName}-2` : '');
-
                   return (
                     <div
                       key={d._id}
@@ -1117,63 +1069,38 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                           marginTop: '1.25rem'
                         }}
                       >
-                        {mainImg ? (
-                          <img
-                            src={mainImg}
-                            alt={d.designName}
-                            loading="lazy"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }}
-                            onClick={(evt) => setZoomImg(evt.target.src || mainImg)}
-                            onError={(e) => {
-                              const name = (d.designName || '').trim();
-                              if (name && !e.target.dataset.retried) {
-                                e.target.dataset.retried = 'true';
-                                const origin = getBaseUrl() || (typeof window !== 'undefined' ? window.location.origin : '');
-                                e.target.src = origin ? `${origin}/v1/designs/${name}.jpg` : `/v1/designs/${name}.jpg`;
-                              }
-                            }}
-                          />
-                    ) : (
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '100%',
-                        height: '100%',
-                        background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%)',
-                        color: 'var(--text-muted)',
-                        gap: '0.45rem',
-                        padding: '1rem',
-                        textAlign: 'center'
-                      }}>
-                        <div style={{
-                          width: 42, height: 42, borderRadius: 10,
-                          background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8',
-                          boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
-                        }}>
-                          <Image size={22} />
-                        </div>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.02em' }}>{d.designName}</span>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', opacity: 0.8, fontWeight: 500 }}>No Image Uploaded</span>
-                      </div>
-                    )}
+                        <DesignImage
+                          rawUrl={d.imageUrl}
+                          designName={d.designName}
+                          category={d.category}
+                          department={department}
+                          onZoom={(src) => setZoomImg(src)}
+                          style={{ width: '100%', height: '100%' }}
+                        />
 
-                    {/* Small Sub image thumbnail inside card if available */}
-                    {subImg && (
-                      <div
-                        onClick={() => setZoomImg(subImg)}
-                        style={{
-                          position: 'absolute', bottom: 6, right: 6, width: '36px', height: '36px',
-                          border: '1px solid var(--border-light)', borderRadius: '4px', overflow: 'hidden',
-                          background: '#000', cursor: 'pointer', zIndex: 3
-                        }}
-                      >
-                        <img src={subImg} alt="Sub view" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        {/* Small Sub image thumbnail inside card if available */}
+                        {d.imageUrl2 && (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setZoomImg(convertDriveUrl(d.imageUrl2, `${d.designName}-2`));
+                            }}
+                            style={{
+                              position: 'absolute', bottom: 6, right: 6, width: '38px', height: '38px',
+                              border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', overflow: 'hidden',
+                              background: '#000', cursor: 'pointer', zIndex: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
+                            }}
+                            title="Click to view secondary image"
+                          >
+                            <DesignImage
+                              rawUrl={d.imageUrl2}
+                              designName={`${d.designName}-2`}
+                              showPlaceholderBadge={false}
+                              style={{ width: '100%', height: '100%' }}
+                            />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
 
                   {/* Design Info */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>

@@ -22,6 +22,7 @@ import StitchingSettings from './StitchingSettings';
 import QADepartment from './QADepartment';
 import JobCardStatusDashboard from './JobCardStatusDashboard';
 import { areDesignsEquivalent, cleanDesignNameString, extractDesignNames } from '../utils/designUtils';
+import { R2_PUBLIC_BASE, convertDriveUrl, getImageCandidates } from '../utils/imageUrlHelper';
 
 const normalizeFabricName = (val, pannaVal = '') => {
   if (!val) return '';
@@ -114,64 +115,6 @@ function calcExpTime(panna, passText, totalMtr, machineName) {
   return `${hours}H & ${minutes}M`;
 }
 
-// ─── Google Drive URL auto-converter ─────────────────────────────────────────
-const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
-
-function convertDriveUrl(link) {
-  if (!link || typeof link !== 'string' || !link.trim()) return '';
-  const trimmed = link.trim();
-  if (trimmed.startsWith('data:')) return trimmed;
-
-  // 1. Google Drive Links: convert to direct Google CDN lh3 embed links
-  if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
-    if (trimmed.includes('/folders/')) return '';
-    let fid = '';
-    const fileMatch = trimmed.match(/\/d\/([-\w]{20,})/);
-    if (fileMatch) fid = fileMatch[1];
-    if (!fid) {
-      const openMatch = trimmed.match(/[?&]id=([-\w]{20,})/);
-      if (openMatch) fid = openMatch[1];
-    }
-    if (!fid) {
-      const idMatch = trimmed.match(/([-\w]{25,})/);
-      if (idMatch) fid = idMatch[1];
-    }
-    if (fid) return `https://drive.google.com/thumbnail?id=${fid}&sz=w1000`;
-  }
-
-  // 2. Extract relative path for /designs/ or /uploads/ and point to Cloudflare R2 CDN
-  if (trimmed.includes('/designs/')) {
-    const filename = trimmed.split('/designs/')[1].replace(/^\/+/, '');
-    return `${R2_PUBLIC_BASE}/designs/${filename}`;
-  }
-  if (trimmed.includes('/uploads/')) {
-    const filename = trimmed.split('/uploads/')[1].replace(/^\/+/, '');
-    return `${R2_PUBLIC_BASE}/uploads/${filename}`;
-  }
-
-  // 3. Full HTTPS external URLs (Cloudflare R2, AWS S3, etc.)
-  if (trimmed.startsWith('https://')) {
-    return encodeURI(trimmed);
-  }
-
-  // 4. Insecure HTTP IP link e.g. http://3.7.174.180:3001/designs/ED-476.jpg
-  if (trimmed.includes('3.7.174.180') || trimmed.startsWith('http://')) {
-    const clean = trimmed.replace(/^http:\/\/[^\/]+/, '');
-    if (clean.includes('/designs/') || clean.includes('/uploads/')) {
-      const sub = clean.startsWith('/') ? clean.substring(1) : clean;
-      return `${R2_PUBLIC_BASE}/${sub}`;
-    }
-    return encodeURI(trimmed.replace('http://', 'https://'));
-  }
-
-  // 5. Bare design filenames e.g. "ED-01.jpg"
-  if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
-    const filename = trimmed.includes('.') ? trimmed : `${trimmed}.jpeg`;
-    return `${R2_PUBLIC_BASE}/designs/${encodeURIComponent(filename)}`;
-  }
-
-  return encodeURI(trimmed);
-}
 
 // ─── Extract multiple design names helper ────────────────────────────────────
 // ─── Blank form ──────────────────────────────────────────────────────────────
@@ -223,14 +166,17 @@ export function triggerJobCardPrint(cardOrCards) {
     const names = extractDesignNames(keyStr);
     const showTwoImages = names.length >= 2;
 
-    let img1 = convertDriveUrl(imageUrl1);
-    let img2 = showTwoImages ? convertDriveUrl(imageUrl2) : '';
+    const design1 = names[0] || card.designName || card.designNo || '';
+    const design2 = names[1] || (card.designName ? `${card.designName}-2` : '');
 
-    if (!img1 && (card.designName || card.designNo)) {
-      img1 = convertDriveUrl(card.designName || card.designNo);
+    let img1 = convertDriveUrl(imageUrl1, design1);
+    let img2 = showTwoImages ? convertDriveUrl(imageUrl2, design2) : '';
+
+    if (!img1 && design1) {
+      img1 = convertDriveUrl('', design1);
     }
 
-    const retryScript = `if(!this.dataset.retried){this.dataset.retried=1;if(this.src.endsWith('.jpg'))this.src=this.src.slice(0,-4)+'.jpeg';else if(this.src.endsWith('.jpeg'))this.src=this.src.slice(0,-5)+'.jpg';else if(this.src.endsWith('.png'))this.src=this.src.slice(0,-4)+'.jpeg';}`;
+    const retryScript = `if(!this.dataset.retryCount){this.dataset.retryCount=1;}else{this.dataset.retryCount=parseInt(this.dataset.retryCount)+1;}const c=parseInt(this.dataset.retryCount);if(c===1){if(this.src.endsWith('.jpeg'))this.src=this.src.slice(0,-5)+'.jpg';else if(this.src.endsWith('.jpg'))this.src=this.src.slice(0,-4)+'.jpeg';else if(this.src.endsWith('.png'))this.src=this.src.slice(0,-4)+'.jpg';}else if(c===2){this.src=this.src.replace(/\\.(jpe?g|png)/i,'.png');}else if(c===3){const base=this.alt||'';if(base)this.src='${window.location.origin}/v1/designs/'+encodeURIComponent(base)+'.jpg?fallback=1';}else{this.style.display='none';}`;
 
     let imgAreaHtml = '';
     if (img1 && img2) {

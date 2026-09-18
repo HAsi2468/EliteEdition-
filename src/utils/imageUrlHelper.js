@@ -5,10 +5,16 @@ const config = require('../config/config');
  * Returns empty string '' if url is falsy/empty, preventing 404 GET requests.
  * 
  * @param {string} url - The raw image URL or path
+ * @param {string} [designName] - Optional design identifier for smart resolution
  * @returns {string} Normalized R2 / HTTPS URL or empty string
  */
-function normalizeImageUrl(url) {
+function normalizeImageUrl(url, designName = '') {
   if (!url || typeof url !== 'string' || !url.trim()) {
+    if (designName && typeof designName === 'string' && designName.trim()) {
+      const clean = designName.trim().replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '');
+      const r2 = ((config.r2 && config.r2.publicUrl) || 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev').replace(/\/+$/, '');
+      return `${r2}/designs/${encodeURIComponent(clean)}.jpg`;
+    }
     return '';
   }
 
@@ -34,46 +40,42 @@ function normalizeImageUrl(url) {
 
   const r2Base = ((config.r2 && config.r2.publicUrl) || 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev').replace(/\/+$/, '');
 
-  // Extract clean path if file is under /designs/ or /uploads/
-  let subPath = '';
+  // Extract clean filename if file is under /designs/ or /uploads/
+  let subFolder = 'designs';
+  let rawFilename = '';
+
   if (trimmed.includes('/designs/')) {
-    subPath = `designs/${trimmed.split('/designs/')[1].replace(/^\/+/, '')}`;
+    subFolder = 'designs';
+    rawFilename = trimmed.split('/designs/')[1];
   } else if (trimmed.includes('/uploads/')) {
-    subPath = `uploads/${trimmed.split('/uploads/')[1].replace(/^\/+/, '')}`;
-  }
-
-  // 1. If Cloudflare R2 Public CDN URL is configured
-  if (r2Base) {
-    if (subPath) {
-      return `${r2Base}/${subPath}`;
+    subFolder = 'uploads';
+    rawFilename = trimmed.split('/uploads/')[1];
+  } else if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      const parsed = new URL(trimmed);
+      rawFilename = parsed.pathname.split('/').pop() || '';
+    } catch (e) {
+      rawFilename = trimmed.split('/').pop() || '';
     }
-    if (trimmed.startsWith('https://')) {
-      return trimmed;
+  } else if (!trimmed.includes('/')) {
+    rawFilename = trimmed;
+  }
+
+  if (rawFilename) {
+    // Strip query params and single decode to avoid double-encoding
+    rawFilename = rawFilename.split('?')[0].split('#')[0];
+    try { rawFilename = decodeURIComponent(rawFilename); } catch (e) {}
+    rawFilename = rawFilename.replace(/^\/+/, '').trim();
+
+    // Default to .jpg if no extension present
+    if (!/\.[a-zA-Z0-9]+$/.test(rawFilename)) {
+      rawFilename = `${rawFilename}.jpg`;
     }
-  }
 
-  // 2. Insecure IP Backend URLs e.g. "http://3.7.174.180:3001/designs/ED-476(1).jpg" -> convert to relative HTTPS route
-  if (trimmed.includes('3.7.174.180') || trimmed.startsWith('http://')) {
-    if (subPath) {
-      return `/v1/${subPath}`;
+    if (r2Base) {
+      return `${r2Base}/${subFolder}/${encodeURIComponent(rawFilename)}`;
     }
-    const cleanPath = trimmed.replace(/^http:\/\/[^\/]+/, '');
-    return cleanPath.startsWith('/designs/') ? `/v1${cleanPath}` : cleanPath;
-  }
-
-  // 3. Absolute HTTPS external links (R2, AWS S3, etc.)
-  if (trimmed.startsWith('https://')) {
-    return trimmed;
-  }
-
-  // 4. Relative paths or bare filenames e.g. "ED-476.jpg" or "/designs/ED-476.jpg"
-  if (subPath) {
-    return `/v1/${subPath}`;
-  }
-
-  if (!trimmed.startsWith('http') && !trimmed.includes('/')) {
-    const filename = trimmed.includes('.') ? trimmed : `${trimmed}.jpeg`;
-    return `/v1/designs/${encodeURIComponent(filename)}`;
+    return `/v1/${subFolder}/${encodeURIComponent(rawFilename)}`;
   }
 
   return trimmed;
