@@ -980,6 +980,30 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     }
   };
 
+  const handleDeleteTransfer = async (transfer) => {
+    if (!transfer || !transfer.transferRefId) return;
+    const confirmed = await triggerEliteConfirm({
+      title: 'Undo Lot Transfer',
+      message: `Are you sure you want to undo/delete this lot transfer (${transfer.transferRefId}) of ${transfer.qty} mtr from Lot #${transfer.sourceLotNo} to Lot #${transfer.destLotNo}?\n\nThis will reverse the transfer and restore the original lot balances.`,
+      confirmText: 'Undo Transfer',
+      type: 'danger'
+    });
+    if (!confirmed) return;
+
+    try {
+      const res = await api.deleteLotTransfer(transfer.transferRefId);
+      if (res && res.success) {
+        triggerPushNotification('Lot Transfer Reverted', res.message || 'Transfer undone successfully.', 'success');
+        triggerGlobalDataRefresh('fabric');
+        fetchData();
+      } else {
+        triggerEliteAlert('Error', res?.error || 'Failed to delete lot transfer.', 'error');
+      }
+    } catch (err) {
+      triggerEliteAlert('Error', 'Failed to delete lot transfer: ' + err.message, 'error');
+    }
+  };
+
   const startEditInward = (t) => {
     setEditingTransaction(t);
     setInwardForm({
@@ -2671,6 +2695,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>To Lot (Destination)</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'right', color: 'var(--text-muted)' }}>Transferred Qty</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: 'var(--text-muted)' }}>Notes / Reason</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2701,11 +2726,21 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         {Number(t.qty || 0).toFixed(2)} mtr
                       </td>
                       <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>{t.notes || '—'}</td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                        <button
+                          onClick={() => handleDeleteTransfer(t)}
+                          className="btn-icon"
+                          title="Undo / Delete Lot Transfer"
+                          style={{ color: '#ef4444', padding: '0.3rem' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   {lotTransfers.length === 0 && (
                     <tr>
-                      <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                         No lot transfers performed yet. Click "New Lot Transfer" to move stock between lots.
                       </td>
                     </tr>

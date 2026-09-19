@@ -54,6 +54,7 @@ router.get('/stock-adjustment/:id/pdf', fabricController.downloadStockAdjustment
 router.post('/lot-transfer', fabricController.createLotTransfer);
 router.post('/auto-lot-transfer', fabricController.autoLotTransfer);
 router.get('/lot-transfer', fabricController.getLotTransfers);
+router.delete('/lot-transfer/:refId', fabricController.deleteLotTransfer);
 
 // Update a transaction by ID
 router.put('/:id', fabricController.updateTransaction);

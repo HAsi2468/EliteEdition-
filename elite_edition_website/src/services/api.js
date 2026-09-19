@@ -1641,6 +1641,12 @@ export const api = {
     });
   },
 
+  async deleteLotTransfer(refId) {
+    return request(`/fabric/lot-transfer/${encodeURIComponent(refId)}`, {
+      method: 'DELETE',
+    });
+  },
+
   // ── Billing & Invoicing Department ───────────────────────────────────────
   async getBillingDashboardStats(companyEntity = 'Elite Online') {
     return request(`/billing/dashboard-stats?companyEntity=${encodeURIComponent(companyEntity)}`);

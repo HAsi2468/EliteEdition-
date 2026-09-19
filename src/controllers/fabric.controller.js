@@ -4067,6 +4067,28 @@ const autoLotTransfer = async (req, res) => {
   }
 };
 
+// ── DELETE /fabric/lot-transfer/:refId ───────────────────────────────────────
+const deleteLotTransfer = async (req, res) => {
+  try {
+    const { refId } = req.params;
+    if (!refId) return res.status(400).json({ success: false, error: 'Transfer reference ID required' });
+
+    const cleanRef = decodeURIComponent(refId).trim();
+    const result = await FabricTransaction.deleteMany({
+      notes: { $regex: cleanRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' }
+    });
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${result.deletedCount} transaction record(s) for transfer ${cleanRef}`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Error deleting lot transfer:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   createInward,
   createOutward,
@@ -4097,4 +4119,5 @@ module.exports = {
   createLotTransfer,
   getLotTransfers,
   autoLotTransfer,
+  deleteLotTransfer,
 };
