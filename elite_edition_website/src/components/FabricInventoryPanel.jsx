@@ -5049,42 +5049,60 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         />
       )}
 
-      {/* COMBINED / INDIVIDUAL DEPARTMENT PDF REPORT MODAL */}
+      {/* COMBINED / INDIVIDUAL DEPARTMENT PDF REPORT MODAL (WHITE & BLUE THEME) */}
       {isCombinedModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
-          <div className="glass-panel" style={{ background: 'var(--panel-bg, #1e1b4b)', width: '100%', maxWidth: '560px', borderRadius: '14px', padding: '1.5rem', border: '1px solid var(--border-light, #4c1d95)', color: 'var(--text-primary, #ffffff)', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <FileText size={22} color="#a78bfa" />
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>Download PDF Reports (Elite Digital Prints)</h3>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
+          <div style={{ background: '#ffffff', width: '100%', maxWidth: '560px', borderRadius: '16px', padding: '1.5rem', border: '1px solid #bfdbfe', color: '#0f172a', boxShadow: '0 25px 50px -12px rgba(30, 58, 138, 0.25), 0 0 0 1px rgba(191, 219, 254, 0.5)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ background: '#eff6ff', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #bfdbfe' }}>
+                  <FileText size={20} color="#2563eb" />
+                </div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#1e3a8a' }}>Download PDF Reports (Elite Digital Prints)</h3>
               </div>
-              <button onClick={() => setIsCombinedModalOpen(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.2rem' }}><X size={20} /></button>
+              <button
+                type="button"
+                onClick={() => setIsCombinedModalOpen(false)}
+                style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px', color: '#64748b', cursor: 'pointer', padding: '0.35rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            <p style={{ fontSize: '0.82rem', color: '#cbd5e1', marginBottom: '1rem', lineHeight: '1.4' }}>
+            <p style={{ fontSize: '0.82rem', color: '#475569', marginBottom: '1rem', lineHeight: '1.4' }}>
               Select the date period and choose individual department reports or combine them into a single report PDF.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', marginBottom: '0.3rem' }}>Date Start</label>
-                  <input type="date" value={combinedDateStart} onChange={e => setCombinedDateStart(e.target.value)} style={inputStyle} />
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#1e40af', marginBottom: '0.35rem' }}>Date Start</label>
+                  <input
+                    type="date"
+                    value={combinedDateStart}
+                    onChange={e => setCombinedDateStart(e.target.value)}
+                    style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', background: '#f8fafc', color: '#0f172a', fontSize: '0.85rem', fontWeight: 500, boxSizing: 'border-box' }}
+                  />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', marginBottom: '0.3rem' }}>Date End</label>
-                  <input type="date" value={combinedDateEnd} onChange={e => setCombinedDateEnd(e.target.value)} style={inputStyle} />
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#1e40af', marginBottom: '0.35rem' }}>Date End</label>
+                  <input
+                    type="date"
+                    value={combinedDateEnd}
+                    onChange={e => setCombinedDateEnd(e.target.value)}
+                    style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', background: '#f8fafc', color: '#0f172a', fontSize: '0.85rem', fontWeight: 500, boxSizing: 'border-box' }}
+                  />
                 </div>
               </div>
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#a78bfa', margin: 0 }}>Select Department Reports:</label>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1e3a8a', margin: 0 }}>Select Department Reports:</label>
                   <div style={{ display: 'flex', gap: '0.4rem' }}>
                     <button
                       type="button"
                       onClick={() => setSelectedCombinedReports(['stock', 'inward', 'lotwise', 'lotTransfer', 'stockAdjustment', 'requirement', 'challan'])}
-                      style={{ fontSize: '0.7rem', padding: '2px 8px', background: 'rgba(124, 58, 237, 0.2)', border: '1px solid rgba(124, 58, 237, 0.4)', color: '#c084fc', borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}
+                      style={{ fontSize: '0.72rem', padding: '3px 9px', background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
                     >
                       Select All
                     </button>
@@ -5102,14 +5120,14 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                         const targetRep = tabToReport[activeTab] || 'stock';
                         setSelectedCombinedReports([targetRep]);
                       }}
-                      style={{ fontSize: '0.7rem', padding: '2px 8px', background: 'rgba(56, 189, 248, 0.2)', border: '1px solid rgba(56, 189, 248, 0.4)', color: '#38bdf8', borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}
+                      style={{ fontSize: '0.72rem', padding: '3px 9px', background: '#eff6ff', border: '1px solid #93c5fd', color: '#0284c7', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
                     >
                       Active Tab Only
                     </button>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(255,255,255,0.03)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', maxHeight: '240px', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '10px', border: '1px solid #e2e8f0', maxHeight: '240px', overflowY: 'auto' }}>
                   {[
                     { id: 'stock', label: 'Stock Overview', desc: 'Fabric quality stock levels, inward/outward totals & net available stock' },
                     { id: 'inward', label: 'Inward Register', desc: 'Supplier inward receipts, lot numbers, vendor names & inward meters' },
@@ -5118,37 +5136,70 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     { id: 'stockAdjustment', label: 'Stock Adjustment (SA)', desc: 'Physical audit adjustments, stock (+/-) entries & SA vouchers' },
                     { id: 'requirement', label: 'Fabric Requirements', desc: 'Required vs available fabric meters & shortage alerts' },
                     { id: 'challan', label: 'Delivery Challans Register', desc: 'Dispatched challans, party names, billing & TP rolls' }
-                  ].map(rep => (
-                    <label key={rep.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'pointer', fontSize: '0.83rem' }}>
-                      <input
-                        type="checkbox"
-                        checked={selectedCombinedReports.includes(rep.id)}
-                        onChange={e => {
-                          if (e.target.checked) {
-                            setSelectedCombinedReports([...selectedCombinedReports, rep.id]);
-                          } else {
-                            if (selectedCombinedReports.length <= 1) {
-                              alert('Please select at least 1 report.');
-                              return;
-                            }
-                            setSelectedCombinedReports(selectedCombinedReports.filter(r => r !== rep.id));
-                          }
+                  ].map(rep => {
+                    const isSelected = selectedCombinedReports.includes(rep.id);
+                    return (
+                      <label
+                        key={rep.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '0.65rem',
+                          cursor: 'pointer',
+                          fontSize: '0.83rem',
+                          padding: '0.4rem 0.5rem',
+                          borderRadius: '6px',
+                          background: isSelected ? '#eff6ff' : 'transparent',
+                          border: isSelected ? '1px solid #bfdbfe' : '1px solid transparent',
+                          transition: 'all 0.15s ease'
                         }}
-                        style={{ marginTop: '0.15rem', accentColor: '#7c3aed' }}
-                      />
-                      <div>
-                        <strong style={{ color: '#f8fafc' }}>{rep.label}</strong>
-                        <div style={{ fontSize: '0.73rem', color: '#94a3b8' }}>{rep.desc}</div>
-                      </div>
-                    </label>
-                  ))}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSelectedCombinedReports([...selectedCombinedReports, rep.id]);
+                            } else {
+                              if (selectedCombinedReports.length <= 1) {
+                                alert('Please select at least 1 report.');
+                                return;
+                              }
+                              setSelectedCombinedReports(selectedCombinedReports.filter(r => r !== rep.id));
+                            }
+                          }}
+                          style={{ marginTop: '0.15rem', accentColor: '#2563eb', cursor: 'pointer' }}
+                        />
+                        <div>
+                          <strong style={{ color: isSelected ? '#1e40af' : '#1e293b' }}>{rep.label}</strong>
+                          <div style={{ fontSize: '0.73rem', color: isSelected ? '#3b82f6' : '#64748b' }}>{rep.desc}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button onClick={() => setIsCombinedModalOpen(false)} className="btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>Cancel</button>
               <button
+                type="button"
+                onClick={() => setIsCombinedModalOpen(false)}
+                style={{
+                  padding: '0.55rem 1.2rem',
+                  fontSize: '0.85rem',
+                  background: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  color: '#334155',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
                 onClick={async () => {
                   setCombinedLoading(true);
                   try {
@@ -5161,10 +5212,22 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   }
                 }}
                 disabled={combinedLoading}
-                className="btn-primary"
-                style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', border: 'none', gap: '0.4rem', fontWeight: 700 }}
+                style={{
+                  padding: '0.55rem 1.35rem',
+                  fontSize: '0.85rem',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)'
+                }}
               >
-                <Download size={16} /> {combinedLoading ? 'Generating Report PDF...' : 'Download Report PDF'}
+                <Download size={16} color="#ffffff" /> {combinedLoading ? 'Generating Report PDF...' : 'Download Report PDF'}
               </button>
             </div>
           </div>

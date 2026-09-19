@@ -1961,11 +1961,11 @@ export default function JobPrintingLog() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '6px',
-                  boxShadow: '0 4px 14px rgba(124, 58, 237, 0.4)',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)',
                   cursor: 'pointer',
                   opacity: 1
                 }}
