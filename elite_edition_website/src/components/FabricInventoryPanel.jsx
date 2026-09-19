@@ -2230,23 +2230,6 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   </button>
                 )}
 
-                <DateRangePicker
-                  preset={lotDatePreset}
-                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
-                    setLotDatePreset(p);
-                    setLotDateStart(ds || '');
-                    setLotDateEnd(de || '');
-                  }}
-                  customStart={customLotDateStart}
-                  customEnd={customLotDateEnd}
-                  onCustomChange={(s, e) => {
-                    setCustomLotDateStart(s);
-                    setCustomLotDateEnd(e);
-                    setLotDateStart(s);
-                    setLotDateEnd(e);
-                  }}
-                />
-
                 <button
                   onClick={async () => {
                     try {
@@ -2333,46 +2316,50 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <option value="Exhausted">Exhausted Only ({dateFilteredLots.filter(l => l.currentStock <= 0).length})</option>
                 </select>
 
-                {/* Active Date Filter Pill */}
-                {(lotDateStart || lotDateEnd) && (
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.45rem',
-                    background: 'rgba(99, 102, 241, 0.12)',
-                    border: '1px solid rgba(99, 102, 241, 0.4)',
-                    borderRadius: '8px',
-                    padding: '0.35rem 0.75rem',
-                    fontSize: '0.78rem',
-                    color: '#818cf8',
-                    fontWeight: 700
-                  }}>
-                    <Calendar size={13} />
-                    <span>Filter: {lotDateStart || 'Start'} → {lotDateEnd || 'Now'}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLotDatePreset('all');
-                        setLotDateStart('');
-                        setLotDateEnd('');
-                        setCustomLotDateStart('');
-                        setCustomLotDateEnd('');
-                      }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#f87171',
-                        cursor: 'pointer',
-                        padding: '0 2px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        marginLeft: '3px'
-                      }}
-                      title="Clear Date Filter"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
+                <DateRangePicker
+                  preset={lotDatePreset}
+                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                    setLotDatePreset(p);
+                    setLotDateStart(ds || '');
+                    setLotDateEnd(de || '');
+                  }}
+                  customStart={customLotDateStart}
+                  customEnd={customLotDateEnd}
+                  onCustomChange={(s, e) => {
+                    setCustomLotDateStart(s);
+                    setCustomLotDateEnd(e);
+                    setLotDateStart(s);
+                    setLotDateEnd(e);
+                  }}
+                />
+
+                {(lotDateStart || lotDateEnd || lotDatePreset !== 'all') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLotDatePreset('all');
+                      setLotDateStart('');
+                      setLotDateEnd('');
+                      setCustomLotDateStart('');
+                      setCustomLotDateEnd('');
+                    }}
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      color: '#ef4444',
+                      borderRadius: '8px',
+                      padding: '0.45rem 0.65rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
+                    }}
+                    title="Reset Date Filter to All Time"
+                  >
+                    <X size={13} /> Clear Date
+                  </button>
                 )}
               </div>
 
