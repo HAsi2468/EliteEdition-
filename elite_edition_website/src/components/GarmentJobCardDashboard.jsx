@@ -80,12 +80,15 @@ export default function GarmentJobCardDashboard() {
   // Active Sub View
   const [activeTab, setActiveTab] = useState('list'); // 'list' or 'analytics'
 
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const loadingMoreRef = useRef(false);
+
   const fetchCards = useCallback(async (isSilent = false, targetPage = 1) => {
-    if (!isSilent) setLoading(true);
+    if (!isSilent && cards.length === 0) setLoading(true);
     setError('');
     try {
-      const effectiveLimit = isSilent && page > 1 ? Math.min(page * 25, 250) : 25;
-      const effectivePage = isSilent ? 1 : targetPage;
+      const effectivePage = targetPage;
       const res = await api.getGarmentJobCards({
         search: debouncedSearch,
         dateStart,
@@ -95,26 +98,28 @@ export default function GarmentJobCardDashboard() {
         status: statusFilter,
         stage: stageFilter !== 'All' ? stageFilter : undefined,
         page: effectivePage,
-        limit: effectiveLimit
+        limit: 25
       });
       if (res && res.success) {
         setCards(res.data || []);
         setTotal(res.total || 0);
         setPages(res.pages || 1);
-        if (!isSilent && targetPage !== page) setPage(targetPage);
+        setPage(targetPage);
+        pageRef.current = targetPage;
       }
     } catch (err) {
       if (!isSilent) setError(err.message || 'Failed to load garment job cards.');
     } finally {
-      if (!isSilent) setLoading(false);
+      setLoading(false);
     }
-  }, [debouncedSearch, dateStart, dateEnd, designFilter, vendorFilter, statusFilter, stageFilter, page]);
+  }, [debouncedSearch, dateStart, dateEnd, designFilter, vendorFilter, statusFilter, stageFilter]);
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || loading || page >= pages) return;
+    if (loadingMoreRef.current || pageRef.current >= pages) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
-      const nextPage = page + 1;
+      const nextPage = pageRef.current + 1;
       const res = await api.getGarmentJobCards({
         search: debouncedSearch,
         dateStart,
@@ -134,15 +139,17 @@ export default function GarmentJobCardDashboard() {
           return Array.from(map.values());
         });
         setPage(nextPage);
+        pageRef.current = nextPage;
         if (res.pages) setPages(res.pages);
         if (res.total !== undefined) setTotal(res.total);
       }
     } catch (e) {
       console.warn('Failed to load more garment job cards:', e);
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [loadingMore, loading, page, pages, debouncedSearch, dateStart, dateEnd, designFilter, vendorFilter, statusFilter, stageFilter]);
+  }, [pages, debouncedSearch, dateStart, dateEnd, designFilter, vendorFilter, statusFilter, stageFilter]);
 
   const fetchAnalytics = useCallback(async () => {
     try {

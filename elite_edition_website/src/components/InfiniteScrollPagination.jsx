@@ -29,28 +29,39 @@ export default function InfiniteScrollPagination({
   style = {}
 }) {
   const sentinelRef = useRef(null);
+  const onLoadMoreRef = useRef(onLoadMore);
+  onLoadMoreRef.current = onLoadMore;
 
   useEffect(() => {
-    if (!hasMore || loadingMore || loading || !onLoadMore) return;
+    if (!hasMore || loadingMore || loading) return;
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
 
+    let debounceTimer = null;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          onLoadMore();
+        if (entries[0].isIntersecting && !loadingMore && hasMore) {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            if (onLoadMoreRef.current) {
+              onLoadMoreRef.current();
+            }
+          }, 100);
         }
       },
       {
         root: scrollContainerRef?.current || null,
-        rootMargin: '300px',
-        threshold: 0.05
+        rootMargin: '200px',
+        threshold: 0.01
       }
     );
 
     observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, loadingMore, loading, onLoadMore, scrollContainerRef]);
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      observer.disconnect();
+    };
+  }, [hasMore, loadingMore, loading, scrollContainerRef]);
 
   // If no items loaded at all, hide pagination dock
   if (currentCount === 0 && !loading && !loadingMore) return null;

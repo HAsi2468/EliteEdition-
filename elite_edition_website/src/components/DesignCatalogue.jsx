@@ -446,14 +446,18 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
       window.removeEventListener('elite-data-refresh', handleDataRefresh);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [search, categoryFilter, colorFilter, statusFilter, page, sortBy, sortOrder]);
+  }, [search, categoryFilter, colorFilter, statusFilter, sortBy, sortOrder, department]);
+
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const loadingMoreRef = useRef(false);
 
   const fetchDesigns = async (isSilent = false, targetPage = 1) => {
-    if (!isSilent) setLoading(true);
+    // Only show full-screen loader if there are no designs rendered yet
+    if (!isSilent && designs.length === 0) setLoading(true);
     setError('');
     try {
-      const effectiveLimit = isSilent && page > 1 ? Math.min(page * 40, 240) : 40;
-      const effectivePage = isSilent ? 1 : targetPage;
+      const effectivePage = targetPage;
       const res = await api.getDesigns({
         search,
         category: categoryFilter,
@@ -463,26 +467,28 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
         sortBy,
         sortOrder,
         page: effectivePage,
-        limit: effectiveLimit
+        limit: 40
       });
       if (res && res.data) {
         setDesigns(res.data);
         setTotal(res.total || 0);
         setPages(res.pages || 1);
-        if (!isSilent && targetPage !== page) setPage(targetPage);
+        setPage(targetPage);
+        pageRef.current = targetPage;
       }
     } catch (err) {
       if (!isSilent) setError(err.message || 'Failed to fetch designs');
     } finally {
-      if (!isSilent) setLoading(false);
+      setLoading(false);
     }
   };
 
   const loadMore = async () => {
-    if (loadingMore || loading || page >= pages) return;
+    if (loadingMoreRef.current || pageRef.current >= pages) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
-      const nextPage = page + 1;
+      const nextPage = pageRef.current + 1;
       const res = await api.getDesigns({
         search,
         category: categoryFilter,
@@ -502,12 +508,14 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
           return Array.from(map.values());
         });
         setPage(nextPage);
+        pageRef.current = nextPage;
         if (res.pages) setPages(res.pages);
         if (res.total !== undefined) setTotal(res.total);
       }
     } catch (err) {
       console.warn('Failed to load more designs:', err);
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
   };

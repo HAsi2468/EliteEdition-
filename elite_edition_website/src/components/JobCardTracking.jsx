@@ -89,12 +89,15 @@ export default function JobCardTracking({ onPreview }) {
     }
   }, [printLogsMap]);
 
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const loadingMoreRef = useRef(false);
+
   const fetchCards = useCallback(async (isSilent = false, targetPage = 1) => {
-    if (!isSilent) setLoading(true);
+    if (!isSilent && cards.length === 0) setLoading(true);
     setError('');
     try {
-      const effectiveLimit = isSilent && page > 1 ? Math.min(page * 50, 300) : 50;
-      const effectivePage = isSilent ? 1 : targetPage;
+      const effectivePage = targetPage;
       const res = await api.getJobCards({
         search,
         dateStart,
@@ -103,7 +106,7 @@ export default function JobCardTracking({ onPreview }) {
         fusingStatus: fusingStatusFilter,
         deliveryStatus: deliveryStatusFilter,
         page: effectivePage,
-        limit: effectiveLimit,
+        limit: 50,
         sortBy,
         sortOrder
       });
@@ -111,20 +114,22 @@ export default function JobCardTracking({ onPreview }) {
         setCards(res.data);
         setPages(res.pages || 1);
         setTotal(res.total || 0);
-        if (!isSilent && targetPage !== page) setPage(targetPage);
+        setPage(targetPage);
+        pageRef.current = targetPage;
       }
     } catch (err) {
       if (!isSilent) setError(err.message || 'Failed to load tracking data.');
     } finally {
-      if (!isSilent) setLoading(false);
+      setLoading(false);
     }
-  }, [search, dateStart, dateEnd, printStatusFilter, fusingStatusFilter, deliveryStatusFilter, page, sortBy, sortOrder]);
+  }, [search, dateStart, dateEnd, printStatusFilter, fusingStatusFilter, deliveryStatusFilter, sortBy, sortOrder]);
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || loading || page >= pages) return;
+    if (loadingMoreRef.current || pageRef.current >= pages) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
-      const nextPage = page + 1;
+      const nextPage = pageRef.current + 1;
       const res = await api.getJobCards({
         search,
         dateStart,
@@ -145,26 +150,28 @@ export default function JobCardTracking({ onPreview }) {
           return Array.from(map.values());
         });
         setPage(nextPage);
+        pageRef.current = nextPage;
         if (res.pages) setPages(res.pages);
         if (res.total !== undefined) setTotal(res.total);
       }
     } catch (e) {
       console.warn('Failed to load more tracking cards:', e);
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [loadingMore, loading, page, pages, search, dateStart, dateEnd, printStatusFilter, fusingStatusFilter, deliveryStatusFilter, sortBy, sortOrder]);
+  }, [pages, search, dateStart, dateEnd, printStatusFilter, fusingStatusFilter, deliveryStatusFilter, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchCards(false, 1);
-    const interval = setInterval(() => fetchCards(true), 10000);
-    const handleDataRefresh = () => fetchCards(true);
+    const interval = setInterval(() => fetchCards(true, pageRef.current), 10000);
+    const handleDataRefresh = () => fetchCards(true, pageRef.current);
     window.addEventListener('elite-data-refresh', handleDataRefresh);
     return () => {
       clearInterval(interval);
       window.removeEventListener('elite-data-refresh', handleDataRefresh);
     };
-  }, [search, dateStart, dateEnd, printStatusFilter, fusingStatusFilter, deliveryStatusFilter, sortBy, sortOrder]);
+  }, [fetchCards]);
 
   // Handle local cell modifications
   const handleCellChange = (cardId, field, value) => {

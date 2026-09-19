@@ -2208,23 +2208,29 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         setTotalMtr(res.totalMtr || 0);
         if (res.statusCounts) setStatusCounts(res.statusCounts);
         setPages(res.pages || 1);
-        if (!isSilent && targetPage !== page) setPage(targetPage);
+        setPage(targetPage);
+        pageRef.current = targetPage;
       }
     } catch (err) {
       if (!controller.signal.aborted && !isSilent) {
         setError(err.message || 'Failed to load job cards.');
       }
     } finally {
-      if (!controller.signal.aborted && !isSilent) setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
-  }, [debouncedSearch, statusFilter, page, activeSubTab, sortBy, sortOrder, dateStart, dateEnd, department]);
+  }, [debouncedSearch, statusFilter, activeSubTab, sortBy, sortOrder, dateStart, dateEnd, department]);
+
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const loadingMoreRef = useRef(false);
 
   // Infinite scroll loader: fetches next page and appends with deduplication
   const loadMore = useCallback(async () => {
-    if (loadingMore || loading || page >= pages) return;
+    if (loadingMoreRef.current || pageRef.current >= pages) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
-      const nextPage = page + 1;
+      const nextPage = pageRef.current + 1;
       const res = await api.getJobCards({
         search: debouncedSearch,
         status: statusFilter === 'All' ? '' : statusFilter,
@@ -2244,6 +2250,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
           return Array.from(map.values());
         });
         setPage(nextPage);
+        pageRef.current = nextPage;
         if (res.pages) setPages(res.pages);
         if (res.total !== undefined) setTotal(res.total);
         if (res.totalMtr !== undefined) setTotalMtr(res.totalMtr);
@@ -2252,14 +2259,15 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
     } catch (e) {
       console.warn('Failed to load more job cards:', e);
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }, [loadingMore, loading, page, pages, debouncedSearch, statusFilter, department, sortBy, sortOrder, dateStart, dateEnd]);
+  }, [pages, debouncedSearch, statusFilter, department, sortBy, sortOrder, dateStart, dateEnd]);
 
   useEffect(() => {
-    fetchCards(false);
-    const interval = setInterval(() => fetchCards(true), 10000);
-    const handleDataRefresh = () => fetchCards(true);
+    fetchCards(false, 1);
+    const interval = setInterval(() => fetchCards(true, pageRef.current), 10000);
+    const handleDataRefresh = () => fetchCards(true, pageRef.current);
     window.addEventListener('elite-data-refresh', handleDataRefresh);
 
     return () => {

@@ -52,22 +52,25 @@ export default function SalesGrid() {
     }
   };
 
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const loadingMoreRef = useRef(false);
+
   // Debounced filters or search on trigger
   useEffect(() => {
-    fetchOrders(false);
-    const interval = setInterval(() => fetchOrders(true), 30000);
+    fetchOrders(false, 1);
+    const interval = setInterval(() => fetchOrders(true, pageRef.current), 30000);
     return () => clearInterval(interval);
-  }, [page, sortField, sortOrder, statusFilter]);
+  }, [sortField, sortOrder, statusFilter]);
 
   const fetchOrders = async (isSilent = false, targetPage = 1) => {
-    if (!isSilent) setLoading(true);
+    if (!isSilent && orders.length === 0) setLoading(true);
     setError('');
     try {
-      const effectiveLimit = isSilent && page > 1 ? Math.min(page * 25, 200) : 25;
-      const effectivePage = isSilent ? 1 : targetPage;
+      const effectivePage = targetPage;
       const params = {
         page: effectivePage,
-        limit: effectiveLimit,
+        limit: 25,
         sortField,
         sortOrder,
         itemSKUCode: skuSearch.trim() || undefined,
@@ -82,20 +85,22 @@ export default function SalesGrid() {
           setTotalPages(res.meta.totalPages || 1);
           setTotal(res.meta.totalRecords || 0);
         }
-        if (!isSilent && targetPage !== page) setPage(targetPage);
+        setPage(targetPage);
+        pageRef.current = targetPage;
       }
     } catch (err) {
       if (!isSilent) setError(err.message || 'Failed to fetch sales orders.');
     } finally {
-      if (!isSilent) setLoading(false);
+      setLoading(false);
     }
   };
 
   const loadMore = async () => {
-    if (loadingMore || loading || page >= totalPages) return;
+    if (loadingMoreRef.current || pageRef.current >= totalPages) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
-      const nextPage = page + 1;
+      const nextPage = pageRef.current + 1;
       const params = {
         page: nextPage,
         limit: 25,
@@ -115,12 +120,14 @@ export default function SalesGrid() {
           return Array.from(map.values());
         });
         setPage(nextPage);
+        pageRef.current = nextPage;
         if (res.meta?.totalPages) setTotalPages(res.meta.totalPages);
         if (res.meta?.totalRecords) setTotal(res.meta.totalRecords);
       }
     } catch (err) {
       console.warn('Failed to load more sales orders:', err);
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
   };
