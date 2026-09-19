@@ -117,13 +117,35 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [chatSoundMuted, setChatSoundMuted] = useState(() => typeof localStorage !== 'undefined' ? localStorage.getItem('elite_chat_sound_muted') === 'true' : false);
   const [playingAudioId, setPlayingAudioId] = useState(null);
   const [isMobileScreen, setIsMobileScreen] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [viewportHeight, setViewportHeight] = useState(null);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     const handleResize = () => {
-      setIsMobileScreen(window.innerWidth < 768);
+      const isMob = window.innerWidth < 768;
+      setIsMobileScreen(isMob);
+      if (isMob) {
+        const vv = window.visualViewport;
+        setViewportHeight(vv ? vv.height : window.innerHeight);
+      } else {
+        setViewportHeight(null);
+      }
     };
+
+    handleResize();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+      window.visualViewport.addEventListener('scroll', handleResize);
+    }
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+        window.visualViewport.removeEventListener('scroll', handleResize);
+      }
+    };
   }, []);
 
   const [showMobileActionMenu, setShowMobileActionMenu] = useState(false);
@@ -438,7 +460,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     if (chatBottomRef.current) {
       chatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [messages, viewportHeight]);
 
   const fetchGroups = async (showLoader = true) => {
     if (showLoader) setLoadingGroups(true);
@@ -1673,7 +1695,30 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 70px)', padding: isMobileScreen ? (activeGroup ? '0' : '0.4rem') : '0.75rem', gap: isMobileScreen ? (activeGroup ? '0' : '0.35rem') : '0.75rem', background: 'var(--bg-main)', boxSizing: 'border-box' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        position: isMobileScreen && activeGroup ? 'fixed' : 'relative',
+        top: isMobileScreen && activeGroup ? 0 : 'auto',
+        left: isMobileScreen && activeGroup ? 0 : 'auto',
+        right: isMobileScreen && activeGroup ? 0 : 'auto',
+        bottom: isMobileScreen && activeGroup ? 0 : 'auto',
+        width: isMobileScreen && activeGroup ? '100vw' : 'auto',
+        height: isMobileScreen && activeGroup
+          ? (viewportHeight ? `${viewportHeight}px` : '100dvh')
+          : (isMobileScreen ? 'calc(100dvh - 70px)' : 'calc(100vh - 70px)'),
+        maxHeight: isMobileScreen && activeGroup
+          ? (viewportHeight ? `${viewportHeight}px` : '100dvh')
+          : undefined,
+        zIndex: isMobileScreen && activeGroup ? 9999 : 'auto',
+        padding: isMobileScreen ? (activeGroup ? '0' : '0.4rem') : '0.75rem',
+        gap: isMobileScreen ? (activeGroup ? '0' : '0.35rem') : '0.75rem',
+        background: 'var(--bg-main)',
+        boxSizing: 'border-box',
+        overflow: 'hidden'
+      }}
+    >
       
       {/* ── TOP HEADER / ACTION BAR WITH PRIMARY TAB SWITCHER (Hidden on mobile when inside active chat) ── */}
       {(!isMobileScreen || !activeGroup) && (
@@ -2073,7 +2118,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         </div>
 
         {/* ════ RIGHT COLUMN: CHAT STREAM / TASK MANAGER / ACTIVITY FEED ════ */}
-        <div className="glass-panel" style={{ display: (isMobileScreen && !activeGroup && rosterTab !== 'tasks') ? 'none' : 'flex', flexDirection: 'column', height: '100%', borderRadius: '12px', overflow: 'hidden' }}>
+        <div className="glass-panel" style={{ display: (isMobileScreen && !activeGroup && rosterTab !== 'tasks') ? 'none' : 'flex', flexDirection: 'column', height: '100%', borderRadius: isMobileScreen && activeGroup ? '0' : '12px', border: isMobileScreen && activeGroup ? 'none' : undefined, overflow: 'hidden' }}>
           
           {rosterTab === 'tasks' ? (
             <TaskManagerPanel currentUser={currentUser} onNavigateTab={onNavigateTab} />
@@ -2104,11 +2149,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         {isMobileScreen && activeGroup && (
                           <button
                             onClick={() => { setActiveGroup(null); setShowMobileActionMenu(false); setShowMobileHeaderMenu(false); }}
+                            className="chat-icon-circle-btn"
                             style={{
                               background: '#eff6ff',
                               border: '1px solid #bfdbfe',
                               color: '#2563eb',
-                              padding: '5px',
+                              padding: 0,
+                              width: '32px',
+                              height: '32px',
+                              minWidth: '32px',
+                              minHeight: '32px',
+                              boxSizing: 'border-box',
                               borderRadius: '8px',
                               cursor: 'pointer',
                               display: 'flex',
@@ -2119,7 +2170,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             }}
                             title="Back to conversation list"
                           >
-                            <ChevronLeft size={20} />
+                            <ChevronLeft size={20} color="#2563eb" />
                           </button>
                         )}
                         {isDirect ? (
@@ -3101,10 +3152,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             style={{
                               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '10px 8px',
                               background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', color: '#2563eb',
-                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700
+                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, minHeight: 'unset', boxSizing: 'border-box'
                             }}
                           >
-                            <Paperclip size={20} />
+                            <Paperclip size={20} color="#2563eb" />
                             <span>Attach File</span>
                           </button>
 
@@ -3115,10 +3166,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             style={{
                               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '10px 8px',
                               background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', color: '#16a34a',
-                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700
+                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, minHeight: 'unset', boxSizing: 'border-box'
                             }}
                           >
-                            <Mic size={20} />
+                            <Mic size={20} color="#16a34a" />
                             <span>Voice Note</span>
                           </button>
 
@@ -3129,10 +3180,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             style={{
                               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '10px 8px',
                               background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '10px', color: '#059669',
-                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700
+                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, minHeight: 'unset', boxSizing: 'border-box'
                             }}
                           >
-                            <BarChart2 size={20} />
+                            <BarChart2 size={20} color="#059669" />
                             <span>Create Poll</span>
                           </button>
 
@@ -3143,10 +3194,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             style={{
                               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '10px 8px',
                               background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '10px', color: '#9333ea',
-                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700
+                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700, minHeight: 'unset', boxSizing: 'border-box'
                             }}
                           >
-                            <Share2 size={20} />
+                            <Share2 size={20} color="#9333ea" />
                             <span>Share Record</span>
                           </button>
 
@@ -3158,10 +3209,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               gridColumn: 'span 2',
                               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '9px',
                               background: isUrgent ? '#ef4444' : '#fff1f2', border: '1px solid #fecdd3', borderRadius: '10px',
-                              color: isUrgent ? '#ffffff' : '#e11d48', cursor: 'pointer', fontSize: '0.76rem', fontWeight: 800
+                              color: isUrgent ? '#ffffff' : '#e11d48', cursor: 'pointer', fontSize: '0.76rem', fontWeight: 800,
+                              minHeight: 'unset', boxSizing: 'border-box'
                             }}
                           >
-                            <AlertTriangle size={16} />
+                            <AlertTriangle size={16} color={isUrgent ? '#ffffff' : '#e11d48'} />
                             <span>{isUrgent ? '🚨 Urgent SOS Alert ACTIVE' : '🚨 Send as Urgent SOS Alert'}</span>
                           </button>
                         </div>
@@ -3171,14 +3223,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     {/* '+' Toggle button for tools on Mobile */}
                     <button
                       type="button"
+                      className="chat-icon-circle-btn"
                       onClick={() => setShowMobileActionMenu(!showMobileActionMenu)}
                       style={{
                         background: showMobileActionMenu ? '#2563eb' : '#eff6ff',
                         color: showMobileActionMenu ? '#ffffff' : '#2563eb',
-                        border: '1px solid #bfdbfe',
+                        border: '1.5px solid #93c5fd',
                         borderRadius: '50%',
                         width: '36px',
                         height: '36px',
+                        minWidth: '36px',
+                        minHeight: '36px',
+                        padding: 0,
+                        margin: 0,
+                        boxSizing: 'border-box',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -3188,26 +3246,33 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       }}
                       title="Attachments & Tools"
                     >
-                      <Plus size={20} style={{ transform: showMobileActionMenu ? 'rotate(45deg)' : 'none', transition: 'transform 0.15s ease' }} />
+                      <Plus size={20} strokeWidth={2.5} color={showMobileActionMenu ? '#ffffff' : '#2563eb'} style={{ width: 20, height: 20, stroke: showMobileActionMenu ? '#ffffff' : '#2563eb', transform: showMobileActionMenu ? 'rotate(45deg)' : 'none', transition: 'transform 0.15s ease', flexShrink: 0, display: 'block' }} />
                     </button>
 
                     {/* 1-tap File Attachment */}
                     <button
                       type="button"
+                      className="chat-icon-circle-btn"
                       onClick={() => fileInputRef.current && fileInputRef.current.click()}
                       style={{
                         background: 'none',
                         border: 'none',
                         color: '#64748b',
-                        padding: '6px',
+                        padding: 0,
+                        width: '32px',
+                        height: '32px',
+                        minWidth: '32px',
+                        minHeight: '32px',
+                        boxSizing: 'border-box',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
+                        justifyContent: 'center',
                         flexShrink: 0
                       }}
                       title="Attach File"
                     >
-                      <Paperclip size={19} />
+                      <Paperclip size={19} strokeWidth={2.3} color="#64748b" style={{ width: 19, height: 19, stroke: '#64748b', flexShrink: 0, display: 'block' }} />
                     </button>
 
                     {/* SOS Tag if active */}
@@ -3223,6 +3288,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       placeholder={isUrgent ? "🚨 Urgent SOS Message..." : "Message..."}
                       value={inputMessage}
                       onPaste={handlePasteClipboard}
+                      onFocus={() => {
+                        setTimeout(() => {
+                          chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+                        }, 250);
+                      }}
                       onChange={(e) => {
                         const val = e.target.value;
                         setInputMessage(val);
@@ -3234,12 +3304,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         flex: 1,
                         minWidth: 0,
                         padding: '0.55rem 0.85rem',
-                        fontSize: '0.88rem',
+                        fontSize: isMobileScreen ? '16px' : '0.88rem',
                         background: 'var(--bg-input, #f1f5f9)',
                         border: isUrgent ? '1.5px solid #ef4444' : '1px solid var(--border-light, #cbd5e1)',
                         borderRadius: '20px',
                         color: 'var(--text-primary, #0f172a)',
-                        outline: 'none'
+                        outline: 'none',
+                        boxSizing: 'border-box'
                       }}
                     />
 
@@ -3247,6 +3318,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     {(inputMessage.trim() || attachedFile) ? (
                       <button
                         type="submit"
+                        className="chat-icon-circle-btn"
                         style={{
                           background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                           color: '#ffffff',
@@ -3254,6 +3326,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           borderRadius: '50%',
                           width: '36px',
                           height: '36px',
+                          minWidth: '36px',
+                          minHeight: '36px',
+                          padding: 0,
+                          margin: 0,
+                          boxSizing: 'border-box',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -3262,19 +3339,25 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           boxShadow: '0 3px 10px rgba(37,99,235,0.35)'
                         }}
                       >
-                        <Send size={15} />
+                        <Send size={16} strokeWidth={2.5} color="#ffffff" style={{ width: 16, height: 16, stroke: '#ffffff', flexShrink: 0, display: 'block', marginLeft: '1px' }} />
                       </button>
                     ) : (
                       <button
                         type="button"
+                        className="chat-icon-circle-btn"
                         onClick={startAudioRecording}
                         style={{
                           background: '#eff6ff',
                           color: '#2563eb',
-                          border: '1px solid #bfdbfe',
+                          border: '1.5px solid #93c5fd',
                           borderRadius: '50%',
                           width: '36px',
                           height: '36px',
+                          minWidth: '36px',
+                          minHeight: '36px',
+                          padding: 0,
+                          margin: 0,
+                          boxSizing: 'border-box',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -3283,7 +3366,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         }}
                         title="Voice Note"
                       >
-                        <Mic size={17} />
+                        <Mic size={19} strokeWidth={2.3} color="#2563eb" style={{ width: 19, height: 19, stroke: '#2563eb', flexShrink: 0, display: 'block' }} />
                       </button>
                     )}
                   </>

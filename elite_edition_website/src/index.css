@@ -572,6 +572,32 @@ form,
   .btn, button {
     min-height: 40px;
   }
+
+  .chat-icon-circle-btn,
+  .chat-icon-btn,
+  button.chat-icon-circle-btn {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    max-width: 36px !important;
+    max-height: 36px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+    line-height: 1 !important;
+  }
+  .chat-icon-circle-btn svg,
+  .chat-icon-btn svg,
+  button.chat-icon-circle-btn svg {
+    display: block !important;
+    flex-shrink: 0 !important;
+    min-width: 16px !important;
+    min-height: 16px !important;
+  }
 }
 
 /* ═══════════════════════════════════════════════════

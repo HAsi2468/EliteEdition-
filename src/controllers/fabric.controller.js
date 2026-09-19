@@ -88,6 +88,14 @@ const createInward = async (req, res) => {
       parsedMtr = parseFloat(((qty * parsedPct) / 100).toFixed(2));
     }
 
+    // Auto-assign the next lot number
+    const lastLotTx = await FabricTransaction.findOne(
+      { type: 'INWARD', lotNo: { $ne: null, $exists: true } },
+      { lotNo: 1 },
+      { sort: { lotNo: -1 } }
+    );
+    const nextLotNo = lastLotTx && lastLotTx.lotNo ? Number(lastLotTx.lotNo) + 1 : 1;
+
     const transaction = new FabricTransaction({
       type: 'INWARD',
       challanNo,
@@ -95,6 +103,7 @@ const createInward = async (req, res) => {
       fabricQuality: normFabric,
       panna: normP,
       qty,
+      lotNo: nextLotNo,
       date: date ? new Date(date) : new Date(),
       notes,
       shortagePct: parsedPct,
