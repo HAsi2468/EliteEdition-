@@ -17,6 +17,7 @@ import Workspace from './components/Workspace';
 import CommunicationPanel from './components/CommunicationPanel';
 import TaskManagerPanel from './components/TaskManagerPanel';
 import EliteModalDialog from './components/EliteModalDialog';
+import AutoUpdateNotification from './components/AutoUpdateNotification';
 import CompanySettingsPanel from './components/CompanySettingsPanel';
 import { matchSkuOrBrandCode } from './utils/skuHelper';
 import EliteBillingDepartment from './components/EliteBillingDepartment';
@@ -2456,6 +2457,9 @@ export default function App() {
 
       {/* Global Elite Glassmorphic Modal Dialog */}
       <EliteModalDialog />
+
+      {/* Zero-Hard-Refresh Hot Update Notification */}
+      <AutoUpdateNotification />
 
       {/* Hardware & Web Device Permissions Hub Modal */}
       <WebDevicePermissionsModal

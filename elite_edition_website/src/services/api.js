@@ -17,72 +17,99 @@ export const setBaseUrl = (url) => {
   localStorage.setItem('elite_api_base_url', cleaned);
 };
 
-// Generic request wrapper with Timeout & Safe Error Parser
+// Generic request wrapper with Auto-Retry, Timeout & Safe Error Parser
 const request = async (path, options = {}) => {
-  const baseUrl = getBaseUrl();
-  const token = localStorage.getItem('elite_auth_token');
+  const maxRetries = options.maxRetries ?? (options.method && options.method !== 'GET' ? 2 : 3);
+  let attempt = 0;
 
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-    throw new Error('Network offline. Please check your internet connection.');
-  }
-  
-  const userStr = localStorage.getItem('elite_user');
-  let currUser = null;
-  if (userStr) {
-    try { currUser = JSON.parse(userStr); } catch (e) {}
-  }
-  const uId = currUser?.id || currUser?._id || '';
-  const uName = currUser?.name || currUser?.fullName || currUser?.username || '';
+  while (attempt <= maxRetries) {
+    attempt++;
+    const baseUrl = getBaseUrl();
+    const token = localStorage.getItem('elite_auth_token');
 
-  const headers = {
-    ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    ...(uId ? { 'X-User-Id': uId } : {}),
-    ...(uName ? { 'X-User-Name': uName } : {}),
-    ...options.headers,
-  };
-  
-  const timeoutMs = options.timeout || 120000;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  let response;
-  try {
-    response = await fetch(`${baseUrl}${path}`, {
-      ...options,
-      headers,
-      signal: options.signal || controller.signal,
-    });
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s.`);
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      throw new Error('Network offline. Please check your internet connection.');
     }
-    throw new Error(err.message || 'Server connection failed. Please check network.');
-  } finally {
-    clearTimeout(timeoutId);
-  }
-  
-  if (!response.ok) {
-    let errMsg = `Server returned status ${response.status}`;
+    
+    const userStr = localStorage.getItem('elite_user');
+    let currUser = null;
+    if (userStr) {
+      try { currUser = JSON.parse(userStr); } catch (e) {}
+    }
+    const uId = currUser?.id || currUser?._id || '';
+    const uName = currUser?.name || currUser?.fullName || currUser?.username || '';
+
+    const headers = {
+      ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...(uId ? { 'X-User-Id': uId } : {}),
+      ...(uName ? { 'X-User-Name': uName } : {}),
+      ...options.headers,
+    };
+    
+    const timeoutMs = options.timeout || 120000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    let response;
     try {
-      const contentType = response.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        const data = await response.json();
-        errMsg = data.message || data.error || data.err || errMsg;
-        if (typeof errMsg === 'object') {
-          errMsg = JSON.stringify(errMsg);
-        }
-      } else {
-        const text = await response.text();
-        if (text && text.length < 150) {
-          errMsg = text.replace(/<[^>]*>/g, '').trim() || errMsg;
-        }
+      response = await fetch(`${baseUrl}${path}`, {
+        ...options,
+        headers,
+        signal: options.signal || controller.signal,
+      });
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)}s.`);
       }
-    } catch (e) {}
-    throw new Error(errMsg);
+
+      // Check if transient network error during server reload or internet glitch
+      const isTransient = err.message && (
+        err.message.includes('Failed to fetch') ||
+        err.message.includes('NetworkError') ||
+        err.message.includes('Load failed')
+      );
+
+      if (isTransient && attempt <= maxRetries) {
+        const delay = attempt * 800; // 800ms, 1600ms, 2400ms
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      throw new Error(err.message || 'Server connection failed. Please check network.');
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    
+    // If server is reloading during deployment, status code is 502, 503, or 504
+    if ((response.status === 502 || response.status === 503 || response.status === 504) && attempt <= maxRetries) {
+      const delay = attempt * 1000; // 1s, 2s
+      await new Promise(r => setTimeout(r, delay));
+      continue;
+    }
+
+    if (!response.ok) {
+      let errMsg = `Server returned status ${response.status}`;
+      try {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await response.json();
+          errMsg = data.message || data.error || data.err || errMsg;
+          if (typeof errMsg === 'object') {
+            errMsg = JSON.stringify(errMsg);
+          }
+        } else {
+          const text = await response.text();
+          if (text && text.length < 150) {
+            errMsg = text.replace(/<[^>]*>/g, '').trim() || errMsg;
+          }
+        }
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+    
+    return response.json();
   }
-  
-  return response.json();
 };
 
 export const api = {

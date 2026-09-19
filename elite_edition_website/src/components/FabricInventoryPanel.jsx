@@ -9,6 +9,7 @@ import { matchSearchQuery } from '../utils/searchUtils';
 import { cleanDesignNameString } from '../utils/designUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
+import { useFormDraft } from '../utils/useFormDraft';
 import {
   RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
   Layers, Database, Settings, Trash2, FileDown, Search, X,
@@ -254,6 +255,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     qty: '',
     notes: '',
   });
+
+  const { clearDraft: clearTransferDraft } = useFormDraft('fabric_lot_transfer', transferForm, setTransferForm, isTransferFormOpen);
 
   // Stock Dashboard Date Range & Filtered Stock state
   const [stockDatePreset, setStockDatePreset] = useState('this_month');
@@ -976,6 +979,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       if (res.success) {
         triggerPushNotification('🔄 Lot Transfer Complete', res.message || `Transferred ${transferForm.qty}m to Lot #${transferForm.destLotNo}`, 'success');
         setIsTransferFormOpen(false);
+        clearTransferDraft();
         setTransferForm({
           date: new Date().toISOString().split('T')[0],
           fabricQuality: '',

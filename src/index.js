@@ -64,6 +64,10 @@ server.listen(port, '0.0.0.0', async () => {
   }
 
   await syncCommunicationGroups();
+
+  if (typeof process.send === 'function') {
+    process.send('ready');
+  }
 });
 
 // const exitHandler = () => {
