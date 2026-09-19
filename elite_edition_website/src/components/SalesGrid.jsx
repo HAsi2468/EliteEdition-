@@ -4,16 +4,19 @@ import { uniwareApi } from '../services/uniware';
 import { Search, ChevronLeft, ChevronRight, SlidersHorizontal, RefreshCw, ShoppingBag } from 'lucide-react';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
+import InfiniteScrollPagination from './InfiniteScrollPagination';
 
 export default function SalesGrid() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [syncingOrderId, setSyncingOrderId] = useState('');
   const [error, setError] = useState('');
   
   // Pagination State
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [limit] = useState(25);
 
   // Sorting State
@@ -56,13 +59,15 @@ export default function SalesGrid() {
     return () => clearInterval(interval);
   }, [page, sortField, sortOrder, statusFilter]);
 
-  const fetchOrders = async (isSilent = false) => {
+  const fetchOrders = async (isSilent = false, targetPage = 1) => {
     if (!isSilent) setLoading(true);
     setError('');
     try {
+      const effectiveLimit = isSilent && page > 1 ? Math.min(page * 25, 200) : 25;
+      const effectivePage = isSilent ? 1 : targetPage;
       const params = {
-        page,
-        limit,
+        page: effectivePage,
+        limit: effectiveLimit,
         sortField,
         sortOrder,
         itemSKUCode: skuSearch.trim() || undefined,
@@ -75,12 +80,48 @@ export default function SalesGrid() {
         setOrders(res.data);
         if (res.meta) {
           setTotalPages(res.meta.totalPages || 1);
+          setTotal(res.meta.totalRecords || 0);
         }
+        if (!isSilent && targetPage !== page) setPage(targetPage);
       }
     } catch (err) {
       if (!isSilent) setError(err.message || 'Failed to fetch sales orders.');
     } finally {
       if (!isSilent) setLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    if (loadingMore || loading || page >= totalPages) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const params = {
+        page: nextPage,
+        limit: 25,
+        sortField,
+        sortOrder,
+        itemSKUCode: skuSearch.trim() || undefined,
+        shippingAddressCity: citySearch.trim() || undefined,
+        saleOrderStatus: statusFilter === 'All' ? undefined : statusFilter,
+      };
+
+      const res = await api.getSales(params);
+      if (res && res.data && res.data.length > 0) {
+        setOrders(prev => {
+          const map = new Map();
+          prev.forEach(o => map.set(o.id || o._id || o.saleOrderItemCode, o));
+          res.data.forEach(o => map.set(o.id || o._id || o.saleOrderItemCode, o));
+          return Array.from(map.values());
+        });
+        setPage(nextPage);
+        if (res.meta?.totalPages) setTotalPages(res.meta.totalPages);
+        if (res.meta?.totalRecords) setTotal(res.meta.totalRecords);
+      }
+    } catch (err) {
+      console.warn('Failed to load more sales orders:', err);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -274,34 +315,27 @@ export default function SalesGrid() {
         )}
       </div>
 
-      {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div style={styles.pagination}>
-          <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1 || loading}
-            className="btn-secondary"
-            style={styles.pagBtn}
-          >
-            <ChevronLeft size={16} />
-            Prev
-          </button>
-          
-          <span style={styles.pageIndicator}>
-            Page <strong>{page}</strong> of <strong>{totalPages}</strong>
-          </span>
-          
-          <button
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages || loading}
-            className="btn-secondary"
-            style={styles.pagBtn}
-          >
-            Next
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      )}
+      {/* Infinite Scroll & Pagination */}
+      <InfiniteScrollPagination
+        hasMore={page < totalPages}
+        loading={loading && orders.length === 0}
+        loadingMore={loadingMore}
+        onLoadMore={loadMore}
+        page={page}
+        pages={totalPages}
+        total={total}
+        currentCount={orders.length}
+        itemName="sales orders"
+        onPrevPage={() => {
+          const prevPage = Math.max(1, page - 1);
+          fetchOrders(false, prevPage);
+        }}
+        onNextPage={() => {
+          if (page < totalPages) {
+            loadMore();
+          }
+        }}
+      />
     </div>
   );
 }

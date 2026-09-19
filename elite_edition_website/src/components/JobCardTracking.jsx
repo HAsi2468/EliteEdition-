@@ -3,6 +3,7 @@ import { api } from '../services/api';
 import { Search, RefreshCw, Save, Check, Clipboard, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import JobCardTooltip from './JobCardTooltip';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
+import InfiniteScrollPagination from './InfiniteScrollPagination';
 
 const formatDateDDMMYYYY = (d) => {
   if (!d) return '—';
@@ -25,6 +26,7 @@ export default function JobCardTracking({ onPreview }) {
   const defaultThisMonth = getDatePresetRange('this_month');
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   
@@ -87,10 +89,12 @@ export default function JobCardTracking({ onPreview }) {
     }
   }, [printLogsMap]);
 
-  const fetchCards = useCallback(async () => {
-    setLoading(true);
+  const fetchCards = useCallback(async (isSilent = false, targetPage = 1) => {
+    if (!isSilent) setLoading(true);
     setError('');
     try {
+      const effectiveLimit = isSilent && page > 1 ? Math.min(page * 50, 300) : 50;
+      const effectivePage = isSilent ? 1 : targetPage;
       const res = await api.getJobCards({
         search,
         dateStart,
@@ -98,8 +102,8 @@ export default function JobCardTracking({ onPreview }) {
         printStatus: printStatusFilter,
         fusingStatus: fusingStatusFilter,
         deliveryStatus: deliveryStatusFilter,
-        page: 1,
-        limit: 5000,
+        page: effectivePage,
+        limit: effectiveLimit,
         sortBy,
         sortOrder
       });
@@ -107,24 +111,60 @@ export default function JobCardTracking({ onPreview }) {
         setCards(res.data);
         setPages(res.pages || 1);
         setTotal(res.total || 0);
+        if (!isSilent && targetPage !== page) setPage(targetPage);
       }
     } catch (err) {
-      setError(err.message || 'Failed to load tracking data.');
+      if (!isSilent) setError(err.message || 'Failed to load tracking data.');
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [search, dateStart, dateEnd, printStatusFilter, fusingStatusFilter, deliveryStatusFilter, page, sortBy, sortOrder]);
 
+  const loadMore = useCallback(async () => {
+    if (loadingMore || loading || page >= pages) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const res = await api.getJobCards({
+        search,
+        dateStart,
+        dateEnd,
+        printStatus: printStatusFilter,
+        fusingStatus: fusingStatusFilter,
+        deliveryStatus: deliveryStatusFilter,
+        page: nextPage,
+        limit: 50,
+        sortBy,
+        sortOrder
+      });
+      if (res && res.data && res.data.length > 0) {
+        setCards(prev => {
+          const map = new Map();
+          prev.forEach(c => map.set(c._id || c.id, c));
+          res.data.forEach(c => map.set(c._id || c.id, c));
+          return Array.from(map.values());
+        });
+        setPage(nextPage);
+        if (res.pages) setPages(res.pages);
+        if (res.total !== undefined) setTotal(res.total);
+      }
+    } catch (e) {
+      console.warn('Failed to load more tracking cards:', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, loading, page, pages, search, dateStart, dateEnd, printStatusFilter, fusingStatusFilter, deliveryStatusFilter, sortBy, sortOrder]);
+
   useEffect(() => {
-    fetchCards();
-    const interval = setInterval(fetchCards, 10000);
-    const handleDataRefresh = () => fetchCards();
+    fetchCards(false, 1);
+    const interval = setInterval(() => fetchCards(true), 10000);
+    const handleDataRefresh = () => fetchCards(true);
     window.addEventListener('elite-data-refresh', handleDataRefresh);
     return () => {
       clearInterval(interval);
       window.removeEventListener('elite-data-refresh', handleDataRefresh);
     };
-  }, [fetchCards]);
+  }, [search, dateStart, dateEnd, printStatusFilter, fusingStatusFilter, deliveryStatusFilter, sortBy, sortOrder]);
 
   // Handle local cell modifications
   const handleCellChange = (cardId, field, value) => {
@@ -1089,6 +1129,28 @@ export default function JobCardTracking({ onPreview }) {
           </table>
         )}
       </div>
+
+      {/* Infinite Scroll & Pagination */}
+      <InfiniteScrollPagination
+        hasMore={page < pages}
+        loading={loading && cards.length === 0}
+        loadingMore={loadingMore}
+        onLoadMore={loadMore}
+        page={page}
+        pages={pages}
+        total={total}
+        currentCount={cards.length}
+        itemName="tracking cards"
+        onPrevPage={() => {
+          const prevPage = Math.max(1, page - 1);
+          fetchCards(false, prevPage);
+        }}
+        onNextPage={() => {
+          if (page < pages) {
+            loadMore();
+          }
+        }}
+      />
     </div>
   );
 }

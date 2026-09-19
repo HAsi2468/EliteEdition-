@@ -23,6 +23,7 @@ import QADepartment from './QADepartment';
 import JobCardStatusDashboard from './JobCardStatusDashboard';
 import { areDesignsEquivalent, cleanDesignNameString, extractDesignNames } from '../utils/designUtils';
 import { R2_PUBLIC_BASE, convertDriveUrl, getImageCandidates } from '../utils/imageUrlHelper';
+import InfiniteScrollPagination from './InfiniteScrollPagination';
 
 const normalizeFabricName = (val, pannaVal = '') => {
   if (!val) return '';
@@ -1952,6 +1953,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -2177,7 +2179,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
     }
   };
 
-  const fetchCards = useCallback(async (isSilent = false) => {
+  const fetchCards = useCallback(async (isSilent = false, targetPage = page) => {
     if (activeSubTab !== 'list') return;
     // Cancel any in-flight request to prevent race conditions
     if (abortRef.current) abortRef.current.abort();
@@ -2187,12 +2189,14 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
     if (!isSilent) setLoading(true);
     setError('');
     try {
+      const effectiveLimit = isSilent && page > 1 ? Math.min(page * 25, 250) : 25;
+      const effectivePage = isSilent ? 1 : targetPage;
       const res = await api.getJobCards({
         search: debouncedSearch,
         status: statusFilter === 'All' ? '' : statusFilter,
         department,
-        page,
-        limit: 25,
+        page: effectivePage,
+        limit: effectiveLimit,
         sortBy,
         sortOrder,
         dateStart,
@@ -2204,6 +2208,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         setTotalMtr(res.totalMtr || 0);
         if (res.statusCounts) setStatusCounts(res.statusCounts);
         setPages(res.pages || 1);
+        if (!isSilent && targetPage !== page) setPage(targetPage);
       }
     } catch (err) {
       if (!controller.signal.aborted && !isSilent) {
@@ -2213,6 +2218,43 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
       if (!controller.signal.aborted && !isSilent) setLoading(false);
     }
   }, [debouncedSearch, statusFilter, page, activeSubTab, sortBy, sortOrder, dateStart, dateEnd, department]);
+
+  // Infinite scroll loader: fetches next page and appends with deduplication
+  const loadMore = useCallback(async () => {
+    if (loadingMore || loading || page >= pages) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const res = await api.getJobCards({
+        search: debouncedSearch,
+        status: statusFilter === 'All' ? '' : statusFilter,
+        department,
+        page: nextPage,
+        limit: 25,
+        sortBy,
+        sortOrder,
+        dateStart,
+        dateEnd
+      });
+      if (res && res.data && res.data.length > 0) {
+        setCards(prev => {
+          const map = new Map();
+          prev.forEach(c => map.set(c._id || c.id, c));
+          res.data.forEach(c => map.set(c._id || c.id, c));
+          return Array.from(map.values());
+        });
+        setPage(nextPage);
+        if (res.pages) setPages(res.pages);
+        if (res.total !== undefined) setTotal(res.total);
+        if (res.totalMtr !== undefined) setTotalMtr(res.totalMtr);
+        if (res.statusCounts) setStatusCounts(res.statusCounts);
+      }
+    } catch (e) {
+      console.warn('Failed to load more job cards:', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, loading, page, pages, debouncedSearch, statusFilter, department, sortBy, sortOrder, dateStart, dateEnd]);
 
   useEffect(() => {
     fetchCards(false);
@@ -2834,18 +2876,27 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
             </div>
           )}
 
-          {/* Pagination */}
-          {pages > 1 && (
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem', marginTop:'0.5rem' }}>
-              <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} className="btn-icon">
-                <ChevronLeft size={14}/>
-              </button>
-              <span style={{ fontSize:'0.85rem', color:'var(--text-muted)' }}>Page {page} of {pages}</span>
-              <button onClick={()=>setPage(p=>Math.min(pages,p+1))} disabled={page===pages} className="btn-icon">
-                <ChevronRight size={14}/>
-              </button>
-            </div>
-          )}
+          {/* Infinite Scroll & Pagination */}
+          <InfiniteScrollPagination
+            hasMore={page < pages}
+            loading={loading && cards.length === 0}
+            loadingMore={loadingMore}
+            onLoadMore={loadMore}
+            page={page}
+            pages={pages}
+            total={total}
+            currentCount={cards.length}
+            itemName="job cards"
+            onPrevPage={() => {
+              const prevPage = Math.max(1, page - 1);
+              fetchCards(false, prevPage);
+            }}
+            onNextPage={() => {
+              if (page < pages) {
+                loadMore();
+              }
+            }}
+          />
         </>
       )}
 
