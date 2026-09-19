@@ -209,6 +209,17 @@ const chatMessageSchema = new mongoose.Schema(
   }
 );
 
+// High-performance indexes for ChatRoom
+chatRoomSchema.index({ members: 1, updatedAt: -1 });
+chatRoomSchema.index({ type: 1, isArchived: 1, updatedAt: -1 });
+chatRoomSchema.index({ isArchived: 1, updatedAt: -1 });
+
+// High-performance indexes for ChatMessage
+chatMessageSchema.index({ roomId: 1, createdAt: -1 });
+chatMessageSchema.index({ roomId: 1, msgType: 1, createdAt: -1 });
+chatMessageSchema.index({ roomId: 1, senderId: 1, readBy: 1 });
+chatMessageSchema.index({ senderId: 1 });
+
 const ChatRoom = mongoose.model('ChatRoom', chatRoomSchema, 'chatrooms');
 const ChatMessage = mongoose.model('ChatMessage', chatMessageSchema, 'chatmessages');
 

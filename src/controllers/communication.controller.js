@@ -57,30 +57,68 @@ const getGroups = async (req, res) => {
         .sort({ updatedAt: -1 });
     }
 
-    // Fetch unread count & latest message snippet for each room
-    const roomsWithMeta = await Promise.all(
-      rooms.map(async (room) => {
-        const roomObj = room.toObject();
-        
-        const lastMsg = await ChatMessage.findOne({ roomId: room._id })
-          .sort({ createdAt: -1 })
-          .populate('senderId', 'name username email');
+    // Fetch unread count & latest message snippet for each room using fast batch aggregation
+    const roomIds = rooms.map((r) => r._id);
+    const lastMsgMap = {};
+    const unreadMap = {};
 
-        let unreadCount = 0;
-        const targetUserId = currentUser ? currentUser._id : currentUserId;
-        if (targetUserId) {
-          unreadCount = await ChatMessage.countDocuments({
-            roomId: room._id,
-            senderId: { $ne: targetUserId },
-            readBy: { $ne: targetUserId }
+    if (roomIds.length > 0) {
+      // 1. Fetch latest message for each room in a single aggregation pipeline
+      const latestAgg = await ChatMessage.aggregate([
+        { $match: { roomId: { $in: roomIds } } },
+        { $sort: { createdAt: -1 } },
+        {
+          $group: {
+            _id: '$roomId',
+            lastMsg: { $first: '$$ROOT' }
+          }
+        }
+      ]);
+
+      if (latestAgg.length > 0) {
+        const msgsToPopulate = latestAgg.map((x) => x.lastMsg);
+        await ChatMessage.populate(msgsToPopulate, { path: 'senderId', select: 'name username email' });
+        latestAgg.forEach((x) => {
+          lastMsgMap[String(x._id)] = x.lastMsg;
+        });
+      }
+
+      // 2. Fetch unread counts in a single aggregation pipeline
+      const targetUserId = currentUser ? currentUser._id : (rawUserId && mongoose.Types.ObjectId.isValid(rawUserId) ? rawUserId : null);
+      if (targetUserId) {
+        const targetUserObjId = mongoose.Types.ObjectId.isValid(targetUserId)
+          ? (typeof targetUserId === 'object' ? targetUserId : new mongoose.Types.ObjectId(targetUserId))
+          : null;
+        if (targetUserObjId) {
+          const unreadAgg = await ChatMessage.aggregate([
+            {
+              $match: {
+                roomId: { $in: roomIds },
+                senderId: { $ne: targetUserObjId },
+                readBy: { $ne: targetUserObjId },
+                isDeleted: { $ne: true }
+              }
+            },
+            {
+              $group: {
+                _id: '$roomId',
+                count: { $sum: 1 }
+              }
+            }
+          ]);
+          unreadAgg.forEach((u) => {
+            unreadMap[String(u._id)] = u.count;
           });
         }
+      }
+    }
 
-        roomObj.lastMessage = lastMsg || null;
-        roomObj.unreadCount = unreadCount;
-        return roomObj;
-      })
-    );
+    const roomsWithMeta = rooms.map((room) => {
+      const roomObj = room.toObject();
+      roomObj.lastMessage = lastMsgMap[String(room._id)] || null;
+      roomObj.unreadCount = unreadMap[String(room._id)] || 0;
+      return roomObj;
+    });
 
     res.json({ success: true, data: roomsWithMeta });
   } catch (error) {
@@ -101,16 +139,15 @@ const getGroupMessages = async (req, res) => {
     const limitNum = parseInt(limit, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    const room = await ChatRoom.findById(groupId);
+    const room = await ChatRoom.findById(groupId).select('_id type members');
     if (!room) {
       return res.status(404).json({ success: false, message: 'Group not found' });
     }
 
     const rawReqUserId = req.user ? req.user._id : (req.headers['x-user-id'] || req.query.userId || req.body?.userId);
-    const requestingUser = rawReqUserId ? await User.findById(rawReqUserId) : null;
-    const reqUserIdStr = String(requestingUser ? requestingUser._id : (rawReqUserId || ''));
+    const reqUserIdStr = rawReqUserId ? String(rawReqUserId) : '';
 
-    if (requestingUser && reqUserIdStr) {
+    if (reqUserIdStr) {
       const isMember = room.members && room.members.some((m) => {
         if (!m) return false;
         const memberIdStr = getMemberIdString(m);
@@ -123,34 +160,36 @@ const getGroupMessages = async (req, res) => {
           return res.status(403).json({ success: false, message: 'Access denied to direct message conversation' });
         }
         // Auto-join public/authority group rooms if user has access
-        room.members = room.members || [];
-        room.members.push(requestingUser._id);
-        await room.save();
+        await ChatRoom.findByIdAndUpdate(groupId, { $addToSet: { members: rawReqUserId } });
       }
     }
 
-    const query = { roomId: groupId };
+    const roomObjId = mongoose.Types.ObjectId.isValid(groupId) ? new mongoose.Types.ObjectId(groupId) : groupId;
+    const query = { roomId: roomObjId };
     if (msgType === 'human') {
       query.$or = [{ msgType: 'human' }, { msgType: { $exists: false } }, { msgType: null }, { msgType: '' }];
     } else if (msgType === 'system_activity') {
       query.msgType = 'system_activity';
     }
 
-    const total = await ChatMessage.countDocuments(query);
-    const messages = await ChatMessage.find(query)
-      .populate('senderId', 'name username email role')
-      .populate('pollMeta.options.votes', 'name username email')
-      .populate({
-        path: 'reactions.user',
-        select: 'name username email'
-      })
-      .populate({
-        path: 'replyTo',
-        populate: { path: 'senderId', select: 'name username email' }
-      })
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum);
+    const [total, messages] = await Promise.all([
+      ChatMessage.countDocuments(query),
+      ChatMessage.find(query)
+        .populate('senderId', 'name username email role')
+        .populate('pollMeta.options.votes', 'name username email')
+        .populate({
+          path: 'reactions.user',
+          select: 'name username email'
+        })
+        .populate({
+          path: 'replyTo',
+          populate: { path: 'senderId', select: 'name username email' }
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean()
+    ]);
 
     // Return in chronological order
     messages.reverse();

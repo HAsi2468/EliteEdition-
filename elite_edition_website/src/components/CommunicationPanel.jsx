@@ -255,9 +255,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   // Ref to track activeGroup._id without triggering re-render loops / closure bugs
   const activeGroupIdRef = useRef(null);
+  const messagesCacheRef = useRef({});
+
   useEffect(() => {
     activeGroupIdRef.current = activeGroup?._id;
   }, [activeGroup?._id]);
+
+  // Keep in-memory cache synchronized with current messages
+  useEffect(() => {
+    if (activeGroup?._id && messages && messages.length > 0) {
+      messagesCacheRef.current[activeGroup._id] = messages;
+    }
+  }, [activeGroup?._id, messages]);
 
   // Initialize Socket.io connection listeners & fetch groups & user directory
   useEffect(() => {
@@ -474,15 +483,24 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     };
   }, [socket, currentUser]);
 
-  // Join socket room when active group changes & fetch messages explicitly with loader
+  // Join socket room when active group changes & fetch messages with in-memory caching
   useEffect(() => {
-    if (!activeGroup) return;
+    if (!activeGroup?._id) return;
 
     if (socket) {
       socket.emit('join-room', activeGroup._id);
     }
 
-    fetchGroupMessages(activeGroup._id, msgFilter, true);
+    const cached = messagesCacheRef.current[activeGroup._id];
+    if (cached && cached.length > 0) {
+      setMessages(cached);
+      setLoadingMessages(false);
+      // Background sync without blocking user interaction
+      fetchGroupMessages(activeGroup._id, msgFilter, false);
+    } else {
+      // First time loading this conversation
+      fetchGroupMessages(activeGroup._id, msgFilter, true);
+    }
   }, [socket, activeGroup?._id, msgFilter]);
 
   const handleSelectGroup = (targetGroup) => {
@@ -493,6 +511,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         [activeGroup._id]: inputMessage
       }));
     }
+
+    // Instantly show cached messages if available
+    const cached = messagesCacheRef.current[targetGroup._id];
+    if (cached && cached.length > 0) {
+      setMessages(cached);
+      setLoadingMessages(false);
+    } else {
+      setMessages([]);
+      setLoadingMessages(true);
+    }
+
     setActiveGroup(targetGroup);
     if (typeof localStorage !== 'undefined' && targetGroup._id) {
       localStorage.setItem('elite_active_chat_room_id', targetGroup._id);
@@ -501,7 +530,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     if (socket && targetGroup._id) {
       socket.emit('join-room', targetGroup._id);
     }
-    fetchGroupMessages(targetGroup._id, msgFilter, true);
+    // Note: The useEffect on activeGroup?._id handles background/initial fetch automatically
   };
 
   // Auto-scroll to chat bottom
@@ -569,6 +598,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           list = list.filter((m) => m.attachment && m.attachment.fileUrl);
         }
         setMessages(list);
+        if (!filter || filter === 'all') {
+          messagesCacheRef.current[groupId] = list;
+        }
 
         const myId = currentUser?._id || currentUser?.id;
         if (socket && myId && groupId) {
@@ -581,7 +613,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     } catch (err) {
       console.error('Failed to fetch group messages:', err);
     } finally {
-      if (showLoader) setLoadingMessages(false);
+      setLoadingMessages(false);
     }
   };
 
