@@ -190,6 +190,22 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
   const recordingSecondsRef = useRef(0);
+  const autoSendRef = useRef(false);
+  const isPushToTalkRef = useRef(false);
+  const recordingStartTimeRef = useRef(0);
+  const touchStartYRef = useRef(null);
+  const isCancelGestureRef = useRef(false);
+  const [slideCancelActive, setSlideCancelActive] = useState(false);
+  const activeGroupRef = useRef(activeGroup);
+  const currentUserRef = useRef(currentUser);
+
+  useEffect(() => {
+    activeGroupRef.current = activeGroup;
+  }, [activeGroup]);
+
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
 
   // Quick Share Record Cards Modal
   const [showShareModal, setShowShareModal] = useState(false);
@@ -709,7 +725,58 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   };
 
-  // ── AUDIO VOICE NOTE RECORDING HANDLERS ──
+  // ── AUDIO VOICE NOTE RECORDING & PUSH-TO-TALK HANDLERS ──
+  const sendVoiceNoteMessage = async (audioAttachment) => {
+    const currentGroup = activeGroupRef.current;
+    if (!audioAttachment || !currentGroup) return;
+    const sender = currentUserRef.current;
+    const senderId = sender?.id || sender?._id;
+    if (!senderId) return;
+
+    const messageText = `Attached ${audioAttachment.fileName}`;
+    const messagePayload = {
+      roomId: currentGroup._id,
+      senderId,
+      content: messageText,
+      priority: isUrgent ? 'urgent' : 'normal',
+      attachment: audioAttachment,
+    };
+
+    const tempId = 'temp_' + Date.now();
+    const tempMsg = {
+      _id: tempId,
+      roomId: currentGroup._id,
+      senderId: typeof sender === 'object' ? sender : { _id: senderId, name: 'You' },
+      content: messageText,
+      createdAt: new Date().toISOString(),
+      type: 'text',
+      msgType: 'human',
+      priority: isUrgent ? 'urgent' : 'normal',
+      attachment: audioAttachment,
+      readBy: [senderId],
+      isOptimistic: true
+    };
+
+    setMessages((prev) => [...prev, tempMsg]);
+    setIsUrgent(false);
+
+    try {
+      const res = await api.sendCommunicationMessage(currentGroup._id, messagePayload);
+      if (res && res.success && res.data) {
+        const realMsg = res.data;
+        setMessages((prev) => {
+          const filtered = prev.filter((m) => m._id !== tempId && String(m._id) !== String(realMsg._id));
+          return [...filtered, realMsg];
+        });
+      }
+    } catch (err) {
+      console.warn('HTTP post message failed, falling back to socket emit:', err.message);
+      if (socket) {
+        socket.emit('send-message', messagePayload);
+      }
+    }
+  };
+
   const startAudioRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -726,24 +793,32 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         if (audioBlob.size === 0) return;
 
+        const duration = recordingSecondsRef.current || 1;
         const audioFile = new File([audioBlob], `voice_note_${Date.now()}.webm`, { type: 'audio/webm' });
         setUploadingFile(true);
         try {
-          const roomName = activeGroup?.name || 'General';
+          const currentGroup = activeGroupRef.current;
+          const roomName = currentGroup?.name || 'General';
           const res = await api.uploadChatAttachment(audioFile, roomName);
           if (res && res.fileUrl) {
-            setAttachedFile({
-              fileName: `Voice Note (${recordingSecondsRef.current || 5}s)`,
+            const attachmentData = {
+              fileName: `Voice Note (${duration}s)`,
               fileType: 'audio',
               fileUrl: res.fileUrl,
               fileSize: res.fileSize || audioBlob.size,
-              durationSec: recordingSecondsRef.current || 5
-            });
+              durationSec: duration
+            };
+            if (autoSendRef.current) {
+              await sendVoiceNoteMessage(attachmentData);
+            } else {
+              setAttachedFile(attachmentData);
+            }
           }
         } catch (err) {
           alert('Failed to upload voice note: ' + err.message);
         } finally {
           setUploadingFile(false);
+          autoSendRef.current = false;
         }
       };
 
@@ -760,18 +835,24 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       }, 1000);
     } catch (err) {
       alert('Microphone access denied or not supported: ' + err.message);
+      setIsRecordingAudio(false);
     }
   };
 
-  const stopAudioRecording = () => {
+  const stopAudioRecording = (autoSend = false) => {
+    autoSendRef.current = autoSend;
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
     setIsRecordingAudio(false);
+    setSlideCancelActive(false);
   };
 
   const cancelAudioRecording = () => {
+    autoSendRef.current = false;
+    isCancelGestureRef.current = false;
+    setSlideCancelActive(false);
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.onstop = null;
@@ -781,6 +862,59 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
     setIsRecordingAudio(false);
     setRecordingSeconds(0);
+  };
+
+  // Push-to-Talk touch & mouse listeners
+  const handlePushToTalkStart = (e) => {
+    isCancelGestureRef.current = false;
+    setSlideCancelActive(false);
+    isPushToTalkRef.current = true;
+    recordingStartTimeRef.current = Date.now();
+    if (e.touches && e.touches[0]) {
+      touchStartYRef.current = e.touches[0].clientY;
+    } else {
+      touchStartYRef.current = null;
+    }
+    startAudioRecording();
+  };
+
+  const handlePushToTalkMove = (e) => {
+    if (!isRecordingAudio) return;
+    if (e.touches && e.touches[0] && touchStartYRef.current !== null) {
+      const currentY = e.touches[0].clientY;
+      if (touchStartYRef.current - currentY > 40) {
+        if (!isCancelGestureRef.current) {
+          isCancelGestureRef.current = true;
+          setSlideCancelActive(true);
+        }
+      } else {
+        if (isCancelGestureRef.current) {
+          isCancelGestureRef.current = false;
+          setSlideCancelActive(false);
+        }
+      }
+    }
+  };
+
+  const handlePushToTalkEnd = () => {
+    if (!isRecordingAudio) return;
+    const elapsed = Date.now() - recordingStartTimeRef.current;
+
+    if (isCancelGestureRef.current) {
+      cancelAudioRecording();
+      isCancelGestureRef.current = false;
+      setSlideCancelActive(false);
+      isPushToTalkRef.current = false;
+      return;
+    }
+
+    if (elapsed >= 650) {
+      // Held and released -> auto-send voice note!
+      stopAudioRecording(true);
+    } else {
+      // Short tap (< 650ms) -> keep recording open for hands-free mode
+      isPushToTalkRef.current = false;
+    }
   };
 
   // ── QUICK SHARE RECORD CARDS HANDLERS ──
@@ -3110,14 +3244,46 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 }}
               >
                 {isRecordingAudio ? (
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fee2e2', border: '1px solid #fca5a5', padding: '0.4rem 0.8rem', borderRadius: '8px', color: '#b91c1c', fontWeight: 800, fontSize: '0.82rem' }}>
+                  <div style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: slideCancelActive ? '#fef2f2' : '#fee2e2',
+                    border: slideCancelActive ? '1.5px dashed #ef4444' : '1px solid #fca5a5',
+                    padding: '0.4rem 0.8rem',
+                    borderRadius: '12px',
+                    color: '#b91c1c',
+                    fontWeight: 800,
+                    fontSize: '0.82rem',
+                    transition: 'all 0.15s ease'
+                  }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
-                      <span>Recording... {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:{String(recordingSeconds % 60).padStart(2, '0')}</span>
+                      <span>{slideCancelActive ? 'Release to Cancel ✕' : `Recording... ${String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:${String(recordingSeconds % 60).padStart(2, '0')}`}</span>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                       <button type="button" onClick={cancelAudioRecording} style={{ background: 'none', border: 'none', color: '#dc2626', fontWeight: 700, cursor: 'pointer', fontSize: '0.78rem' }}>Cancel</button>
-                      <button type="button" onClick={stopAudioRecording} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '0.25rem 0.75rem', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', fontSize: '0.78rem' }}>Attach Audio →</button>
+                      <button
+                        type="button"
+                        onClick={() => stopAudioRecording(true)}
+                        style={{
+                          background: '#2563eb',
+                          color: '#ffffff',
+                          border: 'none',
+                          padding: '0.3rem 0.75rem',
+                          borderRadius: '8px',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          fontSize: '0.78rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <Send size={12} color="#ffffff" strokeWidth={2.5} />
+                        <span>Send Now</span>
+                      </button>
                     </div>
                   </div>
                 ) : isMobileScreen ? (
@@ -3345,7 +3511,17 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                       <button
                         type="button"
                         className="chat-icon-circle-btn"
-                        onClick={startAudioRecording}
+                        onMouseDown={handlePushToTalkStart}
+                        onMouseUp={handlePushToTalkEnd}
+                        onTouchStart={handlePushToTalkStart}
+                        onTouchMove={handlePushToTalkMove}
+                        onTouchEnd={handlePushToTalkEnd}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (!isRecordingAudio && !isPushToTalkRef.current) {
+                            startAudioRecording();
+                          }
+                        }}
                         style={{
                           background: '#eff6ff',
                           color: '#2563eb',
@@ -3362,11 +3538,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
-                          flexShrink: 0
+                          flexShrink: 0,
+                          userSelect: 'none',
+                          WebkitUserSelect: 'none',
+                          touchAction: 'none'
                         }}
-                        title="Voice Note"
+                        title="Hold to send voice note / Tap to record"
                       >
-                        <Mic size={19} strokeWidth={2.3} color="#2563eb" style={{ width: 19, height: 19, stroke: '#2563eb', flexShrink: 0, display: 'block' }} />
+                        <Mic size={19} strokeWidth={2.3} color="#2563eb" style={{ width: 19, height: 19, stroke: '#2563eb', flexShrink: 0, display: 'block', pointerEvents: 'none' }} />
                       </button>
                     )}
                   </>
@@ -3375,9 +3554,16 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     {/* Audio Record Button */}
                     <button
                       type="button"
-                      onClick={startAudioRecording}
+                      onMouseDown={handlePushToTalkStart}
+                      onMouseUp={handlePushToTalkEnd}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (!isRecordingAudio && !isPushToTalkRef.current) {
+                          startAudioRecording();
+                        }
+                      }}
                       style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '0.3rem', display: 'flex', alignItems: 'center' }}
-                      title="Record Voice Note"
+                      title="Hold to send voice note / Click to record"
                     >
                       <Mic size={18} />
                     </button>
