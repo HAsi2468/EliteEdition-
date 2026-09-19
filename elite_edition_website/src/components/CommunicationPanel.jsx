@@ -727,33 +727,54 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   // ── QUICK SHARE RECORD CARDS HANDLERS ──
   const handleOpenShareModal = async (cat = 'jobcard') => {
     setShareRecordCategory(cat);
+    setShareRecordSearch('');
     setShowShareModal(true);
-    fetchShareRecordItems(cat);
+    fetchShareRecordItems(cat, '');
   };
 
-  const fetchShareRecordItems = async (cat) => {
+  const fetchShareRecordItems = async (cat, searchTerm = '') => {
     setLoadingShareItems(true);
-    setShareRecordItems([]);
     try {
+      let items = [];
+      const cleanSearch = (searchTerm || '').trim();
       if (cat === 'jobcard') {
-        const res = await api.getJobCards();
-        if (res.success && res.data) setShareRecordItems(res.data.slice(0, 30));
+        const params = { limit: 50, sortBy: 'jobNo', sortOrder: 'desc' };
+        if (cleanSearch) params.search = cleanSearch;
+        const res = await api.getJobCards(params);
+        items = Array.isArray(res) ? res : (res?.data || []);
       } else if (cat === 'design') {
-        const res = await api.getDesignCatalogue();
-        if (res.success && res.data) setShareRecordItems(res.data.slice(0, 30));
+        const params = { limit: 50, sortBy: 'createdAt', sortOrder: 'desc' };
+        if (cleanSearch) params.search = cleanSearch;
+        const res = await (api.getDesigns ? api.getDesigns(params) : api.getDesignCatalogue(params));
+        items = Array.isArray(res) ? res : (res?.data || []);
       } else if (cat === 'invoice') {
-        const res = await api.getBillingInvoices();
-        if (res.success && res.data) setShareRecordItems(res.data.slice(0, 30));
+        const params = { limit: 50 };
+        if (cleanSearch) params.search = cleanSearch;
+        const res = await api.getBillingInvoices(params);
+        items = Array.isArray(res) ? res : (res?.data || []);
       } else if (cat === 'complaint') {
-        const res = await api.getComplaints();
-        if (res.success && res.data) setShareRecordItems(res.data.slice(0, 30));
+        const params = { limit: 50 };
+        if (cleanSearch) params.search = cleanSearch;
+        const res = await api.getComplaints(params);
+        items = Array.isArray(res) ? res : (res?.data || []);
       }
+      setShareRecordItems(items);
     } catch (err) {
       console.error('Failed to fetch share items:', err);
+      setShareRecordItems([]);
     } finally {
       setLoadingShareItems(false);
     }
   };
+
+  // Debounced search for Quick Share Records
+  useEffect(() => {
+    if (!showShareModal) return;
+    const timer = setTimeout(() => {
+      fetchShareRecordItems(shareRecordCategory, shareRecordSearch);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [shareRecordSearch, shareRecordCategory, showShareModal]);
 
   const handleShareRecordToChat = (item) => {
     if (!activeGroup) return;
@@ -804,16 +825,27 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     setMessages((prev) => [...prev, tempMsg]);
 
-    if (socket) {
-      socket.emit('send-message', {
-        roomId: activeGroup._id,
-        senderId: myId,
-        content: cardTitle,
-        type: 'record-card',
-        activityMeta: actMeta,
-        recordMentions: [{ recordType: shareRecordCategory, recordRef: refVal }]
+    const messagePayload = {
+      roomId: activeGroup._id,
+      senderId: myId,
+      content: cardTitle,
+      type: 'record-card',
+      activityMeta: actMeta,
+      recordMentions: [{ recordType: shareRecordCategory, recordRef: refVal }]
+    };
+
+    api.sendCommunicationMessage(activeGroup._id, messagePayload)
+      .then((res) => {
+        if (res && res.success && res.data) {
+          setMessages((prev) => prev.map((m) => (m._id === tempMsg._id ? res.data : m)));
+        }
+      })
+      .catch((err) => {
+        console.warn('HTTP share record card failed, falling back to socket emit:', err.message);
+        if (socket) {
+          socket.emit('send-message', messagePayload);
+        }
       });
-    }
 
     setShowShareModal(false);
   };
@@ -3087,56 +3119,49 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   </div>
                 ) : shareRecordItems.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                    No records found for {shareRecordCategory}.
+                    No records found for {shareRecordCategory}{shareRecordSearch ? ` matching "${shareRecordSearch}"` : ''}.
                   </div>
                 ) : (
-                  shareRecordItems
-                    .filter((item) => {
-                      const term = shareRecordSearch.toLowerCase().trim();
-                      if (!term) return true;
-                      const text = JSON.stringify(item).toLowerCase();
-                      return text.includes(term);
-                    })
-                    .map((item) => (
-                      <div
-                        key={item._id}
-                        onClick={() => handleShareRecordToChat(item)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '0.55rem 0.8rem',
-                          borderRadius: '8px',
-                          background: 'var(--bg-card)',
-                          border: '1px solid var(--border-light)',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                            {shareRecordCategory === 'jobcard' && `Job Card #${item.jobNo} — ${item.party || 'Client'}`}
-                            {shareRecordCategory === 'design' && `Design: ${item.designName || item.designNo}`}
-                            {shareRecordCategory === 'invoice' && `Invoice #${item.invoiceNo} — ₹${item.totalAmount || 0}`}
-                            {shareRecordCategory === 'complaint' && `Complaint #${item.complaintNo || 'Ref'} — ${item.departmentName || 'General'}`}
-                          </div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                            {shareRecordCategory === 'jobcard' && `Stage: ${item.productionStage || 'Order Received'} · ${item.totalMtr ? item.totalMtr + 'm' : ''}`}
-                            {shareRecordCategory === 'design' && `Category: ${item.category || 'General'}`}
-                            {shareRecordCategory === 'invoice' && `Party: ${item.partyName || 'Client'} · Date: ${formatDateLabel(item.createdAt)}`}
-                            {shareRecordCategory === 'complaint' && `Status: ${item.status || 'Pending'} · Issue: ${item.issueType || 'General'}`}
-                          </div>
+                  shareRecordItems.map((item) => (
+                    <div
+                      key={item._id}
+                      onClick={() => handleShareRecordToChat(item)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.55rem 0.8rem',
+                        borderRadius: '8px',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-light)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0, paddingRight: '0.5rem' }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {shareRecordCategory === 'jobcard' && `Job Card #${item.jobNo} — ${item.party || 'Client'}`}
+                          {shareRecordCategory === 'design' && `Design: ${item.designName || item.designNo}`}
+                          {shareRecordCategory === 'invoice' && `Invoice #${item.invoiceNo} — ₹${item.totalAmount || 0}`}
+                          {shareRecordCategory === 'complaint' && `Complaint #${item.complaintNo || 'Ref'} — ${item.departmentName || 'General'}`}
                         </div>
-
-                        <button
-                          type="button"
-                          className="btn-primary"
-                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.72rem', borderRadius: '6px', background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)' }}
-                        >
-                          Share Card →
-                        </button>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          {shareRecordCategory === 'jobcard' && `Design: ${item.designName || item.designNo || 'N/A'} · Fabric: ${item.fabric || 'N/A'} · Stage: ${item.productionStage || 'Order Received'}${item.totalMtr ? ' · ' + item.totalMtr + 'm' : ''}`}
+                          {shareRecordCategory === 'design' && `Category: ${item.category || 'General'} · Fabric: ${item.fabricName || 'N/A'}`}
+                          {shareRecordCategory === 'invoice' && `Party: ${item.customer?.name || item.partyName || 'Client'} · Date: ${item.invoiceDate || item.date || 'Recent'}`}
+                          {shareRecordCategory === 'complaint' && `Status: ${item.status || 'Pending'} · Issue: ${item.issueType || item.category || 'General'}`}
+                        </div>
                       </div>
-                    ))
+
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        style={{ padding: '0.3rem 0.65rem', fontSize: '0.72rem', borderRadius: '6px', background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', flexShrink: 0 }}
+                      >
+                        Share Card →
+                      </button>
+                    </div>
+                  ))
                 )}
               </div>
             </div>

@@ -800,6 +800,9 @@ export const api = {
     const qs = query.toString() ? `?${query.toString()}` : '';
     return request(`/designs${qs}`);
   },
+  async getDesignCatalogue(params = {}) {
+    return this.getDesigns(params);
+  },
   async createDesign(data) {
     return request('/designs', { method: 'POST', body: JSON.stringify(data) });
   },
