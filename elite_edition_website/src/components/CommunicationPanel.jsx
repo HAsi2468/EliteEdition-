@@ -152,6 +152,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const [showMobileActionMenu, setShowMobileActionMenu] = useState(false);
   const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false);
+  const [showDesktopHeaderMenu, setShowDesktopHeaderMenu] = useState(false);
 
   // Job Card PDF preview modal state
   const [pdfPreviewCard, setPdfPreviewCard] = useState(null);
@@ -2549,62 +2550,152 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             <span>Search</span>
                           </button>
 
-                          <button
-                            onClick={() => {
-                              const next = !chatSoundMuted;
-                              setChatSoundMuted(next);
-                              if (typeof localStorage !== 'undefined') localStorage.setItem('elite_chat_sound_muted', String(next));
-                            }}
-                            className="btn-secondary"
-                            style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', borderRadius: '6px' }}
-                            title={chatSoundMuted ? "Unmute Chat Sound Chimes" : "Mute Chat Sound Chimes"}
-                          >
-                            {chatSoundMuted ? <VolumeX size={13} color="#ef4444" /> : <Volume2 size={13} color="#10b981" />}
-                          </button>
-
-                          <button
-                            onClick={() => setShowGalleryModal(true)}
-                            className="btn-secondary"
-                            style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px' }}
-                            title="View Cloudflare R2 Media & Document Gallery for this room"
-                          >
-                            <Folder size={13} />
-                            <span>Gallery</span>
-                          </button>
-
-                          <button
-                            onClick={handleExportChatLog}
-                            className="btn-secondary"
-                            style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px' }}
-                            title="Export chat transcript as a text file"
-                          >
-                            <FileText size={13} />
-                            <span>Export</span>
-                          </button>
-
-                          {!isDirect && (
+                          {/* More Options Dropdown */}
+                          <div style={{ position: 'relative' }}>
                             <button
-                              onClick={handleOpenMembers}
+                              type="button"
+                              onClick={() => setShowDesktopHeaderMenu(!showDesktopHeaderMenu)}
                               className="btn-secondary"
-                              style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px' }}
-                              title="View authorized members of this group"
+                              style={{
+                                fontSize: '0.75rem',
+                                padding: '0.35rem 0.65rem',
+                                gap: '0.35rem',
+                                borderRadius: '6px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                background: showDesktopHeaderMenu ? '#eff6ff' : undefined,
+                                borderColor: showDesktopHeaderMenu ? '#3b82f6' : undefined,
+                                color: showDesktopHeaderMenu ? '#1d4ed8' : 'currentColor',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                              title="More options"
                             >
-                              <Users size={13} />
-                              <span>Members ({activeGroup.members?.length || 0})</span>
+                              <MoreVertical size={14} />
+                              <span>More</span>
                             </button>
-                          )}
 
-                          {currentUser?.role === 'admin' && (
-                            <button
-                              onClick={() => handleDeleteGroup(activeGroup)}
-                              className="btn-secondary"
-                              style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px', color: '#dc2626', border: '1px solid #fca5a5', background: '#fee2e2' }}
-                              title="Delete this group permanently"
-                            >
-                              <Trash2 size={13} />
-                              <span>Delete</span>
-                            </button>
-                          )}
+                            {showDesktopHeaderMenu && (
+                              <>
+                                <div
+                                  onClick={() => setShowDesktopHeaderMenu(false)}
+                                  style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'transparent' }}
+                                />
+                                <div style={{
+                                  position: 'absolute',
+                                  top: 'calc(100% + 6px)',
+                                  right: 0,
+                                  background: 'var(--bg-card, #ffffff)',
+                                  border: '1px solid var(--border-light, #e2e8f0)',
+                                  borderRadius: '10px',
+                                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                                  zIndex: 9999,
+                                  padding: '5px',
+                                  minWidth: '190px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '2px'
+                                }}>
+                                  {/* Gallery */}
+                                  <button
+                                    type="button"
+                                    onClick={() => { setShowDesktopHeaderMenu(false); setShowGalleryModal(true); }}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                      background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                      fontSize: '0.8rem', color: 'var(--text-primary, #0f172a)', cursor: 'pointer', fontWeight: 600,
+                                      transition: 'background 0.12s'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main, #f1f5f9)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                  >
+                                    <Folder size={14} color="#2563eb" />
+                                    <span>Gallery</span>
+                                  </button>
+
+                                  {/* Sound Toggle */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowDesktopHeaderMenu(false);
+                                      const next = !chatSoundMuted;
+                                      setChatSoundMuted(next);
+                                      if (typeof localStorage !== 'undefined') localStorage.setItem('elite_chat_sound_muted', String(next));
+                                    }}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                      background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                      fontSize: '0.8rem', color: 'var(--text-primary, #0f172a)', cursor: 'pointer', fontWeight: 600,
+                                      transition: 'background 0.12s'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main, #f1f5f9)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                  >
+                                    {chatSoundMuted ? <Volume2 size={14} color="#10b981" /> : <VolumeX size={14} color="#ef4444" />}
+                                    <span>{chatSoundMuted ? 'Unmute Sound' : 'Mute Sound'}</span>
+                                  </button>
+
+                                  {/* Export Chat Log */}
+                                  <button
+                                    type="button"
+                                    onClick={() => { setShowDesktopHeaderMenu(false); handleExportChatLog(); }}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                      background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                      fontSize: '0.8rem', color: 'var(--text-primary, #0f172a)', cursor: 'pointer', fontWeight: 600,
+                                      transition: 'background 0.12s'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main, #f1f5f9)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                  >
+                                    <FileText size={14} color="#8b5cf6" />
+                                    <span>Export Chat</span>
+                                  </button>
+
+                                  {/* Members (if not direct chat) */}
+                                  {!isDirect && (
+                                    <button
+                                      type="button"
+                                      onClick={() => { setShowDesktopHeaderMenu(false); handleOpenMembers(); }}
+                                      style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                        background: 'transparent', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                        fontSize: '0.8rem', color: 'var(--text-primary, #0f172a)', cursor: 'pointer', fontWeight: 600,
+                                        transition: 'background 0.12s'
+                                      }}
+                                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-main, #f1f5f9)'}
+                                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                    >
+                                      <Users size={14} color="#0ea5e9" />
+                                      <span>Members ({activeGroup.members?.length || 0})</span>
+                                    </button>
+                                  )}
+
+                                  {/* Delete Group (Admin only) */}
+                                  {currentUser?.role === 'admin' && (
+                                    <>
+                                      <div style={{ height: '1px', background: 'var(--border-light, #e2e8f0)', margin: '3px 0' }} />
+                                      <button
+                                        type="button"
+                                        onClick={() => { setShowDesktopHeaderMenu(false); handleDeleteGroup(activeGroup); }}
+                                        style={{
+                                          display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                          background: '#fee2e2', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                          fontSize: '0.8rem', color: '#dc2626', cursor: 'pointer', fontWeight: 700,
+                                          transition: 'background 0.12s'
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#fecaca'}
+                                        onMouseLeave={e => e.currentTarget.style.background = '#fee2e2'}
+                                      >
+                                        <Trash2 size={14} color="#dc2626" />
+                                        <span>Delete Group</span>
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
