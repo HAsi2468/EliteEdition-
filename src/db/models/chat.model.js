@@ -154,8 +154,12 @@ const chatMessageSchema = new mongoose.Schema(
       ]
     },
     forwardedFrom: {
-      senderName: { type: String, default: '' },
-      originalRoomName: { type: String, default: '' }
+      type: {
+        senderName: { type: String, default: null },
+        originalRoomName: { type: String, default: null }
+      },
+      default: null,
+      _id: false
     },
     isScheduled: {
       type: Boolean,

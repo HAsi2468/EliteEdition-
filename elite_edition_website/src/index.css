@@ -889,8 +889,8 @@ body {
    WHATSAPP-LIKE CHAT STREAM STYLES
    ═══════════════════════════════════════════════════ */
 .wa-chat-container {
-  background-color: #efeae2 !important;
-  background-image: radial-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px) !important;
+  background-color: #f1f5f9 !important;
+  background-image: radial-gradient(rgba(37, 99, 235, 0.05) 1px, transparent 1px) !important;
   background-size: 18px 18px !important;
 }
 
