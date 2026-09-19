@@ -138,6 +138,27 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     }
     return clean;
   };
+
+  const matchesTransferFabric = (lot, selectedFabric) => {
+    if (!selectedFabric) return true;
+    if (!lot) return false;
+    const targetNorm = normalizeFabricName(selectedFabric).toUpperCase().trim();
+    const lotNorm = normalizeFabricName(lot.fabricQuality, lot.panna).toUpperCase().trim();
+    if (targetNorm && lotNorm && targetNorm === lotNorm) return true;
+
+    // Base name comparison without trailing panna
+    const targetBase = targetNorm.replace(/\s+\d+.*$/, '').trim();
+    const lotBase = lotNorm.replace(/\s+\d+.*$/, '').trim();
+    if (targetBase && lotBase && targetBase === lotBase) return true;
+
+    const sUpper = String(selectedFabric).trim().toUpperCase();
+    const lUpper = String(lot.fabricQuality || '').trim().toUpperCase();
+    if (sUpper === lUpper) return true;
+    if (sUpper.includes(lUpper) || lUpper.includes(sUpper)) return true;
+
+    return false;
+  };
+
   const isAdmin = String(currentUser?.role || '').toLowerCase() === 'admin' || !!currentUser?.isMainAdmin || currentUser?.email === 'harshitsidapara2468@gmail.com';
   const [stock, setStock] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -915,13 +936,41 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
   const handleTransferSubmit = async (e) => {
     e.preventDefault();
-    if (!transferForm.fabricQuality || !transferForm.sourceLotNo || !transferForm.destLotNo || !transferForm.qty) {
-      alert('Please fill in all required fields (Fabric Quality, Source Lot, Destination Lot, Quantity).');
+    if (!transferForm.sourceLotNo || !transferForm.destLotNo || !transferForm.qty) {
+      alert('Please select both Source Lot, Destination Lot, and enter Transfer Quantity.');
       return;
     }
+    const transferQty = parseFloat(transferForm.qty);
+    if (isNaN(transferQty) || transferQty <= 0) {
+      alert('Transfer quantity must be greater than 0.');
+      return;
+    }
+    if (String(transferForm.sourceLotNo) === String(transferForm.destLotNo)) {
+      alert('Source Lot and Destination Lot must be different.');
+      return;
+    }
+
+    const srcLot = lotRecords.find(l => String(l.lotNo) === String(transferForm.sourceLotNo));
+    if (srcLot && transferQty > srcLot.currentStock) {
+      const proceed = await triggerEliteConfirm({
+        title: 'Source Lot Stock Warning',
+        message: `Source Lot #${transferForm.sourceLotNo} currently has only ${srcLot.currentStock.toFixed(2)}m available. Transferring ${transferQty.toFixed(2)}m will leave it in negative deficit. Do you want to proceed?`,
+        confirmText: 'Yes, Proceed',
+        type: 'warning'
+      });
+      if (!proceed) return;
+    }
+
     setLoading(true);
-    const cleanFabric = normalizeFabricName(transferForm.fabricQuality, transferForm.panna);
-    const payload = { ...transferForm, fabricQuality: cleanFabric || transferForm.fabricQuality };
+    const effFabric = transferForm.fabricQuality || (srcLot && (normalizeFabricName(srcLot.fabricQuality, srcLot.panna) || srcLot.fabricQuality)) || '';
+    const effPanna = transferForm.panna || (srcLot && srcLot.panna) || '58';
+    const cleanFabric = normalizeFabricName(effFabric, effPanna);
+    const payload = {
+      ...transferForm,
+      fabricQuality: cleanFabric || effFabric,
+      panna: effPanna,
+      department: department || 'digital_print'
+    };
     try {
       const res = await api.createLotTransfer(payload);
       if (res.success) {
@@ -1915,6 +1964,36 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       l.outwardTxs.some(ot => (ot.partyName || '').toLowerCase().includes(s) || (ot.jobNo || '').toLowerCase().includes(s));
   });
 
+  const availableTransferFabrics = React.useMemo(() => {
+    const set = new Set();
+    (fabricsList || []).forEach(f => {
+      if (f) set.add(normalizeFabricName(f) || f);
+    });
+    (lotRecords || []).forEach(l => {
+      const norm = normalizeFabricName(l.fabricQuality, l.panna);
+      if (norm) set.add(norm);
+      else if (l.fabricQuality) set.add(l.fabricQuality);
+    });
+    return Array.from(set).filter(Boolean).sort();
+  }, [fabricsList, lotRecords]);
+
+  const sourceLotOptions = React.useMemo(() => {
+    return (lotRecords || [])
+      .filter(l => matchesTransferFabric(l, transferForm.fabricQuality))
+      .filter(l => l.currentStock > 0);
+  }, [lotRecords, transferForm.fabricQuality]);
+
+  const destLotOptions = React.useMemo(() => {
+    const list = (lotRecords || [])
+      .filter(l => matchesTransferFabric(l, transferForm.fabricQuality))
+      .filter(l => String(l.lotNo) !== String(transferForm.sourceLotNo));
+    return list.sort((a, b) => {
+      if (a.currentStock < 0 && b.currentStock >= 0) return -1;
+      if (a.currentStock >= 0 && b.currentStock < 0) return 1;
+      return a.currentStock - b.currentStock;
+    });
+  }, [lotRecords, transferForm.fabricQuality, transferForm.sourceLotNo]);
+
   // Parse lot numbers from the comma-separated lotNo field
   const parseSelectedLots = (lotNoStr) => {
     if (!lotNoStr) return [];
@@ -2706,7 +2785,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   onClick={() => {
                     setTransferForm({
                       date: new Date().toISOString().split('T')[0],
-                      fabricQuality: fabricsList[0] || '',
+                      fabricQuality: '',
                       panna: '58',
                       sourceLotNo: '',
                       destLotNo: '',
@@ -5234,53 +5313,131 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
         </div>
       )}
 
-      {/* Lot Transfer Modal */}
+      {/* Lot Transfer Modal - Crisp White & Blue Theme */}
       {isTransferFormOpen && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(5px)',
+          background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(6px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 1000, padding: '1rem'
         }}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '550px', padding: '1.5rem', background: '#0f172a', border: '1px solid #334155', borderRadius: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f8fafc' }}>
-                <ArrowRightLeft size={20} color="#a78bfa" /> Perform Fabric Lot Transfer
-              </h3>
-              <X size={20} onClick={() => setIsTransferFormOpen(false)} style={{ cursor: 'pointer', color: '#94a3b8' }} />
+          <div style={{
+            width: '100%', maxWidth: '580px',
+            background: '#ffffff',
+            border: '1px solid #bfdbfe',
+            borderRadius: '16px',
+            boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(37, 99, 235, 0.08)',
+            overflow: 'hidden'
+          }}>
+            {/* Header: White & Soft Blue gradient */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '1.2rem 1.5rem',
+              background: 'linear-gradient(135deg, #f0f7ff 0%, #e0edfe 100%)',
+              borderBottom: '1px solid #dbeafe'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{
+                  width: '38px', height: '38px', borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 4px 10px rgba(37, 99, 235, 0.3)'
+                }}>
+                  <ArrowRightLeft size={20} color="#ffffff" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#0f172a' }}>
+                    Perform Fabric Lot Transfer
+                  </h3>
+                  <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 500, marginTop: '2px' }}>
+                    Rebalance batch stock & clear negative deficit lots
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTransferFormOpen(false)}
+                style={{
+                  background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px',
+                  padding: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#64748b', transition: 'all 0.15s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#0f172a'; e.currentTarget.style.borderColor = '#94a3b8'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            <form onSubmit={handleTransferSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            {/* Form Body */}
+            <form onSubmit={handleTransferSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.15rem', background: '#ffffff' }}>
+              {/* Informational hint banner */}
+              <div style={{
+                padding: '0.75rem 1rem',
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.65rem',
+                fontSize: '0.8rem',
+                color: '#1e40af'
+              }}>
+                <AlertCircle size={18} color="#2563eb" style={{ flexShrink: 0 }} />
+                <span>
+                  Transfers stock in meters between batches. <strong>Source Lot</strong> stock will decrease and <strong>Destination Lot</strong> will increase.
+                </span>
+              </div>
+
+              {/* Date & Fabric Quality */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Date</label>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+                    Date
+                  </label>
                   <input
                     type="date"
                     required
                     value={transferForm.date}
                     onChange={e => setTransferForm({ ...transferForm, date: e.target.value })}
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: '#1e293b', border: '1px solid #475569', color: '#f8fafc' }}
+                    style={{
+                      width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
+                      background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
+                      fontSize: '0.88rem', outline: 'none'
+                    }}
+                    onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
+                    onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Fabric Quality</label>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+                    Fabric Quality
+                  </label>
                   <select
-                    required
                     value={transferForm.fabricQuality}
                     onChange={e => {
                       const fab = e.target.value;
-                      setTransferForm({
-                        ...transferForm,
-                        fabricQuality: fab,
-                        sourceLotNo: '',
-                        destLotNo: '',
-                        qty: ''
+                      setTransferForm(prev => {
+                        const curSrc = lotRecords.find(l => String(l.lotNo) === String(prev.sourceLotNo));
+                        const curDest = lotRecords.find(l => String(l.lotNo) === String(prev.destLotNo));
+                        return {
+                          ...prev,
+                          fabricQuality: fab,
+                          sourceLotNo: matchesTransferFabric(curSrc, fab) ? prev.sourceLotNo : '',
+                          destLotNo: matchesTransferFabric(curDest, fab) ? prev.destLotNo : '',
+                        };
                       });
                     }}
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: '#1e293b', border: '1px solid #475569', color: '#f8fafc' }}
+                    style={{
+                      width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
+                      background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
+                      fontSize: '0.88rem', outline: 'none', fontWeight: 500
+                    }}
+                    onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
+                    onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
                   >
-                    <option value="">Select Fabric Quality</option>
-                    {fabricsList.map(f => (
+                    <option value="">All Fabric Qualities</option>
+                    {availableTransferFabrics.map(f => (
                       <option key={f} value={f}>{f}</option>
                     ))}
                   </select>
@@ -5290,30 +5447,58 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               {/* Source Lot and Destination Lot */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#f87171', marginBottom: '0.3rem', fontWeight: 600 }}>
-                    Source Lot # (From / Decreases Stock)
+                  <label style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    fontSize: '0.82rem', color: '#b91c1c', marginBottom: '0.35rem', fontWeight: 700
+                  }}>
+                    <span>Source Lot (From)</span>
+                    <span style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 600 }}>- Decreases</span>
                   </label>
                   <select
                     required
                     value={transferForm.sourceLotNo}
-                    onChange={e => setTransferForm({ ...transferForm, sourceLotNo: e.target.value })}
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: '#1e293b', border: '1px solid #475569', color: '#f8fafc' }}
+                    onChange={e => {
+                      const sLotNo = e.target.value;
+                      const matched = lotRecords.find(l => String(l.lotNo) === String(sLotNo));
+                      if (matched) {
+                        const mNorm = normalizeFabricName(matched.fabricQuality, matched.panna);
+                        setTransferForm(prev => ({
+                          ...prev,
+                          sourceLotNo: sLotNo,
+                          fabricQuality: prev.fabricQuality || mNorm || matched.fabricQuality || '',
+                          panna: matched.panna || prev.panna || '58'
+                        }));
+                      } else {
+                        setTransferForm(prev => ({ ...prev, sourceLotNo: sLotNo }));
+                      }
+                    }}
+                    style={{
+                      width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
+                      background: '#fff5f5', border: '1.5px solid #fca5a5', color: '#991b1b',
+                      fontSize: '0.85rem', outline: 'none', fontWeight: 600
+                    }}
+                    onFocus={e => { e.target.style.borderColor = '#dc2626'; e.target.style.boxShadow = '0 0 0 3px rgba(220, 38, 38, 0.15)'; }}
+                    onBlur={e => { e.target.style.borderColor = '#fca5a5'; e.target.style.boxShadow = 'none'; }}
                   >
                     <option value="">Select Source Lot</option>
-                    {lotRecords
-                      .filter(l => !transferForm.fabricQuality || l.fabricQuality.toUpperCase() === transferForm.fabricQuality.toUpperCase())
-                      .filter(l => l.currentStock > 0)
-                      .map(l => (
-                        <option key={l.lotNo} value={l.lotNo}>
-                          Lot #{l.lotNo} ({l.currentStock.toFixed(2)}m available)
-                        </option>
-                      ))}
+                    {sourceLotOptions.map(l => (
+                      <option key={l.lotNo} value={l.lotNo}>
+                        Lot #{l.lotNo} ({l.currentStock.toFixed(2)}m avail) {!transferForm.fabricQuality ? `- ${l.fabricQuality}` : ''}
+                      </option>
+                    ))}
+                    {sourceLotOptions.length === 0 && (
+                      <option value="" disabled>No positive stock lots available</option>
+                    )}
                   </select>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#34d399', marginBottom: '0.3rem', fontWeight: 600 }}>
-                    Destination Lot # (To / Increases Stock)
+                  <label style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    fontSize: '0.82rem', color: '#1d4ed8', marginBottom: '0.35rem', fontWeight: 700
+                  }}>
+                    <span>Destination Lot (To)</span>
+                    <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600 }}>+ Increases</span>
                   </label>
                   <select
                     required
@@ -5325,26 +5510,46 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       if (matched && matched.currentStock < 0) {
                         autoQty = String(Math.abs(matched.currentStock).toFixed(2));
                       }
-                      setTransferForm({ ...transferForm, destLotNo: dLotNo, qty: autoQty });
+                      if (matched) {
+                        const mNorm = normalizeFabricName(matched.fabricQuality, matched.panna);
+                        setTransferForm(prev => ({
+                          ...prev,
+                          destLotNo: dLotNo,
+                          qty: autoQty || prev.qty,
+                          fabricQuality: prev.fabricQuality || mNorm || matched.fabricQuality || '',
+                          panna: matched.panna || prev.panna || '58'
+                        }));
+                      } else {
+                        setTransferForm(prev => ({ ...prev, destLotNo: dLotNo, qty: autoQty }));
+                      }
                     }}
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: '#1e293b', border: '1px solid #475569', color: '#f8fafc' }}
+                    style={{
+                      width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
+                      background: '#eff6ff', border: '1.5px solid #93c5fd', color: '#1e40af',
+                      fontSize: '0.85rem', outline: 'none', fontWeight: 600
+                    }}
+                    onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
+                    onBlur={e => { e.target.style.borderColor = '#93c5fd'; e.target.style.boxShadow = 'none'; }}
                   >
                     <option value="">Select Destination Lot</option>
-                    {lotRecords
-                      .filter(l => !transferForm.fabricQuality || l.fabricQuality.toUpperCase() === transferForm.fabricQuality.toUpperCase())
-                      .filter(l => String(l.lotNo) !== String(transferForm.sourceLotNo))
-                      .map(l => (
-                        <option key={l.lotNo} value={l.lotNo}>
-                          Lot #{l.lotNo} ({l.currentStock < 0 ? `DEFICIT: ${l.currentStock.toFixed(2)}m` : `${l.currentStock.toFixed(2)}m stock`})
-                        </option>
-                      ))}
+                    {destLotOptions.map(l => (
+                      <option key={l.lotNo} value={l.lotNo}>
+                        {l.currentStock < 0 ? `⚠️ DEFICIT: Lot #${l.lotNo} (${l.currentStock.toFixed(2)}m)` : `Lot #${l.lotNo} (${l.currentStock.toFixed(2)}m stock)`} {!transferForm.fabricQuality ? `- ${l.fabricQuality}` : ''}
+                      </option>
+                    ))}
+                    {destLotOptions.length === 0 && (
+                      <option value="" disabled>No destination lots available</option>
+                    )}
                   </select>
                 </div>
               </div>
 
+              {/* Quantity */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                  <label style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Transfer Quantity (Meters)</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#334155' }}>
+                    Transfer Quantity (Meters)
+                  </label>
                   {transferForm.destLotNo && (() => {
                     const matched = lotRecords.find(l => String(l.lotNo) === String(transferForm.destLotNo));
                     if (matched && matched.currentStock < 0) {
@@ -5352,8 +5557,20 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                       return (
                         <button
                           type="button"
-                          onClick={() => setTransferForm({ ...transferForm, qty: String(defVal.toFixed(2)) })}
-                          style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                          onClick={() => setTransferForm(prev => ({ ...prev, qty: String(defVal.toFixed(2)) }))}
+                          style={{
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            color: '#2563eb',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
                         >
                           Auto-fill Deficit ({defVal.toFixed(2)}m)
                         </button>
@@ -5370,24 +5587,68 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   placeholder="e.g. 15.5"
                   value={transferForm.qty}
                   onChange={e => setTransferForm({ ...transferForm, qty: e.target.value })}
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: '#1e293b', border: '1px solid #475569', color: '#f8fafc', fontWeight: 700 }}
+                  style={{
+                    width: '100%', padding: '0.65rem 0.75rem', borderRadius: '8px',
+                    background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
+                    fontWeight: 700, fontSize: '1rem', outline: 'none'
+                  }}
+                  onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
+                  onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
                 />
               </div>
 
+              {/* Notes */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.3rem' }}>Notes / Reason (Optional)</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+                  Notes / Reason (Optional)
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. Rebalance negative lot stock balance"
                   value={transferForm.notes}
                   onChange={e => setTransferForm({ ...transferForm, notes: e.target.value })}
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: '#1e293b', border: '1px solid #475569', color: '#f8fafc' }}
+                  style={{
+                    width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px',
+                    background: '#ffffff', border: '1.5px solid #cbd5e1', color: '#0f172a',
+                    fontSize: '0.88rem', outline: 'none'
+                  }}
+                  onFocus={e => { e.target.style.borderColor = '#2563eb'; e.target.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)'; }}
+                  onBlur={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button type="button" onClick={() => setIsTransferFormOpen(false)} className="btn-secondary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>Cancel</button>
-                <button type="submit" disabled={loading} className="btn-primary" style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)', border: 'none' }}>
+              {/* Action Buttons */}
+              <div style={{
+                display: 'flex', justifyContent: 'flex-end', gap: '0.75rem',
+                marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setIsTransferFormOpen(false)}
+                  style={{
+                    padding: '0.6rem 1.25rem', fontSize: '0.88rem', fontWeight: 600,
+                    background: '#f8fafc', border: '1.5px solid #cbd5e1', color: '#475569',
+                    borderRadius: '8px', cursor: 'pointer', transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#1e293b'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.color = '#475569'; }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    padding: '0.6rem 1.5rem', fontSize: '0.88rem', fontWeight: 700,
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                    border: 'none', color: '#ffffff', borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  <ArrowRightLeft size={16} color="#ffffff" />
                   {loading ? 'Processing Transfer...' : 'Execute Transfer'}
                 </button>
               </div>

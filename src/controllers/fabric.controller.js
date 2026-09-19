@@ -3823,7 +3823,7 @@ const downloadStockAdjustmentPdf = async (req, res) => {
 // ── POST /fabric/lot-transfer ──────────────────────────────────────────────
 const createLotTransfer = async (req, res) => {
   try {
-    const { date, fabricQuality, panna, sourceLotNo, destLotNo, qty, notes } = req.body;
+    const { date, fabricQuality, panna, sourceLotNo, destLotNo, qty, notes, department } = req.body;
 
     const sourceLot = parseInt(sourceLotNo, 10);
     const destLot = parseInt(destLotNo, 10);
@@ -3845,14 +3845,24 @@ const createLotTransfer = async (req, res) => {
     const transferDate = date ? new Date(date) : new Date();
     const transferRefId = 'LT-' + Date.now();
 
+    // Inherit panna, vendor, and department from existing source lot if available
+    const existingSource = await FabricTransaction.findOne({ lotNo: sourceLot, type: 'INWARD' }).lean() ||
+                           await FabricTransaction.findOne({ lotNo: sourceLot }).lean();
+    const effectivePanna = panna || existingSource?.panna || '58';
+    const effectiveVendor = existingSource?.vendorName || '';
+    const effectiveDept = department || existingSource?.department || 'digital_print';
+    const normFabric = normalizeFabric(fabricQuality, effectivePanna);
+
     // 1. OUTWARD from Source Lot
     const outwardTx = new FabricTransaction({
       type: 'OUTWARD',
       date: transferDate,
-      fabricQuality,
-      panna: panna || '',
+      fabricQuality: normFabric || fabricQuality,
+      panna: effectivePanna,
+      vendorName: effectiveVendor,
       lotNo: sourceLot,
       qty: transferQty,
+      department: effectiveDept,
       notes: `Lot Transfer to Lot #${destLot}${notes ? ' | ' + notes : ''} [Ref: ${transferRefId}]`
     });
 
@@ -3860,10 +3870,12 @@ const createLotTransfer = async (req, res) => {
     const inwardTx = new FabricTransaction({
       type: 'INWARD',
       date: transferDate,
-      fabricQuality,
-      panna: panna || '',
+      fabricQuality: normFabric || fabricQuality,
+      panna: effectivePanna,
+      vendorName: effectiveVendor,
       lotNo: destLot,
       qty: transferQty,
+      department: effectiveDept,
       notes: `Lot Transfer from Lot #${sourceLot}${notes ? ' | ' + notes : ''} [Ref: ${transferRefId}]`
     });
 
