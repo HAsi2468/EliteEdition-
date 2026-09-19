@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Printer, Download, ExternalLink, Loader2, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { X, Printer, Download, ExternalLink, Loader2, Image as ImageIcon, AlertCircle, FileText } from 'lucide-react';
 import { api } from '../services/api';
 import { triggerJobCardPrint } from './JobCardPanel';
 
@@ -88,10 +88,10 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
           width: '100%',
           maxWidth: '680px',
           maxHeight: '94vh',
-          background: '#0f172a',
-          borderRadius: '14px',
-          border: '1px solid rgba(255,255,255,0.15)',
-          boxShadow: '0 20px 45px rgba(0,0,0,0.5)',
+          background: '#ffffff',
+          borderRadius: '16px',
+          border: '1px solid #bfdbfe',
+          boxShadow: '0 25px 50px -12px rgba(30, 58, 138, 0.25), 0 0 0 1px rgba(191, 219, 254, 0.5)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -105,16 +105,18 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '0.75rem 1rem',
-            background: '#1e293b',
-            borderBottom: '1px solid rgba(255,255,255,0.1)',
+            background: '#ffffff',
+            borderBottom: '1px solid #e2e8f0',
             gap: '8px',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-            <span style={{ fontSize: '1.1rem' }}>📄</span>
+            <div style={{ background: '#eff6ff', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #bfdbfe' }}>
+              <FileText size={18} color="#2563eb" />
+            </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#f8fafc' }}>
+                <span style={{ fontWeight: 800, fontSize: '0.98rem', color: '#1e3a8a' }}>
                   Job Card #{card?.jobNo || 'Preview'}
                 </span>
                 {card?.machineName && (
@@ -124,7 +126,7 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                       color: '#ffffff',
                       fontSize: '0.65rem',
                       fontWeight: 800,
-                      padding: '1px 6px',
+                      padding: '2px 7px',
                       borderRadius: '4px',
                       letterSpacing: '0.5px',
                     }}
@@ -133,7 +135,7 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: '0.74rem', color: '#94a3b8', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                 {card?.party || 'Elite Edition'} {card?.fabric ? `• ${card.fabric}` : ''}
               </div>
             </div>
@@ -146,14 +148,15 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
-                background: '#2563eb',
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                 color: '#ffffff',
                 border: 'none',
-                padding: '6px 12px',
+                padding: '6px 14px',
                 borderRadius: '6px',
                 fontSize: '0.78rem',
                 fontWeight: 700,
                 cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(37, 99, 235, 0.3)',
               }}
               title="Print or Save as PDF"
             >
@@ -167,9 +170,9 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '5px',
-                background: 'rgba(255,255,255,0.08)',
-                color: '#e2e8f0',
-                border: '1px solid rgba(255,255,255,0.18)',
+                background: '#eff6ff',
+                color: '#2563eb',
+                border: '1px solid #bfdbfe',
                 padding: '6px 10px',
                 borderRadius: '6px',
                 fontSize: '0.78rem',
@@ -184,9 +187,9 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
             <button
               onClick={onClose}
               style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#94a3b8',
+                background: '#f1f5f9',
+                border: '1px solid #e2e8f0',
+                color: '#64748b',
                 cursor: 'pointer',
                 padding: '6px',
                 borderRadius: '6px',
@@ -206,7 +209,7 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
             flex: 1,
             overflowY: 'auto',
             padding: '1rem',
-            background: '#090d16',
+            background: '#f8fafc',
             display: 'flex',
             justifyContent: 'center',
           }}
@@ -493,8 +496,8 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '0.65rem 1rem',
-            background: '#1e293b',
-            borderTop: '1px solid rgba(255,255,255,0.1)',
+            background: '#ffffff',
+            borderTop: '1px solid #e2e8f0',
             gap: '8px',
           }}
         >
@@ -504,7 +507,7 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#60a5fa',
+                color: '#2563eb',
                 fontSize: '0.78rem',
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -523,10 +526,10 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
             <button
               onClick={handlePrint}
               style={{
-                background: '#2563eb',
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                 color: '#ffffff',
                 border: 'none',
-                padding: '6px 14px',
+                padding: '6px 16px',
                 borderRadius: '6px',
                 fontSize: '0.8rem',
                 fontWeight: 700,
@@ -534,6 +537,7 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
+                boxShadow: '0 3px 10px rgba(37, 99, 235, 0.35)',
               }}
             >
               <Printer size={14} />
@@ -543,10 +547,10 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
             <button
               onClick={onClose}
               style={{
-                background: 'rgba(255,255,255,0.08)',
-                color: '#e2e8f0',
-                border: '1px solid rgba(255,255,255,0.15)',
-                padding: '6px 12px',
+                background: '#f1f5f9',
+                color: '#334155',
+                border: '1px solid #cbd5e1',
+                padding: '6px 14px',
                 borderRadius: '6px',
                 fontSize: '0.8rem',
                 fontWeight: 600,
