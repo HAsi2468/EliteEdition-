@@ -23,6 +23,8 @@ const io = new Server(server, {
 });
 setupSockets(io);
 app.set('socketio', io);
+app.set('io', io);
+global.io = io;
 
 const { syncCommunicationGroups } = require('./utils/syncCommunicationGroups');
 const { checkOverdueTasks } = require('./controllers/task.controller');

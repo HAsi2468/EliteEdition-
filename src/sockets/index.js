@@ -1,6 +1,15 @@
 const { setActivitySocketIo } = require('../utils/activityEvent');
 const { ChatMessage, User, Task, ChatRoom } = require('../db/models');
 
+const getMemberIdString = (m) => {
+  if (!m) return '';
+  if (typeof m === 'object') {
+    if (m._id) return String(m._id);
+    return m.toString ? m.toString() : String(m);
+  }
+  return String(m);
+};
+
 const activeUsers = new Map(); // socket.id -> userId
 const getOnlineUserIds = () => {
   return Array.from(new Set(activeUsers.values()));
@@ -43,7 +52,7 @@ const setupSockets = (io) => {
 
         const isMember = targetRoom.members && targetRoom.members.some((m) => {
           if (!m) return false;
-          const memberIdStr = String(typeof m === 'object' ? (m._id || m.id || m) : m);
+          const memberIdStr = getMemberIdString(m);
           return memberIdStr === String(senderId);
         });
 
@@ -112,18 +121,17 @@ const setupSockets = (io) => {
           })
           .populate('mentions', 'name username email');
 
-        // Broadcast to everyone in the room (including sender)
-        io.to(roomId).emit('receive-message', populatedMessage);
-
-        // Also broadcast directly to personal channels of all room members so they get real-time messages & unread updates instantly
+        // Broadcast to everyone in the room & personal channels of members
+        let broadcast = io.to(roomId);
         if (targetRoom.members && targetRoom.members.length > 0) {
           targetRoom.members.forEach((m) => {
-            const mIdStr = String(typeof m === 'object' ? (m._id || m.id || m) : m);
+            const mIdStr = getMemberIdString(m);
             if (mIdStr) {
-              io.to(`user_${mIdStr}`).emit('receive-message', populatedMessage);
+              broadcast = broadcast.to(`user_${mIdStr}`);
             }
           });
         }
+        broadcast.emit('receive-message', populatedMessage);
 
         // Emit direct notification to each mentioned user
         if (mentions.length > 0) {
@@ -505,7 +513,15 @@ const setupSockets = (io) => {
           { roomId, senderId: { $ne: userId }, readBy: { $ne: userId } },
           { $addToSet: { readBy: userId } }
         );
-        io.to(roomId).emit('room-messages-read', { roomId, userId });
+        const targetRoom = await ChatRoom.findById(roomId);
+        let broadcast = io.to(roomId);
+        if (targetRoom && targetRoom.members && targetRoom.members.length > 0) {
+          targetRoom.members.forEach((m) => {
+            const mIdStr = getMemberIdString(m);
+            if (mIdStr) broadcast = broadcast.to(`user_${mIdStr}`);
+          });
+        }
+        broadcast.emit('room-messages-read', { roomId, userId });
       } catch (error) {
         console.error('Error marking messages as read:', error);
       }

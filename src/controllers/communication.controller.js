@@ -3,6 +3,15 @@ const { ChatRoom, ChatMessage, user: User } = require('../db/models');
 const { syncCommunicationGroups } = require('../utils/syncCommunicationGroups');
 const { publishActivity } = require('../utils/activityEvent');
 
+const getMemberIdString = (m) => {
+  if (!m) return '';
+  if (typeof m === 'object') {
+    if (m._id) return String(m._id);
+    return m.toString ? m.toString() : String(m);
+  }
+  return String(m);
+};
+
 /**
  * Get all communication groups accessible to the user
  */
@@ -103,7 +112,7 @@ const getGroupMessages = async (req, res) => {
     if (requestingUser && reqUserIdStr) {
       const isMember = room.members && room.members.some((m) => {
         if (!m) return false;
-        const memberIdStr = String(typeof m === 'object' ? (m._id || m.id || m) : m);
+        const memberIdStr = getMemberIdString(m);
         return memberIdStr === reqUserIdStr;
       });
 
@@ -208,7 +217,7 @@ const votePollMessage = async (req, res) => {
       .populate('senderId', 'name username email role')
       .populate('pollMeta.options.votes', 'name username email');
 
-    const io = req.app.get('io') || global.io;
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
     if (io) {
       io.to(String(message.roomId)).emit('poll-updated', { messageId: message._id, pollMeta: updatedMessage.pollMeta });
     }
@@ -263,9 +272,17 @@ const forwardMessage = async (req, res) => {
       .populate('senderId', 'name username email role')
       .populate('readBy', 'name username email');
 
-    const io = req.app.get('io') || global.io;
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
     if (io) {
-      io.to(String(targetRoomId)).emit('receive-message', populatedMsg);
+      let broadcast = io.to(String(targetRoomId));
+      const targetRoom = await ChatRoom.findById(targetRoomId);
+      if (targetRoom && targetRoom.members && targetRoom.members.length > 0) {
+        targetRoom.members.forEach((m) => {
+          const mIdStr = getMemberIdString(m);
+          if (mIdStr) broadcast = broadcast.to(`user_${mIdStr}`);
+        });
+      }
+      broadcast.emit('receive-message', populatedMsg);
     }
 
     res.json({ success: true, data: populatedMsg });
@@ -303,7 +320,7 @@ const postGroupMessage = async (req, res) => {
 
     const isMember = targetRoom.members && targetRoom.members.some((m) => {
       if (!m) return false;
-      const memberIdStr = String(typeof m === 'object' ? (m._id || m.id || m) : m);
+      const memberIdStr = getMemberIdString(m);
       return memberIdStr === strSender;
     });
 
@@ -372,17 +389,18 @@ const postGroupMessage = async (req, res) => {
       .populate('mentions', 'name username email');
 
     // Broadcast via Socket.IO if available
-    const io = req.app.get('io') || global.io;
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
     if (io) {
-      io.to(String(groupId)).emit('receive-message', populatedMessage);
+      let broadcast = io.to(String(groupId));
       if (targetRoom.members && targetRoom.members.length > 0) {
         targetRoom.members.forEach((m) => {
-          const mIdStr = String(typeof m === 'object' ? (m._id || m.id || m) : m);
+          const mIdStr = getMemberIdString(m);
           if (mIdStr) {
-            io.to(`user_${mIdStr}`).emit('receive-message', populatedMessage);
+            broadcast = broadcast.to(`user_${mIdStr}`);
           }
         });
       }
+      broadcast.emit('receive-message', populatedMessage);
     }
 
     res.json({ success: true, data: populatedMessage });
@@ -498,7 +516,7 @@ const acknowledgeMessage = async (req, res) => {
     await message.save();
 
     // Broadcast via global socket if io is attached
-    const io = req.app.get('io') || global.io;
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
     if (io) {
       io.to(String(message.roomId)).emit('message-acknowledged', {
         messageId: message._id,
@@ -740,7 +758,7 @@ const clearAllData = async (req, res) => {
     await ChatRoom.deleteMany({ isSystemGroup: false });
     await syncCommunicationGroups();
 
-    const io = req.app.get('io') || global.io;
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
     if (io) {
       io.emit('communication-data-cleared', { timestamp: Date.now() });
     }

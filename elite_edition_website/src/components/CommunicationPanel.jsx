@@ -461,6 +461,14 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           list = list.filter((m) => m.attachment && m.attachment.fileUrl);
         }
         setMessages(list);
+
+        const myId = currentUser?._id || currentUser?.id;
+        if (socket && myId && groupId) {
+          socket.emit('read-room-messages', { roomId: groupId, userId: myId });
+        }
+        setGroups((prev) =>
+          prev.map((g) => (String(g._id) === String(groupId) ? { ...g, unreadCount: 0 } : g))
+        );
       }
     } catch (err) {
       console.error('Failed to fetch group messages:', err);

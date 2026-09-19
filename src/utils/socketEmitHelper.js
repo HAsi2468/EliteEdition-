@@ -5,7 +5,7 @@
 function emitSocketEvent(req, eventName, payload) {
   try {
     if (!req || !req.app) return;
-    const io = req.app.get('io');
+    const io = req.app.get('io') || req.app.get('socketio') || global.io;
     if (io) {
       io.emit(eventName, payload);
     }
