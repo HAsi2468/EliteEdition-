@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require('fs');
 
 const { isR2Configured, uploadToR2, getPresignedR2UploadUrl } = require('../../utils/r2Storage');
+const communicationController = require('../../controllers/communication.controller');
 
 // Ensure uploads dir exists
 const uploadsDir = path.join(__dirname, '../../../uploads');
@@ -146,29 +147,7 @@ router.delete('/r2-attachments', async (req, res) => {
 });
 
 
-router.get('/rooms', async (req, res) => {
-  try {
-    await ensureAutoScreenGroupsExist();
-    const { userId } = req.query;
-    
-    let query = { isArchived: { $ne: true } };
-    if (userId) {
-      query = {
-        isArchived: { $ne: true },
-        $or: [
-          { members: userId }, // Match any room where user is a member
-          { type: { $ne: 'direct' }, $or: [ { members: { $exists: false } }, { members: { $size: 0 } } ] } // Match public group rooms
-        ]
-      };
-    }
-
-    const rooms = await ChatRoom.find(query).populate('members', 'name email');
-    res.json({ success: true, data: rooms });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Server Error' });
-  }
-});
+router.get('/rooms', communicationController.getGroups);
 
 // Broadcast Today's Operational Data across Auto Screen Groups
 router.post('/broadcast-today-data', async (req, res) => {
@@ -355,31 +334,9 @@ router.get('/rooms/:roomId/messages', async (req, res) => {
 });
 
 // Send a message to a room via HTTP (e.g. for sharing reports)
-router.post('/rooms/:roomId/messages', async (req, res) => {
-  try {
-    const { roomId } = req.params;
-    const { senderId, content } = req.body;
-    
-    const newMessage = await ChatMessage.create({
-      roomId,
-      senderId,
-      content,
-      type: 'text'
-    });
-    
-    const populatedMessage = await ChatMessage.findById(newMessage._id).populate('senderId', 'name email');
-    
-    // Broadcast message via socket if Socket.io is attached to req.app
-    const io = req.app.get('socketio');
-    if (io) {
-      io.to(roomId).emit('receive-message', populatedMessage);
-    }
-    
-    res.json({ success: true, data: populatedMessage });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Server Error' });
-  }
+router.post('/rooms/:roomId/messages', async (req, res, next) => {
+  req.params.groupId = req.params.roomId;
+  return communicationController.postGroupMessage(req, res, next);
 });
 
 // Get all Tasks

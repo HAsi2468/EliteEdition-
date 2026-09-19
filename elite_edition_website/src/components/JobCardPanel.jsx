@@ -3,7 +3,7 @@ import { api, getBaseUrl } from '../services/api';
 import {
   PlusCircle, Search, RefreshCw, Edit2, Trash2, FileText,
   Printer, ChevronLeft, ChevronRight, Clock, CheckCircle,
-  AlertCircle, Cpu, X, Save, Eye, Image, LayoutGrid, List, Send, Download, Receipt
+  AlertCircle, Cpu, X, Save, Eye, Image, LayoutGrid, List, Send, Download, Receipt, Loader
 } from 'lucide-react';
 import DesignCatalogue from './DesignCatalogue';
 import DesignMaster from './DesignMaster';
@@ -1978,6 +1978,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [shareCompanyFilter, setShareCompanyFilter] = useState('');
   const [shareSearch, setShareSearch] = useState('');
+  const [shareNote, setShareNote] = useState('');
+  const [loadingShareRooms, setLoadingShareRooms] = useState(false);
   const [sharingJobCard, setSharingJobCard] = useState(false);
 
   // Multi-select for Job Cards Bulk Download / Print
@@ -2030,80 +2032,117 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => {
-    if (showShareModal) {
-      const loadRooms = async () => {
-        try {
-          const res = await api.getCommunicationGroups();
-          const groupsList = Array.isArray(res) ? res : (res?.data || []);
-          setChatRooms(groupsList);
+  const detectCompanyForCard = (card) => {
+    if (!card) return 'Elite Digital Print';
+    const cardDept = (card.department || '').toLowerCase();
+    const cardParty = (card.party || '').toLowerCase();
+    if (cardDept === 'stitching' || cardParty.includes('stitching')) return 'Elite Stitching';
+    if (cardParty.includes('online') || cardParty.includes('eon')) return 'Elite Online';
+    if (cardParty.includes('fabtex')) return 'Elite Fabtex';
+    if (cardParty.includes('edition')) return 'Elite Edition';
+    return 'Elite Digital Print';
+  };
 
-          if (shareCard) {
-            const cardDept = (shareCard.department || '').toLowerCase();
-            const cardParty = (shareCard.party || '').toLowerCase();
-            const autoGroup = groupsList.find((g) => {
-              if (g.type === 'direct') return false;
-              const gName = (g.name || '').toLowerCase();
-              const gComp = (g.companyEntity || '').toLowerCase();
-              if (cardDept === 'stitching' || cardParty.includes('stitching')) {
-                return gComp.includes('stitching') || gName.includes('stitching');
-              }
-              if (cardDept === 'digital_print' || cardParty.includes('print') || cardParty.includes('digital')) {
-                return gComp.includes('print') || gName.includes('job card') || gName.includes('print');
-              }
-              if (cardParty.includes('online') || cardParty.includes('eon')) {
-                return gComp.includes('online') || gName.includes('sales');
-              }
-              if (cardParty.includes('fabtex')) {
-                return gComp.includes('fabtex') || gName.includes('fabtex');
-              }
-              if (cardParty.includes('edition')) {
-                return gComp.includes('edition') || gName.includes('operations');
-              }
-              return false;
-            });
-            if (autoGroup) {
-              setSelectedRoomId(autoGroup._id);
-            } else if (groupsList.length > 0) {
-              setSelectedRoomId(groupsList[0]._id);
-            }
-          }
-        } catch (err) {
-          console.error('Failed to load chat rooms for sharing', err);
+  const loadShareRooms = async (targetCard, forceSync = false) => {
+    setLoadingShareRooms(true);
+    try {
+      if (forceSync) {
+        await api.syncCommunicationGroups().catch(() => {});
+      }
+      let res = await api.getCommunicationGroups();
+      let groupsList = Array.isArray(res) ? res : (res?.data || []);
+
+      if (groupsList.length === 0) {
+        await api.syncCommunicationGroups().catch(() => {});
+        res = await api.getCommunicationGroups();
+        groupsList = Array.isArray(res) ? res : (res?.data || []);
+      }
+
+      if (groupsList.length === 0) {
+        const legacyRes = await api.getRooms().catch(() => null);
+        if (legacyRes?.data) groupsList = legacyRes.data;
+      }
+
+      setChatRooms(groupsList);
+
+      const card = targetCard || shareCard;
+      if (card && groupsList.length > 0) {
+        const detectedComp = detectCompanyForCard(card).toLowerCase();
+        const autoGroup = groupsList.find((g) => {
+          if (g.type === 'direct') return false;
+          const gName = (g.name || '').toLowerCase();
+          const gComp = (g.companyEntity || '').toLowerCase();
+          if (detectedComp.includes('print')) return gComp.includes('print') || gName.includes('job card') || gName.includes('print');
+          if (detectedComp.includes('online')) return gComp.includes('online') || gName.includes('sales');
+          if (detectedComp.includes('stitching')) return gComp.includes('stitching') || gName.includes('stitching');
+          if (detectedComp.includes('fabtex')) return gComp.includes('fabtex') || gName.includes('fabtex');
+          if (detectedComp.includes('edition')) return gComp.includes('edition') || gName.includes('operations');
+          return gComp.includes(detectedComp) || gName.includes(detectedComp);
+        });
+
+        if (autoGroup) {
+          setSelectedRoomId(autoGroup._id);
+        } else {
+          setSelectedRoomId(groupsList[0]._id);
         }
-      };
-      loadRooms();
+      }
+    } catch (err) {
+      console.error('Failed to load chat rooms for sharing', err);
+    } finally {
+      setLoadingShareRooms(false);
     }
-  }, [showShareModal, shareCard]);
+  };
+
+  const handleSelectShareCompany = (comp) => {
+    setShareCompanyFilter(comp);
+    if (!comp) return;
+    const cLow = comp.toLowerCase();
+    const match = chatRooms.find((r) => {
+      if (r.type === 'direct') return false;
+      const rName = (r.name || '').toLowerCase();
+      const rComp = (r.companyEntity || '').toLowerCase();
+      if (cLow.includes('print')) return rComp.includes('print') || rName.includes('job card') || rName.includes('print');
+      if (cLow.includes('online')) return rComp.includes('online') || rName.includes('online') || rName.includes('sales');
+      if (cLow.includes('stitching')) return rComp.includes('stitching') || rName.includes('stitching');
+      if (cLow.includes('fabtex')) return rComp.includes('fabtex') || rName.includes('fabtex');
+      if (cLow.includes('edition')) return rComp.includes('edition') || rName.includes('operations');
+      return rComp.includes(cLow) || rName.includes(cLow);
+    });
+    if (match) setSelectedRoomId(match._id);
+  };
 
   const handleOpenShareModal = (card) => {
     setShareCard(card);
-    setShareCompanyFilter('');
+    const initialComp = detectCompanyForCard(card);
+    setShareCompanyFilter(initialComp);
     setShareSearch('');
+    setShareNote('');
     setShowShareModal(true);
+    loadShareRooms(card);
   };
 
   const handleShareJobCard = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!selectedRoomId || !shareCard) return;
 
     setSharingJobCard(true);
     try {
       const currentUser = api.getCurrentUser();
       const myId = currentUser ? (currentUser._id || currentUser.id) : '';
-      if (!myId) {
-        triggerEliteAlert('Authentication Required', 'You must be signed in to share job cards.', 'warning');
-        return;
-      }
 
       const refVal = `JC-${shareCard.jobNo}`;
-      const cardTitle = `Job Card #${shareCard.jobNo} — ${shareCard.party || 'Client'}`;
+      const notePrefix = shareNote.trim() ? `${shareNote.trim()}\n\n` : '';
+      const cardTitle = `${notePrefix}📋 Job Card #${shareCard.jobNo} — ${shareCard.party || 'Client'}`;
       const actMeta = {
         action: 'SHARE_RECORD',
         module: 'Job Card',
         recordRef: refVal,
         recordId: shareCard._id,
-        permissionScope: 'jobcards'
+        permissionScope: 'jobcards',
+        jobNo: shareCard.jobNo,
+        party: shareCard.party,
+        totalMtr: shareCard.totalMtr,
+        status: shareCard.status || shareCard.currentStage
       };
 
       const messagePayload = {
@@ -2118,11 +2157,12 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
       await api.sendCommunicationMessage(selectedRoomId, messagePayload);
 
       const targetRoom = chatRooms.find((r) => String(r._id) === String(selectedRoomId));
-      triggerEliteAlert('Job Card Shared 🚀', `Job Card #${shareCard.jobNo} shared successfully to "${targetRoom?.name || 'chat'}"!`, 'success');
+      triggerEliteAlert('Job Card Shared 🚀', `Job Card #${shareCard.jobNo} shared directly to "${targetRoom?.name || 'chat'}"!`, 'success');
       setShowShareModal(false);
       setShareCard(null);
       setSelectedRoomId('');
       setShareSearch('');
+      setShareNote('');
       setShareCompanyFilter('');
     } catch (err) {
       console.error('Failed to share job card', err);
@@ -2781,281 +2821,460 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
       )}
 
       {/* 🌟 SHARE TO CHAT FLOATING MODAL 🌟 */}
-      {showShareModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.65)',
-          backdropFilter: 'blur(5px)',
-          zIndex: 999999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1rem',
-          animation: 'fadeIn 0.2s ease-out'
-        }}>
+      {showShareModal && (() => {
+        const COMPANY_OPTIONS = [
+          { id: 'Elite Digital Print', label: '🖨️ Digital Print', color: '#2563eb' },
+          { id: 'Elite Online', label: '🛍️ Online', color: '#9333ea' },
+          { id: 'Elite Edition', label: '🏢 Edition', color: '#0284c7' },
+          { id: 'Elite Fabtex', label: '🧵 Fabtex', color: '#d97706' },
+          { id: 'Elite Stitching', label: '✂️ Stitching', color: '#16a34a' },
+          { id: '', label: '🌐 All Channels', color: '#475569' }
+        ];
+
+        const selectedRoom = chatRooms.find(r => String(r._id) === String(selectedRoomId));
+
+        const filteredRooms = chatRooms.filter(r => {
+          if (shareCompanyFilter) {
+            const cLow = shareCompanyFilter.toLowerCase();
+            const rName = (r.name || '').toLowerCase();
+            const rComp = (r.companyEntity || '').toLowerCase();
+            const isMatch = r.type !== 'direct' && (
+              (cLow.includes('print') && (rComp.includes('print') || rName.includes('print'))) ||
+              (cLow.includes('online') && (rComp.includes('online') || rName.includes('sales'))) ||
+              (cLow.includes('stitching') && (rComp.includes('stitching') || rName.includes('stitching'))) ||
+              (cLow.includes('fabtex') && (rComp.includes('fabtex') || rName.includes('fabtex'))) ||
+              (cLow.includes('edition') && (rComp.includes('edition') || rName.includes('operations'))) ||
+              rComp.includes(cLow) || rName.includes(cLow)
+            );
+            if (!isMatch) return false;
+          }
+          if (!shareSearch) return true;
+          const roomName = r.type === 'direct' 
+            ? (r.members?.find(m => (m._id || m) !== api.getCurrentUser()?._id)?.name || r.name || '')
+            : (r.name || '');
+          return roomName.toLowerCase().includes(shareSearch.toLowerCase());
+        });
+
+        return (
           <div style={{
-            background: '#ffffff',
-            width: '100%',
-            maxWidth: '520px',
-            borderRadius: '14px',
-            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
-            border: '1px solid #cbd5e1',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(5px)',
+            zIndex: 999999,
             display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            color: '#0f172a'
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+            animation: 'fadeIn 0.2s ease-out'
           }}>
-            {/* Modal Header */}
             <div style={{
-              padding: '1.1rem 1.4rem',
-              background: '#f8fafc',
-              borderBottom: '1px solid #e2e8f0',
+              background: '#ffffff',
+              width: '100%',
+              maxWidth: '540px',
+              borderRadius: '16px',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
+              border: '1px solid #cbd5e1',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
+              flexDirection: 'column',
+              overflow: 'hidden',
+              color: '#0f172a'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <div style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  background: '#eff6ff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <Send size={18} color="#2563eb" />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
-                    Share Job Card {shareCard?.jobNo ? `— ${shareCard.jobNo}` : ''}
-                  </h3>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                    Send this job card directly into a team chat channel or direct message.
-                  </p>
-                </div>
-              </div>
-
-              <button 
-                type="button"
-                onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); }} 
-                style={{
-                  background: '#f1f5f9',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: 30,
-                  height: 30,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#475569'
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleShareJobCard} style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
-                  🏢 Select Company
-                </label>
-                <select
-                  value={shareCompanyFilter}
-                  onChange={(e) => {
-                    const comp = e.target.value;
-                    setShareCompanyFilter(comp);
-                    if (comp) {
-                      const cLow = comp.toLowerCase();
-                      const match = chatRooms.find((r) => {
-                        if (r.type === 'direct') return false;
-                        const rName = (r.name || '').toLowerCase();
-                        const rComp = (r.companyEntity || '').toLowerCase();
-                        if (cLow.includes('print')) return rComp.includes('print') || rName.includes('print');
-                        if (cLow.includes('online')) return rComp.includes('online') || rName.includes('online') || rName.includes('sales');
-                        if (cLow.includes('stitching')) return rComp.includes('stitching') || rName.includes('stitching');
-                        if (cLow.includes('fabtex')) return rComp.includes('fabtex') || rName.includes('fabtex');
-                        if (cLow.includes('edition')) return rComp.includes('edition') || rName.includes('operations');
-                        return rComp.includes(cLow) || rName.includes(cLow);
-                      });
-                      if (match) setSelectedRoomId(match._id);
-                    }
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '0.6rem 0.85rem',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    backgroundColor: '#ffffff',
-                    color: '#0f172a',
-                    outline: 'none',
-                    fontSize: '0.85rem',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="">🏢 All Companies &amp; Departments</option>
-                  <option value="Elite Digital Print">🖨️ Elite Digital Print (EDP)</option>
-                  <option value="Elite Online">🛍️ Elite Online (EON)</option>
-                  <option value="Elite Edition">🏢 Elite Edition (EE)</option>
-                  <option value="Elite Fabtex">🧵 Elite Fabtex (EF)</option>
-                  <option value="Elite Stitching">✂️ Elite Stitching (ES)</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Search Channel or Team Member</label>
-                <input 
-                  type="text" 
-                  value={shareSearch} 
-                  onChange={e => setShareSearch(e.target.value)} 
-                  placeholder="Type channel or member name..." 
-                  style={{
-                    width: '100%',
-                    padding: '0.6rem 0.85rem',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    backgroundColor: '#ffffff',
-                    color: '#0f172a',
-                    outline: 'none',
-                    fontSize: '0.85rem'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Select Chat Destination</label>
-                <div style={{
-                  maxHeight: '220px',
-                  overflowY: 'auto',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '10px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  padding: '6px',
-                  backgroundColor: '#f8fafc'
-                }}>
-                  {chatRooms
-                    .filter(r => {
-                      if (shareCompanyFilter) {
-                        const cLow = shareCompanyFilter.toLowerCase();
-                        const rName = (r.name || '').toLowerCase();
-                        const rComp = (r.companyEntity || '').toLowerCase();
-                        const isMatch = r.type !== 'direct' && (
-                          (cLow.includes('print') && (rComp.includes('print') || rName.includes('print'))) ||
-                          (cLow.includes('online') && (rComp.includes('online') || rName.includes('sales'))) ||
-                          (cLow.includes('stitching') && (rComp.includes('stitching') || rName.includes('stitching'))) ||
-                          (cLow.includes('fabtex') && (rComp.includes('fabtex') || rName.includes('fabtex'))) ||
-                          (cLow.includes('edition') && (rComp.includes('edition') || rName.includes('operations'))) ||
-                          rComp.includes(cLow) || rName.includes(cLow)
-                        );
-                        if (!isMatch) return false;
-                      }
-                      if (!shareSearch) return true;
-                      const roomName = r.type === 'direct' 
-                        ? (r.members?.find(m => (m._id || m) !== api.getCurrentUser()?._id)?.name || r.name || '')
-                        : (r.name || '');
-                      return roomName.toLowerCase().includes(shareSearch.toLowerCase());
-                    })
-                    .map(r => {
-                      const isDirect = r.type === 'direct';
-                      const displayName = isDirect 
-                        ? (r.members?.find(m => (m._id || m) !== api.getCurrentUser()?._id)?.name || r.name || 'Direct Message')
-                        : `# ${r.name}`;
-                      const isSelected = selectedRoomId === r._id;
-                      
-                      return (
-                        <div 
-                          key={r._id} 
-                          onClick={() => setSelectedRoomId(r._id)}
-                          style={{
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            cursor: 'pointer',
-                            backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
-                            border: isSelected ? '1px solid #2563eb' : '1px solid #e2e8f0',
-                            color: isSelected ? '#1d4ed8' : '#0f172a',
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          <div style={{
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '50%',
-                            background: isSelected
-                              ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
-                              : '#e2e8f0',
-                            color: isSelected ? '#ffffff' : '#475569',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.78rem',
-                            fontWeight: '800'
-                          }}>
-                            {isDirect ? displayName.charAt(0).toUpperCase() : '#'}
-                          </div>
-                          <span style={{ fontSize: '0.88rem', fontWeight: isSelected ? 700 : 500, flex: 1 }}>{displayName}</span>
-                          {isSelected && <span style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: 800 }}>✓</span>}
-                        </div>
-                      );
-                    })}
-                  {chatRooms.length === 0 && (
-                    <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
-                      No active channels or messages found.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button 
-                  type="button" 
-                  onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); }} 
-                  className="btn-secondary"
-                  style={{
-                    padding: '0.5rem 1.2rem',
-                    borderRadius: '6px',
-                    fontSize: '0.85rem',
-                    fontWeight: 700
-                  }}
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={sharingJobCard || !selectedRoomId}
-                  style={{
-                    padding: '12px 24px',
-                    borderRadius: '24px',
-                    border: 'none',
-                    background: selectedRoomId ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'rgba(255,255,255,0.08)',
-                    color: 'white',
-                    cursor: selectedRoomId ? 'pointer' : 'not-allowed',
-                    fontWeight: 'bold',
-                    fontSize: '0.88rem',
+              {/* Modal Header */}
+              <div style={{
+                padding: '1.1rem 1.4rem',
+                background: '#f8fafc',
+                borderBottom: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    background: '#eff6ff',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
-                    boxShadow: selectedRoomId ? '0 4px 14px rgba(56,189,248,0.3)' : 'none',
-                    opacity: selectedRoomId ? 1 : 0.5
+                    justifyContent: 'center'
+                  }}>
+                    <Send size={20} color="#2563eb" />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                      Share Job Card {shareCard?.jobNo ? `— #${shareCard.jobNo}` : ''}
+                    </h3>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                      Send directly into company team channels or private messages.
+                    </p>
+                  </div>
+                </div>
+
+                <button 
+                  type="button"
+                  onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); setShareNote(''); }} 
+                  style={{
+                    background: '#f1f5f9',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: 32,
+                    height: 32,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: '#475569'
                   }}
                 >
-                  {sharingJobCard ? 'Sharing...' : 'Confirm Share'}
+                  <X size={16} />
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleShareJobCard} style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {/* 📋 Job Card Mini Context Card */}
+                {shareCard && (
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '8px',
+                    fontSize: '0.8rem'
+                  }}>
+                    <span style={{ fontWeight: 800, color: '#2563eb' }}>JC #{shareCard.jobNo}</span>
+                    <span style={{ color: '#475569', fontWeight: 600 }}>Party: <strong>{shareCard.party || 'Client'}</strong></span>
+                    <span style={{ color: '#059669', fontWeight: 700 }}>{shareCard.totalMtr || 0} Mtr</span>
+                    <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '6px', fontWeight: 700, fontSize: '0.72rem' }}>
+                      {shareCard.currentStage || shareCard.status || 'Active'}
+                    </span>
+                  </div>
+                )}
+
+                {/* 🏢 Quick Company Filter Pills */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+                      🏢 Select Company
+                    </label>
+                    <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                      Filters channels &amp; auto-selects direct group
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {COMPANY_OPTIONS.map(opt => {
+                      const isSelected = shareCompanyFilter === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => handleSelectShareCompany(opt.id)}
+                          style={{
+                            padding: '5px 10px',
+                            borderRadius: '20px',
+                            border: isSelected ? `2px solid ${opt.color}` : '1px solid #cbd5e1',
+                            background: isSelected ? `${opt.color}15` : '#ffffff',
+                            color: isSelected ? opt.color : '#475569',
+                            fontWeight: isSelected ? 800 : 600,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          {opt.label}
+                          {isSelected && <span style={{ fontSize: '0.75rem' }}>✓</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ⚡ 1-Click Direct Share Banner */}
+                {selectedRoom ? (
+                  <div style={{
+                    background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                    border: '1.5px solid #93c5fd',
+                    borderRadius: '12px',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.08)'
+                  }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#1d4ed8', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span>⚡ 1-Click Destination</span>
+                        {selectedRoom.companyEntity && (
+                          <span style={{ background: '#bfdbfe', color: '#1e40af', padding: '1px 5px', borderRadius: '4px', fontSize: '0.66rem' }}>
+                            {selectedRoom.companyEntity}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
+                        #{selectedRoom.name}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleShareJobCard}
+                      disabled={sharingJobCard}
+                      style={{
+                        background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '9px 18px',
+                        fontWeight: 800,
+                        fontSize: '0.86rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: sharingJobCard ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                        flexShrink: 0
+                      }}
+                    >
+                      {sharingJobCard ? <Loader size={15} className="animate-spin" /> : <Send size={15} />}
+                      <span>{sharingJobCard ? 'Sending...' : '🚀 Send Directly Now'}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{
+                    background: '#fef3c7',
+                    border: '1px solid #fde68a',
+                    borderRadius: '10px',
+                    padding: '10px 12px',
+                    color: '#92400e',
+                    fontSize: '0.8rem',
+                    fontWeight: 700
+                  }}>
+                    ⚠️ Please select a channel below to send this job card.
+                  </div>
+                )}
+
+                {/* 💬 Optional Note Input */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '4px', fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>
+                    💬 Optional Note / Instruction (Shared with Job Card)
+                  </label>
+                  <input 
+                    type="text" 
+                    value={shareNote} 
+                    onChange={e => setShareNote(e.target.value)} 
+                    placeholder="e.g. Urgent production run, please prioritize printing..." 
+                    style={{
+                      width: '100%',
+                      padding: '0.55rem 0.8rem',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: '#ffffff',
+                      color: '#0f172a',
+                      outline: 'none',
+                      fontSize: '0.84rem'
+                    }}
+                  />
+                </div>
+
+                {/* 🔍 Search & Channels Roster */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>
+                      Destination Channels ({filteredRooms.length})
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => loadShareRooms(shareCard, true)}
+                      disabled={loadingShareRooms}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#2563eb',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <RefreshCw size={12} className={loadingShareRooms ? 'animate-spin' : ''} />
+                      Sync Channels
+                    </button>
+                  </div>
+
+                  <div style={{ position: 'relative', marginBottom: '6px' }}>
+                    <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+                    <input 
+                      type="text" 
+                      value={shareSearch} 
+                      onChange={e => setShareSearch(e.target.value)} 
+                      placeholder="Search channel or member name..." 
+                      style={{
+                        width: '100%',
+                        padding: '0.5rem 0.8rem 0.5rem 2rem',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        backgroundColor: '#ffffff',
+                        color: '#0f172a',
+                        outline: 'none',
+                        fontSize: '0.82rem'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{
+                    maxHeight: '170px',
+                    overflowY: 'auto',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    padding: '6px',
+                    backgroundColor: '#f8fafc'
+                  }}>
+                    {loadingShareRooms ? (
+                      <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                        <Loader size={20} className="animate-spin" color="#2563eb" />
+                        <span>Loading team communication channels...</span>
+                      </div>
+                    ) : filteredRooms.length === 0 ? (
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '0.82rem' }}>
+                        <p style={{ margin: '0 0 8px 0' }}>No active channels found for this filter.</p>
+                        <button
+                          type="button"
+                          onClick={() => { setShareCompanyFilter(''); setShareSearch(''); loadShareRooms(shareCard, true); }}
+                          style={{
+                            background: '#2563eb',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '5px 12px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🔄 Reset Filters &amp; Sync Groups
+                        </button>
+                      </div>
+                    ) : (
+                      filteredRooms.map(r => {
+                        const isDirect = r.type === 'direct';
+                        const displayName = isDirect 
+                          ? (r.members?.find(m => (m._id || m) !== api.getCurrentUser()?._id)?.name || r.name || 'Direct Message')
+                          : r.name;
+                        const isSelected = selectedRoomId === r._id;
+                        
+                        return (
+                          <div 
+                            key={r._id} 
+                            onClick={() => setSelectedRoomId(r._id)}
+                            style={{
+                              padding: '7px 10px',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              cursor: 'pointer',
+                              backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
+                              border: isSelected ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+                              color: isSelected ? '#1d4ed8' : '#0f172a',
+                              transition: 'all 0.12s ease',
+                            }}
+                          >
+                            <div style={{
+                              width: '26px',
+                              height: '26px',
+                              borderRadius: '50%',
+                              background: isSelected
+                                ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                                : '#e2e8f0',
+                              color: isSelected ? '#ffffff' : '#475569',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.75rem',
+                              fontWeight: '800',
+                              flexShrink: 0
+                            }}>
+                              {isDirect ? displayName.charAt(0).toUpperCase() : '#'}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: '0.84rem', fontWeight: isSelected ? 800 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {displayName}
+                              </div>
+                              {r.companyEntity && (
+                                <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                  {r.companyEntity}
+                                </div>
+                              )}
+                            </div>
+                            {isSelected && (
+                              <span style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: 900 }}>✓</span>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Bottom action controls */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.25rem', paddingTop: '0.75rem', borderTop: '1px solid #f1f5f9' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => { setShowShareModal(false); setSelectedRoomId(''); setShareSearch(''); setShareNote(''); }} 
+                    className="btn-secondary"
+                    style={{
+                      padding: '0.5rem 1.1rem',
+                      borderRadius: '8px',
+                      fontSize: '0.84rem',
+                      fontWeight: 700
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={sharingJobCard || !selectedRoomId}
+                    style={{
+                      padding: '8px 20px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: selectedRoomId ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' : '#cbd5e1',
+                      color: 'white',
+                      cursor: selectedRoomId ? 'pointer' : 'not-allowed',
+                      fontWeight: 'bold',
+                      fontSize: '0.86rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: selectedRoomId ? '0 4px 14px rgba(37,99,235,0.25)' : 'none',
+                      opacity: selectedRoomId ? 1 : 0.6
+                    }}
+                  >
+                    {sharingJobCard ? <Loader size={15} className="animate-spin" /> : <Send size={15} />}
+                    <span>{sharingJobCard ? 'Sharing...' : 'Confirm Share'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Staff Audit History & Mistakes Tracker Modal */}
       {historyModalCard && (
