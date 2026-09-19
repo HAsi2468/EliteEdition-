@@ -13,7 +13,7 @@ import {
   RefreshCw, PlusCircle, ArrowDownToLine, ArrowUpFromLine,
   Layers, Database, Settings, Trash2, FileDown, Search, X,
   AlertTriangle, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Edit, FileText,
-  Check, Plus, ArrowRightLeft, Download, Eye, Receipt, Clock, Truck
+  Check, Plus, ArrowRightLeft, Download, Eye, Receipt, Clock, Truck, Calendar
 } from 'lucide-react';
 
 export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard', onlyChallan = false }) {
@@ -623,6 +623,8 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   // Lot-Wise Management state
   const [lotSearch, setLotSearch] = useState('');
   const [lotStatusFilter, setLotStatusFilter] = useState('All');
+  const [lotDateStart, setLotDateStart] = useState('');
+  const [lotDateEnd, setLotDateEnd] = useState('');
   const [expandedLotNo, setExpandedLotNo] = useState(null);
   const [lotPdfLoading, setLotPdfLoading] = useState(false);
   const [lotDownloadingNo, setLotDownloadingNo] = useState(null);
@@ -1853,6 +1855,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
       item.totalOutward += qty;
       item.outwardTxs.push(t);
     }
+
+    if (t.date) {
+      if (!item.firstDate || new Date(t.date) < new Date(item.firstDate)) item.firstDate = t.date;
+      if (!item.lastDate || new Date(t.date) > new Date(item.lastDate)) item.lastDate = t.date;
+    }
   });
 
   const lotRecords = Array.from(lotMap.values()).map(l => {
@@ -1870,7 +1877,25 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     return b.lotNo.localeCompare(a.lotNo);
   });
 
-  const filteredLots = lotRecords.filter(l => {
+  const dateFilteredLots = lotRecords.filter(l => {
+    if (lotDateStart) {
+      const startD = new Date(lotDateStart);
+      const hasAfter = (l.inwardTxs.some(tx => tx.date && new Date(tx.date) >= startD)) ||
+                       (l.outwardTxs.some(tx => tx.date && new Date(tx.date) >= startD)) ||
+                       (l.lastDate && new Date(l.lastDate) >= startD);
+      if (!hasAfter) return false;
+    }
+    if (lotDateEnd) {
+      const endD = new Date(lotDateEnd + 'T23:59:59');
+      const hasBefore = (l.inwardTxs.some(tx => tx.date && new Date(tx.date) <= endD)) ||
+                        (l.outwardTxs.some(tx => tx.date && new Date(tx.date) <= endD)) ||
+                        (l.firstDate && new Date(l.firstDate) <= endD);
+      if (!hasBefore) return false;
+    }
+    return true;
+  });
+
+  const filteredLots = dateFilteredLots.filter(l => {
     if (lotStatusFilter === 'InStock' && l.currentStock <= 0) return false;
     if (lotStatusFilter === 'Exhausted' && l.currentStock > 0) return false;
     if (!lotSearch) return true;
@@ -2200,7 +2225,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   onClick={async () => {
                     try {
                       setLotPdfLoading(true);
-                      await api.downloadFabricLotWisePdf('', '', `Fabric_LotWise_Management_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+                      await api.downloadFabricLotWisePdf(
+                        lotDateStart,
+                        lotDateEnd,
+                        `Fabric_LotWise_Management_Report_${lotDateStart || 'all'}_to_${lotDateEnd || 'all'}.pdf`
+                      );
                     } catch (err) {
                       alert('Failed to download Lot Report PDF: ' + err.message);
                     } finally {
@@ -2220,46 +2249,48 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
             {/* Lot Summary Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
               <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>Total Lots Tracked</span>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: 'var(--text-primary)' }}>{lotRecords.length}</div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>
+                  Total Lots Tracked {(lotDateStart || lotDateEnd) ? '(Filtered)' : ''}
+                </span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: 'var(--text-primary)' }}>{dateFilteredLots.length}</div>
               </div>
               <div style={{ padding: '1rem', background: 'rgba(16, 185, 129, 0.06)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
                 <span style={{ color: 'var(--success)', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>In-Stock Lots</span>
                 <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: 'var(--success)' }}>
-                  {lotRecords.filter(l => l.currentStock > 0).length}
+                  {dateFilteredLots.filter(l => l.currentStock > 0).length}
                 </div>
               </div>
               <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.06)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
                 <span style={{ color: '#f87171', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>Exhausted / Deficit Lots</span>
                 <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '0.2rem', color: '#ef4444' }}>
-                  {lotRecords.filter(l => l.currentStock <= 0).length}
+                  {dateFilteredLots.filter(l => l.currentStock <= 0).length}
                 </div>
               </div>
               <div style={{ padding: '1rem', background: 'rgba(56, 189, 248, 0.06)', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
                 <span style={{ color: '#38bdf8', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>Positive Lot Stock (Gross)</span>
                 <div style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '0.2rem', color: '#38bdf8' }}>
-                  {Number(lotRecords.reduce((acc, l) => acc + Math.max(0, l.currentStock), 0)).toFixed(2)} <span style={{ fontSize: '0.75rem' }}>mtr</span>
+                  {Number(dateFilteredLots.reduce((acc, l) => acc + Math.max(0, l.currentStock), 0)).toFixed(2)} <span style={{ fontSize: '0.75rem' }}>mtr</span>
                 </div>
               </div>
               <div style={{ padding: '1rem', background: 'rgba(167, 139, 250, 0.06)', borderRadius: '8px', border: '1px solid rgba(167, 139, 250, 0.2)' }}>
                 <span style={{ color: '#c4b5fd', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>Net Available Stock</span>
                 <div style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '0.2rem', color: '#c4b5fd' }}>
-                  {Number(lotRecords.reduce((acc, l) => acc + (l.currentStock || 0), 0)).toFixed(2)} <span style={{ fontSize: '0.75rem' }}>mtr</span>
+                  {Number(dateFilteredLots.reduce((acc, l) => acc + (l.currentStock || 0), 0)).toFixed(2)} <span style={{ fontSize: '0.75rem' }}>mtr</span>
                 </div>
               </div>
             </div>
 
             {/* Filter Bar */}
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', gap: '0.75rem', flex: 1, minWidth: '280px', flexWrap: 'wrap' }}>
-                <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '0.6rem', flex: 1, minWidth: '280px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: '190px' }}>
                   <Search size={15} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                   <input
                     type="text"
                     placeholder="Search Lot #, Fabric Quality, Vendor, or Party Name..."
                     value={lotSearch}
                     onChange={e => setLotSearch(e.target.value)}
-                    style={{ width: '100%', paddingLeft: '2.2rem', paddingRight: '0.75rem', paddingTop: '0.5rem', paddingBottom: '0.5rem', fontSize: '0.85rem' }}
+                    style={{ width: '100%', paddingLeft: '2.2rem', paddingRight: '0.75rem', paddingTop: '0.45rem', paddingBottom: '0.45rem', fontSize: '0.85rem' }}
                   />
                   {lotSearch && (
                     <X size={14} onClick={() => setLotSearch('')} style={{ position: 'absolute', right: '0.65rem', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--text-muted)' }} />
@@ -2269,16 +2300,150 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                 <select
                   value={lotStatusFilter}
                   onChange={e => setLotStatusFilter(e.target.value)}
-                  style={{ padding: '0.5rem 0.8rem', fontSize: '0.85rem', minWidth: '150px' }}
+                  style={{ padding: '0.45rem 0.75rem', fontSize: '0.85rem', minWidth: '140px' }}
                 >
-                  <option value="All">All Lot Statuses ({lotRecords.length})</option>
-                  <option value="InStock">In-Stock Only ({lotRecords.filter(l => l.currentStock > 0).length})</option>
-                  <option value="Exhausted">Exhausted Only ({lotRecords.filter(l => l.currentStock <= 0).length})</option>
+                  <option value="All">All Statuses ({dateFilteredLots.length})</option>
+                  <option value="InStock">In-Stock Only ({dateFilteredLots.filter(l => l.currentStock > 0).length})</option>
+                  <option value="Exhausted">Exhausted Only ({dateFilteredLots.filter(l => l.currentStock <= 0).length})</option>
                 </select>
+
+                {/* 📅 Date Filter Inputs */}
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: (lotDateStart || lotDateEnd) ? '1px solid var(--primary)' : '1px solid var(--border-light)',
+                  borderRadius: '6px',
+                  padding: '2px 8px',
+                  flexWrap: 'nowrap'
+                }}>
+                  <Calendar size={14} style={{ color: (lotDateStart || lotDateEnd) ? 'var(--primary)' : 'var(--text-muted)' }} />
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
+                  <input
+                    type="date"
+                    value={lotDateStart}
+                    onChange={e => setLotDateStart(e.target.value)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.8rem',
+                      padding: '0.3rem 0.1rem',
+                      outline: 'none',
+                    }}
+                    title="Filter activity from date"
+                  />
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>To:</span>
+                  <input
+                    type="date"
+                    value={lotDateEnd}
+                    onChange={e => setLotDateEnd(e.target.value)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.8rem',
+                      padding: '0.3rem 0.1rem',
+                      outline: 'none',
+                    }}
+                    title="Filter activity up to date"
+                  />
+                  {(lotDateStart || lotDateEnd) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLotDateStart('');
+                        setLotDateEnd('');
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        padding: '2px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        marginLeft: '2px'
+                      }}
+                      title="Clear Date Filter"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick Date Range Presets */}
+                <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const today = new Date().toISOString().split('T')[0];
+                      setLotDateStart(today);
+                      setLotDateEnd(today);
+                    }}
+                    style={{
+                      fontSize: '0.74rem',
+                      padding: '0.35rem 0.55rem',
+                      borderRadius: '4px',
+                      border: '1px solid var(--border-light)',
+                      background: lotDateStart === new Date().toISOString().split('T')[0] && lotDateEnd === new Date().toISOString().split('T')[0] ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                      color: lotDateStart === new Date().toISOString().split('T')[0] && lotDateEnd === new Date().toISOString().split('T')[0] ? '#fff' : 'var(--text-muted)',
+                      cursor: 'pointer',
+                      fontWeight: 600
+                    }}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const now = new Date();
+                      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                      const today = now.toISOString().split('T')[0];
+                      setLotDateStart(firstDay);
+                      setLotDateEnd(today);
+                    }}
+                    style={{
+                      fontSize: '0.74rem',
+                      padding: '0.35rem 0.55rem',
+                      borderRadius: '4px',
+                      border: '1px solid var(--border-light)',
+                      background: 'rgba(255,255,255,0.05)',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      fontWeight: 600
+                    }}
+                  >
+                    This Month
+                  </button>
+                  {(lotDateStart || lotDateEnd) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLotDateStart('');
+                        setLotDateEnd('');
+                      }}
+                      style={{
+                        fontSize: '0.74rem',
+                        padding: '0.35rem 0.55rem',
+                        borderRadius: '4px',
+                        border: '1px solid rgba(239,68,68,0.3)',
+                        background: 'rgba(239,68,68,0.1)',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        fontWeight: 600
+                      }}
+                    >
+                      All Time
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Showing <strong>{filteredLots.length}</strong> of <strong>{lotRecords.length}</strong> lots
+                Showing <strong>{filteredLots.length}</strong> of <strong>{dateFilteredLots.length}</strong> lots
+                {(lotDateStart || lotDateEnd) && ` (filtered from ${lotRecords.length})`}
               </div>
             </div>
 

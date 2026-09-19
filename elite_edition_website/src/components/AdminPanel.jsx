@@ -27,7 +27,8 @@ import {
   Download,
   FileSpreadsheet,
   Search,
-  Settings
+  Settings,
+  AlertCircle
 } from 'lucide-react';
 import { AVAILABLE_SCREENS } from '../config/screensConfig';
 
@@ -40,6 +41,7 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState('');
+  const [modalError, setModalError] = useState('');
   const [success, setSuccess] = useState('');
 
   // Sub Tab Navigation
@@ -436,6 +438,7 @@ export default function AdminPanel() {
       permissions: user.permissions || []
     });
     setError('');
+    setModalError('');
     setSuccess('');
     setShowUserModal(true);
   };
@@ -480,6 +483,7 @@ export default function AdminPanel() {
       permissions: []
     });
     setError('');
+    setModalError('');
     setSuccess('');
     setShowUserModal(true);
   };
@@ -487,6 +491,7 @@ export default function AdminPanel() {
   const handleCancelEdit = () => {
     setEditingUser(null);
     setShowUserModal(false);
+    setModalError('');
     setFormData({
       name: '',
       email: '',
@@ -510,15 +515,20 @@ export default function AdminPanel() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setModalError('');
     setSuccess('');
 
     if (!formData.name.trim() || !formData.email.trim()) {
-      setError('Name and Email are required.');
+      const errText = 'Name and Email are required.';
+      setError(errText);
+      setModalError(errText);
       return;
     }
 
     if (!editingUser && !formData.password) {
-      setError('Password is required for new users.');
+      const errText = 'Password is required for new users.';
+      setError(errText);
+      setModalError(errText);
       return;
     }
 
@@ -537,16 +547,42 @@ export default function AdminPanel() {
           canExportReports: formData.canExportReports,
           canDeleteRecords: formData.canDeleteRecords,
           canViewFinancials: formData.canViewFinancials,
+          canCreateJobCards: formData.canCreateJobCards,
+          canEditJobCards: formData.canEditJobCards,
+          canDeleteJobCards: formData.canDeleteJobCards,
+          canAdvanceJobStage: formData.canAdvanceJobStage,
+          canViewJobCosts: formData.canViewJobCosts,
+          canCreateDesigns: formData.canCreateDesigns,
+          canEditDesigns: formData.canEditDesigns,
+          canDeleteDesigns: formData.canDeleteDesigns,
+          canViewDesignCosts: formData.canViewDesignCosts,
+          canAddFabricInward: formData.canAddFabricInward,
+          canIssueFabricOutward: formData.canIssueFabricOutward,
+          canTransferFabricLot: formData.canTransferFabricLot,
+          canDeleteFabricLogs: formData.canDeleteFabricLogs,
+          canViewFabricPrices: formData.canViewFabricPrices,
+          canCreateInvoices: formData.canCreateInvoices,
+          canEditInvoiceRates: formData.canEditInvoiceRates,
+          canCancelInvoices: formData.canCancelInvoices,
+          canRecordPayments: formData.canRecordPayments,
+          canCreateStitchingJobs: formData.canCreateStitchingJobs,
+          canIssueStitchingChallans: formData.canIssueStitchingChallans,
+          canManageWorkerRates: formData.canManageWorkerRates,
           allowedCompanies: formData.allowedCompanies,
           permissions: formData.permissions
         };
-        if (formData.password) {
-          updatePayload.password = formData.password;
+        if (formData.password && formData.password.trim()) {
+          updatePayload.password = formData.password.trim();
         }
 
-        const updatedRes = await api.updateUser(editingUser.id || editingUser._id, updatePayload);
+        const targetUserId = editingUser.id || editingUser._id;
+        if (!targetUserId) {
+          throw new Error('User ID not found for update.');
+        }
+
+        const updatedRes = await api.updateUser(targetUserId, updatePayload);
         const loggedUser = api.getCurrentUser();
-        if (loggedUser && (loggedUser.id === editingUser.id || loggedUser._id === editingUser.id)) {
+        if (loggedUser && (loggedUser.id === targetUserId || loggedUser._id === targetUserId)) {
           if (updatedRes && updatedRes.user) {
             localStorage.setItem('elite_user', JSON.stringify(updatedRes.user));
           } else {
@@ -560,7 +596,7 @@ export default function AdminPanel() {
         await api.createUser({
           name: formData.name.trim(),
           email: formData.email.trim(),
-          password: formData.password,
+          password: formData.password.trim(),
           role: formData.role,
           isMainAdmin: formData.isMainAdmin,
           department: formData.department,
@@ -570,6 +606,27 @@ export default function AdminPanel() {
           canExportReports: formData.canExportReports,
           canDeleteRecords: formData.canDeleteRecords,
           canViewFinancials: formData.canViewFinancials,
+          canCreateJobCards: formData.canCreateJobCards,
+          canEditJobCards: formData.canEditJobCards,
+          canDeleteJobCards: formData.canDeleteJobCards,
+          canAdvanceJobStage: formData.canAdvanceJobStage,
+          canViewJobCosts: formData.canViewJobCosts,
+          canCreateDesigns: formData.canCreateDesigns,
+          canEditDesigns: formData.canEditDesigns,
+          canDeleteDesigns: formData.canDeleteDesigns,
+          canViewDesignCosts: formData.canViewDesignCosts,
+          canAddFabricInward: formData.canAddFabricInward,
+          canIssueFabricOutward: formData.canIssueFabricOutward,
+          canTransferFabricLot: formData.canTransferFabricLot,
+          canDeleteFabricLogs: formData.canDeleteFabricLogs,
+          canViewFabricPrices: formData.canViewFabricPrices,
+          canCreateInvoices: formData.canCreateInvoices,
+          canEditInvoiceRates: formData.canEditInvoiceRates,
+          canCancelInvoices: formData.canCancelInvoices,
+          canRecordPayments: formData.canRecordPayments,
+          canCreateStitchingJobs: formData.canCreateStitchingJobs,
+          canIssueStitchingChallans: formData.canIssueStitchingChallans,
+          canManageWorkerRates: formData.canManageWorkerRates,
           allowedCompanies: formData.allowedCompanies,
           permissions: formData.permissions
         });
@@ -581,7 +638,9 @@ export default function AdminPanel() {
       handleCancelEdit();
       fetchUsers();
     } catch (err) {
-      setError(err.message || 'Failed to save user.');
+      const errMsg = err.message || 'Failed to save user.';
+      setError(errMsg);
+      setModalError(errMsg);
     } finally {
       setSubmitLoading(false);
     }
@@ -1059,6 +1118,27 @@ export default function AdminPanel() {
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
                   <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
                     
+                    {/* Error Box inside Modal */}
+                    {modalError && (
+                      <div
+                        style={{
+                          background: '#fef2f2',
+                          color: '#b91c1c',
+                          border: '1px solid #fecaca',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '8px',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+                      >
+                        <AlertCircle size={16} />
+                        <span>{modalError}</span>
+                      </div>
+                    )}
+
                     {/* ⚡ 1-Click Role Permission Presets Bar */}
                     <div style={{ background: '#f8fafc', padding: '0.75rem 0.85rem', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
                       <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase', marginBottom: '0.4rem', letterSpacing: '0.04em' }}>

@@ -145,13 +145,16 @@ async function updateUser(req) {
 	if (email) {
 		const existedUser = await getUserByEmail(email);
 
-		if (existedUser && existedUser.id !== userId) {
+		if (existedUser && existedUser._id.toString() !== String(userId)) {
 			throw new ApiError(
 				httpStatus.CONFLICT,
 				'This email already exists'
 			);
 		}
 	}
+
+	delete req.body.id;
+	delete req.body._id;
 
 	const updatedUser = await db.user.findOneAndUpdate(
 		{ _id: userId },

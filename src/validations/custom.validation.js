@@ -1,4 +1,7 @@
 const password = (value, helpers) => {
+	if (!value || String(value).trim() === '') {
+		return value;
+	}
 	if (value.length < 8) {
 		return helpers.error('any.custom', { message: 'password must be at least 8 characters' });
 	}
