@@ -2034,13 +2034,17 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     const mtdMachinePrintedMtr = mtdPrintLogs.reduce((s, l) => s + (Number(l.meters) || 0), 0);
 
     const doc = new PDFDocument({ margin: 25, size: 'A4', autoFirstPage: true, bufferPages: true });
+    doc.page.margins.bottom = 10;
+    doc.on('pageAdded', () => {
+      doc.page.margins.bottom = 10;
+    });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="Elite_Digital_Prints_1_Page_Report.pdf"');
     doc.pipe(res);
 
     const PW = 595, PH = 842, ML = 30, MR = 30;
     const contentWidth = PW - ML - MR;
-    const maxY = 770;
+    const maxY = 750;
 
     const startDateStr = dsStr ? new Date(`${dsStr}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'All Time';
     const endDateStr = deStr ? new Date(`${deStr}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Present';
@@ -2088,17 +2092,17 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       }
 
       doc.fillColor('#000000').fontSize(13).font('Helvetica-Bold')
-        .text('ELITE DIGITAL PRINTS — PRINTING REPORT', ML + 130, 16, { width: contentWidth - 130, align: 'right' });
+        .text('ELITE DIGITAL PRINTS — PRINTING REPORT', ML + 130, 16, { width: contentWidth - 130, align: 'right', lineBreak: false });
 
       let timeText = `Report Period: ${startDateStr} to ${endDateStr}`;
       if (startTimeVal || stopTimeVal) timeText += ` | Shift Time: ${startTimeVal || '—'} to ${stopTimeVal || '—'}`;
       if (operator) timeText += ` | Operator: ${operator}`;
 
       doc.fillColor('#475569').fontSize(8).font('Helvetica-Bold')
-        .text(timeText, ML + 130, 34, { width: contentWidth - 130, align: 'right' });
+        .text(timeText, ML + 130, 34, { width: contentWidth - 130, align: 'right', lineBreak: false });
 
       doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
-        .text(`Generated: ${new Date().toLocaleDateString('en-IN')} ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`, ML + 130, 47, { width: contentWidth - 130, align: 'right' });
+        .text(`Generated: ${new Date().toLocaleDateString('en-IN')} ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`, ML + 130, 47, { width: contentWidth - 130, align: 'right', lineBreak: false });
 
       doc.moveTo(ML, 62).lineTo(PW - MR, 62).strokeColor('#ddd6fe').lineWidth(1.2).stroke();
     };
@@ -2193,6 +2197,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
     const checkAddPage = (heightNeeded) => {
       if (currentY + heightNeeded > maxY) {
         doc.addPage();
+        doc.page.margins.bottom = 10;
         drawPageHeader(false);
         currentY = 70;
         return true;
@@ -2215,15 +2220,15 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       const drawChallanHeaders = () => {
         doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
         doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
-        doc.text('CH. NO', ML + 4, currentY + 5, { width: 44 });
-        doc.text('DATE', ML + 50, currentY + 5, { width: 42 });
-        doc.text('PARTY NAME', ML + 94, currentY + 5, { width: 96 });
-        doc.text('BILLING NAME', ML + 192, currentY + 5, { width: 96 });
-        doc.text('JOB NO', ML + 290, currentY + 5, { width: 50 });
-        doc.text('DESIGN NO', ML + 342, currentY + 5, { width: 70 });
-        doc.text('FABRIC', ML + 414, currentY + 5, { width: 50 });
-        doc.text('TP', ML + 466, currentY + 5, { width: 20, align: 'center' });
-        doc.text('METERS', ML + 488, currentY + 5, { width: 43, align: 'right' });
+        doc.text('CH. NO', ML + 4, currentY + 5, { width: 44, lineBreak: false });
+        doc.text('DATE', ML + 50, currentY + 5, { width: 42, lineBreak: false });
+        doc.text('PARTY NAME', ML + 94, currentY + 5, { width: 96, lineBreak: false });
+        doc.text('BILLING NAME', ML + 192, currentY + 5, { width: 96, lineBreak: false });
+        doc.text('JOB NO', ML + 290, currentY + 5, { width: 50, lineBreak: false });
+        doc.text('DESIGN NO', ML + 342, currentY + 5, { width: 70, lineBreak: false });
+        doc.text('FABRIC', ML + 414, currentY + 5, { width: 50, lineBreak: false });
+        doc.text('TP', ML + 466, currentY + 5, { width: 20, align: 'center', lineBreak: false });
+        doc.text('METERS', ML + 488, currentY + 5, { width: 43, align: 'right', lineBreak: false });
         currentY += 18;
       };
 
@@ -2270,13 +2275,13 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       const drawInwardHeaders = () => {
         doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
         doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
-        doc.text('DATE', ML + 4, currentY + 5, { width: 52 });
-        doc.text('VENDOR NAME', ML + 60, currentY + 5, { width: 140 });
-        doc.text('VENDOR CHALLAN', ML + 204, currentY + 5, { width: 100 });
-        doc.text('FABRIC QUALITY', ML + 308, currentY + 5, { width: 110 });
-        doc.text('PANNA', ML + 422, currentY + 5, { width: 35 });
-        doc.text('LOT NO', ML + 460, currentY + 5, { width: 35 });
-        doc.text('QTY (MTR)', ML + 498, currentY + 5, { width: 33, align: 'right' });
+        doc.text('DATE', ML + 4, currentY + 5, { width: 52, lineBreak: false });
+        doc.text('VENDOR NAME', ML + 60, currentY + 5, { width: 140, lineBreak: false });
+        doc.text('VENDOR CHALLAN', ML + 204, currentY + 5, { width: 100, lineBreak: false });
+        doc.text('FABRIC QUALITY', ML + 308, currentY + 5, { width: 110, lineBreak: false });
+        doc.text('PANNA', ML + 422, currentY + 5, { width: 35, lineBreak: false });
+        doc.text('LOT NO', ML + 460, currentY + 5, { width: 35, lineBreak: false });
+        doc.text('QTY (MTR)', ML + 498, currentY + 5, { width: 33, align: 'right', lineBreak: false });
         currentY += 18;
       };
 
@@ -2321,15 +2326,15 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       const drawOutwardHeaders = () => {
         doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
         doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
-        doc.text('DATE', ML + 4, currentY + 5, { width: 40 });
-        doc.text('PARTY NAME', ML + 46, currentY + 5, { width: 90 });
-        doc.text('BILL TO', ML + 138, currentY + 5, { width: 90 });
-        doc.text('JOB NO', ML + 230, currentY + 5, { width: 45 });
-        doc.text('CHALLAN NO', ML + 277, currentY + 5, { width: 55 });
-        doc.text('FABRIC QUALITY', ML + 334, currentY + 5, { width: 85 });
-        doc.text('LOT NO', ML + 421, currentY + 5, { width: 35 });
-        doc.text('SHORTAGE', ML + 458, currentY + 5, { width: 35, align: 'center' });
-        doc.text('QTY (MTR)', ML + 495, currentY + 5, { width: 36, align: 'right' });
+        doc.text('DATE', ML + 4, currentY + 5, { width: 40, lineBreak: false });
+        doc.text('PARTY NAME', ML + 46, currentY + 5, { width: 90, lineBreak: false });
+        doc.text('BILL TO', ML + 138, currentY + 5, { width: 90, lineBreak: false });
+        doc.text('JOB NO', ML + 230, currentY + 5, { width: 45, lineBreak: false });
+        doc.text('CHALLAN NO', ML + 277, currentY + 5, { width: 55, lineBreak: false });
+        doc.text('FABRIC QUALITY', ML + 334, currentY + 5, { width: 85, lineBreak: false });
+        doc.text('LOT NO', ML + 421, currentY + 5, { width: 35, lineBreak: false });
+        doc.text('SHORTAGE', ML + 458, currentY + 5, { width: 35, align: 'center', lineBreak: false });
+        doc.text('QTY (MTR)', ML + 495, currentY + 5, { width: 36, align: 'right', lineBreak: false });
         currentY += 18;
       };
 
@@ -2490,11 +2495,11 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
 
         // ── 1. SHIFT WISE INK CONSUMPTION TABLE (DAY SHIFT & NIGHT SHIFT) ──
-        checkAddPage(110);
+        checkAddPage(150);
 
         doc.rect(ML, currentY, contentWidth, 15).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold')
-          .text('INK CONSUMPTION SUMMARY (DAY & NIGHT SHIFT)', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
+          .text('INK CONSUMPTION SUMMARY (DAY & NIGHT SHIFT)', ML, currentY + 3.5, { width: contentWidth, align: 'center', lineBreak: false });
         currentY += 16;
 
         const leftX = ML;
@@ -2507,21 +2512,21 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         // 1A. DAY SHIFT INK CONSUMPTION
         doc.rect(leftX, currentY, tableW, 14).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-          .text('GRANDO (DAY SHIFT)', leftX, currentY + 3, { width: tableW, align: 'center' });
+          .text('GRANDO (DAY SHIFT)', leftX, currentY + 3, { width: tableW, align: 'center', lineBreak: false });
 
         doc.rect(rightX, currentY, tableW, 14).fill('#f5f3ff').stroke('#ddd6fe');
         doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
-          .text('PRINTDOT (DAY SHIFT)', rightX, currentY + 3, { width: tableW, align: 'center' });
+          .text('PRINTDOT (DAY SHIFT)', rightX, currentY + 3, { width: tableW, align: 'center', lineBreak: false });
         currentY += 14;
 
         inkCols.forEach((col, i) => {
           doc.rect(leftX + i * colW, currentY, colW, 13).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#334155').fontSize(7).font('Helvetica-Bold')
-            .text(col, leftX + i * colW, currentY + 2.5, { width: colW, align: 'center' });
+            .text(col, leftX + i * colW, currentY + 2.5, { width: colW, align: 'center', lineBreak: false });
 
           doc.rect(rightX + i * colW, currentY, colW, 13).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#334155').fontSize(7).font('Helvetica-Bold')
-            .text(col, rightX + i * colW, currentY + 2.5, { width: colW, align: 'center' });
+            .text(col, rightX + i * colW, currentY + 2.5, { width: colW, align: 'center', lineBreak: false });
         });
         currentY += 13;
 
@@ -2536,34 +2541,34 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           const isTot = i === 4;
           doc.rect(leftX + i * colW, currentY, colW, 14).fill(isTot ? '#eff6ff' : '#ffffff').stroke(isTot ? '#bfdbfe' : '#cbd5e1');
           doc.fillColor(isTot ? '#1e40af' : '#0f172a').fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
-            .text(val, leftX + i * colW, currentY + 3, { width: colW, align: 'center' });
+            .text(val, leftX + i * colW, currentY + 3, { width: colW, align: 'center', lineBreak: false });
         });
         pDayVals.forEach((val, i) => {
           const isTot = i === 4;
           doc.rect(rightX + i * colW, currentY, colW, 14).fill(isTot ? '#f5f3ff' : '#ffffff').stroke(isTot ? '#ddd6fe' : '#cbd5e1');
           doc.fillColor(isTot ? '#5b21b6' : '#0f172a').fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
-            .text(val, rightX + i * colW, currentY + 3, { width: colW, align: 'center' });
+            .text(val, rightX + i * colW, currentY + 3, { width: colW, align: 'center', lineBreak: false });
         });
         currentY += 18;
 
         // 1B. NIGHT SHIFT INK CONSUMPTION
         doc.rect(leftX, currentY, tableW, 14).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-          .text('GRANDO (NIGHT SHIFT)', leftX, currentY + 3, { width: tableW, align: 'center' });
+          .text('GRANDO (NIGHT SHIFT)', leftX, currentY + 3, { width: tableW, align: 'center', lineBreak: false });
 
         doc.rect(rightX, currentY, tableW, 14).fill('#f5f3ff').stroke('#ddd6fe');
         doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
-          .text('PRINTDOT (NIGHT SHIFT)', rightX, currentY + 3, { width: tableW, align: 'center' });
+          .text('PRINTDOT (NIGHT SHIFT)', rightX, currentY + 3, { width: tableW, align: 'center', lineBreak: false });
         currentY += 14;
 
         inkCols.forEach((col, i) => {
           doc.rect(leftX + i * colW, currentY, colW, 13).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#334155').fontSize(7).font('Helvetica-Bold')
-            .text(col, leftX + i * colW, currentY + 2.5, { width: colW, align: 'center' });
+            .text(col, leftX + i * colW, currentY + 2.5, { width: colW, align: 'center', lineBreak: false });
 
           doc.rect(rightX + i * colW, currentY, colW, 13).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#334155').fontSize(7).font('Helvetica-Bold')
-            .text(col, rightX + i * colW, currentY + 2.5, { width: colW, align: 'center' });
+            .text(col, rightX + i * colW, currentY + 2.5, { width: colW, align: 'center', lineBreak: false });
         });
         currentY += 13;
 
@@ -2578,13 +2583,13 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           const isTot = i === 4;
           doc.rect(leftX + i * colW, currentY, colW, 14).fill(isTot ? '#eff6ff' : '#ffffff').stroke(isTot ? '#bfdbfe' : '#cbd5e1');
           doc.fillColor(isTot ? '#1e40af' : '#0f172a').fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
-            .text(val, leftX + i * colW, currentY + 3, { width: colW, align: 'center' });
+            .text(val, leftX + i * colW, currentY + 3, { width: colW, align: 'center', lineBreak: false });
         });
         pNightVals.forEach((val, i) => {
           const isTot = i === 4;
           doc.rect(rightX + i * colW, currentY, colW, 14).fill(isTot ? '#f5f3ff' : '#ffffff').stroke(isTot ? '#ddd6fe' : '#cbd5e1');
           doc.fillColor(isTot ? '#5b21b6' : '#0f172a').fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
-            .text(val, rightX + i * colW, currentY + 3, { width: colW, align: 'center' });
+            .text(val, rightX + i * colW, currentY + 3, { width: colW, align: 'center', lineBreak: false });
         });
         currentY += 15;
 
@@ -2592,16 +2597,16 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         const grandTotInkAll = dayTotInk + nightTotInk;
         doc.rect(ML, currentY, contentWidth, 15).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-          .text(`TOTAL INK CONSUMED (DAY + NIGHT SHIFT): ${grandTotInkAll.toFixed(2)} Ltr (Day: ${dayTotInk.toFixed(2)} Ltr | Night: ${nightTotInk.toFixed(2)} Ltr)`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center' });
+          .text(`TOTAL INK CONSUMED (DAY + NIGHT SHIFT): ${grandTotInkAll.toFixed(2)} Ltr (Day: ${dayTotInk.toFixed(2)} Ltr | Night: ${nightTotInk.toFixed(2)} Ltr)`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center', lineBreak: false });
         currentY += 21;
 
 
         // ── 2. SHIFT WISE PAPER CONSUMPTION SUMMARY (DAY SHIFT & NIGHT SHIFT) ──
-        checkAddPage(120);
+        checkAddPage(30);
 
         doc.rect(ML, currentY, contentWidth, 15).fill('#f5f3ff').stroke('#ddd6fe');
         doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
-          .text('PAPER CONSUMPTION SUMMARY (DAY & NIGHT SHIFT)', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
+          .text('PAPER CONSUMPTION SUMMARY (DAY & NIGHT SHIFT)', ML, currentY + 3.5, { width: contentWidth, align: 'center', lineBreak: false });
         currentY += 16;
 
         const typeColW = 95;
@@ -2617,25 +2622,29 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
         // Function helper to render Paper Consumption Matrix for a specific shift
         const renderShiftPaperMatrix = (shiftTitle, typeMap, metersMap) => {
+          const shiftRowsCount = allPaperKeys.length || 3;
+          const totalShiftHeight = 13 + 14 + (shiftRowsCount * 14) + 14 + 14 + 18;
+          checkAddPage(totalShiftHeight);
+
           doc.rect(ML, currentY, contentWidth, 13).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
-            .text(shiftTitle, ML + 6, currentY + 2.5, { width: contentWidth - 12, align: 'left' });
+            .text(shiftTitle, ML + 6, currentY + 2.5, { width: contentWidth - 12, align: 'left', lineBreak: false });
           currentY += 13;
 
           doc.rect(ML, currentY, typeColW, 14).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-            .text('PAPER TYPE', ML, currentY + 3, { width: typeColW, align: 'center' });
+            .text('PAPER TYPE', ML, currentY + 3, { width: typeColW, align: 'center', lineBreak: false });
 
           pannaCols.forEach((panna, i) => {
             const x = ML + typeColW + i * pannaColW;
             doc.rect(x, currentY, pannaColW, 14).fill('#f8fafc').stroke('#cbd5e1');
             doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-              .text(panna, x, currentY + 3, { width: pannaColW, align: 'center' });
+              .text(panna, x, currentY + 3, { width: pannaColW, align: 'center', lineBreak: false });
           });
 
           doc.rect(ML + typeColW + pannaCols.length * pannaColW, currentY, totalColW, 14).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#1e293b').fontSize(7.5).font('Helvetica-Bold')
-            .text('TOTAL', ML + typeColW + pannaCols.length * pannaColW, currentY + 3, { width: totalColW, align: 'center' });
+            .text('TOTAL', ML + typeColW + pannaCols.length * pannaColW, currentY + 3, { width: totalColW, align: 'center', lineBreak: false });
           currentY += 14;
 
           const colTotals = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
@@ -2644,10 +2653,11 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           let shiftTotMeters = 0;
 
           allPaperKeys.forEach((pType, pIdx) => {
+            checkAddPage(15);
             const bg = pIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
             doc.rect(ML, currentY, typeColW, 14).fill(bg).stroke('#cbd5e1');
             doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
-              .text(pType, ML, currentY + 3, { width: typeColW, align: 'center' });
+              .text(pType, ML, currentY + 3, { width: typeColW, align: 'center', lineBreak: false });
 
             let rowRollTotal = 0;
             let rowMetersTotal = 0;
@@ -2677,7 +2687,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
               doc.rect(x, currentY, pannaColW, 14).fill(bg).stroke('#cbd5e1');
               doc.fillColor(qtyVal > 0 || mtrVal > 0 ? '#1e40af' : '#94a3b8').fontSize(6.5).font(qtyVal > 0 || mtrVal > 0 ? 'Helvetica-Bold' : 'Helvetica')
-                .text(valStr, x, currentY + 3.5, { width: pannaColW, align: 'center' });
+                .text(valStr, x, currentY + 3.5, { width: pannaColW, align: 'center', lineBreak: false });
             });
 
             shiftTotRolls += rowRollTotal;
@@ -2694,47 +2704,49 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
             }
 
             doc.fillColor('#1e40af').fontSize(6.5).font('Helvetica-Bold')
-              .text(rowTotStr, totX, currentY + 3.5, { width: totalColW, align: 'center' });
+              .text(rowTotStr, totX, currentY + 3.5, { width: totalColW, align: 'center', lineBreak: false });
 
             currentY += 14;
           });
 
           // TOTAL ROLLS ROW
+          checkAddPage(15);
           doc.rect(ML, currentY, typeColW, 14).fill('#eff6ff').stroke('#bfdbfe');
           doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-            .text('TOTAL ROLLS', ML, currentY + 3, { width: typeColW, align: 'center' });
+            .text('TOTAL ROLLS', ML, currentY + 3, { width: typeColW, align: 'center', lineBreak: false });
 
           pannaCols.forEach((panna, i) => {
             const x = ML + typeColW + i * pannaColW;
             const cTot = colTotals[panna] || 0;
             doc.rect(x, currentY, pannaColW, 14).fill('#eff6ff').stroke('#bfdbfe');
             doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-              .text(cTot > 0 ? `${cTot} R` : '0', x, currentY + 3, { width: pannaColW, align: 'center' });
+              .text(cTot > 0 ? `${cTot} R` : '0', x, currentY + 3, { width: pannaColW, align: 'center', lineBreak: false });
           });
 
           const totX1 = ML + typeColW + pannaCols.length * pannaColW;
           doc.rect(totX1, currentY, totalColW, 14).fill('#eff6ff').stroke('#bfdbfe');
           doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-            .text(`${shiftTotRolls} Rolls`, totX1, currentY + 3, { width: totalColW, align: 'center' });
+            .text(`${shiftTotRolls} Rolls`, totX1, currentY + 3, { width: totalColW, align: 'center', lineBreak: false });
           currentY += 14;
 
           // TOTAL METERS ROW
+          checkAddPage(15);
           doc.rect(ML, currentY, typeColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
           doc.fillColor('#5b21b6').fontSize(7.0).font('Helvetica-Bold')
-            .text('TOTAL PAPER METERS', ML, currentY + 3, { width: typeColW, align: 'center' });
+            .text('TOTAL PAPER METERS', ML, currentY + 3, { width: typeColW, align: 'center', lineBreak: false });
 
           pannaCols.forEach((panna, i) => {
             const x = ML + typeColW + i * pannaColW;
             const cMtrTot = colMetersTotals[panna] || 0;
             doc.rect(x, currentY, pannaColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
             doc.fillColor('#5b21b6').fontSize(7.0).font('Helvetica-Bold')
-              .text(cMtrTot > 0 ? `${cMtrTot.toFixed(0)}m` : '0m', x, currentY + 3, { width: pannaColW, align: 'center' });
+              .text(cMtrTot > 0 ? `${cMtrTot.toFixed(0)}m` : '0m', x, currentY + 3, { width: pannaColW, align: 'center', lineBreak: false });
           });
 
           const totX2 = ML + typeColW + pannaCols.length * pannaColW;
           doc.rect(totX2, currentY, totalColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
           doc.fillColor('#5b21b6').fontSize(7.2).font('Helvetica-Bold')
-            .text(`${shiftTotMeters.toFixed(0)} mtr`, totX2, currentY + 3, { width: totalColW, align: 'center' });
+            .text(`${shiftTotMeters.toFixed(0)} mtr`, totX2, currentY + 3, { width: totalColW, align: 'center', lineBreak: false });
 
           currentY += 18;
           return shiftTotMeters;
@@ -2747,10 +2759,11 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         const nightShiftMetersTot = renderShiftPaperMatrix('NIGHT SHIFT PAPER CONSUMPTION', paperNightTypeMap, paperNightMetersMap);
 
         // GRAND TOTAL PAPER SUMMARY BAR
+        checkAddPage(25);
         const grandTotPaperAll = dayShiftMetersTot + nightShiftMetersTot;
         doc.rect(ML, currentY, contentWidth, 15).fill('#f5f3ff').stroke('#ddd6fe');
         doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
-          .text(`TOTAL PAPER METERS PRINTED (DAY + NIGHT SHIFT): ${grandTotPaperAll.toFixed(0)} mtr (Day: ${dayShiftMetersTot.toFixed(0)}m | Night: ${nightShiftMetersTot.toFixed(0)}m)`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center' });
+          .text(`TOTAL PAPER METERS PRINTED (DAY + NIGHT SHIFT): ${grandTotPaperAll.toFixed(0)} mtr (Day: ${dayShiftMetersTot.toFixed(0)}m | Night: ${nightShiftMetersTot.toFixed(0)}m)`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center', lineBreak: false });
         currentY += 21;
 
 
@@ -2805,23 +2818,23 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         // GRANDO Table Header Row 1 (Light Blue)
         doc.rect(inwLeftX, currentY, inwTableW, 15).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold')
-          .text('GRANDO INK INWARD', inwLeftX, currentY + 3.5, { width: inwTableW, align: 'center' });
+          .text('GRANDO INK INWARD', inwLeftX, currentY + 3.5, { width: inwTableW, align: 'center', lineBreak: false });
 
         // PRINTDOT Table Header Row 1 (Light Purple)
         doc.rect(inwRightX, currentY, inwTableW, 15).fill('#f5f3ff').stroke('#ddd6fe');
         doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
-          .text('PRINTDOT INK INWARD', inwRightX, currentY + 3.5, { width: inwTableW, align: 'center' });
+          .text('PRINTDOT INK INWARD', inwRightX, currentY + 3.5, { width: inwTableW, align: 'center', lineBreak: false });
         currentY += 15;
 
         // Header Row 2: C | M | Y | K | TOTAL
         inwInkCols.forEach((col, i) => {
           doc.rect(inwLeftX + i * inwColW, currentY, inwColW, 14).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-            .text(col, inwLeftX + i * inwColW, currentY + 3, { width: inwColW, align: 'center' });
+            .text(col, inwLeftX + i * inwColW, currentY + 3, { width: inwColW, align: 'center', lineBreak: false });
 
           doc.rect(inwRightX + i * inwColW, currentY, inwColW, 14).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-            .text(col, inwRightX + i * inwColW, currentY + 3, { width: inwColW, align: 'center' });
+            .text(col, inwRightX + i * inwColW, currentY + 3, { width: inwColW, align: 'center', lineBreak: false });
         });
         currentY += 14;
 
@@ -2848,7 +2861,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           const textColor = isTot ? '#1e40af' : '#0f172a';
           doc.rect(inwLeftX + i * inwColW, currentY, inwColW, 15).fill(bg).stroke(stroke);
           doc.fillColor(textColor).fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
-            .text(val, inwLeftX + i * inwColW, currentY + 3.5, { width: inwColW, align: 'center' });
+            .text(val, inwLeftX + i * inwColW, currentY + 3.5, { width: inwColW, align: 'center', lineBreak: false });
         });
 
         printdotInwardVals.forEach((val, i) => {
@@ -2858,25 +2871,18 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           const textColor = isTot ? '#5b21b6' : '#0f172a';
           doc.rect(inwRightX + i * inwColW, currentY, inwColW, 15).fill(bg).stroke(stroke);
           doc.fillColor(textColor).fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
-            .text(val, inwRightX + i * inwColW, currentY + 3.5, { width: inwColW, align: 'center' });
+            .text(val, inwRightX + i * inwColW, currentY + 3.5, { width: inwColW, align: 'center', lineBreak: false });
         });
         currentY += 15;
 
         // INK INWARD TOTAL BAR (Light Blue)
         doc.rect(ML, currentY, contentWidth, 15).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-          .text(`TOTAL INK RECEIVED INWARD: ${totInkInwardVol.toFixed(2)} Ltr (${inkInwardList.length} Receipts)`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center' });
+          .text(`TOTAL INK RECEIVED INWARD: ${totInkInwardVol.toFixed(2)} Ltr (${inkInwardList.length} Receipts)`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center', lineBreak: false });
         currentY += 21;
 
 
         // 2. PAPER INWARD SUMMARY MATRIX (PANNA & PAPER TYPE GRID)
-        checkAddPage(90);
-
-        doc.rect(ML, currentY, contentWidth, 15).fill('#f5f3ff').stroke('#ddd6fe');
-        doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
-          .text('PAPER INWARD SUMMARY', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
-        currentY += 15;
-
         const paperInwardTypeMap = {};
         const paperInwardMetersMap = {};
 
@@ -2896,30 +2902,38 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           paperInwardMetersMap[pType][pannaWidth] += mtrVal;
         });
 
+        const inwPaperTypes = Object.keys(paperInwardTypeMap).length > 0
+          ? Object.keys(paperInwardTypeMap)
+          : ['A++', 'A+', 'A'];
+
+        const totalInwHeight = 15 + 14 + (inwPaperTypes.length * 14) + 14 + 14 + 20;
+        checkAddPage(totalInwHeight);
+
+        doc.rect(ML, currentY, contentWidth, 15).fill('#f5f3ff').stroke('#ddd6fe');
+        doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
+          .text('PAPER INWARD SUMMARY', ML, currentY + 3.5, { width: contentWidth, align: 'center', lineBreak: false });
+        currentY += 15;
+
         const inwTypeColW = 95;
         const inwTotalColW = 65;
         const inwPannaColW = (contentWidth - inwTypeColW - inwTotalColW) / pannaCols.length;
 
         doc.rect(ML, currentY, inwTypeColW, 14).fill('#f8fafc').stroke('#cbd5e1');
         doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-          .text('PAPER TYPE', ML, currentY + 3, { width: inwTypeColW, align: 'center' });
+          .text('PAPER TYPE', ML, currentY + 3, { width: inwTypeColW, align: 'center', lineBreak: false });
 
         pannaCols.forEach((panna, i) => {
           const x = ML + inwTypeColW + i * inwPannaColW;
           doc.rect(x, currentY, inwPannaColW, 14).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-            .text(panna, x, currentY + 3, { width: inwPannaColW, align: 'center' });
+            .text(panna, x, currentY + 3, { width: inwPannaColW, align: 'center', lineBreak: false });
         });
 
         doc.rect(ML + inwTypeColW + pannaCols.length * inwPannaColW, currentY, inwTotalColW, 14).fill('#f8fafc').stroke('#cbd5e1');
         doc.fillColor('#1e293b').fontSize(7.5).font('Helvetica-Bold')
-          .text('TOTAL', ML + inwTypeColW + pannaCols.length * inwPannaColW, currentY + 3, { width: inwTotalColW, align: 'center' });
+          .text('TOTAL', ML + inwTypeColW + pannaCols.length * inwPannaColW, currentY + 3, { width: inwTotalColW, align: 'center', lineBreak: false });
 
         currentY += 14;
-
-        const inwPaperTypes = Object.keys(paperInwardTypeMap).length > 0
-          ? Object.keys(paperInwardTypeMap)
-          : ['A++', 'A+', 'A'];
 
         const inwColTotals = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
         const inwColMetersTotals = { '36': 0, '38': 0, '44': 0, '54': 0, '58': 0, '60': 0 };
@@ -2927,10 +2941,11 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         let grandInwPaperMeters = 0;
 
         inwPaperTypes.forEach((pType, pIdx) => {
+          checkAddPage(15);
           const bg = pIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
           doc.rect(ML, currentY, inwTypeColW, 14).fill(bg).stroke('#cbd5e1');
           doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
-            .text(pType, ML, currentY + 3, { width: inwTypeColW, align: 'center' });
+            .text(pType, ML, currentY + 3, { width: inwTypeColW, align: 'center', lineBreak: false });
 
           let rowRollTotal = 0;
           let rowMetersTotal = 0;
@@ -2956,7 +2971,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
             doc.rect(x, currentY, inwPannaColW, 14).fill(bg).stroke('#cbd5e1');
             doc.fillColor(qtyVal > 0 || mtrVal > 0 ? '#1e40af' : '#94a3b8').fontSize(6.5).font(qtyVal > 0 || mtrVal > 0 ? 'Helvetica-Bold' : 'Helvetica')
-              .text(valStr, x, currentY + 3.5, { width: inwPannaColW, align: 'center' });
+              .text(valStr, x, currentY + 3.5, { width: inwPannaColW, align: 'center', lineBreak: false });
           });
 
           grandInwPaperRolls += rowRollTotal;
@@ -2972,57 +2987,59 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           }
 
           doc.fillColor('#1e40af').fontSize(6.5).font('Helvetica-Bold')
-            .text(rowTotStr, totX, currentY + 3.5, { width: inwTotalColW, align: 'center' });
+            .text(rowTotStr, totX, currentY + 3.5, { width: inwTotalColW, align: 'center', lineBreak: false });
 
           currentY += 14;
         });
 
         // INWARD PAPER TOTAL BOTTOM ROW 1: TOTAL ROLLS (Light Blue)
+        checkAddPage(15);
         doc.rect(ML, currentY, inwTypeColW, 14).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-          .text('TOTAL ROLLS', ML, currentY + 3, { width: inwTypeColW, align: 'center' });
+          .text('TOTAL ROLLS', ML, currentY + 3, { width: inwTypeColW, align: 'center', lineBreak: false });
 
         pannaCols.forEach((panna, i) => {
           const x = ML + inwTypeColW + i * inwPannaColW;
           const cTot = inwColTotals[panna] || 0;
           doc.rect(x, currentY, inwPannaColW, 14).fill('#eff6ff').stroke('#bfdbfe');
           doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-            .text(cTot > 0 ? `${cTot} R` : '0', x, currentY + 3, { width: inwPannaColW, align: 'center' });
+            .text(cTot > 0 ? `${cTot} R` : '0', x, currentY + 3, { width: inwPannaColW, align: 'center', lineBreak: false });
         });
 
         const inwTotX1 = ML + inwTypeColW + pannaCols.length * inwPannaColW;
         doc.rect(inwTotX1, currentY, inwTotalColW, 14).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(7.5).font('Helvetica-Bold')
-          .text(`${grandInwPaperRolls} Rolls`, inwTotX1, currentY + 3, { width: inwTotalColW, align: 'center' });
+          .text(`${grandInwPaperRolls} Rolls`, inwTotX1, currentY + 3, { width: inwTotalColW, align: 'center', lineBreak: false });
 
         currentY += 14;
 
         // INWARD PAPER TOTAL BOTTOM ROW 2: TOTAL PAPER METERS (Light Purple)
+        checkAddPage(15);
         doc.rect(ML, currentY, inwTypeColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
         doc.fillColor('#5b21b6').fontSize(7.0).font('Helvetica-Bold')
-          .text('TOTAL PAPER METERS', ML, currentY + 3, { width: inwTypeColW, align: 'center' });
+          .text('TOTAL PAPER METERS', ML, currentY + 3, { width: inwTypeColW, align: 'center', lineBreak: false });
 
         pannaCols.forEach((panna, i) => {
           const x = ML + inwTypeColW + i * inwPannaColW;
           const cMtrTot = inwColMetersTotals[panna] || 0;
           doc.rect(x, currentY, inwPannaColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
           doc.fillColor('#5b21b6').fontSize(7.0).font('Helvetica-Bold')
-            .text(cMtrTot > 0 ? `${cMtrTot.toFixed(0)}m` : '0m', x, currentY + 3, { width: inwPannaColW, align: 'center' });
+            .text(cMtrTot > 0 ? `${cMtrTot.toFixed(0)}m` : '0m', x, currentY + 3, { width: inwPannaColW, align: 'center', lineBreak: false });
         });
 
         const inwTotX2 = ML + inwTypeColW + pannaCols.length * inwPannaColW;
         doc.rect(inwTotX2, currentY, inwTotalColW, 14).fill('#f5f3ff').stroke('#ddd6fe');
         doc.fillColor('#5b21b6').fontSize(7.2).font('Helvetica-Bold')
-          .text(`${grandInwPaperMeters.toFixed(0)} mtr`, inwTotX2, currentY + 3, { width: inwTotalColW, align: 'center' });
+          .text(`${grandInwPaperMeters.toFixed(0)} mtr`, inwTotX2, currentY + 3, { width: inwTotalColW, align: 'center', lineBreak: false });
 
         currentY += 20;
 
         // ── 3. MACHINE WISE REPORT TABLE (LIGHT BLUE & LIGHT PURPLE THEME) ──
-        checkAddPage(80);
+        checkAddPage(95);
 
         doc.rect(ML, currentY, contentWidth, 15).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold')
-          .text('MACHINE WISE REPORT', ML, currentY + 3.5, { width: contentWidth, align: 'center' });
+          .text('MACHINE WISE REPORT', ML, currentY + 3.5, { width: contentWidth, align: 'center', lineBreak: false });
         currentY += 15;
 
         const halfW = contentWidth / 2;
@@ -3030,11 +3047,11 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
         doc.rect(ML, currentY, halfW, 15).fill('#f5f3ff').stroke('#ddd6fe');
         doc.fillColor('#5b21b6').fontSize(8).font('Helvetica-Bold')
-          .text('GRANDO', ML, currentY + 3.5, { width: halfW, align: 'center' });
+          .text('GRANDO', ML, currentY + 3.5, { width: halfW, align: 'center', lineBreak: false });
 
         doc.rect(ML + halfW, currentY, halfW, 15).fill('#eff6ff').stroke('#bfdbfe');
         doc.fillColor('#1e40af').fontSize(8).font('Helvetica-Bold')
-          .text('PRINTDOT', ML + halfW, currentY + 3.5, { width: halfW, align: 'center' });
+          .text('PRINTDOT', ML + halfW, currentY + 3.5, { width: halfW, align: 'center', lineBreak: false });
         currentY += 15;
 
         const machineCols = ['1PASS MTR', '2 PASS MTR', 'TOTAL MTR', '1PASS MTR', '2 PASS MTR', 'TOTAL MTR'];
@@ -3042,7 +3059,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           const x = ML + i * subColW;
           doc.rect(x, currentY, subColW, 14).fill('#f8fafc').stroke('#cbd5e1');
           doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-            .text(col, x, currentY + 3, { width: subColW, align: 'center' });
+            .text(col, x, currentY + 3, { width: subColW, align: 'center', lineBreak: false });
         });
         currentY += 14;
 
@@ -3063,7 +3080,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
 
           doc.rect(x, currentY, subColW, 15).fill(bg).stroke(stroke);
           doc.fillColor(textColor).fontSize(7.5).font(isTot ? 'Helvetica-Bold' : 'Helvetica')
-            .text(val, x, currentY + 3.5, { width: subColW, align: 'center' });
+            .text(val, x, currentY + 3.5, { width: subColW, align: 'center', lineBreak: false });
         });
         currentY += 15;
 
@@ -3071,7 +3088,7 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
         const totalBothMtr = grandoTotal + printdotTotal;
         doc.rect(ML, currentY, contentWidth, 15).fill('#f5f3ff').stroke('#ddd6fe');
         doc.fillColor('#5b21b6').fontSize(7.5).font('Helvetica-Bold')
-          .text(`TOTAL PRINTED METERS (BOTH MACHINES): ${totalBothMtr.toFixed(2)} mtr`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center' });
+          .text(`TOTAL PRINTED METERS (BOTH MACHINES): ${totalBothMtr.toFixed(2)} mtr`, ML + 8, currentY + 3.5, { width: contentWidth - 16, align: 'center', lineBreak: false });
         currentY += 21;
 
         // ── 4. DETAILS OF PRINTING JOBCARD (FORMERLY COMPLETE DETAILED PRINTING RUN LOGS) ──
@@ -3088,14 +3105,14 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
           const drawDetailHeaders = () => {
             doc.rect(ML, currentY, contentWidth, 18).fill('#1e293b').stroke('#0f172a');
             doc.fillColor('#ffffff').fontSize(7).font('Helvetica-Bold');
-            doc.text('SHIFT', ML + 4, currentY + 5, { width: 35, align: 'center' });
-            doc.text('JOB CARD #', ML + 41, currentY + 5, { width: 65 });
-            doc.text('PARTY / CLIENT', ML + 108, currentY + 5, { width: 105 });
-            doc.text('DESIGN NAME', ML + 215, currentY + 5, { width: 80 });
-            doc.text('MACHINE', ML + 300, currentY + 5, { width: 45, align: 'center' });
-            doc.text('PASS', ML + 347, currentY + 5, { width: 35, align: 'center' });
-            doc.text('METERS PRINTED', ML + 384, currentY + 5, { width: 65, align: 'right' });
-            doc.text('OPERATOR', ML + 451, currentY + 5, { width: 75 });
+            doc.text('SHIFT', ML + 4, currentY + 5, { width: 35, align: 'center', lineBreak: false });
+            doc.text('JOB CARD #', ML + 41, currentY + 5, { width: 65, lineBreak: false });
+            doc.text('PARTY / CLIENT', ML + 108, currentY + 5, { width: 105, lineBreak: false });
+            doc.text('DESIGN NAME', ML + 215, currentY + 5, { width: 80, lineBreak: false });
+            doc.text('MACHINE', ML + 300, currentY + 5, { width: 45, align: 'center', lineBreak: false });
+            doc.text('PASS', ML + 347, currentY + 5, { width: 35, align: 'center', lineBreak: false });
+            doc.text('METERS PRINTED', ML + 384, currentY + 5, { width: 65, align: 'right', lineBreak: false });
+            doc.text('OPERATOR', ML + 451, currentY + 5, { width: 75, lineBreak: false });
             currentY += 18;
           };
 
@@ -3176,11 +3193,11 @@ const downloadFabricCombinedReportPdf = async (req, res) => {
       const drawStockHeaders = () => {
         doc.rect(ML, currentY, contentWidth, 18).fill('#f8fafc').stroke('#cbd5e1');
         doc.fillColor('#000000').fontSize(7.2).font('Helvetica-Bold');
-        doc.text('FABRIC QUALITY', ML + 4, currentY + 5, { width: 180 });
-        doc.text('TOTAL INWARD (MTR)', ML + 188, currentY + 5, { width: 85, align: 'right' });
-        doc.text('TOTAL OUTWARD (MTR)', ML + 277, currentY + 5, { width: 85, align: 'right' });
-        doc.text('CURRENT STOCK (MTR)', ML + 366, currentY + 5, { width: 85, align: 'right' });
-        doc.text('STOCK STATUS', ML + 455, currentY + 5, { width: 73, align: 'center' });
+        doc.text('FABRIC QUALITY', ML + 4, currentY + 5, { width: 180, lineBreak: false });
+        doc.text('TOTAL INWARD (MTR)', ML + 188, currentY + 5, { width: 85, align: 'right', lineBreak: false });
+        doc.text('TOTAL OUTWARD (MTR)', ML + 277, currentY + 5, { width: 85, align: 'right', lineBreak: false });
+        doc.text('CURRENT STOCK (MTR)', ML + 366, currentY + 5, { width: 85, align: 'right', lineBreak: false });
+        doc.text('STOCK STATUS', ML + 455, currentY + 5, { width: 73, align: 'center', lineBreak: false });
         currentY += 18;
       };
 
