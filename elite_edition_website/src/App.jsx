@@ -118,6 +118,30 @@ export default function App() {
   // Notification Toasts state
   const [toasts, setToasts] = useState([]);
 
+  // Chat unread count tracking for notification badges
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    api.getCommunicationGroups()
+      .then((res) => {
+        const groupsList = res?.data || (Array.isArray(res) ? res : []);
+        const total = groupsList.reduce((acc, g) => acc + (Number(g.unreadCount) || 0), 0);
+        setChatUnreadCount(total);
+      })
+      .catch(() => {});
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    const handleUnreadEvent = (e) => {
+      if (e.detail && typeof e.detail.count === 'number') {
+        setChatUnreadCount(e.detail.count);
+      }
+    };
+    window.addEventListener('chat-unread-count-change', handleUnreadEvent);
+    return () => window.removeEventListener('chat-unread-count-change', handleUnreadEvent);
+  }, []);
+
   // Department state (digital_print vs elite_edition vs stitching)
   const [activeDepartment, setActiveDepartment] = useState(initialNav.dept);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -506,6 +530,10 @@ export default function App() {
 
       const senderName = typeof senderObj === 'object' ? (senderObj?.name || senderObj?.username || 'Colleague') : 'Colleague';
       const msgContent = msg.type === 'record-card' ? `🃏 Shared Record Card: ${msg.content}` : (msg.attachment ? `📎 [${msg.attachment.fileType || 'Attachment'}] ${msg.content}` : msg.content);
+
+      if (activeTab !== 'communication' && activeTab !== 'workspace') {
+        setChatUnreadCount((prev) => prev + 1);
+      }
 
       triggerPushNotification(
         `💬 Chat from ${senderName}`,
@@ -1129,9 +1157,32 @@ export default function App() {
                 onClick={() => { setActiveTab('communication'); setMobileMenuOpen(false); }}
                 className={`dept-switch-btn ${activeTab === 'communication' || activeTab === 'workspace' ? 'active' : ''}`}
                 title="Open Department Communication & Activity Stream"
+                style={{ position: 'relative' }}
               >
                 <MessageSquare size={15} />
                 <span>Inter-Dept Communication</span>
+                {chatUnreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-5px',
+                    right: '-5px',
+                    background: '#ef4444',
+                    color: '#ffffff',
+                    borderRadius: '10px',
+                    minWidth: '18px',
+                    height: '18px',
+                    fontSize: '0.62rem',
+                    fontWeight: 900,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 4px',
+                    boxShadow: '0 2px 6px rgba(239, 68, 68, 0.6)',
+                    border: '1.5px solid #ffffff'
+                  }}>
+                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                  </span>
+                )}
               </button>
             )}
           </div>
@@ -1311,7 +1362,26 @@ export default function App() {
                   <MessageSquare size={16} />
                   <span>Inter-Dept Communication</span>
                 </div>
-                <ChevronRight size={14} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {chatUnreadCount > 0 && (
+                    <span style={{
+                      background: '#ef4444',
+                      color: '#ffffff',
+                      borderRadius: '10px',
+                      minWidth: '18px',
+                      height: '18px',
+                      fontSize: '0.62rem',
+                      fontWeight: 900,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0 5px'
+                    }}>
+                      {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                    </span>
+                  )}
+                  <ChevronRight size={14} />
+                </div>
               </button>
             )}
 
@@ -2073,7 +2143,12 @@ export default function App() {
 
           {/* Persistent CommunicationPanel (Chat & Task Manager - preserved across tab navigation) */}
           <div style={{ display: (activeTab === 'communication' || activeTab === 'task_management' || activeTab === 'workspace') ? 'block' : 'none', height: '100%' }}>
-            <CommunicationPanel currentUser={currentUser} initialMainTab={activeTab === 'task_management' ? 'task' : 'chat'} onNavigateTab={(tab) => setActiveTab(tab)} />
+            <CommunicationPanel
+              currentUser={currentUser}
+              initialMainTab={activeTab === 'task_management' ? 'task' : 'chat'}
+              onNavigateTab={(tab) => setActiveTab(tab)}
+              onUnreadChange={(count) => setChatUnreadCount(count)}
+            />
           </div>
         </section>
       </main>
@@ -2332,6 +2407,23 @@ export default function App() {
                         <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '6px', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
                           CHAT &amp; TASKS
                         </span>
+                        {chatUnreadCount > 0 && (
+                          <span style={{
+                            background: '#ef4444',
+                            color: '#ffffff',
+                            borderRadius: '10px',
+                            minWidth: '18px',
+                            height: '18px',
+                            fontSize: '0.62rem',
+                            fontWeight: 900,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '0 5px'
+                          }}>
+                            {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
                         Real-time Team Chat, Channels &amp; Task Stream

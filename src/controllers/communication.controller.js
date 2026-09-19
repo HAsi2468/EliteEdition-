@@ -67,11 +67,12 @@ const getGroups = async (req, res) => {
           .populate('senderId', 'name username email');
 
         let unreadCount = 0;
-        if (currentUser) {
+        const targetUserId = currentUser ? currentUser._id : currentUserId;
+        if (targetUserId) {
           unreadCount = await ChatMessage.countDocuments({
             roomId: room._id,
-            senderId: { $ne: currentUser._id },
-            readBy: { $ne: currentUser._id }
+            senderId: { $ne: targetUserId },
+            readBy: { $ne: targetUserId }
           });
         }
 

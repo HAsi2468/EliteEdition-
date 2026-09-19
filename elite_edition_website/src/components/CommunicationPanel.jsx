@@ -59,7 +59,7 @@ import {
 } from 'lucide-react';
 
 
-export default function CommunicationPanel({ currentUser, onNavigateTab, initialMainTab = 'chat' }) {
+export default function CommunicationPanel({ currentUser, onNavigateTab, initialMainTab = 'chat', onUnreadChange }) {
   const [mainTab, setMainTab] = useState(initialMainTab); // 'chat' | 'task'
 
   useEffect(() => {
@@ -73,6 +73,30 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [inputMessage, setInputMessage] = useState('');
   const [roomDrafts, setRoomDrafts] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Real-time unread count badges calculations
+  const groupUnreadCount = useMemo(() => {
+    return groups
+      .filter((g) => g.type !== 'direct')
+      .reduce((acc, g) => acc + (Number(g.unreadCount) || 0), 0);
+  }, [groups]);
+
+  const dmUnreadCount = useMemo(() => {
+    return groups
+      .filter((g) => g.type === 'direct')
+      .reduce((acc, g) => acc + (Number(g.unreadCount) || 0), 0);
+  }, [groups]);
+
+  const totalChatUnreadCount = groupUnreadCount + dmUnreadCount;
+
+  useEffect(() => {
+    if (typeof onUnreadChange === 'function') {
+      onUnreadChange(totalChatUnreadCount);
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('chat-unread-count-change', { detail: { count: totalChatUnreadCount } }));
+    }
+  }, [totalChatUnreadCount, onUnreadChange]);
 
   // Auto-restore draft message per room/DM conversation
   useEffect(() => {
@@ -137,6 +161,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   // Quick Share Record Cards Modal
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareRecordCategory, setShareRecordCategory] = useState('jobcard'); // 'jobcard' | 'design' | 'invoice' | 'complaint'
+  const [shareRecordCompany, setShareRecordCompany] = useState(''); // '' = All Companies
+  const [shareTargetRoomId, setShareTargetRoomId] = useState(''); // Direct target room
   const [shareRecordSearch, setShareRecordSearch] = useState('');
   const [shareRecordItems, setShareRecordItems] = useState([]);
   const [loadingShareItems, setLoadingShareItems] = useState(false);
@@ -728,11 +754,47 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const handleOpenShareModal = async (cat = 'jobcard') => {
     setShareRecordCategory(cat);
     setShareRecordSearch('');
+    setShareRecordCompany('');
+    setShareTargetRoomId(activeGroup?._id || '');
     setShowShareModal(true);
-    fetchShareRecordItems(cat, '');
+    fetchShareRecordItems(cat, '', '');
   };
 
-  const fetchShareRecordItems = async (cat, searchTerm = '') => {
+  const handleCompanyChangeInShareModal = (newCompany) => {
+    setShareRecordCompany(newCompany);
+    if (newCompany) {
+      const cLow = newCompany.toLowerCase();
+      const match = groups.find((g) => {
+        if (g.type === 'direct') return false;
+        const gName = (g.name || '').toLowerCase();
+        const gComp = (g.companyEntity || '').toLowerCase();
+        const gDept = (g.department || '').toLowerCase();
+        if (cLow.includes('print')) {
+          return gComp.includes('print') || gName.includes('print') || gDept.includes('production');
+        }
+        if (cLow.includes('online')) {
+          return gComp.includes('online') || gName.includes('online') || gDept.includes('e-commerce') || gName.includes('sales');
+        }
+        if (cLow.includes('stitching')) {
+          return gComp.includes('stitching') || gName.includes('stitching');
+        }
+        if (cLow.includes('fabtex')) {
+          return gComp.includes('fabtex') || gName.includes('fabtex');
+        }
+        if (cLow.includes('edition')) {
+          return gComp.includes('edition') || gName.includes('operations') || gName.includes('admin') || gDept.includes('admin');
+        }
+        return gComp.includes(cLow) || gName.includes(cLow);
+      });
+      if (match) {
+        setShareTargetRoomId(match._id);
+      }
+    } else {
+      setShareTargetRoomId(activeGroup?._id || '');
+    }
+  };
+
+  const fetchShareRecordItems = async (cat, searchTerm = '', comp = shareRecordCompany) => {
     setLoadingShareItems(true);
     try {
       let items = [];
@@ -740,23 +802,69 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       if (cat === 'jobcard') {
         const params = { limit: 50, sortBy: 'jobNo', sortOrder: 'desc' };
         if (cleanSearch) params.search = cleanSearch;
+        if (comp === 'Elite Digital Print') {
+          params.department = 'digital_print';
+        } else if (comp === 'Elite Stitching') {
+          params.department = 'stitching';
+        } else if (comp === 'Elite Fabtex') {
+          params.party = 'FABTEX';
+        } else if (comp === 'Elite Edition') {
+          params.party = 'ELITE EDITION';
+        }
         const res = await api.getJobCards(params);
-        items = Array.isArray(res) ? res : (res?.data || []);
+        let list = Array.isArray(res) ? res : (res?.data || []);
+        if (comp && !params.department && !params.party) {
+          const cLow = comp.toLowerCase();
+          list = list.filter((item) =>
+            (item.party && item.party.toLowerCase().includes(cLow)) ||
+            (item.department && item.department.toLowerCase().includes(cLow)) ||
+            (item.companyEntity && item.companyEntity.toLowerCase().includes(cLow))
+          );
+        }
+        items = list;
       } else if (cat === 'design') {
         const params = { limit: 50, sortBy: 'createdAt', sortOrder: 'desc' };
         if (cleanSearch) params.search = cleanSearch;
         const res = await (api.getDesigns ? api.getDesigns(params) : api.getDesignCatalogue(params));
-        items = Array.isArray(res) ? res : (res?.data || []);
+        let list = Array.isArray(res) ? res : (res?.data || []);
+        if (comp) {
+          const cLow = comp.toLowerCase();
+          list = list.filter((d) =>
+            (d.companyEntity && d.companyEntity.toLowerCase().includes(cLow)) ||
+            (d.party && d.party.toLowerCase().includes(cLow)) ||
+            (d.category && d.category.toLowerCase().includes(cLow)) ||
+            (d.department && d.department.toLowerCase().includes(cLow))
+          );
+        }
+        items = list;
       } else if (cat === 'invoice') {
         const params = { limit: 50 };
         if (cleanSearch) params.search = cleanSearch;
+        if (comp) params.companyEntity = comp;
         const res = await api.getBillingInvoices(params);
-        items = Array.isArray(res) ? res : (res?.data || []);
+        let list = Array.isArray(res) ? res : (res?.data || []);
+        if (comp && !params.companyEntity) {
+          const cLow = comp.toLowerCase();
+          list = list.filter((inv) =>
+            (inv.companyEntity && inv.companyEntity.toLowerCase().includes(cLow)) ||
+            (inv.partyName && inv.partyName.toLowerCase().includes(cLow))
+          );
+        }
+        items = list;
       } else if (cat === 'complaint') {
         const params = { limit: 50 };
         if (cleanSearch) params.search = cleanSearch;
+        if (comp) params.companyEntity = comp;
         const res = await api.getComplaints(params);
-        items = Array.isArray(res) ? res : (res?.data || []);
+        let list = Array.isArray(res) ? res : (res?.data || []);
+        if (comp) {
+          const cLow = comp.toLowerCase();
+          list = list.filter((cmp) =>
+            (cmp.companyEntity && cmp.companyEntity.toLowerCase().includes(cLow)) ||
+            (cmp.departmentName && cmp.departmentName.toLowerCase().includes(cLow))
+          );
+        }
+        items = list;
       }
       setShareRecordItems(items);
     } catch (err) {
@@ -771,13 +879,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   useEffect(() => {
     if (!showShareModal) return;
     const timer = setTimeout(() => {
-      fetchShareRecordItems(shareRecordCategory, shareRecordSearch);
+      fetchShareRecordItems(shareRecordCategory, shareRecordSearch, shareRecordCompany);
     }, 250);
     return () => clearTimeout(timer);
-  }, [shareRecordSearch, shareRecordCategory, showShareModal]);
+  }, [shareRecordSearch, shareRecordCategory, shareRecordCompany, showShareModal]);
 
   const handleShareRecordToChat = (item) => {
-    if (!activeGroup) return;
+    const targetRoomId = shareTargetRoomId || activeGroup?._id;
+    if (!targetRoomId) return;
+
+    const targetRoom = groups.find((g) => String(g._id) === String(targetRoomId)) || activeGroup;
+    const isCurrentRoom = activeGroup && String(activeGroup._id) === String(targetRoomId);
+
     const myId = currentUser?.id || currentUser?._id;
     let cardTitle = '';
     let refVal = '';
@@ -811,7 +924,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
     const tempMsg = {
       _id: 'temp_' + Date.now(),
-      roomId: activeGroup._id,
+      roomId: targetRoomId,
       senderId: typeof currentUser === 'object' ? currentUser : { _id: myId, name: 'You' },
       content: cardTitle,
       createdAt: new Date().toISOString(),
@@ -823,10 +936,12 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       isOptimistic: true
     };
 
-    setMessages((prev) => [...prev, tempMsg]);
+    if (isCurrentRoom) {
+      setMessages((prev) => [...prev, tempMsg]);
+    }
 
     const messagePayload = {
-      roomId: activeGroup._id,
+      roomId: targetRoomId,
       senderId: myId,
       content: cardTitle,
       type: 'record-card',
@@ -834,17 +949,21 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       recordMentions: [{ recordType: shareRecordCategory, recordRef: refVal }]
     };
 
-    api.sendCommunicationMessage(activeGroup._id, messagePayload)
+    api.sendCommunicationMessage(targetRoomId, messagePayload)
       .then((res) => {
         if (res && res.success && res.data) {
-          setMessages((prev) => prev.map((m) => (m._id === tempMsg._id ? res.data : m)));
+          if (isCurrentRoom) {
+            setMessages((prev) => prev.map((m) => (m._id === tempMsg._id ? res.data : m)));
+          }
         }
+        fetchGroups(false);
       })
       .catch((err) => {
         console.warn('HTTP share record card failed, falling back to socket emit:', err.message);
         if (socket) {
           socket.emit('send-message', messagePayload);
         }
+        fetchGroups(false);
       });
 
     setShowShareModal(false);
@@ -1534,11 +1653,26 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               alignItems: 'center',
               gap: '0.5rem',
               boxShadow: mainTab === 'chat' ? '0 3px 10px rgba(37,99,235,0.35)' : 'none',
-              transition: 'all 0.18s ease'
+              transition: 'all 0.18s ease',
+              position: 'relative'
             }}
           >
             <MessageSquare size={16} />
             <span>Chat</span>
+            {totalChatUnreadCount > 0 && (
+              <span style={{
+                background: '#ef4444',
+                color: '#ffffff',
+                fontSize: '0.65rem',
+                fontWeight: 900,
+                padding: '1px 6px',
+                borderRadius: '10px',
+                lineHeight: '1.2',
+                boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
+              }}>
+                {totalChatUnreadCount > 99 ? '99+' : totalChatUnreadCount}
+              </span>
+            )}
           </button>
 
           <button
@@ -1632,6 +1766,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             >
               <Building2 size={13} />
               <span>Groups</span>
+              {groupUnreadCount > 0 && (
+                <span style={{
+                  background: rosterTab === 'groups' ? '#ffffff' : '#ef4444',
+                  color: rosterTab === 'groups' ? '#2563eb' : '#ffffff',
+                  fontSize: '0.62rem',
+                  fontWeight: 900,
+                  padding: '1px 5px',
+                  borderRadius: '10px',
+                  lineHeight: '1.2',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.15)'
+                }}>
+                  {groupUnreadCount > 99 ? '99+' : groupUnreadCount}
+                </span>
+              )}
             </button>
 
             <button
@@ -1655,6 +1803,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             >
               <User size={13} />
               <span>Personal DMs</span>
+              {dmUnreadCount > 0 && (
+                <span style={{
+                  background: rosterTab === 'direct' ? '#ffffff' : '#ef4444',
+                  color: rosterTab === 'direct' ? '#2563eb' : '#ffffff',
+                  fontSize: '0.62rem',
+                  fontWeight: 900,
+                  padding: '1px 5px',
+                  borderRadius: '10px',
+                  lineHeight: '1.2',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.15)'
+                }}>
+                  {dmUnreadCount > 99 ? '99+' : dmUnreadCount}
+                </span>
+              )}
             </button>
           </div>
 
@@ -1775,8 +1937,23 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         {group.unreadCount > 0 && (
-                          <span style={{ background: 'var(--primary)', color: '#fff', fontSize: '0.62rem', fontWeight: 800, padding: '1px 5px', borderRadius: '10px', flexShrink: 0 }}>
-                            {group.unreadCount}
+                          <span style={{
+                            background: '#ef4444',
+                            color: '#ffffff',
+                            fontSize: '0.64rem',
+                            fontWeight: 900,
+                            padding: '1px 6px',
+                            borderRadius: '10px',
+                            minWidth: '18px',
+                            height: '18px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            boxShadow: '0 2px 6px rgba(239, 68, 68, 0.45)',
+                            border: '1px solid rgba(255, 255, 255, 0.4)'
+                          }}>
+                            {group.unreadCount > 99 ? '99+' : group.unreadCount}
                           </span>
                         )}
                         {currentUser?.role === 'admin' && (
@@ -3099,12 +3276,93 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               ))}
             </div>
 
+            {/* 🏢 COMPANY SELECTION & 🚀 DIRECT SEND DESTINATION SELECTOR */}
+            <div style={{
+              padding: '0.65rem 1rem',
+              background: 'rgba(139, 92, 246, 0.05)',
+              borderBottom: '1px solid var(--border-light)',
+              display: 'grid',
+              gridTemplateColumns: isMobileScreen ? '1fr' : '1fr 1fr',
+              gap: '0.65rem'
+            }}>
+              {/* Company Filter Dropdown */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-secondary)', marginBottom: '3px' }}>
+                  🏢 Select Company:
+                </label>
+                <select
+                  value={shareRecordCompany}
+                  onChange={(e) => handleCompanyChangeInShareModal(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '32px',
+                    padding: '0 0.5rem',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    borderRadius: '6px',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-light)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">🏢 All Companies &amp; Depts</option>
+                  <option value="Elite Digital Print">🖨️ Elite Digital Print (EDP)</option>
+                  <option value="Elite Online">🛍️ Elite Online (EON)</option>
+                  <option value="Elite Edition">🏢 Elite Edition (EE)</option>
+                  <option value="Elite Fabtex">🧵 Elite Fabtex (EF)</option>
+                  <option value="Elite Stitching">✂️ Elite Stitching (ES)</option>
+                </select>
+              </div>
+
+              {/* Direct Send Target Channel Dropdown */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#8b5cf6', marginBottom: '3px' }}>
+                  🚀 Send Directly To:
+                </label>
+                <select
+                  value={shareTargetRoomId}
+                  onChange={(e) => setShareTargetRoomId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '32px',
+                    padding: '0 0.5rem',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    borderRadius: '6px',
+                    background: 'var(--bg-card)',
+                    border: '1.5px solid #8b5cf6',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value={activeGroup?._id || ''}>📍 Current Chat ({activeGroup?.name || 'Active Room'})</option>
+                  <optgroup label="🏢 Company Channels &amp; Groups">
+                    {groups.filter((g) => g.type !== 'direct').map((g) => (
+                      <option key={g._id} value={g._id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                  {groups.some((g) => g.type === 'direct') && (
+                    <optgroup label="💬 Direct Messages">
+                      {groups.filter((g) => g.type === 'direct').map((g) => (
+                        <option key={g._id} value={g._id}>
+                          👤 {g.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+            </div>
+
             <div style={{ padding: '0.75rem 1rem' }}>
               <div style={{ position: 'relative', marginBottom: '0.65rem' }}>
                 <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input
                   type="text"
-                  placeholder={`Search ${shareRecordCategory} records...`}
+                  placeholder={`Search ${shareRecordCompany ? shareRecordCompany + ' ' : ''}${shareRecordCategory} records...`}
                   value={shareRecordSearch}
                   onChange={(e) => setShareRecordSearch(e.target.value)}
                   style={{ width: '100%', paddingLeft: '32px', fontSize: '0.8rem', height: '34px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '6px', boxSizing: 'border-box' }}
@@ -3119,7 +3377,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                   </div>
                 ) : shareRecordItems.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                    No records found for {shareRecordCategory}{shareRecordSearch ? ` matching "${shareRecordSearch}"` : ''}.
+                    No records found for {shareRecordCategory}{shareRecordCompany ? ` (${shareRecordCompany})` : ''}{shareRecordSearch ? ` matching "${shareRecordSearch}"` : ''}.
                   </div>
                 ) : (
                   shareRecordItems.map((item) => (
@@ -3158,7 +3416,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                         className="btn-primary"
                         style={{ padding: '0.3rem 0.65rem', fontSize: '0.72rem', borderRadius: '6px', background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)', flexShrink: 0 }}
                       >
-                        Share Card →
+                        {shareTargetRoomId && activeGroup && String(shareTargetRoomId) !== String(activeGroup._id) ? 'Send Direct →' : 'Share Card →'}
                       </button>
                     </div>
                   ))
