@@ -1013,17 +1013,13 @@ export const api = {
     });
   },
 
-  // --- Workspace (Chat & Task) ---
+  // --- Workspace (Chat & Task) backwards compatibility with communication groups ---
   async getRooms(userId) {
-    const url = userId ? `/workspace/rooms?userId=${userId}` : '/workspace/rooms';
-    return request(url);
+    return this.getCommunicationGroups();
   },
   
   async createRoom(data) {
-    return request('/workspace/rooms', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return this.createCommunicationGroup(data);
   },
 
   async broadcastTodayData() {
@@ -1033,15 +1029,11 @@ export const api = {
   },
 
   async getRoomMessages(roomId, before = '') {
-    const query = before ? `?before=${before}` : '';
-    return request(`/workspace/rooms/${roomId}/messages${query}`);
+    return this.getCommunicationMessages(roomId);
   },
 
   async sendRoomMessage(roomId, data) {
-    return request(`/workspace/rooms/${roomId}/messages`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return this.sendCommunicationMessage(roomId, data);
   },
 
   async getTasks() {

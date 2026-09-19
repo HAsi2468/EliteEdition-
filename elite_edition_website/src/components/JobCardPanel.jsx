@@ -1976,6 +1976,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
   const [shareCard, setShareCard] = useState(null);
   const [chatRooms, setChatRooms] = useState([]);
   const [selectedRoomId, setSelectedRoomId] = useState('');
+  const [shareCompanyFilter, setShareCompanyFilter] = useState('');
   const [shareSearch, setShareSearch] = useState('');
   const [sharingJobCard, setSharingJobCard] = useState(false);
 
@@ -2033,20 +2034,52 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
     if (showShareModal) {
       const loadRooms = async () => {
         try {
-          const currentUser = api.getCurrentUser();
-          const userId = currentUser ? (currentUser._id || currentUser.id) : '';
-          const res = await api.getRooms(userId);
-          if (res.data) setChatRooms(res.data);
+          const res = await api.getCommunicationGroups();
+          const groupsList = Array.isArray(res) ? res : (res?.data || []);
+          setChatRooms(groupsList);
+
+          if (shareCard) {
+            const cardDept = (shareCard.department || '').toLowerCase();
+            const cardParty = (shareCard.party || '').toLowerCase();
+            const autoGroup = groupsList.find((g) => {
+              if (g.type === 'direct') return false;
+              const gName = (g.name || '').toLowerCase();
+              const gComp = (g.companyEntity || '').toLowerCase();
+              if (cardDept === 'stitching' || cardParty.includes('stitching')) {
+                return gComp.includes('stitching') || gName.includes('stitching');
+              }
+              if (cardDept === 'digital_print' || cardParty.includes('print') || cardParty.includes('digital')) {
+                return gComp.includes('print') || gName.includes('job card') || gName.includes('print');
+              }
+              if (cardParty.includes('online') || cardParty.includes('eon')) {
+                return gComp.includes('online') || gName.includes('sales');
+              }
+              if (cardParty.includes('fabtex')) {
+                return gComp.includes('fabtex') || gName.includes('fabtex');
+              }
+              if (cardParty.includes('edition')) {
+                return gComp.includes('edition') || gName.includes('operations');
+              }
+              return false;
+            });
+            if (autoGroup) {
+              setSelectedRoomId(autoGroup._id);
+            } else if (groupsList.length > 0) {
+              setSelectedRoomId(groupsList[0]._id);
+            }
+          }
         } catch (err) {
           console.error('Failed to load chat rooms for sharing', err);
         }
       };
       loadRooms();
     }
-  }, [showShareModal]);
+  }, [showShareModal, shareCard]);
 
   const handleOpenShareModal = (card) => {
     setShareCard(card);
+    setShareCompanyFilter('');
+    setShareSearch('');
     setShowShareModal(true);
   };
 
@@ -2057,34 +2090,43 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
     setSharingJobCard(true);
     try {
       const currentUser = api.getCurrentUser();
-      const senderId = currentUser ? (currentUser._id || currentUser.id) : '';
-      if (!senderId) {
+      const myId = currentUser ? (currentUser._id || currentUser.id) : '';
+      if (!myId) {
         triggerEliteAlert('Authentication Required', 'You must be signed in to share job cards.', 'warning');
         return;
       }
 
-      const apiBase = getBaseUrl();
-      const fullBase = apiBase.startsWith('http') ? apiBase : `${window.location.origin}${apiBase}`;
-      const downloadLink = `${fullBase}/jobCards/pdf/${shareCard._id}`;
+      const refVal = `JC-${shareCard.jobNo}`;
+      const cardTitle = `Job Card #${shareCard.jobNo} — ${shareCard.party || 'Client'}`;
+      const actMeta = {
+        action: 'SHARE_RECORD',
+        module: 'Job Card',
+        recordRef: refVal,
+        recordId: shareCard._id,
+        permissionScope: 'jobcards'
+      };
 
-      let content = `📋 *SHARED JOB CARD: ${shareCard.jobNo}*\n`;
-      content += `🏢 *Party:* ${shareCard.party || '—'}\n`;
-      content += `🎨 *Design:* ${shareCard.designName || shareCard.designNo || '—'}\n`;
-      content += `👕 *Fabric:* ${shareCard.fabric || '—'} · *Colors:* ${shareCard.colors || '—'}\n`;
-      content += `📏 *Panna:* ${shareCard.panna || '—'} · *Total Mtr:* ${shareCard.totalMtr || '—'}\n`;
-      content += `⚡ *EXP. Time:* ${shareCard.expTime || '—'} · *Urgency:* ${shareCard.urgency || 'Normal'}\n`;
-      content += `🔄 *Status:* ${shareCard.status || 'To Do'}\n\n`;
-      content += `🔗 *Download PDF:* ${downloadLink}`;
+      const messagePayload = {
+        roomId: selectedRoomId,
+        senderId: myId,
+        content: cardTitle,
+        type: 'record-card',
+        activityMeta: actMeta,
+        recordMentions: [{ recordType: 'jobcard', recordRef: refVal }]
+      };
 
-      await api.sendRoomMessage(selectedRoomId, { senderId, content });
-      triggerEliteAlert('Job Card Shared 🚀', 'Job Card shared successfully to the chat room!', 'success');
+      await api.sendCommunicationMessage(selectedRoomId, messagePayload);
+
+      const targetRoom = chatRooms.find((r) => String(r._id) === String(selectedRoomId));
+      triggerEliteAlert('Job Card Shared 🚀', `Job Card #${shareCard.jobNo} shared successfully to "${targetRoom?.name || 'chat'}"!`, 'success');
       setShowShareModal(false);
       setShareCard(null);
       setSelectedRoomId('');
       setShareSearch('');
+      setShareCompanyFilter('');
     } catch (err) {
       console.error('Failed to share job card', err);
-      triggerEliteAlert('Sharing Failed', 'Failed to share job card.', 'error');
+      triggerEliteAlert('Sharing Failed', 'Failed to share job card: ' + err.message, 'error');
     } finally {
       setSharingJobCard(false);
     }
@@ -2818,9 +2860,56 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
               </button>
             </div>
 
-            <form onSubmit={handleShareJobCard} style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <form onSubmit={handleShareJobCard} style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Search Channel or Team Member</label>
+                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+                  🏢 Select Company
+                </label>
+                <select
+                  value={shareCompanyFilter}
+                  onChange={(e) => {
+                    const comp = e.target.value;
+                    setShareCompanyFilter(comp);
+                    if (comp) {
+                      const cLow = comp.toLowerCase();
+                      const match = chatRooms.find((r) => {
+                        if (r.type === 'direct') return false;
+                        const rName = (r.name || '').toLowerCase();
+                        const rComp = (r.companyEntity || '').toLowerCase();
+                        if (cLow.includes('print')) return rComp.includes('print') || rName.includes('print');
+                        if (cLow.includes('online')) return rComp.includes('online') || rName.includes('online') || rName.includes('sales');
+                        if (cLow.includes('stitching')) return rComp.includes('stitching') || rName.includes('stitching');
+                        if (cLow.includes('fabtex')) return rComp.includes('fabtex') || rName.includes('fabtex');
+                        if (cLow.includes('edition')) return rComp.includes('edition') || rName.includes('operations');
+                        return rComp.includes(cLow) || rName.includes(cLow);
+                      });
+                      if (match) setSelectedRoomId(match._id);
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.6rem 0.85rem',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
+                    outline: 'none',
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">🏢 All Companies &amp; Departments</option>
+                  <option value="Elite Digital Print">🖨️ Elite Digital Print (EDP)</option>
+                  <option value="Elite Online">🛍️ Elite Online (EON)</option>
+                  <option value="Elite Edition">🏢 Elite Edition (EE)</option>
+                  <option value="Elite Fabtex">🧵 Elite Fabtex (EF)</option>
+                  <option value="Elite Stitching">✂️ Elite Stitching (ES)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Search Channel or Team Member</label>
                 <input 
                   type="text" 
                   value={shareSearch} 
@@ -2840,9 +2929,9 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Select Chat Destination</label>
+                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Select Chat Destination</label>
                 <div style={{
-                  maxHeight: '230px',
+                  maxHeight: '220px',
                   overflowY: 'auto',
                   border: '1px solid #cbd5e1',
                   borderRadius: '10px',
@@ -2854,6 +2943,20 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                 }}>
                   {chatRooms
                     .filter(r => {
+                      if (shareCompanyFilter) {
+                        const cLow = shareCompanyFilter.toLowerCase();
+                        const rName = (r.name || '').toLowerCase();
+                        const rComp = (r.companyEntity || '').toLowerCase();
+                        const isMatch = r.type !== 'direct' && (
+                          (cLow.includes('print') && (rComp.includes('print') || rName.includes('print'))) ||
+                          (cLow.includes('online') && (rComp.includes('online') || rName.includes('sales'))) ||
+                          (cLow.includes('stitching') && (rComp.includes('stitching') || rName.includes('stitching'))) ||
+                          (cLow.includes('fabtex') && (rComp.includes('fabtex') || rName.includes('fabtex'))) ||
+                          (cLow.includes('edition') && (rComp.includes('edition') || rName.includes('operations'))) ||
+                          rComp.includes(cLow) || rName.includes(cLow)
+                        );
+                        if (!isMatch) return false;
+                      }
                       if (!shareSearch) return true;
                       const roomName = r.type === 'direct' 
                         ? (r.members?.find(m => (m._id || m) !== api.getCurrentUser()?._id)?.name || r.name || '')

@@ -114,7 +114,8 @@ export default function ReportsCenter({ department }) {
           const currentUser = api.getCurrentUser();
           const userId = currentUser ? (currentUser._id || currentUser.id) : '';
           const res = await api.getRooms(userId);
-          if (res.data) setChatRooms(res.data);
+          const list = Array.isArray(res) ? res : (res?.data || []);
+          setChatRooms(list);
         } catch (err) {
           console.error('Failed to load chat rooms for sharing', err);
         }
