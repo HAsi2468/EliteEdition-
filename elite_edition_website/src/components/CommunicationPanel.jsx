@@ -17,6 +17,8 @@ import {
   Clock,
   ExternalLink,
   ChevronRight,
+  ChevronLeft,
+  MoreVertical,
   UserCheck,
   Building2,
   Zap,
@@ -122,6 +124,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const [showMobileActionMenu, setShowMobileActionMenu] = useState(false);
+  const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false);
 
   // New DM modal state
   const [showNewDmModal, setShowNewDmModal] = useState(false);
@@ -1610,127 +1615,147 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 70px)', padding: '0.75rem', gap: '0.75rem', background: 'var(--bg-main)', boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 70px)', padding: isMobileScreen ? (activeGroup ? '0' : '0.4rem') : '0.75rem', gap: isMobileScreen ? (activeGroup ? '0' : '0.35rem') : '0.75rem', background: 'var(--bg-main)', boxSizing: 'border-box' }}>
       
-      {/* ── TOP HEADER / ACTION BAR WITH PRIMARY TAB SWITCHER ── */}
-      <div className="glass-panel" style={{ padding: '0.75rem 1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '14px', background: 'var(--bg-card)', flexWrap: 'wrap', gap: '0.75rem', border: '1px solid var(--border-light, #e2e8f0)', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ width: 40, height: 40, borderRadius: '11px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 14px rgba(37,99,235,0.3)' }}>
-            {mainTab === 'chat' ? <MessageSquare size={21} /> : <CheckSquare size={21} />}
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.015em' }}>
-                Inter-Department Communication &amp; Activity Stream
-              </h2>
-              <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px', background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                LIVE SYNC
-              </span>
+      {/* ── TOP HEADER / ACTION BAR WITH PRIMARY TAB SWITCHER (Hidden on mobile when inside active chat) ── */}
+      {(!isMobileScreen || !activeGroup) && (
+        <div className="glass-panel" style={{
+          padding: isMobileScreen ? '0.5rem 0.75rem' : '0.75rem 1.1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderRadius: isMobileScreen ? '10px' : '14px',
+          background: 'var(--bg-card)',
+          flexWrap: isMobileScreen ? 'nowrap' : 'wrap',
+          gap: '0.5rem',
+          border: '1px solid var(--border-light, #e2e8f0)',
+          boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05)',
+          flexShrink: 0
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+            <div style={{ width: isMobileScreen ? 32 : 40, height: isMobileScreen ? 32 : 40, borderRadius: '10px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 14px rgba(37,99,235,0.3)', flexShrink: 0 }}>
+              {mainTab === 'chat' ? <MessageSquare size={isMobileScreen ? 17 : 21} /> : <CheckSquare size={isMobileScreen ? 17 : 21} />}
             </div>
-            <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-              {mainTab === 'chat'
-                ? 'Group Channels, Direct Messages & Real-Time Activity Stream'
-                : 'Task Management, Department Assignments & Progress Tracking'}
-            </p>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <h2 style={{ margin: 0, fontSize: isMobileScreen ? '0.92rem' : '1.1rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.015em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {isMobileScreen ? 'Inter-Dept Chat' : 'Inter-Department Communication & Activity Stream'}
+                </h2>
+                {!isMobileScreen && (
+                  <span style={{ fontSize: '0.62rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px', background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    LIVE SYNC
+                  </span>
+                )}
+              </div>
+              {!isMobileScreen && (
+                <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                  {mainTab === 'chat'
+                    ? 'Group Channels, Direct Messages & Real-Time Activity Stream'
+                    : 'Task Management, Department Assignments & Progress Tracking'}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* 🌟 PRIMARY TAB SWITCHER: Chat | Tasks 🌟 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--bg-input, #f1f5f9)', padding: '5px', borderRadius: '12px', border: '1px solid var(--border-light, #cbd5e1)' }}>
-          <button
-            type="button"
-            onClick={() => { setMainTab('chat'); setRosterTab('groups'); }}
-            style={{
-              padding: '0.5rem 1.25rem',
-              fontSize: '0.84rem',
-              fontWeight: 800,
-              borderRadius: '9px',
-              border: 'none',
-              background: mainTab === 'chat' ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'transparent',
-              color: mainTab === 'chat' ? '#ffffff' : 'var(--text-muted, #475569)',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              boxShadow: mainTab === 'chat' ? '0 3px 10px rgba(37,99,235,0.35)' : 'none',
-              transition: 'all 0.18s ease',
-              position: 'relative'
-            }}
-          >
-            <MessageSquare size={16} />
-            <span>Chat</span>
-            {totalChatUnreadCount > 0 && (
-              <span style={{
-                background: '#ef4444',
-                color: '#ffffff',
-                fontSize: '0.65rem',
-                fontWeight: 900,
-                padding: '1px 6px',
-                borderRadius: '10px',
-                lineHeight: '1.2',
-                boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
-              }}>
-                {totalChatUnreadCount > 99 ? '99+' : totalChatUnreadCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => { setMainTab('task'); }}
-            style={{
-              padding: '0.5rem 1.25rem',
-              fontSize: '0.84rem',
-              fontWeight: 800,
-              borderRadius: '9px',
-              border: 'none',
-              background: mainTab === 'task' ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'transparent',
-              color: mainTab === 'task' ? '#ffffff' : 'var(--text-muted, #475569)',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              boxShadow: mainTab === 'task' ? '0 3px 10px rgba(37,99,235,0.35)' : 'none',
-              transition: 'all 0.18s ease'
-            }}
-          >
-            <CheckSquare size={16} />
-            <span>Tasks</span>
-          </button>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.55rem', alignItems: 'center' }}>
-          {mainTab === 'chat' && currentUser?.role === 'admin' && (
+          {/* 🌟 PRIMARY TAB SWITCHER: Chat | Tasks 🌟 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--bg-input, #f1f5f9)', padding: '3px', borderRadius: '10px', border: '1px solid var(--border-light, #cbd5e1)', flexShrink: 0 }}>
             <button
-              onClick={handleOpenCreateGroupModal}
-              className="btn-primary"
-              style={{ fontSize: '0.78rem', padding: '0.45rem 0.9rem', gap: '0.4rem', borderRadius: '9px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', fontWeight: 700 }}
-              title="Create a new custom communication group with members"
+              type="button"
+              onClick={() => { setMainTab('chat'); setRosterTab('groups'); }}
+              style={{
+                padding: isMobileScreen ? '0.35rem 0.75rem' : '0.5rem 1.25rem',
+                fontSize: isMobileScreen ? '0.75rem' : '0.84rem',
+                fontWeight: 800,
+                borderRadius: '7px',
+                border: 'none',
+                background: mainTab === 'chat' ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'transparent',
+                color: mainTab === 'chat' ? '#ffffff' : 'var(--text-muted, #475569)',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                boxShadow: mainTab === 'chat' ? '0 3px 10px rgba(37,99,235,0.35)' : 'none',
+                transition: 'all 0.18s ease',
+                position: 'relative'
+              }}
             >
-              <PlusCircle size={14} />
-              <span>+ Create Group</span>
+              <MessageSquare size={14} />
+              <span>Chat</span>
+              {totalChatUnreadCount > 0 && (
+                <span style={{
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  fontSize: '0.62rem',
+                  fontWeight: 900,
+                  padding: '1px 5px',
+                  borderRadius: '10px',
+                  lineHeight: '1.2',
+                  boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)'
+                }}>
+                  {totalChatUnreadCount > 99 ? '99+' : totalChatUnreadCount}
+                </span>
+              )}
             </button>
-          )}
 
-          <button
-            onClick={async () => {
-              if (!window.confirm('Are you sure you want to force a hard reload for ALL connected users across the company? Connected browsers will clear caches and reload immediately.')) return;
-              try {
-                await api.forceReloadAllUsers();
-                alert('⚡ Hard reload signal sent to all connected users!');
-              } catch (err) {
-                alert('Failed to send reload signal: ' + err.message);
-              }
-            }}
-            className="btn-secondary"
-            style={{ fontSize: '0.78rem', padding: '0.45rem 0.9rem', gap: '0.4rem', borderRadius: '9px', color: '#d97706', borderColor: '#f59e0b40', fontWeight: 700 }}
-            title="Force clear cache & hard reload all connected users instantly"
-          >
-            <Zap size={13} color="#d97706" />
-            <span>Hard Refresh All</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => { setMainTab('task'); }}
+              style={{
+                padding: isMobileScreen ? '0.35rem 0.75rem' : '0.5rem 1.25rem',
+                fontSize: isMobileScreen ? '0.75rem' : '0.84rem',
+                fontWeight: 800,
+                borderRadius: '7px',
+                border: 'none',
+                background: mainTab === 'task' ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'transparent',
+                color: mainTab === 'task' ? '#ffffff' : 'var(--text-muted, #475569)',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                boxShadow: mainTab === 'task' ? '0 3px 10px rgba(37,99,235,0.35)' : 'none',
+                transition: 'all 0.18s ease'
+              }}
+            >
+              <CheckSquare size={14} />
+              <span>Tasks</span>
+            </button>
+          </div>
+
+          {!isMobileScreen && (
+            <div style={{ display: 'flex', gap: '0.55rem', alignItems: 'center' }}>
+              {mainTab === 'chat' && currentUser?.role === 'admin' && (
+                <button
+                  onClick={handleOpenCreateGroupModal}
+                  className="btn-primary"
+                  style={{ fontSize: '0.78rem', padding: '0.45rem 0.9rem', gap: '0.4rem', borderRadius: '9px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', fontWeight: 700 }}
+                  title="Create a new custom communication group with members"
+                >
+                  <PlusCircle size={14} />
+                  <span>+ Create Group</span>
+                </button>
+              )}
+
+              <button
+                onClick={async () => {
+                  if (!window.confirm('Are you sure you want to force a hard reload for ALL connected users across the company? Connected browsers will clear caches and reload immediately.')) return;
+                  try {
+                    await api.forceReloadAllUsers();
+                    alert('⚡ Hard reload signal sent to all connected users!');
+                  } catch (err) {
+                    alert('Failed to send reload signal: ' + err.message);
+                  }
+                }}
+                className="btn-secondary"
+                style={{ fontSize: '0.78rem', padding: '0.45rem 0.9rem', gap: '0.4rem', borderRadius: '9px', color: '#d97706', borderColor: '#f59e0b40', fontWeight: 700 }}
+                title="Force clear cache & hard reload all connected users instantly"
+              >
+                <Zap size={13} color="#d97706" />
+                <span>Hard Refresh All</span>
+              </button>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* ── MAIN CONTENT VIEW (IF TASK MODE SELECTED: FULL TASK PANEL | IF CHAT MODE: SPLIT ROSTER & STREAM) ── */}
       {mainTab === 'task' ? (
@@ -2004,64 +2029,324 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                 const displayName = isDirect ? (colleagueName || activeGroup.name || 'Private DM') : activeGroup.name;
 
                 return (
-                  <div style={{ padding: '0.65rem 1rem', borderBottom: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-th, #f8fafc)', flexShrink: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                      {isMobileScreen && activeGroup && (
-                        <button
-                          onClick={() => setActiveGroup(null)}
-                          style={{
-                            background: '#eff6ff',
-                            border: '1px solid #bfdbfe',
-                            color: '#2563eb',
-                            fontSize: '0.75rem',
-                            fontWeight: 800,
-                            padding: '0.35rem 0.65rem',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            marginRight: '6px',
-                            flexShrink: 0
-                          }}
-                          title="Back to conversation list"
-                        >
-                          ← Channels
-                        </button>
-                      )}
-                      {isDirect ? (
-                        <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.9rem', fontWeight: 800, boxShadow: '0 3px 10px rgba(37,99,235,0.3)' }}>
-                          {(displayName || 'D').charAt(0).toUpperCase()}
+                  <>
+                    <div style={{
+                      padding: isMobileScreen ? '0.45rem 0.65rem' : '0.65rem 1rem',
+                      borderBottom: '1px solid var(--border-light)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: 'var(--bg-th, #f8fafc)',
+                      flexShrink: 0,
+                      position: 'relative',
+                      gap: '0.5rem'
+                    }}>
+                      {/* Left: Back Button (Mobile) + Avatar + Display Name */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: isMobileScreen ? '0.45rem' : '0.65rem', minWidth: 0, flex: 1 }}>
+                        {isMobileScreen && activeGroup && (
+                          <button
+                            onClick={() => { setActiveGroup(null); setShowMobileActionMenu(false); setShowMobileHeaderMenu(false); }}
+                            style={{
+                              background: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              color: '#2563eb',
+                              padding: '5px',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginRight: '2px',
+                              flexShrink: 0
+                            }}
+                            title="Back to conversation list"
+                          >
+                            <ChevronLeft size={20} />
+                          </button>
+                        )}
+                        {isDirect ? (
+                          <div style={{ width: isMobileScreen ? 32 : 34, height: isMobileScreen ? 32 : 34, borderRadius: '50%', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.85rem', fontWeight: 800, flexShrink: 0, boxShadow: '0 3px 10px rgba(37,99,235,0.3)' }}>
+                            {(displayName || 'D').charAt(0).toUpperCase()}
+                          </div>
+                        ) : (
+                          <div style={{ width: isMobileScreen ? 32 : 34, height: isMobileScreen ? 32 : 34, borderRadius: '8px', background: `${getDeptColor(activeGroup.department)}15`, border: `1.5px solid ${getDeptColor(activeGroup.department)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: getDeptColor(activeGroup.department), flexShrink: 0 }}>
+                            <Building2 size={16} />
+                          </div>
+                        )}
+
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <h3 style={{ margin: 0, fontSize: isMobileScreen ? '0.88rem' : '0.95rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {displayName}
+                            </h3>
+                            {!isMobileScreen && (
+                              <span style={{ fontSize: '0.62rem', fontWeight: 800, color: isDirect ? '#2563eb' : getDeptColor(activeGroup.department), background: isDirect ? '#eff6ff' : `${getDeptColor(activeGroup.department)}18`, padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                                {isDirect ? '1-on-1 PRIVATE DM' : activeGroup.department}
+                              </span>
+                            )}
+                          </div>
+                          <p style={{ margin: 0, fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {isDirect ? (
+                              <span>{colleague?.role ? `${colleague.role} · ` : ''}Private Chat</span>
+                            ) : (
+                              <span>{activeGroup.companyEntity || activeGroup.department || 'Group Channel'}</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Right: Actions */}
+                      {isMobileScreen ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                          {/* Search */}
+                          <button
+                            type="button"
+                            onClick={() => setShowInRoomSearch(!showInRoomSearch)}
+                            style={{
+                              background: showInRoomSearch ? '#eff6ff' : 'transparent',
+                              border: showInRoomSearch ? '1px solid #bfdbfe' : 'none',
+                              color: showInRoomSearch ? '#2563eb' : 'var(--text-muted)',
+                              padding: '6px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                            title="Search keywords"
+                          >
+                            <Search size={17} />
+                          </button>
+
+                          {/* Gallery */}
+                          <button
+                            type="button"
+                            onClick={() => setShowGalleryModal(true)}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', padding: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            title="View Gallery"
+                          >
+                            <Folder size={17} />
+                          </button>
+
+                          {/* More Options Toggle */}
+                          <button
+                            type="button"
+                            onClick={() => setShowMobileHeaderMenu(!showMobileHeaderMenu)}
+                            style={{
+                              background: showMobileHeaderMenu ? '#f1f5f9' : 'none',
+                              border: 'none',
+                              color: 'var(--text-muted)',
+                              padding: '6px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                            title="More actions"
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+
+                          {/* Mobile Header Dropdown Popup */}
+                          {showMobileHeaderMenu && (
+                            <>
+                              <div
+                                onClick={() => setShowMobileHeaderMenu(false)}
+                                style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'transparent' }}
+                              />
+                              <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: '6px',
+                                marginTop: '4px',
+                                background: 'var(--bg-card, #ffffff)',
+                                border: '1px solid var(--border-light, #e2e8f0)',
+                                borderRadius: '12px',
+                                boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                                zIndex: 9999,
+                                padding: '6px',
+                                minWidth: '180px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '2px'
+                              }}>
+                                {!isDirect && (
+                                  <button
+                                    type="button"
+                                    onClick={() => { setShowMobileHeaderMenu(false); handleOpenMembers(); }}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                      background: 'none', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                      fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                    }}
+                                  >
+                                    <Users size={14} color="#2563eb" />
+                                    <span>Members ({activeGroup.members?.length || 0})</span>
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowMobileHeaderMenu(false);
+                                    const next = !chatSoundMuted;
+                                    setChatSoundMuted(next);
+                                    if (typeof localStorage !== 'undefined') localStorage.setItem('elite_chat_sound_muted', String(next));
+                                  }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'none', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  {chatSoundMuted ? <Volume2 size={14} color="#10b981" /> : <VolumeX size={14} color="#ef4444" />}
+                                  <span>{chatSoundMuted ? 'Unmute Sound' : 'Mute Sound'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => { setShowMobileHeaderMenu(false); handleExportChatLog(); }}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                    background: 'none', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                    fontSize: '0.8rem', color: 'var(--text-primary)', cursor: 'pointer', fontWeight: 600
+                                  }}
+                                >
+                                  <FileText size={14} color="#8b5cf6" />
+                                  <span>Export Chat Log</span>
+                                </button>
+
+                                {currentUser?.role === 'admin' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => { setShowMobileHeaderMenu(false); handleDeleteGroup(activeGroup); }}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
+                                      background: '#fee2e2', border: 'none', borderRadius: '6px', textAlign: 'left',
+                                      fontSize: '0.8rem', color: '#dc2626', cursor: 'pointer', fontWeight: 700
+                                    }}
+                                  >
+                                    <Trash2 size={14} color="#dc2626" />
+                                    <span>Delete Group</span>
+                                  </button>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </div>
                       ) : (
-                        <div style={{ width: 34, height: 34, borderRadius: '8px', background: `${getDeptColor(activeGroup.department)}15`, border: `1.5px solid ${getDeptColor(activeGroup.department)}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: getDeptColor(activeGroup.department) }}>
-                          <Building2 size={18} />
+                        /* Desktop full toolbar */
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', background: 'var(--bg-main)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+                            {[
+                              { id: 'all', label: 'All' },
+                              { id: 'human', label: '💬 Chat' },
+                              { id: 'system_activity', label: '🤖 Activity' },
+                              { id: 'urgent', label: '🚨 SOS' },
+                              { id: 'media', label: '📎 Media' },
+                            ].map((f) => (
+                              <button
+                                key={f.id}
+                                onClick={() => setMsgFilter(f.id)}
+                                style={{
+                                  background: msgFilter === f.id ? 'var(--primary)' : 'transparent',
+                                  color: msgFilter === f.id ? '#fff' : 'var(--text-muted)',
+                                  border: 'none',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 700,
+                                  padding: '0.25rem 0.5rem',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s'
+                                }}
+                              >
+                                {f.label}
+                              </button>
+                            ))}
+                          </div>
+
+                          <button
+                            onClick={() => setShowInRoomSearch(!showInRoomSearch)}
+                            className="btn-secondary"
+                            style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px', background: showInRoomSearch ? 'rgba(56,189,248,0.15)' : undefined, borderColor: showInRoomSearch ? 'var(--primary)' : undefined }}
+                            title="Search keywords inside this message stream"
+                          >
+                            <Search size={13} color={showInRoomSearch ? 'var(--primary)' : 'currentColor'} />
+                            <span>Search</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              const next = !chatSoundMuted;
+                              setChatSoundMuted(next);
+                              if (typeof localStorage !== 'undefined') localStorage.setItem('elite_chat_sound_muted', String(next));
+                            }}
+                            className="btn-secondary"
+                            style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', borderRadius: '6px' }}
+                            title={chatSoundMuted ? "Unmute Chat Sound Chimes" : "Mute Chat Sound Chimes"}
+                          >
+                            {chatSoundMuted ? <VolumeX size={13} color="#ef4444" /> : <Volume2 size={13} color="#10b981" />}
+                          </button>
+
+                          <button
+                            onClick={() => setShowGalleryModal(true)}
+                            className="btn-secondary"
+                            style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px' }}
+                            title="View Cloudflare R2 Media & Document Gallery for this room"
+                          >
+                            <Folder size={13} />
+                            <span>Gallery</span>
+                          </button>
+
+                          <button
+                            onClick={handleExportChatLog}
+                            className="btn-secondary"
+                            style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px' }}
+                            title="Export chat transcript as a text file"
+                          >
+                            <FileText size={13} />
+                            <span>Export</span>
+                          </button>
+
+                          {!isDirect && (
+                            <button
+                              onClick={handleOpenMembers}
+                              className="btn-secondary"
+                              style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px' }}
+                              title="View authorized members of this group"
+                            >
+                              <Users size={13} />
+                              <span>Members ({activeGroup.members?.length || 0})</span>
+                            </button>
+                          )}
+
+                          {currentUser?.role === 'admin' && (
+                            <button
+                              onClick={() => handleDeleteGroup(activeGroup)}
+                              className="btn-secondary"
+                              style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px', color: '#dc2626', border: '1px solid #fca5a5', background: '#fee2e2' }}
+                              title="Delete this group permanently"
+                            >
+                              <Trash2 size={13} />
+                              <span>Delete</span>
+                            </button>
+                          )}
                         </div>
                       )}
-
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                          <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                            {displayName}
-                          </h3>
-                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: isDirect ? '#2563eb' : getDeptColor(activeGroup.department), background: isDirect ? '#eff6ff' : `${getDeptColor(activeGroup.department)}18`, padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                            {isDirect ? '1-on-1 PRIVATE DM' : activeGroup.department}
-                          </span>
-                        </div>
-                        <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500, marginTop: '1px' }}>
-                          {isDirect ? (
-                            <span>Role: <strong>{colleague?.role || 'Staff'}</strong> · Private Direct Conversation</span>
-                          ) : (
-                            <span>{activeGroup.description || `Department: ${activeGroup.department || 'General'}`}</span>
-                          )}
-                        </p>
-                      </div>
                     </div>
 
-                    {/* Filter Tabs, Delete & Members Buttons */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      {/* Msg Filter Pill */}
-                      <div style={{ display: 'flex', background: 'var(--bg-main)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-light)' }}>
+                    {/* Horizontal Filter Pills for Mobile */}
+                    {isMobileScreen && (
+                      <div style={{
+                        display: 'flex',
+                        gap: '6px',
+                        padding: '6px 10px',
+                        borderBottom: '1px solid var(--border-light)',
+                        background: 'var(--bg-main, #f8fafc)',
+                        overflowX: 'auto',
+                        scrollbarWidth: 'none',
+                        WebkitOverflowScrolling: 'touch',
+                        flexShrink: 0
+                      }}>
                         {[
                           { id: 'all', label: 'All' },
                           { id: 'human', label: '💬 Chat' },
@@ -2073,92 +2358,26 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             key={f.id}
                             onClick={() => setMsgFilter(f.id)}
                             style={{
-                              background: msgFilter === f.id ? 'var(--primary)' : 'transparent',
-                              color: msgFilter === f.id ? '#fff' : 'var(--text-muted)',
-                              border: 'none',
-                              fontSize: '0.7rem',
+                              background: msgFilter === f.id ? 'var(--primary, #2563eb)' : 'var(--bg-card, #ffffff)',
+                              color: msgFilter === f.id ? '#ffffff' : 'var(--text-muted, #64748b)',
+                              border: msgFilter === f.id ? '1px solid var(--primary, #2563eb)' : '1px solid var(--border-light, #e2e8f0)',
+                              fontSize: '0.72rem',
                               fontWeight: 700,
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '4px',
+                              padding: '4px 10px',
+                              borderRadius: '16px',
                               cursor: 'pointer',
-                              transition: 'all 0.15s'
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0,
+                              boxShadow: msgFilter === f.id ? '0 2px 6px rgba(37,99,235,0.25)' : 'none',
+                              transition: 'all 0.15s ease'
                             }}
                           >
                             {f.label}
                           </button>
                         ))}
                       </div>
-
-                      {/* In-Stream Search Toggle */}
-                      <button
-                        onClick={() => setShowInRoomSearch(!showInRoomSearch)}
-                        className="btn-secondary"
-                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px', background: showInRoomSearch ? 'rgba(56,189,248,0.15)' : undefined, borderColor: showInRoomSearch ? 'var(--primary)' : undefined }}
-                        title="Search keywords inside this message stream"
-                      >
-                        <Search size={13} color={showInRoomSearch ? 'var(--primary)' : 'currentColor'} />
-                        <span>Search</span>
-                      </button>
-
-                      {/* Audio Chime Mute/Unmute Toggle */}
-                      <button
-                        onClick={() => {
-                          const next = !chatSoundMuted;
-                          setChatSoundMuted(next);
-                          if (typeof localStorage !== 'undefined') localStorage.setItem('elite_chat_sound_muted', String(next));
-                        }}
-                        className="btn-secondary"
-                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', borderRadius: '6px' }}
-                        title={chatSoundMuted ? "Unmute Chat Sound Chimes" : "Mute Chat Sound Chimes"}
-                      >
-                        {chatSoundMuted ? <VolumeX size={13} color="#ef4444" /> : <Volume2 size={13} color="#10b981" />}
-                      </button>
-
-                      <button
-                        onClick={() => setShowGalleryModal(true)}
-                        className="btn-secondary"
-                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px' }}
-                        title="View Cloudflare R2 Media & Document Gallery for this room"
-                      >
-                        <Folder size={13} />
-                        <span>Gallery</span>
-                      </button>
-
-                      <button
-                        onClick={handleExportChatLog}
-                        className="btn-secondary"
-                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px' }}
-                        title="Export chat transcript as a text file"
-                      >
-                        <FileText size={13} />
-                        <span>Export</span>
-                      </button>
-
-                      {!isDirect && (
-                        <button
-                          onClick={handleOpenMembers}
-                          className="btn-secondary"
-                          style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px' }}
-                          title="View authorized members of this group"
-                        >
-                          <Users size={13} />
-                          <span>Members ({activeGroup.members?.length || 0})</span>
-                        </button>
-                      )}
-
-                      {currentUser?.role === 'admin' && (
-                        <button
-                          onClick={() => handleDeleteGroup(activeGroup)}
-                          className="btn-secondary"
-                          style={{ fontSize: '0.75rem', padding: '0.35rem 0.65rem', gap: '0.35rem', borderRadius: '6px', color: '#dc2626', border: '1px solid #fca5a5', background: '#fee2e2' }}
-                          title="Delete this group permanently"
-                        >
-                          <Trash2 size={13} />
-                          <span>Delete</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                    )}
+                  </>
                 );
               })()}
 
@@ -2681,18 +2900,248 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               <input type="file" ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} accept="image/*,.pdf,.doc,.docx,audio/*" />
 
               {/* Chat Input Form */}
-              <form onSubmit={handleSendMessage} style={{ padding: '0.65rem 0.9rem', background: 'var(--bg-card)', borderTop: '1px solid var(--border-light)', display: 'flex', gap: '0.45rem', alignItems: 'center', flexShrink: 0 }}>
+              <form
+                onSubmit={handleSendMessage}
+                style={{
+                  padding: isMobileScreen ? '0.45rem 0.6rem' : '0.65rem 0.9rem',
+                  background: 'var(--bg-card)',
+                  borderTop: '1px solid var(--border-light)',
+                  display: 'flex',
+                  gap: isMobileScreen ? '0.4rem' : '0.45rem',
+                  alignItems: 'center',
+                  flexShrink: 0,
+                  position: 'relative'
+                }}
+              >
                 {isRecordingAudio ? (
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fee2e2', border: '1px solid #fca5a5', padding: '0.4rem 0.8rem', borderRadius: '8px', color: '#b91c1c', fontWeight: 800, fontSize: '0.82rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
-                      <span>Recording Voice Note... {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:{String(recordingSeconds % 60).padStart(2, '0')}</span>
+                      <span>Recording... {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:{String(recordingSeconds % 60).padStart(2, '0')}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '0.4rem' }}>
                       <button type="button" onClick={cancelAudioRecording} style={{ background: 'none', border: 'none', color: '#dc2626', fontWeight: 700, cursor: 'pointer', fontSize: '0.78rem' }}>Cancel</button>
                       <button type="button" onClick={stopAudioRecording} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '0.25rem 0.75rem', borderRadius: '6px', fontWeight: 800, cursor: 'pointer', fontSize: '0.78rem' }}>Attach Audio →</button>
                     </div>
                   </div>
+                ) : isMobileScreen ? (
+                  <>
+                    {/* Mobile Action Sheet Overlay & Menu */}
+                    {showMobileActionMenu && (
+                      <>
+                        <div
+                          onClick={() => setShowMobileActionMenu(false)}
+                          style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(2px)' }}
+                        />
+                        <div style={{
+                          position: 'absolute',
+                          bottom: '100%',
+                          left: '8px',
+                          marginBottom: '8px',
+                          background: 'var(--bg-card, #ffffff)',
+                          border: '1px solid var(--border-light, #e2e8f0)',
+                          borderRadius: '16px',
+                          boxShadow: '0 12px 32px rgba(0,0,0,0.22)',
+                          zIndex: 9999,
+                          padding: '10px',
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(2, 1fr)',
+                          gap: '8px',
+                          width: '260px'
+                        }}>
+                          {/* File Attachment */}
+                          <button
+                            type="button"
+                            onClick={() => { setShowMobileActionMenu(false); fileInputRef.current && fileInputRef.current.click(); }}
+                            style={{
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '10px 8px',
+                              background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', color: '#2563eb',
+                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700
+                            }}
+                          >
+                            <Paperclip size={20} />
+                            <span>Attach File</span>
+                          </button>
+
+                          {/* Voice Note */}
+                          <button
+                            type="button"
+                            onClick={() => { setShowMobileActionMenu(false); startAudioRecording(); }}
+                            style={{
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '10px 8px',
+                              background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', color: '#16a34a',
+                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700
+                            }}
+                          >
+                            <Mic size={20} />
+                            <span>Voice Note</span>
+                          </button>
+
+                          {/* Department Poll */}
+                          <button
+                            type="button"
+                            onClick={() => { setShowMobileActionMenu(false); setShowPollModal(true); }}
+                            style={{
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '10px 8px',
+                              background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '10px', color: '#059669',
+                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700
+                            }}
+                          >
+                            <BarChart2 size={20} />
+                            <span>Create Poll</span>
+                          </button>
+
+                          {/* Share Record Card */}
+                          <button
+                            type="button"
+                            onClick={() => { setShowMobileActionMenu(false); handleOpenShareModal('jobcard'); }}
+                            style={{
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '10px 8px',
+                              background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: '10px', color: '#9333ea',
+                              cursor: 'pointer', fontSize: '0.74rem', fontWeight: 700
+                            }}
+                          >
+                            <Share2 size={20} />
+                            <span>Share Record</span>
+                          </button>
+
+                          {/* Urgent SOS Alert Toggle */}
+                          <button
+                            type="button"
+                            onClick={() => { setShowMobileActionMenu(false); setIsUrgent(!isUrgent); }}
+                            style={{
+                              gridColumn: 'span 2',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '9px',
+                              background: isUrgent ? '#ef4444' : '#fff1f2', border: '1px solid #fecdd3', borderRadius: '10px',
+                              color: isUrgent ? '#ffffff' : '#e11d48', cursor: 'pointer', fontSize: '0.76rem', fontWeight: 800
+                            }}
+                          >
+                            <AlertTriangle size={16} />
+                            <span>{isUrgent ? '🚨 Urgent SOS Alert ACTIVE' : '🚨 Send as Urgent SOS Alert'}</span>
+                          </button>
+                        </div>
+                      </>
+                    )}
+
+                    {/* '+' Toggle button for tools on Mobile */}
+                    <button
+                      type="button"
+                      onClick={() => setShowMobileActionMenu(!showMobileActionMenu)}
+                      style={{
+                        background: showMobileActionMenu ? '#2563eb' : '#eff6ff',
+                        color: showMobileActionMenu ? '#ffffff' : '#2563eb',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: '50%',
+                        width: '36px',
+                        height: '36px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        transition: 'all 0.15s ease'
+                      }}
+                      title="Attachments & Tools"
+                    >
+                      <Plus size={20} style={{ transform: showMobileActionMenu ? 'rotate(45deg)' : 'none', transition: 'transform 0.15s ease' }} />
+                    </button>
+
+                    {/* 1-tap File Attachment */}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#64748b',
+                        padding: '6px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        flexShrink: 0
+                      }}
+                      title="Attach File"
+                    >
+                      <Paperclip size={19} />
+                    </button>
+
+                    {/* SOS Tag if active */}
+                    {isUrgent && (
+                      <div style={{ background: '#ef4444', color: '#ffffff', fontSize: '0.66rem', fontWeight: 900, padding: '3px 7px', borderRadius: '12px', flexShrink: 0 }}>
+                        SOS
+                      </div>
+                    )}
+
+                    {/* Main input */}
+                    <input
+                      type="text"
+                      placeholder={isUrgent ? "🚨 Urgent SOS Message..." : "Message..."}
+                      value={inputMessage}
+                      onPaste={handlePasteClipboard}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setInputMessage(val);
+                        if (activeGroup?._id) {
+                          setRoomDrafts((prev) => ({ ...prev, [activeGroup._id]: val }));
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        padding: '0.55rem 0.85rem',
+                        fontSize: '0.88rem',
+                        background: 'var(--bg-input, #f1f5f9)',
+                        border: isUrgent ? '1.5px solid #ef4444' : '1px solid var(--border-light, #cbd5e1)',
+                        borderRadius: '20px',
+                        color: 'var(--text-primary, #0f172a)',
+                        outline: 'none'
+                      }}
+                    />
+
+                    {/* Send / Mic Button */}
+                    {(inputMessage.trim() || attachedFile) ? (
+                      <button
+                        type="submit"
+                        style={{
+                          background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '36px',
+                          height: '36px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                          boxShadow: '0 3px 10px rgba(37,99,235,0.35)'
+                        }}
+                      >
+                        <Send size={15} />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={startAudioRecording}
+                        style={{
+                          background: '#eff6ff',
+                          color: '#2563eb',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: '50%',
+                          width: '36px',
+                          height: '36px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          flexShrink: 0
+                        }}
+                        title="Voice Note"
+                      >
+                        <Mic size={17} />
+                      </button>
+                    )}
+                  </>
                 ) : (
                   <>
                     {/* Audio Record Button */}
