@@ -109,6 +109,7 @@ export default function InventoryGrid({
   const [inwardSortField, setInwardSortField] = useState('created_date_time');
   const [inwardSortOrder, setInwardSortOrder] = useState('desc');
   const [inwardData, setInwardData] = useState({ items: [], totalQty: 0, totalPurchase: 0 });
+  const [totalInwardCount, setTotalInwardCount] = useState(null);
   const [inwardLoading, setInwardLoading] = useState(false);
   const [inwardError, setInwardError] = useState('');
   const [downloadingInwardPdf, setDownloadingInwardPdf] = useState(false);
@@ -123,6 +124,7 @@ export default function InventoryGrid({
   const [customOutwardEnd, setCustomOutwardEnd] = useState('');
   const [outwardSearchTerm, setOutwardSearchTerm] = useState('');
   const [outwardData, setOutwardData] = useState({ items: [], totalQty: 0, totalPurchase: 0, totalSell: 0, totalProfit: 0 });
+  const [totalOutwardCount, setTotalOutwardCount] = useState(null);
   const [outwardLoading, setOutwardLoading] = useState(false);
   const [outwardError, setOutwardError] = useState('');
   const [downloadingOutwardPdf, setDownloadingOutwardPdf] = useState(false);
@@ -194,6 +196,9 @@ export default function InventoryGrid({
       const combinedEnd = end ? `${end}T23:59:59` : '';
       const res = await api.getStockInwardReportData(combinedStart, combinedEnd);
       setInwardData(res || { items: [], totalQty: 0, totalPurchase: 0 });
+      if (!start && !end) {
+        setTotalInwardCount(res?.items?.length || 0);
+      }
     } catch (err) {
       console.error('Failed to fetch inward stock data:', err);
       setInwardError(err.message || 'Failed to load inward stock records.');
@@ -210,6 +215,9 @@ export default function InventoryGrid({
       const combinedEnd = end ? `${end}T23:59:59` : '';
       const res = await api.getStockOutwardReportData(combinedStart, combinedEnd);
       setOutwardData(res || { items: [], totalQty: 0, totalPurchase: 0, totalSell: 0, totalProfit: 0 });
+      if (!start && !end) {
+        setTotalOutwardCount(res?.items?.length || 0);
+      }
     } catch (err) {
       console.error('Failed to fetch outward stock data:', err);
       setOutwardError(err.message || 'Failed to load outward stock records.');
@@ -217,6 +225,12 @@ export default function InventoryGrid({
       setOutwardLoading(false);
     }
   }, [outwardDateStart, outwardDateEnd]);
+
+  // Initial load on mount so Inward & Outward counts are populated immediately without clicking tabs
+  useEffect(() => {
+    fetchInwardData('', '');
+    fetchOutwardData('', '');
+  }, []);
 
   // Trigger data fetch when switching tabs
   useEffect(() => {
@@ -226,6 +240,30 @@ export default function InventoryGrid({
       fetchOutwardData();
     }
   }, [activeSubTab, fetchInwardData, fetchOutwardData]);
+
+  // Auto-refresh without page reload: listen to global event dispatched on inward, outward, or inventory transactions
+  const refreshAllStockLogs = useCallback(async () => {
+    fetchInwardData();
+    fetchOutwardData();
+    if (inwardDateStart || inwardDateEnd) {
+      api.getStockInwardReportData('', '')
+        .then(res => setTotalInwardCount(res?.items?.length || 0))
+        .catch(() => {});
+    }
+    if (outwardDateStart || outwardDateEnd) {
+      api.getStockOutwardReportData('', '')
+        .then(res => setTotalOutwardCount(res?.items?.length || 0))
+        .catch(() => {});
+    }
+  }, [fetchInwardData, fetchOutwardData, inwardDateStart, inwardDateEnd, outwardDateStart, outwardDateEnd]);
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      refreshAllStockLogs();
+    };
+    window.addEventListener('elite-data-refresh', handleRefresh);
+    return () => window.removeEventListener('elite-data-refresh', handleRefresh);
+  }, [refreshAllStockLogs]);
 
   // Quick Date Preset Handler matching regular ERP date filter
   const handleQuickDatePreset = (tab, preset) => {
@@ -647,7 +685,7 @@ export default function InventoryGrid({
             <ArrowDownRight size={17} />
             <span>Inward Stock</span>
             <span style={styles.tabBadge(activeSubTab === 'inward', '#10b981')}>
-              {inwardData.items?.length || 0}
+              {totalInwardCount !== null ? totalInwardCount : (inwardData.items?.length || 0)}
             </span>
           </button>
 
@@ -659,7 +697,7 @@ export default function InventoryGrid({
             <ArrowUpRight size={17} />
             <span>Outward Stock</span>
             <span style={styles.tabBadge(activeSubTab === 'outward', '#f59e0b')}>
-              {outwardData.items?.length || 0}
+              {totalOutwardCount !== null ? totalOutwardCount : (outwardData.items?.length || 0)}
             </span>
           </button>
 

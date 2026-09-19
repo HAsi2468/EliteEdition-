@@ -870,10 +870,10 @@ export default function App() {
           await ensureSkuSavedToCatalog(item);
         }
       }
-      alert(res.message || 'Bulk inward completed successfully!');
       setIsBulkInwardOpen(false);
       triggerGlobalDataRefresh();
       await fetchData();
+      alert(res.message || 'Bulk inward completed successfully!');
     } catch (err) {
       alert(err.message || 'Failed to process bulk inward.');
     } finally {
@@ -888,7 +888,9 @@ export default function App() {
       await api.createStockOut(payload);
       setIsStockOutOpen(false);
       setStockOutItem(null);
+      triggerGlobalDataRefresh();
       await fetchData();
+      alert('Outward dispatch completed successfully!');
     } catch (err) {
       alert(err.message || 'Failed to submit outward transaction.');
     } finally {
