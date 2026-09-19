@@ -296,7 +296,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
         }
       }
 
-      setGroups((prevGroups) => {
+        setGroups((prevGroups) => {
         return prevGroups.map((g) => {
           if (String(g._id) === String(msg.roomId)) {
             const isCurrentActive = currentActiveId && String(g._id) === String(currentActiveId);
@@ -311,6 +311,36 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
           return g;
         }).sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
       });
+
+      // Emergency SOS chime & vibration if message is urgent
+      if (msg.priority === 'urgent') {
+        const senderId = typeof msg.senderId === 'object' ? (msg.senderId._id || msg.senderId.id) : msg.senderId;
+        if (String(senderId) !== String(uId)) {
+          try {
+            if (!chatSoundMuted) {
+              const AudioCtx = window.AudioContext || window.webkitAudioContext;
+              if (AudioCtx) {
+                const ctx = new AudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                osc.frequency.setValueAtTime(440, ctx.currentTime + 0.12);
+                osc.frequency.setValueAtTime(880, ctx.currentTime + 0.24);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.38);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.38);
+              }
+            }
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              navigator.vibrate([300, 100, 300]);
+            }
+          } catch (e) {}
+        }
+      }
 
       fetchGroups(false);
     };
@@ -2842,12 +2872,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                           <div
                             style={{
-                              background: isMe ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'var(--bg-card)',
-                              color: isMe ? '#ffffff' : 'var(--text-primary)',
+                              background: msg.priority === 'urgent'
+                                ? (isMe ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' : '#fee2e2')
+                                : (isMe ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'var(--bg-card)'),
+                              color: msg.priority === 'urgent'
+                                ? (isMe ? '#ffffff' : '#991b1b')
+                                : (isMe ? '#ffffff' : 'var(--text-primary)'),
                               padding: '0.65rem 0.9rem',
                               borderRadius: isMe ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
-                              border: isMe ? 'none' : '1px solid var(--border-light)',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                              border: msg.priority === 'urgent'
+                                ? (isMe ? '1.5px solid #fca5a5' : '1.5px solid #ef4444')
+                                : (isMe ? 'none' : '1px solid var(--border-light)'),
+                              boxShadow: msg.priority === 'urgent' ? '0 4px 14px rgba(239,68,68,0.3)' : '0 2px 8px rgba(0,0,0,0.04)',
                               fontSize: '0.85rem',
                               lineHeight: 1.45,
                               wordBreak: 'break-word',
