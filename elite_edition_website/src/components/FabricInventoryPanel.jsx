@@ -623,8 +623,11 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   // Lot-Wise Management state
   const [lotSearch, setLotSearch] = useState('');
   const [lotStatusFilter, setLotStatusFilter] = useState('All');
+  const [lotDatePreset, setLotDatePreset] = useState('all');
   const [lotDateStart, setLotDateStart] = useState('');
   const [lotDateEnd, setLotDateEnd] = useState('');
+  const [customLotDateStart, setCustomLotDateStart] = useState('');
+  const [customLotDateEnd, setCustomLotDateEnd] = useState('');
   const [expandedLotNo, setExpandedLotNo] = useState(null);
   const [lotPdfLoading, setLotPdfLoading] = useState(false);
   const [lotDownloadingNo, setLotDownloadingNo] = useState(null);
@@ -1877,23 +1880,29 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     return b.lotNo.localeCompare(a.lotNo);
   });
 
-  const dateFilteredLots = lotRecords.filter(l => {
-    if (lotDateStart) {
-      const startD = new Date(lotDateStart);
-      const hasAfter = (l.inwardTxs.some(tx => tx.date && new Date(tx.date) >= startD)) ||
-                       (l.outwardTxs.some(tx => tx.date && new Date(tx.date) >= startD)) ||
-                       (l.lastDate && new Date(l.lastDate) >= startD);
-      if (!hasAfter) return false;
-    }
-    if (lotDateEnd) {
-      const endD = new Date(lotDateEnd + 'T23:59:59');
-      const hasBefore = (l.inwardTxs.some(tx => tx.date && new Date(tx.date) <= endD)) ||
-                        (l.outwardTxs.some(tx => tx.date && new Date(tx.date) <= endD)) ||
-                        (l.firstDate && new Date(l.firstDate) <= endD);
-      if (!hasBefore) return false;
-    }
-    return true;
-  });
+  const dateFilteredLots = React.useMemo(() => {
+    if (!lotDateStart && !lotDateEnd) return lotRecords;
+
+    return lotRecords.filter(l => {
+      const hasMatchingInward = (l.inwardTxs || []).some(tx => {
+        if (!tx.date) return false;
+        const d = String(tx.date).slice(0, 10);
+        if (lotDateStart && d < lotDateStart) return false;
+        if (lotDateEnd && d > lotDateEnd) return false;
+        return true;
+      });
+
+      const hasMatchingOutward = (l.outwardTxs || []).some(tx => {
+        if (!tx.date) return false;
+        const d = String(tx.date).slice(0, 10);
+        if (lotDateStart && d < lotDateStart) return false;
+        if (lotDateEnd && d > lotDateEnd) return false;
+        return true;
+      });
+
+      return hasMatchingInward || hasMatchingOutward;
+    });
+  }, [lotRecords, lotDateStart, lotDateEnd]);
 
   const filteredLots = dateFilteredLots.filter(l => {
     if (lotStatusFilter === 'InStock' && l.currentStock <= 0) return false;
@@ -2221,6 +2230,23 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   </button>
                 )}
 
+                <DateRangePicker
+                  preset={lotDatePreset}
+                  onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+                    setLotDatePreset(p);
+                    setLotDateStart(ds || '');
+                    setLotDateEnd(de || '');
+                  }}
+                  customStart={customLotDateStart}
+                  customEnd={customLotDateEnd}
+                  onCustomChange={(s, e) => {
+                    setCustomLotDateStart(s);
+                    setCustomLotDateEnd(e);
+                    setLotDateStart(s);
+                    setLotDateEnd(e);
+                  }}
+                />
+
                 <button
                   onClick={async () => {
                     try {
@@ -2307,138 +2333,47 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <option value="Exhausted">Exhausted Only ({dateFilteredLots.filter(l => l.currentStock <= 0).length})</option>
                 </select>
 
-                {/* 📅 Date Filter Inputs */}
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  background: 'rgba(255,255,255,0.04)',
-                  border: (lotDateStart || lotDateEnd) ? '1px solid var(--primary)' : '1px solid var(--border-light)',
-                  borderRadius: '6px',
-                  padding: '2px 8px',
-                  flexWrap: 'nowrap'
-                }}>
-                  <Calendar size={14} style={{ color: (lotDateStart || lotDateEnd) ? 'var(--primary)' : 'var(--text-muted)' }} />
-                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>From:</span>
-                  <input
-                    type="date"
-                    value={lotDateStart}
-                    onChange={e => setLotDateStart(e.target.value)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.8rem',
-                      padding: '0.3rem 0.1rem',
-                      outline: 'none',
-                    }}
-                    title="Filter activity from date"
-                  />
-                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>To:</span>
-                  <input
-                    type="date"
-                    value={lotDateEnd}
-                    onChange={e => setLotDateEnd(e.target.value)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--text-primary)',
-                      fontSize: '0.8rem',
-                      padding: '0.3rem 0.1rem',
-                      outline: 'none',
-                    }}
-                    title="Filter activity up to date"
-                  />
-                  {(lotDateStart || lotDateEnd) && (
+                {/* Active Date Filter Pill */}
+                {(lotDateStart || lotDateEnd) && (
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    background: 'rgba(99, 102, 241, 0.12)',
+                    border: '1px solid rgba(99, 102, 241, 0.4)',
+                    borderRadius: '8px',
+                    padding: '0.35rem 0.75rem',
+                    fontSize: '0.78rem',
+                    color: '#818cf8',
+                    fontWeight: 700
+                  }}>
+                    <Calendar size={13} />
+                    <span>Filter: {lotDateStart || 'Start'} → {lotDateEnd || 'Now'}</span>
                     <button
                       type="button"
                       onClick={() => {
+                        setLotDatePreset('all');
                         setLotDateStart('');
                         setLotDateEnd('');
+                        setCustomLotDateStart('');
+                        setCustomLotDateEnd('');
                       }}
                       style={{
-                        background: 'transparent',
+                        background: 'none',
                         border: 'none',
-                        color: '#ef4444',
+                        color: '#f87171',
                         cursor: 'pointer',
-                        padding: '2px',
+                        padding: '0 2px',
                         display: 'flex',
                         alignItems: 'center',
-                        marginLeft: '2px'
+                        marginLeft: '3px'
                       }}
                       title="Clear Date Filter"
                     >
                       <X size={14} />
                     </button>
-                  )}
-                </div>
-
-                {/* Quick Date Range Presets */}
-                <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const today = new Date().toISOString().split('T')[0];
-                      setLotDateStart(today);
-                      setLotDateEnd(today);
-                    }}
-                    style={{
-                      fontSize: '0.74rem',
-                      padding: '0.35rem 0.55rem',
-                      borderRadius: '4px',
-                      border: '1px solid var(--border-light)',
-                      background: lotDateStart === new Date().toISOString().split('T')[0] && lotDateEnd === new Date().toISOString().split('T')[0] ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                      color: lotDateStart === new Date().toISOString().split('T')[0] && lotDateEnd === new Date().toISOString().split('T')[0] ? '#fff' : 'var(--text-muted)',
-                      cursor: 'pointer',
-                      fontWeight: 600
-                    }}
-                  >
-                    Today
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const now = new Date();
-                      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-                      const today = now.toISOString().split('T')[0];
-                      setLotDateStart(firstDay);
-                      setLotDateEnd(today);
-                    }}
-                    style={{
-                      fontSize: '0.74rem',
-                      padding: '0.35rem 0.55rem',
-                      borderRadius: '4px',
-                      border: '1px solid var(--border-light)',
-                      background: 'rgba(255,255,255,0.05)',
-                      color: 'var(--text-muted)',
-                      cursor: 'pointer',
-                      fontWeight: 600
-                    }}
-                  >
-                    This Month
-                  </button>
-                  {(lotDateStart || lotDateEnd) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLotDateStart('');
-                        setLotDateEnd('');
-                      }}
-                      style={{
-                        fontSize: '0.74rem',
-                        padding: '0.35rem 0.55rem',
-                        borderRadius: '4px',
-                        border: '1px solid rgba(239,68,68,0.3)',
-                        background: 'rgba(239,68,68,0.1)',
-                        color: '#ef4444',
-                        cursor: 'pointer',
-                        fontWeight: 600
-                      }}
-                    >
-                      All Time
-                    </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
