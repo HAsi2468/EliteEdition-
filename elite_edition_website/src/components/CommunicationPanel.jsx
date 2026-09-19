@@ -3271,13 +3271,39 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               >
                                 {msg.isPinned && <Pin size={10} color={isMe ? '#fef08a' : '#d97706'} style={{ transform: 'rotate(45deg)' }} />}
                                 <span>{formatTime(msg.createdAt)}</span>
-                                {isMe && (
-                                  msg.readBy && msg.readBy.length > 1 ? (
-                                    <CheckCheck size={14} color="#93c5fd" />
+                                {isMe && (() => {
+                                  const myIdStr = String(currentUser?._id || currentUser?.id || '');
+                                  const isRead = Boolean(
+                                    msg.readBy &&
+                                    msg.readBy.some((u) => {
+                                      const uId = String(typeof u === 'object' ? (u._id || u.id) : u);
+                                      return uId && uId !== myIdStr;
+                                    })
+                                  );
+
+                                  return isRead ? (
+                                    <CheckCheck
+                                      size={14}
+                                      color="#38bdf8"
+                                      style={{
+                                        strokeWidth: 2.6,
+                                        filter: 'drop-shadow(0 0 2.5px rgba(56, 189, 248, 0.8))',
+                                        marginLeft: '1px'
+                                      }}
+                                      title="Read by recipient"
+                                    />
                                   ) : (
-                                    <CheckCheck size={14} color="rgba(255,255,255,0.7)" />
-                                  )
-                                )}
+                                    <Check
+                                      size={13}
+                                      color="rgba(255, 255, 255, 0.55)"
+                                      style={{
+                                        strokeWidth: 2.2,
+                                        marginLeft: '1px'
+                                      }}
+                                      title="Sent"
+                                    />
+                                  );
+                                })()}
                               </span>
                             </div>
                           </div>
