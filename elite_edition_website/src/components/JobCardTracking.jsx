@@ -747,15 +747,35 @@ export default function JobCardTracking({ onPreview }) {
 
                       {/* Bill No */}
                       <td style={tdStyle}>
-                        <input
-                          type="text"
-                          value={getValue(c, 'billNo')}
-                          onChange={e => handleCellChange(c._id, 'billNo', e.target.value)}
-                          onBlur={e => handleAutoSave(c._id, 'billNo', e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && e.target.blur()}
-                          placeholder="Bill No"
-                          style={{ ...inputStyle, width: '90px' }}
-                        />
+                        {isAdmin ? (
+                          <input
+                            type="text"
+                            value={getValue(c, 'billNo')}
+                            onChange={e => handleCellChange(c._id, 'billNo', e.target.value)}
+                            onBlur={e => handleAutoSave(c._id, 'billNo', e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && e.target.blur()}
+                            placeholder="Bill No"
+                            title="Auto-synced from Billing Invoice. (Admin can edit)"
+                            style={{ ...inputStyle, width: '100px', fontWeight: 700, color: getValue(c, 'billNo') ? '#38bdf8' : 'inherit' }}
+                          />
+                        ) : (
+                          <span
+                            title="Auto-synced from Billing Invoice"
+                            style={{
+                              display: 'inline-block',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              color: getValue(c, 'billNo') ? '#38bdf8' : 'var(--text-muted)',
+                              background: getValue(c, 'billNo') ? 'rgba(56, 189, 248, 0.1)' : 'transparent',
+                              padding: getValue(c, 'billNo') ? '2px 6px' : 0,
+                              borderRadius: '4px',
+                              border: getValue(c, 'billNo') ? '1px solid rgba(56, 189, 248, 0.25)' : 'none',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {getValue(c, 'billNo') || '—'}
+                          </span>
+                        )}
                       </td>
 
                       {/* Job Mtr (Total target meters from Job Card) */}
@@ -865,12 +885,16 @@ export default function JobCardTracking({ onPreview }) {
                       <td style={{ ...tdStyle, textAlign: 'center' }}>
                         <select
                           value={getValue(c, 'fusingStatus') || 'Fusing Pending'}
-                          onChange={e => handleAutoSave(c._id, 'fusingStatus', e.target.value)}
+                          disabled={!isAdmin}
+                          onChange={e => isAdmin && handleAutoSave(c._id, 'fusingStatus', e.target.value)}
+                          title={!isAdmin ? "Auto-updated from Fusing Department" : "Edit Fusing Status"}
                           style={{
                             ...selectStyle,
                             color: getValue(c, 'fusingStatus') === 'Fusing Done' ? '#34d399' : '#fbbf24',
                             borderColor: getValue(c, 'fusingStatus') === 'Fusing Done' ? 'rgba(52,211,153,0.3)' : 'rgba(245,158,11,0.3)',
-                            background: getValue(c, 'fusingStatus') === 'Fusing Done' ? 'rgba(52,211,153,0.06)' : 'rgba(245,158,11,0.06)'
+                            background: getValue(c, 'fusingStatus') === 'Fusing Done' ? 'rgba(52,211,153,0.06)' : 'rgba(245,158,11,0.06)',
+                            opacity: !isAdmin ? 0.9 : 1,
+                            cursor: !isAdmin ? 'default' : 'pointer'
                           }}
                         >
                           <option value="Fusing Pending" style={{ color: '#000' }}>FP</option>
@@ -883,8 +907,17 @@ export default function JobCardTracking({ onPreview }) {
                         <input
                           type="date"
                           value={getValue(c, 'fusingDate')}
-                          onChange={e => handleAutoSave(c._id, 'fusingDate', e.target.value)}
-                          style={{ ...inputStyle, width: '120px' }}
+                          disabled={!isAdmin}
+                          readOnly={!isAdmin}
+                          onChange={e => isAdmin && handleAutoSave(c._id, 'fusingDate', e.target.value)}
+                          title={!isAdmin ? "Auto-updated from Fusing Department" : "Edit Fusing Date"}
+                          style={{
+                            ...inputStyle,
+                            width: '120px',
+                            opacity: !isAdmin ? 0.8 : 1,
+                            cursor: !isAdmin ? 'default' : 'pointer',
+                            background: !isAdmin ? 'rgba(255,255,255,0.03)' : inputStyle.background
+                          }}
                         />
                       </td>
 
@@ -893,10 +926,21 @@ export default function JobCardTracking({ onPreview }) {
                         <input
                           type="number"
                           value={getValue(c, 'fusingMtr')}
-                          onChange={e => handleCellChange(c._id, 'fusingMtr', parseFloat(e.target.value) || 0)}
-                          onBlur={e => handleAutoSave(c._id, 'fusingMtr', parseFloat(e.target.value) || 0)}
-                          onKeyDown={e => e.key === 'Enter' && e.target.blur()}
-                          style={{ ...inputStyle, width: '60px' }}
+                          disabled={!isAdmin}
+                          readOnly={!isAdmin}
+                          onChange={e => isAdmin && handleCellChange(c._id, 'fusingMtr', parseFloat(e.target.value) || 0)}
+                          onBlur={e => isAdmin && handleAutoSave(c._id, 'fusingMtr', parseFloat(e.target.value) || 0)}
+                          onKeyDown={e => e.key === 'Enter' && isAdmin && e.target.blur()}
+                          title={!isAdmin ? "Auto-updated from Fusing Department" : "Edit Fusing Meters"}
+                          style={{
+                            ...inputStyle,
+                            width: '65px',
+                            fontWeight: 700,
+                            color: '#fb923c',
+                            opacity: !isAdmin ? 0.85 : 1,
+                            cursor: !isAdmin ? 'default' : 'text',
+                            background: !isAdmin ? 'rgba(255,255,255,0.03)' : inputStyle.background
+                          }}
                         />
                       </td>
 

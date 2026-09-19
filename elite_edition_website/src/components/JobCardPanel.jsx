@@ -133,9 +133,12 @@ const BLANK = {
 // ─── STATUS badge ────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const cfg = {
-    Pending:     { bg:'rgba(245,158,11,0.12)',  color:'#fbbf24', border:'rgba(245,158,11,0.25)' },
+    Pending:      { bg:'rgba(245,158,11,0.12)',  color:'#fbbf24', border:'rgba(245,158,11,0.25)' },
     'In Progress':{ bg:'rgba(56,189,248,0.12)',  color:'#38bdf8', border:'rgba(56,189,248,0.25)' },
-    Done:        { bg:'rgba(52,211,153,0.12)',   color:'#34d399', border:'rgba(52,211,153,0.25)' },
+    Printing:     { bg:'rgba(56,189,248,0.12)',  color:'#38bdf8', border:'rgba(56,189,248,0.25)' },
+    Fusing:       { bg:'rgba(249,115,22,0.12)',  color:'#fb923c', border:'rgba(249,115,22,0.25)' },
+    Delivery:     { bg:'rgba(168,85,247,0.12)',  color:'#c084fc', border:'rgba(168,85,247,0.25)' },
+    Done:         { bg:'rgba(52,211,153,0.12)',   color:'#34d399', border:'rgba(52,211,153,0.25)' },
   };
   const s = cfg[status] || cfg['Pending'];
   return (
@@ -1944,6 +1947,8 @@ const rowStyle = {
 export default function JobCardPanel({ activeSubTab = 'jobcards', department }) {
   const [cards, setCards] = useState([]);
   const [total, setTotal] = useState(0);
+  const [totalMtr, setTotalMtr] = useState(0);
+  const [statusCounts, setStatusCounts] = useState({});
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -2196,6 +2201,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
       if (!controller.signal.aborted) {
         setCards(res.data || []);
         setTotal(res.total || 0);
+        setTotalMtr(res.totalMtr || 0);
+        if (res.statusCounts) setStatusCounts(res.statusCounts);
         setPages(res.pages || 1);
       }
     } catch (err) {
@@ -2336,7 +2343,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                     </h2>
                   </div>
                   <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0', fontWeight: 500 }}>
-                    Production &amp; Stage Tracking — <strong>{total}</strong> Total Cards
+                    Production &amp; Stage Tracking — <strong style={{ color: 'var(--primary)' }}>{total}</strong> Total Cards • <strong style={{ color: '#34d399' }}>{(Number(totalMtr) || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</strong> Mtr
                   </p>
                 </div>
               </div>
@@ -2436,17 +2443,53 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
               setCustomDateEnd(e);
             }}
           />
-          {['All','Pending','In Progress','Done'].map(s=>(
-            <button key={s} onClick={()=>{ setStatusFilter(s); setPage(1); }}
-              style={{ padding:'0.45rem 0.9rem', fontSize:'0.8rem', borderRadius:'var(--radius-sm)',
-                fontFamily:'var(--font-sans)', fontWeight:600, cursor:'pointer', border:'1px solid',
-                borderColor: statusFilter===s ? 'var(--primary)' : 'var(--border-light)',
-                background: statusFilter===s ? 'var(--nav-active-bg)' : 'transparent',
-                color: statusFilter===s ? 'var(--primary)' : 'var(--text-muted)',
-                transition:'all 0.15s' }}>
-              {s}
-            </button>
-          ))}
+          {['All', 'Pending', 'Printing', 'Fusing', 'Delivery'].map(s => {
+            const count = statusCounts[s]?.count;
+            return (
+              <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
+                style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', borderRadius: 'var(--radius-sm)',
+                  fontFamily: 'var(--font-sans)', fontWeight: 600, cursor: 'pointer', border: '1px solid',
+                  borderColor: statusFilter === s ? 'var(--primary)' : 'var(--border-light)',
+                  background: statusFilter === s ? 'var(--nav-active-bg)' : 'transparent',
+                  color: statusFilter === s ? 'var(--primary)' : 'var(--text-muted)',
+                  display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                  transition: 'all 0.15s' }}>
+                <span>{s}</span>
+                {count != null && (
+                  <span style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    padding: '1px 5px',
+                    borderRadius: '999px',
+                    background: statusFilter === s ? 'var(--primary)' : 'rgba(255,255,255,0.08)',
+                    color: statusFilter === s ? '#ffffff' : 'var(--text-muted)'
+                  }}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.45rem 0.85rem',
+            borderRadius: 'var(--radius-sm)',
+            background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(16, 185, 129, 0.12))',
+            border: '1px solid rgba(37, 99, 235, 0.3)',
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            color: 'var(--text-primary)',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+          }}>
+            <span style={{ color: '#38bdf8' }}>📊 {statusFilter}:</span>
+            <span style={{ color: '#a78bfa' }}><strong>{total}</strong> Cards</span>
+            <span style={{ color: 'var(--border-light)', margin: '0 1px' }}>•</span>
+            <span style={{ color: '#34d399' }}><strong>{(Number(totalMtr) || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</strong> Mtr</span>
+          </div>
+
           <button onClick={() => { setSortBy(prev => prev === 'urgency' ? '' : 'urgency'); setPage(1); }}
             style={{ padding:'0.45rem 0.9rem', fontSize:'0.8rem', borderRadius:'var(--radius-sm)',
               fontFamily:'var(--font-sans)', fontWeight:600, cursor:'pointer', border:'1px solid',

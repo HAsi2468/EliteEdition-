@@ -301,6 +301,7 @@ const createInvoice = async (req, res) => {
 
     // Sync linked Challans to INVOICED
     await syncChallanStatusForInvoice(invoice);
+    await syncJobCardsForInvoice(invoice);
 
     res.status(201).json({ success: true, data: invoice });
   } catch (error) {
@@ -410,6 +411,42 @@ const syncChallanStatusForInvoice = async (invoice) => {
   }
 };
 
+// Helper function to auto-sync billNo into JobCards matching invoice items
+const syncJobCardsForInvoice = async (invoice) => {
+  if (!invoice || !Array.isArray(invoice.items)) return;
+  try {
+    const JobCard = require('../db/models/jobCard.model');
+    const jobNos = new Set();
+    invoice.items.forEach(it => {
+      if (it.jobNo && String(it.jobNo).trim()) {
+        const raw = String(it.jobNo).trim();
+        jobNos.add(raw);
+        const clean = raw.replace(/^JC-/i, '').replace(/^JOB\s*NO\.?\s*[-:]?\s*/i, '').trim();
+        if (clean) {
+          jobNos.add(clean);
+          jobNos.add(`JOB-${clean}`);
+          jobNos.add(`JOB NO.- ${clean}`);
+        }
+      }
+    });
+
+    if (jobNos.size > 0) {
+      const jobNoList = Array.from(jobNos);
+      await JobCard.updateMany(
+        {
+          $or: [
+            { jobNo: { $in: jobNoList } },
+            { jobNo: { $in: jobNoList.map(j => Number(j)).filter(n => !isNaN(n)) } }
+          ]
+        },
+        { $set: { billNo: invoice.invoiceNo } }
+      );
+    }
+  } catch (err) {
+    console.warn('syncJobCardsForInvoice warning: %s', err.message);
+  }
+};
+
 // ── 6. UPDATE INVOICE ────────────────────────────────────────────────────────
 const updateInvoice = async (req, res) => {
   try {
@@ -447,6 +484,7 @@ const updateInvoice = async (req, res) => {
 
     // Sync linked Challans to INVOICED and revert unlinked ones to PENDING
     await syncChallanStatusForInvoice(invoice);
+    await syncJobCardsForInvoice(invoice);
 
     res.json({ success: true, data: invoice });
   } catch (error) {

@@ -134,46 +134,21 @@ function calcExpTime(panna, passText, totalMtr, machineName) {
 const getAllJobCards = async (req, res) => {
   try {
     const { status, printStatus, fusingStatus, deliveryStatus, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder, category, department } = req.query;
-    const filter = {};
-    const andClauses = [];
+    const baseFilter = {};
+    const baseAndClauses = [];
 
-    if (status && status !== 'All') filter.status = status;
-    if (category && category !== 'All') filter.category = category;
-
-    if (printStatus && printStatus !== 'All') {
-      if (printStatus === 'Printing Done') {
-        filter.printStatus = 'Printing Done';
-      } else if (printStatus === 'Printing Pending') {
-        andClauses.push({ printStatus: { $ne: 'Printing Done' } });
-      }
-    }
-
-    if (fusingStatus && fusingStatus !== 'All') {
-      if (fusingStatus === 'Fusing Done') {
-        filter.fusingStatus = 'Fusing Done';
-      } else if (fusingStatus === 'Fusing Pending') {
-        andClauses.push({ fusingStatus: { $ne: 'Fusing Done' } });
-      }
-    }
-
-    if (deliveryStatus && deliveryStatus !== 'All') {
-      if (deliveryStatus === 'Delivery Done') {
-        filter.deliveryStatus = 'Delivery Done';
-      } else if (deliveryStatus === 'Delivery Pending') {
-        andClauses.push({ deliveryStatus: { $ne: 'Delivery Done' } });
-      }
-    }
+    if (category && category !== 'All') baseFilter.category = category;
 
     if (department === 'stitching') {
-      andClauses.push({
+      baseAndClauses.push({
         $or: [
           { department: 'stitching' },
           { category: { $regex: 'stitching', $options: 'i' } }
         ]
       });
     } else {
-      filter.department = { $ne: 'stitching' };
-      filter.category = { $ne: 'Stitching' };
+      baseFilter.department = { $ne: 'stitching' };
+      baseFilter.category = { $ne: 'Stitching' };
     }
 
     if (dateStart || dateEnd) {
@@ -220,7 +195,7 @@ const getAllJobCards = async (req, res) => {
         dateOr.push({ _id: { $in: matchingLogIds } });
       }
 
-      andClauses.push({ $or: dateOr });
+      baseAndClauses.push({ $or: dateOr });
     }
 
     if (search) {
@@ -232,6 +207,7 @@ const getAllJobCards = async (req, res) => {
         { jobNo:       searchRegex },
         { party:       searchRegex },
         { designNo:    searchRegex },
+        { designName:  searchRegex },
         { machineName: searchRegex },
         { billNo:      searchRegex },
         { partyChallan: searchRegex },
@@ -250,14 +226,114 @@ const getAllJobCards = async (req, res) => {
         );
       }
 
-      andClauses.push({ $or: searchOr });
+      baseAndClauses.push({ $or: searchOr });
+    }
+
+    if (baseAndClauses.length > 0) {
+      baseFilter.$and = baseAndClauses;
+    }
+
+    // Clone baseFilter for active query filter
+    const filter = { ...baseFilter };
+    const andClauses = baseAndClauses.slice();
+
+    if (status && status !== 'All') {
+      if (status === 'Printing') {
+        filter.printStatus = { $ne: 'Printing Done' };
+      } else if (status === 'Fusing') {
+        filter.printStatus = 'Printing Done';
+        filter.fusingStatus = { $ne: 'Fusing Done' };
+      } else if (status === 'Delivery') {
+        filter.fusingStatus = 'Fusing Done';
+      } else if (status === 'Pending') {
+        filter.status = 'Pending';
+      } else {
+        filter.status = status;
+      }
+    }
+
+    if (printStatus && printStatus !== 'All') {
+      if (printStatus === 'Printing Done') {
+        filter.printStatus = 'Printing Done';
+      } else if (printStatus === 'Printing Pending') {
+        andClauses.push({ printStatus: { $ne: 'Printing Done' } });
+      }
+    }
+
+    if (fusingStatus && fusingStatus !== 'All') {
+      if (fusingStatus === 'Fusing Done') {
+        filter.fusingStatus = 'Fusing Done';
+      } else if (fusingStatus === 'Fusing Pending') {
+        andClauses.push({ fusingStatus: { $ne: 'Fusing Done' } });
+      }
+    }
+
+    if (deliveryStatus && deliveryStatus !== 'All') {
+      if (deliveryStatus === 'Delivery Done') {
+        filter.deliveryStatus = 'Delivery Done';
+      } else if (deliveryStatus === 'Delivery Pending') {
+        andClauses.push({ deliveryStatus: { $ne: 'Delivery Done' } });
+      }
     }
 
     if (andClauses.length > 0) {
       filter.$and = andClauses;
     }
+
+    const meterExpr = {
+      $convert: {
+        input: '$totalMtr',
+        to: 'double',
+        onError: 0,
+        onNull: 0
+      }
+    };
+
+    const statsFacet = await db.JobCard.aggregate([
+      {
+        $facet: {
+          current: [
+            { $match: filter },
+            { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
+          ],
+          all: [
+            { $match: baseFilter },
+            { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
+          ],
+          pending: [
+            { $match: { ...baseFilter, status: 'Pending' } },
+            { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
+          ],
+          printing: [
+            { $match: { ...baseFilter, printStatus: { $ne: 'Printing Done' } } },
+            { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
+          ],
+          fusing: [
+            { $match: { ...baseFilter, printStatus: 'Printing Done', fusingStatus: { $ne: 'Fusing Done' } } },
+            { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
+          ],
+          delivery: [
+            { $match: { ...baseFilter, fusingStatus: 'Fusing Done' } },
+            { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
+          ]
+        }
+      }
+    ]);
+
+    const facetData = statsFacet && statsFacet[0] ? statsFacet[0] : {};
+    const curStats = facetData.current && facetData.current[0] ? facetData.current[0] : { count: 0, totalMtr: 0 };
+    const total = curStats.count || 0;
+    const totalMtr = Math.round((curStats.totalMtr || 0) * 100) / 100;
+
+    const statusCounts = {
+      All: { count: facetData.all?.[0]?.count || 0, meters: Math.round((facetData.all?.[0]?.totalMtr || 0) * 100) / 100 },
+      Pending: { count: facetData.pending?.[0]?.count || 0, meters: Math.round((facetData.pending?.[0]?.totalMtr || 0) * 100) / 100 },
+      Printing: { count: facetData.printing?.[0]?.count || 0, meters: Math.round((facetData.printing?.[0]?.totalMtr || 0) * 100) / 100 },
+      Fusing: { count: facetData.fusing?.[0]?.count || 0, meters: Math.round((facetData.fusing?.[0]?.totalMtr || 0) * 100) / 100 },
+      Delivery: { count: facetData.delivery?.[0]?.count || 0, meters: Math.round((facetData.delivery?.[0]?.totalMtr || 0) * 100) / 100 }
+    };
+
     const skip  = (Number(page)-1) * Number(limit);
-    const total = await db.JobCard.countDocuments(filter);
 
     let cards;
     if (sortBy === 'urgency') {
@@ -282,9 +358,10 @@ const getAllJobCards = async (req, res) => {
         .lean();
     } else {
       const order = sortOrder === 'desc' ? -1 : 1;
+      const sortObj = { [sortBy]: order };
       cards = await db.JobCard.find(filter)
         .collation({ locale:'en', numericOrdering:true })
-        .sort(sort).skip(skip).limit(Number(limit)).lean();
+        .sort(sortObj).skip(skip).limit(Number(limit)).lean();
     }
 
     const { normalizeImageUrl } = require('../utils/imageUrlHelper');
@@ -294,7 +371,14 @@ const getAllJobCards = async (req, res) => {
       imageUrl2: normalizeImageUrl(c.imageUrl2, c.designName ? `${c.designName}-2` : ''),
     }));
 
-    res.json({ data: normalizedCards, total, page: Number(page), pages: Math.ceil(total/Number(limit)) });
+    res.json({
+      data: normalizedCards,
+      total,
+      totalMtr,
+      statusCounts,
+      page: Number(page),
+      pages: Math.ceil(total/Number(limit))
+    });
   } catch (err) {
     logger.error('getAllJobCards error: %o', err);
     res.status(500).json({ error: 'Internal Server Error' });

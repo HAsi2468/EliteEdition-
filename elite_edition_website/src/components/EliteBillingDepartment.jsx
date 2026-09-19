@@ -1527,6 +1527,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         dispatchScreenGroupEvent('jobcards_billing', 'New Tax Invoice Generated 🧾', `Invoice #${invNoStr} for ${payload.customerName || 'Customer'} (₹${Number(payload.grandTotal || 0).toLocaleString('en-IN')}) generated & dispatched to Billing Group.`, 'invoices');
       }
 
+      window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: { source: 'billing', timestamp: Date.now() } }));
       alert(`Invoice ${editingInvoiceId ? 'updated' : 'created'} successfully!`);
       await loadData();
       setActiveTab('invoices');
