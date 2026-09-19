@@ -611,6 +611,10 @@ export default function App() {
     socket.on('task-created', handleDataUpdate);
     socket.on('proof-status-updated', handleDataUpdate);
     socket.on('global-room-updated', handleDataUpdate);
+    socket.on('fabric-updated', handleDataUpdate);
+    socket.on('catalog-updated', handleDataUpdate);
+    socket.on('stock-out-created', handleDataUpdate);
+    socket.on('returns-updated', handleDataUpdate);
 
     return () => {
       socket.off('receive-message', handleReceiveMessage);
@@ -644,6 +648,10 @@ export default function App() {
       socket.off('task-created', handleDataUpdate);
       socket.off('proof-status-updated', handleDataUpdate);
       socket.off('global-room-updated', handleDataUpdate);
+      socket.off('fabric-updated', handleDataUpdate);
+      socket.off('catalog-updated', handleDataUpdate);
+      socket.off('stock-out-created', handleDataUpdate);
+      socket.off('returns-updated', handleDataUpdate);
     };
   }, [socket, isAuthenticated, currentUser?._id]);
 

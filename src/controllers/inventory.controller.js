@@ -2,6 +2,7 @@ const db = require('../db/models');
 const logger = require('../config/logger');
 const { getAccessToken, getInventorySnapshot: fetchSnapshot } = require('../services/api.service');
 const { extractBaseSku, extractSizeFromSku } = require('../utils/skuHelper');
+const { emitSocketEvent } = require('../utils/socketEmitHelper');
 
 async function resolveMasterSkuForBackend(inputSku, inputSize) {
   if (!inputSku || typeof inputSku !== 'string') return inputSku;
@@ -72,6 +73,7 @@ const createInventory = async (req, res) => {
       }
 
       logger.info(`[INVENTORY] ✅ Bulk created/updated ${processedItems.length} items successfully`);
+      emitSocketEvent(req, 'inventory-created', { count: processedItems.length });
       return res.status(201).json(processedItems);
     }
 
@@ -93,6 +95,7 @@ const createInventory = async (req, res) => {
       if (imageUrl) existingRecord.imageUrl = imageUrl;
       await existingRecord.save();
       logger.info(`[INVENTORY] ✅ Consolidated into existing Master SKU — ID: ${existingRecord._id} | SKU: ${masterSku} | Total Qty: ${existingRecord.qty}`);
+      emitSocketEvent(req, 'inventory-updated', existingRecord);
       return res.status(200).json(existingRecord);
     }
 
@@ -112,6 +115,7 @@ const createInventory = async (req, res) => {
     });
 
     logger.info(`[INVENTORY] ✅ Created — ID: ${newItem._id} | SKU: "${newItem.skuCode}" | Party: "${newItem.party}" | Size: ${newItem.size} | Qty: ${newItem.qty}`);
+    emitSocketEvent(req, 'inventory-created', newItem);
     res.status(201).json(newItem);
   } catch (error) {
     logger.error('[INVENTORY] Error creating inventory item: %o', error);
@@ -174,6 +178,7 @@ const updateInventory = async (req, res) => {
     }
 
     logger.info(`[INVENTORY] ✅ Updated — ID: ${updatedItem._id} | Party: "${updatedItem.party}" | Item: "${updatedItem.itemName}" | Size: ${updatedItem.size}`);
+    emitSocketEvent(req, 'inventory-updated', updatedItem);
     res.json(updatedItem);
   } catch (error) {
     logger.error('[INVENTORY] Error updating inventory item: %o', error);
@@ -194,6 +199,7 @@ const deleteInventory = async (req, res) => {
     }
 
     logger.info(`[INVENTORY] ✅ Deleted — ID: ${id} | Party: "${deletedItem.party}" | Item: "${deletedItem.itemName}" | Size: ${deletedItem.size}`);
+    emitSocketEvent(req, 'inventory-deleted', { id });
     res.json({ message: 'Inventory item deleted successfully', id });
   } catch (error) {
     logger.error('[INVENTORY] Error deleting inventory item: %o', error);
@@ -440,6 +446,8 @@ const syncInventorySnapshot = async (req, res) => {
     const deleteRes = await db.Inventory.deleteMany({ party: 'Uniware Channel Sync' });
     logger.info(`[INVENTORY] Cleaned up ${deleteRes.deletedCount} Uniware Channel Sync records from db.Inventory.`);
 
+    emitSocketEvent(req, 'inventory-updated', { type: 'snapshot-sync' });
+
     res.json({
       success: true,
       message: `Product catalog synced with Uniware inventory snapshots. Updated ${updatedCount} catalog items. Cleaned up ${deleteRes.deletedCount} old inventory records.`
@@ -553,6 +561,9 @@ const bulkInward = async (req, res) => {
         results.errors.push({ skuCode: item.skuCode, error: err.message });
       }
     }
+
+    emitSocketEvent(req, 'inventory-created', { count: results.created, updated: results.updated });
+    emitSocketEvent(req, 'inventory-updated', { count: results.updated });
 
     res.status(200).json({
       success: true,

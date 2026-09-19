@@ -1,6 +1,7 @@
 const FabricTransaction = require('../db/models/fabricTransaction.model');
 const FabricStockAdjustment = require('../db/models/fabricStockAdjustment.model');
 const PDFDocument = require('pdfkit');
+const { emitSocketEvent } = require('../utils/socketEmitHelper');
 
 // Normalize functions to merge matching fabric and panna widths (e.g. 58" and 58)
 const normalizeFabric = (val, pannaVal = '') => {
@@ -113,6 +114,7 @@ const createInward = async (req, res) => {
     });
 
     await transaction.save();
+    emitSocketEvent(req, 'fabric-updated', { type: 'inward', data: transaction });
     res.status(201).json({ success: true, data: transaction });
   } catch (error) {
     console.error('Error creating inward fabric transaction:', error);
@@ -224,6 +226,7 @@ const createOutward = async (req, res) => {
       }
     }
 
+    emitSocketEvent(req, 'fabric-updated', { type: 'outward', data: transaction });
     res.status(201).json({ success: true, data: transaction });
   } catch (error) {
     console.error('Error creating outward fabric transaction:', error);
@@ -402,6 +405,7 @@ const deleteTransaction = async (req, res) => {
     if (!record) {
       return res.status(404).json({ success: false, error: 'Transaction not found.' });
     }
+    emitSocketEvent(req, 'fabric-updated', { type: 'delete', id });
     res.status(200).json({ success: true, message: 'Transaction deleted successfully.' });
   } catch (error) {
     console.error('Error deleting fabric transaction:', error);
@@ -3430,6 +3434,8 @@ const createStockAdjustment = async (req, res) => {
     saDoc.fabricTransactionIds = createdTxIds;
     await saDoc.save();
 
+    emitSocketEvent(req, 'fabric-updated', { type: 'adjustment', data: saDoc });
+
     res.status(201).json({ success: true, data: saDoc });
   } catch (err) {
     console.error('Error creating fabric stock adjustment:', err);
@@ -3863,6 +3869,8 @@ const createLotTransfer = async (req, res) => {
 
     await outwardTx.save();
     await inwardTx.save();
+
+    emitSocketEvent(req, 'fabric-updated', { type: 'lot-transfer', transferRefId });
 
     res.status(201).json({
       success: true,

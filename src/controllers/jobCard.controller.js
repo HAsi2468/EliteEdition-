@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const { publishActivity } = require('../utils/activityEvent');
+const { emitSocketEvent } = require('../utils/socketEmitHelper');
 
 // ─── Google Drive URL converter ───────────────────────────────────────────────
 function convertDriveUrl(link) {
@@ -435,6 +436,8 @@ const createJobCard = async (req, res) => {
       description: `📋 **New Job Card #${card.jobNo || ''}** created for party **"${card.party || 'Client'}"** | Design: **${dNo}** | Fabric: **${fab}** | Qty: **${mtr}**${pcsStr} | Machine: **${mach}** by **${creatorName}**.`
     }).catch(e => logger.warn('publishActivity failed on job card create: %s', e.message));
 
+    emitSocketEvent(req, 'job-created', card);
+
     res.status(201).json(card);
   } catch (err) {
     logger.error('createJobCard error: %o', err);
@@ -557,6 +560,8 @@ const updateJobCard = async (req, res) => {
       description: `🔄 **Job Card #${card.jobNo || ''}** updated for party **"${card.party || 'Client'}"** | Design: **${edNo}** | Fabric: **${efab}** (${emtr}) | Status: **'${card.status}'** (Print: ${card.printStatus || 'Pending'}, Fusing: ${card.fusingStatus || 'Pending'}, Delivery: ${card.deliveryStatus || 'Pending'}) by **${editorName}**.`
     }).catch(e => logger.warn('publishActivity failed on job card update: %s', e.message));
 
+    emitSocketEvent(req, 'job-updated', card);
+
     res.json(card);
   } catch (err) {
     logger.error('updateJobCard error: %o', err);
@@ -568,6 +573,7 @@ const deleteJobCard = async (req, res) => {
   try {
     const card = await db.JobCard.findByIdAndDelete(req.params.id);
     if (!card) return res.status(404).json({ error: 'Job card not found' });
+    emitSocketEvent(req, 'job-deleted', { id: req.params.id });
     res.json({ message: 'Deleted successfully' });
   } catch (err) { res.status(500).json({ error: 'Internal Server Error' }); }
 };
@@ -1173,6 +1179,9 @@ const updateProductionStage = async (req, res) => {
       notes: notes || ''
     });
 
+    emitSocketEvent(req, 'job-stage-updated', { jobCardId: id, jobNo: card.jobNo, newStage, prevStage });
+    emitSocketEvent(req, 'job-updated', card);
+
     res.json({ success: true, data: card });
   } catch (err) {
     logger.error('updateProductionStage error: %o', err);
@@ -1200,6 +1209,8 @@ const updateProofingStatus = async (req, res) => {
     }
 
     await card.save();
+    emitSocketEvent(req, 'proof-status-updated', { jobCardId: id, jobNo: card.jobNo, status: approvalStatus });
+    emitSocketEvent(req, 'job-updated', card);
     res.json({ success: true, data: card });
   } catch (err) {
     logger.error('updateProofingStatus error: %o', err);

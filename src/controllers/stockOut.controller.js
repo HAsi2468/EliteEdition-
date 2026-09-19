@@ -1,5 +1,6 @@
 const db = require('../db/models');
 const logger = require('../config/logger');
+const { emitSocketEvent } = require('../utils/socketEmitHelper');
 
 const createStockOut = async (req, res) => {
   try {
@@ -65,6 +66,9 @@ const createStockOut = async (req, res) => {
     if (results.length === 0) {
       return res.status(400).json({ error: 'Failed to process outward. Check SKU availability and party.' });
     }
+
+    emitSocketEvent(req, 'inventory-updated', { type: 'stock-out', count: results.length });
+    emitSocketEvent(req, 'stock-out-created', results);
 
     res.status(201).json(Array.isArray(req.body) ? results : results[0]);
   } catch (error) {

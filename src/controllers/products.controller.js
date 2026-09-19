@@ -1,6 +1,7 @@
 const db = require('../db/models');
 const logger = require('../config/logger');
 const config = require('../config/config');
+const { emitSocketEvent } = require('../utils/socketEmitHelper');
 const {
   fetchProductData,
   getAccessToken,
@@ -1387,6 +1388,8 @@ const createProduct = async (req, res) => {
     }
 
     const result = createdProduct || createdInvProduct;
+    emitSocketEvent(req, 'inventory-created', result);
+    emitSocketEvent(req, 'catalog-updated', result);
     res.status(201).json({ ...result.toObject(), id: result._id.toString() });
   } catch (error) {
     logger.error('Error creating product: %o', error);
@@ -1418,6 +1421,9 @@ const deleteProduct = async (req, res) => {
       await db.Product.deleteMany({ skuCode: skuToDelete }).catch(() => {});
       await db.InventoryProduct.deleteMany({ skuCode: skuToDelete }).catch(() => {});
     }
+
+    emitSocketEvent(req, 'inventory-deleted', { id, sku: skuToDelete });
+    emitSocketEvent(req, 'catalog-updated', { id, sku: skuToDelete });
 
     res.json({ message: 'Product deleted successfully', id });
   } catch (error) {
@@ -1496,6 +1502,9 @@ const updateProduct = async (req, res) => {
       delete obj._id;
       await db.Product.create(obj).catch(() => {});
     }
+
+    emitSocketEvent(req, 'inventory-updated', { id, sku: targetSku });
+    emitSocketEvent(req, 'catalog-updated', { id, sku: targetSku });
 
     res.json({ ...savedResult.toObject(), id: savedResult._id.toString() });
   } catch (error) {

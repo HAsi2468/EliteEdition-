@@ -1,5 +1,6 @@
 const db = require('../db/models');
 const logger = require('../config/logger');
+const { emitSocketEvent } = require('../utils/socketEmitHelper');
 
 const buildExpenseCompFilter = (companyEntity) => {
   if (companyEntity === 'Elite Stitching') {
@@ -216,6 +217,9 @@ const create = async (req, res) => {
       logger.warn('Failed to publish activity for expense: %o', e);
     }
 
+    emitSocketEvent(req, 'expense-created', created);
+    emitSocketEvent(req, 'expense-updated', created);
+
     res.status(201).json(created);
   } catch (err) {
     logger.error('expense.create error: %o', err);
@@ -239,6 +243,7 @@ const update = async (req, res) => {
 
     const updated = await db.Expense.findByIdAndUpdate(id, payload, { new: true, runValidators: true });
     if (!updated) return res.status(404).json({ error: 'Expense record not found' });
+    emitSocketEvent(req, 'expense-updated', updated);
     res.json(updated);
   } catch (err) {
     logger.error('expense.update error: %o', err);
@@ -252,6 +257,8 @@ const remove = async (req, res) => {
     const { id } = req.params;
     const deleted = await db.Expense.findByIdAndDelete(id);
     if (!deleted) return res.status(404).json({ error: 'Expense record not found' });
+    emitSocketEvent(req, 'expense-deleted', { id });
+    emitSocketEvent(req, 'expense-updated', { id });
     res.json({ success: true, message: 'Expense record deleted successfully' });
   } catch (err) {
     logger.error('expense.remove error: %o', err);
