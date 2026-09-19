@@ -183,6 +183,7 @@ const chatMessageSchema = new mongoose.Schema(
       recordId:        { type: String, default: '' },   // MongoDB _id string if applicable
       department:      { type: String, default: '' },
       permissionScope: { type: String, default: '' },
+      recordData:      { type: mongoose.Schema.Types.Mixed }, // Full snapshot if provided
     },
     acknowledgments: [
       {

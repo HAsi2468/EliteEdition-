@@ -624,6 +624,9 @@ export const api = {
     const qs = query.toString() ? `?${query.toString()}` : '';
     return request(`/jobCards${qs}`);
   },
+  async getJobCard(id) {
+    return request(`/jobCards/${id}`);
+  },
   async createJobCard(data) {
     return request('/jobCards', { method: 'POST', body: JSON.stringify(data) });
   },

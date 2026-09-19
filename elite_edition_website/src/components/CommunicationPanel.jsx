@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api, getBaseUrl } from '../services/api';
 import { useSocket } from '../contexts/SocketContext';
 import TaskManagerPanel from './TaskManagerPanel';
+import JobCardPdfModal from './JobCardPdfModal';
 import {
   MessageSquare,
   Activity,
@@ -127,6 +128,11 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
   const [showMobileActionMenu, setShowMobileActionMenu] = useState(false);
   const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false);
+
+  // Job Card PDF preview modal state
+  const [pdfPreviewCard, setPdfPreviewCard] = useState(null);
+  const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
+  const [pdfPreviewError, setPdfPreviewError] = useState('');
 
   // New DM modal state
   const [showNewDmModal, setShowNewDmModal] = useState(false);
@@ -924,7 +930,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
       module: shareRecordCategory === 'jobcard' ? 'Job Card' : shareRecordCategory === 'design' ? 'Design' : shareRecordCategory === 'invoice' ? 'Invoice' : 'Complaint',
       recordRef: refVal,
       recordId: item._id,
-      permissionScope: scopeVal
+      permissionScope: scopeVal,
+      recordData: item
     };
 
     const tempMsg = {
@@ -1542,11 +1549,62 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
     }
   };
 
-  const handleRecordClick = (meta) => {
-    if (!onNavigateTab || !meta) return;
+  const handleOpenJobCardPdf = async (meta, rawData = null) => {
+    const initialCard = rawData || meta?.recordData;
+    if (initialCard && (initialCard.jobNo || initialCard._id)) {
+      setPdfPreviewCard(initialCard);
+      setPdfPreviewLoading(false);
+      setPdfPreviewError('');
+      return;
+    }
+
+    const cleanJobNo = String(meta?.recordRef || meta?.content || '')
+      .replace(/^(JC|Job\s*Card)[\s#-:]*/i, '')
+      .replace(/[—–-].*$/, '')
+      .trim();
+
+    setPdfPreviewCard({ jobNo: cleanJobNo || '...' });
+    setPdfPreviewLoading(true);
+    setPdfPreviewError('');
+
+    try {
+      let card = null;
+      const refOrId = meta?.recordId || cleanJobNo || meta?.recordRef;
+      if (refOrId) {
+        try {
+          const res = await api.getJobCard(refOrId);
+          if (res && (res._id || res.jobNo)) card = res;
+        } catch (e) {}
+      }
+
+      if (!card && cleanJobNo) {
+        const searchRes = await api.getJobCards({ search: cleanJobNo, limit: 1 });
+        const list = Array.isArray(searchRes) ? searchRes : (searchRes?.data || []);
+        if (list.length > 0) card = list[0];
+      }
+
+      if (card) {
+        setPdfPreviewCard(card);
+      } else {
+        setPdfPreviewError(`Could not load details for Job Card ${cleanJobNo || ''}`);
+      }
+    } catch (err) {
+      console.error('Failed to load job card for PDF view:', err);
+      setPdfPreviewError('Failed to load Job Card');
+    } finally {
+      setPdfPreviewLoading(false);
+    }
+  };
+
+  const handleRecordClick = (meta, rawData = null) => {
+    if (!meta) return;
     const scope = (meta.permissionScope || meta.module || '').toLowerCase();
-    if (scope.includes('jobcard') || scope.includes('job card')) onNavigateTab('jobcards');
-    else if (scope.includes('catalogue') || scope.includes('design')) onNavigateTab('catalog');
+    if (scope.includes('jobcard') || scope.includes('job card') || (meta.recordRef && String(meta.recordRef).toUpperCase().startsWith('JC-'))) {
+      handleOpenJobCardPdf(meta, rawData);
+      return;
+    }
+    if (!onNavigateTab) return;
+    if (scope.includes('catalogue') || scope.includes('design')) onNavigateTab('catalog');
     else if (scope.includes('billing') || scope.includes('invoice')) onNavigateTab('ee_invoices');
     else if (scope.includes('complain') || scope.includes('complaint')) onNavigateTab('ee_complaints');
     else if (scope.includes('fabric')) onNavigateTab('jobcards_fabric');
@@ -2732,25 +2790,112 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                             )}
 
                             {/* Quick Share Record Card */}
-                            {isRecordCard && msg.activityMeta && msg.activityMeta.module && (
-                              <div style={{ background: isMe ? 'rgba(255,255,255,0.15)' : 'var(--bg-main)', padding: '0.55rem 0.75rem', borderRadius: '8px', border: isMe ? '1px solid rgba(255,255,255,0.3)' : '1px solid var(--border-light)', marginBottom: '0.35rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '4px' }}>
-                                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: isMe ? '#fff' : '#2563eb', textTransform: 'uppercase' }}>
-                                    🃏 {msg.activityMeta.module}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRecordClick(msg.activityMeta)}
-                                    style={{ background: isMe ? '#ffffff' : '#2563eb', color: isMe ? '#2563eb' : '#ffffff', border: 'none', padding: '2px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer' }}
-                                  >
-                                    Open →
-                                  </button>
+                            {isRecordCard && msg.activityMeta && msg.activityMeta.module && (() => {
+                              const isJobCard = (msg.activityMeta.module || '').toLowerCase().includes('job') ||
+                                                (msg.activityMeta.recordRef || '').toUpperCase().startsWith('JC-');
+                              const cardData = msg.activityMeta.recordData;
+
+                              return (
+                                <div
+                                  onClick={() => handleRecordClick(msg.activityMeta, cardData)}
+                                  style={{
+                                    background: isMe ? 'rgba(255,255,255,0.18)' : '#ffffff',
+                                    color: isMe ? '#ffffff' : 'var(--text-primary)',
+                                    padding: '0.65rem 0.8rem',
+                                    borderRadius: '10px',
+                                    border: isMe ? '1px solid rgba(255,255,255,0.35)' : '1px solid #bfdbfe',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                                    marginBottom: '0.45rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.18s ease',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '4px' }}>
+                                    <span
+                                      style={{
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        color: isMe ? '#ffffff' : '#1d4ed8',
+                                        background: isMe ? 'rgba(255,255,255,0.22)' : '#eff6ff',
+                                        padding: '2px 7px',
+                                        borderRadius: '4px',
+                                        textTransform: 'uppercase',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                      }}
+                                    >
+                                      {isJobCard ? '📄 JOB CARD PDF' : `🃏 ${msg.activityMeta.module}`}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRecordClick(msg.activityMeta, cardData);
+                                      }}
+                                      style={{
+                                        background: isMe ? '#ffffff' : '#2563eb',
+                                        color: isMe ? '#1d4ed8' : '#ffffff',
+                                        border: 'none',
+                                        padding: '3px 9px',
+                                        borderRadius: '5px',
+                                        fontSize: '0.7rem',
+                                        fontWeight: 800,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+                                      }}
+                                    >
+                                      {isJobCard ? <FileText size={11} /> : null}
+                                      <span>{isJobCard ? 'View PDF' : 'Open →'}</span>
+                                    </button>
+                                  </div>
+
+                                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: isMe ? '#ffffff' : '#1e293b' }}>
+                                    {msg.activityMeta.recordRef || msg.content}
+                                  </div>
+
+                                  {cardData && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', fontSize: '0.7rem', opacity: isMe ? 0.95 : 0.85, marginTop: '4px' }}>
+                                      {cardData.party && (
+                                        <span style={{ background: isMe ? 'rgba(255,255,255,0.2)' : '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
+                                          👤 {cardData.party}
+                                        </span>
+                                      )}
+                                      {cardData.totalMtr && (
+                                        <span style={{ background: isMe ? 'rgba(255,255,255,0.2)' : '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
+                                          📏 {cardData.totalMtr} Mtr
+                                        </span>
+                                      )}
+                                      {cardData.machineName && (
+                                        <span style={{ background: isMe ? 'rgba(255,255,255,0.2)' : '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
+                                          ⚙️ {cardData.machineName}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {isJobCard && (
+                                    <div
+                                      style={{
+                                        fontSize: '0.68rem',
+                                        color: isMe ? 'rgba(255,255,255,0.85)' : '#64748b',
+                                        marginTop: '5px',
+                                        paddingTop: '4px',
+                                        borderTop: isMe ? '1px solid rgba(255,255,255,0.2)' : '1px solid #f1f5f9',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                      }}
+                                    >
+                                      <span>Tap to preview printable sheet & design</span>
+                                    </div>
+                                  )}
                                 </div>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 800 }}>
-                                  {msg.activityMeta.recordRef || msg.content}
-                                </div>
-                              </div>
-                            )}
+                              );
+                            })()}
 
                             {/* Image Attachment */}
                             {msg.attachment && msg.attachment.fileUrl && !isAudioMsg && (
@@ -3675,6 +3820,20 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
             </button>
           </div>
         </div>
+      )}
+
+      {/* ── JOB CARD PDF VIEW MODAL ── */}
+      {pdfPreviewCard && (
+        <JobCardPdfModal
+          card={pdfPreviewCard}
+          loading={pdfPreviewLoading}
+          error={pdfPreviewError}
+          onClose={() => setPdfPreviewCard(null)}
+          onNavigateToJobCards={onNavigateTab ? () => {
+            setPdfPreviewCard(null);
+            onNavigateTab('jobcards');
+          } : null}
+        />
       )}
 
       {/* ── QUICK SHARE RECORD CARDS MODAL ── */}

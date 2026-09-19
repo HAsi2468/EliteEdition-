@@ -303,7 +303,21 @@ const getAllJobCards = async (req, res) => {
 const getJobCard = async (req, res) => {
   try {
     const { normalizeImageUrl } = require('../utils/imageUrlHelper');
-    const card = await db.JobCard.findById(req.params.id).lean();
+    const mongoose = require('mongoose');
+    const param = req.params.id;
+    let card = null;
+
+    if (mongoose.Types.ObjectId.isValid(param)) {
+      card = await db.JobCard.findById(param).lean();
+    }
+    if (!card) {
+      const cleanJobNo = String(param).replace(/^JC-/i, '').replace(/^JOB\s*NO\.?\s*[-:]?\s*/i, '').trim();
+      const num = parseInt(cleanJobNo, 10);
+      const query = { $or: [{ jobNo: cleanJobNo }, { jobNo: String(cleanJobNo) }] };
+      if (!isNaN(num)) query.$or.push({ jobNo: num });
+      card = await db.JobCard.findOne(query).lean();
+    }
+
     if (!card) return res.status(404).json({ error: 'Job card not found' });
     card.imageUrl1 = normalizeImageUrl(card.imageUrl1 || card.imageUrl, card.designName || card.designNo);
     card.imageUrl2 = normalizeImageUrl(card.imageUrl2, card.designName ? `${card.designName}-2` : '');
@@ -980,7 +994,21 @@ async function renderJobCardA5Page(doc, jobCard, activeLogo) {
 
 const downloadJobCardPdf = async (req, res) => {
   try {
-    const jobCard = await db.JobCard.findById(req.params.id).lean();
+    const mongoose = require('mongoose');
+    const param = req.params.id;
+    let jobCard = null;
+
+    if (mongoose.Types.ObjectId.isValid(param)) {
+      jobCard = await db.JobCard.findById(param).lean();
+    }
+    if (!jobCard) {
+      const cleanJobNo = String(param).replace(/^JC-/i, '').replace(/^JOB\s*NO\.?\s*[-:]?\s*/i, '').trim();
+      const num = parseInt(cleanJobNo, 10);
+      const query = { $or: [{ jobNo: cleanJobNo }, { jobNo: String(cleanJobNo) }] };
+      if (!isNaN(num)) query.$or.push({ jobNo: num });
+      jobCard = await db.JobCard.findOne(query).lean();
+    }
+
     if (!jobCard) {
       return res.status(404).json({ error: 'Job card not found' });
     }
