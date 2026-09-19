@@ -58,7 +58,8 @@ import {
   FilePlus,
   BarChart2,
   Reply,
-  CornerUpRight
+  CornerUpRight,
+  ChevronDown
 } from 'lucide-react';
 
 
@@ -116,6 +117,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
   const [chatSoundMuted, setChatSoundMuted] = useState(() => typeof localStorage !== 'undefined' ? localStorage.getItem('elite_chat_sound_muted') === 'true' : false);
   const [playingAudioId, setPlayingAudioId] = useState(null);
+  const [activeMsgMenuId, setActiveMsgMenuId] = useState(null);
   const [isMobileScreen, setIsMobileScreen] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [viewportHeight, setViewportHeight] = useState(null);
 
@@ -2697,7 +2699,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
               <div
                 ref={chatScrollRef}
                 onScroll={handleChatScroll}
-                style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--bg-main)' }}
+                onClick={() => setActiveMsgMenuId(null)}
+                className="wa-chat-container"
+                style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 1rem', display: 'flex', flexDirection: 'column', gap: '4px' }}
               >
                 {loadingMoreMessages && (
                   <div style={{ textAlign: 'center', padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
@@ -2837,74 +2841,180 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                     return (
                       <React.Fragment key={msg._id}>
                         {showDateHeader && (
-                          <div style={{ display: 'flex', justifyContent: 'center', margin: '0.75rem 0', position: 'sticky', top: 0, zIndex: 10 }}>
-                            <span style={{ padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.68rem', fontWeight: 800, background: 'rgba(15,23,42,0.75)', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', margin: '0.6rem 0', position: 'sticky', top: 4, zIndex: 10 }}>
+                            <span style={{ padding: '4px 12px', borderRadius: '7.5px', fontSize: '0.72rem', fontWeight: 600, background: '#ffffff', color: '#54656f', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 1px 0.5px rgba(11,20,26,0.13)' }}>
                               {msgDateHeader}
                             </span>
                           </div>
                         )}
 
                         <div
+                          className={activeMsgMenuId === msg._id ? 'wa-msg-row menu-open' : 'wa-msg-row'}
                           style={{
                             alignSelf: isMe ? 'flex-end' : 'flex-start',
-                            maxWidth: '74%',
+                            maxWidth: isMobileScreen ? '85%' : '72%',
+                            position: 'relative',
                             display: 'flex',
                             flexDirection: 'column',
-                            alignItems: isMe ? 'flex-end' : 'flex-start'
+                            alignItems: isMe ? 'flex-end' : 'flex-start',
+                            marginBottom: '3px'
                           }}
                         >
-                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '2px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span>{msg.senderId?.name || msg.senderName || 'Staff Member'}</span>
-                            <span>·</span>
-                            <span>{formatTime(msg.createdAt)}</span>
-                            {isMe && <CheckCheck size={13} color="#38bdf8" style={{ marginLeft: '2px' }} />}
-                            {msg.priority === 'urgent' && (
-                              <span style={{ color: '#ffffff', fontWeight: 800, background: '#ef4444', padding: '1px 5px', borderRadius: '4px', fontSize: '0.62rem', animation: 'pulse 1.5s infinite' }}>
-                                🚨 URGENT SOS
-                              </span>
-                            )}
-                            {msg.isPinned && (
-                              <span style={{ color: '#d97706', fontWeight: 800, background: '#fef3c7', padding: '1px 4px', borderRadius: '3px', fontSize: '0.62rem' }}>
-                                📌 PINNED
-                              </span>
-                            )}
-                          </div>
-
                           <div
+                            className="wa-msg-bubble"
                             style={{
                               background: msg.priority === 'urgent'
                                 ? (isMe ? 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)' : '#fee2e2')
-                                : (isMe ? 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)' : 'var(--bg-card)'),
+                                : (isMe ? '#d9fdd3' : '#ffffff'),
                               color: msg.priority === 'urgent'
                                 ? (isMe ? '#ffffff' : '#991b1b')
-                                : (isMe ? '#ffffff' : 'var(--text-primary)'),
-                              padding: '0.65rem 0.9rem',
-                              borderRadius: isMe ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
+                                : '#111b21',
+                              padding: '6px 9px 5px 9px',
+                              borderRadius: isMe ? '8px 8px 2px 8px' : '8px 8px 8px 2px',
                               border: msg.priority === 'urgent'
                                 ? (isMe ? '1.5px solid #fca5a5' : '1.5px solid #ef4444')
-                                : (isMe ? 'none' : '1px solid var(--border-light)'),
-                              boxShadow: msg.priority === 'urgent' ? '0 4px 14px rgba(239,68,68,0.3)' : '0 2px 8px rgba(0,0,0,0.04)',
-                              fontSize: '0.85rem',
-                              lineHeight: 1.45,
+                                : 'none',
+                              boxShadow: msg.priority === 'urgent' ? '0 3px 12px rgba(239,68,68,0.25)' : '0 1px 0.5px rgba(11,20,26,0.13)',
+                              fontSize: '0.88rem',
+                              lineHeight: 1.4,
                               wordBreak: 'break-word',
-                              position: 'relative'
+                              position: 'relative',
+                              minWidth: '70px'
                             }}
                           >
-                            {/* Forwarded Header */}
-                            {msg.forwardedFrom && (
-                              <div style={{ fontSize: '0.68rem', fontStyle: 'italic', fontWeight: 700, opacity: 0.9, display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px', paddingBottom: '3px', borderBottom: isMe ? '1px solid rgba(255,255,255,0.2)' : '1px solid var(--border-light)' }}>
-                                <CornerUpRight size={12} />
-                                <span>Forwarded from {msg.forwardedFrom.senderName} ({msg.forwardedFrom.originalRoomName || 'Chat'})</span>
+                            {/* WhatsApp Down-Chevron Trigger */}
+                            <button
+                              type="button"
+                              className="wa-bubble-trigger"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMsgMenuId(activeMsgMenuId === msg._id ? null : msg._id);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                top: '3px',
+                                right: '3px',
+                                background: isMe ? 'rgba(217, 253, 211, 0.92)' : 'rgba(255, 255, 255, 0.92)',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '18px',
+                                height: '18px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                color: '#667781',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
+                                zIndex: 4
+                              }}
+                              title="Message options"
+                            >
+                              <ChevronDown size={12} />
+                            </button>
+
+                            {/* WhatsApp Dropdown Action Menu */}
+                            {activeMsgMenuId === msg._id && (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: '24px',
+                                  right: isMe ? 0 : 'auto',
+                                  left: isMe ? 'auto' : 0,
+                                  background: '#ffffff',
+                                  borderRadius: '8px',
+                                  boxShadow: '0 4px 18px rgba(0,0,0,0.18)',
+                                  zIndex: 50,
+                                  minWidth: '170px',
+                                  padding: '4px 0',
+                                  border: '1px solid #e2e8f0',
+                                  animation: 'fadeIn 0.12s ease'
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {/* Quick Reactions */}
+                                <div style={{ display: 'flex', justifyContent: 'space-around', padding: '6px 8px', borderBottom: '1px solid #f1f5f9' }}>
+                                  {['👍', '❤️', '😂', '😮', '😢', '🙏'].map((emo) => (
+                                    <button
+                                      key={emo}
+                                      type="button"
+                                      onClick={() => {
+                                        handleToggleReaction(msg._id, emo);
+                                        setActiveMsgMenuId(null);
+                                      }}
+                                      style={{ background: 'none', border: 'none', fontSize: '1rem', cursor: 'pointer', padding: '2px', transition: 'transform 0.1s' }}
+                                    >
+                                      {emo}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setReplyToMessage(msg);
+                                    setActiveMsgMenuId(null);
+                                  }}
+                                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
+                                >
+                                  <Reply size={14} color="#00a884" />
+                                  <span>Reply</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleOpenForwardModal(msg);
+                                    setActiveMsgMenuId(null);
+                                  }}
+                                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
+                                >
+                                  <CornerUpRight size={14} color="#8b5cf6" />
+                                  <span>Forward</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleTogglePin(msg._id);
+                                    setActiveMsgMenuId(null);
+                                  }}
+                                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: 'none', border: 'none', fontSize: '0.8rem', color: '#1e293b', cursor: 'pointer', textAlign: 'left' }}
+                                >
+                                  {msg.isPinned ? <PinOff size={14} color="#d97706" /> : <Pin size={14} color="#64748b" />}
+                                  <span>{msg.isPinned ? 'Unpin message' : 'Pin message'}</span>
+                                </button>
                               </div>
                             )}
 
-                            {/* Quoted Reply Card */}
+                            {/* Sender Name (only shown for others in group chats) */}
+                            {!isMe && activeGroup?.type !== 'direct' && (
+                              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#1f8a70', marginBottom: '2px', lineHeight: 1.2 }}>
+                                {msg.senderId?.name || msg.senderName || 'Staff Member'}
+                              </div>
+                            )}
+
+                            {/* Urgent SOS Alert Badge */}
+                            {msg.priority === 'urgent' && (
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#ef4444', color: '#ffffff', fontWeight: 800, fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px', marginBottom: '4px', animation: 'pulse 1.5s infinite' }}>
+                                🚨 URGENT SOS
+                              </div>
+                            )}
+
+                            {/* WhatsApp Style Forwarded Header */}
+                            {msg.forwardedFrom && (
+                              <div style={{ fontSize: '0.7rem', fontStyle: 'italic', color: isMe && msg.priority === 'urgent' ? 'rgba(255,255,255,0.85)' : '#667781', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
+                                <CornerUpRight size={12} style={{ transform: 'scaleX(-1)' }} />
+                                <span>Forwarded</span>
+                              </div>
+                            )}
+
+                            {/* WhatsApp Style Quoted Reply Card */}
                             {msg.replyTo && (
-                              <div style={{ background: isMe ? 'rgba(0,0,0,0.18)' : 'rgba(37,99,235,0.08)', borderRadius: '6px', borderLeft: isMe ? '3px solid #ffffff' : '3px solid #2563eb', padding: '4px 8px', marginBottom: '6px', fontSize: '0.74rem' }}>
-                                <div style={{ fontWeight: 800, color: isMe ? '#ffffff' : '#2563eb', fontSize: '0.7rem' }}>
-                                  {typeof msg.replyTo.senderId === 'object' ? (msg.replyTo.senderId.name || msg.replyTo.senderId.username) : 'Replying to staff'}
+                              <div style={{ background: isMe ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: '5px', borderLeft: '3.5px solid #25d366', padding: '3px 8px', marginBottom: '4px', fontSize: '0.74rem' }}>
+                                <div style={{ fontWeight: 700, color: '#1f8a70', fontSize: '0.7rem', marginBottom: '1px' }}>
+                                  {typeof msg.replyTo.senderId === 'object' ? (msg.replyTo.senderId.name || msg.replyTo.senderId.username) : 'Staff Member'}
                                 </div>
-                                <div style={{ opacity: 0.9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <div style={{ color: '#54656f', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.72rem' }}>
                                   {msg.replyTo.content}
                                 </div>
                               </div>
@@ -2912,9 +3022,9 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                             {/* Interactive Poll Card */}
                             {isPollMsg && msg.pollMeta && (
-                              <div style={{ minWidth: 240, maxWidth: 360, background: isMe ? 'rgba(255,255,255,0.12)' : 'var(--bg-main)', borderRadius: '10px', padding: '0.65rem 0.8rem', border: isMe ? '1px solid rgba(255,255,255,0.25)' : '1px solid var(--border-light)', marginBottom: '0.35rem' }}>
+                              <div style={{ minWidth: 240, maxWidth: 360, background: isMe ? 'rgba(0,0,0,0.05)' : '#f8fafc', borderRadius: '8px', padding: '0.6rem 0.75rem', border: '1px solid rgba(0,0,0,0.08)', marginBottom: '0.35rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                                  <BarChart2 size={16} color={isMe ? '#ffffff' : '#2563eb'} />
+                                  <BarChart2 size={16} color="#00a884" />
                                   <span style={{ fontSize: '0.85rem', fontWeight: 800 }}>{msg.pollMeta.question}</span>
                                 </div>
 
@@ -2937,14 +3047,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                               position: 'relative',
                                               padding: '0.45rem 0.65rem',
                                               borderRadius: '7px',
-                                              background: isMe ? 'rgba(0,0,0,0.15)' : 'var(--bg-card)',
-                                              border: hasVoted ? (isMe ? '1.5px solid #ffffff' : '1.5px solid #2563eb') : '1px solid var(--border-light)',
+                                              background: '#ffffff',
+                                              border: hasVoted ? '1.5px solid #00a884' : '1px solid #e2e8f0',
                                               cursor: 'pointer',
                                               overflow: 'hidden',
                                               transition: 'all 0.15s ease'
                                             }}
                                           >
-                                            {/* Progress Bar Fill */}
                                             <div
                                               style={{
                                                 position: 'absolute',
@@ -2952,7 +3061,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                                 top: 0,
                                                 bottom: 0,
                                                 width: `${pct}%`,
-                                                background: isMe ? 'rgba(255,255,255,0.25)' : 'rgba(37,99,235,0.15)',
+                                                background: 'rgba(0,168,132,0.15)',
                                                 transition: 'width 0.3s ease'
                                               }}
                                             />
@@ -2980,7 +3089,7 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                             {/* Audio Voice Player Card */}
                             {isAudioMsg && msg.attachment && msg.attachment.fileUrl && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.4rem 0.65rem', background: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(37,99,235,0.08)', borderRadius: '10px', marginBottom: '0.35rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.4rem 0.65rem', background: isMe ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: '10px', marginBottom: '0.35rem' }}>
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -2993,18 +3102,18 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                       audio.onended = () => setPlayingAudioId(null);
                                     }
                                   }}
-                                  style={{ background: isMe ? '#ffffff' : '#2563eb', color: isMe ? '#2563eb' : '#ffffff', border: 'none', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}
+                                  style={{ background: '#00a884', color: '#ffffff', border: 'none', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}
                                 >
                                   {playingAudioId === msg._id ? <Pause size={15} /> : <Play size={15} />}
                                 </button>
 
                                 <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: '0.76rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <div style={{ fontSize: '0.76rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px', color: '#111b21' }}>
                                     <Volume2 size={13} />
                                     <span>Voice Note</span>
                                   </div>
-                                  <div style={{ fontSize: '0.66rem', opacity: 0.85 }}>
-                                    {msg.attachment.durationSec || 5} sec · Cloudflare R2 Audio
+                                  <div style={{ fontSize: '0.66rem', color: '#667781' }}>
+                                    {msg.attachment.durationSec || 5} sec
                                   </div>
                                 </div>
                               </div>
@@ -3020,13 +3129,13 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                 <div
                                   onClick={() => handleRecordClick(msg.activityMeta, cardData)}
                                   style={{
-                                    background: isMe ? 'rgba(255,255,255,0.18)' : '#ffffff',
-                                    color: isMe ? '#ffffff' : 'var(--text-primary)',
-                                    padding: '0.65rem 0.8rem',
-                                    borderRadius: '10px',
-                                    border: isMe ? '1px solid rgba(255,255,255,0.35)' : '1px solid #bfdbfe',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                                    marginBottom: '0.45rem',
+                                    background: isMe ? 'rgba(255,255,255,0.7)' : '#f8fafc',
+                                    color: '#1e293b',
+                                    padding: '0.55rem 0.75rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(0,0,0,0.08)',
+                                    boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+                                    marginBottom: '0.4rem',
                                     cursor: 'pointer',
                                     transition: 'all 0.18s ease',
                                   }}
@@ -3036,8 +3145,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                       style={{
                                         fontSize: '0.68rem',
                                         fontWeight: 800,
-                                        color: isMe ? '#ffffff' : '#1d4ed8',
-                                        background: isMe ? 'rgba(255,255,255,0.22)' : '#eff6ff',
+                                        color: '#1d4ed8',
+                                        background: '#eff6ff',
                                         padding: '2px 7px',
                                         borderRadius: '4px',
                                         textTransform: 'uppercase',
@@ -3055,8 +3164,8 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                         handleRecordClick(msg.activityMeta, cardData);
                                       }}
                                       style={{
-                                        background: isMe ? '#ffffff' : '#2563eb',
-                                        color: isMe ? '#1d4ed8' : '#ffffff',
+                                        background: '#2563eb',
+                                        color: '#ffffff',
                                         border: 'none',
                                         padding: '3px 9px',
                                         borderRadius: '5px',
@@ -3074,24 +3183,24 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     </button>
                                   </div>
 
-                                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: isMe ? '#ffffff' : '#1e293b' }}>
+                                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#1e293b' }}>
                                     {msg.activityMeta.recordRef || msg.content}
                                   </div>
 
                                   {cardData && (
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', fontSize: '0.7rem', opacity: isMe ? 0.95 : 0.85, marginTop: '4px' }}>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', fontSize: '0.7rem', opacity: 0.9, marginTop: '4px' }}>
                                       {cardData.party && (
-                                        <span style={{ background: isMe ? 'rgba(255,255,255,0.2)' : '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
+                                        <span style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
                                           👤 {cardData.party}
                                         </span>
                                       )}
                                       {cardData.totalMtr && (
-                                        <span style={{ background: isMe ? 'rgba(255,255,255,0.2)' : '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
+                                        <span style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
                                           📏 {cardData.totalMtr} Mtr
                                         </span>
                                       )}
                                       {cardData.machineName && (
-                                        <span style={{ background: isMe ? 'rgba(255,255,255,0.2)' : '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
+                                        <span style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
                                           ⚙️ {cardData.machineName}
                                         </span>
                                       )}
@@ -3102,10 +3211,10 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                                     <div
                                       style={{
                                         fontSize: '0.68rem',
-                                        color: isMe ? 'rgba(255,255,255,0.85)' : '#64748b',
+                                        color: '#64748b',
                                         marginTop: '5px',
                                         paddingTop: '4px',
-                                        borderTop: isMe ? '1px solid rgba(255,255,255,0.2)' : '1px solid #f1f5f9',
+                                        borderTop: '1px solid #f1f5f9',
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '4px',
@@ -3120,19 +3229,19 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
 
                             {/* Image Attachment */}
                             {msg.attachment && msg.attachment.fileUrl && !isAudioMsg && (
-                              <div style={{ marginBottom: '0.4rem' }}>
+                              <div style={{ marginBottom: '0.35rem' }}>
                                 {msg.attachment.fileType === 'image' ? (
                                   <img
                                     src={msg.attachment.fileUrl}
                                     alt="Attachment"
                                     onClick={() => setZoomImg(msg.attachment.fileUrl)}
-                                    style={{ maxWidth: '100%', maxHeight: '220px', borderRadius: '8px', cursor: 'zoom-in', objectFit: 'cover' }}
+                                    style={{ maxWidth: '100%', maxHeight: '240px', borderRadius: '6px', cursor: 'zoom-in', objectFit: 'cover' }}
                                   />
                                 ) : (
                                   <a
                                     href={msg.attachment.fileUrl}
                                     download={msg.attachment.fileName}
-                                    style={{ color: isMe ? '#fff' : '#2563eb', fontWeight: 700, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'underline' }}
+                                    style={{ color: '#2563eb', fontWeight: 700, fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'underline' }}
                                   >
                                     <FileText size={14} /> {msg.attachment.fileName}
                                   </a>
@@ -3140,91 +3249,128 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
                               </div>
                             )}
 
-                            {!isPollMsg && renderContentWithMentions(msg.content)}
+                            {/* WhatsApp Text Content + Inline Timestamp & Read Ticks */}
+                            <div style={{ fontSize: '0.88rem', lineHeight: '1.42', color: 'inherit' }}>
+                              {!isPollMsg && renderContentWithMentions(msg.content)}
 
-                            {/* Reaction Badges */}
-                            {msg.reactions && (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '5px' }}>
-                                {Object.entries(
-                                  Array.isArray(msg.reactions)
-                                    ? msg.reactions.reduce((acc, r) => {
-                                        acc[r.emoji] = (acc[r.emoji] || 0) + 1;
-                                        return acc;
-                                      }, {})
-                                    : Object.fromEntries(Object.entries(msg.reactions).map(([e, users]) => [e, users.length]))
-                                ).map(([emoji, count]) => (
-                                  <span
-                                    key={emoji}
-                                    onClick={() => handleToggleReaction(msg._id, emoji)}
-                                    style={{ fontSize: '0.7rem', background: isMe ? 'rgba(255,255,255,0.22)' : 'var(--bg-main)', border: isMe ? '1px solid rgba(255,255,255,0.3)' : '1px solid var(--border-light)', borderRadius: '10px', padding: '1px 6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
-                                  >
-                                    <span>{emoji}</span>
-                                    <span style={{ fontWeight: 800, fontSize: '0.64rem' }}>{count}</span>
-                                  </span>
-                                ))}
-                              </div>
-                            )}
+                              <span
+                                style={{
+                                  float: 'right',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  fontSize: '0.66rem',
+                                  color: isMe && msg.priority === 'urgent' ? 'rgba(255,255,255,0.85)' : '#667781',
+                                  marginLeft: '8px',
+                                  marginTop: '3px',
+                                  userSelect: 'none',
+                                  verticalAlign: 'bottom',
+                                  position: 'relative',
+                                  top: '2px'
+                                }}
+                              >
+                                {msg.isPinned && <Pin size={10} color="#d97706" style={{ transform: 'rotate(45deg)' }} />}
+                                <span>{formatTime(msg.createdAt)}</span>
+                                {isMe && (
+                                  msg.readBy && msg.readBy.length > 1 ? (
+                                    <CheckCheck size={14} color="#53bdeb" />
+                                  ) : (
+                                    <CheckCheck size={14} color="#8696a0" />
+                                  )
+                                )}
+                              </span>
+                            </div>
                           </div>
 
-                          {/* Hover Reaction Bar, Reply & Forward Buttons */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', opacity: 0.85 }}>
-                            <div style={{ display: 'flex', gap: '2px', background: 'var(--bg-card)', padding: '1px 4px', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
-                              {['👍', '❤️', '🔥', '🎉', '✅'].map((emo) => (
-                                <button
-                                  key={emo}
-                                  type="button"
-                                  onClick={() => handleToggleReaction(msg._id, emo)}
-                                  style={{ background: 'none', border: 'none', fontSize: '0.72rem', cursor: 'pointer', padding: '1px 3px' }}
+                          {/* Existing Reaction Badges (WhatsApp Style Overlapping Pill) */}
+                          {msg.reactions && (
+                            <div style={{
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: '3px',
+                              marginTop: '2px',
+                              marginBottom: '-2px',
+                              alignSelf: isMe ? 'flex-end' : 'flex-start'
+                            }}>
+                              {Object.entries(
+                                Array.isArray(msg.reactions)
+                                  ? msg.reactions.reduce((acc, r) => {
+                                      acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                                      return acc;
+                                    }, {})
+                                  : Object.fromEntries(Object.entries(msg.reactions).map(([e, users]) => [e, users.length]))
+                              ).map(([emoji, count]) => (
+                                <span
+                                  key={emoji}
+                                  onClick={() => handleToggleReaction(msg._id, emoji)}
+                                  style={{
+                                    fontSize: '0.72rem',
+                                    background: '#ffffff',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '10px',
+                                    padding: '1px 5px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+                                  }}
                                 >
-                                  {emo}
-                                </button>
+                                  <span>{emoji}</span>
+                                  {count > 1 && <span style={{ fontWeight: 800, fontSize: '0.64rem', color: '#64748b' }}>{count}</span>}
+                                </span>
                               ))}
-                              
+                            </div>
+                          )}
+
+                          {/* Desktop Hover Action Floating Bar */}
+                          {!isMobileScreen && (
+                            <div
+                              className="wa-hover-actions"
+                              style={{
+                                position: 'absolute',
+                                top: '2px',
+                                [isMe ? 'left' : 'right']: '-66px',
+                                display: 'flex',
+                                gap: '2px',
+                                background: 'rgba(255,255,255,0.95)',
+                                backdropFilter: 'blur(4px)',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '16px',
+                                padding: '2px 4px',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                                zIndex: 10
+                              }}
+                            >
                               <button
                                 type="button"
                                 onClick={() => setReplyToMessage(msg)}
-                                style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', padding: '1px 3px', display: 'flex', alignItems: 'center' }}
-                                title="Reply to this message"
+                                style={{ background: 'none', border: 'none', color: '#54656f', cursor: 'pointer', padding: '3px', display: 'flex', alignItems: 'center' }}
+                                title="Reply"
                               >
-                                <Reply size={11} />
+                                <Reply size={13} />
                               </button>
-
                               <button
                                 type="button"
                                 onClick={() => handleOpenForwardModal(msg)}
-                                style={{ background: 'none', border: 'none', color: '#8b5cf6', cursor: 'pointer', padding: '1px 3px', display: 'flex', alignItems: 'center' }}
-                                title="Forward message to another channel/DM"
+                                style={{ background: 'none', border: 'none', color: '#54656f', cursor: 'pointer', padding: '3px', display: 'flex', alignItems: 'center' }}
+                                title="Forward"
                               >
-                                <CornerUpRight size={11} />
+                                <CornerUpRight size={13} />
                               </button>
-
                               <button
                                 type="button"
-                                onClick={() => handleTogglePin(msg._id)}
-                                style={{ background: 'none', border: 'none', color: msg.isPinned ? '#d97706' : 'var(--text-muted)', cursor: 'pointer', padding: '1px 3px', display: 'flex', alignItems: 'center' }}
-                                title={msg.isPinned ? 'Unpin message' : 'Pin message'}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMsgMenuId(activeMsgMenuId === msg._id ? null : msg._id);
+                                }}
+                                style={{ background: 'none', border: 'none', color: '#54656f', cursor: 'pointer', padding: '3px', display: 'flex', alignItems: 'center' }}
+                                title="More"
                               >
-                                {msg.isPinned ? <PinOff size={11} /> : <Pin size={11} />}
+                                <MoreVertical size={13} />
                               </button>
                             </div>
-
-                            {/* Read Receipts Indicator */}
-                            {isMe && (
-                              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '4px' }}>
-                                {msg.readBy && msg.readBy.length > 1 ? (
-                                  <span style={{ color: '#2563eb', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '2px' }} title={`Read by ${msg.readBy.length - 1} team members`}>
-                                    <CheckCheck size={13} />
-                                    <span>Read</span>
-                                  </span>
-                                ) : (
-                                  <span style={{ color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                                    <Check size={12} />
-                                    <span>Sent</span>
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                          )}
                         </div>
                       </React.Fragment>
                     );

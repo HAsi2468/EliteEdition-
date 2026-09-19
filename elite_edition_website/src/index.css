@@ -885,5 +885,53 @@ body {
   }
 }
 
+/* ═══════════════════════════════════════════════════
+   WHATSAPP-LIKE CHAT STREAM STYLES
+   ═══════════════════════════════════════════════════ */
+.wa-chat-container {
+  background-color: #efeae2 !important;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px) !important;
+  background-size: 18px 18px !important;
+}
 
+.wa-msg-row {
+  position: relative;
+  transition: all 0.12s ease;
+}
 
+.wa-msg-bubble {
+  transition: box-shadow 0.15s ease;
+}
+
+.wa-bubble-trigger {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.wa-msg-row:hover .wa-bubble-trigger,
+.wa-msg-row:focus-within .wa-bubble-trigger,
+.wa-msg-row.menu-open .wa-bubble-trigger {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (max-width: 768px) {
+  .wa-msg-row .wa-bubble-trigger {
+    opacity: 0.5;
+    pointer-events: auto;
+  }
+}
+
+.wa-hover-actions {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(3px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.wa-msg-row:hover .wa-hover-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
