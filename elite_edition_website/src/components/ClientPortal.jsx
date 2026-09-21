@@ -290,19 +290,6 @@ export default function ClientPortal({ client, onLogout }) {
   });
 
   const filteredDesigns = designs.filter(d => {
-    // Re-verify that the design contains this client's assigned party code
-    const partiesList = Array.isArray(d.parties)
-      ? d.parties
-      : (d.parties ? [d.parties] : (d.party ? [d.party] : []));
-    const c1 = String(partyCode).toLowerCase().trim();
-    const c2 = String(clientData.companyCode || '').toLowerCase().trim();
-    const c3 = String(clientData.companyName || '').toLowerCase().trim();
-    const matchesParty = partiesList.some(p => {
-      const pStr = String(p || '').toLowerCase().trim();
-      return (c1 && pStr === c1) || (c2 && pStr === c2) || (c3 && pStr === c3);
-    });
-    if (!matchesParty) return false;
-
     const term = searchDesign.toLowerCase().trim();
     if (!term) return true;
     return (
@@ -854,71 +841,89 @@ export default function ClientPortal({ client, onLogout }) {
               </div>
             ) : (
               <div className="client-designs-grid" style={styles.designsGrid}>
-                {filteredDesigns.map((d) => (
-                  <div key={d._id || d.id} style={styles.designCard}>
-                    {/* Design Image */}
-                    <div
-                      className="client-design-img-box"
-                      style={styles.designImgBox}
-                      onClick={() => d.imageUrl && setZoomImg(d.imageUrl)}
-                    >
-                      <DesignImage
-                        rawUrl={d.imageUrl}
-                        designName={d.designName}
-                        category={d.category}
-                        onZoom={(src) => setZoomImg(src)}
-                        style={{ width: '100%', height: '100%' }}
-                      />
-                    </div>
-
-                    <div className="client-design-info" style={styles.designInfo}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={styles.designTitle}>{d.designName}</span>
-                        {d.category && (
-                          <span style={styles.designCat}>{d.category}</span>
-                        )}
+                {filteredDesigns.map((d) => {
+                  const dName = String(d.designName || '').trim().toLowerCase();
+                  const matchingOrders = orders.filter(o => {
+                    const oName = String(o.designName || o.designNo || '').trim().toLowerCase();
+                    return oName && (oName === dName || oName.includes(dName) || dName.includes(oName));
+                  });
+                  const totalPcs = matchingOrders.reduce((sum, o) => {
+                    const pcs = Number(o.pcs) || Number(o.pieces) || 0;
+                    return sum + pcs;
+                  }, 0);
+                  const fabricDisplay = d.fabricName || matchingOrders[0]?.fabric || '';
+                  return (
+                    <div key={d._id || d.id} style={styles.designCard}>
+                      {/* Design Image */}
+                      <div
+                        className="client-design-img-box"
+                        style={styles.designImgBox}
+                        onClick={() => d.imageUrl && setZoomImg(d.imageUrl)}
+                      >
+                        <DesignImage
+                          rawUrl={d.imageUrl}
+                          designName={d.designName}
+                          category={d.category}
+                          onZoom={(src) => setZoomImg(src)}
+                          style={{ width: '100%', height: '100%' }}
+                        />
                       </div>
 
-                      <div style={styles.designMetaGrid}>
-                        {d.fabricName && (
-                          <div>
-                            <span style={styles.metaLabel}>Fabric</span>
-                            <span style={styles.metaVal}>{d.fabricName}</span>
-                          </div>
-                        )}
-                        {d.colors && (
-                          <div>
-                            <span style={styles.metaLabel}>Colors</span>
-                            <span style={styles.metaVal}>{d.colors}</span>
-                          </div>
-                        )}
-                        {d.panna && (
-                          <div>
-                            <span style={styles.metaLabel}>Width</span>
-                            <span style={styles.metaVal}>{d.panna}"</span>
-                          </div>
-                        )}
-                        {d.partySkuId && (
-                          <div>
-                            <span style={styles.metaLabel}>Party SKU</span>
-                            <span style={{ ...styles.metaVal, color: '#2563eb' }}>{d.partySkuId}</span>
-                          </div>
-                        )}
-                      </div>
+                      <div className="client-design-info" style={styles.designInfo}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                          <span style={styles.designTitle}>{d.designName}</span>
+                          {d.category && (
+                            <span style={styles.designCat}>{d.category}</span>
+                          )}
+                        </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px dashed #e2e8f0' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '6px' }}>
-                          Party: {partyCode || (Array.isArray(d.parties) ? d.parties.join(', ') : d.parties || d.party)}
-                        </span>
-                        {d.department && (
-                          <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'capitalize' }}>
-                            {d.department.replace('_', ' ')}
+                        <div style={styles.designMetaGrid}>
+                          {fabricDisplay && (
+                            <div>
+                              <span style={styles.metaLabel}>Fabric</span>
+                              <span style={styles.metaVal}>{fabricDisplay}</span>
+                            </div>
+                          )}
+                          {d.colors && (
+                            <div>
+                              <span style={styles.metaLabel}>Colors</span>
+                              <span style={styles.metaVal}>{d.colors}</span>
+                            </div>
+                          )}
+                          {d.panna && (
+                            <div>
+                              <span style={styles.metaLabel}>Width</span>
+                              <span style={styles.metaVal}>{d.panna}"</span>
+                            </div>
+                          )}
+                          {matchingOrders.length > 0 && (
+                            <div>
+                              <span style={styles.metaLabel}>Orders</span>
+                              <span style={{ ...styles.metaVal, color: '#1d4ed8' }}>
+                                {matchingOrders.length} {matchingOrders.length === 1 ? 'Order' : 'Orders'} {totalPcs > 0 ? `(${totalPcs} pcs)` : ''}
+                              </span>
+                            </div>
+                          )}
+                          {d.partySkuId && (
+                            <div>
+                              <span style={styles.metaLabel}>Party SKU</span>
+                              <span style={{ ...styles.metaVal, color: '#2563eb' }}>{d.partySkuId}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px dashed #e2e8f0' }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '6px' }}>
+                            Party: {partyCode || 'VG'}
                           </span>
-                        )}
+                          <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 500 }}>
+                            {matchingOrders.length > 0 ? `${matchingOrders.length} active orders` : (d.department ? d.department.replace('_', ' ') : 'Catalog Design')}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
