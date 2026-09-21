@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../services/api';
-import { Search, RefreshCw, Save, Check, Clipboard, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { Search, RefreshCw, Save, Check, Clipboard, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Download, Zap } from 'lucide-react';
 import JobCardTooltip from './JobCardTooltip';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import InfiniteScrollPagination from './InfiniteScrollPagination';
@@ -53,6 +53,7 @@ export default function JobCardTracking({ onPreview }) {
   // Row edit state: { [cardId]: { billNo, printStatus, printDate, printMtr, fusingStatus, fusingDate, fusingMtr, deliveryStatus, deliveryDate } }
   const [modifiedCards, setModifiedCards] = useState({});
   const [savingIds, setSavingIds] = useState(new Set());
+  const [syncingFusing, setSyncingFusing] = useState(false);
 
   // Collapsible print run history state
   const [expandedCardIds, setExpandedCardIds] = useState(new Set());
@@ -187,9 +188,96 @@ export default function JobCardTracking({ onPreview }) {
     };
   }, [fetchCards]);
 
+  // Helpers to resolve delivery meters and invoice date for a card
+  const getCardDeliveryMtr = (c) => {
+    if (!c) return 0;
+    if (c.deliveredMtr && Number(c.deliveredMtr) > 0) return Number(c.deliveredMtr);
+    if (Array.isArray(c.invoices) && c.invoices.length > 0) {
+      const sum = c.invoices.reduce((acc, inv) => acc + (Number(inv.meters) || 0), 0);
+      if (sum > 0) return Math.round(sum * 100) / 100;
+    }
+    return 0;
+  };
+
+  const getCardInvoiceDate = (c) => {
+    if (!c) return '';
+    if (c.deliveryDate) {
+      return typeof c.deliveryDate === 'string' && c.deliveryDate.includes('T') ? c.deliveryDate.split('T')[0] : c.deliveryDate;
+    }
+    if (Array.isArray(c.invoices) && c.invoices.length > 0) {
+      const sorted = [...c.invoices].sort((a, b) => new Date(b.date) - new Date(a.date));
+      if (sorted[0]?.date) {
+        const dt = new Date(sorted[0].date);
+        if (!isNaN(dt.getTime())) {
+          return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+        }
+      }
+    }
+    return '';
+  };
+
+  const handleSyncSingleCardFusing = async (c) => {
+    const delMtr = getCardDeliveryMtr(c);
+    const invDate = getCardInvoiceDate(c) || new Date().toISOString().split('T')[0];
+
+    const currentMod = modifiedCards[c._id] || {
+      billNo: c.billNo || '',
+      printStatus: c.printStatus || 'Printing Pending',
+      printDate: c.printDate || '',
+      printMtr: c.printMtr || 0,
+      fusingStatus: c.fusingStatus || 'Fusing Pending',
+      fusingDate: c.fusingDate || '',
+      fusingMtr: c.fusingMtr || 0,
+      deliveryStatus: c.deliveryStatus || 'Delivery Pending',
+      deliveryDate: c.deliveryDate || '',
+    };
+
+    const updated = {
+      ...currentMod,
+      fusingMtr: delMtr > 0 ? delMtr : currentMod.fusingMtr,
+      fusingStatus: 'Fusing Done',
+      fusingDate: invDate
+    };
+
+    setSavingIds(prev => new Set(prev).add(c._id));
+    try {
+      const res = await api.updateJobCard(c._id, updated);
+      setCards(prev => prev.map(item => item._id === c._id ? { ...item, ...res, ...updated } : item));
+      setModifiedCards(prev => {
+        const next = { ...prev };
+        delete next[c._id];
+        return next;
+      });
+    } catch (err) {
+      alert(err.message || 'Failed to sync fusing from delivery.');
+    } finally {
+      setSavingIds(prev => {
+        const next = new Set(prev);
+        next.delete(c._id);
+        return next;
+      });
+    }
+  };
+
+  const handleSyncFusingFromDelivery = async () => {
+    if (!window.confirm('Sync Fusing for all delivered job cards?\n\nThis will find job cards with delivery meters / invoices, set Fusing Mtr = Delivery Mtr, Fusing Status = Fusing Done, and Fusing Date = Invoice Date.')) {
+      return;
+    }
+    setSyncingFusing(true);
+    try {
+      const res = await api.syncFusingFromDelivery();
+      alert(res.message || `Successfully synced ${res.updatedCount || 0} job cards!`);
+      await fetchCards(false, page);
+      window.dispatchEvent(new Event('elite-data-refresh'));
+    } catch (err) {
+      alert(`Sync failed: ${err.message}`);
+    } finally {
+      setSyncingFusing(false);
+    }
+  };
+
   // Handle local cell modifications
   const handleCellChange = (cardId, field, value) => {
-    // Find the original card to base modifications on if not already modified
     const originalCard = cards.find(c => c._id === cardId);
     if (!originalCard) return;
 
@@ -217,8 +305,17 @@ export default function JobCardTracking({ onPreview }) {
       if (field === 'fusingStatus' && value === 'Fusing Done' && !updated.fusingDate) {
         updated.fusingDate = todayStr;
       }
-      if (field === 'deliveryStatus' && value === 'Delivery Done' && !updated.deliveryDate) {
-        updated.deliveryDate = todayStr;
+      if (field === 'deliveryStatus' && value === 'Delivery Done') {
+        if (!updated.deliveryDate) updated.deliveryDate = todayStr;
+        updated.fusingStatus = 'Fusing Done';
+        if (!updated.fusingDate) updated.fusingDate = updated.deliveryDate;
+        const delMtr = getCardDeliveryMtr(originalCard);
+        if (delMtr > 0) updated.fusingMtr = delMtr;
+      }
+      if (field === 'deliveryDate' && value) {
+        if (updated.fusingStatus === 'Fusing Done' || updated.deliveryStatus === 'Delivery Done') {
+          updated.fusingDate = value;
+        }
       }
 
       return { ...prev, [cardId]: updated };
@@ -227,7 +324,6 @@ export default function JobCardTracking({ onPreview }) {
 
   // Auto save row to backend
   const handleAutoSave = async (cardId, field, value) => {
-    // Find the original card to base modifications on if not already modified
     const originalCard = cards.find(c => c._id === cardId);
     if (!originalCard) return;
 
@@ -253,8 +349,17 @@ export default function JobCardTracking({ onPreview }) {
     if (field === 'fusingStatus' && value === 'Fusing Done' && !updated.fusingDate) {
       updated.fusingDate = todayStr;
     }
-    if (field === 'deliveryStatus' && value === 'Delivery Done' && !updated.deliveryDate) {
-      updated.deliveryDate = todayStr;
+    if (field === 'deliveryStatus' && value === 'Delivery Done') {
+      if (!updated.deliveryDate) updated.deliveryDate = todayStr;
+      updated.fusingStatus = 'Fusing Done';
+      if (!updated.fusingDate) updated.fusingDate = updated.deliveryDate;
+      const delMtr = getCardDeliveryMtr(originalCard);
+      if (delMtr > 0) updated.fusingMtr = delMtr;
+    }
+    if (field === 'deliveryDate' && value) {
+      if (updated.fusingStatus === 'Fusing Done' || updated.deliveryStatus === 'Delivery Done') {
+        updated.fusingDate = value;
+      }
     }
 
     setSavingIds(prev => {
@@ -633,6 +738,45 @@ export default function JobCardTracking({ onPreview }) {
             <option value="Delivery Pending">Delivery: DP</option>
           </select>
 
+          {/* Sync Fusing from Delivery Button */}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={handleSyncFusingFromDelivery}
+              disabled={syncingFusing}
+              title="Find all job cards with delivery meters / invoices, set Fusing Mtr = Delivery Mtr, Fusing Status = Fusing Done, and Fusing Date = Invoice Date"
+              style={{
+                padding: '0.45rem 0.85rem',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #059669, #10b981)',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#ffffff',
+                cursor: syncingFusing ? 'not-allowed' : 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                whiteSpace: 'nowrap',
+                opacity: syncingFusing ? 0.7 : 1,
+                marginLeft: 'auto'
+              }}
+            >
+              {syncingFusing ? (
+                <>
+                  <RefreshCw size={15} className="spin-loader" />
+                  <span>Syncing Fusing...</span>
+                </>
+              ) : (
+                <>
+                  <Zap size={15} />
+                  <span>Sync Fusing from Delivery</span>
+                </>
+              )}
+            </button>
+          )}
+
           {/* Download PDF Tracking Report Button */}
           <button
             onClick={handleDownloadTrackingPdfReport}
@@ -651,7 +795,7 @@ export default function JobCardTracking({ onPreview }) {
               gap: '0.4rem',
               boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)',
               whiteSpace: 'nowrap',
-              marginLeft: 'auto'
+              marginLeft: isAdmin ? '0' : 'auto'
             }}
           >
             <Download size={15} />
@@ -1076,25 +1220,71 @@ export default function JobCardTracking({ onPreview }) {
 
                       {/* Fusing Mtr */}
                       <td style={{ ...tdStyle, textAlign: 'center' }}>
-                        <input
-                          type="number"
-                          value={getValue(c, 'fusingMtr')}
-                          disabled={!isAdmin}
-                          readOnly={!isAdmin}
-                          onChange={e => isAdmin && handleCellChange(c._id, 'fusingMtr', parseFloat(e.target.value) || 0)}
-                          onBlur={e => isAdmin && handleAutoSave(c._id, 'fusingMtr', parseFloat(e.target.value) || 0)}
-                          onKeyDown={e => e.key === 'Enter' && isAdmin && e.target.blur()}
-                          title={!isAdmin ? "Auto-updated from Fusing Department" : "Edit Fusing Meters"}
-                          style={{
-                            ...inputStyle,
-                            width: '65px',
-                            fontWeight: 700,
-                            color: '#fb923c',
-                            opacity: !isAdmin ? 0.85 : 1,
-                            cursor: !isAdmin ? 'default' : 'text',
-                            background: !isAdmin ? 'rgba(255,255,255,0.03)' : inputStyle.background
-                          }}
-                        />
+                        {(() => {
+                          const cardDelMtr = getCardDeliveryMtr(c);
+                          const cardInvDate = getCardInvoiceDate(c);
+                          const currentFMtr = parseFloat(getValue(c, 'fusingMtr')) || 0;
+                          const currentFStatus = getValue(c, 'fusingStatus');
+                          const currentFDate = getValue(c, 'fusingDate');
+                          const needsSync = cardDelMtr > 0 && (
+                            currentFMtr !== cardDelMtr ||
+                            currentFStatus !== 'Fusing Done' ||
+                            (cardInvDate && currentFDate !== cardInvDate)
+                          );
+
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <input
+                                type="number"
+                                value={getValue(c, 'fusingMtr')}
+                                disabled={!isAdmin}
+                                readOnly={!isAdmin}
+                                onChange={e => isAdmin && handleCellChange(c._id, 'fusingMtr', parseFloat(e.target.value) || 0)}
+                                onBlur={e => isAdmin && handleAutoSave(c._id, 'fusingMtr', parseFloat(e.target.value) || 0)}
+                                onKeyDown={e => e.key === 'Enter' && isAdmin && e.target.blur()}
+                                title={!isAdmin ? "Auto-updated from Fusing Department" : "Edit Fusing Meters"}
+                                style={{
+                                  ...inputStyle,
+                                  width: '65px',
+                                  fontWeight: 700,
+                                  color: '#fb923c',
+                                  opacity: !isAdmin ? 0.85 : 1,
+                                  cursor: !isAdmin ? 'default' : 'text',
+                                  background: !isAdmin ? 'rgba(255,255,255,0.03)' : inputStyle.background
+                                }}
+                              />
+                              {isAdmin && needsSync ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSyncSingleCardFusing(c)}
+                                  title={`Write delivery ${cardDelMtr}m in Fusing Mtr, set Status to FD, and date to ${cardInvDate || 'invoice date'}`}
+                                  style={{
+                                    marginTop: '3px',
+                                    padding: '1px 6px',
+                                    fontSize: '0.62rem',
+                                    fontWeight: 700,
+                                    background: 'rgba(16, 185, 129, 0.15)',
+                                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                                    color: '#10b981',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '2px',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  <Zap size={10} />
+                                  <span>Sync ({cardDelMtr}m)</span>
+                                </button>
+                              ) : cardDelMtr > 0 ? (
+                                <div style={{ fontSize: '0.62rem', color: '#10b981', marginTop: '2px', fontWeight: 600 }} title="Fusing Mtr and Date are synced with delivery invoice">
+                                  ✓ Synced ({cardDelMtr}m)
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Delivery Status */}

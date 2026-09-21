@@ -663,6 +663,12 @@ export const api = {
   async deleteJobCard(id) {
     return request(`/jobCards/${id}`, { method: 'DELETE' });
   },
+  async syncFusingFromDelivery(cardId = null) {
+    return request('/jobCards/sync-fusing-from-delivery', {
+      method: 'POST',
+      body: JSON.stringify(cardId ? { cardId } : {})
+    });
+  },
   async downloadJobCardPdf(id, jobNo = '') {
     const baseUrl = getBaseUrl();
     const token = localStorage.getItem('elite_auth_token') || localStorage.getItem('token');

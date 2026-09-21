@@ -542,6 +542,18 @@ const syncJobCardsForInvoice = async (invoice) => {
           }
         }
 
+        // Auto-sync Fusing from delivery mtr and invoice date
+        if (totalDeliveredMtr > 0) {
+          card.fusingMtr = String(card.deliveredMtr);
+          card.fusingStatus = 'Fusing Done';
+          if (card.deliveryDate) {
+            card.fusingDate = card.deliveryDate;
+          }
+          if (card.deliveryStatus === 'Delivery Done') {
+            card.status = 'Done';
+          }
+        }
+
         await card.save();
       }
     }
