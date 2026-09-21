@@ -137,18 +137,20 @@ export default function ClientPortal({ client, onLogout }) {
     };
   }, []);
 
-  // Load Client Orders strictly by assigned party code
+  // Load Client Orders strictly by assigned party code (Company code in jobcard's party)
   const fetchOrders = async () => {
-    const code = partyCode;
+    const code = clientData.companyCode || partyCode;
     if (!code) {
       setOrders([]);
       return;
     }
     setLoadingOrders(true);
     try {
+      const partyQuery = [clientData.companyCode, partyCode, clientData.companyName].filter(Boolean);
+      const uniqueParties = [...new Set(partyQuery)].join(',');
       const res = await api.getJobCards({
-        party: code,
-        limit: 100
+        party: uniqueParties || code,
+        limit: 1000
       });
       const list = res?.data || (Array.isArray(res) ? res : []);
       setOrders(list);
@@ -161,16 +163,18 @@ export default function ClientPortal({ client, onLogout }) {
 
   // Load Client Designs strictly by assigned party code
   const fetchDesigns = async () => {
-    const code = partyCode;
+    const code = clientData.companyCode || partyCode;
     if (!code) {
       setDesigns([]);
       return;
     }
     setLoadingDesigns(true);
     try {
+      const partyQuery = [clientData.companyCode, partyCode, clientData.companyName].filter(Boolean);
+      const uniqueParties = [...new Set(partyQuery)].join(',');
       const res = await api.getDesigns({
-        party: code,
-        limit: 200
+        party: uniqueParties || code,
+        limit: 500
       });
       const list = res?.data || (Array.isArray(res) ? res : []);
       // STRICT FILTER: Only designs whose parties array or party field contains this client's party code
@@ -195,11 +199,11 @@ export default function ClientPortal({ client, onLogout }) {
   };
 
   useEffect(() => {
-    if (partyCode) {
+    if (partyCode || clientData.companyCode) {
       fetchOrders();
       fetchDesigns();
     }
-  }, [partyCode]);
+  }, [partyCode, clientData.companyCode]);
 
   // Handle client avatar upload to Cloudflare R2
   const handleAvatarSelect = async (e) => {

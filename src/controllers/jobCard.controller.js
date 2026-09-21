@@ -133,9 +133,23 @@ function calcExpTime(panna, passText, totalMtr, machineName) {
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 const getAllJobCards = async (req, res) => {
   try {
-    const { status, printStatus, fusingStatus, deliveryStatus, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder, category, department } = req.query;
+    const { status, printStatus, fusingStatus, deliveryStatus, party, search, page=1, limit=50, dateStart, dateEnd, sortBy, sortOrder, category, department } = req.query;
     const baseFilter = {};
     const baseAndClauses = [];
+
+    // Filter by Party (Client Company Code or Name)
+    if (party && party !== 'All') {
+      const partyParts = String(party).split(',').map(p => p.trim()).filter(Boolean);
+      const partyOrs = [];
+      partyParts.forEach(p => {
+        const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        partyOrs.push({ party: { $regex: new RegExp(`^\\s*${escaped}\\s*$`, 'i') } });
+        partyOrs.push({ party: p });
+      });
+      if (partyOrs.length > 0) {
+        baseAndClauses.push({ $or: partyOrs });
+      }
+    }
 
     if (category && category !== 'All') baseFilter.category = category;
 
@@ -146,6 +160,8 @@ const getAllJobCards = async (req, res) => {
           { category: { $regex: 'stitching', $options: 'i' } }
         ]
       });
+    } else if (department === 'all' || party) {
+      // If party is specified (e.g. client portal) or department=all, do not exclude records
     } else {
       baseFilter.department = { $ne: 'stitching' };
       baseFilter.category = { $ne: 'Stitching' };
