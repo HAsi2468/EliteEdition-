@@ -180,8 +180,142 @@ export default function ClientPortal({ client, onLogout }) {
 
   return (
     <div style={styles.container}>
+      <style>{`
+        .client-portal-header {
+          padding: 0.85rem 1.75rem;
+          background: #ffffff;
+          border-bottom: 1px solid #e2e8f0;
+          box-shadow: 0 2px 8px rgba(30, 58, 138, 0.04);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          position: sticky;
+          top: 0;
+          z-index: 100;
+        }
+        .client-portal-main {
+          flex: 1;
+          padding: 1.5rem;
+          max-width: 1200px;
+          width: 100%;
+          margin: 0 auto;
+          box-sizing: border-box;
+        }
+        .client-welcome-card {
+          background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
+          border: 1px solid #bfdbfe;
+          border-radius: 16px;
+          padding: 1.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 1.25rem;
+          margin-bottom: 1.5rem;
+          box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.08);
+        }
+        .client-tabs-bar {
+          display: flex;
+          gap: 0.5rem;
+          margin-bottom: 1.25rem;
+          border-bottom: 1px solid #e2e8f0;
+          padding-bottom: 0.5rem;
+          overflow-x: auto;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+          -webkit-overflow-scrolling: touch;
+        }
+        .client-tabs-bar::-webkit-scrollbar {
+          display: none;
+        }
+        .client-orders-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+          gap: 1rem;
+        }
+        .client-designs-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+          gap: 1rem;
+        }
+        .client-details-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 1rem;
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          padding: 1.25rem;
+          border-radius: 12px;
+        }
+        .client-search-input {
+          font-size: 16px !important; /* Prevents auto-zoom on iOS */
+        }
+        @media (max-width: 768px) {
+          .client-portal-header {
+            padding: 0.65rem 0.85rem !important;
+          }
+          .client-portal-main {
+            padding: 1rem 0.75rem !important;
+          }
+          .client-welcome-card {
+            padding: 1.15rem 1rem !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 1rem !important;
+          }
+          .client-welcome-stats {
+            width: 100% !important;
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 0.65rem !important;
+          }
+          .client-orders-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .client-designs-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 0.65rem !important;
+          }
+          .client-design-img-box {
+            height: 155px !important;
+          }
+          .client-design-info {
+            padding: 0.65rem !important;
+            gap: 0.35rem !important;
+          }
+          .client-details-grid {
+            grid-template-columns: 1fr 1fr !important;
+            padding: 0.85rem !important;
+            gap: 0.65rem !important;
+          }
+          .hide-mobile {
+            display: none !important;
+          }
+          .client-name-truncate {
+            max-width: 110px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            display: inline-block !important;
+          }
+          .client-avatar-section {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 1rem !important;
+          }
+        }
+        @media (max-width: 420px) {
+          .client-details-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .client-name-truncate {
+            max-width: 80px !important;
+          }
+        }
+      `}</style>
+
       {/* ── Top Navigation Bar ── */}
-      <header style={styles.header}>
+      <header className="client-portal-header" style={styles.header}>
         <div style={styles.headerLeft}>
           <div style={styles.logoBadge}>
             <Building2 size={20} color="#ffffff" />
@@ -210,7 +344,7 @@ export default function ClientPortal({ client, onLogout }) {
               </div>
             )}
             <div style={styles.clientMeta}>
-              <span style={styles.clientName}>{clientData.companyName || clientData.username}</span>
+              <span className="client-name-truncate" style={styles.clientName}>{clientData.companyName || clientData.username}</span>
               <span style={styles.clientCode}>Party: {partyCode}</span>
             </div>
           </div>
@@ -228,9 +362,9 @@ export default function ClientPortal({ client, onLogout }) {
       </header>
 
       {/* ── Main Content Area ── */}
-      <main style={styles.main}>
+      <main className="client-portal-main" style={styles.main}>
         {/* Welcome Banner */}
-        <div style={styles.welcomeCard}>
+        <div className="client-welcome-card" style={styles.welcomeCard}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <div style={styles.welcomeAvatarWrap}>
               {clientData.image ? (
@@ -258,7 +392,7 @@ export default function ClientPortal({ client, onLogout }) {
             </div>
           </div>
 
-          <div style={styles.quickStatsRow}>
+          <div className="client-welcome-stats" style={styles.quickStatsRow}>
             <div style={styles.statBox}>
               <span style={styles.statNumber}>{orders.length}</span>
               <span style={styles.statLabel}>Total Orders</span>
@@ -271,7 +405,7 @@ export default function ClientPortal({ client, onLogout }) {
         </div>
 
         {/* Navigation Tabs */}
-        <div style={styles.tabsContainer}>
+        <div className="client-tabs-bar" style={styles.tabsContainer}>
           <button
             style={activeTab === 'orders' ? styles.tabActive : styles.tab}
             onClick={() => setActiveTab('orders')}
@@ -308,6 +442,7 @@ export default function ClientPortal({ client, onLogout }) {
                   value={searchOrder}
                   onChange={(e) => setSearchOrder(e.target.value)}
                   placeholder="Search order number, design, fabric..."
+                  className="client-search-input"
                   style={styles.searchInput}
                 />
               </div>
@@ -337,7 +472,7 @@ export default function ClientPortal({ client, onLogout }) {
                 </p>
               </div>
             ) : (
-              <div style={styles.ordersGrid}>
+              <div className="client-orders-grid" style={styles.ordersGrid}>
                 {filteredOrders.map((ord) => {
                   const statusColor = getStatusColor(ord.status);
                   return (
@@ -411,6 +546,7 @@ export default function ClientPortal({ client, onLogout }) {
                   value={searchDesign}
                   onChange={(e) => setSearchDesign(e.target.value)}
                   placeholder="Search design name, color, fabric, category..."
+                  className="client-search-input"
                   style={styles.searchInput}
                 />
               </div>
@@ -440,11 +576,12 @@ export default function ClientPortal({ client, onLogout }) {
                 </p>
               </div>
             ) : (
-              <div style={styles.designsGrid}>
+              <div className="client-designs-grid" style={styles.designsGrid}>
                 {filteredDesigns.map((d) => (
                   <div key={d._id || d.id} style={styles.designCard}>
                     {/* Design Image */}
                     <div
+                      className="client-design-img-box"
                       style={styles.designImgBox}
                       onClick={() => d.imageUrl && setZoomImg(d.imageUrl)}
                     >
@@ -457,7 +594,7 @@ export default function ClientPortal({ client, onLogout }) {
                       />
                     </div>
 
-                    <div style={styles.designInfo}>
+                    <div className="client-design-info" style={styles.designInfo}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={styles.designTitle}>{d.designName}</span>
                         {d.category && (
@@ -523,7 +660,7 @@ export default function ClientPortal({ client, onLogout }) {
               )}
 
               {/* Logo / Avatar Upload */}
-              <div style={styles.avatarSection}>
+              <div className="client-avatar-section" style={styles.avatarSection}>
                 <div style={styles.avatarLargeWrap}>
                   {clientData.image ? (
                     <img src={clientData.image} alt="Logo" style={styles.avatarLarge} />
@@ -559,7 +696,7 @@ export default function ClientPortal({ client, onLogout }) {
               </div>
 
               {/* Company Details Read-Only Grid */}
-              <div style={styles.detailsGrid}>
+              <div className="client-details-grid" style={styles.detailsGrid}>
                 <div style={styles.detailItem}>
                   <label style={styles.detailLabel}>Company Name</label>
                   <div style={styles.detailVal}>{clientData.companyName || '—'}</div>
@@ -596,6 +733,7 @@ export default function ClientPortal({ client, onLogout }) {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Enter new password"
+                      className="client-search-input"
                       style={styles.formInput}
                       required
                     />
@@ -608,6 +746,7 @@ export default function ClientPortal({ client, onLogout }) {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Re-enter password"
+                      className="client-search-input"
                       style={styles.formInput}
                       required
                     />
