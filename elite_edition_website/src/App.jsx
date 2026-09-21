@@ -412,6 +412,7 @@ export default function App() {
   // Tab permission validation — ONLY reset activeTab if the tab is truly forbidden
   useEffect(() => {
     if (!isAuthenticated || !currentUser) return;
+    if (api.isClientUser() || currentUser.isClient || currentUser.role === 'Client') return;
 
     const ALL_SYSTEM_TABS = [
       'dashboard', 'workspace', 'communication', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra', 'admin',

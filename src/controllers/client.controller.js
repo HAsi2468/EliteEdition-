@@ -59,7 +59,22 @@ const getClients = async (req, res) => {
 const getClientById = async (req, res) => {
   try {
     const { id } = req.params;
-    const client = await Client.findById(id);
+    const mongoose = require('mongoose');
+    let client = null;
+
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      client = await Client.findById(id);
+    }
+
+    if (!client) {
+      client = await Client.findOne({
+        $or: [
+          { mobile: id },
+          { username: id },
+          { companyName: id }
+        ]
+      });
+    }
 
     if (!client) {
       return res.status(404).json({ success: false, message: 'Client not found' });

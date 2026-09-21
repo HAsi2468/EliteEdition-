@@ -80,8 +80,25 @@ export default function ClientPortal({ client, onLogout }) {
         if (res && res.data) {
           setClientData(prev => ({ ...prev, ...res.data }));
           localStorage.setItem('elite_client_data', JSON.stringify(res.data));
+          localStorage.setItem('elite_user', JSON.stringify({ ...api.getCurrentUser(), ...res.data, role: 'Client', isClient: true }));
         }
-      }).catch(err => console.warn('Could not refresh client data:', err));
+      }).catch((err) => {
+        // If stale ID (404), resolve client using mobile number
+        const fallbackMobile = clientData.mobile || mobile;
+        if (fallbackMobile) {
+          api.getClients({ search: fallbackMobile }).then((cRes) => {
+            const list = cRes?.data || [];
+            if (list.length > 0) {
+              const matched = list.find((c) => c.mobile === fallbackMobile) || list[0];
+              if (matched) {
+                setClientData((prev) => ({ ...prev, ...matched }));
+                localStorage.setItem('elite_client_data', JSON.stringify(matched));
+                localStorage.setItem('elite_user', JSON.stringify({ ...api.getCurrentUser(), ...matched, role: 'Client', isClient: true }));
+              }
+            }
+          }).catch(() => {});
+        }
+      });
     }
   }, []);
 
