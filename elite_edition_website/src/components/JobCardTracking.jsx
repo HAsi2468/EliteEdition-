@@ -52,6 +52,9 @@ export default function JobCardTracking({ onPreview }) {
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
+  const pageSizeRef = useRef(pageSize);
+  pageSizeRef.current = pageSize;
 
   // Sorting
   const [sortBy, setSortBy] = useState('jobNo');
@@ -101,12 +104,15 @@ export default function JobCardTracking({ onPreview }) {
   pageRef.current = page;
   const loadingMoreRef = useRef(false);
 
-  const fetchCards = useCallback(async (isSilent = false, targetPage = 1) => {
+  const fetchCards = useCallback(async (isSilent = false, targetPage = 1, targetPageSize = pageSizeRef.current) => {
     if (isSilent && loadingMoreRef.current) return;
     if (!isSilent && cards.length === 0) setLoading(true);
     setError('');
     try {
-      const effectivePage = isSilent ? 1 : targetPage;
+      const isAll = targetPageSize === 'all' || targetPageSize >= 1000;
+      const numLimit = isAll ? 2000 : Number(targetPageSize || 50);
+      const effectiveLimit = isAll ? 2000 : (isSilent && targetPage > 1 ? targetPage * numLimit : numLimit);
+      const effectivePage = isAll || (isSilent && targetPage > 1) ? 1 : targetPage;
       const res = await api.getJobCards({
         search,
         dateStart,
@@ -115,7 +121,7 @@ export default function JobCardTracking({ onPreview }) {
         fusingStatus: fusingStatusFilter,
         deliveryStatus: deliveryStatusFilter,
         page: effectivePage,
-        limit: 50,
+        limit: effectiveLimit,
         sortBy,
         sortOrder,
         skipStats: isSilent ? 'true' : undefined
@@ -129,13 +135,13 @@ export default function JobCardTracking({ onPreview }) {
             return prev.map(c => freshMap.get(c._id || c.id) || c);
           });
           if (res.total !== undefined) setTotal(res.total);
-          if (res.pages !== undefined) setPages(res.pages);
+          if (res.pages !== undefined) setPages(isAll ? 1 : res.pages);
         } else {
           setCards(res.data);
-          setPages(res.pages || 1);
+          setPages(isAll ? 1 : (res.pages || 1));
           setTotal(res.total || 0);
-          setPage(targetPage);
-          pageRef.current = targetPage;
+          setPage(isAll ? 1 : targetPage);
+          pageRef.current = isAll ? 1 : targetPage;
         }
       }
     } catch (err) {
@@ -146,11 +152,12 @@ export default function JobCardTracking({ onPreview }) {
   }, [search, dateStart, dateEnd, printStatusFilter, fusingStatusFilter, deliveryStatusFilter, sortBy, sortOrder]);
 
   const loadMore = useCallback(async () => {
-    if (loadingMoreRef.current || pageRef.current >= pages) return;
+    if (loadingMoreRef.current || pageRef.current >= pages || pageSizeRef.current === 'all') return;
     loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
       const nextPage = pageRef.current + 1;
+      const currentLimit = Number(pageSizeRef.current || 50);
       const res = await api.getJobCards({
         search,
         dateStart,
@@ -159,17 +166,16 @@ export default function JobCardTracking({ onPreview }) {
         fusingStatus: fusingStatusFilter,
         deliveryStatus: deliveryStatusFilter,
         page: nextPage,
-        limit: 50,
+        limit: currentLimit,
         sortBy,
         sortOrder,
         skipStats: 'true'
       });
       if (res && res.data && res.data.length > 0) {
         setCards(prev => {
-          const map = new Map();
-          prev.forEach(c => map.set(c._id || c.id, c));
-          res.data.forEach(c => map.set(c._id || c.id, c));
-          return Array.from(map.values());
+          const existingIds = new Set(prev.map(c => c._id || c.id));
+          const newItems = res.data.filter(c => !existingIds.has(c._id || c.id));
+          return newItems.length > 0 ? [...prev, ...newItems] : prev;
         });
         setPage(nextPage);
         pageRef.current = nextPage;
@@ -1467,7 +1473,7 @@ export default function JobCardTracking({ onPreview }) {
 
       {/* Infinite Scroll & Pagination */}
       <InfiniteScrollPagination
-        hasMore={page < pages}
+        hasMore={pageSize !== 'all' && page < pages}
         loading={loading && cards.length === 0}
         loadingMore={loadingMore}
         onLoadMore={loadMore}
@@ -1476,13 +1482,51 @@ export default function JobCardTracking({ onPreview }) {
         total={total}
         currentCount={cards.length}
         itemName="tracking cards"
+        pageSize={pageSize}
+        pageSizeOptions={[50, 100, 250, 'All']}
+        onPageSizeChange={(newSize) => {
+          const s = newSize === 'All' ? 'all' : Number(newSize);
+          setPageSize(s);
+          pageSizeRef.current = s;
+          setPage(1);
+          pageRef.current = 1;
+          fetchCards(false, 1, s);
+        }}
+        onLoadAll={() => {
+          setPageSize('all');
+          pageSizeRef.current = 'all';
+          setPage(1);
+          pageRef.current = 1;
+          fetchCards(false, 1, 'all');
+        }}
+        onFirstPage={() => {
+          setPage(1);
+          pageRef.current = 1;
+          fetchCards(false, 1, pageSizeRef.current);
+        }}
+        onLastPage={() => {
+          setPage(pages);
+          pageRef.current = pages;
+          fetchCards(false, pages, pageSizeRef.current);
+        }}
+        onPageChange={(targetPage) => {
+          const p = Math.max(1, Math.min(pages, targetPage));
+          setPage(p);
+          pageRef.current = p;
+          fetchCards(false, p, pageSizeRef.current);
+        }}
         onPrevPage={() => {
           const prevPage = Math.max(1, page - 1);
-          fetchCards(false, prevPage);
+          setPage(prevPage);
+          pageRef.current = prevPage;
+          fetchCards(false, prevPage, pageSizeRef.current);
         }}
         onNextPage={() => {
           if (page < pages) {
-            loadMore();
+            const nextPage = page + 1;
+            setPage(nextPage);
+            pageRef.current = nextPage;
+            fetchCards(false, nextPage, pageSizeRef.current);
           }
         }}
       />

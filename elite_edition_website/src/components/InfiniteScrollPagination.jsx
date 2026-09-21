@@ -49,39 +49,73 @@ export default function InfiniteScrollPagination({
   const cooldownRef = useRef(false);
 
   useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
+    let ticking = false;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (
-          entries[0].isIntersecting &&
-          !loadingMoreRef.current &&
-          !loadingRef.current &&
-          hasMoreRef.current &&
-          !cooldownRef.current
-        ) {
-          cooldownRef.current = true;
-          if (onLoadMoreRef.current) {
-            onLoadMoreRef.current();
-          }
-          setTimeout(() => {
-            cooldownRef.current = false;
-          }, 350);
-        }
-      },
-      {
-        root: scrollContainerRef?.current || null,
-        rootMargin: '150px',
-        threshold: 0.01
+    const checkAutoLoad = () => {
+      if (!hasMoreRef.current || loadingMoreRef.current || loadingRef.current || cooldownRef.current) {
+        return;
       }
-    );
+      const sentinel = sentinelRef.current;
+      if (!sentinel) return;
 
-    observer.observe(sentinel);
-    return () => {
-      observer.disconnect();
+      const rect = sentinel.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+
+      // Trigger automatic infinite scroll when within 600px of viewport bottom
+      if (rect.top <= viewportHeight + 600) {
+        cooldownRef.current = true;
+        if (onLoadMoreRef.current) {
+          onLoadMoreRef.current();
+        }
+        setTimeout(() => {
+          cooldownRef.current = false;
+        }, 350);
+      }
     };
-  }, [scrollContainerRef]);
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          checkAutoLoad();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    // 1. Window scroll & resize listeners for foolproof auto-scrolling
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleScroll, { passive: true });
+
+    // 2. IntersectionObserver with generous 600px margin
+    let observer = null;
+    const sentinel = sentinelRef.current;
+    if (sentinel && window.IntersectionObserver) {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            checkAutoLoad();
+          }
+        },
+        {
+          root: scrollContainerRef?.current || null,
+          rootMargin: '600px',
+          threshold: 0
+        }
+      );
+      observer.observe(sentinel);
+    }
+
+    // Check immediately on load or when new page/items arrive
+    const timer = setTimeout(checkAutoLoad, 150);
+
+    return () => {
+      clearTimeout(timer);
+      if (observer) observer.disconnect();
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [scrollContainerRef, page, currentCount]);
 
   // If no items loaded at all, hide pagination dock
   if (currentCount === 0 && !loading && !loadingMore) return null;
@@ -189,7 +223,7 @@ export default function InfiniteScrollPagination({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',
-                fontSize: '0.85rem',
+                fontSize: '0.82rem',
                 fontWeight: 600,
                 color: '#2563eb',
                 padding: '0.35rem 0.85rem',
@@ -198,42 +232,41 @@ export default function InfiniteScrollPagination({
               }}
             >
               <Loader2 size={16} className="spin" style={{ animation: 'spin 1s linear infinite' }} />
-              <span>Loading more {itemName}...</span>
+              <span>Auto-loading {itemName}...</span>
             </div>
           ) : hasMore ? (
-            <button
+            <div
               onClick={() => onLoadMore && onLoadMore()}
-              type="button"
-              className="btn-secondary"
+              role="button"
+              tabIndex={0}
               style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.45rem',
-                fontSize: '0.82rem',
+                fontSize: '0.8rem',
                 fontWeight: 600,
-                padding: '0.4rem 0.95rem',
+                padding: '0.35rem 0.85rem',
                 borderRadius: '12px',
                 color: '#2563eb',
-                background: 'rgba(37, 99, 235, 0.06)',
-                border: '1px solid rgba(37, 99, 235, 0.2)',
+                background: 'rgba(37, 99, 235, 0.08)',
+                border: '1px dashed rgba(37, 99, 235, 0.35)',
                 cursor: 'pointer',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.15s ease',
+                userSelect: 'none'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = '#2563eb';
                 e.currentTarget.style.color = '#ffffff';
-                e.currentTarget.style.transform = 'translateY(-1px)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(37, 99, 235, 0.06)';
+                e.currentTarget.style.background = 'rgba(37, 99, 235, 0.08)';
                 e.currentTarget.style.color = '#2563eb';
-                e.currentTarget.style.transform = 'translateY(0)';
               }}
-              title="Load next page"
+              title="Auto-loads as you scroll down, or click to load now"
             >
               <ArrowDown size={14} />
-              <span>Load More (Page {page + 1})</span>
-            </button>
+              <span>Auto-scrolling (Page {page + 1})</span>
+            </div>
           ) : total > 0 && currentCount >= total ? (
             <span
               style={{
