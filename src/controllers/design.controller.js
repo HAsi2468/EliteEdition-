@@ -23,29 +23,12 @@ const getAll = async (req, res) => {
         return new RegExp(`^\\s*${escaped}\\s*$`, 'i');
       });
 
-      // Find designs used in this party's job cards
-      let jcDesignNames = [];
-      try {
-        const jcDesigns = await db.JobCard.distinct('designName', {
-          $or: [
-            { party: { $in: partyRegexes } },
-            { partyCode: { $in: partyRegexes } }
-          ]
-        });
-        jcDesignNames = (jcDesigns || []).map(n => String(n || '').trim()).filter(Boolean);
-      } catch (e) {
-        // ignore error if JobCard model fails
-      }
-
-      const partyOr = [
-        { parties: { $in: partyRegexes } },
-        { party: { $in: partyRegexes } }
-      ];
-      if (jcDesignNames.length > 0) {
-        partyOr.push({ designName: { $in: jcDesignNames } });
-      }
-
-      const partyFilter = { $or: partyOr };
+      const partyFilter = {
+        $or: [
+          { parties: { $in: partyRegexes } },
+          { party: { $in: partyRegexes } }
+        ]
+      };
       if (!filter.$and) filter.$and = [];
       filter.$and.push(partyFilter);
     }
