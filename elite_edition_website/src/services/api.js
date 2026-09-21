@@ -2137,6 +2137,13 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ action, rejectionReason })
     });
+  },
+
+  async bulkUpdateSignedDocumentApprovals({ items, action, rejectionReason = '' }) {
+    return request('/signed-documents/bulk-approval', {
+      method: 'PATCH',
+      body: JSON.stringify({ items, action, rejectionReason })
+    });
   }
 };
 

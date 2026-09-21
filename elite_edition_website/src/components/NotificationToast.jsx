@@ -260,6 +260,39 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
 
   const unreadCount = history.filter(h => !h.read).length;
 
+  const [selectedNotifIds, setSelectedNotifIds] = useState([]);
+
+  const toggleSelectNotif = (id, e) => {
+    if (e) e.stopPropagation();
+    setSelectedNotifIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllNotifs = () => {
+    if (selectedNotifIds.length === history.length) {
+      setSelectedNotifIds([]);
+    } else {
+      setSelectedNotifIds(history.map(h => h.id));
+    }
+  };
+
+  const markSelectedRead = () => {
+    if (selectedNotifIds.length === 0) return;
+    const updated = history.map(h => selectedNotifIds.includes(h.id) ? { ...h, read: true } : h);
+    saveNotificationHistory(updated);
+    setHistory(updated);
+    setSelectedNotifIds([]);
+  };
+
+  const deleteSelectedNotifs = () => {
+    if (selectedNotifIds.length === 0) return;
+    const updated = history.filter(h => !selectedNotifIds.includes(h.id));
+    saveNotificationHistory(updated);
+    setHistory(updated);
+    setSelectedNotifIds([]);
+  };
+
   const markAllAsRead = () => {
     const updated = history.map(h => ({ ...h, read: true }));
     saveNotificationHistory(updated);
@@ -269,6 +302,7 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
   const clearHistory = () => {
     saveNotificationHistory([]);
     setHistory([]);
+    setSelectedNotifIds([]);
   };
 
   const markSingleRead = (id) => {
@@ -335,14 +369,45 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
           </div>
         ) : null}
 
-        {/* Toolbar */}
-        <div style={{ padding: '0.65rem 1.25rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.1)' }}>
-          <button onClick={markAllAsRead} disabled={unreadCount === 0} style={{ background: 'none', border: 'none', color: unreadCount > 0 ? 'var(--primary)' : 'var(--text-muted)', fontSize: '0.75rem', cursor: unreadCount > 0 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
-            <CheckCheck size={14} /> Mark all read
-          </button>
-          <button onClick={clearHistory} disabled={history.length === 0} style={{ background: 'none', border: 'none', color: history.length > 0 ? 'var(--danger)' : 'var(--text-muted)', fontSize: '0.75rem', cursor: history.length > 0 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
-            <Trash2 size={14} /> Clear history
-          </button>
+        {/* Toolbar & Multi-Select Action Bar */}
+        <div style={{ padding: '0.65rem 1.25rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: selectedNotifIds.length > 0 ? 'rgba(56,189,248,0.1)' : 'rgba(0,0,0,0.1)', flexWrap: 'wrap', gap: '0.5rem' }}>
+          {history.length > 0 && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.74rem', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 600 }}>
+              <input
+                type="checkbox"
+                checked={history.length > 0 && selectedNotifIds.length === history.length}
+                onChange={handleSelectAllNotifs}
+                style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--primary)' }}
+              />
+              <span>All ({history.length})</span>
+            </label>
+          )}
+
+          {selectedNotifIds.length > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                onClick={markSelectedRead}
+                style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 700 }}
+              >
+                <CheckCheck size={14} /> Read ({selectedNotifIds.length})
+              </button>
+              <button
+                onClick={deleteSelectedNotifs}
+                style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 700 }}
+              >
+                <Trash2 size={14} /> Delete ({selectedNotifIds.length})
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginLeft: 'auto' }}>
+              <button onClick={markAllAsRead} disabled={unreadCount === 0} style={{ background: 'none', border: 'none', color: unreadCount > 0 ? 'var(--primary)' : 'var(--text-muted)', fontSize: '0.75rem', cursor: unreadCount > 0 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
+                <CheckCheck size={14} /> Mark all read
+              </button>
+              <button onClick={clearHistory} disabled={history.length === 0} style={{ background: 'none', border: 'none', color: history.length > 0 ? 'var(--danger)' : 'var(--text-muted)', fontSize: '0.75rem', cursor: history.length > 0 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
+                <Trash2 size={14} /> Clear all
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Notification List */}
@@ -365,6 +430,8 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
                   }
                 };
 
+                const isSelected = selectedNotifIds.includes(item.id);
+
                 return (
                   <div
                     key={item.id}
@@ -378,14 +445,22 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
                     style={{
                       padding: '0.85rem 1rem',
                       borderRadius: '8px',
-                      background: item.read ? 'rgba(255,255,255,0.02)' : 'rgba(56,189,248,0.08)',
-                      border: item.read ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(56,189,248,0.25)',
+                      background: isSelected ? 'rgba(56, 189, 248, 0.15)' : item.read ? 'rgba(255,255,255,0.02)' : 'rgba(56,189,248,0.08)',
+                      border: isSelected ? '1px solid var(--primary)' : item.read ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(56,189,248,0.25)',
                       cursor: item.actionTab ? 'pointer' : 'default',
                       transition: 'all 0.15s ease',
                       position: 'relative'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => toggleSelectNotif(item.id, e)}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--primary)', marginTop: '2px', flexShrink: 0 }}
+                        title="Select notification"
+                      />
                       <div style={{ marginTop: '2px', flexShrink: 0 }}>{getIcon()}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>

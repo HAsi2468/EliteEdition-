@@ -34,6 +34,45 @@ export default function ReturnsManager() {
   // Data state
   const [refinishQueue, setRefinishQueue] = useState([]);
   const [history, setHistory] = useState([]);
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState([]);
+
+  const toggleSelectHistory = (id) => {
+    setSelectedHistoryIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllHistory = () => {
+    if (selectedHistoryIds.length === history.length) {
+      setSelectedHistoryIds([]);
+    } else {
+      setSelectedHistoryIds(history.map(item => item._id));
+    }
+  };
+
+  const handleExportSelectedHistory = () => {
+    const selected = history.filter(item => selectedHistoryIds.includes(item._id));
+    if (selected.length === 0) return;
+    const headers = ['Date', 'AWB/Reference', 'Display Order ID', 'SKU', 'Type', 'Condition', 'Status', 'Notes'];
+    const rows = selected.map(item => [
+      formatDateTimeDDMMYYYY(item.createdAt),
+      item.referenceId,
+      item.displayOrderId || '',
+      item.sku,
+      item.returnType,
+      item.condition,
+      item.status,
+      (item.notes || '').replace(/,/g, ' ')
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Returns_History_${selected.length}_items.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   useEffect(() => {
     const fetchData = () => {
@@ -594,17 +633,34 @@ export default function ReturnsManager() {
 
   const renderHistory = () => (
     <div className="glass-panel" style={{ padding: '1.5rem' }}>
-      <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
           <h3 style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--text-primary)' }}>Returns History & Claims</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Master ledger of all returns. Use this to file SPF claims for Disputed items.</p>
         </div>
+        {selectedHistoryIds.length > 0 && (
+          <button
+            onClick={handleExportSelectedHistory}
+            className="btn-primary"
+            style={{ padding: '0.45rem 0.85rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+          >
+            <Download size={14} /> Export Selected ({selectedHistoryIds.length})
+          </button>
+        )}
       </div>
 
       <div className="table-container">
         <table>
           <thead>
             <tr>
+              <th style={{ width: '38px', textAlign: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={history.length > 0 && selectedHistoryIds.length === history.length}
+                  onChange={handleSelectAllHistory}
+                  style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--primary)' }}
+                />
+              </th>
               <th>Date</th>
               <th>AWB / Reference</th>
               <th>Display Order ID</th>
@@ -617,11 +673,21 @@ export default function ReturnsManager() {
           </thead>
           <tbody>
             {history.length === 0 ? (
-              <tr><td colSpan="8" className="text-center" style={{ padding: '2rem', color: 'var(--text-muted)' }}>No returns history found.</td></tr>
+              <tr><td colSpan="9" className="text-center" style={{ padding: '2rem', color: 'var(--text-muted)' }}>No returns history found.</td></tr>
             ) : (
-              history.map(item => (
-                <tr key={item._id}>
-                  <td>{formatDateTimeDDMMYYYY(item.createdAt)}</td>
+              history.map(item => {
+                const isSelected = selectedHistoryIds.includes(item._id);
+                return (
+                  <tr key={item._id} style={{ background: isSelected ? 'rgba(56,189,248,0.08)' : 'transparent' }}>
+                    <td style={{ textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectHistory(item._id)}
+                        style={{ cursor: 'pointer', width: '15px', height: '15px', accentColor: 'var(--primary)' }}
+                      />
+                    </td>
+                    <td>{formatDateTimeDDMMYYYY(item.createdAt)}</td>
                   <td style={{ fontWeight: 'bold' }}>{item.referenceId}</td>
                   <td style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{item.displayOrderId || '-'}</td>
                   <td>{item.sku}</td>
@@ -644,8 +710,9 @@ export default function ReturnsManager() {
                     {item.notes || '-'}
                   </td>
                 </tr>
-              ))
-            )}
+              );
+            })
+          )}
           </tbody>
         </table>
       </div>
