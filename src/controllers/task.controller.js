@@ -132,6 +132,12 @@ const createTask = async (req, res) => {
 
     const creatorId = req.user ? req.user._id : (customCreatedBy || null);
 
+    // If no staff members were selected, automatically assign to creator (themselves)
+    let finalAssignees = Array.isArray(assignees) ? assignees.filter(Boolean) : [];
+    if (finalAssignees.length === 0 && creatorId) {
+      finalAssignees = [creatorId];
+    }
+
     const initialAudit = [{
       user: creatorId,
       userName: createdByName,
@@ -151,7 +157,7 @@ const createTask = async (req, res) => {
       clientName: clientName.trim(),
       dueDate: dueDate ? new Date(dueDate) : null,
       estimatedHours: Number(estimatedHours) || 0,
-      assignees,
+      assignees: finalAssignees,
       dependencies,
       checklist,
       tags,

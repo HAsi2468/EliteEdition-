@@ -372,7 +372,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         clientName: newClientName.trim(),
         dueDate: newDueDate || undefined,
         estimatedHours: parseFloat(newEstHours) || 0,
-        assignees: selectedAssigneeIds,
+        assignees: selectedAssigneeIds && selectedAssigneeIds.length > 0 ? selectedAssigneeIds : (myId ? [myId] : []),
         createdBy: myId,
         createdByName: myName,
         recurrence: isRecurring ? { isRecurring: true, frequency: recurrenceFreq } : { isRecurring: false }
@@ -2075,10 +2075,25 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
               {/* Assigned To Staff Selection Checkboxes */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    Assigned To Staff Members ({selectedAssigneeIds.length} selected)
-                  </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      Assigned To Staff Members
+                    </label>
+                    <span
+                      style={{
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        padding: '1px 7px',
+                        borderRadius: '10px',
+                        background: selectedAssigneeIds.length > 0 ? '#eff6ff' : '#f0fdf4',
+                        color: selectedAssigneeIds.length > 0 ? '#2563eb' : '#16a34a',
+                        border: `1px solid ${selectedAssigneeIds.length > 0 ? '#bfdbfe' : '#bbf7d0'}`
+                      }}
+                    >
+                      {selectedAssigneeIds.length > 0 ? `${selectedAssigneeIds.length} selected` : `Auto-assigned to self (${myName})`}
+                    </span>
+                  </div>
                   <div style={{ display: 'flex', gap: '0.4rem' }}>
                     <button type="button" onClick={handleSelectAllStaff} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}>
                       Select All
@@ -2089,6 +2104,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                     </button>
                   </div>
                 </div>
+                {selectedAssigneeIds.length === 0 && (
+                  <p style={{ margin: '2px 0 6px', fontSize: '0.72rem', color: '#16a34a', fontWeight: 600 }}>
+                    💡 No staff selected — this task will automatically be assigned to you ({myName}).
+                  </p>
+                )}
 
                 <div style={{ position: 'relative', marginBottom: '0.4rem' }}>
                   <Search size={12} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
