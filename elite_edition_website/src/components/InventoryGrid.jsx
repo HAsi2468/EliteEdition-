@@ -124,6 +124,8 @@ export default function InventoryGrid({
   const [editingChallan, setEditingChallan] = useState(null);
   const [editChallanNo, setEditChallanNo] = useState('');
   const [editParty, setEditParty] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editItems, setEditItems] = useState([]);
   const [isUpdatingChallan, setIsUpdatingChallan] = useState(false);
 
   // --- Sub-Screen 3: Outward Stock State ---
@@ -697,37 +699,98 @@ export default function InventoryGrid({
     printWindow.document.close();
   };
 
-  // Edit Challan Handler
+  // Edit Inward Challan / Stock Form Handler
   const handleEditChallan = (challan) => {
     if (!challan) return;
-    if (challan.items && challan.items.length === 1) {
-      onEdit(challan.items[0]);
+    setEditChallanNo(challan.challanNo || challan.displayChallanNo || '');
+    setEditParty(challan.party || '');
+
+    // Extract date from first item or challan date
+    const firstItem = (challan.items && challan.items[0]) || {};
+    const rawDate = firstItem.inwardDate || firstItem.createdAt || challan.date;
+    if (rawDate) {
+      try {
+        const d = new Date(rawDate);
+        if (!isNaN(d.getTime())) {
+          setEditDate(d.toISOString().slice(0, 10));
+        } else {
+          setEditDate('');
+        }
+      } catch {
+        setEditDate('');
+      }
     } else {
-      setEditChallanNo(challan.challanNo || challan.displayChallanNo || '');
-      setEditParty(challan.party || '');
-      setEditingChallan(challan);
+      setEditDate('');
+    }
+
+    setEditItems(
+      (challan.items || []).map(item => ({
+        _id: item._id || item.id,
+        skuCode: item.skuCode || item.sku || '',
+        itemName: item.itemName || item.description || item.name || '',
+        imageUrl: item.imageUrl || '',
+        size: item.size || '',
+        sizes: Array.isArray(item.sizes) ? JSON.parse(JSON.stringify(item.sizes)) : [],
+        qty: Number(item.qty ?? item.total ?? item.currentlyAvailableStock ?? 0),
+        purchasePrice: Number(item.purchasePrice ?? item.basePrice ?? 0),
+        salePrice: Number(item.salePrice ?? item.price ?? 0),
+      }))
+    );
+    setEditingChallan(challan);
+  };
+
+  const handleEditItemField = (idx, field, value) => {
+    setEditItems(prev => {
+      const next = [...prev];
+      if (field === 'qty') {
+        next[idx] = { ...next[idx], qty: Math.max(0, parseInt(value, 10) || 0) };
+      } else if (field === 'purchasePrice' || field === 'salePrice') {
+        next[idx] = { ...next[idx], [field]: Math.max(0, parseFloat(value) || 0) };
+      } else {
+        next[idx] = { ...next[idx], [field]: value };
+      }
+      return next;
+    });
+  };
+
+  const handleRemoveEditItem = (idx) => {
+    if (editItems.length <= 1) {
+      alert('An inward challan must contain at least one item.');
+      return;
+    }
+    if (window.confirm('Remove this SKU row from this inward challan?')) {
+      setEditItems(prev => prev.filter((_, i) => i !== idx));
     }
   };
 
-  // Save Challan Metadata (Challan No & Party updates across all items in that batch)
+  // Save Inward Form (Updates Challan No, Party, Inward Date, and all items' Qty, Rate, Size)
   const handleSaveChallanMeta = async () => {
-    if (!editingChallan || !editingChallan.items || !editingChallan.items.length) return;
+    if (!editingChallan || !editItems || !editItems.length) return;
     try {
       setIsUpdatingChallan(true);
       await Promise.all(
-        editingChallan.items.map(item => {
-          const itemId = item._id || item.id;
+        editItems.map(item => {
+          const itemId = item._id;
           if (!itemId) return Promise.resolve();
-          return api.updateInventory(itemId, {
+          const payload = {
             challanNo: (editChallanNo || '').trim(),
-            party: (editParty || '').trim()
-          });
+            party: (editParty || '').trim(),
+            qty: Number(item.qty) || 0,
+            currentlyAvailableStock: Number(item.qty) || 0,
+            purchasePrice: Number(item.purchasePrice) || 0,
+            salePrice: Number(item.salePrice) || 0,
+            size: (item.size || '').trim()
+          };
+          if (editDate) {
+            payload.inwardDate = new Date(editDate);
+          }
+          return api.updateInventory(itemId, payload);
         })
       );
       setEditingChallan(null);
       await fetchInwardData();
     } catch (err) {
-      alert('Failed to update Challan details: ' + (err.message || err));
+      alert('Failed to update Inward details: ' + (err.message || err));
     } finally {
       setIsUpdatingChallan(false);
     }
@@ -1956,9 +2019,9 @@ export default function InventoryGrid({
                                                   </button>
                                                   <button
                                                     type="button"
-                                                    onClick={() => onEdit(subItem)}
-                                                    style={{ border: 'none', background: '#f0fdf4', color: '#16a34a', padding: '3px 6px', borderRadius: '4px', cursor: 'pointer' }}
-                                                    title="Edit item"
+                                                    onClick={() => handleEditChallan(ch)}
+                                                    style={{ border: 'none', background: '#fef3c7', color: '#b45309', padding: '3px 6px', borderRadius: '4px', cursor: 'pointer' }}
+                                                    title="Edit Inward Challan / Stock"
                                                   >
                                                     <Edit2 size={12} />
                                                   </button>
@@ -2861,7 +2924,7 @@ export default function InventoryGrid({
         </div>
       )}
 
-      {/* Edit Challan Modal */}
+      {/* Edit Inward Challan / Stock Form Modal */}
       {editingChallan && (
         <div style={{
           position: 'fixed',
@@ -2870,7 +2933,7 @@ export default function InventoryGrid({
           right: 0,
           bottom: 0,
           background: 'rgba(15, 23, 42, 0.65)',
-          backdropFilter: 'blur(4px)',
+          backdropFilter: 'blur(5px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -2881,7 +2944,7 @@ export default function InventoryGrid({
             background: '#ffffff',
             borderRadius: '16px',
             width: '100%',
-            maxWidth: '920px',
+            maxWidth: '960px',
             maxHeight: '90vh',
             display: 'flex',
             flexDirection: 'column',
@@ -2891,22 +2954,35 @@ export default function InventoryGrid({
           }}>
             {/* Modal Header */}
             <div style={{
-              padding: '1rem 1.5rem',
-              background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+              padding: '1.1rem 1.5rem',
+              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between'
             }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <span style={{ fontSize: '1.2rem', fontWeight: 800 }}>Edit Inward Challan</span>
-                  <span style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600 }}>
-                    {editingChallan.displayChallanNo}
-                  </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Package size={20} color="#ffffff" />
                 </div>
-                <div style={{ fontSize: '0.78rem', color: '#e0f2fe', marginTop: '2px' }}>
-                  Update Challan / Vendor metadata or modify individual SKU entries below
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800 }}>Edit Inward Form</span>
+                    <span style={{ background: 'rgba(255,255,255,0.25)', padding: '2px 9px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.3px' }}>
+                      {editingChallan.displayChallanNo}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#e0f2fe', marginTop: '2px' }}>
+                    Modify inward challan details, supplier, date, quantities, and purchase rates
+                  </div>
                 </div>
               </div>
               <button
@@ -2917,180 +2993,309 @@ export default function InventoryGrid({
                   border: 'none',
                   borderRadius: '8px',
                   color: '#ffffff',
-                  width: '32px',
-                  height: '32px',
+                  width: '34px',
+                  height: '34px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  transition: 'background 0.15s ease'
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Quick Metadata Form */}
+            {/* Challan Header Fields (Challan No, Vendor, Date) */}
             <div style={{
-              padding: '1rem 1.5rem',
+              padding: '1.1rem 1.5rem',
               background: '#f8fafc',
               borderBottom: '1px solid #e2e8f0',
-              display: 'flex',
-              alignItems: 'flex-end',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
               gap: '1rem',
-              flexWrap: 'wrap'
+              alignItems: 'flex-end'
             }}>
-              <div style={{ flex: 1, minWidth: '180px' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#475569', marginBottom: '4px', textTransform: 'uppercase' }}>
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, color: '#334155', marginBottom: '5px', textTransform: 'uppercase' }}>
+                  <FileText size={13} color="#0284c7" />
                   Challan / Ref No
                 </label>
                 <input
                   type="text"
                   value={editChallanNo}
                   onChange={(e) => setEditChallanNo(e.target.value)}
-                  placeholder="e.g. CH-1029 or INW-01"
+                  placeholder="e.g. CH-2109-01 or INW-102"
                   style={{
                     width: '100%',
-                    padding: '0.5rem 0.75rem',
+                    padding: '0.55rem 0.8rem',
                     borderRadius: '8px',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
                     color: '#0f172a',
+                    background: '#ffffff',
                     outline: 'none',
                     boxSizing: 'border-box'
                   }}
+                  onFocus={(e) => e.target.style.borderColor = '#0284c7'}
+                  onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
                 />
               </div>
 
-              <div style={{ flex: 1, minWidth: '180px' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#475569', marginBottom: '4px', textTransform: 'uppercase' }}>
-                  Vendor / Supplier
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, color: '#334155', marginBottom: '5px', textTransform: 'uppercase' }}>
+                  <Building2 size={13} color="#0284c7" />
+                  Vendor / Supplier Party
                 </label>
                 <input
                   type="text"
+                  list="inwardVendorList"
                   value={editParty}
                   onChange={(e) => setEditParty(e.target.value)}
                   placeholder="e.g. pramukh park"
                   style={{
                     width: '100%',
-                    padding: '0.5rem 0.75rem',
+                    padding: '0.55rem 0.8rem',
                     borderRadius: '8px',
                     border: '1px solid #cbd5e1',
-                    fontSize: '0.82rem',
-                    fontWeight: 600,
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
                     color: '#0f172a',
+                    background: '#ffffff',
                     outline: 'none',
                     boxSizing: 'border-box'
                   }}
+                  onFocus={(e) => e.target.style.borderColor = '#0284c7'}
+                  onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
+                />
+                <datalist id="inwardVendorList">
+                  {sortedVendors.map((v, i) => (
+                    <option key={i} value={v} />
+                  ))}
+                </datalist>
+              </div>
+
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 800, color: '#334155', marginBottom: '5px', textTransform: 'uppercase' }}>
+                  <Calendar size={13} color="#0284c7" />
+                  Inward Date
+                </label>
+                <input
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.55rem 0.8rem',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    color: '#0f172a',
+                    background: '#ffffff',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#0284c7'}
+                  onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
                 />
               </div>
-
-              <button
-                type="button"
-                onClick={handleSaveChallanMeta}
-                disabled={isUpdatingChallan}
-                style={{
-                  padding: '0.52rem 1.1rem',
-                  background: '#0284c7',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: 700,
-                  fontSize: '0.82rem',
-                  cursor: isUpdatingChallan ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-                  flexShrink: 0
-                }}
-              >
-                <Sparkles size={14} />
-                <span>{isUpdatingChallan ? 'Saving...' : 'Save Challan Info'}</span>
-              </button>
             </div>
 
-            {/* Items Table with Direct Edit Buttons */}
-            <div style={{ padding: '1rem 1.5rem', overflowY: 'auto', flex: 1 }}>
-              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0369a1', marginBottom: '0.65rem' }}>
-                Challan Items ({editingChallan.items.length} Products Logged) — Click "Edit" to modify quantities, rates, or sizes:
+            {/* Quick Challan Summary Metrics */}
+            <div style={{
+              padding: '0.65rem 1.5rem',
+              background: '#eff6ff',
+              borderBottom: '1px solid #dbeafe',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.75rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                <div style={{ fontSize: '0.78rem', color: '#1e40af' }}>
+                  Total Items: <strong style={{ color: '#0369a1', fontSize: '0.85rem' }}>{editItems.length} SKUs</strong>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#1e40af' }}>
+                  Total Inward Quantity: <strong style={{ color: '#047857', fontSize: '0.85rem' }}>
+                    +{editItems.reduce((sum, it) => sum + (Number(it.qty) || 0), 0)} Pcs
+                  </strong>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#1e40af' }}>
+                  Challan Value: <strong style={{ color: '#0f172a', fontSize: '0.85rem' }}>
+                    ₹{editItems.reduce((sum, it) => sum + ((Number(it.qty) || 0) * (Number(it.purchasePrice) || 0)), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </strong>
+                </div>
               </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+              <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                * Directly edit Inward Qty or Buy Price in rows below
+              </div>
+            </div>
+
+            {/* Editable Inward Items Table */}
+            <div style={{ padding: '1rem 1.5rem', overflowY: 'auto', flex: 1 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                 <thead>
-                  <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1', color: '#475569' }}>
-                    <th style={{ padding: '0.55rem 0.65rem', textAlign: 'left', fontWeight: 800, width: '30px' }}>#</th>
-                    <th style={{ padding: '0.55rem 0.65rem', textAlign: 'left', fontWeight: 800, width: '40px' }}>PHOTO</th>
-                    <th style={{ padding: '0.55rem 0.65rem', textAlign: 'left', fontWeight: 800 }}>SKU CODE</th>
-                    <th style={{ padding: '0.55rem 0.65rem', textAlign: 'left', fontWeight: 800 }}>PRODUCT NAME</th>
-                    <th style={{ padding: '0.55rem 0.65rem', textAlign: 'center', fontWeight: 800 }}>SIZES</th>
-                    <th style={{ padding: '0.55rem 0.65rem', textAlign: 'center', fontWeight: 800 }}>QTY</th>
-                    <th style={{ padding: '0.55rem 0.65rem', textAlign: 'right', fontWeight: 800 }}>BUY PRICE</th>
-                    <th style={{ padding: '0.55rem 0.65rem', textAlign: 'center', fontWeight: 800, width: '80px' }}>ACTION</th>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
+                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'left', fontWeight: 800, width: '30px' }}>#</th>
+                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'left', fontWeight: 800, width: '45px' }}>PHOTO</th>
+                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'left', fontWeight: 800 }}>SKU CODE & PRODUCT</th>
+                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'center', fontWeight: 800, width: '90px' }}>SIZE</th>
+                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'center', fontWeight: 800, width: '130px' }}>INWARD QTY</th>
+                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'center', fontWeight: 800, width: '130px' }}>BUY PRICE (₹)</th>
+                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'right', fontWeight: 800, width: '110px' }}>TOTAL (₹)</th>
+                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'center', fontWeight: 800, width: '50px' }}>ACTION</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {editingChallan.items.map((item, idx) => {
-                    const itemQty = Number(item.qty || item.total || item.currentlyAvailableStock || 0);
+                  {editItems.map((item, idx) => {
+                    const itemQty = Number(item.qty || 0);
                     const buyPrice = Number(item.purchasePrice || 0);
+                    const lineTotal = itemQty * buyPrice;
 
                     return (
-                      <tr key={item._id || item.id || idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                        <td style={{ padding: '0.55rem 0.65rem', color: '#64748b' }}>{idx + 1}</td>
-                        <td style={{ padding: '0.55rem 0.65rem' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '6px', overflow: 'hidden', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <tr key={item._id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.65rem 0.65rem', color: '#64748b', fontWeight: 600 }}>{idx + 1}</td>
+                        <td style={{ padding: '0.65rem 0.65rem' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '7px', overflow: 'hidden', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             {item.imageUrl ? (
-                              <img src={item.imageUrl} alt={item.sku} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <img src={convertDriveUrl(item.imageUrl)} alt={item.skuCode} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
-                              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8' }}>{item.itemName ? item.itemName[0] : 'E'}</span>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0284c7' }}>{item.itemName ? item.itemName[0] : 'E'}</span>
                             )}
                           </div>
                         </td>
-                        <td style={{ padding: '0.55rem 0.65rem', fontWeight: 700, color: '#0369a1' }}>{item.skuCode || item.sku || '-'}</td>
-                        <td style={{ padding: '0.55rem 0.65rem', fontWeight: 600, color: '#0f172a' }}>{item.itemName || '-'}</td>
-                        <td style={{ padding: '0.55rem 0.65rem', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                            {item.sizes && item.sizes.length > 0 ? (
-                              item.sizes.map((s, sIdx) => (
-                                <span key={sIdx} style={{ background: '#e0f2fe', color: '#0369a1', padding: '1px 5px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
-                                  {s.size}: {s.qty}
-                                </span>
-                              ))
-                            ) : (
-                              <span style={{ color: '#64748b', fontSize: '0.7rem' }}>{item.size || '-'}</span>
-                            )}
+                        <td style={{ padding: '0.65rem 0.65rem' }}>
+                          <div style={{ fontWeight: 800, color: '#0369a1', fontSize: '0.82rem' }}>{item.skuCode || '-'}</div>
+                          <div style={{ fontSize: '0.74rem', color: '#475569', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '240px' }}>
+                            {item.itemName || '-'}
                           </div>
                         </td>
-                        <td style={{ padding: '0.55rem 0.65rem', textAlign: 'center' }}>
-                          <span style={{ background: '#ecfdf5', color: '#047857', padding: '2px 7px', borderRadius: '5px', fontWeight: 800, fontSize: '0.74rem' }}>
-                            +{itemQty} Pcs
-                          </span>
+                        <td style={{ padding: '0.65rem 0.65rem', textAlign: 'center' }}>
+                          <input
+                            type="text"
+                            value={item.size || ''}
+                            onChange={(e) => handleEditItemField(idx, 'size', e.target.value)}
+                            placeholder="Size"
+                            style={{
+                              width: '70px',
+                              padding: '0.35rem 0.45rem',
+                              borderRadius: '6px',
+                              border: '1px solid #cbd5e1',
+                              textAlign: 'center',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              color: '#0f172a'
+                            }}
+                          />
                         </td>
-                        <td style={{ padding: '0.55rem 0.65rem', textAlign: 'right', fontWeight: 600, color: '#475569' }}>
-                          ₹{buyPrice.toFixed(2)}
+                        <td style={{ padding: '0.65rem 0.65rem', textAlign: 'center' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleEditItemField(idx, 'qty', Math.max(0, itemQty - 1))}
+                              style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '4px',
+                                border: '1px solid #cbd5e1',
+                                background: '#ffffff',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#475569'
+                              }}
+                            >
+                              <Minus size={12} />
+                            </button>
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.qty}
+                              onChange={(e) => handleEditItemField(idx, 'qty', e.target.value)}
+                              style={{
+                                width: '56px',
+                                padding: '0.35rem 0.4rem',
+                                borderRadius: '6px',
+                                border: '1px solid #93c5fd',
+                                background: '#f0f9ff',
+                                textAlign: 'center',
+                                fontSize: '0.82rem',
+                                fontWeight: 800,
+                                color: '#0369a1',
+                                outline: 'none'
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleEditItemField(idx, 'qty', itemQty + 1)}
+                              style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '4px',
+                                border: '1px solid #cbd5e1',
+                                background: '#ffffff',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#475569'
+                              }}
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
                         </td>
-                        <td style={{ padding: '0.55rem 0.65rem', textAlign: 'center' }}>
+                        <td style={{ padding: '0.65rem 0.65rem', textAlign: 'center' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>₹</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={item.purchasePrice}
+                              onChange={(e) => handleEditItemField(idx, 'purchasePrice', e.target.value)}
+                              style={{
+                                width: '74px',
+                                padding: '0.35rem 0.45rem',
+                                borderRadius: '6px',
+                                border: '1px solid #cbd5e1',
+                                textAlign: 'right',
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
+                                color: '#0f172a',
+                                outline: 'none'
+                              }}
+                            />
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.65rem 0.65rem', textAlign: 'right', fontWeight: 800, color: '#0284c7' }}>
+                          ₹{lineTotal.toFixed(2)}
+                        </td>
+                        <td style={{ padding: '0.65rem 0.65rem', textAlign: 'center' }}>
                           <button
                             type="button"
-                            onClick={() => {
-                              onEdit(item);
-                            }}
+                            onClick={() => handleRemoveEditItem(idx)}
                             style={{
-                              padding: '0.35rem 0.65rem',
-                              background: '#fef3c7',
-                              border: '1px solid #fde68a',
-                              color: '#b45309',
+                              border: 'none',
+                              background: '#fee2e2',
+                              color: '#dc2626',
+                              width: '26px',
+                              height: '26px',
                               borderRadius: '6px',
-                              fontWeight: 700,
-                              fontSize: '0.72rem',
                               cursor: 'pointer',
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '0.25rem'
+                              justifyContent: 'center'
                             }}
-                            title="Edit this SKU entry"
+                            title="Remove SKU from Challan"
                           >
-                            <Edit2 size={12} />
-                            <span>Edit</span>
+                            <Trash2 size={13} />
                           </button>
                         </td>
                       </tr>
@@ -3102,27 +3307,55 @@ export default function InventoryGrid({
 
             {/* Modal Footer */}
             <div style={{
-              padding: '0.85rem 1.5rem',
+              padding: '1rem 1.5rem',
               borderTop: '1px solid #e2e8f0',
               background: '#f8fafc',
               display: 'flex',
-              justifyContent: 'flex-end'
+              alignItems: 'center',
+              justifyContent: 'space-between'
             }}>
               <button
                 type="button"
                 onClick={() => setEditingChallan(null)}
                 style={{
-                  padding: '0.5rem 1.2rem',
-                  background: '#64748b',
-                  color: '#ffffff',
-                  border: 'none',
+                  padding: '0.55rem 1.25rem',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px solid #cbd5e1',
                   borderRadius: '8px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  fontSize: '0.82rem'
+                  fontSize: '0.82rem',
+                  transition: 'background 0.15s ease'
                 }}
               >
-                Close
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveChallanMeta}
+                disabled={isUpdatingChallan}
+                style={{
+                  padding: '0.6rem 1.6rem',
+                  background: '#0284c7',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 800,
+                  fontSize: '0.84rem',
+                  cursor: isUpdatingChallan ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.28)',
+                  transition: 'background 0.15s ease'
+                }}
+                onMouseEnter={(e) => { if (!isUpdatingChallan) e.currentTarget.style.background = '#0369a1'; }}
+                onMouseLeave={(e) => { if (!isUpdatingChallan) e.currentTarget.style.background = '#0284c7'; }}
+              >
+                <Sparkles size={16} />
+                <span>{isUpdatingChallan ? 'Saving Changes...' : 'Save Inward Details'}</span>
               </button>
             </div>
           </div>

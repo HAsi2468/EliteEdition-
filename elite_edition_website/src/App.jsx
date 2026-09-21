@@ -998,7 +998,7 @@ export default function App() {
   const triggerEditModal = (item) => {
     savedModalScrollRef.current = window.scrollY || document.documentElement.scrollTop || 0;
     const titleOrDescription = item.description || item.itemName || item.name || item.title || item.productName || item.skuCode || '';
-    const isCatalog = activeTab === 'catalog' || catalogItems.some(c => c._id === item._id) || 'basePrice' in item;
+    const isCatalog = activeTab === 'catalog';
     setFormMode(isCatalog ? 'catalog' : 'inventory');
     if (isCatalog) {
       const adapted = {
