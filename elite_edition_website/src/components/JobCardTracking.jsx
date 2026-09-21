@@ -94,10 +94,11 @@ export default function JobCardTracking({ onPreview }) {
   const loadingMoreRef = useRef(false);
 
   const fetchCards = useCallback(async (isSilent = false, targetPage = 1) => {
+    if (isSilent && loadingMoreRef.current) return;
     if (!isSilent && cards.length === 0) setLoading(true);
     setError('');
     try {
-      const effectivePage = targetPage;
+      const effectivePage = isSilent ? 1 : targetPage;
       const res = await api.getJobCards({
         search,
         dateStart,
@@ -108,19 +109,31 @@ export default function JobCardTracking({ onPreview }) {
         page: effectivePage,
         limit: 50,
         sortBy,
-        sortOrder
+        sortOrder,
+        skipStats: isSilent ? 'true' : undefined
       });
       if (res && res.data) {
-        setCards(res.data);
-        setPages(res.pages || 1);
-        setTotal(res.total || 0);
-        setPage(targetPage);
-        pageRef.current = targetPage;
+        if (isSilent) {
+          // Merge incoming fresh data into existing cards state without shrinking or resetting scroll
+          setCards(prev => {
+            const freshMap = new Map();
+            res.data.forEach(c => freshMap.set(c._id || c.id, c));
+            return prev.map(c => freshMap.get(c._id || c.id) || c);
+          });
+          if (res.total !== undefined) setTotal(res.total);
+          if (res.pages !== undefined) setPages(res.pages);
+        } else {
+          setCards(res.data);
+          setPages(res.pages || 1);
+          setTotal(res.total || 0);
+          setPage(targetPage);
+          pageRef.current = targetPage;
+        }
       }
     } catch (err) {
       if (!isSilent) setError(err.message || 'Failed to load tracking data.');
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [search, dateStart, dateEnd, printStatusFilter, fusingStatusFilter, deliveryStatusFilter, sortBy, sortOrder]);
 
@@ -140,7 +153,8 @@ export default function JobCardTracking({ onPreview }) {
         page: nextPage,
         limit: 50,
         sortBy,
-        sortOrder
+        sortOrder,
+        skipStats: 'true'
       });
       if (res && res.data && res.data.length > 0) {
         setCards(prev => {
@@ -164,8 +178,8 @@ export default function JobCardTracking({ onPreview }) {
 
   useEffect(() => {
     fetchCards(false, 1);
-    const interval = setInterval(() => fetchCards(true, pageRef.current), 10000);
-    const handleDataRefresh = () => fetchCards(true, pageRef.current);
+    const interval = setInterval(() => fetchCards(true, 1), 30000);
+    const handleDataRefresh = () => fetchCards(true, 1);
     window.addEventListener('elite-data-refresh', handleDataRefresh);
     return () => {
       clearInterval(interval);
@@ -852,6 +866,55 @@ export default function JobCardTracking({ onPreview }) {
                               </span>
                             )}
                           </div>
+                        ) : getValue(c, 'billNo') ? (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <span
+                              style={{
+                                background: 'rgba(56, 189, 248, 0.12)',
+                                border: '1px solid rgba(56, 189, 248, 0.35)',
+                                color: '#38bdf8',
+                                borderRadius: '4px',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                padding: '2px 6px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                whiteSpace: 'nowrap'
+                              }}
+                              title="Auto-synced Bill No"
+                            >
+                              📄 {getValue(c, 'billNo')}
+                            </span>
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                title="Edit Bill No"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const currentVal = getValue(c, 'billNo');
+                                  const newVal = prompt('Edit Bill No for this job card:', currentVal);
+                                  if (newVal !== null && newVal !== currentVal) {
+                                    handleCellChange(c._id, 'billNo', newVal);
+                                    handleAutoSave(c._id, 'billNo', newVal);
+                                  }
+                                }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'var(--text-muted)',
+                                  cursor: 'pointer',
+                                  padding: '1px 3px',
+                                  fontSize: '0.72rem',
+                                  opacity: 0.7
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                                onMouseLeave={e => e.currentTarget.style.opacity = '0.7'}
+                              >
+                                ✏️
+                              </button>
+                            )}
+                          </div>
                         ) : isAdmin ? (
                           <input
                             type="text"
@@ -861,25 +924,10 @@ export default function JobCardTracking({ onPreview }) {
                             onKeyDown={e => e.key === 'Enter' && e.target.blur()}
                             placeholder="Bill No"
                             title="Auto-synced from Billing Invoice. (Admin can edit)"
-                            style={{ ...inputStyle, width: '100px', fontWeight: 700, color: getValue(c, 'billNo') ? '#38bdf8' : 'inherit' }}
+                            style={{ ...inputStyle, width: '100px', fontWeight: 700 }}
                           />
                         ) : (
-                          <span
-                            title="Auto-synced from Billing Invoice"
-                            style={{
-                              display: 'inline-block',
-                              fontSize: '0.78rem',
-                              fontWeight: 700,
-                              color: getValue(c, 'billNo') ? '#38bdf8' : 'var(--text-muted)',
-                              background: getValue(c, 'billNo') ? 'rgba(56, 189, 248, 0.1)' : 'transparent',
-                              padding: getValue(c, 'billNo') ? '2px 6px' : 0,
-                              borderRadius: '4px',
-                              border: getValue(c, 'billNo') ? '1px solid rgba(56, 189, 248, 0.25)' : 'none',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            {getValue(c, 'billNo') || '—'}
-                          </span>
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
                         )}
                       </td>
 

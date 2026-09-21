@@ -280,58 +280,68 @@ const getAllJobCards = async (req, res) => {
       filter.$and = andClauses;
     }
 
-    const meterExpr = {
-      $convert: {
-        input: '$totalMtr',
-        to: 'double',
-        onError: 0,
-        onNull: 0
-      }
-    };
+    let total = 0;
+    let totalMtr = 0;
+    let statusCounts = {};
 
-    const statsFacet = await db.JobCard.aggregate([
-      {
-        $facet: {
-          current: [
-            { $match: filter },
-            { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
-          ],
-          all: [
-            { $match: baseFilter },
-            { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
-          ],
-          pending: [
-            { $match: { ...baseFilter, status: 'Pending' } },
-            { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
-          ],
-          printing: [
-            { $match: { ...baseFilter, printStatus: { $ne: 'Printing Done' } } },
-            { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
-          ],
-          fusing: [
-            { $match: { ...baseFilter, printStatus: 'Printing Done', fusingStatus: { $ne: 'Fusing Done' } } },
-            { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
-          ],
-          delivery: [
-            { $match: { ...baseFilter, fusingStatus: 'Fusing Done' } },
-            { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
-          ]
+    const shouldSkipStats = req.query.skipStats === 'true' || Number(page) > 1;
+
+    if (shouldSkipStats) {
+      total = await db.JobCard.countDocuments(filter);
+    } else {
+      const meterExpr = {
+        $convert: {
+          input: '$totalMtr',
+          to: 'double',
+          onError: 0,
+          onNull: 0
         }
-      }
-    ]);
+      };
 
-    const facetData = statsFacet && statsFacet[0] ? statsFacet[0] : {};
-    const curStats = facetData.current && facetData.current[0] ? facetData.current[0] : { count: 0, totalMtr: 0 };
-    const total = curStats.count || 0;
-    const totalMtr = Math.round((curStats.totalMtr || 0) * 100) / 100;
+      const statsFacet = await db.JobCard.aggregate([
+        {
+          $facet: {
+            current: [
+              { $match: filter },
+              { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
+            ],
+            all: [
+              { $match: baseFilter },
+              { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
+            ],
+            pending: [
+              { $match: { ...baseFilter, status: 'Pending' } },
+              { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
+            ],
+            printing: [
+              { $match: { ...baseFilter, printStatus: { $ne: 'Printing Done' } } },
+              { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
+            ],
+            fusing: [
+              { $match: { ...baseFilter, printStatus: 'Printing Done', fusingStatus: { $ne: 'Fusing Done' } } },
+              { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
+            ],
+            delivery: [
+              { $match: { ...baseFilter, fusingStatus: 'Fusing Done' } },
+              { $group: { _id: null, count: { $sum: 1 }, totalMtr: { $sum: meterExpr } } }
+            ]
+          }
+        }
+      ]);
 
-    const statusCounts = {
-      All: { count: facetData.all?.[0]?.count || 0, meters: Math.round((facetData.all?.[0]?.totalMtr || 0) * 100) / 100 },
-      Pending: { count: facetData.pending?.[0]?.count || 0, meters: Math.round((facetData.pending?.[0]?.totalMtr || 0) * 100) / 100 },
-      Printing: { count: facetData.printing?.[0]?.count || 0, meters: Math.round((facetData.printing?.[0]?.totalMtr || 0) * 100) / 100 },
-      Fusing: { count: facetData.fusing?.[0]?.count || 0, meters: Math.round((facetData.fusing?.[0]?.totalMtr || 0) * 100) / 100 },
-      Delivery: { count: facetData.delivery?.[0]?.count || 0, meters: Math.round((facetData.delivery?.[0]?.totalMtr || 0) * 100) / 100 }
-    };
+      const facetData = statsFacet && statsFacet[0] ? statsFacet[0] : {};
+      const curStats = facetData.current && facetData.current[0] ? facetData.current[0] : { count: 0, totalMtr: 0 };
+      total = curStats.count || 0;
+      totalMtr = Math.round((curStats.totalMtr || 0) * 100) / 100;
+
+      statusCounts = {
+        All: { count: facetData.all?.[0]?.count || 0, meters: Math.round((facetData.all?.[0]?.totalMtr || 0) * 100) / 100 },
+        Pending: { count: facetData.pending?.[0]?.count || 0, meters: Math.round((facetData.pending?.[0]?.totalMtr || 0) * 100) / 100 },
+        Printing: { count: facetData.printing?.[0]?.count || 0, meters: Math.round((facetData.printing?.[0]?.totalMtr || 0) * 100) / 100 },
+        Fusing: { count: facetData.fusing?.[0]?.count || 0, meters: Math.round((facetData.fusing?.[0]?.totalMtr || 0) * 100) / 100 },
+        Delivery: { count: facetData.delivery?.[0]?.count || 0, meters: Math.round((facetData.delivery?.[0]?.totalMtr || 0) * 100) / 100 }
+      };
+    }
 
     const skip  = (Number(page)-1) * Number(limit);
 

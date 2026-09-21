@@ -23,25 +23,43 @@ async function run() {
   console.log(`Loaded ${invoices.length} active invoices.`);
 
   // 2. Map invoice items by normalized job number (digits)
-  const jobInvoicesMap = new Map(); // digits -> array of { invoiceId, invoiceNo, date, meters, amount, rawJobNo }
+  const jobInvoicesMap = new Map(); // digits -> array of invoice entries
 
   invoices.forEach(inv => {
     (inv.items || []).forEach(it => {
       if (!it.jobNo || !String(it.jobNo).trim()) return;
-      const rawJob = String(it.jobNo).trim();
-      const digits = rawJob.replace(/[^\d]/g, '');
-      const key = digits || rawJob.toLowerCase();
 
-      if (!jobInvoicesMap.has(key)) {
-        jobInvoicesMap.set(key, []);
-      }
-      jobInvoicesMap.get(key).push({
-        invoiceId: inv._id,
-        invoiceNo: inv.invoiceNo,
-        date: inv.invoiceDate,
-        meters: Number(it.qty) || 0,
-        amount: Number(it.totalAmount) || 0,
-        rawJobNo: rawJob
+      // Split comma/slash/semicolon/and separated job numbers
+      const rawJobParts = String(it.jobNo).split(/[,/;&|]+|\band\b/i).map(p => p.trim()).filter(Boolean);
+
+      // Gather all distinct job keys from this line item
+      const jobKeys = [];
+      rawJobParts.forEach(p => {
+        // Also handle dot-separated like 2762.2756 or 2258.2259
+        const subParts = p.split(/\.(?=\d{3,})/).map(s => s.trim()).filter(Boolean);
+        subParts.forEach(sp => {
+          const digits = sp.replace(/[^\d]/g, '');
+          if (digits) jobKeys.push({ digits, raw: sp });
+        });
+      });
+
+      const totalLineQty = Number(it.qty) || 0;
+      const totalLineAmt = Number(it.totalAmount) || 0;
+      const numJobs = Math.max(1, jobKeys.length);
+
+      jobKeys.forEach(({ digits, raw }) => {
+        if (!jobInvoicesMap.has(digits)) {
+          jobInvoicesMap.set(digits, []);
+        }
+        jobInvoicesMap.get(digits).push({
+          invoiceId: inv._id,
+          invoiceNo: inv.invoiceNo,
+          date: inv.invoiceDate,
+          meters: jobKeys.length > 1 ? 0 : totalLineQty,
+          lineQty: totalLineQty,
+          amount: Math.round((totalLineAmt / numJobs) * 100) / 100,
+          rawJobNo: raw
+        });
       });
     });
   });
@@ -63,21 +81,28 @@ async function run() {
 
     if (jobInvoicesMap.has(key)) {
       const invList = jobInvoicesMap.get(key);
-      const totalDeliveredMtr = invList.reduce((sum, item) => sum + (item.meters || 0), 0);
       const uniqueBillNos = Array.from(new Set(invList.map(i => i.invoiceNo))).filter(Boolean);
-
-      card.invoices = invList.map(i => ({
-        invoiceId: i.invoiceId,
-        invoiceNo: i.invoiceNo,
-        date: i.date,
-        meters: i.meters,
-        amount: i.amount
-      }));
-      card.deliveredMtr = Math.round(totalDeliveredMtr * 100) / 100;
-      card.billNo = uniqueBillNos.join(', ');
 
       const targetMatch = String(card.totalMtr || card.consumption || '0').match(/[\d.]+/);
       const targetMtr = targetMatch ? parseFloat(targetMatch[0]) : 0;
+
+      card.invoices = invList.map(i => {
+        let mtr = i.meters;
+        if (mtr <= 0 && i.lineQty > 0) {
+          mtr = targetMtr > 0 ? targetMtr : i.lineQty;
+        }
+        return {
+          invoiceId: i.invoiceId,
+          invoiceNo: i.invoiceNo,
+          date: i.date,
+          meters: Math.round(mtr * 100) / 100,
+          amount: i.amount
+        };
+      });
+
+      const totalDeliveredMtr = card.invoices.reduce((sum, item) => sum + (item.meters || 0), 0);
+      card.deliveredMtr = Math.round(totalDeliveredMtr * 100) / 100;
+      card.billNo = uniqueBillNos.join(', ');
 
       if (targetMtr > 0 && totalDeliveredMtr >= targetMtr) {
         card.deliveryStatus = 'Delivery Done';
