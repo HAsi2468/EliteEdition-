@@ -177,20 +177,7 @@ export default function ClientPortal({ client, onLogout }) {
         limit: 500
       });
       const list = res?.data || (Array.isArray(res) ? res : []);
-      // STRICT FILTER: Only designs whose parties array or party field contains this client's party code
-      const valid = list.filter(d => {
-        const partiesList = Array.isArray(d.parties)
-          ? d.parties
-          : (d.parties ? [d.parties] : (d.party ? [d.party] : []));
-        const c1 = String(code).toLowerCase().trim();
-        const c2 = String(clientData.companyCode || '').toLowerCase().trim();
-        const c3 = String(clientData.companyName || '').toLowerCase().trim();
-        return partiesList.some(p => {
-          const pStr = String(p || '').toLowerCase().trim();
-          return (c1 && pStr === c1) || (c2 && pStr === c2) || (c3 && pStr === c3);
-        });
-      });
-      setDesigns(valid);
+      setDesigns(list);
     } catch (err) {
       console.warn('Failed to fetch client designs:', err);
     } finally {

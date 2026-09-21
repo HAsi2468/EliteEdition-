@@ -13,14 +13,39 @@ const getAll = async (req, res) => {
     }
     if (colors && colors !== 'All') filter.colors = { $regex: colors, $options: 'i' };
     if (party && party !== 'All') {
-      const escaped = String(party).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const partyRegex = { $regex: `^\\s*${escaped}\\s*$`, $options: 'i' };
-      const partyFilter = {
-        $or: [
-          { parties: partyRegex },
-          { party: partyRegex }
-        ]
-      };
+      const partyItems = String(party)
+        .split(',')
+        .map(p => p.trim())
+        .filter(Boolean);
+
+      const partyRegexes = partyItems.map(p => {
+        const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`^\\s*${escaped}\\s*$`, 'i');
+      });
+
+      // Find designs used in this party's job cards
+      let jcDesignNames = [];
+      try {
+        const jcDesigns = await db.JobCard.distinct('designName', {
+          $or: [
+            { party: { $in: partyRegexes } },
+            { partyCode: { $in: partyRegexes } }
+          ]
+        });
+        jcDesignNames = (jcDesigns || []).map(n => String(n || '').trim()).filter(Boolean);
+      } catch (e) {
+        // ignore error if JobCard model fails
+      }
+
+      const partyOr = [
+        { parties: { $in: partyRegexes } },
+        { party: { $in: partyRegexes } }
+      ];
+      if (jcDesignNames.length > 0) {
+        partyOr.push({ designName: { $in: jcDesignNames } });
+      }
+
+      const partyFilter = { $or: partyOr };
       if (!filter.$and) filter.$and = [];
       filter.$and.push(partyFilter);
     }
