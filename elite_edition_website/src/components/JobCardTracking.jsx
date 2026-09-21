@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../services/api';
 import { Search, RefreshCw, Save, Check, Clipboard, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import JobCardTooltip from './JobCardTooltip';

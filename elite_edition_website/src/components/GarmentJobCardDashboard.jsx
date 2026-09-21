@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Search, Filter, Download, Eye, Edit, Trash2, Scissors, Calculator, TrendingUp, DollarSign, Layers, ArrowRight, CheckCircle2, History, Package, Truck, Check, AlertCircle } from 'lucide-react';
 import { api } from '../services/api';
 import GarmentJobCardForm from './GarmentJobCardForm';

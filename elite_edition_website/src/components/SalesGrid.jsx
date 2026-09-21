@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import { uniwareApi } from '../services/uniware';
 import { Search, ChevronLeft, ChevronRight, SlidersHorizontal, RefreshCw, ShoppingBag } from 'lucide-react';
