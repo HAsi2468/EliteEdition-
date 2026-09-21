@@ -86,8 +86,8 @@ async function run() {
         }
       }
 
-      // If deliveryDate is empty, set from latest invoice
-      if (!card.deliveryDate && invList.length > 0) {
+      // Sync deliveryDate to latest invoice date
+      if (invList.length > 0) {
         const sorted = [...invList].sort((a, b) => new Date(b.date) - new Date(a.date));
         if (sorted[0]?.date) {
           const dt = new Date(sorted[0].date);

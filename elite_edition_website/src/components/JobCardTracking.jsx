@@ -836,9 +836,12 @@ export default function JobCardTracking({ onPreview }) {
                                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.25)'}
                                   onMouseLeave={e => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.12)'}
                                 >
-                                  📄 {inv.invoiceNo}
+                                  <span>📄 {inv.invoiceNo}</span>
                                   {inv.meters ? (
                                     <span style={{ color: '#34d399', fontSize: '0.65rem' }}>({inv.meters}m)</span>
+                                  ) : null}
+                                  {inv.date ? (
+                                    <span style={{ color: '#cbd5e1', fontSize: '0.65rem' }}>• {formatDateDDMMYYYY(inv.date)}</span>
                                   ) : null}
                                 </button>
                               ))}
@@ -1071,6 +1074,11 @@ export default function JobCardTracking({ onPreview }) {
                           onChange={e => handleAutoSave(c._id, 'deliveryDate', e.target.value)}
                           style={{ ...inputStyle, width: '120px' }}
                         />
+                        {c.invoices && c.invoices.length > 1 && (
+                          <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '2px', whiteSpace: 'nowrap' }} title="Synced from latest delivery invoice">
+                            Latest of {c.invoices.length} delivery dates
+                          </div>
+                        )}
                       </td>
 
                       {/* Sync Status Indicator */}
