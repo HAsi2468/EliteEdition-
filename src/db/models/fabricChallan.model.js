@@ -148,6 +148,26 @@ const fabricChallanSchema = new mongoose.Schema(
       type: String,
       default: ''
     },
+    // Signed physical copy upload & verification (max 2 images in R2)
+    signedCopy: {
+      images: {
+        type: [{ type: String }],
+        validate: [arr => !arr || arr.length <= 2, 'Maximum 2 images allowed for signed copy'],
+        default: []
+      },
+      status: {
+        type: String,
+        enum: ['NONE', 'PENDING', 'APPROVED', 'REJECTED'],
+        default: 'NONE'
+      },
+      uploadedAt: { type: Date },
+      uploadedBy: { type: String, default: '' },
+      uploadedByName: { type: String, default: '' },
+      approvedAt: { type: Date },
+      approvedBy: { type: String, default: '' },
+      approvedByName: { type: String, default: '' },
+      rejectionReason: { type: String, default: '' }
+    }
   },
   {
     timestamps: true,
@@ -167,17 +187,18 @@ fabricChallanSchema.pre('save', async function () {
   }
 });
 
-// ── Indexes for query optimization ──
 // Challan queries filtering by fabric and panna
 fabricChallanSchema.index({ fabricName: 1, panna: 1 });
 // Challan listing and search
 fabricChallanSchema.index({ partyName: 1 });
-// Filtering by PENDING/INVOICED/CANCELLED
+// Status filter
 fabricChallanSchema.index({ status: 1 });
 // Lookup challans by job number
 fabricChallanSchema.index({ jobNo: 1 });
-// Default sort for listing
+// Default sort
 fabricChallanSchema.index({ createdAt: -1 });
+// Signed copy approval status index
+fabricChallanSchema.index({ 'signedCopy.status': 1 });
 
 const FabricChallan = mongoose.model('FabricChallan', fabricChallanSchema);
 module.exports = FabricChallan;

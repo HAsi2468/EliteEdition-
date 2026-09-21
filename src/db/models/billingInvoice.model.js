@@ -97,6 +97,27 @@ const billingInvoiceSchema = new mongoose.Schema(
     notes: { type: String, default: 'Thank you for doing business with Elite Digital Prints!' },
     terms: { type: String, default: 'Payment due within 15 days from invoice date. Subject to Surat jurisdiction.' },
 
+    // Signed physical copy upload & verification (max 2 images in R2)
+    signedCopy: {
+      images: {
+        type: [{ type: String }],
+        validate: [arr => !arr || arr.length <= 2, 'Maximum 2 images allowed for signed copy'],
+        default: []
+      },
+      status: {
+        type: String,
+        enum: ['NONE', 'PENDING', 'APPROVED', 'REJECTED'],
+        default: 'NONE'
+      },
+      uploadedAt: { type: Date },
+      uploadedBy: { type: String, default: '' },
+      uploadedByName: { type: String, default: '' },
+      approvedAt: { type: Date },
+      approvedBy: { type: String, default: '' },
+      approvedByName: { type: String, default: '' },
+      rejectionReason: { type: String, default: '' }
+    },
+
     // Audit Trail
     createdBy: { type: String, default: 'Admin', trim: true }
   },
@@ -114,5 +135,7 @@ billingInvoiceSchema.index({ paymentStatus: 1 });
 billingInvoiceSchema.index({ 'customer.name': 1 });
 // Auto-increment sequence lookup
 billingInvoiceSchema.index({ invoiceSeq: -1 });
+// Signed copy approval status index
+billingInvoiceSchema.index({ 'signedCopy.status': 1 });
 
 module.exports = mongoose.model('BillingInvoice', billingInvoiceSchema);

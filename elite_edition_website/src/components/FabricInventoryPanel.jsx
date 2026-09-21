@@ -16,11 +16,15 @@ import {
   AlertTriangle, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Edit, FileText,
   Check, Plus, ArrowRightLeft, Download, Eye, Receipt, Clock, Truck, Calendar
 } from 'lucide-react';
+import SignedDocumentUploadModal from './SignedDocumentUploadModal';
+import SignedDocumentPreviewModal from './SignedDocumentPreviewModal';
 
 export default function FabricInventoryPanel({ department, onNavigateToBilling, initialTab = 'dashboard', onlyChallan = false }) {
   const defaultThisMonth = getDatePresetRange('this_month');
   const [activeTab, setActiveTab] = useState(onlyChallan ? 'challan' : initialTab);
   const currentUser = api.getCurrentUser();
+  const [signedUploadTarget, setSignedUploadTarget] = useState(null);
+  const [signedPreviewTarget, setSignedPreviewTarget] = useState(null);
 
   const renderJobNoBadge = (jobNoRaw) => {
     if (!jobNoRaw) return '—';
@@ -4094,6 +4098,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                     </th>
                     <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '90px' }}>Ch. No</th>
                     <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '85px' }}>Status</th>
+                    <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '120px', textAlign: 'center' }}>Signed Copy</th>
                     <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '90px' }}>Date</th>
                     <th style={{ padding: '0.65rem 0.5rem' }}>Bill To / Party</th>
                     <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '75px' }}>Lot No</th>
@@ -4158,6 +4163,118 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(251,191,36,0.3)' }}>
                             PENDING
                           </span>
+                        )}
+                      </td>
+                      {/* Signed Copy status & upload trigger */}
+                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        {ch.signedCopy && ch.signedCopy.status === 'APPROVED' ? (
+                          <button
+                            type="button"
+                            onClick={() => setSignedPreviewTarget({
+                              _id: ch._id,
+                              docType: 'challan',
+                              docNumber: `EDP-${ch.challanNo}`,
+                              partyName: ch.billTo || ch.partyName,
+                              signedCopy: ch.signedCopy
+                            })}
+                            style={{
+                              background: 'rgba(16, 185, 129, 0.12)',
+                              border: '1px solid rgba(16, 185, 129, 0.35)',
+                              color: '#34d399',
+                              borderRadius: '6px',
+                              padding: '2px 8px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            title="Verified & Approved by Admin. Click to view."
+                          >
+                            <CheckCircle size={12} /> Approved ({ch.signedCopy.images?.length || 1})
+                          </button>
+                        ) : ch.signedCopy && ch.signedCopy.status === 'PENDING' ? (
+                          <button
+                            type="button"
+                            onClick={() => setSignedPreviewTarget({
+                              _id: ch._id,
+                              docType: 'challan',
+                              docNumber: `EDP-${ch.challanNo}`,
+                              partyName: ch.billTo || ch.partyName,
+                              signedCopy: ch.signedCopy
+                            })}
+                            style={{
+                              background: 'rgba(245, 158, 11, 0.12)',
+                              border: '1px solid rgba(245, 158, 11, 0.35)',
+                              color: '#fbbf24',
+                              borderRadius: '6px',
+                              padding: '2px 8px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            title="Uploaded, pending admin review. Click to view."
+                          >
+                            <Clock size={12} /> Pending ({ch.signedCopy.images?.length || 1})
+                          </button>
+                        ) : ch.signedCopy && ch.signedCopy.status === 'REJECTED' ? (
+                          <button
+                            type="button"
+                            onClick={() => setSignedUploadTarget({
+                              id: ch._id,
+                              docType: 'challan',
+                              docNumber: `EDP-${ch.challanNo}`,
+                              partyName: ch.billTo || ch.partyName,
+                              existingSignedCopy: ch.signedCopy
+                            })}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.12)',
+                              border: '1px solid rgba(239, 68, 68, 0.35)',
+                              color: '#f87171',
+                              borderRadius: '6px',
+                              padding: '2px 8px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            title={`Rejected: ${ch.signedCopy.rejectionReason || 'Please re-upload'}. Click to re-upload.`}
+                          >
+                            <AlertCircle size={12} /> Rejected (Re-upload)
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setSignedUploadTarget({
+                              id: ch._id,
+                              docType: 'challan',
+                              docNumber: `EDP-${ch.challanNo}`,
+                              partyName: ch.billTo || ch.partyName,
+                              existingSignedCopy: null
+                            })}
+                            style={{
+                              background: 'rgba(56, 189, 248, 0.08)',
+                              border: '1px dashed rgba(56, 189, 248, 0.35)',
+                              color: '#38bdf8',
+                              borderRadius: '6px',
+                              padding: '2px 8px',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            title="Upload physical signed challan copy"
+                          >
+                            + Upload Signed
+                          </button>
                         )}
                       </td>
                       <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>{formatDateDDMMYYYY(ch.date)}</td>
@@ -5702,6 +5819,29 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
             </div>
           </div>
         </div>
+      )}
+
+      {signedUploadTarget && (
+        <SignedDocumentUploadModal
+          isOpen={!!signedUploadTarget}
+          onClose={() => setSignedUploadTarget(null)}
+          docType="challan"
+          docId={signedUploadTarget.id}
+          docNumber={signedUploadTarget.docNumber}
+          partyName={signedUploadTarget.partyName}
+          existingSignedCopy={signedUploadTarget.existingSignedCopy}
+          onSuccess={() => fetchChallans && fetchChallans()}
+        />
+      )}
+
+      {signedPreviewTarget && (
+        <SignedDocumentPreviewModal
+          isOpen={!!signedPreviewTarget}
+          onClose={() => setSignedPreviewTarget(null)}
+          documentData={signedPreviewTarget}
+          isAdmin={currentUser?.role === 'admin' || currentUser?.isMainAdmin}
+          onStatusUpdated={() => fetchChallans && fetchChallans()}
+        />
       )}
     </div>
   );

@@ -28,9 +28,11 @@ import {
   FileSpreadsheet,
   Search,
   Settings,
-  AlertCircle
+  AlertCircle,
+  FileCheck
 } from 'lucide-react';
 import { AVAILABLE_SCREENS } from '../config/screensConfig';
+import AdminSignedDocumentsApproval from './AdminSignedDocumentsApproval';
 
 export default function AdminPanel() {
   const [users, setUsers] = useState([]);
@@ -677,7 +679,7 @@ export default function AdminPanel() {
           <ShieldAlert size={22} color="var(--primary)" />
           <div>
             <h2 style={styles.pageTitle}>
-              {activeSubTab === 'users' ? 'Admin User Management' : activeSubTab === 'billing' ? 'Infrastructure Billing Management' : activeSubTab === 'backup' ? 'System Data Backup & Export' : 'Department Expense Settings'}
+              {activeSubTab === 'users' ? 'Admin User Management' : activeSubTab === 'billing' ? 'Infrastructure Billing Management' : activeSubTab === 'backup' ? 'System Data Backup & Export' : activeSubTab === 'signedDocs' ? 'Signed Documents Approval' : 'Department Expense Settings'}
             </h2>
             <p style={styles.pageSubtitle}>
               {activeSubTab === 'users'
@@ -686,6 +688,8 @@ export default function AdminPanel() {
                 ? 'Track monthly cloud bills for AWS and MongoDB to monitor hosting costs.'
                 : activeSubTab === 'backup'
                 ? 'Export comprehensive system data filtered by department and custom date ranges.'
+                : activeSubTab === 'signedDocs'
+                ? 'Review and verify customer-signed physical copies of Challans and Invoices stored in Cloudflare R2.'
                 : 'Configure Cash IN categories, Cash OUT categories, and Payment Modes for department expense entry forms.'}
             </p>
           </div>
@@ -721,6 +725,13 @@ export default function AdminPanel() {
           style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
         >
           <Database size={16} /> Data Backup
+        </button>
+        <button
+          onClick={() => { setActiveSubTab('signedDocs'); setError(''); setSuccess(''); }}
+          className={activeSubTab === 'signedDocs' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+        >
+          <FileCheck size={16} /> Signed Documents Approval
         </button>
       </div>
 
@@ -2025,6 +2036,10 @@ export default function AdminPanel() {
 
       {activeSubTab === 'settings' && (
         <PrintSettings expenseOnly={true} />
+      )}
+
+      {activeSubTab === 'signedDocs' && (
+        <AdminSignedDocumentsApproval />
       )}
     </div>
   );

@@ -2108,6 +2108,35 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(commentData)
     });
+  },
+
+  // ─── Signed Documents (Challan & Invoice) Verification & Approval ───
+  async uploadSignedDocumentImage(file, docType = 'challan') {
+    const folder = `signed_documents/${docType}s`;
+    return this.uploadImage(file, folder);
+  },
+
+  async uploadSignedDocument({ docType, docId, images }) {
+    return request('/signed-documents/upload', {
+      method: 'POST',
+      body: JSON.stringify({ docType, docId, images })
+    });
+  },
+
+  async getSignedDocumentApprovals(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set('status', params.status);
+    if (params.docType) qs.set('docType', params.docType);
+    if (params.search) qs.set('search', params.search);
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return request(`/signed-documents/approvals${query}`);
+  },
+
+  async updateSignedDocumentApproval(docType, id, { action, rejectionReason = '' }) {
+    return request(`/signed-documents/${docType}/${id}/approval`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action, rejectionReason })
+    });
   }
 };
 

@@ -10,6 +10,8 @@ import ScreenGroupRoster from './ScreenGroupRoster';
 import { dispatchScreenGroupEvent } from '../services/screenGroupService';
 import { triggerEliteAlert } from './EliteModalDialog';
 import DateRangePicker from './DateRangePicker';
+import SignedDocumentUploadModal from './SignedDocumentUploadModal';
+import SignedDocumentPreviewModal from './SignedDocumentPreviewModal';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -307,6 +309,9 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+  const currentUser = api.getCurrentUser();
+  const [signedUploadTarget, setSignedUploadTarget] = useState(null);
+  const [signedPreviewTarget, setSignedPreviewTarget] = useState(null);
 
   // Multi-select for bulk Invoice PDF download
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
@@ -1946,6 +1951,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                       <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Invoice No</th>
                       <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Challan No</th>
                       <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Customer Name</th>
+                      <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'center' }}>Signed Copy</th>
                       <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Date</th>
                       <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Grand Total</th>
                       <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Paid Amount</th>
@@ -2015,6 +2021,118 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                             <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)', verticalAlign: 'middle' }}>
                               <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>{inv.customer?.businessName || inv.customer?.name || '—'}</div>
                               {inv.customer?.gstin && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>GSTIN: {inv.customer.gstin}</div>}
+                            </td>
+                            {/* Signed Copy status & upload trigger */}
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              {inv.signedCopy && inv.signedCopy.status === 'APPROVED' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSignedPreviewTarget({
+                                    _id: inv._id,
+                                    docType: 'invoice',
+                                    docNumber: inv.invoiceNo,
+                                    partyName: inv.customer?.businessName || inv.customer?.name,
+                                    signedCopy: inv.signedCopy
+                                  })}
+                                  style={{
+                                    background: 'rgba(16, 185, 129, 0.12)',
+                                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                                    color: '#34d399',
+                                    borderRadius: '6px',
+                                    padding: '2px 8px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  title="Verified & Approved by Admin. Click to view."
+                                >
+                                  <CheckCircle size={12} /> Approved ({inv.signedCopy.images?.length || 1})
+                                </button>
+                              ) : inv.signedCopy && inv.signedCopy.status === 'PENDING' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSignedPreviewTarget({
+                                    _id: inv._id,
+                                    docType: 'invoice',
+                                    docNumber: inv.invoiceNo,
+                                    partyName: inv.customer?.businessName || inv.customer?.name,
+                                    signedCopy: inv.signedCopy
+                                  })}
+                                  style={{
+                                    background: 'rgba(245, 158, 11, 0.12)',
+                                    border: '1px solid rgba(245, 158, 11, 0.35)',
+                                    color: '#fbbf24',
+                                    borderRadius: '6px',
+                                    padding: '2px 8px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  title="Uploaded, pending admin review. Click to view."
+                                >
+                                  <Clock size={12} /> Pending ({inv.signedCopy.images?.length || 1})
+                                </button>
+                              ) : inv.signedCopy && inv.signedCopy.status === 'REJECTED' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSignedUploadTarget({
+                                    id: inv._id,
+                                    docType: 'invoice',
+                                    docNumber: inv.invoiceNo,
+                                    partyName: inv.customer?.businessName || inv.customer?.name,
+                                    existingSignedCopy: inv.signedCopy
+                                  })}
+                                  style={{
+                                    background: 'rgba(239, 68, 68, 0.12)',
+                                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                                    color: '#f87171',
+                                    borderRadius: '6px',
+                                    padding: '2px 8px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  title={`Rejected: ${inv.signedCopy.rejectionReason || 'Please re-upload'}. Click to re-upload.`}
+                                >
+                                  <AlertCircle size={12} /> Rejected (Re-upload)
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setSignedUploadTarget({
+                                    id: inv._id,
+                                    docType: 'invoice',
+                                    docNumber: inv.invoiceNo,
+                                    partyName: inv.customer?.businessName || inv.customer?.name,
+                                    existingSignedCopy: null
+                                  })}
+                                  style={{
+                                    background: 'rgba(56, 189, 248, 0.08)',
+                                    border: '1px dashed rgba(56, 189, 248, 0.35)',
+                                    color: '#38bdf8',
+                                    borderRadius: '6px',
+                                    padding: '2px 8px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                  title="Upload physical signed invoice copy"
+                                >
+                                  + Upload Signed
+                                </button>
+                              )}
                             </td>
                             <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               {formatDateDDMMYYYY(inv.invoiceDate)}
@@ -4004,6 +4122,29 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             </div>
           </div>
         </div>
+      )}
+
+      {signedUploadTarget && (
+        <SignedDocumentUploadModal
+          isOpen={!!signedUploadTarget}
+          onClose={() => setSignedUploadTarget(null)}
+          docType="invoice"
+          docId={signedUploadTarget.id}
+          docNumber={signedUploadTarget.docNumber}
+          partyName={signedUploadTarget.partyName}
+          existingSignedCopy={signedUploadTarget.existingSignedCopy}
+          onSuccess={() => fetchInvoices && fetchInvoices()}
+        />
+      )}
+
+      {signedPreviewTarget && (
+        <SignedDocumentPreviewModal
+          isOpen={!!signedPreviewTarget}
+          onClose={() => setSignedPreviewTarget(null)}
+          documentData={signedPreviewTarget}
+          isAdmin={currentUser?.role === 'admin' || currentUser?.isMainAdmin}
+          onStatusUpdated={() => fetchInvoices && fetchInvoices()}
+        />
       )}
 
     </div>

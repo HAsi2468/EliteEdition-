@@ -1442,38 +1442,6 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                   </div>
                   <FormField label="Colour" name="colors" value={formVal.colors} onChange={handleFormChange} options={COLOR_NAMES} placeholder="Select or type colour..." />
 
-                  {/* Auto-detect color from image button */}
-                  <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <button
-                      type="button"
-                      onClick={handleAutoDetectColor}
-                      disabled={detectingColor || !formVal.imageUrl}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        fontFamily: 'var(--font-sans)',
-                        borderRadius: 'var(--radius-sm)',
-                        border: '1px solid',
-                        borderColor: !formVal.imageUrl ? 'var(--border-light)' : 'rgba(139,92,246,0.4)',
-                        background: !formVal.imageUrl ? 'rgba(255,255,255,0.02)' : 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(56,189,248,0.15))',
-                        color: !formVal.imageUrl ? 'var(--text-muted)' : '#a78bfa',
-                        cursor: !formVal.imageUrl ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        transition: 'all 0.2s',
-                        width: 'fit-content'
-                      }}
-                    >
-                      {detectingColor ? (
-                        <><RefreshCw size={14} className="spin-loader" /> Detecting colours...</>
-                      ) : (
-                        <><span style={{ fontSize: '1rem' }}>🪄</span> Auto-detect Colour from Image</>
-                      )}
-                    </button>
-                  </div>
-
                   <FormField label="Panna (width)" name="panna" value={formVal.panna} onChange={handleFormChange} options={['', ...(printConfig.widths || [])]} />
 
                   {printConfig.machines?.map(machine => (

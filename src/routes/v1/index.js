@@ -59,5 +59,6 @@ router.use('/communication', require('./communication.route'));
 router.use('/tasks', require('./task.route'));
 router.use('/leads', require('./lead.route'));
 router.use('/business-connections', require('./businessConnection.route'));
+router.use('/signed-documents', require('./signedDocument.route'));
 
 module.exports = router;
