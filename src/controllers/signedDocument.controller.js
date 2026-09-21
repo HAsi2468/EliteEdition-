@@ -1,6 +1,7 @@
 const FabricChallan = require('../db/models/fabricChallan.model');
 const BillingInvoice = require('../db/models/billingInvoice.model');
 const logger = require('../config/logger');
+const { emitSocketEvent } = require('../utils/socketEmitHelper');
 
 /**
  * 1. Upload signed copy (Regular staff / delivery users can upload up to 2 images)
@@ -53,6 +54,14 @@ const uploadSignedCopy = async (req, res) => {
     };
 
     await doc.save();
+
+    emitSocketEvent(req, 'signed-document-updated', {
+      action: 'UPLOADED',
+      docType,
+      docId,
+      status: 'PENDING',
+      uploaderName
+    });
 
     logger.info(`[SignedDocument] ${uploaderName} uploaded signed copy for ${docType} ${docId}`);
 
@@ -226,6 +235,14 @@ const updateApprovalStatus = async (req, res) => {
     }
 
     await doc.save();
+
+    emitSocketEvent(req, 'signed-document-updated', {
+      action,
+      docType,
+      docId: id,
+      status: doc.signedCopy.status,
+      adminName
+    });
 
     logger.info(`[SignedDocument] ${adminName} ${action} signed copy for ${docType} ${id}`);
 
