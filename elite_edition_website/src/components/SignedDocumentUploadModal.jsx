@@ -227,23 +227,7 @@ export default function SignedDocumentUploadModal({
               </div>
             )}
 
-            {/* Instructions & R2 Badge */}
-            <div
-              style={{
-                background: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                borderRadius: '10px',
-                padding: '0.75rem 1rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                fontSize: '0.8rem',
-                color: '#1e40af'
-              }}
-            >
-              <span>📸 Upload max <strong>2 images</strong> (Front / Back or Page 1 / 2)</span>
-              <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 700, background: '#dbeafe', padding: '2px 8px', borderRadius: '4px' }}>☁️ Cloudflare R2</span>
-            </div>
+
 
             {/* Image Slots (Max 2) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.85rem' }}>

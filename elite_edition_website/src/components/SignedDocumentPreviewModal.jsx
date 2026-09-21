@@ -298,11 +298,6 @@ export default function SignedDocumentPreviewModal({
               </span>
             )}
           </div>
-
-          {/* Cloudflare R2 Source Pill */}
-          <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 700, background: '#dbeafe', padding: '2px 8px', borderRadius: '4px' }}>
-            ☁️ Cloudflare R2
-          </span>
         </div>
 
         {/* Rejection Note Display if rejected */}

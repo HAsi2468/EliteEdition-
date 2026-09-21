@@ -135,7 +135,7 @@ export default function AdminSignedDocumentsApproval() {
                 Signed Documents Approval Queue
               </h2>
               <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                Review and approve physical signed copies of Challans and Invoices (stored in Cloudflare R2).
+                Review and approve physical signed copies of Challans and Invoices.
               </p>
             </div>
           </div>
