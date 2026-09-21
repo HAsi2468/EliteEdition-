@@ -179,6 +179,21 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceFreq, setRecurrenceFreq] = useState('daily'); // 'daily' | 'weekly' | 'monthly'
 
+  // Task Attachments (stored in Cloudflare R2)
+  const [newAttachments, setNewAttachments] = useState([]); // [{ fileName, fileUrl, fileSize, fileType }]
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [drawerUploadingAttachment, setDrawerUploadingAttachment] = useState(false);
+  const fileInputRef = useRef(null);
+  const drawerFileInputRef = useRef(null);
+
+  const formatFileSize = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
   // Speech Recognition Handler
   const startVoiceInput = (targetField = 'title') => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -354,6 +369,94 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     setSelectedAssigneeIds([]);
   };
 
+  // Cloudflare R2 Attachment Handlers
+  const handleUploadNewTaskAttachments = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    setUploadingAttachment(true);
+    try {
+      for (const file of files) {
+        const uploadRes = await api.uploadTaskAttachment(file);
+        if (uploadRes && (uploadRes.url || uploadRes.fileUrl)) {
+          const fileUrl = uploadRes.url || uploadRes.fileUrl;
+          const fileName = file.name;
+          const fileSize = file.size;
+          const fileType = file.type || 'document';
+          setNewAttachments((prev) => [
+            ...prev,
+            { fileName, fileUrl, fileSize, fileType }
+          ]);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to upload attachment to R2:', err);
+      alert('Failed to upload attachment to Cloudflare R2: ' + err.message);
+    } finally {
+      setUploadingAttachment(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveNewAttachment = (indexToRemove) => {
+    setNewAttachments((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleUploadDrawerAttachment = async (e) => {
+    if (!selectedTask) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    setDrawerUploadingAttachment(true);
+    try {
+      for (const file of files) {
+        const uploadRes = await api.uploadTaskAttachment(file);
+        if (uploadRes && (uploadRes.url || uploadRes.fileUrl)) {
+          const fileUrl = uploadRes.url || uploadRes.fileUrl;
+          const fileName = file.name;
+          const fileSize = file.size;
+          const fileType = file.type || 'document';
+
+          const res = await api.addTaskAttachment(selectedTask._id, {
+            fileName,
+            fileUrl,
+            fileSize,
+            fileType,
+            userId: myId,
+            userName: myName
+          });
+
+          if (res.success && res.data) {
+            setSelectedTask(res.data);
+            setTasks((prev) => prev.map((t) => (String(t._id) === String(selectedTask._id) ? res.data : t)));
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to upload attachment to R2:', err);
+      alert('Failed to upload attachment to Cloudflare R2: ' + err.message);
+    } finally {
+      setDrawerUploadingAttachment(false);
+      if (drawerFileInputRef.current) drawerFileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteDrawerAttachment = async (attachmentId) => {
+    if (!selectedTask || !attachmentId) return;
+    if (!window.confirm('Are you sure you want to delete this attachment?')) return;
+
+    try {
+      const res = await api.deleteTaskAttachment(selectedTask._id, attachmentId);
+      if (res.success && res.data) {
+        setSelectedTask(res.data);
+        setTasks((prev) => prev.map((t) => (String(t._id) === String(selectedTask._id) ? res.data : t)));
+      }
+    } catch (err) {
+      console.error('Failed to delete attachment:', err);
+      alert('Failed to delete attachment: ' + err.message);
+    }
+  };
+
   const handleCreateTaskSubmit = async (e) => {
     e.preventDefault();
     if (!newTitle.trim()) {
@@ -373,6 +476,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         dueDate: newDueDate || undefined,
         estimatedHours: parseFloat(newEstHours) || 0,
         assignees: selectedAssigneeIds && selectedAssigneeIds.length > 0 ? selectedAssigneeIds : (myId ? [myId] : []),
+        attachments: newAttachments,
         createdBy: myId,
         createdByName: myName,
         recurrence: isRecurring ? { isRecurring: true, frequency: recurrenceFreq } : { isRecurring: false }
@@ -420,6 +524,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     setTemplateChecklist([]);
     setIsRecurring(false);
     setRecurrenceFreq('daily');
+    setNewAttachments([]);
   };
 
   const handleStatusChange = async (task, newStatusVal) => {
@@ -1080,6 +1185,12 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                                 <span style={{ fontSize: '0.6rem', fontWeight: 800, color: pri.color, background: pri.bg, border: `1px solid ${pri.border}`, padding: '1px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
                                   {pri.label}
                                 </span>
+                                {t.attachments && t.attachments.length > 0 && (
+                                  <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#0284c7', background: '#f0f9ff', border: '1px solid #bae6fd', padding: '1px 5px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title={`${t.attachments.length} attachment(s)`}>
+                                    <Paperclip size={10} />
+                                    <span>{t.attachments.length}</span>
+                                  </span>
+                                )}
                                 {t.recurrence && t.recurrence.isRecurring && (
                                   <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#7c3aed', background: '#f3e8ff', border: '1px solid #ddd6fe', padding: '1px 6px', borderRadius: '4px' }}>
                                     🔄 {t.recurrence.frequency ? t.recurrence.frequency.toUpperCase() : 'RECURRING'}
@@ -1246,6 +1357,12 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                         <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <span>{t.title}</span>
+                            {t.attachments && t.attachments.length > 0 && (
+                              <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#0284c7', background: '#f0f9ff', border: '1px solid #bae6fd', padding: '1px 5px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title={`${t.attachments.length} attachment(s)`}>
+                                <Paperclip size={10} />
+                                <span>{t.attachments.length}</span>
+                              </span>
+                            )}
                             {t.recurrence && t.recurrence.isRecurring && (
                               <span style={{ fontSize: '0.6rem', fontWeight: 800, color: '#7c3aed', background: '#f3e8ff', padding: '1px 5px', borderRadius: '4px' }}>
                                 🔄 {t.recurrence.frequency}
@@ -2285,6 +2402,96 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 </div>
               </div>
 
+              {/* Attachments Section (Cloudflare R2) */}
+              <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Paperclip size={14} color="#0284c7" />
+                    <span>Attachments ({newAttachments.length})</span>
+                    <span style={{ fontSize: '0.64rem', fontWeight: 700, color: '#0284c7', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px' }}>Cloudflare R2</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                    disabled={uploadingAttachment}
+                    style={{
+                      background: '#eff6ff',
+                      border: '1px solid #bfdbfe',
+                      color: '#2563eb',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Plus size={12} />
+                    <span>{uploadingAttachment ? 'Uploading to R2...' : '+ Attach Files'}</span>
+                  </button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    multiple
+                    onChange={handleUploadNewTaskAttachments}
+                    style={{ display: 'none' }}
+                  />
+                </div>
+
+                {uploadingAttachment && (
+                  <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 600, padding: '4px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: 12, height: 12, border: '2px solid #bae6fd', borderTopColor: '#0284c7', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+                    <span>Uploading attachment to Cloudflare R2...</span>
+                  </div>
+                )}
+
+                {newAttachments.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                    {newAttachments.map((att, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '6px',
+                          padding: '4px 8px',
+                          fontSize: '0.72rem'
+                        }}
+                      >
+                        {/\.(jpg|jpeg|png|webp|gif)$/i.test(att.fileName) ? (
+                          <img src={att.fileUrl} alt={att.fileName} style={{ width: 22, height: 22, borderRadius: 4, objectFit: 'cover' }} />
+                        ) : (
+                          <FileText size={14} color="#64748b" />
+                        )}
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={att.fileName}>
+                          {att.fileName}
+                        </span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.65rem' }}>({formatFileSize(att.fileSize)})</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveNewAttachment(idx)}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                          title="Remove attachment"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  !uploadingAttachment && (
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      Optional: Attach job card proofs, artwork files, or specs. Files will be stored in Cloudflare R2.
+                    </div>
+                  )
+                )}
+              </div>
+
               <button
                 type="submit"
                 disabled={creating}
@@ -2381,6 +2588,168 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                     />
                     <button type="submit" className="btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>Add</button>
                   </form>
+                </div>
+
+                {/* Attachments (Stored in Cloudflare R2) */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Paperclip size={15} color="#0284c7" />
+                      <span>Attachments ({ (selectedTask.attachments || []).length })</span>
+                      <span style={{ fontSize: '0.64rem', fontWeight: 700, color: '#0284c7', background: '#e0f2fe', padding: '1px 6px', borderRadius: '4px' }}>Cloudflare R2</span>
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => drawerFileInputRef.current && drawerFileInputRef.current.click()}
+                      disabled={drawerUploadingAttachment}
+                      style={{
+                        background: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        color: '#2563eb',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Plus size={12} />
+                      <span>{drawerUploadingAttachment ? 'Uploading to R2...' : '+ Add File'}</span>
+                    </button>
+                    <input
+                      type="file"
+                      ref={drawerFileInputRef}
+                      multiple
+                      onChange={handleUploadDrawerAttachment}
+                      style={{ display: 'none' }}
+                    />
+                  </div>
+
+                  {drawerUploadingAttachment && (
+                    <div style={{ fontSize: '0.72rem', color: '#0284c7', fontWeight: 600, padding: '4px 0', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                      <span style={{ width: 12, height: 12, border: '2px solid #bae6fd', borderTopColor: '#0284c7', borderRadius: '50%', animation: 'spin 0.8s linear infinite', display: 'inline-block' }} />
+                      <span>Uploading and storing attachment in Cloudflare R2...</span>
+                    </div>
+                  )}
+
+                  {(selectedTask.attachments || []).length > 0 ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                      {(selectedTask.attachments || []).map((att) => {
+                        const isImg = /\.(jpg|jpeg|png|webp|gif)$/i.test(att.fileName) || (att.fileType && att.fileType.startsWith('image/'));
+                        return (
+                          <div
+                            key={att._id || att.fileUrl}
+                            style={{
+                              background: '#f8fafc',
+                              border: '1px solid var(--border-light)',
+                              borderRadius: '8px',
+                              padding: '0.55rem',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              gap: '6px'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                              {isImg ? (
+                                <a href={att.fileUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', flexShrink: 0 }}>
+                                  <img
+                                    src={att.fileUrl}
+                                    alt={att.fileName}
+                                    style={{ width: 42, height: 42, borderRadius: 6, objectFit: 'cover', border: '1px solid #e2e8f0' }}
+                                  />
+                                </a>
+                              ) : (
+                                <div style={{ width: 42, height: 42, borderRadius: 6, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <FileText size={20} color="#0284c7" />
+                                </div>
+                              )}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <a
+                                  href={att.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    color: '#2563eb',
+                                    textDecoration: 'none',
+                                    display: 'block',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                  title={att.fileName}
+                                >
+                                  {att.fileName}
+                                </a>
+                                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                  {formatFileSize(att.fileSize)}
+                                </div>
+                                {att.uploadedAt && (
+                                  <div style={{ fontSize: '0.62rem', color: '#94a3b8' }}>
+                                    {new Date(att.uploadedAt).toLocaleDateString()}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', borderTop: '1px solid #e2e8f0', paddingTop: '4px' }}>
+                              <a
+                                href={att.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download={att.fileName}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#2563eb',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  textDecoration: 'none',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <Download size={11} />
+                                <span>Open / Download</span>
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteDrawerAttachment(att._id)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#ef4444',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  cursor: 'pointer',
+                                  padding: '2px 4px'
+                                }}
+                                title="Delete attachment"
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    !drawerUploadingAttachment && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: '#f8fafc', padding: '0.6rem 0.8rem', borderRadius: '8px', border: '1px dashed var(--border-light)', textAlign: 'center', marginBottom: '0.6rem' }}>
+                        No files attached to this task. Click <strong>+ Add File</strong> to upload to Cloudflare R2.
+                      </div>
+                    )
+                  )}
                 </div>
 
                 {/* Activity Feed & Comments */}

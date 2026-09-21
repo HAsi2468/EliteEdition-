@@ -2135,6 +2135,24 @@ export const api = {
     });
   },
 
+  async uploadTaskAttachment(file) {
+    return this.uploadImage(file, 'tasks/attachments');
+  },
+
+  async addTaskAttachment(id, attachmentData) {
+    return request(`/tasks/${id}/attachments`, {
+      method: 'POST',
+      body: JSON.stringify(attachmentData)
+    });
+  },
+
+  async deleteTaskAttachment(id, attachmentId) {
+    return request(`/tasks/${id}/attachments/${attachmentId}`, {
+      method: 'DELETE'
+    });
+  },
+
+
   // ─── Signed Documents (Challan & Invoice) Verification & Approval ───
   async uploadSignedDocumentImage(file, docType = 'challan') {
     const folder = `signed_documents/${docType}s`;

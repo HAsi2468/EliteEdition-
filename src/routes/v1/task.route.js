@@ -17,4 +17,9 @@ router.post('/:id/checklist', taskController.addChecklistItem);
 router.put('/:id/checklist/:itemId', taskController.toggleChecklistItem);
 router.post('/:id/comments', taskController.addComment);
 
+// Attachments (stored in Cloudflare R2)
+router.post('/:id/attachments', taskController.addAttachment);
+router.delete('/:id/attachments/:attachmentId', taskController.deleteAttachment);
+
 module.exports = router;
+

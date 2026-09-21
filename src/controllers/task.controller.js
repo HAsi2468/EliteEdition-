@@ -90,7 +90,8 @@ const getTaskById = async (req, res) => {
     const task = await Task.findById(id)
       .populate('assignees', 'name email role department')
       .populate('createdBy', 'name email role')
-      .populate('dependencies', 'title status priority assignees');
+      .populate('dependencies', 'title status priority assignees')
+      .populate('attachments.uploadedBy', 'name email');
 
     if (!task) {
       return res.status(404).json({ success: false, message: 'Task not found' });
@@ -122,6 +123,8 @@ const createTask = async (req, res) => {
       dependencies = [],
       checklist = [],
       tags = [],
+      attachments = [],
+      images = [],
       createdBy: customCreatedBy,
       createdByName = 'Admin'
     } = req.body;
@@ -147,6 +150,15 @@ const createTask = async (req, res) => {
       timestamp: new Date()
     }];
 
+    const formattedAttachments = Array.isArray(attachments) ? attachments.map(att => ({
+      fileName: att.fileName || att.name || 'Attachment',
+      fileUrl: att.fileUrl || att.url,
+      fileSize: Number(att.fileSize || att.size) || 0,
+      fileType: att.fileType || att.type || 'document',
+      uploadedBy: creatorId,
+      uploadedAt: att.uploadedAt ? new Date(att.uploadedAt) : new Date()
+    })).filter(att => !!att.fileUrl) : [];
+
     const task = await Task.create({
       title: title.trim(),
       description: description.trim(),
@@ -161,13 +173,16 @@ const createTask = async (req, res) => {
       dependencies,
       checklist,
       tags,
+      attachments: formattedAttachments,
+      images: Array.isArray(images) ? images : formattedAttachments.filter(a => /\.(jpg|jpeg|png|webp|gif)$/i.test(a.fileName)).map(a => a.fileUrl),
       createdBy: creatorId,
       auditLogs: initialAudit
     });
 
     const populated = await Task.findById(task._id)
       .populate('assignees', 'name email role department')
-      .populate('createdBy', 'name email role');
+      .populate('createdBy', 'name email role')
+      .populate('attachments.uploadedBy', 'name email');
 
     res.status(201).json({ success: true, data: populated });
   } catch (error) {
@@ -516,6 +531,114 @@ const addComment = async (req, res) => {
 };
 
 /**
+ * Add Attachment to Task (stored in Cloudflare R2)
+ */
+const addAttachment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fileName, fileUrl, fileSize = 0, fileType = 'document' } = req.body;
+    const userId = req.user ? req.user._id : (req.body.userId || null);
+    const userName = req.user ? (req.user.name || req.user.username) : (req.body.userName || 'Staff');
+
+    if (!fileName || !fileUrl) {
+      return res.status(400).json({ success: false, message: 'fileName and fileUrl are required' });
+    }
+
+    const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+
+    if (!task.attachments) task.attachments = [];
+    task.attachments.push({
+      fileName,
+      fileUrl,
+      fileSize: Number(fileSize) || 0,
+      fileType,
+      uploadedBy: userId,
+      uploadedAt: new Date()
+    });
+
+    if (fileType.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)$/i.test(fileName)) {
+      if (!task.images) task.images = [];
+      if (!task.images.includes(fileUrl)) {
+        task.images.push(fileUrl);
+      }
+    }
+
+    if (!task.auditLogs) task.auditLogs = [];
+    task.auditLogs.push({
+      user: userId,
+      userName,
+      fieldChanged: 'Attachment Added',
+      oldValue: '',
+      newValue: `Attached "${fileName}"`,
+      timestamp: new Date()
+    });
+
+    await task.save();
+
+    const populated = await Task.findById(id)
+      .populate('assignees', 'name email role department')
+      .populate('createdBy', 'name email role')
+      .populate('dependencies', 'title status priority assignees')
+      .populate('attachments.uploadedBy', 'name email');
+
+    res.json({ success: true, data: populated });
+  } catch (error) {
+    console.error('Error adding task attachment:', error);
+    res.status(500).json({ success: false, message: 'Failed to add attachment', error: error.message });
+  }
+};
+
+/**
+ * Delete Attachment from Task
+ */
+const deleteAttachment = async (req, res) => {
+  try {
+    const { id, attachmentId } = req.params;
+    const userId = req.user ? req.user._id : (req.body?.userId || null);
+    const userName = req.user ? (req.user.name || req.user.username) : (req.body?.userName || 'Staff');
+
+    const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+
+    const existingAtt = (task.attachments || []).find(a => String(a._id) === String(attachmentId));
+    const attName = existingAtt ? existingAtt.fileName : 'attachment';
+
+    task.attachments = (task.attachments || []).filter(a => String(a._id) !== String(attachmentId));
+    if (existingAtt?.fileUrl && task.images) {
+      task.images = task.images.filter(img => img !== existingAtt.fileUrl);
+    }
+
+    if (!task.auditLogs) task.auditLogs = [];
+    task.auditLogs.push({
+      user: userId,
+      userName,
+      fieldChanged: 'Attachment Removed',
+      oldValue: `Removed "${attName}"`,
+      newValue: '',
+      timestamp: new Date()
+    });
+
+    await task.save();
+
+    const populated = await Task.findById(id)
+      .populate('assignees', 'name email role department')
+      .populate('createdBy', 'name email role')
+      .populate('dependencies', 'title status priority assignees')
+      .populate('attachments.uploadedBy', 'name email');
+
+    res.json({ success: true, data: populated });
+  } catch (error) {
+    console.error('Error deleting task attachment:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete attachment', error: error.message });
+  }
+};
+
+/**
  * Check for tasks that have passed their due date without being marked as 'Done'
  */
 const checkOverdueTasks = async (io) => {
@@ -585,5 +708,7 @@ module.exports = {
   addChecklistItem,
   toggleChecklistItem,
   addComment,
+  addAttachment,
+  deleteAttachment,
   checkOverdueTasks
 };
