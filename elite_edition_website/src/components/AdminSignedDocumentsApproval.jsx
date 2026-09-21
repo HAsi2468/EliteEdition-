@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
+import { useSocket } from '../contexts/SocketContext';
 import { triggerPushNotification } from './NotificationToast';
 import SignedDocumentPreviewModal from './SignedDocumentPreviewModal';
 import {
@@ -8,7 +9,6 @@ import {
   XCircle,
   Clock,
   Search,
-  RotateCw,
   ExternalLink,
   Eye,
   Filter,
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 
 export default function AdminSignedDocumentsApproval() {
+  const socket = useSocket();
   const [documents, setDocuments] = useState([]);
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0 });
   const [loading, setLoading] = useState(false);
@@ -54,6 +55,18 @@ export default function AdminSignedDocumentsApproval() {
     const interval = setInterval(fetchDocuments, 30000);
     return () => clearInterval(interval);
   }, [fetchDocuments]);
+
+  // Real-time automatic updates via Socket.IO - no manual refresh needed!
+  useEffect(() => {
+    if (!socket) return;
+    const handleSocketUpdate = () => {
+      fetchDocuments();
+    };
+    socket.on('signed-document-updated', handleSocketUpdate);
+    return () => {
+      socket.off('signed-document-updated', handleSocketUpdate);
+    };
+  }, [socket, fetchDocuments]);
 
   const handleApprove = async (doc) => {
     setProcessingId(doc._id);
@@ -140,29 +153,6 @@ export default function AdminSignedDocumentsApproval() {
             </div>
           </div>
         </div>
-
-        <button
-          type="button"
-          onClick={fetchDocuments}
-          disabled={loading}
-          style={{
-            background: '#ffffff',
-            border: '1px solid #cbd5e1',
-            color: '#1e293b',
-            padding: '0.55rem 1rem',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '0.82rem',
-            fontWeight: 600,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-          }}
-        >
-          <RotateCw size={15} className={loading ? 'animate-spin' : ''} />
-          Refresh
-        </button>
       </div>
 
       {/* Filter Tabs & Search */}
