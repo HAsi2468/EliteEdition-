@@ -135,6 +135,31 @@ export default function JobCardTooltip({ card, children, style = {} }) {
               />
             </div>
           </div>
+
+          {/* Invoices & Delivery Breakdown */}
+          {((card.invoices && card.invoices.length > 0) || card.billNo) && (
+            <div style={{ marginTop: '0.55rem', paddingTop: '0.45rem', borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', fontWeight: 700, marginBottom: '0.25rem' }}>
+                <span style={{ color: '#94a3b8' }}>INVOICES / DELIVERED</span>
+                <span style={{ color: '#34d399' }}>
+                  {card.deliveredMtr || 0}m {card.invoices?.length ? `(${card.invoices.length} ${card.invoices.length === 1 ? 'bill' : 'bills'})` : ''}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                {card.invoices && card.invoices.length > 0 ? (
+                  card.invoices.map((inv, idx) => (
+                    <span key={idx} style={{ fontSize: '0.62rem', fontWeight: 700, background: 'rgba(56,189,248,0.15)', color: '#38bdf8', padding: '1px 5px', borderRadius: '3px', border: '1px solid rgba(56,189,248,0.3)' }}>
+                      📄 {inv.invoiceNo} {inv.meters ? `(${inv.meters}m)` : ''}
+                    </span>
+                  ))
+                ) : (
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#38bdf8' }}>
+                    Bill No: {card.billNo}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

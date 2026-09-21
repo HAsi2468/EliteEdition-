@@ -411,36 +411,97 @@ const syncChallanStatusForInvoice = async (invoice) => {
   }
 };
 
-// Helper function to auto-sync billNo into JobCards matching invoice items
+// Helper function to auto-sync invoices & billNo into JobCards matching invoice items
 const syncJobCardsForInvoice = async (invoice) => {
   if (!invoice || !Array.isArray(invoice.items)) return;
   try {
     const JobCard = require('../db/models/jobCard.model');
-    const jobNos = new Set();
+    const BillingInvoice = require('../db/models/billingInvoice.model');
+
+    const jobKeys = new Set();
     invoice.items.forEach(it => {
       if (it.jobNo && String(it.jobNo).trim()) {
         const raw = String(it.jobNo).trim();
-        jobNos.add(raw);
-        const clean = raw.replace(/^JC-/i, '').replace(/^JOB\s*NO\.?\s*[-:]?\s*/i, '').trim();
-        if (clean) {
-          jobNos.add(clean);
-          jobNos.add(`JOB-${clean}`);
-          jobNos.add(`JOB NO.- ${clean}`);
-        }
+        const digits = raw.replace(/[^\d]/g, '');
+        if (digits) jobKeys.add(digits);
+        else jobKeys.add(raw.toLowerCase());
       }
     });
 
-    if (jobNos.size > 0) {
-      const jobNoList = Array.from(jobNos);
-      await JobCard.updateMany(
-        {
-          $or: [
-            { jobNo: { $in: jobNoList } },
-            { jobNo: { $in: jobNoList.map(j => Number(j)).filter(n => !isNaN(n)) } }
-          ]
-        },
-        { $set: { billNo: invoice.invoiceNo } }
-      );
+    if (jobKeys.size === 0) return;
+
+    // Fetch all active invoices to re-aggregate history for affected jobs
+    const allInvoices = await BillingInvoice.find({
+      invoiceStatus: { $ne: 'CANCELLED' }
+    }).select('_id invoiceNo invoiceDate items').lean();
+
+    // Map invoice entries by job digits/key
+    const jobInvoicesMap = new Map();
+    allInvoices.forEach(inv => {
+      (inv.items || []).forEach(it => {
+        if (!it.jobNo || !String(it.jobNo).trim()) return;
+        const raw = String(it.jobNo).trim();
+        const digits = raw.replace(/[^\d]/g, '');
+        const key = digits || raw.toLowerCase();
+
+        if (jobKeys.has(key)) {
+          if (!jobInvoicesMap.has(key)) {
+            jobInvoicesMap.set(key, []);
+          }
+          jobInvoicesMap.get(key).push({
+            invoiceId: inv._id,
+            invoiceNo: inv.invoiceNo,
+            date: inv.invoiceDate,
+            meters: Number(it.qty) || 0,
+            amount: Number(it.totalAmount) || 0
+          });
+        }
+      });
+    });
+
+    // Find and update matching JobCards
+    const allJobCards = await JobCard.find({});
+    for (const card of allJobCards) {
+      if (!card.jobNo) continue;
+      const raw = String(card.jobNo).trim();
+      const digits = raw.replace(/[^\d]/g, '');
+      const key = digits || raw.toLowerCase();
+
+      if (jobKeys.has(key)) {
+        const invList = jobInvoicesMap.get(key) || [];
+        const totalDeliveredMtr = invList.reduce((sum, item) => sum + (item.meters || 0), 0);
+        const uniqueBillNos = Array.from(new Set(invList.map(i => i.invoiceNo))).filter(Boolean);
+
+        card.invoices = invList.map(i => ({
+          invoiceId: i.invoiceId,
+          invoiceNo: i.invoiceNo,
+          date: i.date,
+          meters: i.meters,
+          amount: i.amount
+        }));
+        card.deliveredMtr = Math.round(totalDeliveredMtr * 100) / 100;
+        card.billNo = uniqueBillNos.join(', ');
+
+        const targetMatch = String(card.totalMtr || card.consumption || '0').match(/[\d.]+/);
+        const targetMtr = targetMatch ? parseFloat(targetMatch[0]) : 0;
+
+        if (targetMtr > 0 && totalDeliveredMtr >= targetMtr) {
+          card.deliveryStatus = 'Delivery Done';
+          if (card.status !== 'Done' && card.fusingStatus === 'Fusing Done') {
+            card.status = 'Done';
+          }
+        }
+
+        if (!card.deliveryDate && invList.length > 0) {
+          const sorted = [...invList].sort((a, b) => new Date(b.date) - new Date(a.date));
+          if (sorted[0]?.date) {
+            const dt = new Date(sorted[0].date);
+            card.deliveryDate = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+          }
+        }
+
+        await card.save();
+      }
     }
   } catch (err) {
     console.warn('syncJobCardsForInvoice warning: %s', err.message);
@@ -676,6 +737,7 @@ const deleteInvoice = async (req, res) => {
     };
     await FabricChallan.updateMany(queryInv, { $set: { status: 'PENDING' }, $unset: { invoiceId: 1, invoiceNo: 1 } });
     await StitchingChallan.updateMany(queryInv, { $set: { status: 'PENDING' }, $unset: { invoiceId: 1, invoiceNo: 1 } });
+    await syncJobCardsForInvoice(invoice);
 
     res.json({ success: true, message: 'Invoice deleted successfully' });
   } catch (error) {

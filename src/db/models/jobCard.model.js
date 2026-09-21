@@ -34,6 +34,16 @@ const jobCardSchema = new mongoose.Schema(
     billTo:           { type: String, default: '', trim: true },
     shipTo:           { type: String, default: '', trim: true },
     billNo:           { type: String, default: '', trim: true },
+    invoices: [
+      {
+        invoiceId:   { type: mongoose.Schema.Types.ObjectId, ref: 'BillingInvoice' },
+        invoiceNo:   { type: String, default: '', trim: true },
+        date:        { type: Date },
+        meters:      { type: Number, default: 0 },
+        amount:      { type: Number, default: 0 }
+      }
+    ],
+    deliveredMtr:     { type: Number, default: 0 },
     machineName:      { type: String, default: '', trim: true },
     note1:            { type: String, default: '', trim: true },
     note2:            { type: String, default: '', trim: true },

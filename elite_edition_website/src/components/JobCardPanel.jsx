@@ -2295,9 +2295,15 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
   };
 
   const handleSendToBilling = (c) => {
+    const totalM = parseFloat(c.totalMtr) || parseFloat(c.totalQty) || 1;
+    const deliveredM = parseFloat(c.deliveredMtr) || 0;
+    const remainingM = totalM > deliveredM ? (totalM - deliveredM) : totalM;
+    const billQty = Math.round(remainingM * 100) / 100;
+    const rate = parseFloat(c.rate) || 0;
+
     const challanData = {
       isJobCardChallan: true,
-      challanNo: c.billNo || c.ourChallanNo || c.jobNo,
+      challanNo: c.ourChallanNo || c.jobNo,
       jobNo: c.jobNo,
       party: c.party,
       customerName: c.party,
@@ -2308,14 +2314,14 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
       vendorChallanNo: c.partyChallan,
       ourChallanNo: c.ourChallanNo || c.jobNo,
       date: c.date,
-      totalMtr: c.totalMtr,
+      totalMtr: billQty,
       items: [
         {
           designNo: c.designNo || c.designName,
           particulars: `Digital Printing Service - ${c.fabric || 'Fabric'} (Design: ${c.designNo || c.designName || ''})`,
-          pcs: parseFloat(c.totalMtr) || parseFloat(c.totalQty) || 1,
-          rate: parseFloat(c.rate) || 0,
-          amount: (parseFloat(c.totalMtr) || 1) * (parseFloat(c.rate) || 0),
+          pcs: billQty,
+          rate: rate,
+          amount: billQty * rate,
           hsnCode: '998821',
           unit: 'Meters',
           jobNo: c.jobNo,

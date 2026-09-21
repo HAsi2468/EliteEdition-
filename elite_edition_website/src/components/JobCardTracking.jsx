@@ -286,6 +286,18 @@ export default function JobCardTracking({ onPreview }) {
     return val;
   };
 
+  const handleDownloadInvoicePdf = async (invoiceId, invoiceNo) => {
+    if (!invoiceId) {
+      alert(`Invoice #${invoiceNo} ID not found.`);
+      return;
+    }
+    try {
+      await api.downloadInvoicePdf(invoiceId, invoiceNo);
+    } catch (err) {
+      alert(`Failed to download invoice PDF: ${err.message}`);
+    }
+  };
+
   // 🖨️ PDF REPORT GENERATOR (Respects all date, print, fusing, delivery, and search filters)
   const handleDownloadTrackingPdfReport = () => {
     if (!cards || cards.length === 0) {
@@ -794,7 +806,50 @@ export default function JobCardTracking({ onPreview }) {
 
                       {/* Bill No */}
                       <td style={tdStyle}>
-                        {isAdmin ? (
+                        {c.invoices && c.invoices.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: '110px' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                              {c.invoices.map((inv, iIdx) => (
+                                <button
+                                  key={inv.invoiceId || iIdx}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadInvoicePdf(inv.invoiceId, inv.invoiceNo);
+                                  }}
+                                  title={`Invoice: ${inv.invoiceNo}\nMeters: ${inv.meters} mtr\nDate: ${formatDateDDMMYYYY(inv.date)}\nAmount: ₹${(inv.amount || 0).toLocaleString('en-IN')}\nClick to Download PDF`}
+                                  style={{
+                                    background: 'rgba(56, 189, 248, 0.12)',
+                                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                                    color: '#38bdf8',
+                                    borderRadius: '4px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    padding: '2px 5px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    whiteSpace: 'nowrap',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.25)'}
+                                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.12)'}
+                                >
+                                  📄 {inv.invoiceNo}
+                                  {inv.meters ? (
+                                    <span style={{ color: '#34d399', fontSize: '0.65rem' }}>({inv.meters}m)</span>
+                                  ) : null}
+                                </button>
+                              ))}
+                            </div>
+                            {c.invoices.length > 1 && (
+                              <span style={{ fontSize: '0.65rem', color: '#34d399', fontWeight: 700 }}>
+                                Delivered: {c.deliveredMtr || c.invoices.reduce((s, x) => s + (x.meters || 0), 0)}m ({c.invoices.length} bills)
+                              </span>
+                            )}
+                          </div>
+                        ) : isAdmin ? (
                           <input
                             type="text"
                             value={getValue(c, 'billNo')}
