@@ -359,25 +359,27 @@ export default function ClientPortal({ client, onLogout }) {
           box-sizing: border-box;
         }
         .client-welcome-card {
-          background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
-          border: 1px solid #bfdbfe;
-          border-radius: 16px;
-          padding: 1.5rem;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          padding: 1.15rem 1.35rem;
           display: flex;
           align-items: center;
           justify-content: space-between;
           flex-wrap: wrap;
-          gap: 1.25rem;
-          margin-bottom: 1.5rem;
-          box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.08);
+          gap: 1rem;
+          margin-bottom: 1.25rem;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
         }
         .client-tabs-bar {
-          display: flex;
-          gap: 0.5rem;
+          display: inline-flex;
+          background: #f1f5f9;
+          padding: 3px;
+          border-radius: 9px;
+          gap: 3px;
           margin-bottom: 1.25rem;
-          border-bottom: 1px solid #e2e8f0;
-          padding-bottom: 0.5rem;
           overflow-x: auto;
+          border: 1px solid #e2e8f0;
           scrollbar-width: none;
           -ms-overflow-style: none;
           -webkit-overflow-scrolling: touch;
@@ -388,10 +390,10 @@ export default function ClientPortal({ client, onLogout }) {
         .client-table-responsive {
           background: #ffffff;
           border: 1px solid #e2e8f0;
-          border-radius: 14px;
+          border-radius: 10px;
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
-          box-shadow: 0 4px 16px rgba(30, 58, 138, 0.05);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
         }
         .client-orders-table {
           width: 100%;
@@ -438,6 +440,15 @@ export default function ClientPortal({ client, onLogout }) {
         }
         .client-search-input {
           font-size: 16px !important; /* Prevents auto-zoom on iOS */
+          transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+        }
+        .client-search-input:focus {
+          border-color: #3b82f6 !important;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12) !important;
+        }
+        .client-search-input::placeholder {
+          color: #94a3b8 !important;
+          font-size: 0.84rem !important;
         }
         @media (max-width: 768px) {
           .client-portal-header {
@@ -554,12 +565,12 @@ export default function ClientPortal({ client, onLogout }) {
       <main className="client-portal-main" style={styles.main}>
         {/* Welcome Banner */}
         <div className="client-welcome-card" style={styles.welcomeCard}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
             <div style={styles.welcomeAvatarWrap}>
               {clientData.image ? (
                 <img src={clientData.image} alt="Logo" style={styles.welcomeAvatar} />
               ) : (
-                <Building2 size={32} color="#2563eb" />
+                <Building2 size={24} color="#2563eb" />
               )}
             </div>
             <div>
@@ -568,13 +579,28 @@ export default function ClientPortal({ client, onLogout }) {
                 <span style={styles.activePill}>Active Partner</span>
               </div>
               <div style={styles.welcomeDetailsRow}>
-                {mobile && <span>📱 {mobile}</span>}
-                {mobile && <span>•</span>}
-                <span>🏢 Party Code: <strong>{partyCode || '—'}</strong></span>
+                {partyCode && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Shield size={12} color="#2563eb" />
+                    <span>Party: <strong style={{ color: '#1d4ed8' }}>{partyCode}</strong></span>
+                  </span>
+                )}
+                {mobile && (
+                  <>
+                    <span style={{ color: '#cbd5e1' }}>•</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Phone size={12} color="#64748b" />
+                      <span>{mobile}</span>
+                    </span>
+                  </>
+                )}
                 {username && (
                   <>
-                    <span>•</span>
-                    <span>👤 User: @{username}</span>
+                    <span style={{ color: '#cbd5e1' }}>•</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <User size={12} color="#64748b" />
+                      <span>@{username}</span>
+                    </span>
                   </>
                 )}
               </div>
@@ -584,11 +610,11 @@ export default function ClientPortal({ client, onLogout }) {
           <div className="client-welcome-stats" style={styles.quickStatsRow}>
             <div style={styles.statBox}>
               <span style={styles.statNumber}>{orders.length}</span>
-              <span style={styles.statLabel}>Total Orders</span>
+              <span style={styles.statLabel}>Orders</span>
             </div>
             <div style={styles.statBox}>
-              <span style={styles.statNumber}>{designs.length}</span>
-              <span style={styles.statLabel}>Assigned Designs</span>
+              <span style={{ ...styles.statNumber, color: '#475569' }}>{designs.length}</span>
+              <span style={styles.statLabel}>Designs</span>
             </div>
           </div>
         </div>
@@ -599,92 +625,42 @@ export default function ClientPortal({ client, onLogout }) {
             style={activeTab === 'orders' ? styles.tabActive : styles.tab}
             onClick={() => setActiveTab('orders')}
           >
-            <Package size={16} />
-            <span>My Orders ({orders.length})</span>
+            <Package size={15} />
+            <span>Orders ({orders.length})</span>
           </button>
 
           <button
             style={activeTab === 'designs' ? styles.tabActive : styles.tab}
             onClick={() => setActiveTab('designs')}
           >
-            <Palette size={16} />
-            <span>Design Catalogue ({designs.length})</span>
+            <Palette size={15} />
+            <span>Designs ({designs.length})</span>
           </button>
 
           <button
             style={activeTab === 'profile' ? styles.tabActive : styles.tab}
             onClick={() => setActiveTab('profile')}
           >
-            <User size={16} />
-            <span>Company Profile & Settings</span>
+            <User size={15} />
+            <span>Company Profile</span>
           </button>
         </div>
 
         {/* ── TAB 1: Live Orders & Job Cards ── */}
         {activeTab === 'orders' && (
           <div style={styles.tabContent}>
+            {/* Minimal Toolbar */}
             <div style={styles.toolbarRow}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', flex: 1 }}>
-                <div style={styles.searchBox}>
-                  <Search size={15} color="#64748b" style={styles.searchIcon} />
-                  <input
-                    type="text"
-                    value={searchOrder}
-                    onChange={(e) => setSearchOrder(e.target.value)}
-                    placeholder="Search order/job number, design, fabric, status..."
-                    className="client-search-input"
-                    style={styles.searchInput}
-                  />
-                </div>
-
-                {/* Stage Filter Pills */}
-                <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  {[
-                    { id: 'all', label: 'All Orders', count: orderCounts.all, activeBg: '#1d4ed8' },
-                    { id: 'print-pending', label: 'Print Pending', count: orderCounts['print-pending'], activeBg: '#d97706' },
-                    { id: 'fusing-pending', label: 'Fusing Pending', count: orderCounts['fusing-pending'], activeBg: '#7c3aed' },
-                    { id: 'delivery-pending', label: 'Delivery Pending', count: orderCounts['delivery-pending'], activeBg: '#2563eb' },
-                    { id: 'delivered', label: 'Delivered', count: orderCounts['delivered'], activeBg: '#16a34a' }
-                  ].map((pill) => {
-                    const isSelected = orderStageFilter === pill.id;
-                    return (
-                      <button
-                        key={pill.id}
-                        type="button"
-                        onClick={() => setOrderStageFilter(pill.id)}
-                        style={{
-                          border: isSelected ? '1px solid transparent' : '1px solid #e2e8f0',
-                          background: isSelected ? pill.activeBg : '#ffffff',
-                          color: isSelected ? '#ffffff' : '#475569',
-                          padding: '0.32rem 0.7rem',
-                          borderRadius: '20px',
-                          fontSize: '0.76rem',
-                          fontWeight: isSelected ? 700 : 500,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          boxShadow: isSelected ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
-                          transition: 'all 0.15s ease'
-                        }}
-                      >
-                        <span>{pill.label}</span>
-                        <span
-                          style={{
-                            background: isSelected ? 'rgba(255,255,255,0.25)' : '#f1f5f9',
-                            color: isSelected ? '#ffffff' : '#64748b',
-                            fontSize: '0.68rem',
-                            padding: '1px 6px',
-                            borderRadius: '10px',
-                            fontWeight: 700
-                          }}
-                        >
-                          {pill.count}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+              <div style={styles.searchBox}>
+                <Search size={15} color="#94a3b8" style={styles.searchIcon} />
+                <input
+                  type="text"
+                  value={searchOrder}
+                  onChange={(e) => setSearchOrder(e.target.value)}
+                  placeholder="Search job no, design, fabric, quantity..."
+                  className="client-search-input"
+                  style={styles.searchInput}
+                />
               </div>
 
               <button
@@ -693,9 +669,67 @@ export default function ClientPortal({ client, onLogout }) {
                 style={styles.refreshBtn}
                 title="Refresh Orders"
               >
-                <RefreshCw size={14} className={loadingOrders ? 'spin' : ''} />
+                <RefreshCw size={13} className={loadingOrders ? 'spin' : ''} />
                 <span>Refresh</span>
               </button>
+            </div>
+
+            {/* Stage Filter Pills */}
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              {[
+                { id: 'all', label: 'All Orders', count: orderCounts.all, dot: '#2563eb' },
+                { id: 'print-pending', label: 'Print Pending', count: orderCounts['print-pending'], dot: '#d97706' },
+                { id: 'fusing-pending', label: 'Fusing Pending', count: orderCounts['fusing-pending'], dot: '#7c3aed' },
+                { id: 'delivery-pending', label: 'Delivery Pending', count: orderCounts['delivery-pending'], dot: '#0284c7' },
+                { id: 'delivered', label: 'Delivered', count: orderCounts['delivered'], dot: '#16a34a' }
+              ].map((pill) => {
+                const isSelected = orderStageFilter === pill.id;
+                return (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    onClick={() => setOrderStageFilter(pill.id)}
+                    style={{
+                      border: isSelected ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                      background: isSelected ? '#2563eb' : '#ffffff',
+                      color: isSelected ? '#ffffff' : '#475569',
+                      padding: '0.32rem 0.72rem',
+                      borderRadius: '20px',
+                      fontSize: '0.78rem',
+                      fontWeight: isSelected ? 600 : 500,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s ease',
+                      boxShadow: isSelected ? '0 1px 3px rgba(37,99,235,0.25)' : 'none'
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        backgroundColor: isSelected ? '#ffffff' : pill.dot,
+                        display: 'inline-block'
+                      }}
+                    />
+                    <span>{pill.label}</span>
+                    <span
+                      style={{
+                        background: isSelected ? 'rgba(255,255,255,0.25)' : '#f1f5f9',
+                        color: isSelected ? '#ffffff' : '#64748b',
+                        fontSize: '0.68rem',
+                        padding: '1px 6px',
+                        borderRadius: '10px',
+                        fontWeight: 700
+                      }}
+                    >
+                      {pill.count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {loadingOrders ? (
@@ -1235,28 +1269,29 @@ const styles = {
     boxSizing: 'border-box'
   },
   welcomeCard: {
-    background: 'linear-gradient(135deg, #ffffff 0%, #eff6ff 100%)',
-    border: '1px solid #bfdbfe',
-    borderRadius: '16px',
-    padding: '1.5rem',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '12px',
+    padding: '1.15rem 1.35rem',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
-    gap: '1.25rem',
-    marginBottom: '1.5rem',
-    boxShadow: '0 10px 25px -5px rgba(37, 99, 235, 0.08)'
+    gap: '1rem',
+    marginBottom: '1.25rem',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)'
   },
   welcomeAvatarWrap: {
-    width: '64px',
-    height: '64px',
-    borderRadius: '16px',
-    background: '#dbeafe',
-    border: '1.5px solid #93c5fd',
+    width: '46px',
+    height: '46px',
+    borderRadius: '10px',
+    background: '#eff6ff',
+    border: '1px solid #bfdbfe',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    flexShrink: 0
   },
   welcomeAvatar: {
     width: '100%',
@@ -1264,95 +1299,100 @@ const styles = {
     objectFit: 'cover'
   },
   welcomeHeading: {
-    fontSize: '1.35rem',
-    fontWeight: 800,
+    fontSize: '1.25rem',
+    fontWeight: 700,
     color: '#0f172a',
     margin: 0
   },
   activePill: {
     fontSize: '0.68rem',
-    fontWeight: 700,
-    background: '#eff6ff',
-    color: '#1d4ed8',
+    fontWeight: 600,
+    background: '#f0fdf4',
+    color: '#16a34a',
     padding: '2px 8px',
-    borderRadius: '12px',
-    border: '1px solid #bfdbfe'
+    borderRadius: '10px',
+    border: '1px solid #bbf7d0'
   },
   welcomeDetailsRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem',
-    fontSize: '0.82rem',
+    gap: '0.65rem',
+    fontSize: '0.8rem',
     color: '#64748b',
     marginTop: '0.35rem',
     flexWrap: 'wrap'
   },
   quickStatsRow: {
     display: 'flex',
-    gap: '0.85rem'
+    gap: '0.75rem'
   },
   statBox: {
-    background: '#ffffff',
-    border: '1px solid #dbeafe',
-    borderRadius: '12px',
-    padding: '0.75rem 1.25rem',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+    padding: '0.5rem 1rem',
     textAlign: 'center',
-    minWidth: '85px',
-    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.05)'
+    minWidth: '80px'
   },
   statNumber: {
     display: 'block',
-    fontSize: '1.45rem',
-    fontWeight: 800,
-    color: '#1d4ed8'
+    fontSize: '1.3rem',
+    fontWeight: 700,
+    color: '#1d4ed8',
+    lineHeight: 1.1
   },
   statLabel: {
-    fontSize: '0.7rem',
+    fontSize: '0.66rem',
     color: '#64748b',
+    fontWeight: 600,
     textTransform: 'uppercase',
-    letterSpacing: '0.04em'
+    letterSpacing: '0.04em',
+    marginTop: '2px'
   },
   tabsContainer: {
-    display: 'flex',
-    gap: '0.5rem',
+    display: 'inline-flex',
+    background: '#f1f5f9',
+    padding: '3px',
+    borderRadius: '9px',
+    gap: '3px',
     marginBottom: '1.25rem',
-    borderBottom: '1px solid #e2e8f0',
-    paddingBottom: '0.5rem',
-    overflowX: 'auto'
+    overflowX: 'auto',
+    border: '1px solid #e2e8f0'
   },
   tab: {
-    display: 'flex',
+    display: 'inline-flex',
     alignItems: 'center',
     gap: '0.45rem',
-    padding: '0.65rem 1.15rem',
-    borderRadius: '10px',
+    padding: '0.45rem 1rem',
+    borderRadius: '7px',
     background: 'transparent',
-    border: '1px solid transparent',
+    border: 'none',
     color: '#64748b',
-    fontSize: '0.88rem',
-    fontWeight: 600,
+    fontSize: '0.84rem',
+    fontWeight: 500,
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     whiteSpace: 'nowrap'
   },
   tabActive: {
-    display: 'flex',
+    display: 'inline-flex',
     alignItems: 'center',
     gap: '0.45rem',
-    padding: '0.65rem 1.15rem',
-    borderRadius: '10px',
-    background: '#eff6ff',
-    border: '1px solid #93c5fd',
+    padding: '0.45rem 1rem',
+    borderRadius: '7px',
+    background: '#ffffff',
+    border: 'none',
     color: '#1d4ed8',
-    fontSize: '0.88rem',
-    fontWeight: 700,
+    fontSize: '0.84rem',
+    fontWeight: 600,
     cursor: 'pointer',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
     whiteSpace: 'nowrap'
   },
   tabContent: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '1rem'
+    gap: '0.85rem'
   },
   toolbarRow: {
     display: 'flex',
@@ -1363,40 +1403,43 @@ const styles = {
   },
   searchBox: {
     position: 'relative',
-    flex: '1 1 250px'
+    width: '100%',
+    maxWidth: '380px'
   },
   searchIcon: {
     position: 'absolute',
-    left: '12px',
+    left: '11px',
     top: '50%',
     transform: 'translateY(-50%)',
     pointerEvents: 'none'
   },
   searchInput: {
     width: '100%',
-    padding: '0.6rem 0.85rem 0.6rem 2.3rem',
-    borderRadius: '10px',
+    height: '38px',
+    padding: '0 12px 0 34px',
+    borderRadius: '8px',
     background: '#ffffff',
-    border: '1.5px solid #cbd5e1',
+    border: '1px solid #cbd5e1',
     color: '#0f172a',
-    fontSize: '0.88rem',
-    boxSizing: 'border-box',
+    fontSize: '0.85rem',
     outline: 'none',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+    boxSizing: 'border-box',
+    transition: 'border-color 0.15s ease, box-shadow 0.15s ease'
   },
   refreshBtn: {
-    display: 'flex',
+    display: 'inline-flex',
     alignItems: 'center',
-    gap: '0.35rem',
-    padding: '0.6rem 0.95rem',
-    borderRadius: '10px',
+    gap: '6px',
+    height: '38px',
+    padding: '0 14px',
+    borderRadius: '8px',
     background: '#ffffff',
-    border: '1.5px solid #cbd5e1',
-    color: '#1e293b',
+    border: '1px solid #cbd5e1',
+    color: '#334155',
     fontSize: '0.82rem',
     fontWeight: 600,
     cursor: 'pointer',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+    transition: 'all 0.15s ease'
   },
   emptyState: {
     padding: '3rem 1.5rem',
