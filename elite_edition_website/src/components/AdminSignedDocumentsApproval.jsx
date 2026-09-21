@@ -110,30 +110,31 @@ export default function AdminSignedDocumentsApproval() {
           gap: '1rem',
           marginBottom: '1.25rem',
           paddingBottom: '1rem',
-          borderBottom: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))'
+          borderBottom: '1px solid #e2e8f0'
         }}
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <div
               style={{
-                width: '36px',
-                height: '36px',
+                width: '38px',
+                height: '38px',
                 borderRadius: '10px',
-                background: 'rgba(56, 189, 248, 0.15)',
-                color: '#38bdf8',
+                background: '#eff6ff',
+                color: '#2563eb',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                border: '1px solid #bfdbfe'
               }}
             >
-              <FileCheck size={20} />
+              <FileCheck size={22} />
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
+              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
                 Signed Documents Approval Queue
               </h2>
-              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted, #94a3b8)' }}>
+              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
                 Review and approve physical signed copies of Challans and Invoices (stored in Cloudflare R2).
               </p>
             </div>
@@ -145,9 +146,9 @@ export default function AdminSignedDocumentsApproval() {
           onClick={fetchDocuments}
           disabled={loading}
           style={{
-            background: 'var(--bg-secondary, rgba(255, 255, 255, 0.05))',
-            border: '1px solid var(--border-color, rgba(255, 255, 255, 0.12))',
-            color: 'var(--text-main, #f8fafc)',
+            background: '#ffffff',
+            border: '1px solid #cbd5e1',
+            color: '#1e293b',
             padding: '0.55rem 1rem',
             borderRadius: '8px',
             cursor: 'pointer',
@@ -155,7 +156,8 @@ export default function AdminSignedDocumentsApproval() {
             fontWeight: 600,
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.4rem'
+            gap: '0.4rem',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
           }}
         >
           <RotateCw size={15} className={loading ? 'animate-spin' : ''} />
@@ -178,18 +180,18 @@ export default function AdminSignedDocumentsApproval() {
         <div
           style={{
             display: 'flex',
-            background: 'var(--bg-secondary, rgba(255, 255, 255, 0.04))',
+            background: '#f1f5f9',
             padding: '4px',
             borderRadius: '12px',
-            border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
+            border: '1px solid #e2e8f0',
             gap: '4px'
           }}
         >
           {[
-            { key: 'PENDING', label: 'Pending Review', count: stats.pending, color: '#fbbf24' },
-            { key: 'APPROVED', label: 'Approved', count: stats.approved, color: '#34d399' },
-            { key: 'REJECTED', label: 'Rejected', count: stats.rejected, color: '#f87171' },
-            { key: 'ALL', label: 'All', count: stats.total, color: '#94a3b8' }
+            { key: 'PENDING', label: 'Pending Review', count: stats.pending, color: '#d97706' },
+            { key: 'APPROVED', label: 'Approved', count: stats.approved, color: '#059669' },
+            { key: 'REJECTED', label: 'Rejected', count: stats.rejected, color: '#dc2626' },
+            { key: 'ALL', label: 'All', count: stats.total, color: '#475569' }
           ].map(tab => {
             const active = statusFilter === tab.key;
             return (
@@ -198,9 +200,9 @@ export default function AdminSignedDocumentsApproval() {
                 type="button"
                 onClick={() => setStatusFilter(tab.key)}
                 style={{
-                  background: active ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-                  border: active ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
-                  color: active ? '#60a5fa' : 'var(--text-muted, #94a3b8)',
+                  background: active ? '#ffffff' : 'transparent',
+                  border: active ? '1px solid #cbd5e1' : '1px solid transparent',
+                  color: active ? '#1d4ed8' : '#64748b',
                   padding: '6px 14px',
                   borderRadius: '8px',
                   fontSize: '0.82rem',
@@ -209,6 +211,7 @@ export default function AdminSignedDocumentsApproval() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
+                  boxShadow: active ? '0 2px 4px rgba(0,0,0,0.06)' : 'none',
                   transition: 'all 0.15s'
                 }}
               >
@@ -218,8 +221,8 @@ export default function AdminSignedDocumentsApproval() {
                     fontSize: '0.7rem',
                     padding: '1px 6px',
                     borderRadius: '10px',
-                    background: active ? tab.color : 'rgba(255,255,255,0.08)',
-                    color: active ? '#000' : 'inherit',
+                    background: active ? '#eff6ff' : '#e2e8f0',
+                    color: active ? tab.color : '#64748b',
                     fontWeight: 800
                   }}
                 >
@@ -237,15 +240,16 @@ export default function AdminSignedDocumentsApproval() {
             value={typeFilter}
             onChange={e => setTypeFilter(e.target.value)}
             style={{
-              background: 'var(--bg-secondary, rgba(255, 255, 255, 0.05))',
-              border: '1px solid var(--border-color, rgba(255, 255, 255, 0.12))',
-              color: 'var(--text-main, #f8fafc)',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              color: '#0f172a',
               padding: '0.55rem 0.85rem',
               borderRadius: '8px',
               fontSize: '0.82rem',
               outline: 'none',
               fontWeight: 600,
-              cursor: 'pointer'
+              cursor: 'pointer',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
             }}
           >
             <option value="all">All Documents</option>
@@ -258,27 +262,27 @@ export default function AdminSignedDocumentsApproval() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              background: 'var(--bg-secondary, rgba(255, 255, 255, 0.05))',
-              border: '1px solid var(--border-color, rgba(255, 255, 255, 0.12))',
+              gap: '0.4rem',
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
               borderRadius: '8px',
               padding: '0.35rem 0.75rem',
-              gap: '0.4rem',
-              width: '240px'
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
             }}
           >
-            <Search size={15} color="var(--text-muted, #94a3b8)" />
+            <Search size={15} color="#94a3b8" />
             <input
               type="text"
-              placeholder="Search by party, number, staff..."
+              placeholder="Search challan #, invoice #, party..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: 'var(--text-main, #f8fafc)',
+                color: '#0f172a',
                 fontSize: '0.82rem',
                 outline: 'none',
-                width: '100%'
+                width: '210px'
               }}
             />
           </div>
@@ -286,26 +290,24 @@ export default function AdminSignedDocumentsApproval() {
       </div>
 
       {/* Documents Grid / Table */}
-      {loading ? (
-        <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted, #94a3b8)' }}>
-          <div className="animate-spin" style={{ display: 'inline-block', marginBottom: '0.5rem' }}>
-            <RotateCw size={24} color="#3b82f6" />
-          </div>
-          <div>Loading signed documents...</div>
+      {loading && documents.length === 0 ? (
+        <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+          <RotateCw size={28} className="animate-spin" style={{ margin: '0 auto 0.75rem', display: 'block', color: '#2563eb' }} />
+          Loading signed document queue...
         </div>
       ) : documents.length === 0 ? (
         <div
           style={{
-            padding: '3.5rem 1rem',
+            padding: '3.5rem 1.5rem',
             textAlign: 'center',
-            background: 'var(--bg-secondary, rgba(255, 255, 255, 0.02))',
-            border: '1px dashed var(--border-color, rgba(255, 255, 255, 0.1))',
+            background: '#f8fafc',
+            border: '1px dashed #cbd5e1',
             borderRadius: '16px',
-            color: 'var(--text-muted, #94a3b8)'
+            color: '#64748b'
           }}
         >
-          <CheckCircle size={38} color="#10b981" style={{ marginBottom: '0.75rem', opacity: 0.8 }} />
-          <h4 style={{ margin: '0 0 0.25rem', fontSize: '1.05rem', color: 'var(--text-main, #f8fafc)' }}>
+          <CheckCircle size={38} color="#059669" style={{ marginBottom: '0.75rem', opacity: 0.9 }} />
+          <h4 style={{ margin: '0 0 0.25rem', fontSize: '1.05rem', color: '#0f172a' }}>
             No documents in this queue
           </h4>
           <p style={{ margin: 0, fontSize: '0.82rem' }}>
@@ -333,19 +335,19 @@ export default function AdminSignedDocumentsApproval() {
               <div
                 key={doc._id}
                 style={{
-                  background: 'var(--card-bg, rgba(30, 41, 59, 0.7))',
+                  background: '#ffffff',
                   border: isPending
-                    ? '1px solid rgba(245, 158, 11, 0.4)'
+                    ? '1.5px solid #f59e0b'
                     : isApproved
-                    ? '1px solid rgba(16, 185, 129, 0.3)'
-                    : '1px solid rgba(239, 68, 68, 0.3)',
+                    ? '1.5px solid #10b981'
+                    : '1.5px solid #ef4444',
                   borderRadius: '14px',
                   padding: '1.1rem',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '0.85rem',
                   position: 'relative',
-                  boxShadow: '0 4px 15px rgba(0, 0, 0, 0.15)',
+                  boxShadow: '0 4px 15px rgba(0, 0, 0, 0.06)',
                   transition: 'transform 0.15s ease'
                 }}
               >
@@ -358,19 +360,20 @@ export default function AdminSignedDocumentsApproval() {
                           fontSize: '0.68rem',
                           fontWeight: 800,
                           textTransform: 'uppercase',
-                          padding: '1px 6px',
+                          padding: '2px 7px',
                           borderRadius: '4px',
-                          background: doc.docType === 'challan' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(56, 189, 248, 0.2)',
-                          color: doc.docType === 'challan' ? '#c084fc' : '#38bdf8'
+                          background: doc.docType === 'challan' ? '#f3e8ff' : '#e0f2fe',
+                          color: doc.docType === 'challan' ? '#7e22ce' : '#0369a1',
+                          border: `1px solid ${doc.docType === 'challan' ? '#d8b4fe' : '#bae6fd'}`
                         }}
                       >
                         {doc.docType}
                       </span>
-                      <span style={{ fontSize: '0.98rem', fontWeight: 800, color: 'var(--text-main, #f8fafc)' }}>
+                      <span style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
                         {doc.docNumber}
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-main, #f8fafc)' }}>
+                    <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>
                       {doc.partyName}
                     </div>
                   </div>
@@ -386,17 +389,17 @@ export default function AdminSignedDocumentsApproval() {
                       alignItems: 'center',
                       gap: '4px',
                       background: isApproved
-                        ? 'rgba(16, 185, 129, 0.15)'
+                        ? '#ecfdf5'
                         : isRejected
-                        ? 'rgba(239, 68, 68, 0.15)'
-                        : 'rgba(245, 158, 11, 0.15)',
-                      color: isApproved ? '#34d399' : isRejected ? '#f87171' : '#fbbf24',
+                        ? '#fef2f2'
+                        : '#fffbeb',
+                      color: isApproved ? '#059669' : isRejected ? '#dc2626' : '#d97706',
                       border: `1px solid ${
                         isApproved
-                          ? 'rgba(16, 185, 129, 0.3)'
+                          ? '#a7f3d0'
                           : isRejected
-                          ? 'rgba(239, 68, 68, 0.3)'
-                          : 'rgba(245, 158, 11, 0.3)'
+                          ? '#fca5a5'
+                          : '#fde68a'
                       }`
                     }}
                   >
@@ -412,7 +415,8 @@ export default function AdminSignedDocumentsApproval() {
                   style={{
                     display: 'flex',
                     gap: '0.5rem',
-                    background: 'rgba(0, 0, 0, 0.25)',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
                     padding: '6px',
                     borderRadius: '10px',
                     cursor: 'pointer'
@@ -430,7 +434,7 @@ export default function AdminSignedDocumentsApproval() {
                           borderRadius: '6px',
                           overflow: 'hidden',
                           position: 'relative',
-                          border: '1px solid rgba(255, 255, 255, 0.1)'
+                          border: '1px solid #cbd5e1'
                         }}
                       >
                         <img
@@ -443,7 +447,7 @@ export default function AdminSignedDocumentsApproval() {
                             position: 'absolute',
                             bottom: '3px',
                             right: '3px',
-                            background: 'rgba(0, 0, 0, 0.7)',
+                            background: 'rgba(15, 23, 42, 0.8)',
                             color: '#fff',
                             fontSize: '0.62rem',
                             padding: '1px 5px',
@@ -456,32 +460,32 @@ export default function AdminSignedDocumentsApproval() {
                       </div>
                     ))
                   ) : (
-                    <div style={{ padding: '1rem', color: 'var(--text-muted, #94a3b8)', fontSize: '0.78rem' }}>
+                    <div style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.78rem' }}>
                       No image
                     </div>
                   )}
                 </div>
 
                 {/* Metadata details */}
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   <div>
-                    👤 Uploaded by: <strong style={{ color: 'var(--text-main, #f8fafc)' }}>{signed.uploadedByName || 'Staff'}</strong>
+                    👤 Uploaded by: <strong style={{ color: '#0f172a' }}>{signed.uploadedByName || 'Staff'}</strong>
                     {signed.uploadedAt && (
                       <span> • {new Date(signed.uploadedAt).toLocaleDateString('en-IN')}</span>
                     )}
                   </div>
                   {doc.amountOrMtr && (
                     <div>
-                      📦 Total: <strong style={{ color: '#c084fc' }}>{doc.amountOrMtr}</strong>
+                      📦 Total: <strong style={{ color: '#2563eb' }}>{doc.amountOrMtr}</strong>
                     </div>
                   )}
                   {isRejected && signed.rejectionReason && (
-                    <div style={{ color: '#f87171', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <div style={{ color: '#dc2626', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <AlertCircle size={12} /> Reason: {signed.rejectionReason}
                     </div>
                   )}
                   {isApproved && signed.approvedByName && (
-                    <div style={{ color: '#34d399', marginTop: '2px' }}>
+                    <div style={{ color: '#059669', marginTop: '2px', fontWeight: 600 }}>
                       ✓ Verified by {signed.approvedByName}
                     </div>
                   )}
@@ -494,7 +498,7 @@ export default function AdminSignedDocumentsApproval() {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: '0.5rem',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                    borderTop: '1px solid #f1f5f9',
                     paddingTop: '0.75rem',
                     marginTop: 'auto'
                   }}
@@ -503,13 +507,13 @@ export default function AdminSignedDocumentsApproval() {
                     type="button"
                     onClick={() => openPreview(doc)}
                     style={{
-                      background: 'rgba(255, 255, 255, 0.06)',
-                      border: '1px solid var(--border-color, rgba(255, 255, 255, 0.12))',
-                      color: 'var(--text-main, #f8fafc)',
+                      background: '#eff6ff',
+                      border: '1px solid #bfdbfe',
+                      color: '#1d4ed8',
                       padding: '0.45rem 0.75rem',
                       borderRadius: '6px',
                       fontSize: '0.78rem',
-                      fontWeight: 600,
+                      fontWeight: 700,
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -528,9 +532,9 @@ export default function AdminSignedDocumentsApproval() {
                         setRejectionReason('');
                       }}
                       style={{
-                        background: 'rgba(239, 68, 68, 0.12)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        color: '#f87171',
+                        background: '#fef2f2',
+                        border: '1px solid #fca5a5',
+                        color: '#dc2626',
                         padding: '0.45rem 0.75rem',
                         borderRadius: '6px',
                         fontSize: '0.78rem',
@@ -548,7 +552,7 @@ export default function AdminSignedDocumentsApproval() {
                       disabled={processingId === doc._id}
                       onClick={() => handleApprove(doc)}
                       style={{
-                        background: '#10b981',
+                        background: 'linear-gradient(135deg, #10b981, #059669)',
                         border: 'none',
                         color: '#fff',
                         padding: '0.45rem 0.9rem',
@@ -579,8 +583,8 @@ export default function AdminSignedDocumentsApproval() {
             position: 'fixed',
             inset: 0,
             zIndex: 100000,
-            background: 'rgba(0,0,0,0.7)',
-            backdropFilter: 'blur(5px)',
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(6px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -590,20 +594,21 @@ export default function AdminSignedDocumentsApproval() {
         >
           <div
             style={{
-              background: '#0f172a',
+              background: '#ffffff',
               border: '1px solid #ef4444',
               borderRadius: '14px',
               padding: '1.25rem',
               width: '100%',
               maxWidth: '420px',
-              color: '#fff'
+              color: '#0f172a',
+              boxShadow: '0 20px 40px -10px rgba(0,0,0,0.2)'
             }}
             onClick={e => e.stopPropagation()}
           >
-            <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.05rem', color: '#f87171' }}>
+            <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.05rem', color: '#dc2626', fontWeight: 800 }}>
               Reject Signed {rejectPromptDoc.docNumber}
             </h4>
-            <p style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: '#94a3b8' }}>
+            <p style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: '#64748b' }}>
               Please specify the reason (e.g. Signature blurry, wrong page, stamp missing). The user will be notified to re-upload.
             </p>
             <input
@@ -614,11 +619,11 @@ export default function AdminSignedDocumentsApproval() {
               style={{
                 width: '100%',
                 boxSizing: 'border-box',
-                background: 'rgba(0,0,0,0.35)',
-                border: '1px solid #334155',
+                background: '#f8fafc',
+                border: '1px solid #cbd5e1',
                 borderRadius: '8px',
                 padding: '0.6rem 0.85rem',
-                color: '#fff',
+                color: '#0f172a',
                 fontSize: '0.82rem',
                 outline: 'none',
                 marginBottom: '1rem'
@@ -630,13 +635,14 @@ export default function AdminSignedDocumentsApproval() {
                 type="button"
                 onClick={() => setRejectPromptDoc(null)}
                 style={{
-                  background: 'transparent',
-                  border: '1px solid #334155',
-                  color: '#94a3b8',
+                  background: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  color: '#475569',
                   padding: '0.5rem 0.9rem',
                   borderRadius: '6px',
                   fontSize: '0.8rem',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  fontWeight: 600
                 }}
               >
                 Cancel
@@ -646,7 +652,7 @@ export default function AdminSignedDocumentsApproval() {
                 onClick={handleConfirmReject}
                 disabled={!rejectionReason.trim()}
                 style={{
-                  background: '#ef4444',
+                  background: '#dc2626',
                   border: 'none',
                   color: '#fff',
                   padding: '0.5rem 1.1rem',

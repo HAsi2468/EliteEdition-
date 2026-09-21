@@ -66,8 +66,8 @@ export default function SignedDocumentPreviewModal({
         position: 'fixed',
         inset: 0,
         zIndex: 99999,
-        background: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(8px)',
+        background: 'rgba(15, 23, 42, 0.75)',
+        backdropFilter: 'blur(6px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -78,16 +78,16 @@ export default function SignedDocumentPreviewModal({
     >
       <div
         style={{
-          background: 'var(--card-bg, #0f172a)',
-          border: '1px solid var(--border-color, #334155)',
+          background: '#ffffff',
+          border: '1px solid #e2e8f0',
           borderRadius: '16px',
           width: '100%',
           maxWidth: '850px',
           maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
-          color: 'var(--text-main, #f8fafc)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          color: '#0f172a',
           overflow: 'hidden',
           position: 'relative'
         }}
@@ -97,11 +97,11 @@ export default function SignedDocumentPreviewModal({
         <div
           style={{
             padding: '1.1rem 1.5rem',
-            borderBottom: '1px solid var(--border-color, #1e293b)',
+            background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+            color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'rgba(255, 255, 255, 0.02)'
+            justifyContent: 'space-between'
           }}
         >
           <div>
@@ -113,9 +113,8 @@ export default function SignedDocumentPreviewModal({
                   textTransform: 'uppercase',
                   padding: '2px 8px',
                   borderRadius: '6px',
-                  background: docType === 'challan' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(56, 189, 248, 0.2)',
-                  color: docType === 'challan' ? '#c084fc' : '#38bdf8',
-                  border: `1px solid ${docType === 'challan' ? 'rgba(168, 85, 247, 0.4)' : 'rgba(56, 189, 248, 0.4)'}`
+                  background: 'rgba(255, 255, 255, 0.25)',
+                  color: '#ffffff'
                 }}
               >
                 {docType === 'challan' ? 'Challan' : 'Invoice'}
@@ -135,23 +134,12 @@ export default function SignedDocumentPreviewModal({
                   gap: '4px',
                   background:
                     status === 'APPROVED'
-                      ? 'rgba(16, 185, 129, 0.2)'
+                      ? 'rgba(16, 185, 129, 0.95)'
                       : status === 'REJECTED'
-                      ? 'rgba(239, 68, 68, 0.2)'
-                      : 'rgba(245, 158, 11, 0.2)',
-                  color:
-                    status === 'APPROVED'
-                      ? '#34d399'
-                      : status === 'REJECTED'
-                      ? '#f87171'
-                      : '#fbbf24',
-                  border: `1px solid ${
-                    status === 'APPROVED'
-                      ? 'rgba(16, 185, 129, 0.4)'
-                      : status === 'REJECTED'
-                      ? 'rgba(239, 68, 68, 0.4)'
-                      : 'rgba(245, 158, 11, 0.4)'
-                  }`
+                      ? 'rgba(239, 68, 68, 0.95)'
+                      : 'rgba(245, 158, 11, 0.95)',
+                  color: '#ffffff',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                 }}
               >
                 {status === 'APPROVED' && <CheckCircle size={13} />}
@@ -161,7 +149,7 @@ export default function SignedDocumentPreviewModal({
               </span>
             </div>
             {partyName && (
-              <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-muted, #94a3b8)' }}>
+              <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.9)' }}>
                 Party: <strong>{partyName}</strong>
               </p>
             )}
@@ -175,17 +163,17 @@ export default function SignedDocumentPreviewModal({
                 rel="noreferrer"
                 title="Open full resolution in new tab"
                 style={{
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid var(--border-color, #334155)',
-                  color: 'var(--text-muted, #94a3b8)',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  color: '#ffffff',
                   borderRadius: '8px',
-                  padding: '6px 10px',
+                  padding: '6px 12px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
-                  fontSize: '0.75rem',
+                  fontSize: '0.78rem',
                   textDecoration: 'none',
-                  fontWeight: 600
+                  fontWeight: 700
                 }}
               >
                 <ExternalLink size={14} /> Full View
@@ -195,12 +183,12 @@ export default function SignedDocumentPreviewModal({
               onClick={onClose}
               type="button"
               style={{
-                background: 'transparent',
+                background: 'rgba(255, 255, 255, 0.15)',
                 border: 'none',
-                color: 'var(--text-muted, #94a3b8)',
+                color: '#ffffff',
                 cursor: 'pointer',
                 padding: '6px',
-                borderRadius: '6px',
+                borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -218,8 +206,8 @@ export default function SignedDocumentPreviewModal({
               display: 'flex',
               gap: '0.5rem',
               padding: '0.6rem 1.5rem',
-              background: 'rgba(0, 0, 0, 0.25)',
-              borderBottom: '1px solid var(--border-color, #1e293b)'
+              background: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0'
             }}
           >
             {images.map((imgUrl, idx) => (
@@ -233,9 +221,9 @@ export default function SignedDocumentPreviewModal({
                   fontSize: '0.78rem',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  border: activeImageIdx === idx ? '1px solid #3b82f6' : '1px solid transparent',
-                  background: activeImageIdx === idx ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                  color: activeImageIdx === idx ? '#60a5fa' : 'var(--text-muted, #94a3b8)',
+                  border: activeImageIdx === idx ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                  background: activeImageIdx === idx ? '#eff6ff' : '#ffffff',
+                  color: activeImageIdx === idx ? '#1d4ed8' : '#64748b',
                   transition: 'all 0.15s'
                 }}
               >
@@ -252,7 +240,7 @@ export default function SignedDocumentPreviewModal({
             minHeight: '340px',
             maxHeight: '52vh',
             overflow: 'auto',
-            background: '#020617',
+            background: '#f1f5f9',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -269,11 +257,12 @@ export default function SignedDocumentPreviewModal({
                 maxHeight: '100%',
                 objectFit: 'contain',
                 borderRadius: '8px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                background: '#ffffff'
               }}
             />
           ) : (
-            <div style={{ color: 'var(--text-muted, #94a3b8)', fontSize: '0.85rem' }}>
+            <div style={{ color: '#64748b', fontSize: '0.85rem' }}>
               No image available
             </div>
           )}
@@ -283,10 +272,10 @@ export default function SignedDocumentPreviewModal({
         <div
           style={{
             padding: '0.9rem 1.5rem',
-            background: 'rgba(255, 255, 255, 0.02)',
-            borderTop: '1px solid var(--border-color, #1e293b)',
+            background: '#f8fafc',
+            borderTop: '1px solid #e2e8f0',
             fontSize: '0.78rem',
-            color: 'var(--text-muted, #94a3b8)',
+            color: '#64748b',
             display: 'flex',
             flexWrap: 'wrap',
             alignItems: 'center',
@@ -296,23 +285,23 @@ export default function SignedDocumentPreviewModal({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', flexWrap: 'wrap' }}>
             <span>
-              👤 Uploaded by: <strong style={{ color: 'var(--text-main, #f8fafc)' }}>{signedCopy?.uploadedByName || 'Staff'}</strong>
+              👤 Uploaded by: <strong style={{ color: '#0f172a' }}>{signedCopy?.uploadedByName || 'Staff'}</strong>
             </span>
             {signedCopy?.uploadedAt && (
               <span>
-                📅 Date: <strong style={{ color: 'var(--text-main, #f8fafc)' }}>{new Date(signedCopy.uploadedAt).toLocaleString('en-IN')}</strong>
+                📅 Date: <strong style={{ color: '#0f172a' }}>{new Date(signedCopy.uploadedAt).toLocaleString('en-IN')}</strong>
               </span>
             )}
             {status === 'APPROVED' && signedCopy?.approvedByName && (
-              <span style={{ color: '#34d399' }}>
+              <span style={{ color: '#059669', fontWeight: 700 }}>
                 <ShieldCheck size={14} style={{ display: 'inline', verticalAlign: 'text-bottom' }} /> Approved by: <strong>{signedCopy.approvedByName}</strong>
               </span>
             )}
           </div>
 
           {/* Cloudflare R2 Source Pill */}
-          <span style={{ fontSize: '0.7rem', color: '#38bdf8', opacity: 0.8 }}>
-            ☁️ Stored in Cloudflare R2
+          <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 700, background: '#dbeafe', padding: '2px 8px', borderRadius: '4px' }}>
+            ☁️ Cloudflare R2
           </span>
         </div>
 
@@ -321,16 +310,16 @@ export default function SignedDocumentPreviewModal({
           <div
             style={{
               padding: '0.75rem 1.5rem',
-              background: 'rgba(239, 68, 68, 0.1)',
-              borderTop: '1px solid rgba(239, 68, 68, 0.25)',
-              color: '#f87171',
-              fontSize: '0.8rem',
+              background: '#fef2f2',
+              borderTop: '1px solid #fca5a5',
+              color: '#991b1b',
+              fontSize: '0.82rem',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem'
             }}
           >
-            <AlertCircle size={16} style={{ flexShrink: 0 }} />
+            <AlertCircle size={16} style={{ flexShrink: 0, color: '#dc2626' }} />
             <span><strong>Rejection Reason:</strong> {signedCopy.rejectionReason}</span>
           </div>
         )}
@@ -340,8 +329,8 @@ export default function SignedDocumentPreviewModal({
           <div
             style={{
               padding: '1rem 1.5rem',
-              borderTop: '1px solid var(--border-color, #1e293b)',
-              background: 'rgba(0, 0, 0, 0.3)',
+              borderTop: '1px solid #e2e8f0',
+              background: '#ffffff',
               display: 'flex',
               flexDirection: 'column',
               gap: '0.75rem'
@@ -356,11 +345,11 @@ export default function SignedDocumentPreviewModal({
                   onChange={e => setRejectionReason(e.target.value)}
                   style={{
                     flex: 1,
-                    background: 'rgba(0,0,0,0.35)',
+                    background: '#ffffff',
                     border: '1px solid #ef4444',
                     borderRadius: '8px',
                     padding: '0.55rem 0.85rem',
-                    color: '#fff',
+                    color: '#0f172a',
                     fontSize: '0.82rem',
                     outline: 'none'
                   }}
@@ -371,7 +360,7 @@ export default function SignedDocumentPreviewModal({
                   onClick={handleReject}
                   disabled={processing || !rejectionReason.trim()}
                   style={{
-                    background: '#ef4444',
+                    background: '#dc2626',
                     border: 'none',
                     color: '#fff',
                     padding: '0.55rem 1rem',
@@ -387,13 +376,14 @@ export default function SignedDocumentPreviewModal({
                   type="button"
                   onClick={() => setShowRejectInput(false)}
                   style={{
-                    background: 'transparent',
-                    border: '1px solid var(--border-color, #334155)',
-                    color: 'var(--text-muted, #94a3b8)',
+                    background: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    color: '#475569',
                     padding: '0.55rem 0.85rem',
                     borderRadius: '8px',
                     fontSize: '0.82rem',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    fontWeight: 600
                   }}
                 >
                   Cancel
@@ -401,7 +391,7 @@ export default function SignedDocumentPreviewModal({
               </div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #94a3b8)' }}>
+                <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
                   👑 <strong>Admin Controls:</strong> Verify signatures, dates, and stamps.
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -410,9 +400,9 @@ export default function SignedDocumentPreviewModal({
                     onClick={() => setShowRejectInput(true)}
                     disabled={processing}
                     style={{
-                      background: 'rgba(239, 68, 68, 0.15)',
-                      border: '1px solid rgba(239, 68, 68, 0.4)',
-                      color: '#f87171',
+                      background: '#fef2f2',
+                      border: '1px solid #fca5a5',
+                      color: '#dc2626',
                       padding: '0.55rem 1.1rem',
                       borderRadius: '8px',
                       fontSize: '0.82rem',
@@ -431,7 +421,7 @@ export default function SignedDocumentPreviewModal({
                     onClick={handleApprove}
                     disabled={processing}
                     style={{
-                      background: '#10b981',
+                      background: 'linear-gradient(135deg, #10b981, #059669)',
                       border: 'none',
                       color: '#ffffff',
                       padding: '0.55rem 1.3rem',

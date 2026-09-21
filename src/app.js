@@ -126,11 +126,21 @@ app.get('/v1/designs/download-zip', (req, res) => {
   res.status(404).json({ error: 'Zip file not found' });
 });
 
-app.use(['/v1/designs/:filename', '/designs/:filename'], async (req, res, next) => {
+app.get(['/v1/designs/:filename', '/designs/:filename'], async (req, res, next) => {
+  // Only handle GET and HEAD requests for image serving
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    return next();
+  }
+
   const rawFilename = req.params.filename || '';
   let filename = rawFilename;
   try { filename = decodeURIComponent(rawFilename); } catch (e) {}
   
+  // Bypass image serving middleware for MongoDB ObjectId (API endpoints: /v1/designs/:id)
+  if (/^[0-9a-fA-F]{24}$/.test(rawFilename) || /^[0-9a-fA-F]{24}$/.test(filename)) {
+    return next();
+  }
+
   const cleanName = filename.replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '').trim();
   if (!cleanName) return next();
 
