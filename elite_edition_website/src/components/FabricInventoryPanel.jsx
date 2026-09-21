@@ -181,6 +181,7 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
   const [challans, setChallans] = useState([]);
   const [challanSearch, setChallanSearch] = useState('');
   const [challanStatusFilter, setChallanStatusFilter] = useState('All');
+  const [signedCopyFilter, setSignedCopyFilter] = useState('All');
   // Ref to always hold latest challan filter values — prevents stale closure in setInterval
   const challanFiltersRef = useRef({ search: '', dateStart: defaultThisMonth.dateStart, dateEnd: defaultThisMonth.dateEnd, status: 'All' });
   const [challanDatePreset, setChallanDatePreset] = useState('this_month');
@@ -4008,6 +4009,20 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                   <option value="INVOICED">Invoiced</option>
                 </select>
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Signed:</span>
+                <select
+                  value={signedCopyFilter}
+                  onChange={e => setSignedCopyFilter(e.target.value)}
+                  style={{ ...inputStyle, width: '150px', padding: '0.35rem 0.5rem', cursor: 'pointer', fontWeight: 700, color: 'var(--text-primary)', background: 'var(--bg-input, rgba(15, 23, 42, 0.6))' }}
+                >
+                  <option value="All">All Signed Status</option>
+                  <option value="NOT_UPLOADED">⚪ Not Uploaded (Gray)</option>
+                  <option value="PENDING">🟡 In Process (Yellow)</option>
+                  <option value="APPROVED">🟢 Approved (Green)</option>
+                  <option value="REJECTED">🔴 Rejected (Red)</option>
+                </select>
+              </div>
               <DateRangePicker
                 preset={challanDatePreset}
                 onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
@@ -4075,288 +4090,275 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
           {/* Table Container */}
           <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', border: '1px solid var(--border-light)' }}>
             <div className="table-responsive" style={{ overflowX: 'auto', width: '100%' }}>
-              <table className="data-table" style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'linear-gradient(135deg, rgba(30,41,59,0.9), rgba(15,23,42,0.9))', borderBottom: '1px solid var(--border-light)' }}>
-                    <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', width: '38px' }}>
-                      <input
-                        type="checkbox"
-                        checked={challans.length > 0 && challans.every(c => !!selectedChallanMap[c._id])}
-                        onChange={e => {
-                          if (e.target.checked) {
-                            setSelectedChallanMap(prev => {
-                              const copy = { ...prev };
-                              challans.forEach(c => { copy[c._id] = c; });
-                              return copy;
-                            });
-                          } else {
-                            setSelectedChallanMap({});
-                          }
-                        }}
-                        style={{ cursor: 'pointer' }}
-                      />
-                    </th>
-                    <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '90px' }}>Ch. No</th>
-                    <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '85px' }}>Status</th>
-                    <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '120px', textAlign: 'center' }}>Signed Copy</th>
-                    <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '90px' }}>Date</th>
-                    <th style={{ padding: '0.65rem 0.5rem' }}>Bill To / Party</th>
-                    <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '75px' }}>Lot No</th>
-                    <th style={{ padding: '0.65rem 0.5rem' }}>Fabric</th>
-                    <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '110px' }}>Job No</th>
-                    <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '60px' }}>Panna</th>
-                    <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '45px' }}>TP</th>
-                    <th style={{ padding: '0.65rem 0.5rem', textAlign: 'right', whiteSpace: 'nowrap', width: '100px' }}>Total Mtr</th>
-                    <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '190px' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {challans.length === 0 && (
-                    <tr><td colSpan={12} style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>No challans found. Click "New Challan" to create one.</td></tr>
-                  )}
-                  {challans.map(ch => (
-                    <tr key={ch._id} style={{ borderBottom: '1px solid var(--border-light)', transition: 'background-color 0.15s' }}>
-                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
-                        <input
-                          type="checkbox"
-                          checked={!!selectedChallanMap[ch._id]}
-                          onChange={e => {
-                            if (e.target.checked) {
-                              setSelectedChallanMap(prev => ({ ...prev, [ch._id]: ch }));
-                            } else {
-                              setSelectedChallanMap(prev => {
-                                const copy = { ...prev };
-                                delete copy[ch._id];
-                                return copy;
-                              });
-                            }
-                          }}
-                          style={{ cursor: 'pointer' }}
-                        />
-                      </td>
-                      <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
-                        <span style={{ padding: '0.2rem 0.5rem', borderRadius: 4, fontWeight: 900, color: '#38bdf8', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)', fontSize: '0.78rem' }}>
-                          EDP-{ch.challanNo}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.6rem 0.5rem' }}>
-                        {ch.status === 'INVOICED' ? (
-                          <span
-                            title={ch.invoiceNo ? `Tax Invoice #${ch.invoiceNo}` : 'Invoiced'}
-                            style={{
-                              background: 'rgba(52,211,153,0.15)',
-                              color: '#34d399',
-                              fontSize: '0.68rem',
-                              fontWeight: 800,
-                              padding: '2px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid rgba(52,211,153,0.3)',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
+              {(() => {
+                const displayedChallans = challans.filter(ch => {
+                  if (!signedCopyFilter || signedCopyFilter === 'All') return true;
+                  const sc = ch.signedCopy;
+                  const st = sc?.status;
+                  if (signedCopyFilter === 'NOT_UPLOADED') {
+                    return !sc || !st || st === 'NONE' || (!sc.images?.length && !sc.pdfUrl && !sc.fileUrl && st !== 'APPROVED' && st !== 'PENDING' && st !== 'REJECTED');
+                  }
+                  if (signedCopyFilter === 'PENDING') {
+                    return st === 'PENDING' || st === 'IN_PROCESS' || st === 'UPLOADED';
+                  }
+                  if (signedCopyFilter === 'APPROVED') {
+                    return st === 'APPROVED';
+                  }
+                  if (signedCopyFilter === 'REJECTED') {
+                    return st === 'REJECTED';
+                  }
+                  return true;
+                });
+
+                return (
+                  <table className="data-table" style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'linear-gradient(135deg, rgba(30,41,59,0.9), rgba(15,23,42,0.9))', borderBottom: '1px solid var(--border-light)' }}>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', width: '38px' }}>
+                          <input
+                            type="checkbox"
+                            checked={displayedChallans.length > 0 && displayedChallans.every(c => !!selectedChallanMap[c._id])}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setSelectedChallanMap(prev => {
+                                  const copy = { ...prev };
+                                  displayedChallans.forEach(c => { copy[c._id] = c; });
+                                  return copy;
+                                });
+                              } else {
+                                setSelectedChallanMap({});
+                              }
                             }}
-                          >
-                            INVOICED {ch.invoiceNo ? `(${ch.invoiceNo})` : ''}
-                          </span>
-                        ) : (
-                          <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(251,191,36,0.3)' }}>
-                            PENDING
-                          </span>
-                        )}
-                      </td>
-                      {/* Signed Copy status & upload trigger */}
-                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        {ch.signedCopy && ch.signedCopy.status === 'APPROVED' ? (
-                          <button
-                            type="button"
-                            onClick={() => setSignedPreviewTarget({
-                              _id: ch._id,
-                              docType: 'challan',
-                              docNumber: `EDP-${ch.challanNo}`,
-                              partyName: ch.billTo || ch.partyName,
-                              signedCopy: ch.signedCopy
-                            })}
-                            style={{
-                              background: 'rgba(16, 185, 129, 0.12)',
-                              border: '1px solid rgba(16, 185, 129, 0.35)',
-                              color: '#34d399',
-                              borderRadius: '6px',
-                              padding: '2px 8px',
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                            title="Verified & Approved by Admin. Click to view."
-                          >
-                            <CheckCircle size={12} /> Approved ({ch.signedCopy.images?.length || 1})
-                          </button>
-                        ) : ch.signedCopy && ch.signedCopy.status === 'PENDING' ? (
-                          <button
-                            type="button"
-                            onClick={() => setSignedPreviewTarget({
-                              _id: ch._id,
-                              docType: 'challan',
-                              docNumber: `EDP-${ch.challanNo}`,
-                              partyName: ch.billTo || ch.partyName,
-                              signedCopy: ch.signedCopy
-                            })}
-                            style={{
-                              background: 'rgba(245, 158, 11, 0.12)',
-                              border: '1px solid rgba(245, 158, 11, 0.35)',
-                              color: '#fbbf24',
-                              borderRadius: '6px',
-                              padding: '2px 8px',
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                            title="Uploaded, pending admin review. Click to view."
-                          >
-                            <Clock size={12} /> Pending ({ch.signedCopy.images?.length || 1})
-                          </button>
-                        ) : ch.signedCopy && ch.signedCopy.status === 'REJECTED' ? (
-                          <button
-                            type="button"
-                            onClick={() => setSignedUploadTarget({
-                              id: ch._id,
-                              docType: 'challan',
-                              docNumber: `EDP-${ch.challanNo}`,
-                              partyName: ch.billTo || ch.partyName,
-                              existingSignedCopy: ch.signedCopy
-                            })}
-                            style={{
-                              background: 'rgba(239, 68, 68, 0.12)',
-                              border: '1px solid rgba(239, 68, 68, 0.35)',
-                              color: '#f87171',
-                              borderRadius: '6px',
-                              padding: '2px 8px',
-                              fontSize: '0.72rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                            title={`Rejected: ${ch.signedCopy.rejectionReason || 'Please re-upload'}. Click to re-upload.`}
-                          >
-                            <AlertCircle size={12} /> Rejected (Re-upload)
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setSignedUploadTarget({
-                              id: ch._id,
-                              docType: 'challan',
-                              docNumber: `EDP-${ch.challanNo}`,
-                              partyName: ch.billTo || ch.partyName,
-                              existingSignedCopy: null
-                            })}
-                            style={{
-                              background: 'rgba(56, 189, 248, 0.08)',
-                              border: '1px dashed rgba(56, 189, 248, 0.35)',
-                              color: '#38bdf8',
-                              borderRadius: '6px',
-                              padding: '2px 8px',
-                              fontSize: '0.72rem',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                            title="Upload physical signed challan copy"
-                          >
-                            + Upload Signed
-                          </button>
-                        )}
-                      </td>
-                      <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>{formatDateDDMMYYYY(ch.date)}</td>
-                      <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: '#a78bfa' }}>{ch.billTo || ch.partyName || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.5rem', maxWidth: '220px' }}>
-                        {ch.lotNo != null && String(ch.lotNo).trim() !== '' ? (
-                          <div>
-                            <span
-                              title={`#${ch.lotNo}`}
-                              style={{
-                                display: 'inline-block',
-                                maxWidth: '200px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                verticalAlign: 'middle',
-                                background: 'rgba(16,185,129,0.12)',
-                                color: '#10b981',
-                                padding: '2px 8px',
-                                borderRadius: 6,
-                                fontWeight: 700,
-                                fontSize: '0.75rem',
-                                border: '1px solid rgba(16,185,129,0.25)'
+                            style={{ cursor: 'pointer' }}
+                          />
+                        </th>
+                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '90px' }}>Ch. No</th>
+                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '85px' }}>Status</th>
+                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '90px' }}>Date</th>
+                        <th style={{ padding: '0.65rem 0.5rem' }}>Bill To / Party</th>
+                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '75px' }}>Lot No</th>
+                        <th style={{ padding: '0.65rem 0.5rem' }}>Fabric</th>
+                        <th style={{ padding: '0.65rem 0.5rem', whiteSpace: 'nowrap', width: '110px' }}>Job No</th>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '60px' }}>Panna</th>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '45px' }}>TP</th>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'right', whiteSpace: 'nowrap', width: '100px' }}>Total Mtr</th>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap', width: '200px' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayedChallans.length === 0 && (
+                        <tr><td colSpan={12} style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>No challans found matching filters. Click "New Challan" to create one.</td></tr>
+                      )}
+                      {displayedChallans.map(ch => (
+                        <tr key={ch._id} style={{ borderBottom: '1px solid var(--border-light)', transition: 'background-color 0.15s' }}>
+                          <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={!!selectedChallanMap[ch._id]}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setSelectedChallanMap(prev => ({ ...prev, [ch._id]: ch }));
+                                } else {
+                                  setSelectedChallanMap(prev => {
+                                    const copy = { ...prev };
+                                    delete copy[ch._id];
+                                    return copy;
+                                  });
+                                }
                               }}
-                            >
-                              #{ch.lotNo}
+                              style={{ cursor: 'pointer' }}
+                            />
+                          </td>
+                          <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
+                            <span style={{ padding: '0.2rem 0.5rem', borderRadius: 4, fontWeight: 900, color: '#38bdf8', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.25)', fontSize: '0.78rem' }}>
+                              EDP-{ch.challanNo}
                             </span>
-                            {(() => {
-                              const lotInfo = lotRecords.find(l => String(l.lotNo) === String(ch.lotNo));
-                              if (!lotInfo || !lotInfo.totalInward) return null;
-                              const totalIn = lotInfo.totalInward;
-                              const totalOut = lotInfo.totalOutward;
-                              const usagePct = Math.min(100, Math.round((totalOut / totalIn) * 100));
-                              const pColor = usagePct >= 100 ? '#ef4444' : usagePct >= 85 ? '#f59e0b' : '#10b981';
-                              return (
-                                <div style={{ marginTop: '3px', width: '100%', maxWidth: '140px' }} title={`Lot #${ch.lotNo}: ${totalOut.toFixed(1)}m dispatched of ${totalIn.toFixed(1)}m inward (${usagePct}% used)`}>
-                                  <div style={{ width: '100%', height: '5px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
-                                    <div style={{ width: `${usagePct}%`, height: '100%', background: pColor, borderRadius: '3px', transition: 'width 0.3s ease' }} />
-                                  </div>
-                                  <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '1px', fontWeight: 600 }}>
-                                    {usagePct}% used ({lotInfo.currentStock.toFixed(0)}m left)
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        ) : '—'}
-                      </td>
-                      <td style={{ padding: '0.6rem 0.5rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{ch.fabricName || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
-                        {renderJobNoBadge(ch.jobNo)}
-                      </td>
-                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>{ch.panna || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--text-primary)' }}>{ch.totalTp}</td>
-                      <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontWeight: 900, color: '#10b981', whiteSpace: 'nowrap', fontSize: '0.88rem' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
-                      <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center', alignItems: 'center' }}>
-                          <button className="btn-icon" title="View Challan" style={{ color: '#38bdf8', padding: '0.3rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => setViewChallanModal(ch)}>
-                            <Eye size={14} />
-                          </button>
-                          <button className="btn-icon" title="Download PDF" style={{ color: '#34d399', padding: '0.3rem', background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => handleDownloadChallanPdf(ch._id, ch.challanNo)}>
-                            <FileDown size={14} />
-                          </button>
-                          <button className="btn-secondary" title="Create Tax Bill" style={{ padding: '0.25rem 0.55rem', fontSize: '0.7rem', fontWeight: 800, background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2))', color: '#a78bfa', border: '1px solid rgba(124,58,237,0.4)', borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }} onClick={() => handleCreateBillFromChallan(ch)}>
-                            <Receipt size={13} /> Bill
-                          </button>
-                          {ch.status !== 'INVOICED' && (
-                            <>
-                              <button className="btn-icon" title="Edit Challan" style={{ color: 'var(--primary)', padding: '0.3rem', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => startEditChallan(ch)}>
-                                <Edit size={14} />
+                          </td>
+                          <td style={{ padding: '0.6rem 0.5rem' }}>
+                            {ch.status === 'INVOICED' ? (
+                              <span
+                                title={ch.invoiceNo ? `Tax Invoice #${ch.invoiceNo}` : 'Invoiced'}
+                                style={{
+                                  background: 'rgba(52,211,153,0.15)',
+                                  color: '#34d399',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  border: '1px solid rgba(52,211,153,0.3)',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                INVOICED {ch.invoiceNo ? `(${ch.invoiceNo})` : ''}
+                              </span>
+                            ) : (
+                              <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(251,191,36,0.3)' }}>
+                                PENDING
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>{formatDateDDMMYYYY(ch.date)}</td>
+                          <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: '#a78bfa' }}>{ch.billTo || ch.partyName || '—'}</td>
+                          <td style={{ padding: '0.6rem 0.5rem', maxWidth: '220px' }}>
+                            {ch.lotNo != null && String(ch.lotNo).trim() !== '' ? (
+                              <div>
+                                <span
+                                  title={`#${ch.lotNo}`}
+                                  style={{
+                                    display: 'inline-block',
+                                    maxWidth: '200px',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    verticalAlign: 'middle',
+                                    background: 'rgba(16,185,129,0.12)',
+                                    color: '#10b981',
+                                    padding: '2px 8px',
+                                    borderRadius: 6,
+                                    fontWeight: 700,
+                                    fontSize: '0.75rem',
+                                    border: '1px solid rgba(16,185,129,0.25)'
+                                  }}
+                                >
+                                  #{ch.lotNo}
+                                </span>
+                                {(() => {
+                                  const lotInfo = lotRecords.find(l => String(l.lotNo) === String(ch.lotNo));
+                                  if (!lotInfo || !lotInfo.totalInward) return null;
+                                  const totalIn = lotInfo.totalInward;
+                                  const totalOut = lotInfo.totalOutward;
+                                  const usagePct = Math.min(100, Math.round((totalOut / totalIn) * 100));
+                                  const pColor = usagePct >= 100 ? '#ef4444' : usagePct >= 85 ? '#f59e0b' : '#10b981';
+                                  return (
+                                    <div style={{ marginTop: '3px', width: '100%', maxWidth: '140px' }} title={`Lot #${ch.lotNo}: ${totalOut.toFixed(1)}m dispatched of ${totalIn.toFixed(1)}m inward (${usagePct}% used)`}>
+                                      <div style={{ width: '100%', height: '5px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                                        <div style={{ width: `${usagePct}%`, height: '100%', background: pColor, borderRadius: '3px', transition: 'width 0.3s ease' }} />
+                                      </div>
+                                      <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '1px', fontWeight: 600 }}>
+                                        {usagePct}% used ({lotInfo.currentStock.toFixed(0)}m left)
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            ) : '—'}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.5rem', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{ch.fabricName || '—'}</td>
+                          <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
+                            {renderJobNoBadge(ch.jobNo)}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>{ch.panna || '—'}</td>
+                          <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--text-primary)' }}>{ch.totalTp}</td>
+                          <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontWeight: 900, color: '#10b981', whiteSpace: 'nowrap', fontSize: '0.88rem' }}>{parseFloat(ch.totalMtr || 0).toFixed(2)} mtr</td>
+                          <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center', alignItems: 'center' }}>
+                              <button className="btn-icon" title="View Challan" style={{ color: '#38bdf8', padding: '0.3rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => setViewChallanModal(ch)}>
+                                <Eye size={14} />
                               </button>
-                              <button className="btn-icon" title="Delete Challan" style={{ color: '#f87171', padding: '0.3rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => setChallanDeleteTarget({ id: ch._id, label: `Challan EDP-${ch.challanNo}` })}>
-                                <Trash2 size={14} />
+                              <button className="btn-icon" title="Download PDF" style={{ color: '#34d399', padding: '0.3rem', background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => handleDownloadChallanPdf(ch._id, ch.challanNo)}>
+                                <FileDown size={14} />
                               </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                              <button className="btn-secondary" title="Create Tax Bill" style={{ padding: '0.25rem 0.55rem', fontSize: '0.7rem', fontWeight: 800, background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2))', color: '#a78bfa', border: '1px solid rgba(124,58,237,0.4)', borderRadius: 6, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '3px' }} onClick={() => handleCreateBillFromChallan(ch)}>
+                                <Receipt size={13} /> Bill
+                              </button>
+
+                              {/* 4-Color Signed Challan Action Button */}
+                              {(() => {
+                                const sc = ch.signedCopy;
+                                const status = sc?.status;
+                                const isApproved = status === 'APPROVED';
+                                const isPending = status === 'PENDING' || status === 'IN_PROCESS' || status === 'UPLOADED';
+                                const isRejected = status === 'REJECTED';
+
+                                let iconColor = '#94a3b8'; // Gray (Not uploaded)
+                                let bgColor = 'rgba(148, 163, 184, 0.12)';
+                                let borderColor = 'rgba(148, 163, 184, 0.3)';
+                                let titleText = 'Signed Copy: Not Uploaded (Click to upload)';
+                                let IconComp = FileText;
+
+                                if (isApproved) {
+                                  iconColor = '#10b981'; // Green (Approved by Admin)
+                                  bgColor = 'rgba(16, 185, 129, 0.14)';
+                                  borderColor = 'rgba(16, 185, 129, 0.35)';
+                                  titleText = `Signed Copy: Approved by Admin (${sc?.images?.length || 1} pages). Click to view.`;
+                                  IconComp = CheckCircle;
+                                } else if (isRejected) {
+                                  iconColor = '#ef4444'; // Red (Rejected)
+                                  bgColor = 'rgba(239, 68, 68, 0.14)';
+                                  borderColor = 'rgba(239, 68, 68, 0.35)';
+                                  titleText = `Signed Copy: Rejected (${sc?.rejectionReason || 'Please re-upload'}). Click to re-upload.`;
+                                  IconComp = AlertCircle;
+                                } else if (isPending) {
+                                  iconColor = '#f59e0b'; // Yellow (In Process / Pending Review)
+                                  bgColor = 'rgba(245, 158, 11, 0.14)';
+                                  borderColor = 'rgba(245, 158, 11, 0.35)';
+                                  titleText = `Signed Copy: In Process / Pending Admin Review (${sc?.images?.length || 1} pages). Click to view.`;
+                                  IconComp = Clock;
+                                }
+
+                                return (
+                                  <button
+                                    type="button"
+                                    className="btn-icon"
+                                    title={titleText}
+                                    onClick={() => {
+                                      if (isApproved || isPending) {
+                                        setSignedPreviewTarget({
+                                          _id: ch._id,
+                                          docType: 'challan',
+                                          docNumber: `EDP-${ch.challanNo}`,
+                                          partyName: ch.billTo || ch.partyName,
+                                          signedCopy: ch.signedCopy
+                                        });
+                                      } else {
+                                        setSignedUploadTarget({
+                                          id: ch._id,
+                                          docType: 'challan',
+                                          docNumber: `EDP-${ch.challanNo}`,
+                                          partyName: ch.billTo || ch.partyName,
+                                          existingSignedCopy: isRejected ? ch.signedCopy : null
+                                        });
+                                      }
+                                    }}
+                                    style={{
+                                      color: iconColor,
+                                      background: bgColor,
+                                      border: `1px solid ${borderColor}`,
+                                      borderRadius: 6,
+                                      padding: '0.3rem',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    <IconComp size={14} />
+                                  </button>
+                                );
+                              })()}
+
+                              {ch.status !== 'INVOICED' && (
+                                <>
+                                  <button className="btn-icon" title="Edit Challan" style={{ color: 'var(--primary)', padding: '0.3rem', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => startEditChallan(ch)}>
+                                    <Edit size={14} />
+                                  </button>
+                                  <button className="btn-icon" title="Delete Challan" style={{ color: '#f87171', padding: '0.3rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 6, cursor: 'pointer' }} onClick={() => setChallanDeleteTarget({ id: ch._id, label: `Challan EDP-${ch.challanNo}` })}>
+                                    <Trash2 size={14} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
             </div>
           </div>
         </div>
