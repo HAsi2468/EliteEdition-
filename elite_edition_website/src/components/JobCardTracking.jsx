@@ -20,8 +20,14 @@ const formatDateDDMMYYYY = (d) => {
 };
 
 export default function JobCardTracking({ onPreview }) {
-  const currentUser = api.getCurrentUser();
   const isAdmin = currentUser?.role?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.isAdmin === true;
+  const isExternalCard = (card) => {
+    if (!card) return false;
+    if (card.isExternal === true || card.source === 'external' || card.source === 'import') return true;
+    const jNo = String(card.jobNo || '').trim().toUpperCase();
+    return !jNo.startsWith('JOB NO.-') && !jNo.startsWith('JOB NO-');
+  };
+  const canEditCard = (card) => isAdmin || isExternalCard(card);
 
   const defaultThisMonth = getDatePresetRange('this_month');
   const [cards, setCards] = useState([]);
@@ -954,6 +960,26 @@ export default function JobCardTracking({ onPreview }) {
                           >
                             {c.jobNo}
                           </button>
+                          {isExternalCard(c) && (
+                            <span
+                              style={{
+                                fontSize: '0.65rem',
+                                background: 'rgba(234, 179, 8, 0.15)',
+                                color: '#eab308',
+                                border: '1px solid rgba(234, 179, 8, 0.3)',
+                                padding: '1px 5px',
+                                borderRadius: '4px',
+                                fontWeight: 700,
+                                marginLeft: '5px',
+                                letterSpacing: '0.02em',
+                                verticalAlign: 'middle',
+                                display: 'inline-block'
+                              }}
+                              title="External / Legacy Job Card (Editable by all users)"
+                            >
+                              Manual
+                            </span>
+                          )}
                         </JobCardTooltip>
                       </td>
 
@@ -1030,7 +1056,7 @@ export default function JobCardTracking({ onPreview }) {
                             >
                               📄 {getValue(c, 'billNo')}
                             </span>
-                            {isAdmin && (
+                            {canEditCard(c) && (
                               <button
                                 type="button"
                                 title="Edit Bill No"
@@ -1059,7 +1085,7 @@ export default function JobCardTracking({ onPreview }) {
                               </button>
                             )}
                           </div>
-                        ) : isAdmin ? (
+                        ) : canEditCard(c) ? (
                           <input
                             type="text"
                             value={getValue(c, 'billNo')}
@@ -1067,7 +1093,7 @@ export default function JobCardTracking({ onPreview }) {
                             onBlur={e => handleAutoSave(c._id, 'billNo', e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && e.target.blur()}
                             placeholder="Bill No"
-                            title="Auto-synced from Billing Invoice. (Admin can edit)"
+                            title={isExternalCard(c) ? "Manual / Legacy Job Card (Editable by all users)" : "Auto-synced from Billing Invoice. (Admin can edit)"}
                             style={{ ...inputStyle, width: '100px', fontWeight: 700 }}
                           />
                         ) : (
@@ -1102,16 +1128,16 @@ export default function JobCardTracking({ onPreview }) {
                         <input
                           type="date"
                           value={getValue(c, 'printDate')}
-                          disabled={!isAdmin}
-                          readOnly={!isAdmin}
-                          onChange={e => isAdmin && handleAutoSave(c._id, 'printDate', e.target.value)}
-                          title={!isAdmin ? "Only Admin can edit Print Date directly. (Auto-updated from Printing Dept)" : "Edit Print Date"}
+                          disabled={!canEditCard(c)}
+                          readOnly={!canEditCard(c)}
+                          onChange={e => canEditCard(c) && handleAutoSave(c._id, 'printDate', e.target.value)}
+                          title={!canEditCard(c) ? "Only Admin can edit Print Date for system cards. (Auto-updated from Printing Dept)" : "Edit Print Date"}
                           style={{
                             ...inputStyle,
                             width: '120px',
-                            opacity: !isAdmin ? 0.75 : 1,
-                            cursor: !isAdmin ? 'not-allowed' : 'pointer',
-                            background: !isAdmin ? 'rgba(255,255,255,0.03)' : inputStyle.background
+                            opacity: !canEditCard(c) ? 0.75 : 1,
+                            cursor: !canEditCard(c) ? 'not-allowed' : 'pointer',
+                            background: !canEditCard(c) ? 'rgba(255,255,255,0.03)' : inputStyle.background
                           }}
                         />
                       </td>
@@ -1122,21 +1148,21 @@ export default function JobCardTracking({ onPreview }) {
                           <input
                             type="text"
                             value={getValue(c, 'printMtr')}
-                            disabled={!isAdmin}
-                            readOnly={!isAdmin}
-                            onChange={e => isAdmin && handleCellChange(c._id, 'printMtr', e.target.value)}
-                            onBlur={e => isAdmin && handleAutoSave(c._id, 'printMtr', e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && isAdmin && e.target.blur()}
+                            disabled={!canEditCard(c)}
+                            readOnly={!canEditCard(c)}
+                            onChange={e => canEditCard(c) && handleCellChange(c._id, 'printMtr', e.target.value)}
+                            onBlur={e => canEditCard(c) && handleAutoSave(c._id, 'printMtr', e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && canEditCard(c) && e.target.blur()}
                             placeholder="0 mtr"
-                            title={!isAdmin ? "Only Admin can edit Print Meters directly. (Auto-updated from Printing Dept)" : "Edit Print Meters"}
+                            title={!canEditCard(c) ? "Only Admin can edit Print Meters for system cards. (Auto-updated from Printing Dept)" : "Edit Print Meters"}
                             style={{
                               ...inputStyle,
                               width: '80px',
                               fontWeight: 700,
                               color: '#38bdf8',
-                              opacity: !isAdmin ? 0.75 : 1,
-                              cursor: !isAdmin ? 'not-allowed' : 'text',
-                              background: !isAdmin ? 'rgba(255,255,255,0.03)' : inputStyle.background
+                              opacity: !canEditCard(c) ? 0.75 : 1,
+                              cursor: !canEditCard(c) ? 'not-allowed' : 'text',
+                              background: !canEditCard(c) ? 'rgba(255,255,255,0.03)' : inputStyle.background
                             }}
                           />
                           <button
@@ -1182,16 +1208,16 @@ export default function JobCardTracking({ onPreview }) {
                       <td style={{ ...tdStyle, textAlign: 'center' }}>
                         <select
                           value={getValue(c, 'fusingStatus') || 'Fusing Pending'}
-                          disabled={!isAdmin}
-                          onChange={e => isAdmin && handleAutoSave(c._id, 'fusingStatus', e.target.value)}
-                          title={!isAdmin ? "Auto-updated from Fusing Department" : "Edit Fusing Status"}
+                          disabled={!canEditCard(c)}
+                          onChange={e => canEditCard(c) && handleAutoSave(c._id, 'fusingStatus', e.target.value)}
+                          title={!canEditCard(c) ? "Auto-updated from Fusing Department" : "Edit Fusing Status"}
                           style={{
                             ...selectStyle,
                             color: getValue(c, 'fusingStatus') === 'Fusing Done' ? '#34d399' : '#fbbf24',
                             borderColor: getValue(c, 'fusingStatus') === 'Fusing Done' ? 'rgba(52,211,153,0.3)' : 'rgba(245,158,11,0.3)',
                             background: getValue(c, 'fusingStatus') === 'Fusing Done' ? 'rgba(52,211,153,0.06)' : 'rgba(245,158,11,0.06)',
-                            opacity: !isAdmin ? 0.9 : 1,
-                            cursor: !isAdmin ? 'default' : 'pointer'
+                            opacity: !canEditCard(c) ? 0.9 : 1,
+                            cursor: !canEditCard(c) ? 'default' : 'pointer'
                           }}
                         >
                           <option value="Fusing Pending" style={{ color: '#000' }}>FP</option>
@@ -1204,16 +1230,16 @@ export default function JobCardTracking({ onPreview }) {
                         <input
                           type="date"
                           value={getValue(c, 'fusingDate')}
-                          disabled={!isAdmin}
-                          readOnly={!isAdmin}
-                          onChange={e => isAdmin && handleAutoSave(c._id, 'fusingDate', e.target.value)}
-                          title={!isAdmin ? "Auto-updated from Fusing Department" : "Edit Fusing Date"}
+                          disabled={!canEditCard(c)}
+                          readOnly={!canEditCard(c)}
+                          onChange={e => canEditCard(c) && handleAutoSave(c._id, 'fusingDate', e.target.value)}
+                          title={!canEditCard(c) ? "Auto-updated from Fusing Department" : "Edit Fusing Date"}
                           style={{
                             ...inputStyle,
                             width: '120px',
-                            opacity: !isAdmin ? 0.8 : 1,
-                            cursor: !isAdmin ? 'default' : 'pointer',
-                            background: !isAdmin ? 'rgba(255,255,255,0.03)' : inputStyle.background
+                            opacity: !canEditCard(c) ? 0.8 : 1,
+                            cursor: !canEditCard(c) ? 'default' : 'pointer',
+                            background: !canEditCard(c) ? 'rgba(255,255,255,0.03)' : inputStyle.background
                           }}
                         />
                       </td>
@@ -1237,20 +1263,20 @@ export default function JobCardTracking({ onPreview }) {
                               <input
                                 type="number"
                                 value={getValue(c, 'fusingMtr')}
-                                disabled={!isAdmin}
-                                readOnly={!isAdmin}
-                                onChange={e => isAdmin && handleCellChange(c._id, 'fusingMtr', parseFloat(e.target.value) || 0)}
-                                onBlur={e => isAdmin && handleAutoSave(c._id, 'fusingMtr', parseFloat(e.target.value) || 0)}
-                                onKeyDown={e => e.key === 'Enter' && isAdmin && e.target.blur()}
-                                title={!isAdmin ? "Auto-updated from Fusing Department" : "Edit Fusing Meters"}
+                                disabled={!canEditCard(c)}
+                                readOnly={!canEditCard(c)}
+                                onChange={e => canEditCard(c) && handleCellChange(c._id, 'fusingMtr', parseFloat(e.target.value) || 0)}
+                                onBlur={e => canEditCard(c) && handleAutoSave(c._id, 'fusingMtr', parseFloat(e.target.value) || 0)}
+                                onKeyDown={e => e.key === 'Enter' && canEditCard(c) && e.target.blur()}
+                                title={!canEditCard(c) ? "Auto-updated from Fusing Department" : "Edit Fusing Meters"}
                                 style={{
                                   ...inputStyle,
                                   width: '65px',
                                   fontWeight: 700,
                                   color: '#fb923c',
-                                  opacity: !isAdmin ? 0.85 : 1,
-                                  cursor: !isAdmin ? 'default' : 'text',
-                                  background: !isAdmin ? 'rgba(255,255,255,0.03)' : inputStyle.background
+                                  opacity: !canEditCard(c) ? 0.85 : 1,
+                                  cursor: !canEditCard(c) ? 'default' : 'text',
+                                  background: !canEditCard(c) ? 'rgba(255,255,255,0.03)' : inputStyle.background
                                 }}
                               />
                               {isAdmin && needsSync ? (

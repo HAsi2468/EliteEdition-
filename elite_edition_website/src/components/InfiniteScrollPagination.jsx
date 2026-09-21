@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Loader2, ArrowDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, ArrowDown } from 'lucide-react';
 
 /**
  * Reusable Infinite Scroll with Pagination Dock
@@ -9,8 +9,10 @@ import { ChevronLeft, ChevronRight, Loader2, ArrowDown } from 'lucide-react';
  * - Progress indicator: "Showing X of Y items • Page P of N"
  * - Sleek pulsing loading spinner during background page loads
  * - Manual "Load More" action button (with hover lift)
- * - Navigation buttons (Prev / Next) for instant page jumps
- * - End-of-data completion pill: "✓ All Y items loaded"
+ * - Navigation buttons (First / Prev / Next / Last) for instant page jumps
+ * - Accurate completion pill: only "✓ All Y items loaded" when currentCount >= total
+ * - Quick jump to Page 1 or Load All when on later pages
+ * - Configurable page size options (e.g. 25, 50, 100, All)
  */
 export default function InfiniteScrollPagination({
   hasMore = false,
@@ -24,6 +26,13 @@ export default function InfiniteScrollPagination({
   itemName = 'items',
   onPrevPage,
   onNextPage,
+  onFirstPage,
+  onLastPage,
+  onPageChange,
+  pageSize = null,
+  onPageSizeChange = null,
+  pageSizeOptions = [25, 50, 100, 'All'],
+  onLoadAll = null,
   scrollContainerRef = null,
   compact = false,
   style = {}
@@ -92,30 +101,25 @@ export default function InfiniteScrollPagination({
           transition: 'all 0.2s ease'
         }}
       >
-        {/* Left: Item Counter Chip */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        {/* Left: Item Counter Chip & Page Size */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
           <span
             style={{
               display: 'inline-block',
               width: '8px',
               height: '8px',
               borderRadius: '50%',
-              backgroundColor: loadingMore ? '#f59e0b' : hasMore ? '#2563eb' : '#10b981',
-              boxShadow: loadingMore 
-                ? '0 0 8px #f59e0b' 
-                : hasMore 
-                  ? '0 0 8px #2563eb' 
-                  : '0 0 8px #10b981',
-              transition: 'all 0.3s ease'
+              background: currentCount >= total && total > 0 ? '#10b981' : '#3b82f6',
+              boxShadow: currentCount >= total && total > 0 ? '0 0 6px #10b981' : '0 0 6px #3b82f6'
             }}
           />
           <span style={{ fontSize: '0.86rem', color: 'var(--text-main, #1e293b)', fontWeight: 600 }}>
             Showing{' '}
-            <span style={{ color: '#2563eb' }}>{currentCount.toLocaleString()}</span>
+            <span style={{ color: '#2563eb', fontWeight: 700 }}>{currentCount.toLocaleString()}</span>
             {total > 0 && (
               <>
                 {' '}of{' '}
-                <span style={{ color: 'var(--text-main, #1e293b)' }}>{total.toLocaleString()}</span>
+                <span style={{ color: 'var(--text-main, #1e293b)', fontWeight: 700 }}>{total.toLocaleString()}</span>
               </>
             )}{' '}
             {itemName}
@@ -134,10 +138,40 @@ export default function InfiniteScrollPagination({
               Page {page} of {pages}
             </span>
           )}
+
+          {/* Page Size Selector */}
+          {onPageSizeChange && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '0.4rem' }}>
+              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted, #64748b)', fontWeight: 600 }}>Per page:</span>
+              {(pageSizeOptions || [25, 50, 100, 'All']).map(opt => {
+                const isSelected = (opt === 'All' && (pageSize === 'all' || pageSize >= 1000)) || (String(opt) === String(pageSize));
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => onPageSizeChange(opt)}
+                    style={{
+                      padding: '2px 7px',
+                      fontSize: '0.72rem',
+                      fontWeight: isSelected ? 800 : 600,
+                      borderRadius: '6px',
+                      border: isSelected ? '1px solid #2563eb' : '1px solid var(--border-color, #cbd5e1)',
+                      background: isSelected ? '#2563eb' : 'var(--bg-main, #ffffff)',
+                      color: isSelected ? '#ffffff' : 'var(--text-muted, #64748b)',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Center: Status & Load More Action */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           {loadingMore ? (
             <div
               style={{
@@ -189,7 +223,7 @@ export default function InfiniteScrollPagination({
               <ArrowDown size={14} />
               <span>Load More (Page {page + 1})</span>
             </button>
-          ) : total > 0 ? (
+          ) : total > 0 && currentCount >= total ? (
             <span
               style={{
                 fontSize: '0.78rem',
@@ -202,12 +236,90 @@ export default function InfiniteScrollPagination({
             >
               ✓ All {total.toLocaleString()} {itemName} loaded
             </span>
-          ) : null}
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  color: 'var(--text-muted, #64748b)',
+                  background: 'var(--bg-muted, #f1f5f9)',
+                  padding: '0.25rem 0.65rem',
+                  borderRadius: '12px'
+                }}
+              >
+                Page {page} of {pages} ({currentCount} showing)
+              </span>
+              {page > 1 && (
+                <button
+                  type="button"
+                  onClick={() => onFirstPage ? onFirstPage() : onPageChange ? onPageChange(1) : onPrevPage && onPrevPage(1)}
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    color: '#2563eb',
+                    background: 'rgba(37, 99, 235, 0.08)',
+                    border: '1px solid rgba(37, 99, 235, 0.25)',
+                    padding: '0.22rem 0.65rem',
+                    borderRadius: '10px',
+                    cursor: 'pointer'
+                  }}
+                  title="Go to Page 1 (Newest items)"
+                >
+                  ⏮ Go to Page 1
+                </button>
+              )}
+              {onLoadAll && currentCount < total && (
+                <button
+                  type="button"
+                  onClick={onLoadAll}
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    color: '#059669',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    padding: '0.22rem 0.65rem',
+                    borderRadius: '10px',
+                    cursor: 'pointer'
+                  }}
+                  title="Load all items into view"
+                >
+                  ⚡ Load All ({total})
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Right: Quick Page Navigation (Prev / Next) */}
+        {/* Right: Quick Page Navigation (First / Prev / Indicator / Next / Last) */}
         {pages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            {/* First Page (⏮) */}
+            <button
+              onClick={() => onFirstPage ? onFirstPage() : onPageChange ? onPageChange(1) : onPrevPage && onPrevPage(1)}
+              disabled={page <= 1 || loadingMore}
+              type="button"
+              title="First page (Page 1)"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color, #e2e8f0)',
+                background: 'var(--bg-main, #ffffff)',
+                color: page <= 1 ? '#94a3b8' : 'var(--text-main, #1e293b)',
+                cursor: page <= 1 ? 'not-allowed' : 'pointer',
+                opacity: page <= 1 ? 0.4 : 1,
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <ChevronsLeft size={16} />
+            </button>
+
+            {/* Prev Page (◀) */}
             <button
               onClick={() => onPrevPage && onPrevPage()}
               disabled={page <= 1 || loadingMore}
@@ -224,7 +336,7 @@ export default function InfiniteScrollPagination({
                 background: 'var(--bg-main, #ffffff)',
                 color: page <= 1 ? '#94a3b8' : 'var(--text-main, #1e293b)',
                 cursor: page <= 1 ? 'not-allowed' : 'pointer',
-                opacity: page <= 1 ? 0.5 : 1,
+                opacity: page <= 1 ? 0.4 : 1,
                 transition: 'all 0.15s ease'
               }}
             >
@@ -234,15 +346,16 @@ export default function InfiniteScrollPagination({
             <span
               style={{
                 fontSize: '0.8rem',
-                fontWeight: 600,
-                color: 'var(--text-muted, #64748b)',
-                minWidth: '45px',
+                fontWeight: 700,
+                color: 'var(--text-main, #1e293b)',
+                minWidth: '55px',
                 textAlign: 'center'
               }}
             >
               {page} / {pages}
             </span>
 
+            {/* Next Page (▶) */}
             <button
               onClick={() => onNextPage ? onNextPage() : onLoadMore && onLoadMore()}
               disabled={page >= pages || loadingMore}
@@ -259,11 +372,35 @@ export default function InfiniteScrollPagination({
                 background: 'var(--bg-main, #ffffff)',
                 color: page >= pages ? '#94a3b8' : 'var(--text-main, #1e293b)',
                 cursor: page >= pages ? 'not-allowed' : 'pointer',
-                opacity: page >= pages ? 0.5 : 1,
+                opacity: page >= pages ? 0.4 : 1,
                 transition: 'all 0.15s ease'
               }}
             >
               <ChevronRight size={16} />
+            </button>
+
+            {/* Last Page (⏭) */}
+            <button
+              onClick={() => onLastPage ? onLastPage() : onPageChange ? onPageChange(pages) : null}
+              disabled={page >= pages || loadingMore}
+              type="button"
+              title={`Last page (Page ${pages})`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color, #e2e8f0)',
+                background: 'var(--bg-main, #ffffff)',
+                color: page >= pages ? '#94a3b8' : 'var(--text-main, #1e293b)',
+                cursor: page >= pages ? 'not-allowed' : 'pointer',
+                opacity: page >= pages ? 0.4 : 1,
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <ChevronsRight size={16} />
             </button>
           </div>
         )}

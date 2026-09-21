@@ -3,7 +3,8 @@ import { api } from '../services/api';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import {
   Layers, Database, Settings, Trash2, Search, X, FileDown,
-  Plus, Edit, ArrowDownToLine, ArrowUpFromLine, RefreshCw, FileSpreadsheet, AlertCircle
+  Plus, Edit, ArrowDownToLine, ArrowUpFromLine, RefreshCw, FileSpreadsheet, AlertCircle,
+  FileText, Droplet, Printer, CheckCircle2, ChevronRight
 } from 'lucide-react';
 import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 
@@ -1123,60 +1124,635 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
               </div>
             )}
 
-            {/* Materials Stock Cards */}
-            {filteredStock.length === 0 && !loading && <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No stock data matching selected material filter.</p>}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.2rem' }}>
-              {filteredStock.map((item, idx) => {
-                const isLow = item.currentStock <= 5;
-                const isEmpty = item.currentStock <= 0;
+            {/* ─── STOCK OVERVIEW: PROPER UI TABLE VIEW ─── */}
+            {(() => {
+              const isPaperItem = (item) => {
+                const name = String(item.materialName || '').toLowerCase();
+                return ['a++', 'a+', 'a'].includes(name) || name.includes('paper') || name.includes('sublimation') || name.includes('butter');
+              };
+              const isGrandoItem = (item) => String(item.materialName || '').toLowerCase().includes('grando');
+              const isPrintdotItem = (item) => String(item.materialName || '').toLowerCase().includes('printdot');
+
+              const paperItems = stock.filter(item => isPaperItem(item)).sort((a, b) => {
+                if (a.materialName !== b.materialName) return a.materialName.localeCompare(b.materialName);
+                return (b.panna || '').localeCompare(a.panna || '');
+              });
+
+              const grandoItems = stock.filter(item => isGrandoItem(item));
+              const printdotItems = stock.filter(item => isPrintdotItem(item));
+              const otherItems = stock.filter(item => !isPaperItem(item) && !isGrandoItem(item) && !isPrintdotItem(item));
+
+              const showPaper = stockMaterialType === 'All' || matchesMaterialType('Sublimation Paper', stockMaterialType) || matchesMaterialType('Butter Paper', stockMaterialType);
+              const showGrando = stockMaterialType === 'All' || stockMaterialType === 'Ink' || stockMaterialType === 'All Inks' || stockMaterialType === 'Grando Ink';
+              const showPrintdot = stockMaterialType === 'All' || stockMaterialType === 'Ink' || stockMaterialType === 'All Inks' || stockMaterialType === 'Printdot Ink';
+              const showOther = stockMaterialType === 'All' || (!showPaper && !showGrando && !showPrintdot);
+
+              const CMYK_SPECS = [
+                { key: 'Cyan', code: 'C', name: 'Cyan (C)', colorVal: '#06b6d4', bg: 'rgba(6, 182, 212, 0.12)', border: 'rgba(6, 182, 212, 0.35)' },
+                { key: 'Magenta', code: 'M', name: 'Magenta (M)', colorVal: '#ec4899', bg: 'rgba(236, 72, 153, 0.12)', border: 'rgba(236, 72, 153, 0.35)' },
+                { key: 'Yellow', code: 'Y', name: 'Yellow (Y)', colorVal: '#eab308', bg: 'rgba(234, 179, 8, 0.12)', border: 'rgba(234, 179, 8, 0.35)' },
+                { key: 'Black', code: 'K', name: 'Black (K)', colorVal: '#1e293b', dotBorder: '#94a3b8', bg: 'rgba(30, 41, 59, 0.25)', border: 'rgba(148, 163, 184, 0.35)' }
+              ];
+
+              const GRANDO_CMYK_SPECS = [
+                ...CMYK_SPECS,
+                { key: 'Cleaning', code: 'C.S.', name: 'Cleaning Solution (C.S.)', colorVal: '#a855f7', bg: 'rgba(168, 85, 247, 0.12)', border: 'rgba(168, 85, 247, 0.35)' }
+              ];
+
+              const handleQuickInward = (matName, panna = '', color = '', canSize = null) => {
+                setEditingTransaction(null);
+                setIsInwardOpen(true);
+                handleInwardTabChange(matName || 'Sublimation Paper');
+                setInwardForm(prev => ({
+                  ...prev,
+                  materialName: matName,
+                  panna: panna ? panna.replace(/"/g, '').replace(/panna/i, '').trim() : prev.panna,
+                  color: color || prev.color,
+                  canSize: canSize || prev.canSize
+                }));
+                setInwardItems([]);
+              };
+
+              const handleQuickOutward = (matName, panna = '', color = '', canSize = null) => {
+                setIsOutwardOpen(true);
+                handleOutwardTabChange(matName || 'Sublimation Paper');
+                setOutwardForm(prev => ({
+                  ...prev,
+                  materialName: matName,
+                  panna: panna ? panna.replace(/"/g, '').replace(/panna/i, '').trim() : prev.panna,
+                  color: color || prev.color,
+                  canSize: canSize || prev.canSize
+                }));
+                setOutwardItems([]);
+              };
+
+              const renderStockStatusBadge = (stockQty) => {
+                if (stockQty <= 0) {
+                  return (
+                    <span style={{ fontSize: '0.72rem', background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', padding: '2px 8px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444' }} />
+                      {stockQty < 0 ? `Negative (${stockQty})` : 'Empty'}
+                    </span>
+                  );
+                }
+                if (stockQty <= 5) {
+                  return (
+                    <span style={{ fontSize: '0.72rem', background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '6px', padding: '2px 8px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b' }} />
+                      Low Stock
+                    </span>
+                  );
+                }
                 return (
-                  <div key={idx} style={{
-                    background: isEmpty ? 'rgba(239,68,68,0.05)' : isLow ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${isEmpty ? 'var(--danger)' : isLow ? '#f59e0b' : 'var(--border-light)'}`,
-                    borderRadius: 'var(--radius-md)',
-                    padding: '1.25rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    minHeight: '120px'
-                  }}>
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
-                        {renderMaterialCell(item)}
-                        {isEmpty ? (
-                          <span style={{ fontSize: '0.65rem', background: 'var(--danger)', color: '#fff', borderRadius: '4px', padding: '2px 6px', fontWeight: 700 }}>EMPTY</span>
-                        ) : isLow ? (
-                          <span style={{ fontSize: '0.65rem', background: '#f59e0b', color: '#000', borderRadius: '4px', padding: '2px 6px', fontWeight: 700 }}>LOW STOCK</span>
-                        ) : null}
-                      </div>
-                      <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        <span>Total In: <strong style={{ color: 'var(--success)' }}>{item.totalInward}</strong></span>
-                        <span>Total Out: <strong style={{ color: 'var(--danger)' }}>{item.totalOutward}</strong></span>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '1rem' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {item.totalMeters !== undefined && item.totalMeters !== null ? (
-                          <>Total: <strong>{item.totalMeters}m</strong> ({item.currentStock} rolls)</>
-                        ) : item.metersPerRoll ? (
-                          <>Total: <strong>{item.currentStock * item.metersPerRoll}m</strong> ({item.currentStock} rolls)</>
-                        ) : item.canSize ? (
-                          <>Total: <strong>{item.currentStock * item.canSize} Ltr</strong> ({item.currentStock} {item.unit || 'Cans'})</>
-                        ) : (
-                          'Available Stock'
-                        )}
-                      </span>
-                      <div style={{ textAlign: 'right' }}>
-                        <strong style={{ fontSize: '1.8rem', fontWeight: 800, color: isEmpty ? 'var(--danger)' : isLow ? '#f59e0b' : 'var(--primary)' }}>
-                          {item.currentStock}
-                        </strong>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-light)', marginLeft: '0.3rem' }}>{item.unit || 'Rolls'}</span>
-                      </div>
-                    </div>
-                  </div>
+                  <span style={{ fontSize: '0.72rem', background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '6px', padding: '2px 8px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} />
+                    In Stock
+                  </span>
                 );
-              })}
-            </div>
+              };
+
+              const grandoTotalStock = grandoItems.reduce((acc, it) => acc + (it.currentStock || 0), 0);
+              const printdotTotalStock = printdotItems.reduce((acc, it) => acc + (it.currentStock || 0), 0);
+
+              const tableCardStyle = {
+                marginBottom: '2rem',
+                background: 'var(--bg-card, #ffffff)',
+                border: '1px solid var(--border-light, #e2e8f0)',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                boxShadow: '0 4px 20px -4px rgba(0,0,0,0.06)'
+              };
+
+              const tableHeaderBarStyle = {
+                padding: '0.9rem 1.25rem',
+                background: 'rgba(255,255,255,0.03)',
+                borderBottom: '1px solid var(--border-light)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '0.8rem'
+              };
+
+              const thStyle = {
+                padding: '0.75rem 1rem',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                background: '#1e293b',
+                color: '#ffffff',
+                borderBottom: '1px solid var(--border-light)'
+              };
+
+              const tdStyle = {
+                padding: '0.85rem 1rem',
+                fontSize: '0.85rem',
+                borderBottom: '1px solid var(--border-light)',
+                verticalAlign: 'middle'
+              };
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  
+                  {/* 1. PAPER INVENTORY TABLE */}
+                  {showPaper && (
+                    <div style={tableCardStyle}>
+                      <div style={tableHeaderBarStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(79, 70, 229, 0.12)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <FileText size={18} />
+                          </div>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Sublimation & Butter Paper Inventory</h3>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Stock tracked by Paper Grade and Panna (Width)</span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.78rem', background: 'rgba(79, 70, 229, 0.08)', color: 'var(--primary)', border: '1px solid rgba(79, 70, 229, 0.25)', borderRadius: '6px', padding: '3px 10px', fontWeight: 700 }}>
+                            {paperItems.length} Profiles
+                          </span>
+                          <span style={{ fontSize: '0.78rem', background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '6px', padding: '3px 10px', fontWeight: 700 }}>
+                            Total {paperItems.reduce((acc, it) => acc + (it.currentStock || 0), 0)} Rolls
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '780px' }}>
+                          <thead>
+                            <tr>
+                              <th style={thStyle}>Paper Type / Grade</th>
+                              <th style={thStyle}>Panna (Width)</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Total Inward</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Total Outward</th>
+                              <th style={{ ...thStyle, textAlign: 'right' }}>Available Rolls</th>
+                              <th style={{ ...thStyle, textAlign: 'right' }}>Total Available Mtr</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Stock Status</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Quick Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {paperItems.length === 0 ? (
+                              <tr>
+                                <td colSpan="8" style={{ ...tdStyle, textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                  No paper stock records found for this period. Click "Stock Inward" to record rolls.
+                                </td>
+                              </tr>
+                            ) : (
+                              paperItems.map((item, idx) => {
+                                const nameLower = (item.materialName || '').toLowerCase();
+                                const isPaperGrade = ['a++', 'a+', 'a'].includes(nameLower);
+                                const displayName = isPaperGrade ? `Sublimation Paper (${item.materialName})` : item.materialName;
+                                const isEmpty = (item.currentStock || 0) <= 0;
+                                const isLow = (item.currentStock || 0) <= 5 && !isEmpty;
+
+                                return (
+                                  <tr 
+                                    key={idx} 
+                                    style={{ 
+                                      background: isEmpty ? 'rgba(239, 68, 68, 0.02)' : isLow ? 'rgba(245, 158, 11, 0.02)' : idx % 2 === 1 ? 'rgba(255, 255, 255, 0.015)' : 'transparent',
+                                      transition: 'background-color 0.15s'
+                                    }}
+                                  >
+                                    <td style={tdStyle}>
+                                      <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{displayName}</div>
+                                      {item.paperQuality && (
+                                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                          Quality: {item.paperQuality}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td style={tdStyle}>
+                                      {item.panna ? (
+                                        <span style={{ fontSize: '0.78rem', background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '6px', padding: '2px 8px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                          📐 {item.panna}
+                                        </span>
+                                      ) : (
+                                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                                      )}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                      <span style={{ fontWeight: 700, color: 'var(--success)' }}>
+                                        {item.totalInward || 0} Rolls
+                                      </span>
+                                      {item.totalInwardMtr ? (
+                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                          {item.totalInwardMtr.toLocaleString()}m
+                                        </div>
+                                      ) : null}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                      <span style={{ fontWeight: 700, color: 'var(--danger)' }}>
+                                        {item.totalOutward || 0} Rolls
+                                      </span>
+                                      {item.totalOutwardMtr ? (
+                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                          {item.totalOutwardMtr.toLocaleString()}m
+                                        </div>
+                                      ) : null}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                      <strong style={{ fontSize: '1.05rem', fontWeight: 800, color: isEmpty ? 'var(--danger)' : isLow ? '#f59e0b' : 'var(--primary)' }}>
+                                        {item.currentStock}
+                                      </strong>
+                                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '4px' }}>Rolls</span>
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                      {item.totalMeters !== undefined && item.totalMeters !== null ? (
+                                        <strong style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{item.totalMeters.toLocaleString()}m</strong>
+                                      ) : item.metersPerRoll ? (
+                                        <strong style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{(item.currentStock * item.metersPerRoll).toLocaleString()}m</strong>
+                                      ) : (
+                                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                                      )}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                      {renderStockStatusBadge(item.currentStock || 0)}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                                        <button 
+                                          onClick={() => handleQuickInward(item.materialName, item.panna)}
+                                          className="btn-primary" 
+                                          title="Quick Inward for this paper & panna"
+                                          style={{ padding: '3px 8px', fontSize: '0.72rem', gap: '3px' }}
+                                        >
+                                          <Plus size={11} /> In
+                                        </button>
+                                        <button 
+                                          onClick={() => handleQuickOutward(item.materialName, item.panna)}
+                                          className="btn-secondary" 
+                                          title="Quick Outward for this paper & panna"
+                                          style={{ padding: '3px 8px', fontSize: '0.72rem', gap: '3px' }}
+                                        >
+                                          <ArrowUpFromLine size={11} /> Out
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                          {paperItems.length > 0 && (
+                            <tfoot>
+                              <tr style={{ background: 'rgba(255,255,255,0.03)', fontWeight: 700, borderTop: '2px solid var(--border-light)' }}>
+                                <td colSpan="2" style={{ ...tdStyle, fontWeight: 700 }}>Total Paper Stock</td>
+                                <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--success)', fontWeight: 700 }}>
+                                  {paperItems.reduce((acc, it) => acc + (it.totalInward || 0), 0)} Rolls
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--danger)', fontWeight: 700 }}>
+                                  {paperItems.reduce((acc, it) => acc + (it.totalOutward || 0), 0)} Rolls
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800, color: 'var(--primary)' }}>
+                                  {paperItems.reduce((acc, it) => acc + (it.currentStock || 0), 0)} Rolls
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 800 }}>
+                                  {paperItems.reduce((acc, it) => acc + (it.totalMeters !== undefined ? it.totalMeters : (it.currentStock * (it.metersPerRoll || 0))), 0).toLocaleString()}m
+                                </td>
+                                <td colSpan="2" style={tdStyle}></td>
+                              </tr>
+                            </tfoot>
+                          )}
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. GRANDO INK INVENTORY TABLE (CMYK) */}
+                  {showGrando && (
+                    <div style={tableCardStyle}>
+                      <div style={tableHeaderBarStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Droplet size={18} />
+                          </div>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Grando Sublimation Ink (C, M, Y, K)</h3>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>High-density sublimation ink inventory tracked by color</span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.78rem', background: 'rgba(56, 189, 248, 0.08)', color: '#0284c7', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '6px', padding: '3px 10px', fontWeight: 700 }}>
+                            Grando System
+                          </span>
+                          <span style={{ fontSize: '0.78rem', background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '6px', padding: '3px 10px', fontWeight: 700 }}>
+                            Total {grandoTotalStock} Liters
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '720px' }}>
+                          <thead>
+                            <tr>
+                              <th style={thStyle}>Ink Color (CMYK)</th>
+                              <th style={thStyle}>Can / Bottle Size</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Total Inward</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Total Outward</th>
+                              <th style={{ ...thStyle, textAlign: 'right' }}>Available Stock</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Quick Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {GRANDO_CMYK_SPECS.map(spec => {
+                              const matched = grandoItems.find(it => {
+                                const cLower = (it.color || '').toLowerCase();
+                                const mLower = (it.materialName || '').toLowerCase();
+                                if (spec.key === 'Cyan') return cLower === 'cyan' || mLower.includes('cyan') || it.color === 'C';
+                                if (spec.key === 'Magenta') return cLower === 'magenta' || mLower.includes('magenta') || it.color === 'M';
+                                if (spec.key === 'Yellow') return cLower === 'yellow' || mLower.includes('yellow') || it.color === 'Y';
+                                if (spec.key === 'Black') return cLower === 'black' || mLower.includes('black') || it.color === 'K';
+                                if (spec.key === 'Cleaning') return cLower.includes('clean') || mLower.includes('clean') || it.color === 'C.S.';
+                                return false;
+                              });
+
+                              const inward = matched ? (matched.totalInward || 0) : 0;
+                              const outward = matched ? (matched.totalOutward || 0) : 0;
+                              const currentStock = matched ? (matched.currentStock || 0) : 0;
+                              const canSize = matched?.canSize || 1;
+                              const matName = matched?.materialName || `Grando Ink - ${spec.name}`;
+
+                              return (
+                                <tr key={spec.code} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                                  <td style={tdStyle}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                                      <span 
+                                        style={{ 
+                                          display: 'inline-block', 
+                                          width: '14px', 
+                                          height: '14px', 
+                                          borderRadius: '50%', 
+                                          background: spec.colorVal,
+                                          border: spec.dotBorder ? `1px solid ${spec.dotBorder}` : 'none',
+                                          boxShadow: `0 0 6px ${spec.bg}`
+                                        }} 
+                                      />
+                                      <div>
+                                        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{spec.name}</span>
+                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Grando Sublimation</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td style={tdStyle}>
+                                    <span style={{ fontSize: '0.76rem', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', padding: '2px 6px' }}>
+                                      {canSize} Liter Bottle
+                                    </span>
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    <span style={{ fontWeight: 700, color: 'var(--success)' }}>
+                                      {inward} Liters
+                                    </span>
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    <span style={{ fontWeight: 700, color: 'var(--danger)' }}>
+                                      {outward} Liters
+                                    </span>
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                    <strong style={{ fontSize: '1.05rem', fontWeight: 800, color: currentStock <= 0 ? 'var(--danger)' : currentStock <= 5 ? '#f59e0b' : 'var(--primary)' }}>
+                                      {currentStock}
+                                    </strong>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '4px' }}>Liters</span>
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    {renderStockStatusBadge(currentStock)}
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                                      <button 
+                                        onClick={() => handleQuickInward('Grando Ink', '', spec.key, canSize)}
+                                        className="btn-primary" 
+                                        title={`Quick Inward for Grando ${spec.name}`}
+                                        style={{ padding: '3px 8px', fontSize: '0.72rem', gap: '3px' }}
+                                      >
+                                        <Plus size={11} /> In
+                                      </button>
+                                      <button 
+                                        onClick={() => handleQuickOutward('Grando Ink', '', spec.key, canSize)}
+                                        className="btn-secondary" 
+                                        title={`Quick Outward for Grando ${spec.name}`}
+                                        style={{ padding: '3px 8px', fontSize: '0.72rem', gap: '3px' }}
+                                      >
+                                        <ArrowUpFromLine size={11} /> Out
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. PRINTDOT INK INVENTORY TABLE (CMYK) */}
+                  {showPrintdot && (
+                    <div style={tableCardStyle}>
+                      <div style={tableHeaderBarStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(236, 72, 153, 0.12)', color: '#ec4899', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Printer size={18} />
+                          </div>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Printdot Digital Ink (C, M, Y, K)</h3>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Printdot production printhead ink inventory tracked by color</span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.78rem', background: 'rgba(236, 72, 153, 0.08)', color: '#db2777', border: '1px solid rgba(236, 72, 153, 0.25)', borderRadius: '6px', padding: '3px 10px', fontWeight: 700 }}>
+                            Printdot System
+                          </span>
+                          <span style={{ fontSize: '0.78rem', background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '6px', padding: '3px 10px', fontWeight: 700 }}>
+                            Total {printdotTotalStock} Liters
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '720px' }}>
+                          <thead>
+                            <tr>
+                              <th style={thStyle}>Ink Color (CMYK)</th>
+                              <th style={thStyle}>Can / Bottle Size</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Total Inward</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Total Outward</th>
+                              <th style={{ ...thStyle, textAlign: 'right' }}>Available Stock</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Quick Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {CMYK_SPECS.map(spec => {
+                              const matched = printdotItems.find(it => {
+                                const cLower = (it.color || '').toLowerCase();
+                                const mLower = (it.materialName || '').toLowerCase();
+                                if (spec.key === 'Cyan') return cLower === 'cyan' || mLower.includes('cyan') || it.color === 'C';
+                                if (spec.key === 'Magenta') return cLower === 'magenta' || mLower.includes('magenta') || it.color === 'M';
+                                if (spec.key === 'Yellow') return cLower === 'yellow' || mLower.includes('yellow') || it.color === 'Y';
+                                if (spec.key === 'Black') return cLower === 'black' || mLower.includes('black') || it.color === 'K';
+                                return false;
+                              });
+
+                              const inward = matched ? (matched.totalInward || 0) : 0;
+                              const outward = matched ? (matched.totalOutward || 0) : 0;
+                              const currentStock = matched ? (matched.currentStock || 0) : 0;
+                              const canSize = matched?.canSize || 1;
+
+                              return (
+                                <tr key={spec.code} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                                  <td style={tdStyle}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                                      <span 
+                                        style={{ 
+                                          display: 'inline-block', 
+                                          width: '14px', 
+                                          height: '14px', 
+                                          borderRadius: '50%', 
+                                          background: spec.colorVal,
+                                          border: spec.dotBorder ? `1px solid ${spec.dotBorder}` : 'none',
+                                          boxShadow: `0 0 6px ${spec.bg}`
+                                        }} 
+                                      />
+                                      <div>
+                                        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{spec.name}</span>
+                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Printdot Inks</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td style={tdStyle}>
+                                    <span style={{ fontSize: '0.76rem', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', padding: '2px 6px' }}>
+                                      {canSize} Liter Can
+                                    </span>
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    <span style={{ fontWeight: 700, color: 'var(--success)' }}>
+                                      {inward} Liters
+                                    </span>
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    <span style={{ fontWeight: 700, color: 'var(--danger)' }}>
+                                      {outward} Liters
+                                    </span>
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                    <strong style={{ fontSize: '1.05rem', fontWeight: 800, color: currentStock <= 0 ? 'var(--danger)' : currentStock <= 5 ? '#f59e0b' : 'var(--primary)' }}>
+                                      {currentStock}
+                                    </strong>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '4px' }}>Liters</span>
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    {renderStockStatusBadge(currentStock)}
+                                  </td>
+                                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                                      <button 
+                                        onClick={() => handleQuickInward('Printdot Ink', '', spec.key, canSize)}
+                                        className="btn-primary" 
+                                        title={`Quick Inward for Printdot ${spec.name}`}
+                                        style={{ padding: '3px 8px', fontSize: '0.72rem', gap: '3px' }}
+                                      >
+                                        <Plus size={11} /> In
+                                      </button>
+                                      <button 
+                                        onClick={() => handleQuickOutward('Printdot Ink', '', spec.key, canSize)}
+                                        className="btn-secondary" 
+                                        title={`Quick Outward for Printdot ${spec.name}`}
+                                        style={{ padding: '3px 8px', fontSize: '0.72rem', gap: '3px' }}
+                                      >
+                                        <ArrowUpFromLine size={11} /> Out
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 4. OTHER MATERIALS TABLE (If any) */}
+                  {showOther && otherItems.length > 0 && (
+                    <div style={tableCardStyle}>
+                      <div style={tableHeaderBarStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Layers size={18} />
+                          </div>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>Other Raw Materials</h3>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Additional configured accessories & raw materials</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+                          <thead>
+                            <tr>
+                              <th style={thStyle}>Material Name</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Total Inward</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Total Outward</th>
+                              <th style={{ ...thStyle, textAlign: 'right' }}>Available Stock</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
+                              <th style={{ ...thStyle, textAlign: 'center' }}>Quick Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {otherItems.map((item, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                                <td style={tdStyle}>
+                                  <strong style={{ color: 'var(--text-primary)' }}>{item.materialName}</strong>
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--success)', fontWeight: 700 }}>
+                                  {item.totalInward || 0} {item.unit || 'Units'}
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: 'center', color: 'var(--danger)', fontWeight: 700 }}>
+                                  {item.totalOutward || 0} {item.unit || 'Units'}
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                  <strong style={{ fontSize: '1.05rem', fontWeight: 800, color: (item.currentStock || 0) <= 0 ? 'var(--danger)' : 'var(--primary)' }}>
+                                    {item.currentStock || 0}
+                                  </strong>
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '4px' }}>{item.unit || 'Units'}</span>
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                  {renderStockStatusBadge(item.currentStock || 0)}
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                  <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                                    <button 
+                                      onClick={() => handleQuickInward(item.materialName)}
+                                      className="btn-primary" 
+                                      style={{ padding: '3px 8px', fontSize: '0.72rem', gap: '3px' }}
+                                    >
+                                      <Plus size={11} /> In
+                                    </button>
+                                    <button 
+                                      onClick={() => handleQuickOutward(item.materialName)}
+                                      className="btn-secondary" 
+                                      style={{ padding: '3px 8px', fontSize: '0.72rem', gap: '3px' }}
+                                    >
+                                      <ArrowUpFromLine size={11} /> Out
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              );
+            })()}
           </div>
         )}
 
