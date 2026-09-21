@@ -33,12 +33,12 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
     setError('');
 
     try {
-      await api.clientLogin({
+      const res = await api.clientLogin({
         mobile: mobile.trim(),
         password: password.trim()
       });
       if (onLoginSuccess) {
-        onLoginSuccess();
+        onLoginSuccess(res);
       }
     } catch (err) {
       setError(err.message || 'Login failed. Please verify your mobile number and password.');

@@ -13,8 +13,16 @@ const getAll = async (req, res) => {
     }
     if (colors && colors !== 'All') filter.colors = { $regex: colors, $options: 'i' };
     if (party && party !== 'All') {
-      const escaped = String(party).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.parties = { $regex: `^${escaped}$`, $options: 'i' };
+      const escaped = String(party).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const partyRegex = { $regex: `^\\s*${escaped}\\s*$`, $options: 'i' };
+      const partyFilter = {
+        $or: [
+          { parties: partyRegex },
+          { party: partyRegex }
+        ]
+      };
+      if (!filter.$and) filter.$and = [];
+      filter.$and.push(partyFilter);
     }
 
     let deptOr = null;
@@ -32,6 +40,11 @@ const getAll = async (req, res) => {
       filter.designName = { $regex: '^ED-', $options: 'i' };
     }
 
+    if (deptOr) {
+      if (!filter.$and) filter.$and = [];
+      filter.$and.push({ $or: deptOr });
+    }
+
     if (search) {
       const searchOr = [
         { designName:     { $regex: search, $options: 'i' } },
@@ -43,13 +56,8 @@ const getAll = async (req, res) => {
         { parties:        { $regex: search, $options: 'i' } },
         { partySkuId:     { $regex: search, $options: 'i' } },
       ];
-      if (deptOr) {
-        filter.$and = [{ $or: deptOr }, { $or: searchOr }];
-      } else {
-        filter.$or = searchOr;
-      }
-    } else if (deptOr) {
-      filter.$or = deptOr;
+      if (!filter.$and) filter.$and = [];
+      filter.$and.push({ $or: searchOr });
     }
     const skip = (Number(page) - 1) * Number(limit);
     let sort = { designName: -1 };

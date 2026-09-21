@@ -816,6 +816,17 @@ body {
     overflow-y: auto !important;
     padding-right: 4px !important;
   }
+
+  /* Override desktop overflow:hidden when Client Portal is active */
+  html.client-portal-active,
+  body.client-portal-active,
+  html:has(.client-portal-container),
+  body:has(.client-portal-container) {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    height: auto !important;
+    min-height: 100vh !important;
+  }
 }
 
 /* ═══════════════════════════════════════════════════

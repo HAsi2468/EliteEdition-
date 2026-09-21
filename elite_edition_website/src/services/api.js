@@ -154,6 +154,29 @@ export const api = {
     if (!user) return null;
     const userId = user.id || user._id;
     if (!userId) return user;
+
+    if (this.isClientUser()) {
+      try {
+        const res = await this.getClientById(userId);
+        if (res && (res.data || res.client)) {
+          const clientData = res.data || res.client;
+          const updated = {
+            ...user,
+            ...clientData,
+            id: clientData._id || userId,
+            role: 'Client',
+            isClient: true
+          };
+          localStorage.setItem('elite_user', JSON.stringify(updated));
+          localStorage.setItem('elite_client_data', JSON.stringify(clientData));
+          return updated;
+        }
+      } catch (e) {
+        console.warn('Failed to refresh client user profile:', e);
+      }
+      return user;
+    }
+
     try {
       const res = await request(`/users/${userId}`);
       if (res && res.user) {

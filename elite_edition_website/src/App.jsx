@@ -699,6 +699,15 @@ export default function App() {
   }, [socket, isAuthenticated, currentUser?._id]);
 
   const fetchData = async () => {
+    if (api.isClientUser()) {
+      const clientData = api.getClientData();
+      if (clientData) {
+        setCurrentUser(clientData);
+      }
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
@@ -1077,9 +1086,12 @@ export default function App() {
 
   // If authenticated as a Client Partner
   if (api.isClientUser() || currentUser?.isClient || currentUser?.role === 'Client') {
+    const activeClient = (currentUser && (currentUser._id || currentUser.companyName || currentUser.companyCode))
+      ? currentUser
+      : api.getClientData();
     return (
       <ClientPortal
-        client={currentUser}
+        client={activeClient}
         onLogout={handleLogout}
       />
     );

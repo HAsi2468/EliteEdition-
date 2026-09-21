@@ -27,7 +27,18 @@ import { formatDateDDMMYYYY } from '../utils/dateUtils';
 
 export default function ClientPortal({ client, onLogout }) {
   const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'designs' | 'profile'
-  const [clientData, setClientData] = useState(client || api.getClientData() || {});
+  
+  // Resolve client data reliably from props, localStorage, or current user
+  const getInitialClient = () => {
+    if (client && (client._id || client.companyName || client.companyCode || client.username)) return client;
+    const fromStorage = api.getClientData();
+    if (fromStorage && (fromStorage._id || fromStorage.companyName || fromStorage.companyCode || fromStorage.username)) return fromStorage;
+    const fromUser = api.getCurrentUser();
+    if (fromUser && (fromUser._id || fromUser.companyName || fromUser.companyCode || fromUser.username)) return fromUser;
+    return client || {};
+  };
+
+  const [clientData, setClientData] = useState(getInitialClient);
   const [orders, setOrders] = useState([]);
   const [designs, setDesigns] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
@@ -48,16 +59,53 @@ export default function ClientPortal({ client, onLogout }) {
 
   const fileInputRef = useRef(null);
 
-  const partyCode = clientData.companyCode || clientData.companyName || '';
+  // Extract resolved client fields with flexible fallbacks
+  const companyName = clientData.companyName || clientData.company_name || clientData.name || '';
+  const partyCode = clientData.companyCode || clientData.company_code || clientData.partyCode || clientData.party || companyName || '';
+  const mobile = clientData.mobile || clientData.phone || '';
+  const username = clientData.username || clientData.user_name || '';
 
-  // Load Client Orders
+  // Synchronize if client prop updates
+  useEffect(() => {
+    if (client && (client._id || client.companyName || client.companyCode || client.username)) {
+      setClientData(prev => ({ ...prev, ...client }));
+    }
+  }, [client]);
+
+  // Fetch fresh client profile from server on mount
+  useEffect(() => {
+    const activeId = clientData._id || clientData.id;
+    if (activeId) {
+      api.getClientById(activeId).then((res) => {
+        if (res && res.data) {
+          setClientData(prev => ({ ...prev, ...res.data }));
+          localStorage.setItem('elite_client_data', JSON.stringify(res.data));
+        }
+      }).catch(err => console.warn('Could not refresh client data:', err));
+    }
+  }, []);
+
+  // Ensure body and html can scroll on PC and mobile
+  useEffect(() => {
+    document.body.classList.add('client-portal-active');
+    document.documentElement.classList.add('client-portal-active');
+    return () => {
+      document.body.classList.remove('client-portal-active');
+      document.documentElement.classList.remove('client-portal-active');
+    };
+  }, []);
+
+  // Load Client Orders strictly by assigned party code
   const fetchOrders = async () => {
-    if (!partyCode) return;
+    const code = partyCode;
+    if (!code) {
+      setOrders([]);
+      return;
+    }
     setLoadingOrders(true);
     try {
-      // Search by partyCode or companyName
       const res = await api.getJobCards({
-        party: partyCode,
+        party: code,
         limit: 100
       });
       const list = res?.data || (Array.isArray(res) ? res : []);
@@ -69,17 +117,34 @@ export default function ClientPortal({ client, onLogout }) {
     }
   };
 
-  // Load Client Designs
+  // Load Client Designs strictly by assigned party code
   const fetchDesigns = async () => {
-    if (!partyCode) return;
+    const code = partyCode;
+    if (!code) {
+      setDesigns([]);
+      return;
+    }
     setLoadingDesigns(true);
     try {
       const res = await api.getDesigns({
-        party: partyCode,
-        limit: 100
+        party: code,
+        limit: 200
       });
       const list = res?.data || (Array.isArray(res) ? res : []);
-      setDesigns(list);
+      // STRICT FILTER: Only designs whose parties array or party field contains this client's party code
+      const valid = list.filter(d => {
+        const partiesList = Array.isArray(d.parties)
+          ? d.parties
+          : (d.parties ? [d.parties] : (d.party ? [d.party] : []));
+        const c1 = String(code).toLowerCase().trim();
+        const c2 = String(clientData.companyCode || '').toLowerCase().trim();
+        const c3 = String(clientData.companyName || '').toLowerCase().trim();
+        return partiesList.some(p => {
+          const pStr = String(p || '').toLowerCase().trim();
+          return (c1 && pStr === c1) || (c2 && pStr === c2) || (c3 && pStr === c3);
+        });
+      });
+      setDesigns(valid);
     } catch (err) {
       console.warn('Failed to fetch client designs:', err);
     } finally {
@@ -88,8 +153,10 @@ export default function ClientPortal({ client, onLogout }) {
   };
 
   useEffect(() => {
-    fetchOrders();
-    fetchDesigns();
+    if (partyCode) {
+      fetchOrders();
+      fetchDesigns();
+    }
   }, [partyCode]);
 
   // Handle client avatar upload to Cloudflare R2
@@ -168,19 +235,42 @@ export default function ClientPortal({ client, onLogout }) {
   });
 
   const filteredDesigns = designs.filter(d => {
+    // Re-verify that the design contains this client's assigned party code
+    const partiesList = Array.isArray(d.parties)
+      ? d.parties
+      : (d.parties ? [d.parties] : (d.party ? [d.party] : []));
+    const c1 = String(partyCode).toLowerCase().trim();
+    const c2 = String(clientData.companyCode || '').toLowerCase().trim();
+    const c3 = String(clientData.companyName || '').toLowerCase().trim();
+    const matchesParty = partiesList.some(p => {
+      const pStr = String(p || '').toLowerCase().trim();
+      return (c1 && pStr === c1) || (c2 && pStr === c2) || (c3 && pStr === c3);
+    });
+    if (!matchesParty) return false;
+
     const term = searchDesign.toLowerCase().trim();
     if (!term) return true;
     return (
       (d.designName && d.designName.toLowerCase().includes(term)) ||
       (d.category && d.category.toLowerCase().includes(term)) ||
       (d.colors && d.colors.toLowerCase().includes(term)) ||
-      (d.fabricName && d.fabricName.toLowerCase().includes(term))
+      (d.fabricName && d.fabricName.toLowerCase().includes(term)) ||
+      (d.partySkuId && d.partySkuId.toLowerCase().includes(term))
     );
   });
 
   return (
-    <div style={styles.container}>
+    <div className="client-portal-container" style={styles.container}>
       <style>{`
+        .client-portal-container {
+          min-height: 100vh !important;
+          min-height: 100dvh !important;
+          height: 100vh !important;
+          height: 100dvh !important;
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+          -webkit-overflow-scrolling: touch !important;
+        }
         .client-portal-header {
           padding: 0.85rem 1.75rem;
           background: #ffffff;
@@ -196,6 +286,7 @@ export default function ClientPortal({ client, onLogout }) {
         .client-portal-main {
           flex: 1;
           padding: 1.5rem;
+          padding-bottom: 6rem !important;
           max-width: 1200px;
           width: 100%;
           margin: 0 auto;
@@ -335,7 +426,7 @@ export default function ClientPortal({ client, onLogout }) {
             {clientData.image ? (
               <img
                 src={clientData.image}
-                alt={clientData.companyName}
+                alt={companyName || 'Client'}
                 style={styles.avatarImg}
               />
             ) : (
@@ -344,8 +435,8 @@ export default function ClientPortal({ client, onLogout }) {
               </div>
             )}
             <div style={styles.clientMeta}>
-              <span className="client-name-truncate" style={styles.clientName}>{clientData.companyName || clientData.username}</span>
-              <span style={styles.clientCode}>Party: {partyCode}</span>
+              <span className="client-name-truncate" style={styles.clientName}>{companyName || username || 'Client Partner'}</span>
+              <span style={styles.clientCode}>Party: {partyCode || '—'}</span>
             </div>
           </div>
 
@@ -375,17 +466,17 @@ export default function ClientPortal({ client, onLogout }) {
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <h2 style={styles.welcomeHeading}>{clientData.companyName || clientData.username}</h2>
+                <h2 style={styles.welcomeHeading}>{companyName || username || 'Valued Partner'}</h2>
                 <span style={styles.activePill}>Active Partner</span>
               </div>
               <div style={styles.welcomeDetailsRow}>
-                <span>📱 {clientData.mobile}</span>
-                <span>•</span>
-                <span>🏢 Party Code: <strong>{partyCode}</strong></span>
-                {clientData.username && (
+                {mobile && <span>📱 {mobile}</span>}
+                {mobile && <span>•</span>}
+                <span>🏢 Party Code: <strong>{partyCode || '—'}</strong></span>
+                {username && (
                   <>
                     <span>•</span>
-                    <span>👤 User: @{clientData.username}</span>
+                    <span>👤 User: @{username}</span>
                   </>
                 )}
               </div>
@@ -624,8 +715,19 @@ export default function ClientPortal({ client, onLogout }) {
                         {d.partySkuId && (
                           <div>
                             <span style={styles.metaLabel}>Party SKU</span>
-                            <span style={{ ...styles.metaVal, color: '#60a5fa' }}>{d.partySkuId}</span>
+                            <span style={{ ...styles.metaVal, color: '#2563eb' }}>{d.partySkuId}</span>
                           </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px dashed #e2e8f0' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '6px' }}>
+                          Party: {partyCode || (Array.isArray(d.parties) ? d.parties.join(', ') : d.parties || d.party)}
+                        </span>
+                        {d.department && (
+                          <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'capitalize' }}>
+                            {d.department.replace('_', ' ')}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -699,7 +801,7 @@ export default function ClientPortal({ client, onLogout }) {
               <div className="client-details-grid" style={styles.detailsGrid}>
                 <div style={styles.detailItem}>
                   <label style={styles.detailLabel}>Company Name</label>
-                  <div style={styles.detailVal}>{clientData.companyName || '—'}</div>
+                  <div style={styles.detailVal}>{companyName || '—'}</div>
                 </div>
 
                 <div style={styles.detailItem}>
@@ -709,12 +811,12 @@ export default function ClientPortal({ client, onLogout }) {
 
                 <div style={styles.detailItem}>
                   <label style={styles.detailLabel}>Registered Mobile</label>
-                  <div style={styles.detailVal}>{clientData.mobile || '—'}</div>
+                  <div style={styles.detailVal}>{mobile || '—'}</div>
                 </div>
 
                 <div style={styles.detailItem}>
                   <label style={styles.detailLabel}>Username</label>
-                  <div style={styles.detailVal}>@{clientData.username || '—'}</div>
+                  <div style={styles.detailVal}>{username ? `@${username}` : '—'}</div>
                 </div>
               </div>
 
@@ -796,7 +898,11 @@ function getStatusColor(status = '') {
 
 const styles = {
   container: {
-    minHeight: '100vh',
+    height: '100dvh',
+    minHeight: '100dvh',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    WebkitOverflowScrolling: 'touch',
     background: '#f8fafc',
     color: '#0f172a',
     fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
