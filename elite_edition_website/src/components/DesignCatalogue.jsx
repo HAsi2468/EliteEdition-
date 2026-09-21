@@ -3,7 +3,7 @@ import { api, getBaseUrl } from '../services/api';
 import {
   PlusCircle, Search, RefreshCw, Edit2, Trash2, X, Save, Image,
   Eye, FileText, ChevronLeft, ChevronRight, CheckCircle, AlertCircle,
-  Layers, BookOpen
+  Layers, BookOpen, ChevronDown, Check
 } from 'lucide-react';
 import { COLOR_NAMES, getColorHex, detectDominantColors } from '../utils/colors';
 import imageCompression from 'browser-image-compression';
@@ -43,8 +43,7 @@ function compressAndConvertToBase64(file, maxWidth = 900, maxHeight = 900, quali
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(dataUrl);
+        resolve(canvas.toDataURL('image/jpeg', quality));
       };
       img.onerror = (err) => reject(err);
     };
@@ -68,6 +67,7 @@ const BLANK_DESIGN = {
   imageUrl2: '',
   notes: '',
   status: 'Active',
+  parties: [],
   partySkuId: '',
   sizeSalesRates: {
     xs_34: 0, s_36: 0, m_38: 0, l_40: 0, xl_42: 0,
@@ -132,6 +132,301 @@ function FormField({ label, name, value, onChange, placeholder, type = 'text', o
           }} title={value} />
         )}
       </div>
+    </div>
+  );
+}
+
+// Multi-Select Component for Parties (Clients) - from Settings -> Parties (Clients)
+function PartyMultiSelect({ label = "Parties (Clients)", selected = [], options = [], onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [customPartyInput, setCustomPartyInput] = useState('');
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [isOpen]);
+
+  const toggleParty = (party) => {
+    if (!party) return;
+    const exists = selected.includes(party);
+    const updated = exists ? selected.filter(p => p !== party) : [...selected, party];
+    onChange(updated);
+  };
+
+  const removeParty = (party, e) => {
+    e.stopPropagation();
+    onChange(selected.filter(p => p !== party));
+  };
+
+  const handleSelectAll = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const newSelected = Array.from(new Set([...selected, ...filteredOptions]));
+    onChange(newSelected);
+  };
+
+  const handleClearAll = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onChange([]);
+  };
+
+  const handleAddCustom = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const trimmed = customPartyInput.trim();
+    if (trimmed && !selected.includes(trimmed)) {
+      onChange([...selected, trimmed]);
+      setCustomPartyInput('');
+    }
+  };
+
+  const allUniqueOptions = Array.from(new Set([...options, ...selected])).filter(Boolean);
+  const filteredOptions = allUniqueOptions.filter(opt =>
+    opt.toLowerCase().includes(searchTerm.toLowerCase().trim())
+  );
+
+  return (
+    <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: '1 1 calc(50% - 0.5rem)', minWidth: '220px', position: 'relative' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <label style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          {label}
+        </label>
+        {selected.length > 0 && (
+          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--primary)', background: 'rgba(59, 130, 246, 0.1)', padding: '1px 6px', borderRadius: '4px' }}>
+            {selected.length} Selected
+          </span>
+        )}
+      </div>
+
+      {/* Main trigger box */}
+      <div
+        onClick={() => setIsOpen(prev => !prev)}
+        style={{
+          minHeight: '38px',
+          padding: '0.4rem 0.6rem',
+          borderRadius: 'var(--radius-sm)',
+          border: isOpen ? '1px solid var(--primary)' : '1px solid var(--border-light)',
+          background: 'var(--input-bg, rgba(255, 255, 255, 0.04))',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          gap: '0.4rem',
+          flexWrap: 'wrap',
+          boxShadow: isOpen ? '0 0 0 2px rgba(59, 130, 246, 0.2)' : 'none',
+          transition: 'all 0.15s ease'
+        }}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', alignItems: 'center', flex: 1 }}>
+          {selected.length === 0 ? (
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
+              Select party name(s)...
+            </span>
+          ) : (
+            selected.map(party => (
+              <span
+                key={party}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  border: '1px solid rgba(59, 130, 246, 0.35)',
+                  color: '#60a5fa',
+                  padding: '2px 7px',
+                  borderRadius: '4px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600
+                }}
+              >
+                {party}
+                <button
+                  type="button"
+                  onClick={(e) => removeParty(party, e)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#93c5fd',
+                    cursor: 'pointer',
+                    padding: 0,
+                    fontSize: '0.85rem',
+                    lineHeight: 1,
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                  title={`Remove ${party}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))
+          )}
+        </div>
+        <ChevronDown
+          size={16}
+          style={{
+            color: 'var(--text-muted)',
+            transform: isOpen ? 'rotate(180deg)' : 'none',
+            transition: 'transform 0.15s ease',
+            flexShrink: 0
+          }}
+        />
+      </div>
+
+      {/* Dropdown Menu */}
+      {isOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            background: 'var(--bg-modal, #1e293b)',
+            border: '1px solid var(--border-light, #334155)',
+            borderRadius: 'var(--radius-md, 8px)',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.4)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: '280px'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Search bar inside dropdown */}
+          <div style={{ padding: '0.5rem', borderBottom: '1px solid var(--border-light, #334155)', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+            <Search size={14} style={{ color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Filter party names..."
+              style={{
+                width: '100%',
+                padding: '0.3rem 0.4rem',
+                fontSize: '0.8rem',
+                background: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid var(--border-light, #334155)',
+                borderRadius: '4px',
+                color: 'var(--text-primary, #fff)'
+              }}
+              autoFocus
+            />
+          </div>
+
+          {/* Quick Actions */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0.6rem', background: 'rgba(0, 0, 0, 0.15)', borderBottom: '1px solid var(--border-light, #334155)', fontSize: '0.72rem' }}>
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              style={{ background: 'none', border: 'none', color: 'var(--primary, #3b82f6)', cursor: 'pointer', fontWeight: 600 }}
+            >
+              Select All
+            </button>
+            <button
+              type="button"
+              onClick={handleClearAll}
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted, #94a3b8)', cursor: 'pointer' }}
+            >
+              Clear All
+            </button>
+          </div>
+
+          {/* Parties List */}
+          <div style={{ overflowY: 'auto', flex: 1, padding: '0.3rem 0' }}>
+            {filteredOptions.length === 0 ? (
+              <div style={{ padding: '0.8rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                {searchTerm ? 'No parties matching search.' : 'No parties found in Settings → Parties (Clients).'}
+              </div>
+            ) : (
+              filteredOptions.map(party => {
+                const isSelected = selected.includes(party);
+                return (
+                  <div
+                    key={party}
+                    onClick={() => toggleParty(party)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.6rem',
+                      padding: '0.45rem 0.75rem',
+                      cursor: 'pointer',
+                      background: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                      color: isSelected ? '#60a5fa' : 'var(--text-primary, #fff)',
+                      fontSize: '0.82rem',
+                      fontWeight: isSelected ? 600 : 400,
+                      transition: 'background 0.1s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) e.currentTarget.style.background = 'transparent';
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => {}}
+                      style={{ cursor: 'pointer', accentColor: 'var(--primary, #3b82f6)' }}
+                    />
+                    <span style={{ flex: 1 }}>{party}</span>
+                    {isSelected && <Check size={14} style={{ color: '#60a5fa' }} />}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Quick Add Custom Party */}
+          <div style={{ padding: '0.4rem 0.6rem', borderTop: '1px solid var(--border-light, #334155)', background: 'rgba(0, 0, 0, 0.2)', display: 'flex', gap: '0.4rem' }}>
+            <input
+              type="text"
+              value={customPartyInput}
+              onChange={e => setCustomPartyInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleAddCustom(e); }}
+              placeholder="+ Add party name..."
+              style={{
+                flex: 1,
+                padding: '0.25rem 0.4rem',
+                fontSize: '0.75rem',
+                background: 'rgba(0, 0, 0, 0.2)',
+                border: '1px solid var(--border-light, #334155)',
+                borderRadius: '4px',
+                color: 'var(--text-primary, #fff)'
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleAddCustom}
+              style={{
+                padding: '0.25rem 0.6rem',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                background: 'var(--primary, #3b82f6)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -361,6 +656,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [colorFilter, setColorFilter] = useState('All');
+  const [partyFilter, setPartyFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('Active');
   const [sortBy, setSortBy] = useState('designName');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -413,8 +709,19 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const cfg = department === 'stitching' ? await api.getStitchingConfig() : await api.getPrintConfig();
-        setPrintConfig(cfg);
+        const [printCfg, stitchingCfg] = await Promise.all([
+          api.getPrintConfig().catch(() => ({})),
+          api.getStitchingConfig().catch(() => ({}))
+        ]);
+        const activeCfg = department === 'stitching' ? stitchingCfg : printCfg;
+        const combinedParties = Array.from(new Set([
+          ...(printCfg?.parties || []),
+          ...(stitchingCfg?.parties || []),
+        ])).filter(Boolean).sort((a, b) => a.localeCompare(b));
+        setPrintConfig({
+          ...activeCfg,
+          parties: combinedParties
+        });
       } catch (err) {
         console.error('Failed to load settings:', err);
       }
@@ -446,7 +753,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
       window.removeEventListener('elite-data-refresh', handleDataRefresh);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [search, categoryFilter, colorFilter, statusFilter, sortBy, sortOrder, department]);
+  }, [search, categoryFilter, colorFilter, partyFilter, statusFilter, sortBy, sortOrder, department]);
 
   const pageRef = useRef(page);
   pageRef.current = page;
@@ -462,6 +769,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
         search,
         category: categoryFilter,
         colors: colorFilter,
+        party: partyFilter,
         status: statusFilter,
         department,
         sortBy,
@@ -493,6 +801,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
         search,
         category: categoryFilter,
         colors: colorFilter,
+        party: partyFilter,
         status: statusFilter,
         department,
         sortBy,
@@ -548,9 +857,13 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
 
   const openEdit = (d) => {
     setFormDesign(d);
+    const existingParties = Array.isArray(d.parties)
+      ? d.parties
+      : (d.parties ? [d.parties] : (d.party ? [d.party] : []));
     setFormVal({
       ...BLANK_DESIGN,
       ...d,
+      parties: existingParties,
       sizeSalesRates: d.sizeSalesRates || { ...BLANK_DESIGN.sizeSalesRates }
     });
     setFormError('');
@@ -638,6 +951,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
     try {
       const sanitizedVal = {
         ...formVal,
+        parties: Array.isArray(formVal.parties) ? formVal.parties.filter(Boolean) : (formVal.parties ? [formVal.parties] : []),
         department: department || (formDesign?.department) || 'digital_print',
         category: formVal.category || '',
         top100: formVal.top100 === '' || formVal.top100 === null || formVal.top100 === undefined ? 0 : Number(formVal.top100),
@@ -975,6 +1289,20 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
             </select>
           </div>
 
+          {/* Party (Client) select filter */}
+          <div style={{ minWidth: 160 }}>
+            <select
+              value={partyFilter}
+              onChange={e => { setPartyFilter(e.target.value); setPage(1); }}
+              style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem' }}
+            >
+              <option value="All">All Parties (Clients)</option>
+              {(printConfig.parties || []).map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Status Buttons */}
           {['Active', 'Inactive', 'All'].map(s => (
             <button
@@ -1140,6 +1468,32 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                       </span>
                     </div>
 
+                    {/* Assigned Parties */}
+                    {((Array.isArray(d.parties) && d.parties.length > 0) || d.party) && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                        {(Array.isArray(d.parties) ? d.parties : [d.parties || d.party]).filter(Boolean).map((pName, pIdx) => (
+                          <span
+                            key={pIdx}
+                            style={{
+                              fontSize: '0.68rem',
+                              color: '#10b981',
+                              fontWeight: 700,
+                              background: 'rgba(16, 185, 129, 0.12)',
+                              padding: '2px 7px',
+                              borderRadius: '4px',
+                              border: '1px solid rgba(16, 185, 129, 0.25)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px'
+                            }}
+                            title={`Party (Client): ${pName}`}
+                          >
+                            <span style={{ fontSize: '0.72rem' }}>🏢</span> {pName}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                     {/* STITCHING ONLY: Party SKU ID badge */}
                     {department === 'stitching' && d.partySkuId && (
                       <div style={{ fontSize: '0.73rem', color: '#60a5fa', fontWeight: 800, background: 'rgba(59,130,246,0.12)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(59,130,246,0.25)', width: 'fit-content' }}>
@@ -1302,6 +1656,13 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                 onChange={handleFormChange}
                 required
                 placeholder={department === 'stitching' ? "PKD-1001" : "e.g. ED-709"}
+              />
+
+              <PartyMultiSelect
+                label="Parties (Clients)"
+                selected={formVal.parties || []}
+                options={printConfig.parties || []}
+                onChange={(updated) => setFormVal(prev => ({ ...prev, parties: updated }))}
               />
 
               {department === 'stitching' && (

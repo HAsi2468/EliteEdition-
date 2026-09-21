@@ -4,7 +4,7 @@ const { normalizeImageUrl } = require('../utils/imageUrlHelper');
 
 const getAll = async (req, res) => {
   try {
-    const { search, category, colors, status, page = 1, limit = 50, sortBy, sortOrder, department } = req.query;
+    const { search, category, colors, status, page = 1, limit = 50, sortBy, sortOrder, department, party } = req.query;
     const filter = {};
     if (status && status !== 'All') filter.status = status;
     if (category && category !== 'All') {
@@ -12,6 +12,10 @@ const getAll = async (req, res) => {
       filter.category = { $regex: `^${escaped}$`, $options: 'i' };
     }
     if (colors && colors !== 'All') filter.colors = { $regex: colors, $options: 'i' };
+    if (party && party !== 'All') {
+      const escaped = String(party).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.parties = { $regex: `^${escaped}$`, $options: 'i' };
+    }
 
     let deptOr = null;
     if (department === 'stitching') {
@@ -36,6 +40,8 @@ const getAll = async (req, res) => {
         { colourMatching: { $regex: search, $options: 'i' } },
         { category:       { $regex: search, $options: 'i' } },
         { colors:         { $regex: search, $options: 'i' } },
+        { parties:        { $regex: search, $options: 'i' } },
+        { partySkuId:     { $regex: search, $options: 'i' } },
       ];
       if (deptOr) {
         filter.$and = [{ $or: deptOr }, { $or: searchOr }];
@@ -90,6 +96,11 @@ const create = async (req, res) => {
     const body = { ...req.body };
     if (body.imageUrl) body.imageUrl = normalizeImageUrl(body.imageUrl, body.designName);
     if (body.imageUrl2) body.imageUrl2 = normalizeImageUrl(body.imageUrl2, body.designName ? `${body.designName}-2` : '');
+    if (body.parties !== undefined) {
+      body.parties = Array.isArray(body.parties)
+        ? body.parties.map(p => String(p).trim()).filter(Boolean)
+        : (typeof body.parties === 'string' && body.parties.trim() ? [body.parties.trim()] : []);
+    }
     const doc = await db.Design.create(body);
     const result = doc.toObject ? doc.toObject() : doc;
     result.imageUrl = normalizeImageUrl(result.imageUrl, result.designName);
@@ -107,6 +118,11 @@ const update = async (req, res) => {
     const body = { ...req.body };
     if (body.imageUrl) body.imageUrl = normalizeImageUrl(body.imageUrl, body.designName);
     if (body.imageUrl2) body.imageUrl2 = normalizeImageUrl(body.imageUrl2, body.designName ? `${body.designName}-2` : '');
+    if (body.parties !== undefined) {
+      body.parties = Array.isArray(body.parties)
+        ? body.parties.map(p => String(p).trim()).filter(Boolean)
+        : (typeof body.parties === 'string' && body.parties.trim() ? [body.parties.trim()] : []);
+    }
     const doc = await db.Design.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true }).lean();
     if (!doc) return res.status(404).json({ error: 'Design not found' });
     doc.imageUrl = normalizeImageUrl(doc.imageUrl, doc.designName);

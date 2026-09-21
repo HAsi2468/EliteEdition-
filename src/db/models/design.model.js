@@ -19,6 +19,7 @@ const designSchema = new mongoose.Schema(
     paperType:      { type: String, default: '', trim: true },
     notes:          { type: String, default: '', trim: true },
     status:         { type: String, default: 'Active', enum: ['Active', 'Inactive'] },
+    parties:        { type: [String], default: [] },
     partySkuId:     { type: String, default: '', trim: true },
     sizeSalesRates: {
       xs_34:  { type: Number, default: 0 },
@@ -53,6 +54,7 @@ const designSchema = new mongoose.Schema(
 
 // Case-insensitive unique index on designName
 designSchema.index({ designName: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } });
+designSchema.index({ parties: 1 });
 
 const Design = mongoose.model('Design', designSchema);
 module.exports = Design;
