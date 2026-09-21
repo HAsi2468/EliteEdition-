@@ -392,7 +392,7 @@ export async function triggerJobCardPrint(cardOrCards) {
         <tr>
           <td class="label" style="width: 15%; text-align: center; font-weight: 800;">FUSING</td>
           <td class="label" style="width: 15%;">TEMP. :</td>
-          <td class="val" style="width: 20%; text-align: center; font-weight: 800;">${card.temperature || ''}</td>
+          <td class="val" style="width: 20%; text-align: center; font-weight: 800;">${card.temperature || card.fusingTemp || ''}</td>
           <td class="label" style="width: 15%;">SPEED :</td>
           <td class="val" style="width: 35%; text-align: center; font-weight: 800;">${card.speed || ''}</td>
         </tr>
@@ -1175,11 +1175,45 @@ function JobCardForm({ card, onSave, onClose, department }) {
     }
   }, [card]);
 
-  // Sync selectedDesign if editing an existing card
+  // Sync selectedDesign if editing an existing card and auto-enrich missing fields
   useEffect(() => {
-    if (card && card.designName && designsList.length > 0) {
-      const matched = designsList.find(d => d.designName === card.designName || d.designNo === card.designNo);
-      if (matched) setSelectedDesign(matched);
+    if (card && (card.designName || card.designNo) && designsList.length > 0) {
+      const raw = (card.designName || card.designNo || '').trim().toUpperCase();
+      const clean = raw.replace(/^ED-/i, '').trim();
+      const matched = designsList.find(d => {
+        const dName = (d.designName || '').trim().toUpperCase();
+        const dNo = (d.designNo || '').trim().toUpperCase();
+        return dName === raw || dNo === raw || dName.replace(/^ED-/i, '').trim() === clean || dNo.replace(/^ED-/i, '').trim() === clean;
+      });
+      if (matched) {
+        setSelectedDesign(matched);
+        setForm(f => {
+          const pcsVal = parseFloat(f.pcs) || 0;
+          return {
+            ...f,
+            designer: f.designer || matched.designerName || '',
+            colourMatching: f.colourMatching || matched.colourMatching || '',
+            fabric: f.fabric || matched.fabricName || '',
+            category: f.category || matched.category || '',
+            temperature: f.temperature || matched.fusingTemp || '',
+            fusingTemp: f.fusingTemp || matched.fusingTemp || f.temperature || '',
+            speed: f.speed || matched.speed || '',
+            colors: f.colors || matched.colors || '',
+            panna: f.panna || matched.panna || '',
+            pass: f.pass || matched.pass || '',
+            paperType: f.paperType || matched.paperType || '',
+            imageUrl1: f.imageUrl1 || matched.imageUrl || matched.imageUrl2 || '',
+            consumption: f.consumption || (matched.totalMtr100 ? (matched.totalMtr100 / 100).toFixed(2) : (f.totalMtr && pcsVal > 0 ? (parseFloat(f.totalMtr) / pcsVal).toFixed(2) : '')),
+            totalMtr: f.totalMtr || (matched.totalMtr100 && pcsVal > 0 ? ((matched.totalMtr100 / 100) * pcsVal).toFixed(2) : (f.consumption && pcsVal > 0 ? (parseFloat(f.consumption) * pcsVal).toFixed(2) : '')),
+            top: f.top || (matched.top100 && pcsVal > 0 ? ((matched.top100 / 100) * pcsVal).toFixed(2) : ''),
+            sleeve: f.sleeve || (matched.sleeve100 && pcsVal > 0 ? ((matched.sleeve100 / 100) * pcsVal).toFixed(2) : ''),
+            bottom: f.bottom || (matched.bottom100 && pcsVal > 0 ? ((matched.bottom100 / 100) * pcsVal).toFixed(2) : ''),
+            dupatta: f.dupatta || (matched.dupatta100 && pcsVal > 0 ? ((matched.dupatta100 / 100) * pcsVal).toFixed(2) : ''),
+            cut: f.cut || (matched.cut100 ? matched.cut100.toString() : ''),
+            setCopy: f.setCopy || (matched.setCopy100 && pcsVal > 0 ? Math.round((matched.setCopy100 / 100) * pcsVal).toString() : ''),
+          };
+        });
+      }
     }
   }, [card, designsList]);
 

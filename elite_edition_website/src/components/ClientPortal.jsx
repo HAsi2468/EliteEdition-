@@ -24,11 +24,13 @@ import {
   PlusCircle,
   Plus,
   Trash2,
+  Printer,
   X
 } from 'lucide-react';
 import DesignImage from './DesignImage';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { useSocket } from '../contexts/SocketContext';
+import { triggerJobCardPrint } from './JobCardPanel';
 
 export default function ClientPortal({ client, onLogout }) {
   const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'designs' | 'profile'
@@ -79,6 +81,7 @@ export default function ClientPortal({ client, onLogout }) {
   const [submittingOrder, setSubmittingOrder] = useState(false);
   const [orderModalError, setOrderModalError] = useState('');
   const [orderModalSuccess, setOrderModalSuccess] = useState('');
+  const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
 
   // Extract resolved client fields with flexible fallbacks
   const companyName = clientData.companyName || clientData.company_name || clientData.name || '';
@@ -170,6 +173,8 @@ export default function ClientPortal({ client, onLogout }) {
       const uniqueParties = [...new Set(partyQuery)].join(',');
       const res = await api.getJobCards({
         party: uniqueParties || code,
+        sortBy: 'created_date_time',
+        sortOrder: 'desc',
         limit: 1000
       });
       const list = res?.data || (Array.isArray(res) ? res : []);
@@ -483,19 +488,32 @@ export default function ClientPortal({ client, onLogout }) {
     }
   };
 
+  // Sort orders descending (newest / last created entry always first)
+  const sortedOrders = useMemo(() => {
+    return [...orders].sort((a, b) => {
+      const dateA = new Date(a.created_date_time || a.createdAt || a.date || 0).getTime();
+      const dateB = new Date(b.created_date_time || b.createdAt || b.date || 0).getTime();
+      if (dateB !== dateA) return dateB - dateA;
+
+      const numA = parseInt(String(a.jobNo || a.orderNo || '').replace(/\D/g, ''), 10) || 0;
+      const numB = parseInt(String(b.jobNo || b.orderNo || '').replace(/\D/g, ''), 10) || 0;
+      return numB - numA;
+    });
+  }, [orders]);
+
   // Calculate order counts per workflow stage
   const orderCounts = useMemo(() => {
-    const counts = { all: orders.length, 'print-pending': 0, 'fusing-pending': 0, 'delivery-pending': 0, 'delivered': 0 };
-    orders.forEach(o => {
+    const counts = { all: sortedOrders.length, 'print-pending': 0, 'fusing-pending': 0, 'delivery-pending': 0, 'delivered': 0 };
+    sortedOrders.forEach(o => {
       const info = getOrderStatusInfo(o);
       if (info.key && counts[info.key] !== undefined) {
         counts[info.key]++;
       }
     });
     return counts;
-  }, [orders]);
+  }, [sortedOrders]);
 
-  const filteredOrders = orders.filter(o => {
+  const filteredOrders = sortedOrders.filter(o => {
     const sInfo = getOrderStatusInfo(o);
     if (orderStageFilter !== 'all' && sInfo.key !== orderStageFilter) {
       return false;
@@ -1123,13 +1141,14 @@ export default function ClientPortal({ client, onLogout }) {
                 <table className="client-orders-table">
                   <thead>
                     <tr>
-                      <th>Order / Job No</th>
+                      <th>Job / Order No</th>
                       <th>Date</th>
-                      <th>Design Name</th>
-                      <th>Fabric</th>
-                      <th>Quantity (Pcs)</th>
+                      <th>Design & Artwork</th>
+                      <th>Fabric & Width</th>
+                      <th>Quantity</th>
+                      <th>Total Meters</th>
                       <th>Status</th>
-                      <th>Notes</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1138,25 +1157,77 @@ export default function ClientPortal({ client, onLogout }) {
                       const pcsVal = (ord.pcs !== undefined && ord.pcs !== null && String(ord.pcs).trim() !== '')
                         ? String(ord.pcs).trim()
                         : ((ord.pieces !== undefined && ord.pieces !== null && String(ord.pieces).trim() !== '') ? String(ord.pieces).trim() : '');
-                      const qtyStr = pcsVal ? `${pcsVal} Pcs` : (ord.totalMtr ? `${ord.totalMtr} Mtrs` : '—');
                       const displayJobNo = ord.jobNo || ord.orderNo || ord.jobCardNo || `JC-${idx + 1}`;
                       const displayDesign = ord.designName || ord.designNo || '—';
+                      const mtrVal = ord.totalMtr ? `${ord.totalMtr}m` : '—';
+                      const consVal = ord.consumption ? `${ord.consumption} m/pc` : '';
+
                       return (
-                        <tr key={ord._id || ord.id || idx} className="client-table-row">
+                        <tr
+                          key={ord._id || ord.id || idx}
+                          className="client-table-row"
+                          onClick={() => setSelectedOrderDetails(ord)}
+                          style={{ cursor: 'pointer' }}
+                        >
                           <td style={{ fontWeight: 800 }}>
-                            <span style={{ color: '#10b981', letterSpacing: '0.02em' }}>{displayJobNo}</span>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ color: '#10b981', letterSpacing: '0.02em', fontSize: '0.9rem' }}>{displayJobNo}</span>
+                              {String(ord.createdBy || ord.createdByName || '').toLowerCase().includes('client') && (
+                                <span style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 600, marginTop: '2px' }}>
+                                  📱 Client Order
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td style={{ color: '#64748b', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
                             {formatDateDDMMYYYY(ord.created_date_time || ord.createdAt || ord.date)}
                           </td>
-                          <td style={{ fontWeight: 700, color: '#0f172a' }}>
-                            {displayDesign}
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div
+                                style={{
+                                  width: '42px',
+                                  height: '42px',
+                                  borderRadius: '8px',
+                                  overflow: 'hidden',
+                                  flexShrink: 0,
+                                  background: '#0f172a',
+                                  border: '1px solid #334155'
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const img = ord.imageUrl1 || ord.imageUrl;
+                                  if (img) setZoomImg(img);
+                                }}
+                              >
+                                <DesignImage
+                                  rawUrl={ord.imageUrl1 || ord.imageUrl}
+                                  designName={displayDesign}
+                                  category={ord.category}
+                                  onZoom={(src) => setZoomImg(src)}
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.86rem' }}>{displayDesign}</span>
+                                {ord.category && (
+                                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{ord.category}</span>
+                                )}
+                              </div>
+                            </div>
                           </td>
-                          <td style={{ color: '#475569' }}>
-                            {ord.fabric || '—'}
+                          <td style={{ color: '#334155', fontSize: '0.82rem' }}>
+                            <div style={{ fontWeight: 600 }}>{ord.fabric || '—'}</div>
+                            {ord.panna && <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Panna: {ord.panna}"</div>}
                           </td>
-                          <td style={{ fontWeight: 800, color: '#10b981', whiteSpace: 'nowrap' }}>
-                            {qtyStr}
+                          <td style={{ fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                            {pcsVal ? `${pcsVal} Pcs` : '—'}
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontWeight: 800, color: '#059669', fontSize: '0.86rem' }}>{mtrVal}</span>
+                              {consVal && <span style={{ fontSize: '0.7rem', color: '#64748b' }}>({consVal})</span>}
+                            </div>
                           </td>
                           <td style={{ whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
@@ -1169,7 +1240,8 @@ export default function ClientPortal({ client, onLogout }) {
                                 alignItems: 'center',
                                 gap: '6px',
                                 fontWeight: 700,
-                                fontSize: '0.78rem'
+                                fontSize: '0.76rem',
+                                padding: '3px 8px'
                               }}>
                                 <span style={{
                                   width: '7px',
@@ -1180,31 +1252,32 @@ export default function ClientPortal({ client, onLogout }) {
                                 }}></span>
                                 {statusInfo.label}
                               </span>
-                              <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 500 }}>
-                                {statusInfo.sublabel}
-                              </span>
                             </div>
                           </td>
-                          <td style={{ color: '#64748b', fontSize: '0.8rem', maxWidth: '240px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
-                            <div>{ord.notes || ord.note1 || ord.emergencyNotes || '—'}</div>
-                            {String(ord.createdBy || ord.createdByName || '').toLowerCase().includes('client') && (
-                              <div style={{ marginTop: '4px' }}>
-                                <span style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  fontSize: '0.68rem',
-                                  fontWeight: 600,
-                                  color: '#059669',
-                                  background: 'rgba(16, 185, 129, 0.1)',
-                                  border: '1px solid rgba(16, 185, 129, 0.25)',
-                                  padding: '1px 6px',
-                                  borderRadius: '6px'
-                                }}>
-                                  📱 {ord.createdByName || ord.createdBy}
-                                </span>
-                              </div>
-                            )}
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedOrderDetails(ord);
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '7px',
+                                background: 'rgba(16, 185, 129, 0.1)',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                color: '#059669',
+                                fontWeight: 700,
+                                fontSize: '0.78rem',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px'
+                              }}
+                            >
+                              <Eye size={13} />
+                              <span>Job Card</span>
+                            </button>
                           </td>
                         </tr>
                       );
@@ -1810,6 +1883,323 @@ export default function ClientPortal({ client, onLogout }) {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Job Card Specifications Modal ── */}
+      {selectedOrderDetails && (
+        <div
+          style={styles.modalOverlay}
+          onClick={() => setSelectedOrderDetails(null)}
+        >
+          <div
+            className="order-modal-content-wrap"
+            style={{
+              ...styles.orderModalContent,
+              maxWidth: '750px',
+              maxHeight: '92vh',
+              overflowY: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={styles.orderModalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#10b981'
+                }}>
+                  <Layers size={20} />
+                </div>
+                <div>
+                  <h3 style={styles.orderModalTitle}>
+                    {selectedOrderDetails.jobNo || 'Job Card Details'}
+                  </h3>
+                  <p style={styles.orderModalSubtitle}>
+                    Complete Manufacturing & Technical Specifications
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedOrderDetails(null)}
+                style={styles.modalCloseBtn}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.25rem' }}>
+              {/* Top Overview Cards */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                gap: '0.75rem',
+                marginBottom: '1.25rem'
+              }}>
+                <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '0.75rem' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</div>
+                  <div style={{ marginTop: '4px' }}>
+                    {(() => {
+                      const s = getOrderStatusInfo(selectedOrderDetails);
+                      return (
+                        <span style={{
+                          ...styles.statusBadge,
+                          background: s.badgeBg,
+                          color: s.text,
+                          border: `1px solid ${s.border}`,
+                          fontSize: '0.75rem',
+                          padding: '2px 8px'
+                        }}>
+                          {s.label}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '0.75rem' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Order Date</div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#f8fafc', marginTop: '4px' }}>
+                    {formatDateDDMMYYYY(selectedOrderDetails.created_date_time || selectedOrderDetails.createdAt || selectedOrderDetails.date)}
+                  </div>
+                </div>
+
+                <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '0.75rem' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Quantity</div>
+                  <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#34d399', marginTop: '4px' }}>
+                    {selectedOrderDetails.pcs || 0} Pcs
+                  </div>
+                </div>
+
+                <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '0.75rem' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total Meters</div>
+                  <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#fbbf24', marginTop: '4px' }}>
+                    {selectedOrderDetails.totalMtr ? `${selectedOrderDetails.totalMtr} m` : '—'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Two Column Layout: Design Info on Left, Breakdown on Right */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(200px, 240px) 1fr',
+                gap: '1.25rem',
+                marginBottom: '1.25rem'
+              }}>
+                {/* Left: Design Artwork & Meta */}
+                <div style={{
+                  background: '#0f172a',
+                  border: '1px solid #334155',
+                  borderRadius: '12px',
+                  padding: '1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem'
+                }}>
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '180px',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      background: '#1e293b',
+                      border: '1px solid #475569',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => {
+                      const img = selectedOrderDetails.imageUrl1 || selectedOrderDetails.imageUrl;
+                      if (img) setZoomImg(img);
+                    }}
+                  >
+                    <DesignImage
+                      rawUrl={selectedOrderDetails.imageUrl1 || selectedOrderDetails.imageUrl}
+                      designName={selectedOrderDetails.designName}
+                      category={selectedOrderDetails.category}
+                      onZoom={(src) => setZoomImg(src)}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc' }}>
+                      {selectedOrderDetails.designName || selectedOrderDetails.designNo || '—'}
+                    </div>
+                    {selectedOrderDetails.category && (
+                      <span style={{ ...styles.designCat, display: 'inline-block', marginTop: '4px' }}>
+                        {selectedOrderDetails.category}
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #334155', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#94a3b8' }}>Fabric:</span>
+                      <span style={{ color: '#f8fafc', fontWeight: 600 }}>{selectedOrderDetails.fabric || '—'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#94a3b8' }}>Width (Panna):</span>
+                      <span style={{ color: '#f8fafc', fontWeight: 600 }}>{selectedOrderDetails.panna ? `${selectedOrderDetails.panna}"` : '—'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#94a3b8' }}>Colors:</span>
+                      <span style={{ color: '#f8fafc', fontWeight: 600 }}>{selectedOrderDetails.colors || selectedOrderDetails.colourMatching || '—'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Breakdown & Specs */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Manufacturing Breakdown */}
+                  <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '12px', padding: '1rem' }}>
+                    <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.82rem', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                      Manufacturing & Cutting Breakdown
+                    </h4>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gap: '0.6rem'
+                    }}>
+                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Consumption</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#34d399' }}>{selectedOrderDetails.consumption ? `${selectedOrderDetails.consumption} m/pc` : '—'}</strong>
+                      </div>
+                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Top</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.top ? `${selectedOrderDetails.top} m` : '—'}</strong>
+                      </div>
+                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Sleeve</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.sleeve ? `${selectedOrderDetails.sleeve} m` : '—'}</strong>
+                      </div>
+                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Bottom</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.bottom ? `${selectedOrderDetails.bottom} m` : '—'}</strong>
+                      </div>
+                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Dupatta</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.dupatta ? `${selectedOrderDetails.dupatta} m` : '—'}</strong>
+                      </div>
+                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Cut</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.cut || '—'}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Technical & Machine Parameters */}
+                  <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '12px', padding: '1rem' }}>
+                    <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.82rem', color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                      Technical & Print Parameters
+                    </h4>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gap: '0.6rem'
+                    }}>
+                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Pass</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.pass || '—'}</strong>
+                      </div>
+                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Speed</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.speed || '—'}</strong>
+                      </div>
+                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Fusing Temp</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>
+                          {selectedOrderDetails.fusingTemp || selectedOrderDetails.temperature ? `${selectedOrderDetails.fusingTemp || selectedOrderDetails.temperature} °C` : '—'}
+                        </strong>
+                      </div>
+                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Designer</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.designer || '—'}</strong>
+                      </div>
+                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Paper Type</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.paperType || '—'}</strong>
+                      </div>
+                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Exp. Time</span>
+                        <strong style={{ fontSize: '0.85rem', color: '#60a5fa' }}>{selectedOrderDetails.expTime || '—'}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              {(selectedOrderDetails.notes || selectedOrderDetails.note1 || selectedOrderDetails.emergencyNotes) && (
+                <div style={{
+                  background: '#0f172a',
+                  border: '1px solid #334155',
+                  borderRadius: '10px',
+                  padding: '0.75rem 1rem',
+                  fontSize: '0.82rem',
+                  color: '#cbd5e1'
+                }}>
+                  <strong style={{ color: '#f8fafc' }}>Instructions / Notes: </strong>
+                  {selectedOrderDetails.notes || selectedOrderDetails.note1 || selectedOrderDetails.emergencyNotes}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              ...styles.orderModalFooter,
+              borderTop: '1px solid #334155',
+              padding: '0.85rem 1.25rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <button
+                type="button"
+                onClick={() => triggerJobCardPrint(selectedOrderDetails)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  border: '1px solid rgba(16, 185, 129, 0.35)',
+                  color: '#34d399',
+                  fontWeight: 700,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Printer size={15} />
+                <span>Print Job Card</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedOrderDetails(null)}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: '8px',
+                  background: '#334155',
+                  border: '1px solid #475569',
+                  color: '#f8fafc',
+                  fontWeight: 600,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

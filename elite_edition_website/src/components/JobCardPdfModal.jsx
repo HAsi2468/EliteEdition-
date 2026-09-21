@@ -479,7 +479,7 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                   </tr>
                   <tr>
                     <td style={tdLabel}>FUSING TEMP :</td>
-                    <td style={tdVal}>{card?.temperature || ''}</td>
+                    <td style={tdVal}>{card?.temperature || card?.fusingTemp || ''}</td>
                     <td style={tdLabel}>SPEED :</td>
                     <td style={tdVal}>{card?.speed || ''}</td>
                   </tr>

@@ -381,19 +381,101 @@ const getAllJobCards = async (req, res) => {
         { $sort: { urgencyScore: -1, created_date_time: -1 } },
         { $skip: skip }, { $limit: Number(limit) }
       ]);
-    } else if (!sortBy || sortBy === 'jobNo') {
-      const order = sortOrder === 'desc' ? -1 : 1;
+    } else if (!sortBy || sortBy === 'jobNo' || sortBy === 'created_date_time' || sortBy === 'createdAt') {
+      const order = sortOrder === 'asc' ? 1 : -1;
       cards = await db.JobCard.find(filter)
         .sort({ created_date_time: order, _id: order })
         .skip(skip)
         .limit(Number(limit))
         .lean();
     } else {
-      const order = sortOrder === 'desc' ? -1 : 1;
+      const order = sortOrder === 'asc' ? 1 : -1;
       const sortObj = { [sortBy]: order };
       cards = await db.JobCard.find(filter)
         .collation({ locale:'en', numericOrdering:true })
         .sort(sortObj).skip(skip).limit(Number(limit)).lean();
+    }
+
+    // Auto-fill any missing design catalogue parameters dynamically
+    (cards || []).forEach(c => {
+      const pcsNum = parseFloat(c.pcs) || 0;
+      const mtrNum = parseFloat(c.totalMtr) || 0;
+      const consNum = parseFloat(c.consumption) || 0;
+      if (!c.consumption && mtrNum > 0 && pcsNum > 0) {
+        c.consumption = (mtrNum / pcsNum).toFixed(2);
+      }
+      if (!c.totalMtr && consNum > 0 && pcsNum > 0) {
+        c.totalMtr = (consNum * pcsNum).toFixed(2);
+      }
+      if (!c.fusingTemp && c.temperature) c.fusingTemp = c.temperature;
+      if (!c.temperature && c.fusingTemp) c.temperature = c.fusingTemp;
+    });
+
+    const missingDesignCards = (cards || []).filter(c => 
+      (!c.totalMtr || !c.consumption || !c.top || !c.bottom || !c.pass || !c.designer || !c.speed || !c.fusingTemp || !c.temperature || !c.fabric) && 
+      (c.designName || c.designNo)
+    );
+    if (missingDesignCards.length > 0) {
+      try {
+        const uniqueNames = [...new Set(missingDesignCards.map(c => String(c.designName || c.designNo).trim()))];
+        const searchTerms = [];
+        uniqueNames.forEach(n => {
+          searchTerms.push(n);
+          searchTerms.push(n.replace(/^ED-/i, '').trim());
+          searchTerms.push(`ED-${n.replace(/^ED-/i, '').trim()}`);
+        });
+
+        const designDocs = await db.Design.find({
+          $or: [
+            { designName: { $in: searchTerms } },
+            { designNo: { $in: searchTerms } }
+          ]
+        }).lean();
+        const dMap = new Map();
+        designDocs.forEach(d => {
+          if (d.designName) {
+            dMap.set(d.designName.trim().toUpperCase(), d);
+            dMap.set(d.designName.replace(/^ED-/i, '').trim().toUpperCase(), d);
+          }
+          if (d.designNo) {
+            dMap.set(d.designNo.trim().toUpperCase(), d);
+            dMap.set(d.designNo.replace(/^ED-/i, '').trim().toUpperCase(), d);
+          }
+        });
+
+        cards.forEach(c => {
+          const raw = String(c.designName || c.designNo || '').trim().toUpperCase();
+          const clean = raw.replace(/^ED-/i, '').trim();
+          const d = dMap.get(raw) || dMap.get(clean);
+          if (d) {
+            const pcsNum = parseFloat(c.pcs) || 0;
+            if (!c.consumption && d.totalMtr100) c.consumption = (d.totalMtr100 / 100).toFixed(2);
+            if (!c.totalMtr && d.totalMtr100 && pcsNum > 0) c.totalMtr = ((d.totalMtr100 / 100) * pcsNum).toFixed(2);
+            if (!c.top && d.top100 && pcsNum > 0) c.top = ((d.top100 / 100) * pcsNum).toFixed(2);
+            if (!c.sleeve && d.sleeve100 && pcsNum > 0) c.sleeve = ((d.sleeve100 / 100) * pcsNum).toFixed(2);
+            if (!c.bottom && d.bottom100 && pcsNum > 0) c.bottom = ((d.bottom100 / 100) * pcsNum).toFixed(2);
+            if (!c.dupatta && d.dupatta100 && pcsNum > 0) c.dupatta = ((d.dupatta100 / 100) * pcsNum).toFixed(2);
+            if (!c.cut && d.cut100) c.cut = d.cut100.toString();
+            if (!c.setCopy && d.setCopy100 && pcsNum > 0) c.setCopy = Math.round((d.setCopy100 / 100) * pcsNum).toString();
+            if (!c.pass && d.pass) c.pass = d.pass;
+            if (!c.speed && d.speed) c.speed = d.speed;
+            if (!c.designer && d.designerName) c.designer = d.designerName;
+            if (!c.colourMatching && d.colourMatching) c.colourMatching = d.colourMatching;
+            if (!c.paperType && d.paperType) c.paperType = d.paperType;
+            const fused = d.fusingTemp || d.temperature || '';
+            if (!c.fusingTemp && fused) c.fusingTemp = fused;
+            if (!c.temperature && fused) c.temperature = fused;
+            if (!c.fabric && d.fabricName) c.fabric = d.fabricName;
+            if (!c.category && d.category) c.category = d.category;
+            if (!c.colors && d.colors) c.colors = d.colors;
+            if (!c.panna && d.panna) c.panna = d.panna;
+            if (!c.imageUrl1 && d.imageUrl) c.imageUrl1 = d.imageUrl;
+            if (!c.imageUrl && d.imageUrl) c.imageUrl = d.imageUrl;
+          }
+        });
+      } catch (e) {
+        logger.warn('Failed to dynamically enrich cards with design specs: %s', e.message);
+      }
     }
 
     const { normalizeImageUrl } = require('../utils/imageUrlHelper');
@@ -405,11 +487,12 @@ const getAllJobCards = async (req, res) => {
 
     res.json({
       data: normalizedCards,
-      total,
-      totalMtr,
-      statusCounts,
-      page: Number(page),
-      pages: Math.ceil(total/Number(limit))
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / Number(limit))
+      }
     });
   } catch (err) {
     logger.error('getAllJobCards error: %o', err);
@@ -421,7 +504,7 @@ const getJobCard = async (req, res) => {
   try {
     const { normalizeImageUrl } = require('../utils/imageUrlHelper');
     const mongoose = require('mongoose');
-    const param = req.params.id;
+    const param = req.params.id || req.params.jobNo;
     let card = null;
 
     if (mongoose.Types.ObjectId.isValid(param)) {
@@ -436,6 +519,61 @@ const getJobCard = async (req, res) => {
     }
 
     if (!card) return res.status(404).json({ error: 'Job card not found' });
+
+    // Auto-fill any missing design catalogue parameters dynamically
+    const pcsNum = parseFloat(card.pcs) || 0;
+    const mtrNum = parseFloat(card.totalMtr) || 0;
+    const consNum = parseFloat(card.consumption) || 0;
+    if (!card.consumption && mtrNum > 0 && pcsNum > 0) {
+      card.consumption = (mtrNum / pcsNum).toFixed(2);
+    }
+    if (!card.totalMtr && consNum > 0 && pcsNum > 0) {
+      card.totalMtr = (consNum * pcsNum).toFixed(2);
+    }
+    if (!card.fusingTemp && card.temperature) card.fusingTemp = card.temperature;
+    if (!card.temperature && card.fusingTemp) card.temperature = card.fusingTemp;
+
+    const rawName = String(card.designName || card.designNo || '').trim();
+    if (rawName && (!card.totalMtr || !card.consumption || !card.top || !card.bottom || !card.pass || !card.designer || !card.speed || !card.temperature || !card.fusingTemp || !card.fabric)) {
+      let d = await db.Design.findOne({ designName: rawName }).lean();
+      if (!d) d = await db.Design.findOne({ designNo: rawName }).lean();
+      if (!d) {
+        const clean = rawName.replace(/^ED-/i, '').trim();
+        const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        d = await db.Design.findOne({
+          $or: [
+            { designName: { $regex: new RegExp(`^(ED-)?${escaped}$`, 'i') } },
+            { designNo: { $regex: new RegExp(`^(ED-)?${escaped}$`, 'i') } },
+            { designName: { $regex: new RegExp(escaped, 'i') } }
+          ]
+        }).lean();
+      }
+      if (d) {
+        if (!card.consumption && d.totalMtr100) card.consumption = (d.totalMtr100 / 100).toFixed(2);
+        if (!card.totalMtr && d.totalMtr100 && pcsNum > 0) card.totalMtr = ((d.totalMtr100 / 100) * pcsNum).toFixed(2);
+        if (!card.top && d.top100 && pcsNum > 0) card.top = ((d.top100 / 100) * pcsNum).toFixed(2);
+        if (!card.sleeve && d.sleeve100 && pcsNum > 0) card.sleeve = ((d.sleeve100 / 100) * pcsNum).toFixed(2);
+        if (!card.bottom && d.bottom100 && pcsNum > 0) card.bottom = ((d.bottom100 / 100) * pcsNum).toFixed(2);
+        if (!card.dupatta && d.dupatta100 && pcsNum > 0) card.dupatta = ((d.dupatta100 / 100) * pcsNum).toFixed(2);
+        if (!card.cut && d.cut100) card.cut = d.cut100.toString();
+        if (!card.setCopy && d.setCopy100 && pcsNum > 0) card.setCopy = Math.round((d.setCopy100 / 100) * pcsNum).toString();
+        if (!card.pass && d.pass) card.pass = d.pass;
+        if (!card.speed && d.speed) card.speed = d.speed;
+        if (!card.designer && d.designerName) card.designer = d.designerName;
+        if (!card.colourMatching && d.colourMatching) card.colourMatching = d.colourMatching;
+        if (!card.paperType && d.paperType) card.paperType = d.paperType;
+        const fused = d.fusingTemp || d.temperature || '';
+        if (!card.fusingTemp && fused) card.fusingTemp = fused;
+        if (!card.temperature && fused) card.temperature = fused;
+        if (!card.fabric && d.fabricName) card.fabric = d.fabricName;
+        if (!card.category && d.category) card.category = d.category;
+        if (!card.colors && d.colors) card.colors = d.colors;
+        if (!card.panna && d.panna) card.panna = d.panna;
+        if (!card.imageUrl1 && d.imageUrl) card.imageUrl1 = d.imageUrl;
+        if (!card.imageUrl && d.imageUrl) card.imageUrl = d.imageUrl;
+      }
+    }
+
     card.imageUrl1 = normalizeImageUrl(card.imageUrl1 || card.imageUrl, card.designName || card.designNo);
     card.imageUrl2 = normalizeImageUrl(card.imageUrl2, card.designName ? `${card.designName}-2` : '');
     res.json(card);
@@ -531,6 +669,56 @@ const createJobCard = async (req, res) => {
         changesSummary: 'Job Card Created'
       }
     ];
+
+    // Auto-fill from design catalogue if fields are missing
+    const rawDesign = String(body.designName || body.designNo || '').trim();
+    if (rawDesign) {
+      let d = await db.Design.findOne({ designName: rawDesign }).lean();
+      if (!d) d = await db.Design.findOne({ designNo: rawDesign }).lean();
+      if (!d) {
+        const clean = rawDesign.replace(/^ED-/i, '').trim();
+        const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        d = await db.Design.findOne({
+          $or: [
+            { designName: { $regex: new RegExp(`^(ED-)?${escaped}$`, 'i') } },
+            { designNo: { $regex: new RegExp(`^(ED-)?${escaped}$`, 'i') } },
+            { designName: { $regex: new RegExp(escaped, 'i') } }
+          ]
+        }).lean();
+      }
+      if (d) {
+        const pNum = parseFloat(body.pcs) || 0;
+        if (!body.consumption && d.totalMtr100) body.consumption = (d.totalMtr100 / 100).toFixed(2);
+        if (!body.totalMtr && d.totalMtr100 && pNum > 0) body.totalMtr = ((d.totalMtr100 / 100) * pNum).toFixed(2);
+        if (!body.top && d.top100 && pNum > 0) body.top = ((d.top100 / 100) * pNum).toFixed(2);
+        if (!body.sleeve && d.sleeve100 && pNum > 0) body.sleeve = ((d.sleeve100 / 100) * pNum).toFixed(2);
+        if (!body.bottom && d.bottom100 && pNum > 0) body.bottom = ((d.bottom100 / 100) * pNum).toFixed(2);
+        if (!body.dupatta && d.dupatta100 && pNum > 0) body.dupatta = ((d.dupatta100 / 100) * pNum).toFixed(2);
+        if (!body.cut && d.cut100) body.cut = d.cut100.toString();
+        if (!body.setCopy && d.setCopy100 && pNum > 0) body.setCopy = Math.round((d.setCopy100 / 100) * pNum).toString();
+        if (!body.pass && d.pass) body.pass = d.pass;
+        if (!body.speed && d.speed) body.speed = d.speed;
+        if (!body.designer && d.designerName) body.designer = d.designerName;
+        if (!body.colourMatching && d.colourMatching) body.colourMatching = d.colourMatching;
+        if (!body.paperType && d.paperType) body.paperType = d.paperType;
+        const fused = d.fusingTemp || d.temperature || '';
+        if (!body.fusingTemp && fused) body.fusingTemp = fused;
+        if (!body.temperature && fused) body.temperature = fused;
+        if (!body.fabric && d.fabricName) body.fabric = d.fabricName;
+        if (!body.category && d.category) body.category = d.category;
+        if (!body.colors && d.colors) body.colors = d.colors;
+        if (!body.panna && d.panna) body.panna = d.panna;
+        if (!body.imageUrl1 && d.imageUrl) body.imageUrl1 = d.imageUrl;
+        if (!body.imageUrl && d.imageUrl) body.imageUrl = d.imageUrl;
+      }
+    }
+    const pcsNum = parseFloat(body.pcs) || 0;
+    const mtrNum = parseFloat(body.totalMtr) || 0;
+    const consNum = parseFloat(body.consumption) || 0;
+    if (!body.consumption && mtrNum > 0 && pcsNum > 0) body.consumption = (mtrNum / pcsNum).toFixed(2);
+    if (!body.totalMtr && consNum > 0 && pcsNum > 0) body.totalMtr = (consNum * pcsNum).toFixed(2);
+    if (!body.fusingTemp && body.temperature) body.fusingTemp = body.temperature;
+    if (!body.temperature && body.fusingTemp) body.temperature = body.fusingTemp;
 
     const card = await db.JobCard.create(body);
 
