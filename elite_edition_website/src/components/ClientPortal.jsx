@@ -1041,13 +1041,18 @@ export default function ClientPortal({ client, onLogout }) {
 
 // Helpers: Determine exact factory workflow stage for client order
 export function getOrderStatusInfo(ord = {}) {
-  const pStatus = String(ord.printStatus || '').toLowerCase();
-  const fStatus = String(ord.fusingStatus || '').toLowerCase();
-  const dStatus = String(ord.deliveryStatus || '').toLowerCase();
-  const genStatus = String(ord.status || '').toLowerCase();
+  const pStatus = String(ord.printStatus || '').toLowerCase().trim();
+  const fStatus = String(ord.fusingStatus || '').toLowerCase().trim();
+  const dStatus = String(ord.deliveryStatus || '').toLowerCase().trim();
+  const genStatus = String(ord.status || '').toLowerCase().trim();
 
-  // 1. Delivered / Delivery Done
-  const isDeliveryDone = dStatus.includes('done') || dStatus.includes('deliver') || genStatus === 'done' || genStatus.includes('deliver');
+  // 1. Delivered / Delivery Done (Must explicitly have 'done' and NOT 'pending')
+  const isDeliveryDone = 
+    dStatus === 'delivery done' || 
+    dStatus === 'delivered' || 
+    (dStatus.includes('done') && !dStatus.includes('pending')) || 
+    (genStatus === 'done' && !dStatus.includes('pending') && !fStatus.includes('pending'));
+
   if (isDeliveryDone) {
     return {
       key: 'delivered',
@@ -1061,7 +1066,7 @@ export function getOrderStatusInfo(ord = {}) {
   }
 
   // 2. Fusing Done -> Waiting for delivery (Delivery Pending)
-  const isFusingDone = fStatus.includes('done');
+  const isFusingDone = fStatus === 'fusing done' || (fStatus.includes('done') && !fStatus.includes('pending'));
   if (isFusingDone) {
     return {
       key: 'delivery-pending',
@@ -1075,7 +1080,7 @@ export function getOrderStatusInfo(ord = {}) {
   }
 
   // 3. Printing Done -> In fusing queue (Fusing Pending)
-  const isPrintDone = pStatus.includes('done');
+  const isPrintDone = pStatus === 'printing done' || (pStatus.includes('done') && !pStatus.includes('pending'));
   if (isPrintDone) {
     return {
       key: 'fusing-pending',
