@@ -11,6 +11,7 @@ router.get('/pdf/:id', ctrl.downloadJobCardPdf);
 router.patch('/:id/stage', ctrl.updateProductionStage);
 router.patch('/:id/proofing', ctrl.updateProofingStatus);
 router.post('/sync-fusing-from-delivery', ctrl.syncFusingFromDelivery);
+router.post('/client-bulk-order', ctrl.createClientBulkOrder);
 router.route('/').get(ctrl.getAllJobCards).post(ctrl.createJobCard);
 router.route('/:id').get(ctrl.getJobCard).put(ctrl.updateJobCard).delete(ctrl.deleteJobCard);
 

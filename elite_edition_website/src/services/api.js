@@ -705,6 +705,12 @@ export const api = {
   async createJobCard(data) {
     return request('/jobCards', { method: 'POST', body: JSON.stringify(data) });
   },
+  async placeClientBulkOrder(data) {
+    return request('/jobCards/client-bulk-order', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
   async updateJobCard(id, data) {
     return request(`/jobCards/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   },

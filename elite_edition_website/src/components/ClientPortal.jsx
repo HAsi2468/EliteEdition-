@@ -20,7 +20,11 @@ import {
   Palette,
   RefreshCw,
   Eye,
-  Key
+  Key,
+  PlusCircle,
+  Plus,
+  Trash2,
+  X
 } from 'lucide-react';
 import DesignImage from './DesignImage';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
@@ -59,6 +63,21 @@ export default function ClientPortal({ client, onLogout }) {
   const [zoomImg, setZoomImg] = useState(null);
 
   const fileInputRef = useRef(null);
+
+  // Place Order Modal State
+  const [showPlaceOrderModal, setShowPlaceOrderModal] = useState(false);
+  const [orderRows, setOrderRows] = useState([
+    {
+      id: 1,
+      date: new Date().toISOString().split('T')[0],
+      designName: '',
+      pcs: '',
+      note: ''
+    }
+  ]);
+  const [submittingOrder, setSubmittingOrder] = useState(false);
+  const [orderModalError, setOrderModalError] = useState('');
+  const [orderModalSuccess, setOrderModalSuccess] = useState('');
 
   // Extract resolved client fields with flexible fallbacks
   const companyName = clientData.companyName || clientData.company_name || clientData.name || '';
@@ -253,6 +272,94 @@ export default function ClientPortal({ client, onLogout }) {
       setProfileError(err.message || 'Failed to update password');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  // ── Place Order Action Handlers ──
+  const handleOpenPlaceOrder = () => {
+    setOrderModalError('');
+    setOrderModalSuccess('');
+    const defaultDesign = designs.length > 0 ? designs[0].designName : '';
+    setOrderRows([
+      {
+        id: 1,
+        date: new Date().toISOString().split('T')[0],
+        designName: defaultDesign,
+        pcs: '',
+        note: ''
+      }
+    ]);
+    setShowPlaceOrderModal(true);
+  };
+
+  const handleAddOrderRow = () => {
+    setOrderRows(prev => [
+      ...prev,
+      {
+        id: prev.length > 0 ? Math.max(...prev.map(r => r.id)) + 1 : 1,
+        date: new Date().toISOString().split('T')[0],
+        designName: designs.length > 0 ? designs[0].designName : '',
+        pcs: '',
+        note: ''
+      }
+    ]);
+  };
+
+  const handleRemoveOrderRow = (id) => {
+    if (orderRows.length <= 1) return;
+    setOrderRows(prev => prev.filter(r => r.id !== id));
+  };
+
+  const handleUpdateOrderRow = (id, field, val) => {
+    setOrderRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
+  };
+
+  const handleSubmitOrder = async (e) => {
+    e?.preventDefault?.();
+    setOrderModalError('');
+    setOrderModalSuccess('');
+
+    // Validation
+    for (let i = 0; i < orderRows.length; i++) {
+      const row = orderRows[i];
+      if (!row.designName) {
+        setOrderModalError(`Row #${i + 1}: Please select a design.`);
+        return;
+      }
+      if (!row.pcs || Number(row.pcs) <= 0) {
+        setOrderModalError(`Row #${i + 1}: Please enter a valid quantity in pieces.`);
+        return;
+      }
+    }
+
+    setSubmittingOrder(true);
+    try {
+      const res = await api.placeClientBulkOrder({
+        items: orderRows,
+        clientInfo: {
+          companyCode: partyCode,
+          companyName,
+          username,
+          mobile
+        }
+      });
+
+      const cards = res.jobCards || [];
+      const jobNos = cards.map(c => c.jobNo).join(', ');
+      setOrderModalSuccess(`🎉 Order placed successfully! Generated Job Card(s): ${jobNos || 'Created'}`);
+
+      // Refresh orders immediately
+      await fetchOrders();
+
+      // Close modal after delay
+      setTimeout(() => {
+        setShowPlaceOrderModal(false);
+        setOrderModalSuccess('');
+      }, 2200);
+    } catch (err) {
+      setOrderModalError(err.message || 'Failed to submit order. Please try again.');
+    } finally {
+      setSubmittingOrder(false);
     }
   };
 
@@ -637,15 +744,27 @@ export default function ClientPortal({ client, onLogout }) {
                 />
               </div>
 
-              <button
-                onClick={fetchOrders}
-                disabled={loadingOrders}
-                style={styles.refreshBtn}
-                title="Refresh Orders"
-              >
-                <RefreshCw size={13} className={loadingOrders ? 'spin' : ''} />
-                <span>Refresh</span>
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={handleOpenPlaceOrder}
+                  style={styles.placeOrderBtn}
+                  title="Place a new order with auto-generated Job Cards"
+                >
+                  <PlusCircle size={15} />
+                  <span>Place Order</span>
+                </button>
+
+                <button
+                  onClick={fetchOrders}
+                  disabled={loadingOrders}
+                  style={styles.refreshBtn}
+                  title="Refresh Orders"
+                >
+                  <RefreshCw size={13} className={loadingOrders ? 'spin' : ''} />
+                  <span>Refresh</span>
+                </button>
+              </div>
             </div>
 
             {/* Stage Filter Pills */}
@@ -787,7 +906,25 @@ export default function ClientPortal({ client, onLogout }) {
                             </div>
                           </td>
                           <td style={{ color: '#64748b', fontSize: '0.8rem', maxWidth: '240px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
-                            {ord.notes || ord.note1 || ord.emergencyNotes || '—'}
+                            <div>{ord.notes || ord.note1 || ord.emergencyNotes || '—'}</div>
+                            {String(ord.createdBy || ord.createdByName || '').toLowerCase().includes('client') && (
+                              <div style={{ marginTop: '4px' }}>
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 600,
+                                  color: '#0369a1',
+                                  background: '#e0f2fe',
+                                  border: '1px solid #bae6fd',
+                                  padding: '1px 6px',
+                                  borderRadius: '6px'
+                                }}>
+                                  📱 {ord.createdByName || ord.createdBy}
+                                </span>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1055,6 +1192,215 @@ export default function ClientPortal({ client, onLogout }) {
           </div>
         )}
       </main>
+
+      {/* ── Place Order Multi-Entry Modal ── */}
+      {showPlaceOrderModal && (
+        <div style={styles.modalOverlay} onClick={() => !submittingOrder && setShowPlaceOrderModal(false)}>
+          <div style={styles.orderModalContainer} onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div style={styles.orderModalHeader}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={styles.orderModalTitle}>Place New Order</h3>
+                  <span style={styles.partyBadgePill}>Party: {partyCode || 'VG'}</span>
+                </div>
+                <p style={styles.orderModalSubtitle}>
+                  Enter order details below. Auto-generated Job Cards will be created for each design.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !submittingOrder && setShowPlaceOrderModal(false)}
+                style={styles.modalCloseBtn}
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Error & Success alerts */}
+            {orderModalError && (
+              <div style={styles.alertDanger}>
+                <AlertCircle size={16} />
+                <span>{orderModalError}</span>
+              </div>
+            )}
+            {orderModalSuccess && (
+              <div style={styles.alertSuccess}>
+                <CheckCircle2 size={16} />
+                <span>{orderModalSuccess}</span>
+              </div>
+            )}
+
+            {/* Multi-Entry Form */}
+            <form onSubmit={handleSubmitOrder}>
+              <div style={styles.orderEntriesTableWrapper}>
+                <table style={styles.orderEntriesTable}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0' }}>
+                      <th style={{ width: '45px', textAlign: 'center', padding: '0.65rem 0.5rem', fontSize: '0.72rem', color: '#475569', fontWeight: 700, textTransform: 'uppercase' }}>ID</th>
+                      <th style={{ width: '135px', padding: '0.65rem 0.5rem', fontSize: '0.72rem', color: '#475569', fontWeight: 700, textTransform: 'uppercase' }}>Date</th>
+                      <th style={{ minWidth: '220px', padding: '0.65rem 0.5rem', fontSize: '0.72rem', color: '#475569', fontWeight: 700, textTransform: 'uppercase' }}>Design No. (Assigned)</th>
+                      <th style={{ width: '120px', padding: '0.65rem 0.5rem', fontSize: '0.72rem', color: '#475569', fontWeight: 700, textTransform: 'uppercase' }}>Quantity (Pcs)</th>
+                      <th style={{ padding: '0.65rem 0.5rem', fontSize: '0.72rem', color: '#475569', fontWeight: 700, textTransform: 'uppercase' }}>Note</th>
+                      <th style={{ width: '45px', textAlign: 'center', padding: '0.65rem 0.5rem' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orderRows.map((row, idx) => {
+                      const selectedDesignDoc = designs.find(d => d.designName === row.designName);
+                      return (
+                        <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          {/* Auto ID */}
+                          <td style={{ textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: '0.8rem', padding: '0.5rem' }}>
+                            #{idx + 1}
+                          </td>
+
+                          {/* Date (default today) */}
+                          <td style={{ padding: '0.5rem' }}>
+                            <input
+                              type="date"
+                              value={row.date}
+                              onChange={(e) => handleUpdateOrderRow(row.id, 'date', e.target.value)}
+                              style={styles.modalInput}
+                              required
+                            />
+                          </td>
+
+                          {/* Design No. (Assigned to them) */}
+                          <td style={{ padding: '0.5rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <select
+                                value={row.designName}
+                                onChange={(e) => handleUpdateOrderRow(row.id, 'designName', e.target.value)}
+                                style={styles.modalSelect}
+                                required
+                              >
+                                <option value="">-- Choose Assigned Design --</option>
+                                {designs.map((d) => (
+                                  <option key={d._id || d.id || d.designName} value={d.designName}>
+                                    {d.designName} {d.category ? `[${d.category}]` : ''} {d.fabricName ? `- ${d.fabricName}` : ''}
+                                  </option>
+                                ))}
+                              </select>
+
+                              {selectedDesignDoc && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#64748b' }}>
+                                  {selectedDesignDoc.category && (
+                                    <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                      {selectedDesignDoc.category}
+                                    </span>
+                                  )}
+                                  {selectedDesignDoc.fabricName && <span>Fabric: {selectedDesignDoc.fabricName}</span>}
+                                  {selectedDesignDoc.colors && <span>• Color: {selectedDesignDoc.colors}</span>}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Pcs */}
+                          <td style={{ padding: '0.5rem' }}>
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              placeholder="e.g. 50"
+                              value={row.pcs}
+                              onChange={(e) => handleUpdateOrderRow(row.id, 'pcs', e.target.value)}
+                              style={styles.modalInput}
+                              required
+                            />
+                          </td>
+
+                          {/* Note */}
+                          <td style={{ padding: '0.5rem' }}>
+                            <input
+                              type="text"
+                              placeholder="Notes (optional)"
+                              value={row.note}
+                              onChange={(e) => handleUpdateOrderRow(row.id, 'note', e.target.value)}
+                              style={styles.modalInput}
+                            />
+                          </td>
+
+                          {/* Remove Action */}
+                          <td style={{ textAlign: 'center', padding: '0.5rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveOrderRow(row.id)}
+                              disabled={orderRows.length <= 1}
+                              style={{
+                                ...styles.rowDeleteBtn,
+                                opacity: orderRows.length <= 1 ? 0.3 : 1,
+                                cursor: orderRows.length <= 1 ? 'not-allowed' : 'pointer'
+                              }}
+                              title="Delete row"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Add Row Button */}
+              <div style={{ marginTop: '0.85rem' }}>
+                <button
+                  type="button"
+                  onClick={handleAddOrderRow}
+                  style={styles.addOrderRowBtn}
+                >
+                  <Plus size={14} />
+                  <span>Add Another Design</span>
+                </button>
+              </div>
+
+              {/* Modal Footer */}
+              <div style={styles.orderModalFooter}>
+                <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                  <span>Total Items: <strong style={{ color: '#0f172a' }}>{orderRows.length}</strong></span>
+                  <span style={{ margin: '0 8px' }}>•</span>
+                  <span>Total Pieces: <strong style={{ color: '#1d4ed8' }}>
+                    {orderRows.reduce((sum, r) => sum + (Number(r.pcs) || 0), 0)} Pcs
+                  </strong></span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.65rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowPlaceOrderModal(false)}
+                    disabled={submittingOrder}
+                    style={styles.cancelBtn}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={submittingOrder}
+                    style={styles.submitOrderBtn}
+                  >
+                    {submittingOrder ? (
+                      <>
+                        <RefreshCw size={14} className="spin" />
+                        <span>Creating Job Cards...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check size={14} />
+                        <span>Submit Order ({orderRows.length} {orderRows.length === 1 ? 'item' : 'items'})</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Image Zoom Modal */}
       {zoomImg && (
@@ -1432,6 +1778,175 @@ const styles = {
     fontWeight: 600,
     cursor: 'pointer',
     transition: 'all 0.15s ease'
+  },
+  placeOrderBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    height: '38px',
+    padding: '0 15px',
+    borderRadius: '8px',
+    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+    color: '#ffffff',
+    border: 'none',
+    fontSize: '0.82rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)'
+  },
+  modalOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(15, 23, 42, 0.65)',
+    backdropFilter: 'blur(6px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 99999,
+    padding: '1rem',
+    overflowY: 'auto'
+  },
+  orderModalContainer: {
+    background: '#ffffff',
+    borderRadius: '16px',
+    width: '100%',
+    maxWidth: '880px',
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    padding: '1.5rem',
+    boxShadow: '0 20px 60px rgba(15, 23, 42, 0.25)',
+    border: '1px solid #e2e8f0'
+  },
+  orderModalHeader: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: '1rem',
+    borderBottom: '1px solid #f1f5f9',
+    paddingBottom: '0.85rem'
+  },
+  orderModalTitle: {
+    margin: 0,
+    fontSize: '1.25rem',
+    fontWeight: 700,
+    color: '#0f172a'
+  },
+  orderModalSubtitle: {
+    margin: '4px 0 0 0',
+    fontSize: '0.8rem',
+    color: '#64748b'
+  },
+  partyBadgePill: {
+    fontSize: '0.7rem',
+    fontWeight: 700,
+    color: '#1d4ed8',
+    background: '#eff6ff',
+    border: '1px solid #bfdbfe',
+    padding: '2px 8px',
+    borderRadius: '6px'
+  },
+  modalCloseBtn: {
+    background: '#f1f5f9',
+    border: 'none',
+    color: '#64748b',
+    cursor: 'pointer',
+    padding: '6px',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  orderEntriesTableWrapper: {
+    overflowX: 'auto',
+    border: '1px solid #e2e8f0',
+    borderRadius: '10px',
+    background: '#ffffff'
+  },
+  orderEntriesTable: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    textAlign: 'left',
+    minWidth: '650px'
+  },
+  modalInput: {
+    width: '100%',
+    padding: '0.45rem 0.65rem',
+    borderRadius: '6px',
+    border: '1px solid #cbd5e1',
+    fontSize: '0.82rem',
+    color: '#0f172a',
+    outline: 'none',
+    boxSizing: 'border-box'
+  },
+  modalSelect: {
+    width: '100%',
+    padding: '0.45rem 0.65rem',
+    borderRadius: '6px',
+    border: '1px solid #cbd5e1',
+    fontSize: '0.82rem',
+    color: '#0f172a',
+    outline: 'none',
+    background: '#ffffff',
+    boxSizing: 'border-box'
+  },
+  rowDeleteBtn: {
+    background: '#fee2e2',
+    border: '1px solid #fecaca',
+    color: '#dc2626',
+    borderRadius: '6px',
+    padding: '5px 8px',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  addOrderRowBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '0.45rem 0.85rem',
+    borderRadius: '8px',
+    background: '#f8fafc',
+    border: '1.5px dashed #cbd5e1',
+    color: '#2563eb',
+    fontSize: '0.82rem',
+    fontWeight: 600,
+    cursor: 'pointer'
+  },
+  orderModalFooter: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: '1.5rem',
+    borderTop: '1px solid #f1f5f9',
+    paddingTop: '1rem',
+    flexWrap: 'wrap',
+    gap: '1rem'
+  },
+  cancelBtn: {
+    padding: '0.55rem 1.1rem',
+    borderRadius: '8px',
+    background: '#ffffff',
+    border: '1px solid #cbd5e1',
+    color: '#475569',
+    fontSize: '0.84rem',
+    fontWeight: 600,
+    cursor: 'pointer'
+  },
+  submitOrderBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '0.55rem 1.25rem',
+    borderRadius: '8px',
+    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+    border: 'none',
+    color: '#ffffff',
+    fontSize: '0.84rem',
+    fontWeight: 600,
+    cursor: 'pointer',
+    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
   },
   emptyState: {
     padding: '3rem 1.5rem',

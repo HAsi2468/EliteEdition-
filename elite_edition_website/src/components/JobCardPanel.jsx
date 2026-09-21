@@ -2754,9 +2754,16 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 600 }}>{c.totalMtr || '—'}</td>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', color: 'var(--text-primary)' }}>{formatDateDDMMYYYY(c.date)}</td>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
-                        <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#a78bfa', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(124, 58, 237, 0.25)' }}>
-                          {c.createdByName || c.createdBy || 'Staff User'}
-                        </span>
+                        {String(c.createdByName || c.createdBy || '').toLowerCase().includes('client') ? (
+                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(16, 185, 129, 0.3)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <span>📱</span>
+                            <span>{c.createdByName || c.createdBy}</span>
+                          </span>
+                        ) : (
+                          <span style={{ padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(124, 58, 237, 0.12)', color: '#a78bfa', fontWeight: 700, fontSize: '0.75rem', border: '1px solid rgba(124, 58, 237, 0.25)' }}>
+                            {c.createdByName || c.createdBy || 'Staff User'}
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: '0.75rem 1rem', fontSize: '0.82rem' }}><StatusBadge status={c.status} /></td>
                       <td style={{ padding: '0.5rem 1rem', textAlign: 'center' }}>

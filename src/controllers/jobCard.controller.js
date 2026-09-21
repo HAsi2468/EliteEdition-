@@ -556,6 +556,130 @@ const createJobCard = async (req, res) => {
   }
 };
 
+const createClientBulkOrder = async (req, res) => {
+  try {
+    const { items, clientInfo } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'At least one order entry is required.' });
+    }
+
+    const partyCode = (clientInfo?.companyCode || clientInfo?.partyCode || req.user?.companyCode || '').trim();
+    const companyName = (clientInfo?.companyName || clientInfo?.name || req.user?.companyName || '').trim();
+    const username = (clientInfo?.username || req.user?.username || '').trim();
+    const clientDisplayName = companyName || username || partyCode || 'Client Partner';
+    const creatorString = `Client: ${clientDisplayName}${partyCode ? ` (${partyCode})` : ''}`;
+
+    // Get current max job number
+    const config = await db.PrintConfig.findOne({ isConfig: true });
+    const startingNo = config && config.startingJobNo ? config.startingJobNo : 1;
+    const [result] = await db.JobCard.aggregate([
+      {
+        $addFields: {
+          jobNoNum: {
+            $convert: {
+              input: {
+                $let: {
+                  vars: { m: { $regexFind: { input: '$jobNo', regex: '\\d+' } } },
+                  in: '$$m.match'
+                }
+              },
+              to: 'int',
+              onError: 0,
+              onNull: 0
+            }
+          }
+        }
+      },
+      { $group: { _id: null, maxNo: { $max: '$jobNoNum' } } }
+    ]);
+    let nextNum = (result ? Math.max(result.maxNo, startingNo - 1) : startingNo - 1) + 1;
+
+    const createdCards = [];
+
+    for (const item of items) {
+      const designName = String(item.designName || item.designNo || '').trim();
+      if (!designName) continue;
+
+      const jobNo = `JOB NO.- ${nextNum++}`;
+
+      // Lookup design in DB for artwork, fabric, colors, category
+      let designDoc = await db.Design.findOne({ designName }).lean();
+      if (!designDoc) {
+        designDoc = await db.Design.findOne({ designNo: designName }).lean();
+      }
+
+      const fabric = (item.fabric || designDoc?.fabricName || 'FRENCH CREP').trim();
+      const category = (item.category || designDoc?.category || 'KURTI-SET').trim();
+      const colors = (item.colors || designDoc?.colors || '').trim();
+      const panna = (item.panna || designDoc?.panna || '58').trim();
+      const pcs = String(item.pcs || item.pieces || '0').trim();
+      const note = String(item.note || item.notes || '').trim();
+      const date = item.date ? normalizeDateStr(item.date) : normalizeDateStr(new Date().toISOString().split('T')[0]);
+
+      const cardData = {
+        jobNo,
+        designNo: designName,
+        designName: designName,
+        category,
+        department: 'digital_print',
+        fabric,
+        pcs,
+        colors,
+        panna,
+        date,
+        party: partyCode || companyName,
+        billTo: companyName || partyCode,
+        shipTo: companyName || partyCode,
+        status: 'Pending',
+        printStatus: 'Printing Pending',
+        fusingStatus: 'Fusing Pending',
+        deliveryStatus: 'Delivery Pending',
+        note1: note,
+        emergencyNotes: `[Order placed by ${creatorString}]`,
+        createdBy: creatorString,
+        createdByName: creatorString,
+        imageUrl1: designDoc?.imageUrl || '',
+        imageUrl: designDoc?.imageUrl || '',
+        auditTrail: [
+          {
+            performedBy: creatorString,
+            performedByName: creatorString,
+            action: 'CREATE',
+            timestamp: new Date(),
+            details: `Online Order placed by ${creatorString} (Qty: ${pcs} pcs, Design: ${designName}, Fabric: ${fabric})`,
+            changesSummary: 'Job Card created via Client Portal'
+          }
+        ]
+      };
+
+      const card = await db.JobCard.create(cardData);
+      createdCards.push(card);
+
+      publishActivity({
+        actorName: creatorString,
+        action: 'CREATE',
+        module: 'Job Card',
+        recordRef: card.jobNo,
+        recordId: card._id,
+        permissionScope: 'jobcards',
+        department: 'Production',
+        description: `📋 **New Client Order #${card.jobNo}** placed by **${creatorString}** | Design: **${designName}** | Qty: **${pcs} pcs** | Fabric: **${fabric}**.`
+      }).catch(e => logger.warn('publishActivity failed on client order: %s', e.message));
+
+      emitSocketEvent(req, 'job-created', card);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `Successfully created ${createdCards.length} Job Card(s).`,
+      jobCards: createdCards
+    });
+  } catch (err) {
+    logger.error('createClientBulkOrder error: %o', err);
+    res.status(500).json({ error: err.message || 'Failed to process client orders.' });
+  }
+};
+
 const updateJobCard = async (req, res) => {
   try {
     const body = { ...req.body };
@@ -1411,7 +1535,7 @@ const syncFusingFromDelivery = async (req, res) => {
 };
 
 module.exports = {
-  getAllJobCards, getJobCard, createJobCard, updateJobCard,
+  getAllJobCards, getJobCard, createJobCard, createClientBulkOrder, updateJobCard,
   deleteJobCard, calcExpTimeEndpoint, getNextJobCardNumber, downloadJobCardPdf,
   downloadBulkJobCardsPdf, calculatePrintCost, updateProductionStage, updateProofingStatus,
   syncFusingFromDelivery
