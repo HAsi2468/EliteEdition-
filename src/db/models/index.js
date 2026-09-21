@@ -56,6 +56,7 @@ const db = {
   ChatMessage: require('./chat.model').ChatMessage,
   Task: require('./task.model').Task,
   OrderActivityLog: require('./orderActivityLog.model'),
+  Client: require('./client.model'),
   mongoose,
 };
 

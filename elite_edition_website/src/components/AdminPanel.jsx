@@ -29,10 +29,13 @@ import {
   Search,
   Settings,
   AlertCircle,
-  FileCheck
+  FileCheck,
+  Users
 } from 'lucide-react';
 import { AVAILABLE_SCREENS } from '../config/screensConfig';
 import AdminSignedDocumentsApproval from './AdminSignedDocumentsApproval';
+import AdminClientDetails from './AdminClientDetails';
+
 
 export default function AdminPanel() {
   const [users, setUsers] = useState([]);
@@ -679,11 +682,23 @@ export default function AdminPanel() {
           <ShieldAlert size={22} color="var(--primary)" />
           <div>
             <h2 style={styles.pageTitle}>
-              {activeSubTab === 'users' ? 'Admin User Management' : activeSubTab === 'billing' ? 'Infrastructure Billing Management' : activeSubTab === 'backup' ? 'System Data Backup & Export' : activeSubTab === 'signedDocs' ? 'Signed Documents Approval' : 'Department Expense Settings'}
+              {activeSubTab === 'users'
+                ? 'Admin User Management'
+                : activeSubTab === 'clients'
+                ? 'Client Details & Accounts'
+                : activeSubTab === 'billing'
+                ? 'Infrastructure Billing Management'
+                : activeSubTab === 'backup'
+                ? 'System Data Backup & Export'
+                : activeSubTab === 'signedDocs'
+                ? 'Signed Documents Approval'
+                : 'Department Expense Settings'}
             </h2>
             <p style={styles.pageSubtitle}>
               {activeSubTab === 'users'
                 ? 'Create system users, set passwords, and manage screen-by-screen functionality credentials.'
+                : activeSubTab === 'clients'
+                ? 'Manage client user accounts, company codes, credentials, and Cloudflare R2 profile images.'
                 : activeSubTab === 'billing'
                 ? 'Track monthly cloud bills for AWS and MongoDB to monitor hosting costs.'
                 : activeSubTab === 'backup'
@@ -704,6 +719,13 @@ export default function AdminPanel() {
           style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem' }}
         >
           <User size={16} /> User Accounts
+        </button>
+        <button
+          onClick={() => { setActiveSubTab('clients'); setError(''); setSuccess(''); }}
+          className={activeSubTab === 'clients' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+        >
+          <Users size={16} /> Client Details
         </button>
         <button
           onClick={() => { setActiveSubTab('settings'); setError(''); setSuccess(''); }}
@@ -2041,6 +2063,11 @@ export default function AdminPanel() {
       {activeSubTab === 'signedDocs' && (
         <AdminSignedDocumentsApproval />
       )}
+
+      {activeSubTab === 'clients' && (
+        <AdminClientDetails />
+      )}
+
     </div>
   );
 }

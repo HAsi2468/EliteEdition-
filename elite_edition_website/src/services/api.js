@@ -2208,8 +2208,49 @@ export const api = {
     return request(`/fabric/white-qa-logs/${id}`, {
       method: 'DELETE'
     });
+  },
+
+  // ── Client Details & Accounts Management ──
+  async getClients(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.search) qs.set('search', params.search);
+    if (params.companyCode) qs.set('companyCode', params.companyCode);
+    if (params.status) qs.set('status', params.status);
+    if (params.page) qs.set('page', params.page);
+    if (params.limit) qs.set('limit', params.limit);
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return request(`/clients${query}`);
+  },
+
+  async getClientById(id) {
+    return request(`/clients/${id}`);
+  },
+
+  async createClient(data) {
+    return request('/clients', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async updateClient(id, data) {
+    return request(`/clients/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async deleteClient(id) {
+    return request(`/clients/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async uploadClientImage(file) {
+    return this.uploadImage(file, 'clients/avatars');
   }
 };
+
 
 
 
