@@ -2182,7 +2182,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
     }
   };
 
-  const fetchCards = useCallback(async (isSilent = false, targetPage = page, targetPageSize = pageSizeRef.current) => {
+  const fetchCards = useCallback(async (isSilent = false, targetPage = 1, targetPageSize = pageSizeRef.current) => {
     if (activeSubTab !== 'list') return;
     // Cancel any in-flight request to prevent race conditions
     if (abortRef.current) abortRef.current.abort();
@@ -2208,13 +2208,24 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         dateEnd
       });
       if (!controller.signal.aborted) {
-        setCards(res.data || []);
+        if (!isSilent) {
+          setCards(res.data || []);
+        } else if (res.data) {
+          setCards(prev => {
+            if (prev.length !== res.data.length) return res.data;
+            const prevIds = prev.map(c => c._id || c.id).join(',');
+            const nextIds = res.data.map(c => c._id || c.id).join(',');
+            return prevIds === nextIds ? prev : res.data;
+          });
+        }
         setTotal(res.total || 0);
         setTotalMtr(res.totalMtr || 0);
         if (res.statusCounts) setStatusCounts(res.statusCounts);
         setPages(isAll ? 1 : (res.pages || 1));
-        setPage(isAll ? 1 : targetPage);
-        pageRef.current = isAll ? 1 : targetPage;
+        if (!isSilent) {
+          setPage(isAll ? 1 : targetPage);
+          pageRef.current = isAll ? 1 : targetPage;
+        }
       }
     } catch (err) {
       if (!controller.signal.aborted && !isSilent) {
@@ -2223,7 +2234,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, [debouncedSearch, statusFilter, activeSubTab, sortBy, sortOrder, dateStart, dateEnd, department, page]);
+  }, [debouncedSearch, statusFilter, activeSubTab, sortBy, sortOrder, dateStart, dateEnd, department]);
 
   const pageRef = useRef(page);
   pageRef.current = page;
@@ -2250,10 +2261,9 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
       });
       if (res && res.data && res.data.length > 0) {
         setCards(prev => {
-          const map = new Map();
-          prev.forEach(c => map.set(c._id || c.id, c));
-          res.data.forEach(c => map.set(c._id || c.id, c));
-          return Array.from(map.values());
+          const existingIds = new Set(prev.map(c => String(c._id || c.id)));
+          const newItems = res.data.filter(c => !existingIds.has(String(c._id || c.id)));
+          return newItems.length > 0 ? [...prev, ...newItems] : prev;
         });
         setPage(nextPage);
         pageRef.current = nextPage;
@@ -2272,7 +2282,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
 
   useEffect(() => {
     fetchCards(false, 1);
-    const interval = setInterval(() => fetchCards(true, pageRef.current), 10000);
+    const interval = setInterval(() => fetchCards(true, pageRef.current), 15000);
     const handleDataRefresh = () => fetchCards(true, pageRef.current);
     window.addEventListener('elite-data-refresh', handleDataRefresh);
 
@@ -2280,7 +2290,7 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
       clearInterval(interval);
       window.removeEventListener('elite-data-refresh', handleDataRefresh);
     };
-  }, [fetchCards, activeSubTab]);
+  }, [debouncedSearch, statusFilter, activeSubTab, sortBy, sortOrder, dateStart, dateEnd, department, fetchCards]);
 
   const handleDelete = async (id, jobNo) => {
     const confirmed = await triggerEliteConfirm({

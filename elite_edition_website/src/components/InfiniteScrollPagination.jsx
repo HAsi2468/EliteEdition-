@@ -40,37 +40,48 @@ export default function InfiniteScrollPagination({
   const sentinelRef = useRef(null);
   const onLoadMoreRef = useRef(onLoadMore);
   onLoadMoreRef.current = onLoadMore;
+  const hasMoreRef = useRef(hasMore);
+  hasMoreRef.current = hasMore;
+  const loadingMoreRef = useRef(loadingMore);
+  loadingMoreRef.current = loadingMore;
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
+  const cooldownRef = useRef(false);
 
   useEffect(() => {
-    if (!hasMore || loadingMore || loading) return;
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
 
-    let debounceTimer = null;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !loadingMore && hasMore) {
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => {
-            if (onLoadMoreRef.current) {
-              onLoadMoreRef.current();
-            }
-          }, 100);
+        if (
+          entries[0].isIntersecting &&
+          !loadingMoreRef.current &&
+          !loadingRef.current &&
+          hasMoreRef.current &&
+          !cooldownRef.current
+        ) {
+          cooldownRef.current = true;
+          if (onLoadMoreRef.current) {
+            onLoadMoreRef.current();
+          }
+          setTimeout(() => {
+            cooldownRef.current = false;
+          }, 350);
         }
       },
       {
         root: scrollContainerRef?.current || null,
-        rootMargin: '200px',
+        rootMargin: '150px',
         threshold: 0.01
       }
     );
 
     observer.observe(sentinel);
     return () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
       observer.disconnect();
     };
-  }, [hasMore, loadingMore, loading, scrollContainerRef]);
+  }, [scrollContainerRef]);
 
   // If no items loaded at all, hide pagination dock
   if (currentCount === 0 && !loading && !loadingMore) return null;
