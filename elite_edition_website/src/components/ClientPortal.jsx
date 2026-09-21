@@ -265,9 +265,7 @@ export default function ClientPortal({ client, onLogout }) {
         .client-portal-container {
           min-height: 100vh !important;
           min-height: 100dvh !important;
-          height: 100vh !important;
-          height: 100dvh !important;
-          overflow-y: auto !important;
+          height: auto !important;
           overflow-x: hidden !important;
           -webkit-overflow-scrolling: touch !important;
         }
@@ -286,7 +284,7 @@ export default function ClientPortal({ client, onLogout }) {
         .client-portal-main {
           flex: 1;
           padding: 1.5rem;
-          padding-bottom: 6rem !important;
+          padding-bottom: 8rem !important;
           max-width: 1200px;
           width: 100%;
           margin: 0 auto;
@@ -319,10 +317,42 @@ export default function ClientPortal({ client, onLogout }) {
         .client-tabs-bar::-webkit-scrollbar {
           display: none;
         }
-        .client-orders-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-          gap: 1rem;
+        .client-table-responsive {
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 14px;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          box-shadow: 0 4px 16px rgba(30, 58, 138, 0.05);
+        }
+        .client-orders-table {
+          width: 100%;
+          border-collapse: collapse;
+          text-align: left;
+          min-width: 680px;
+        }
+        .client-orders-table th {
+          background: #f8fafc;
+          padding: 0.85rem 1rem;
+          color: #475569;
+          font-weight: 700;
+          font-size: 0.74rem;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          border-bottom: 1.5px solid #e2e8f0;
+          white-space: nowrap;
+        }
+        .client-orders-table td {
+          padding: 0.8rem 1rem;
+          border-bottom: 1px solid #f1f5f9;
+          font-size: 0.85rem;
+          color: #0f172a;
+        }
+        .client-table-row {
+          transition: background-color 0.15s ease;
+        }
+        .client-table-row:hover {
+          background-color: #f8fafc !important;
         }
         .client-designs-grid {
           display: grid;
@@ -346,7 +376,7 @@ export default function ClientPortal({ client, onLogout }) {
             padding: 0.65rem 0.85rem !important;
           }
           .client-portal-main {
-            padding: 1rem 0.75rem !important;
+            padding: 0.85rem 0.75rem calc(14rem + env(safe-area-inset-bottom, 24px)) 0.75rem !important;
           }
           .client-welcome-card {
             padding: 1.15rem 1rem !important;
@@ -563,64 +593,59 @@ export default function ClientPortal({ client, onLogout }) {
                 </p>
               </div>
             ) : (
-              <div className="client-orders-grid" style={styles.ordersGrid}>
-                {filteredOrders.map((ord) => {
-                  const statusColor = getStatusColor(ord.status);
-                  return (
-                    <div key={ord._id || ord.id} style={styles.orderCard}>
-                      <div style={styles.orderCardHeader}>
-                        <div>
-                          <span style={styles.orderNo}>{ord.orderNo || 'Job Card'}</span>
-                          <span style={styles.orderDate}>{formatDateDDMMYYYY(ord.created_date_time || ord.createdAt)}</span>
-                        </div>
-                        <span style={{
-                          ...styles.statusBadge,
-                          background: statusColor.bg,
-                          color: statusColor.text,
-                          border: `1px solid ${statusColor.border}`
-                        }}>
-                          {ord.status || 'In Process'}
-                        </span>
-                      </div>
-
-                      <div style={styles.orderBody}>
-                        {ord.designName && (
-                          <div style={styles.orderField}>
-                            <span style={styles.fieldLabel}>Design Name</span>
-                            <span style={styles.fieldValue}>{ord.designName}</span>
-                          </div>
-                        )}
-                        {ord.fabric && (
-                          <div style={styles.orderField}>
-                            <span style={styles.fieldLabel}>Fabric</span>
-                            <span style={styles.fieldValue}>{ord.fabric}</span>
-                          </div>
-                        )}
-                        {ord.totalMtr ? (
-                          <div style={styles.orderField}>
-                            <span style={styles.fieldLabel}>Quantity</span>
-                            <span style={{ ...styles.fieldValue, color: '#1d4ed8', fontWeight: 800 }}>
-                              {ord.totalMtr} Mtrs
+              <div className="client-table-responsive">
+                <table className="client-orders-table">
+                  <thead>
+                    <tr>
+                      <th>Order / Job No</th>
+                      <th>Date</th>
+                      <th>Design Name</th>
+                      <th>Fabric</th>
+                      <th>Quantity</th>
+                      <th>Status</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredOrders.map((ord, idx) => {
+                      const statusColor = getStatusColor(ord.status);
+                      const qtyStr = ord.totalMtr ? `${ord.totalMtr} Mtrs` : (ord.pcs ? `${ord.pcs} Pcs` : '—');
+                      return (
+                        <tr key={ord._id || ord.id || idx} className="client-table-row">
+                          <td style={{ fontWeight: 800 }}>
+                            <span style={{ color: '#1d4ed8' }}>{ord.orderNo || ord.jobCardNo || `JC-${idx + 1}`}</span>
+                          </td>
+                          <td style={{ color: '#64748b', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                            {formatDateDDMMYYYY(ord.created_date_time || ord.createdAt)}
+                          </td>
+                          <td style={{ fontWeight: 700, color: '#0f172a' }}>
+                            {ord.designName || '—'}
+                          </td>
+                          <td style={{ color: '#475569' }}>
+                            {ord.fabric || '—'}
+                          </td>
+                          <td style={{ fontWeight: 800, color: '#1d4ed8', whiteSpace: 'nowrap' }}>
+                            {qtyStr}
+                          </td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            <span style={{
+                              ...styles.statusBadge,
+                              background: statusColor.bg,
+                              color: statusColor.text,
+                              border: `1px solid ${statusColor.border}`,
+                              display: 'inline-block'
+                            }}>
+                              {ord.status || 'In Process'}
                             </span>
-                          </div>
-                        ) : ord.pcs ? (
-                          <div style={styles.orderField}>
-                            <span style={styles.fieldLabel}>Quantity</span>
-                            <span style={{ ...styles.fieldValue, color: '#1d4ed8', fontWeight: 800 }}>
-                              {ord.pcs} Pcs
-                            </span>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {ord.notes && (
-                        <div style={styles.orderNotes}>
-                          <span>Notes:</span> {ord.notes}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                          </td>
+                          <td style={{ color: '#64748b', fontSize: '0.8rem', maxWidth: '240px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                            {ord.notes || '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -771,11 +796,8 @@ export default function ClientPortal({ client, onLogout }) {
                   )}
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                   <h4 style={{ margin: 0, color: '#0f172a', fontSize: '1rem' }}>Company Logo / Avatar</h4>
-                  <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>
-                    Upload your official company logo. Stored securely on Cloudflare R2.
-                  </p>
 
                   <input
                     ref={fileInputRef}
@@ -898,11 +920,9 @@ function getStatusColor(status = '') {
 
 const styles = {
   container: {
-    height: '100dvh',
+    height: 'auto',
     minHeight: '100dvh',
-    overflowY: 'auto',
     overflowX: 'hidden',
-    WebkitOverflowScrolling: 'touch',
     background: '#f8fafc',
     color: '#0f172a',
     fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -1424,23 +1444,25 @@ const styles = {
     color: '#1e293b'
   },
   formInput: {
-    padding: '0.7rem 0.9rem',
+    padding: '0.75rem 0.9rem',
     borderRadius: '10px',
     background: '#ffffff',
     border: '1.5px solid #cbd5e1',
     color: '#0f172a',
-    fontSize: '0.88rem',
-    outline: 'none'
+    fontSize: '16px',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box'
   },
   savePasswordBtn: {
-    marginTop: '0.5rem',
-    padding: '0.7rem 1.15rem',
+    marginTop: '0.65rem',
+    padding: '0.8rem 1.25rem',
     borderRadius: '10px',
     background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
     color: '#fff',
     border: 'none',
     fontWeight: 700,
-    fontSize: '0.88rem',
+    fontSize: '0.92rem',
     cursor: 'pointer',
     boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)'
   },
