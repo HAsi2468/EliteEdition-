@@ -2044,15 +2044,15 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 )}
               </div>
 
-              {/* Assigned By & Priority */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+              {/* Assigned By, Priority & Due Date */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                 <div>
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
                     Assigned By (Creator)
                   </label>
                   <div style={{ padding: '0.55rem', fontSize: '0.8rem', fontWeight: 700, borderRadius: '6px', background: '#f1f5f9', border: '1px solid var(--border-light)', color: '#2563eb', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <User size={14} />
-                    <span>{myName}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{myName}</span>
                   </div>
                 </div>
 
@@ -2063,13 +2063,113 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                   <select
                     value={newPriority}
                     onChange={(e) => setNewPriority(e.target.value)}
-                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)' }}
+                    style={{ width: '100%', padding: '0.55rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', color: '#0f172a' }}
                   >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
                     <option value="high">High</option>
                     <option value="urgent">Urgent</option>
                   </select>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Calendar size={13} color="#2563eb" />
+                      <span>Due Date</span>
+                    </label>
+                    {newDueDate && (
+                      <button
+                        type="button"
+                        onClick={() => setNewDueDate('')}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="date"
+                    value={newDueDate}
+                    onChange={(e) => setNewDueDate(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 0.55rem',
+                      fontSize: '0.8rem',
+                      borderRadius: '6px',
+                      border: newDueDate ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
+                      background: newDueDate ? '#eff6ff' : '#ffffff',
+                      color: '#0f172a',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const today = new Date().toISOString().split('T')[0];
+                        setNewDueDate(today);
+                      }}
+                      style={{
+                        flex: 1,
+                        fontSize: '0.66rem',
+                        padding: '2px 4px',
+                        borderRadius: '4px',
+                        border: '1px solid #e2e8f0',
+                        background: '#f8fafc',
+                        color: '#2563eb',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        textAlign: 'center'
+                      }}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 1);
+                        setNewDueDate(d.toISOString().split('T')[0]);
+                      }}
+                      style={{
+                        flex: 1,
+                        fontSize: '0.66rem',
+                        padding: '2px 4px',
+                        borderRadius: '4px',
+                        border: '1px solid #e2e8f0',
+                        background: '#f8fafc',
+                        color: '#2563eb',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        textAlign: 'center'
+                      }}
+                    >
+                      Tmrw
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 7);
+                        setNewDueDate(d.toISOString().split('T')[0]);
+                      }}
+                      style={{
+                        flex: 1,
+                        fontSize: '0.66rem',
+                        padding: '2px 4px',
+                        borderRadius: '4px',
+                        border: '1px solid #e2e8f0',
+                        background: '#f8fafc',
+                        color: '#2563eb',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        textAlign: 'center'
+                      }}
+                    >
+                      +1 Wk
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2156,17 +2256,33 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 </div>
               </div>
 
-              <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
-                  Project / Job Card Ref
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. @JC-1004"
-                  value={newProjectRef}
-                  onChange={(e) => setNewProjectRef(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: 'var(--bg-input)' }}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                    Project / Job Card Ref (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. @JC-1004"
+                    value={newProjectRef}
+                    onChange={(e) => setNewProjectRef(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                    Est. Hours (Optional)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    placeholder="e.g. 2.0"
+                    value={newEstHours}
+                    onChange={(e) => setNewEstHours(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', boxSizing: 'border-box' }}
+                  />
+                </div>
               </div>
 
               <button
