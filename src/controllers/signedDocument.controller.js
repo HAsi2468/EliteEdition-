@@ -257,8 +257,84 @@ const updateApprovalStatus = async (req, res) => {
   }
 };
 
+/**
+ * 4. Bulk Approve or Reject multiple signed documents (Admin only)
+ */
+const bulkUpdateApprovalStatus = async (req, res) => {
+  try {
+    const { items, action, rejectionReason } = req.body; // items: [{ docType: 'challan'|'invoice', id: '...' }]
+
+    // Strict Admin Authorization Check
+    const userRole = String(req.user?.role || '').toLowerCase();
+    const isMainAdmin = Boolean(req.user?.isMainAdmin);
+    if (userRole !== 'admin' && !isMainAdmin) {
+      return res.status(403).json({ error: 'Access Denied: Only administrators can approve or reject signed documents.' });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Please provide items to update' });
+    }
+
+    if (!['APPROVED', 'REJECTED'].includes(action)) {
+      return res.status(400).json({ error: "Invalid action. Must be 'APPROVED' or 'REJECTED'" });
+    }
+
+    const adminName = req.user?.name || req.headers['x-user-name'] || 'Admin';
+    const adminId = String(req.user?.id || req.user?._id || 'admin');
+
+    const challanIds = items.filter(i => i.docType === 'challan').map(i => i.id);
+    const invoiceIds = items.filter(i => i.docType === 'invoice').map(i => i.id);
+
+    const updateFields = action === 'APPROVED' ? {
+      'signedCopy.status': 'APPROVED',
+      'signedCopy.approvedAt': new Date(),
+      'signedCopy.approvedBy': adminId,
+      'signedCopy.approvedByName': adminName,
+      'signedCopy.rejectionReason': ''
+    } : {
+      'signedCopy.status': 'REJECTED',
+      'signedCopy.approvedAt': null,
+      'signedCopy.approvedBy': adminId,
+      'signedCopy.approvedByName': adminName,
+      'signedCopy.rejectionReason': rejectionReason || 'Rejected by administrator'
+    };
+
+    if (challanIds.length > 0) {
+      await FabricChallan.updateMany(
+        { _id: { $in: challanIds }, 'signedCopy.images.0': { $exists: true } },
+        { $set: updateFields }
+      );
+    }
+
+    if (invoiceIds.length > 0) {
+      await BillingInvoice.updateMany(
+        { _id: { $in: invoiceIds }, 'signedCopy.images.0': { $exists: true } },
+        { $set: updateFields }
+      );
+    }
+
+    emitSocketEvent(req, 'signed-document-updated', {
+      action: `BULK_${action}`,
+      count: items.length,
+      status: action,
+      adminName
+    });
+
+    logger.info(`[SignedDocument] ${adminName} bulk ${action} ${items.length} signed documents`);
+
+    return res.json({
+      success: true,
+      message: `Successfully ${action === 'APPROVED' ? 'approved' : 'rejected'} ${items.length} signed documents`
+    });
+  } catch (err) {
+    logger.error('bulkUpdateApprovalStatus error: %o', err);
+    return res.status(500).json({ error: 'Internal Server Error: ' + err.message });
+  }
+};
+
 module.exports = {
   uploadSignedCopy,
   getSignedDocuments,
-  updateApprovalStatus
+  updateApprovalStatus,
+  bulkUpdateApprovalStatus
 };

@@ -9,7 +9,10 @@ router.post('/upload', signedDocumentController.uploadSignedCopy);
 // 2. Get signed documents for review / queue
 router.get('/approvals', signedDocumentController.getSignedDocuments);
 
-// 3. Approve or reject signed document (admin only)
+// 3. Bulk approve or reject signed documents (admin only)
+router.patch('/bulk-approval', signedDocumentController.bulkUpdateApprovalStatus);
+
+// 4. Approve or reject signed document (admin only)
 router.patch('/:docType/:id/approval', signedDocumentController.updateApprovalStatus);
 
 module.exports = router;
