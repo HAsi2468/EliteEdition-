@@ -7,7 +7,6 @@ import {
   ArrowRight, 
   Eye, 
   EyeOff, 
-  CheckCircle2, 
   AlertCircle, 
   Sparkles,
   ShieldCheck,
@@ -62,11 +61,11 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
       <div style={styles.bgGlowTop} />
       <div style={styles.bgGlowBottom} />
 
-      <div className="glass-panel" style={styles.card}>
-        {/* Top Header Badge */}
+      <div style={styles.card}>
+        {/* Top Header Badge & Copy Link */}
         <div style={styles.badgeRow}>
           <div style={styles.badge}>
-            <Sparkles size={12} color="#10b981" />
+            <Sparkles size={13} color="#2563eb" />
             <span>CLIENT & PARTNER PORTAL</span>
           </div>
           <button
@@ -77,12 +76,12 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
           >
             {copiedLink ? (
               <>
-                <Check size={13} color="#10b981" />
-                <span style={{ color: '#10b981' }}>Link Copied</span>
+                <Check size={13} color="#2563eb" />
+                <span style={{ color: '#2563eb', fontWeight: 600 }}>Link Copied</span>
               </>
             ) : (
               <>
-                <Copy size={13} color="#94a3b8" />
+                <Copy size={13} color="#3b82f6" />
                 <span>Copy Client Link</span>
               </>
             )}
@@ -92,7 +91,7 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
         {/* Brand Header */}
         <div style={styles.header}>
           <div style={styles.logoBadge}>
-            <Building2 size={28} color="#10b981" />
+            <Building2 size={30} color="#ffffff" />
           </div>
           <h2 style={styles.title}>Elite Edition</h2>
           <p style={styles.subtitle}>Welcome to your dedicated Client Order & Design Tracking Portal</p>
@@ -101,7 +100,7 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
         {/* Error message */}
         {error && (
           <div style={styles.errorContainer}>
-            <AlertCircle size={16} color="#ef4444" style={{ flexShrink: 0 }} />
+            <AlertCircle size={16} color="#dc2626" style={{ flexShrink: 0 }} />
             <span>{error}</span>
           </div>
         )}
@@ -111,7 +110,7 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
           <div style={styles.inputGroup}>
             <label style={styles.label}>Registered Mobile Number</label>
             <div style={styles.inputWrapper}>
-              <Phone size={16} style={styles.inputIcon} />
+              <Phone size={17} style={styles.inputIcon} />
               <input
                 type="tel"
                 value={mobile}
@@ -127,7 +126,7 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
           <div style={styles.inputGroup}>
             <label style={styles.label}>Password</label>
             <div style={styles.inputWrapper}>
-              <Lock size={16} style={styles.inputIcon} />
+              <Lock size={17} style={styles.inputIcon} />
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
@@ -142,7 +141,7 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
                 style={styles.eyeBtn}
                 title={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? <EyeOff size={16} color="#94a3b8" /> : <Eye size={16} color="#94a3b8" />}
+                {showPassword ? <EyeOff size={17} color="#64748b" /> : <Eye size={17} color="#64748b" />}
               </button>
             </div>
           </div>
@@ -152,7 +151,7 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
             disabled={loading}
             style={{
               ...styles.submitBtn,
-              opacity: loading ? 0.7 : 1,
+              opacity: loading ? 0.75 : 1,
               cursor: loading ? 'not-allowed' : 'pointer'
             }}
           >
@@ -170,7 +169,7 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
         {/* Footer info & Switch */}
         <div style={styles.footer}>
           <div style={styles.securityNote}>
-            <ShieldCheck size={14} color="#10b981" />
+            <ShieldCheck size={15} color="#2563eb" />
             <span>End-to-End Encrypted Session</span>
           </div>
 
@@ -180,7 +179,7 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
               onClick={onSwitchToStaff}
               style={styles.switchBtn}
             >
-              Are you staff or admin? <strong>Go to Staff Login →</strong>
+              Are you staff or admin? <strong style={{ color: '#2563eb' }}>Go to Staff Login →</strong>
             </button>
           )}
         </div>
@@ -195,31 +194,31 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'radial-gradient(ellipse at top, #0f172a 0%, #030712 100%)',
+    background: 'radial-gradient(ellipse at 50% 0%, #e0f2fe 0%, #eff6ff 45%, #ffffff 100%)',
     position: 'relative',
     overflow: 'hidden',
     padding: '1.5rem',
     boxSizing: 'border-box',
-    fontFamily: 'inherit'
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   },
   bgGlowTop: {
     position: 'absolute',
-    top: '-15%',
+    top: '-20%',
     left: '50%',
     transform: 'translateX(-50%)',
-    width: '600px',
-    height: '400px',
-    background: 'radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, rgba(0,0,0,0) 70%)',
+    width: '700px',
+    height: '450px',
+    background: 'radial-gradient(circle, rgba(37, 99, 235, 0.14) 0%, rgba(255, 255, 255, 0) 70%)',
     pointerEvents: 'none',
     zIndex: 0
   },
   bgGlowBottom: {
     position: 'absolute',
-    bottom: '-10%',
+    bottom: '-15%',
     right: '10%',
-    width: '500px',
-    height: '350px',
-    background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, rgba(0,0,0,0) 70%)',
+    width: '600px',
+    height: '400px',
+    background: 'radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(255, 255, 255, 0) 70%)',
     pointerEvents: 'none',
     zIndex: 0
   },
@@ -229,11 +228,10 @@ const styles = {
     width: '100%',
     maxWidth: '440px',
     padding: '2.5rem 2rem',
-    borderRadius: '20px',
-    background: 'rgba(15, 23, 42, 0.75)',
-    backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(16, 185, 129, 0.15)',
+    borderRadius: '24px',
+    background: '#ffffff',
+    border: '1px solid #dbeafe',
+    boxShadow: '0 25px 50px -12px rgba(30, 64, 175, 0.15), 0 0 0 1px rgba(59, 130, 246, 0.06)',
     boxSizing: 'border-box'
   },
   badgeRow: {
@@ -245,25 +243,25 @@ const styles = {
   badge: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '0.4rem',
-    padding: '0.3rem 0.65rem',
+    gap: '0.45rem',
+    padding: '0.35rem 0.75rem',
     borderRadius: '20px',
-    background: 'rgba(16, 185, 129, 0.12)',
-    border: '1px solid rgba(16, 185, 129, 0.3)',
-    color: '#34d399',
-    fontSize: '0.68rem',
+    background: '#eff6ff',
+    border: '1px solid #bfdbfe',
+    color: '#1d4ed8',
+    fontSize: '0.7rem',
     fontWeight: 800,
-    letterSpacing: '0.05em'
+    letterSpacing: '0.04em'
   },
   copyLinkBtn: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '0.35rem',
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    borderRadius: '6px',
-    padding: '0.3rem 0.6rem',
-    color: '#94a3b8',
+    gap: '0.4rem',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    padding: '0.35rem 0.65rem',
+    color: '#475569',
     fontSize: '0.72rem',
     cursor: 'pointer',
     transition: 'all 0.15s ease'
@@ -273,42 +271,41 @@ const styles = {
     marginBottom: '2rem'
   },
   logoBadge: {
-    width: '56px',
-    height: '56px',
-    borderRadius: '16px',
-    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.3) 100%)',
-    border: '1px solid rgba(16, 185, 129, 0.35)',
+    width: '60px',
+    height: '60px',
+    borderRadius: '18px',
+    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    margin: '0 auto 1rem auto',
-    boxShadow: '0 8px 20px rgba(16, 185, 129, 0.2)'
+    margin: '0 auto 1.1rem auto',
+    boxShadow: '0 10px 22px rgba(37, 99, 235, 0.35)'
   },
   title: {
-    fontSize: '1.65rem',
+    fontSize: '1.75rem',
     fontWeight: 800,
-    color: '#ffffff',
-    margin: '0 0 0.4rem 0',
+    color: '#0f172a',
+    margin: '0 0 0.45rem 0',
     letterSpacing: '-0.02em'
   },
   subtitle: {
-    fontSize: '0.85rem',
-    color: '#94a3b8',
+    fontSize: '0.88rem',
+    color: '#64748b',
     margin: 0,
-    lineHeight: 1.4
+    lineHeight: 1.45
   },
   errorContainer: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.6rem',
-    background: 'rgba(239, 68, 68, 0.12)',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
-    color: '#fca5a5',
-    padding: '0.75rem 1rem',
-    borderRadius: '10px',
-    fontSize: '0.82rem',
-    marginBottom: '1.25rem',
-    lineHeight: 1.3
+    gap: '0.65rem',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    color: '#b91c1c',
+    padding: '0.8rem 1rem',
+    borderRadius: '12px',
+    fontSize: '0.83rem',
+    marginBottom: '1.35rem',
+    lineHeight: 1.35
   },
   form: {
     display: 'flex',
@@ -318,12 +315,12 @@ const styles = {
   inputGroup: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.4rem'
+    gap: '0.45rem'
   },
   label: {
-    fontSize: '0.75rem',
+    fontSize: '0.74rem',
     fontWeight: 700,
-    color: '#cbd5e1',
+    color: '#1e293b',
     textTransform: 'uppercase',
     letterSpacing: '0.04em'
   },
@@ -331,35 +328,37 @@ const styles = {
     position: 'relative',
     display: 'flex',
     alignItems: 'center',
-    background: 'rgba(30, 41, 59, 0.6)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    borderRadius: '10px',
-    transition: 'border-color 0.15s ease',
+    background: '#f8fafc',
+    border: '1.5px solid #cbd5e1',
+    borderRadius: '12px',
+    transition: 'all 0.15s ease',
     overflow: 'hidden'
   },
   inputIcon: {
     position: 'absolute',
     left: '12px',
-    color: '#64748b',
+    color: '#2563eb',
     pointerEvents: 'none'
   },
   input: {
     width: '100%',
-    padding: '0.75rem 1rem 0.75rem 2.5rem',
+    padding: '0.82rem 1rem 0.82rem 2.6rem',
     background: 'transparent',
     border: 'none',
-    color: '#ffffff',
-    fontSize: '0.92rem',
+    color: '#0f172a',
+    fontSize: '0.94rem',
+    fontWeight: 500,
     outline: 'none',
     boxSizing: 'border-box'
   },
   inputPassword: {
     width: '100%',
-    padding: '0.75rem 2.8rem 0.75rem 2.5rem',
+    padding: '0.82rem 2.8rem 0.82rem 2.6rem',
     background: 'transparent',
     border: 'none',
-    color: '#ffffff',
-    fontSize: '0.92rem',
+    color: '#0f172a',
+    fontSize: '0.94rem',
+    fontWeight: 500,
     outline: 'none',
     boxSizing: 'border-box'
   },
@@ -372,28 +371,28 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '4px'
+    padding: '5px'
   },
   submitBtn: {
     marginTop: '0.5rem',
-    padding: '0.85rem 1.25rem',
-    borderRadius: '10px',
+    padding: '0.9rem 1.25rem',
+    borderRadius: '12px',
     border: 'none',
-    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
     color: '#ffffff',
     fontSize: '0.95rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '0.5rem',
-    boxShadow: '0 4px 16px rgba(16, 185, 129, 0.35)',
+    gap: '0.6rem',
+    boxShadow: '0 8px 24px rgba(37, 99, 235, 0.35)',
     transition: 'all 0.15s ease'
   },
   spinner: {
     width: '18px',
     height: '18px',
-    border: '2px solid rgba(255, 255, 255, 0.3)',
+    border: '2px solid rgba(255, 255, 255, 0.35)',
     borderTopColor: '#ffffff',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite'
@@ -403,24 +402,24 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '1rem',
-    borderTop: '1px solid rgba(255, 255, 255, 0.07)',
+    gap: '0.9rem',
+    borderTop: '1px solid #e2e8f0',
     paddingTop: '1.25rem'
   },
   securityNote: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.4rem',
-    fontSize: '0.75rem',
+    gap: '0.45rem',
+    fontSize: '0.78rem',
     color: '#64748b'
   },
   switchBtn: {
     background: 'none',
     border: 'none',
-    color: '#94a3b8',
-    fontSize: '0.8rem',
+    color: '#475569',
+    fontSize: '0.82rem',
     cursor: 'pointer',
-    padding: '4px 8px',
+    padding: '5px 10px',
     borderRadius: '6px',
     transition: 'color 0.15s ease'
   }

@@ -97,9 +97,9 @@ export default function Login({ onLoginSuccess, onSwitchToClient }) {
             type="button"
             onClick={onSwitchToClient || (() => { window.location.hash = '#client-login'; })}
             style={{
-              background: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.28)',
-              color: '#34d399',
+              background: 'rgba(37, 99, 235, 0.12)',
+              border: '1px solid rgba(37, 99, 235, 0.35)',
+              color: '#60a5fa',
               padding: '0.55rem 1rem',
               borderRadius: '10px',
               fontSize: '0.82rem',

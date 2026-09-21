@@ -184,7 +184,7 @@ export default function ClientPortal({ client, onLogout }) {
       <header style={styles.header}>
         <div style={styles.headerLeft}>
           <div style={styles.logoBadge}>
-            <Building2 size={20} color="#10b981" />
+            <Building2 size={20} color="#ffffff" />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -206,7 +206,7 @@ export default function ClientPortal({ client, onLogout }) {
               />
             ) : (
               <div style={styles.avatarFallback}>
-                <User size={16} color="#10b981" />
+                <User size={16} color="#2563eb" />
               </div>
             )}
             <div style={styles.clientMeta}>
@@ -236,7 +236,7 @@ export default function ClientPortal({ client, onLogout }) {
               {clientData.image ? (
                 <img src={clientData.image} alt="Logo" style={styles.welcomeAvatar} />
               ) : (
-                <Building2 size={32} color="#10b981" />
+                <Building2 size={32} color="#2563eb" />
               )}
             </div>
             <div>
@@ -330,9 +330,9 @@ export default function ClientPortal({ client, onLogout }) {
               </div>
             ) : filteredOrders.length === 0 ? (
               <div style={styles.emptyState}>
-                <Package size={42} color="#64748b" style={{ opacity: 0.5, marginBottom: '0.8rem' }} />
-                <h4 style={{ margin: '0 0 0.3rem 0', color: '#fff' }}>No Orders Found</h4>
-                <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.85rem' }}>
+                <Package size={42} color="#94a3b8" style={{ opacity: 0.7, marginBottom: '0.8rem' }} />
+                <h4 style={{ margin: '0 0 0.3rem 0', color: '#0f172a' }}>No Orders Found</h4>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
                   {searchOrder ? 'No orders match your search term.' : `No orders currently assigned to "${partyCode}".`}
                 </p>
               </div>
@@ -373,14 +373,14 @@ export default function ClientPortal({ client, onLogout }) {
                         {ord.totalMtr ? (
                           <div style={styles.orderField}>
                             <span style={styles.fieldLabel}>Quantity</span>
-                            <span style={{ ...styles.fieldValue, color: '#34d399', fontWeight: 800 }}>
+                            <span style={{ ...styles.fieldValue, color: '#1d4ed8', fontWeight: 800 }}>
                               {ord.totalMtr} Mtrs
                             </span>
                           </div>
                         ) : ord.pcs ? (
                           <div style={styles.orderField}>
                             <span style={styles.fieldLabel}>Quantity</span>
-                            <span style={{ ...styles.fieldValue, color: '#34d399', fontWeight: 800 }}>
+                            <span style={{ ...styles.fieldValue, color: '#1d4ed8', fontWeight: 800 }}>
                               {ord.pcs} Pcs
                             </span>
                           </div>
@@ -433,9 +433,9 @@ export default function ClientPortal({ client, onLogout }) {
               </div>
             ) : filteredDesigns.length === 0 ? (
               <div style={styles.emptyState}>
-                <Palette size={42} color="#64748b" style={{ opacity: 0.5, marginBottom: '0.8rem' }} />
-                <h4 style={{ margin: '0 0 0.3rem 0', color: '#fff' }}>No Catalogue Designs Found</h4>
-                <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.85rem' }}>
+                <Palette size={42} color="#94a3b8" style={{ opacity: 0.7, marginBottom: '0.8rem' }} />
+                <h4 style={{ margin: '0 0 0.3rem 0', color: '#0f172a' }}>No Catalogue Designs Found</h4>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>
                   {searchDesign ? 'No designs match your search term.' : `No catalogue designs tagged for party "${partyCode}".`}
                 </p>
               </div>
@@ -504,20 +504,20 @@ export default function ClientPortal({ client, onLogout }) {
           <div style={styles.tabContent}>
             <div style={styles.profileCard}>
               <h3 style={styles.profileSectionHeading}>
-                <Building2 size={18} color="#10b981" />
+                <Building2 size={18} color="#2563eb" />
                 <span>Company Profile & Logo</span>
               </h3>
 
               {profileMessage && (
                 <div style={styles.alertSuccess}>
-                  <CheckCircle2 size={16} color="#10b981" />
+                  <CheckCircle2 size={16} color="#2563eb" />
                   <span>{profileMessage}</span>
                 </div>
               )}
 
               {profileError && (
                 <div style={styles.alertDanger}>
-                  <AlertCircle size={16} color="#ef4444" />
+                  <AlertCircle size={16} color="#dc2626" />
                   <span>{profileError}</span>
                 </div>
               )}
@@ -533,8 +533,8 @@ export default function ClientPortal({ client, onLogout }) {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <h4 style={{ margin: 0, color: '#fff', fontSize: '1rem' }}>Company Logo / Avatar</h4>
-                  <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.8rem' }}>
+                  <h4 style={{ margin: 0, color: '#0f172a', fontSize: '1rem' }}>Company Logo / Avatar</h4>
+                  <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>
                     Upload your official company logo. Stored securely on Cloudflare R2.
                   </p>
 
@@ -567,7 +567,7 @@ export default function ClientPortal({ client, onLogout }) {
 
                 <div style={styles.detailItem}>
                   <label style={styles.detailLabel}>Assigned Party Code</label>
-                  <div style={{ ...styles.detailVal, color: '#10b981', fontWeight: 800 }}>{partyCode || '—'}</div>
+                  <div style={{ ...styles.detailVal, color: '#1d4ed8', fontWeight: 800 }}>{partyCode || '—'}</div>
                 </div>
 
                 <div style={styles.detailItem}>
@@ -582,9 +582,9 @@ export default function ClientPortal({ client, onLogout }) {
               </div>
 
               {/* Change Password Form */}
-              <div style={{ marginTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1.5rem' }}>
-                <h4 style={{ margin: '0 0 1rem 0', color: '#fff', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Key size={16} color="#3b82f6" />
+              <div style={{ marginTop: '2rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
+                <h4 style={{ margin: '0 0 1rem 0', color: '#0f172a', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Key size={16} color="#2563eb" />
                   <span>Update Account Password</span>
                 </h4>
 
@@ -644,31 +644,31 @@ export default function ClientPortal({ client, onLogout }) {
 function getStatusColor(status = '') {
   const s = String(status).toLowerCase();
   if (s.includes('complete') || s.includes('dispatch') || s.includes('deliver')) {
-    return { bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399', border: 'rgba(16, 185, 129, 0.3)' };
+    return { bg: '#ecfdf5', text: '#047857', border: '#a7f3d0' };
   }
   if (s.includes('print') || s.includes('stitch') || s.includes('process')) {
-    return { bg: 'rgba(59, 130, 246, 0.15)', text: '#60a5fa', border: 'rgba(59, 130, 246, 0.3)' };
+    return { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' };
   }
   if (s.includes('pend') || s.includes('hold')) {
-    return { bg: 'rgba(245, 158, 11, 0.15)', text: '#fbbf24', border: 'rgba(245, 158, 11, 0.3)' };
+    return { bg: '#fffbeb', text: '#b45309', border: '#fde68a' };
   }
-  return { bg: 'rgba(255, 255, 255, 0.08)', text: '#e2e8f0', border: 'rgba(255, 255, 255, 0.15)' };
+  return { bg: '#f8fafc', text: '#475569', border: '#e2e8f0' };
 }
 
 const styles = {
   container: {
     minHeight: '100vh',
-    background: '#0a0f1d',
-    color: '#e2e8f0',
-    fontFamily: 'inherit',
+    background: '#f8fafc',
+    color: '#0f172a',
+    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     display: 'flex',
     flexDirection: 'column'
   },
   header: {
     padding: '0.9rem 1.75rem',
-    background: 'rgba(15, 23, 42, 0.85)',
-    backdropFilter: 'blur(16px)',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+    background: '#ffffff',
+    borderBottom: '1px solid #e2e8f0',
+    boxShadow: '0 2px 8px rgba(30, 58, 138, 0.04)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -685,32 +685,32 @@ const styles = {
     width: '38px',
     height: '38px',
     borderRadius: '10px',
-    background: 'rgba(16, 185, 129, 0.15)',
-    border: '1px solid rgba(16, 185, 129, 0.3)',
+    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
   },
   brandTitle: {
     margin: 0,
     fontSize: '1.15rem',
     fontWeight: 800,
-    color: '#ffffff'
+    color: '#0f172a'
   },
   clientTag: {
     fontSize: '0.62rem',
     fontWeight: 800,
-    padding: '1px 6px',
-    borderRadius: '4px',
-    background: 'rgba(16, 185, 129, 0.15)',
-    color: '#34d399',
-    border: '1px solid rgba(16, 185, 129, 0.3)',
+    padding: '2px 7px',
+    borderRadius: '6px',
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    border: '1px solid #bfdbfe',
     letterSpacing: '0.04em'
   },
   brandSubtitle: {
     margin: 0,
     fontSize: '0.72rem',
-    color: '#94a3b8'
+    color: '#64748b'
   },
   headerRight: {
     display: 'flex',
@@ -721,22 +721,23 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '0.65rem',
-    background: 'rgba(255, 255, 255, 0.05)',
+    background: '#f8fafc',
     padding: '0.35rem 0.75rem',
     borderRadius: '30px',
-    border: '1px solid rgba(255, 255, 255, 0.1)'
+    border: '1px solid #e2e8f0'
   },
   avatarImg: {
     width: '30px',
     height: '30px',
     borderRadius: '50%',
-    objectFit: 'cover'
+    objectFit: 'cover',
+    border: '1.5px solid #bfdbfe'
   },
   avatarFallback: {
     width: '30px',
     height: '30px',
     borderRadius: '50%',
-    background: 'rgba(16, 185, 129, 0.15)',
+    background: '#dbeafe',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center'
@@ -748,12 +749,12 @@ const styles = {
   clientName: {
     fontSize: '0.8rem',
     fontWeight: 700,
-    color: '#ffffff',
+    color: '#0f172a',
     lineHeight: 1.1
   },
   clientCode: {
     fontSize: '0.68rem',
-    color: '#94a3b8'
+    color: '#64748b'
   },
   logoutBtn: {
     display: 'flex',
@@ -761,9 +762,9 @@ const styles = {
     gap: '0.4rem',
     padding: '0.45rem 0.85rem',
     borderRadius: '8px',
-    background: 'rgba(239, 68, 68, 0.12)',
-    border: '1px solid rgba(239, 68, 68, 0.25)',
-    color: '#f87171',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    color: '#dc2626',
     cursor: 'pointer',
     fontSize: '0.8rem',
     fontWeight: 600,
@@ -778,8 +779,8 @@ const styles = {
     boxSizing: 'border-box'
   },
   welcomeCard: {
-    background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'linear-gradient(135deg, #ffffff 0%, #eff6ff 100%)',
+    border: '1px solid #bfdbfe',
     borderRadius: '16px',
     padding: '1.5rem',
     display: 'flex',
@@ -788,14 +789,14 @@ const styles = {
     flexWrap: 'wrap',
     gap: '1.25rem',
     marginBottom: '1.5rem',
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)'
+    boxShadow: '0 10px 25px -5px rgba(37, 99, 235, 0.08)'
   },
   welcomeAvatarWrap: {
     width: '64px',
     height: '64px',
     borderRadius: '16px',
-    background: 'rgba(16, 185, 129, 0.12)',
-    border: '1px solid rgba(16, 185, 129, 0.3)',
+    background: '#dbeafe',
+    border: '1.5px solid #93c5fd',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -809,24 +810,24 @@ const styles = {
   welcomeHeading: {
     fontSize: '1.35rem',
     fontWeight: 800,
-    color: '#ffffff',
+    color: '#0f172a',
     margin: 0
   },
   activePill: {
     fontSize: '0.68rem',
     fontWeight: 700,
-    background: 'rgba(16, 185, 129, 0.15)',
-    color: '#34d399',
+    background: '#eff6ff',
+    color: '#1d4ed8',
     padding: '2px 8px',
     borderRadius: '12px',
-    border: '1px solid rgba(16, 185, 129, 0.3)'
+    border: '1px solid #bfdbfe'
   },
   welcomeDetailsRow: {
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
     fontSize: '0.82rem',
-    color: '#94a3b8',
+    color: '#64748b',
     marginTop: '0.35rem',
     flexWrap: 'wrap'
   },
@@ -835,22 +836,23 @@ const styles = {
     gap: '0.85rem'
   },
   statBox: {
-    background: 'rgba(0, 0, 0, 0.25)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+    background: '#ffffff',
+    border: '1px solid #dbeafe',
     borderRadius: '12px',
     padding: '0.75rem 1.25rem',
     textAlign: 'center',
-    minWidth: '85px'
+    minWidth: '85px',
+    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.05)'
   },
   statNumber: {
     display: 'block',
     fontSize: '1.45rem',
     fontWeight: 800,
-    color: '#34d399'
+    color: '#1d4ed8'
   },
   statLabel: {
     fontSize: '0.7rem',
-    color: '#94a3b8',
+    color: '#64748b',
     textTransform: 'uppercase',
     letterSpacing: '0.04em'
   },
@@ -858,7 +860,7 @@ const styles = {
     display: 'flex',
     gap: '0.5rem',
     marginBottom: '1.25rem',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+    borderBottom: '1px solid #e2e8f0',
     paddingBottom: '0.5rem',
     overflowX: 'auto'
   },
@@ -870,7 +872,7 @@ const styles = {
     borderRadius: '10px',
     background: 'transparent',
     border: '1px solid transparent',
-    color: '#94a3b8',
+    color: '#64748b',
     fontSize: '0.88rem',
     fontWeight: 600,
     cursor: 'pointer',
@@ -883,9 +885,9 @@ const styles = {
     gap: '0.45rem',
     padding: '0.65rem 1.15rem',
     borderRadius: '10px',
-    background: 'rgba(16, 185, 129, 0.15)',
-    border: '1px solid rgba(16, 185, 129, 0.35)',
-    color: '#34d399',
+    background: '#eff6ff',
+    border: '1px solid #93c5fd',
+    color: '#1d4ed8',
     fontSize: '0.88rem',
     fontWeight: 700,
     cursor: 'pointer',
@@ -916,33 +918,35 @@ const styles = {
   },
   searchInput: {
     width: '100%',
-    padding: '0.55rem 0.8rem 0.55rem 2.2rem',
-    borderRadius: '8px',
-    background: 'rgba(30, 41, 59, 0.6)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    color: '#fff',
-    fontSize: '0.85rem',
+    padding: '0.6rem 0.85rem 0.6rem 2.3rem',
+    borderRadius: '10px',
+    background: '#ffffff',
+    border: '1.5px solid #cbd5e1',
+    color: '#0f172a',
+    fontSize: '0.88rem',
     boxSizing: 'border-box',
-    outline: 'none'
+    outline: 'none',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
   },
   refreshBtn: {
     display: 'flex',
     alignItems: 'center',
     gap: '0.35rem',
-    padding: '0.55rem 0.85rem',
-    borderRadius: '8px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    color: '#e2e8f0',
+    padding: '0.6rem 0.95rem',
+    borderRadius: '10px',
+    background: '#ffffff',
+    border: '1.5px solid #cbd5e1',
+    color: '#1e293b',
     fontSize: '0.82rem',
     fontWeight: 600,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
   },
   emptyState: {
     padding: '3rem 1.5rem',
     textAlign: 'center',
-    background: 'rgba(15, 23, 42, 0.6)',
-    border: '1px dashed rgba(255, 255, 255, 0.12)',
+    background: '#ffffff',
+    border: '1.5px dashed #cbd5e1',
     borderRadius: '16px'
   },
   ordersGrid: {
@@ -951,14 +955,14 @@ const styles = {
     gap: '1rem'
   },
   orderCard: {
-    background: 'rgba(30, 41, 59, 0.6)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    borderRadius: '12px',
-    padding: '1rem 1.15rem',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '14px',
+    padding: '1.1rem 1.25rem',
     display: 'flex',
     flexDirection: 'column',
     gap: '0.75rem',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+    boxShadow: '0 4px 14px rgba(30, 58, 138, 0.05)'
   },
   orderCardHeader: {
     display: 'flex',
@@ -969,25 +973,26 @@ const styles = {
     display: 'block',
     fontSize: '0.98rem',
     fontWeight: 800,
-    color: '#ffffff'
+    color: '#0f172a'
   },
   orderDate: {
     fontSize: '0.72rem',
-    color: '#94a3b8'
+    color: '#64748b'
   },
   statusBadge: {
     fontSize: '0.7rem',
     fontWeight: 800,
-    padding: '2px 8px',
+    padding: '3px 8px',
     borderRadius: '6px'
   },
   orderBody: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: '0.5rem',
-    background: 'rgba(0, 0, 0, 0.2)',
-    padding: '0.6rem 0.75rem',
-    borderRadius: '8px'
+    background: '#f8fafc',
+    border: '1px solid #f1f5f9',
+    padding: '0.65rem 0.85rem',
+    borderRadius: '10px'
   },
   orderField: {
     display: 'flex',
@@ -995,19 +1000,19 @@ const styles = {
   },
   fieldLabel: {
     fontSize: '0.65rem',
-    color: '#94a3b8',
+    color: '#64748b',
     textTransform: 'uppercase'
   },
   fieldValue: {
-    fontSize: '0.82rem',
+    fontSize: '0.84rem',
     fontWeight: 600,
-    color: '#ffffff'
+    color: '#0f172a'
   },
   orderNotes: {
     fontSize: '0.75rem',
-    color: '#cbd5e1',
+    color: '#475569',
     fontStyle: 'italic',
-    borderTop: '1px dashed rgba(255,255,255,0.08)',
+    borderTop: '1px dashed #e2e8f0',
     paddingTop: '0.4rem'
   },
   designsGrid: {
@@ -1016,21 +1021,22 @@ const styles = {
     gap: '1rem'
   },
   designCard: {
-    background: 'rgba(30, 41, 59, 0.6)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    borderRadius: '12px',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: '14px',
     overflow: 'hidden',
     display: 'flex',
-    flexDirection: 'column'
+    flexDirection: 'column',
+    boxShadow: '0 4px 14px rgba(30, 58, 138, 0.05)'
   },
   designImgBox: {
     height: '180px',
-    background: '#04070d',
+    background: '#f1f5f9',
     cursor: 'pointer',
     position: 'relative'
   },
   designInfo: {
-    padding: '0.85rem',
+    padding: '0.9rem',
     display: 'flex',
     flexDirection: 'column',
     gap: '0.5rem'
@@ -1038,15 +1044,16 @@ const styles = {
   designTitle: {
     fontSize: '0.95rem',
     fontWeight: 800,
-    color: '#10b981'
+    color: '#1d4ed8'
   },
   designCat: {
     fontSize: '0.65rem',
     fontWeight: 700,
-    background: 'rgba(139,92,246,0.2)',
-    color: '#c4b5fd',
-    padding: '2px 6px',
-    borderRadius: '4px'
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    border: '1px solid #bfdbfe',
+    padding: '2px 7px',
+    borderRadius: '6px'
   },
   designMetaGrid: {
     display: 'grid',
@@ -1057,24 +1064,25 @@ const styles = {
   metaLabel: {
     display: 'block',
     fontSize: '0.62rem',
-    color: '#94a3b8',
+    color: '#64748b',
     textTransform: 'uppercase'
   },
   metaVal: {
     fontWeight: 600,
-    color: '#ffffff'
+    color: '#0f172a'
   },
   profileCard: {
-    background: 'rgba(30, 41, 59, 0.6)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
     borderRadius: '16px',
-    padding: '1.75rem'
+    padding: '1.75rem',
+    boxShadow: '0 4px 16px rgba(30, 58, 138, 0.05)'
   },
   profileSectionHeading: {
     margin: '0 0 1.25rem 0',
     fontSize: '1.1rem',
     fontWeight: 800,
-    color: '#fff',
+    color: '#0f172a',
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem'
@@ -1083,11 +1091,11 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
-    background: 'rgba(16, 185, 129, 0.15)',
-    border: '1px solid rgba(16, 185, 129, 0.3)',
-    color: '#34d399',
+    background: '#ecfdf5',
+    border: '1px solid #a7f3d0',
+    color: '#047857',
     padding: '0.75rem 1rem',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '0.85rem',
     marginBottom: '1rem'
   },
@@ -1095,11 +1103,11 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
-    background: 'rgba(239, 68, 68, 0.15)',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
-    color: '#f87171',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    color: '#dc2626',
     padding: '0.75rem 1rem',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '0.85rem',
     marginBottom: '1rem'
   },
@@ -1113,8 +1121,8 @@ const styles = {
     width: '90px',
     height: '90px',
     borderRadius: '20px',
-    background: 'rgba(0, 0, 0, 0.3)',
-    border: '2px solid rgba(16, 185, 129, 0.35)',
+    background: '#eff6ff',
+    border: '2px solid #bfdbfe',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1129,21 +1137,23 @@ const styles = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '0.4rem',
-    padding: '0.5rem 0.9rem',
-    borderRadius: '8px',
-    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    padding: '0.55rem 1rem',
+    borderRadius: '10px',
+    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
     color: '#fff',
     border: 'none',
     fontSize: '0.82rem',
     fontWeight: 700,
     cursor: 'pointer',
-    width: 'fit-content'
+    width: 'fit-content',
+    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
   },
   detailsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
     gap: '1rem',
-    background: 'rgba(0,0,0,0.2)',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
     padding: '1.25rem',
     borderRadius: '12px'
   },
@@ -1154,44 +1164,45 @@ const styles = {
   },
   detailLabel: {
     fontSize: '0.7rem',
-    color: '#94a3b8',
+    color: '#64748b',
     textTransform: 'uppercase',
     fontWeight: 700
   },
   detailVal: {
     fontSize: '0.92rem',
-    color: '#fff',
+    color: '#0f172a',
     fontWeight: 600
   },
   formLabel: {
     fontSize: '0.75rem',
     fontWeight: 700,
-    color: '#cbd5e1'
+    color: '#1e293b'
   },
   formInput: {
-    padding: '0.65rem 0.85rem',
-    borderRadius: '8px',
-    background: 'rgba(15, 23, 42, 0.8)',
-    border: '1px solid rgba(255, 255, 255, 0.12)',
-    color: '#fff',
-    fontSize: '0.85rem',
+    padding: '0.7rem 0.9rem',
+    borderRadius: '10px',
+    background: '#ffffff',
+    border: '1.5px solid #cbd5e1',
+    color: '#0f172a',
+    fontSize: '0.88rem',
     outline: 'none'
   },
   savePasswordBtn: {
     marginTop: '0.5rem',
-    padding: '0.65rem 1rem',
-    borderRadius: '8px',
-    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+    padding: '0.7rem 1.15rem',
+    borderRadius: '10px',
+    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
     color: '#fff',
     border: 'none',
     fontWeight: 700,
-    fontSize: '0.85rem',
-    cursor: 'pointer'
+    fontSize: '0.88rem',
+    cursor: 'pointer',
+    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)'
   },
   zoomOverlay: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(0, 0, 0, 0.85)',
+    background: 'rgba(15, 23, 42, 0.8)',
     backdropFilter: 'blur(8px)',
     display: 'flex',
     alignItems: 'center',
@@ -1208,8 +1219,8 @@ const styles = {
     maxWidth: '100%',
     maxHeight: '90vh',
     objectFit: 'contain',
-    borderRadius: '8px',
-    boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
+    borderRadius: '12px',
+    boxShadow: '0 20px 50px rgba(0,0,0,0.4)'
   },
   closeZoomBtn: {
     position: 'absolute',
@@ -1220,12 +1231,12 @@ const styles = {
     borderRadius: '50%',
     background: '#ffffff',
     color: '#0f172a',
-    border: 'none',
+    border: '1px solid #e2e8f0',
     fontWeight: 800,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
   }
 };
