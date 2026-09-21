@@ -157,15 +157,24 @@ app.get(['/v1/designs/:filename', '/designs/:filename'], async (req, res, next) 
       if (!fs.existsSync(sDir)) continue;
       const files = fs.readdirSync(sDir);
       const targetUpper = cleanName.toUpperCase();
-      const matchedFile = files.find(f => {
+
+      // Pass 1: EXACT match MUST always take precedence (prevents ED-487(1).jpg from overriding ED-487.jpg)
+      let matchedFile = files.find(f => {
         if (f.startsWith('.')) return false;
         const fBase = f.replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '').trim().toUpperCase();
-        return fBase === targetUpper ||
-               fBase === filename.toUpperCase() ||
-               fBase.startsWith(targetUpper + ' ') ||
-               fBase.startsWith(targetUpper + '(') ||
-               fBase.startsWith(targetUpper + '-');
+        return fBase === targetUpper || f.toUpperCase() === filename.toUpperCase();
       });
+
+      // Pass 2: Variation / prefix match ONLY if exact match was not found
+      if (!matchedFile) {
+        matchedFile = files.find(f => {
+          if (f.startsWith('.')) return false;
+          const fBase = f.replace(/\.(jpg|jpeg|png|webp|gif|svg)$/i, '').trim().toUpperCase();
+          return fBase.startsWith(targetUpper + ' ') ||
+                 fBase.startsWith(targetUpper + '(') ||
+                 fBase.startsWith(targetUpper + '-');
+        });
+      }
 
       if (matchedFile) {
         const fullPath = path.join(sDir, matchedFile);

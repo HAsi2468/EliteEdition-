@@ -51,8 +51,9 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
   const formatMaterialDetailsString = (t) => {
     if (!t.materialName) return '-';
     const nameLower = t.materialName.toLowerCase();
+    const isPaperGrade = ['a++', 'a+', 'a'].includes(nameLower);
     const details = [];
-    if (nameLower.includes('sublimation')) {
+    if (nameLower.includes('sublimation') || isPaperGrade) {
       if (t.panna) details.push(`Panna: ${t.panna}`);
       if (t.paperQuality) details.push(`Qual: ${t.paperQuality}`);
       if (t.metersPerRoll) details.push(`${t.metersPerRoll}m`);
@@ -63,7 +64,8 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
       if (t.color) details.push(t.color);
       if (t.canSize) details.push(`${t.canSize} Ltr`);
     }
-    return details.length > 0 ? `${t.materialName} (${details.join(', ')})` : t.materialName;
+    const displayName = isPaperGrade ? `Sublimation Paper (${t.materialName})` : t.materialName;
+    return details.length > 0 ? `${displayName} (${details.join(', ')})` : displayName;
   };
 
   const handleExportCsv = () => {
@@ -388,10 +390,15 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
     fetchStock();
   }, [stockPreset, stockDateStart, stockDateEnd, customStockStart, customStockEnd]);
 
+  const isSublimationTab = (tab) => {
+    const t = String(tab || '').trim().toLowerCase();
+    return t.includes('sublimation') || ['a++', 'a+', 'a'].includes(t);
+  };
+
   // Helper to get defaults for a material
   const getMaterialDefaults = (materialName, configData) => {
     const val = materialName || '';
-    const isSublimation = val.toLowerCase().includes('sublimation');
+    const isSublimation = isSublimationTab(val);
     const isButter = val.toLowerCase().includes('butter');
     const isGrando = val.toLowerCase().includes('grando');
     const isPrintdot = val.toLowerCase().includes('printdot');
@@ -498,7 +505,8 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
     if (!qty || Number(qty) <= 0) {
       return 'Please enter a valid quantity.';
     }
-    const isSublimation = tabName.toLowerCase().includes('sublimation');
+    const isPaperGrade = ['a++', 'a+', 'a'].includes((tabName || '').toLowerCase());
+    const isSublimation = tabName.toLowerCase().includes('sublimation') || isPaperGrade;
     const isButter = tabName.toLowerCase().includes('butter');
     const isGrando = tabName.toLowerCase().includes('grando');
     const isPrintdot = tabName.toLowerCase().includes('printdot');
@@ -786,10 +794,11 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
     if (!materialName) return false;
     const name = String(materialName).trim().toLowerCase();
     const target = String(filterType).trim().toLowerCase();
+    const isPaperGrade = ['a++', 'a+', 'a'].includes(name);
     if (target === 'ink' || target === 'all inks') return name.includes('ink');
-    if (target === 'paper' || target === 'all papers') return name.includes('paper');
+    if (target === 'paper' || target === 'all papers') return name.includes('paper') || isPaperGrade;
     if (target === 'butter paper' || target === 'butter') return name.includes('butter');
-    if (target === 'sublimation paper' || target === 'sublimation') return name.includes('sublimation');
+    if (target === 'sublimation paper' || target === 'sublimation') return name.includes('sublimation') || isPaperGrade;
     return name.includes(target) || target.includes(name);
   };
 
@@ -865,22 +874,30 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
 
   const renderMaterialCell = (t) => {
     const nameLower = (t.materialName || '').toLowerCase();
+    const isPaperGrade = ['a++', 'a+', 'a'].includes(nameLower);
     const details = [];
-    if (nameLower.includes('sublimation')) {
-      if (t.panna) details.push(`Panna: ${t.panna}`);
+    if (nameLower.includes('sublimation') || isPaperGrade) {
       if (t.paperQuality) details.push(`Qual: ${t.paperQuality}`);
       if (t.metersPerRoll) details.push(`${t.metersPerRoll}m`);
     } else if (nameLower.includes('butter')) {
-      if (t.panna) details.push(`Panna: ${t.panna}`);
       if (t.metersPerRoll) details.push(`${t.metersPerRoll}m`);
     } else if (nameLower.includes('ink')) {
       if (t.color) details.push(t.color);
       if (t.canSize) details.push(`${t.canSize} Ltr`);
     }
     
+    const title = isPaperGrade ? `Sublimation Paper (${t.materialName})` : t.materialName;
+
     return (
       <div>
-        <div style={{ fontWeight: '700' }}>{t.materialName}</div>
+        <div style={{ fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+          <span>{title}</span>
+          {t.panna && (
+            <span style={{ fontSize: '0.72rem', background: 'rgba(59, 130, 246, 0.18)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.35)', borderRadius: '4px', padding: '1px 6px', fontWeight: 600 }}>
+              📐 {t.panna}
+            </span>
+          )}
+        </div>
         {details.length > 0 && (
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
             {details.join(' • ')}
@@ -892,7 +909,8 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
 
   const renderDynamicFormFields = (formType, formVal, setFormVal) => {
     const val = formVal.materialName || '';
-    const isSublimation = val.toLowerCase().includes('sublimation');
+    const isPaperGrade = ['a++', 'a+', 'a'].includes(val.toLowerCase());
+    const isSublimation = val.toLowerCase().includes('sublimation') || isPaperGrade;
     const isButter = val.toLowerCase().includes('butter');
     const isInk = val.toLowerCase().includes('ink');
     const isGrando = val.toLowerCase().includes('grando');
@@ -1138,7 +1156,9 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '1rem' }}>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {item.metersPerRoll ? (
+                        {item.totalMeters !== undefined && item.totalMeters !== null ? (
+                          <>Total: <strong>{item.totalMeters}m</strong> ({item.currentStock} rolls)</>
+                        ) : item.metersPerRoll ? (
                           <>Total: <strong>{item.currentStock * item.metersPerRoll}m</strong> ({item.currentStock} rolls)</>
                         ) : item.canSize ? (
                           <>Total: <strong>{item.currentStock * item.canSize} Ltr</strong> ({item.currentStock} {item.unit || 'Cans'})</>
@@ -1541,7 +1561,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
               </div>
 
               {/* Sublimation Paper Form Fields */}
-              {inwardTab.toLowerCase().includes('sublimation') && (
+              {isSublimationTab(inwardTab) && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ display: 'flex', gap: '1rem' }}>
                     <div style={{ flex: 1 }}>
@@ -1661,7 +1681,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
               )}
 
               {/* Other Custom Materials Form Fields */}
-              {!inwardTab.toLowerCase().includes('sublimation') &&
+              {!isSublimationTab(inwardTab) &&
                !inwardTab.toLowerCase().includes('butter') &&
                !inwardTab.toLowerCase().includes('grando') &&
                !inwardTab.toLowerCase().includes('printdot') && (
@@ -1851,7 +1871,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
               </div>
 
               {/* Sublimation Paper Form Fields */}
-              {outwardTab.toLowerCase().includes('sublimation') && (
+              {isSublimationTab(outwardTab) && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={{ display: 'flex', gap: '1rem' }}>
                     <div style={{ flex: 1 }}>
@@ -1971,7 +1991,7 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
               )}
 
               {/* Other Custom Materials Form Fields */}
-              {!outwardTab.toLowerCase().includes('sublimation') &&
+              {!isSublimationTab(outwardTab) &&
                !outwardTab.toLowerCase().includes('butter') &&
                !outwardTab.toLowerCase().includes('grando') &&
                !outwardTab.toLowerCase().includes('printdot') && (

@@ -6,17 +6,17 @@ const path = require('path');
 const formatMaterialDetails = (t) => {
   if (!t.materialName) return '-';
   const nameLower = t.materialName.toLowerCase();
-  if (nameLower.includes('sublimation')) {
+  const isPaper = ['a++', 'a+', 'a'].includes(nameLower) ||
+                  nameLower.includes('sublimation') ||
+                  nameLower.includes('paper') ||
+                  nameLower.includes('butter');
+  if (isPaper) {
     const details = [];
     if (t.panna) details.push(`Panna: ${t.panna}`);
-    if (t.paperQuality) details.push(`Qual: ${t.paperQuality}`);
+    if (t.paperQuality && t.paperQuality !== t.materialName) details.push(`Qual: ${t.paperQuality}`);
     if (t.metersPerRoll) details.push(`${t.metersPerRoll}m`);
-    return details.length > 0 ? `${t.materialName} (${details.join(', ')})` : t.materialName;
-  } else if (nameLower.includes('butter')) {
-    const details = [];
-    if (t.panna) details.push(`Panna: ${t.panna}`);
-    if (t.metersPerRoll) details.push(`${t.metersPerRoll}m`);
-    return details.length > 0 ? `${t.materialName} (${details.join(', ')})` : t.materialName;
+    const prefix = ['a++', 'a+', 'a'].includes(nameLower) ? `Sublimation Paper (${t.materialName})` : t.materialName;
+    return details.length > 0 ? `${prefix} (${details.join(', ')})` : prefix;
   } else if (nameLower.includes('ink')) {
     const details = [];
     if (t.color) details.push(t.color);
@@ -186,7 +186,13 @@ const getTransactions = async (req, res) => {
   }
 };
 
-// Get current stock overview grouped by material name
+const normalizePannaStr = (val) => {
+  if (!val) return '';
+  const num = String(val).replace(/[^0-9]/g, '');
+  return num ? `${num}" Panna` : String(val).trim();
+};
+
+// Get current stock overview grouped by material name and panna
 const getStockOverview = async (req, res) => {
   try {
     const { companyEntity, dateStart, dateEnd } = req.query;
@@ -212,48 +218,64 @@ const getStockOverview = async (req, res) => {
       }
     }
 
-    const pipeline = [
-      { $match: matchStage },
-      {
-        $group: {
-          _id: {
-            materialName: '$materialName',
-            panna: '$panna',
-            paperQuality: '$paperQuality',
-            color: '$color',
-            canSize: '$canSize',
-            metersPerRoll: '$metersPerRoll'
-          },
-          totalInward: {
-            $sum: { $cond: [{ $eq: ['$type', 'INWARD'] }, '$qty', 0] }
-          },
-          totalOutward: {
-            $sum: { $cond: [{ $eq: ['$type', 'OUTWARD'] }, '$qty', 0] }
-          },
-          unit: { $first: '$unit' } // Get unit label
-        }
-      },
-      {
-        $project: {
-          materialName: '$_id.materialName',
-          panna: '$_id.panna',
-          paperQuality: '$_id.paperQuality',
-          color: '$_id.color',
-          canSize: '$_id.canSize',
-          metersPerRoll: '$_id.metersPerRoll',
-          totalInward: 1,
-          totalOutward: 1,
-          currentStock: { $subtract: ['$totalInward', '$totalOutward'] },
-          unit: 1,
-          _id: 0
-        }
-      },
-      {
-        $sort: { materialName: 1, panna: 1, paperQuality: 1, color: 1 }
-      }
-    ];
+    const txs = await RawMaterialTransaction.find(matchStage).lean();
+    const map = {};
 
-    const stock = await RawMaterialTransaction.aggregate(pipeline);
+    for (const t of txs) {
+      const matName = (t.materialName || '').trim();
+      const isInk = matName.toLowerCase().includes('ink');
+      const isPaper = ['a++', 'a+', 'a'].includes(matName.toLowerCase()) ||
+                      matName.toLowerCase().includes('paper') ||
+                      matName.toLowerCase().includes('sublimation') ||
+                      matName.toLowerCase().includes('butter');
+
+      let normPanna = '';
+      if (isPaper || t.panna) {
+        normPanna = normalizePannaStr(t.panna) || '58" Panna';
+      }
+
+      // Group key: Inks group by materialName + color, Papers group by materialName + normPanna
+      const key = isInk
+        ? `${matName}___${(t.color || '').trim()}`
+        : `${matName}___${normPanna}`;
+
+      if (!map[key]) {
+        map[key] = {
+          materialName: matName,
+          panna: normPanna,
+          paperQuality: t.paperQuality || '',
+          color: t.color || '',
+          canSize: t.canSize || null,
+          metersPerRoll: t.metersPerRoll || (isPaper ? 1000 : null),
+          totalInward: 0,
+          totalOutward: 0,
+          totalInwardMtr: 0,
+          totalOutwardMtr: 0,
+          unit: t.unit || (isInk ? 'Liters' : 'Rolls')
+        };
+      }
+
+      const qty = Number(t.qty) || 0;
+      const mtr = qty * (Number(t.metersPerRoll) || 0);
+
+      if (t.type === 'INWARD') {
+        map[key].totalInward += qty;
+        map[key].totalInwardMtr += mtr;
+      } else {
+        map[key].totalOutward += qty;
+        map[key].totalOutwardMtr += mtr;
+      }
+    }
+
+    const stock = Object.values(map).map(item => {
+      item.currentStock = item.totalInward - item.totalOutward;
+      item.currentStockMtr = item.totalInwardMtr - item.totalOutwardMtr;
+      return item;
+    }).sort((a, b) => {
+      if (a.materialName !== b.materialName) return a.materialName.localeCompare(b.materialName);
+      return (a.panna || '').localeCompare(b.panna || '');
+    });
+
     res.status(200).json({ success: true, data: stock });
   } catch (error) {
     console.error('Error calculating raw material stock:', error);
