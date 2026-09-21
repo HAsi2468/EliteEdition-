@@ -47,10 +47,15 @@ const getLotInfo = async (req, res) => {
       data: {
         lotNo: tx.lotNo,
         vendorChallanNo: tx.challanNo || '',
+        challanNo: tx.challanNo || '',
         fabricName: tx.fabricQuality || '',
+        fabricQuality: tx.fabricQuality || '',
         shortagePct: tx.shortagePct != null ? tx.shortagePct : null,
         panna: tx.panna || '',
         vendorName: tx.vendorName || '',
+        qty: tx.qty || 0,
+        totalMtr: tx.qty || 0,
+        date: tx.date ? new Date(tx.date).toISOString().split('T')[0] : '',
       },
     });
   } catch (error) {

@@ -1132,6 +1132,25 @@ export const api = {
     return request(`/fabric/lot-stock${qs}`);
   },
 
+  // White Fabric QA Inspection Logs
+  async getWhiteFabricLogs(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    return request(`/fabric/white-qa-logs${qs}`);
+  },
+  async createWhiteFabricLog(data) {
+    return request('/fabric/white-qa-logs', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  async deleteWhiteFabricLog(id) {
+    return request(`/fabric/white-qa-logs/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
   async getFabricStockByPanna(params = {}) {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => { if (v) query.append(k, v); });
@@ -2149,6 +2168,27 @@ export const api = {
     return request('/signed-documents/bulk-approval', {
       method: 'PATCH',
       body: JSON.stringify({ items, action, rejectionReason })
+    });
+  },
+
+  // ── White Fabric QA Inspection Logs ──
+  async getWhiteFabricLogs(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.department) qs.set('department', params.department);
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return request(`/fabric/white-qa-logs${query}`);
+  },
+
+  async createWhiteFabricLog(payload) {
+    return request('/fabric/white-qa-logs', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  },
+
+  async deleteWhiteFabricLog(id) {
+    return request(`/fabric/white-qa-logs/${id}`, {
+      method: 'DELETE'
     });
   }
 };

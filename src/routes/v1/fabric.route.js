@@ -56,6 +56,11 @@ router.post('/auto-lot-transfer', fabricController.autoLotTransfer);
 router.get('/lot-transfer', fabricController.getLotTransfers);
 router.delete('/lot-transfer/:refId', fabricController.deleteLotTransfer);
 
+// White Fabric QA inspection routes
+router.get('/white-qa-logs', fabricController.getWhiteFabricLogs);
+router.post('/white-qa-logs', fabricController.createWhiteFabricLog);
+router.delete('/white-qa-logs/:id', fabricController.deleteWhiteFabricLog);
+
 // Update a transaction by ID
 router.put('/:id', fabricController.updateTransaction);
 

@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import {
   CheckSquare, Search, RefreshCw, Edit2, Trash2, X, Save,
   CheckCircle2, ShieldAlert, Download, Filter, Eye, AlertCircle, Clock,
-  User, FileText, ArrowRight, Calendar, ShieldCheck, Flame, Layers, Box, AlertTriangle, Layers3
+  User, FileText, ArrowRight, Calendar, ShieldCheck, Flame, Layers, Box, AlertTriangle, Layers3, Zap
 } from 'lucide-react';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
 import DateRangePicker from './DateRangePicker';
@@ -16,6 +16,20 @@ function toLocalYMD(d = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+const formatDateDDMMYYYY = (d) => {
+  if (!d) return '—';
+  try {
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return String(d);
+    const day = String(dt.getDate()).padStart(2, '0');
+    const month = String(dt.getMonth() + 1).padStart(2, '0');
+    const year = dt.getFullYear();
+    return `${day}/${month}/${year}`;
+  } catch (e) {
+    return String(d);
+  }
+};
+
 export default function QADepartment({ department = 'digital_print' }) {
   // Main Sub-Tab: 'printed' (Printed Fabric Checking) or 'white' (White Fabric Checking)
   const [activeSubTab, setActiveSubTab] = useState('printed');
@@ -23,6 +37,8 @@ export default function QADepartment({ department = 'digital_print' }) {
   // Shared Data State
   const [cards, setCards] = useState([]);
   const [whiteFabricLogs, setWhiteFabricLogs] = useState([]);
+  const [inwardLots, setInwardLots] = useState([]);
+  const [selectedInwardBadge, setSelectedInwardBadge] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -88,7 +104,7 @@ export default function QADepartment({ department = 'digital_print' }) {
   useEffect(() => {
     fetchData();
     const handleDataRefresh = (e) => {
-      if (!e || !e.detail || e.detail === 'fusing' || e.detail === 'qa' || e.detail === 'jobcards') {
+      if (!e || !e.detail || e.detail === 'fusing' || e.detail === 'qa' || e.detail === 'jobcards' || e.detail === 'fabric') {
         fetchData();
       }
     };
@@ -106,10 +122,35 @@ export default function QADepartment({ department = 'digital_print' }) {
         setCards(Array.isArray(res.data) ? res.data : []);
       }
 
-      // 2. Fetch White Fabric Inspection records from Local Storage cache/API fallback
-      const savedWhiteLogs = localStorage.getItem(`qa_white_fabric_logs_${department}`);
-      if (savedWhiteLogs) {
-        try { setWhiteFabricLogs(JSON.parse(savedWhiteLogs)); } catch (e) {}
+      // 2. Fetch Inward Fabric Transactions for Auto-fill in White Fabric QA
+      try {
+        const inwRes = await api.getFabricTransactions({ type: 'INWARD', limit: 300 });
+        const list = inwRes?.data?.transactions || inwRes?.transactions || inwRes?.data || inwRes || [];
+        if (Array.isArray(list)) {
+          setInwardLots(list);
+        }
+      } catch (e) {
+        console.warn('Failed to load inward transactions:', e);
+      }
+
+      // 3. Fetch White Fabric Inspection records from MongoDB / API
+      try {
+        const wfRes = await api.getWhiteFabricLogs({ department });
+        const logs = wfRes?.data || wfRes || [];
+        if (Array.isArray(logs) && logs.length > 0) {
+          setWhiteFabricLogs(logs);
+          localStorage.setItem(`qa_white_fabric_logs_${department}`, JSON.stringify(logs));
+        } else {
+          const savedWhiteLogs = localStorage.getItem(`qa_white_fabric_logs_${department}`);
+          if (savedWhiteLogs) {
+            try { setWhiteFabricLogs(JSON.parse(savedWhiteLogs)); } catch (e) {}
+          }
+        }
+      } catch (e) {
+        const savedWhiteLogs = localStorage.getItem(`qa_white_fabric_logs_${department}`);
+        if (savedWhiteLogs) {
+          try { setWhiteFabricLogs(JSON.parse(savedWhiteLogs)); } catch (e) {}
+        }
       }
     } catch (err) {
       console.error('Failed to load QA data:', err);
@@ -203,8 +244,93 @@ export default function QADepartment({ department = 'digital_print' }) {
     }
   };
 
+  // ── Auto-Fill Helpers for White Fabric Inward Checking ──
+  const normalizePanna = (val) => {
+    if (!val) return '58"';
+    const clean = String(val).replace(/["'\s]/g, '');
+    if (['44', '54', '58', '64'].includes(clean)) return `${clean}"`;
+    return String(val).includes('"') ? String(val) : `${val}"`;
+  };
+
+  const applyInwardDataToWhiteForm = (tx) => {
+    if (!tx) return;
+    let formattedDate = toLocalYMD();
+    if (tx.date) {
+      try {
+        const d = new Date(tx.date);
+        if (!isNaN(d.getTime())) {
+          formattedDate = toLocalYMD(d);
+        }
+      } catch (e) {}
+    }
+
+    setWhiteForm(prev => ({
+      ...prev,
+      date: formattedDate,
+      vendorName: tx.vendorName || tx.vendor || prev.vendorName,
+      challanNo: tx.challanNo || prev.challanNo,
+      fabricQuality: tx.fabricQuality || tx.fabricName || prev.fabricQuality,
+      panna: tx.panna ? normalizePanna(tx.panna) : prev.panna,
+      lotNo: tx.lotNo ? String(tx.lotNo) : prev.lotNo,
+      totalMtr: tx.qty !== undefined && tx.qty !== null ? String(tx.qty) : (tx.totalMtr ? String(tx.totalMtr) : prev.totalMtr)
+    }));
+    setSelectedInwardBadge(`Lot #${tx.lotNo || 'N/A'} - ${tx.fabricQuality || ''} (${tx.qty || tx.totalMtr || ''}m)`);
+    triggerPushNotification('⚡ Inward Data Auto-Filled', `Imported Lot #${tx.lotNo || 'N/A'}: ${tx.fabricQuality || ''} (${tx.qty || tx.totalMtr || ''}m) from ${tx.vendorName || 'Inward'}`, 'info');
+  };
+
+  const handleSelectInwardLot = (lotVal) => {
+    if (!lotVal) {
+      setSelectedInwardBadge('');
+      return;
+    }
+    const found = inwardLots.find(tx => String(tx.lotNo) === String(lotVal) || String(tx._id) === String(lotVal));
+    if (found) {
+      applyInwardDataToWhiteForm(found);
+    }
+  };
+
+  const handleLotNoBlur = async (val) => {
+    if (!val || !val.trim()) return;
+    const clean = val.trim();
+    // 1. Check loaded inward lots
+    const match = inwardLots.find(tx => String(tx.lotNo) === clean || String(tx.lotNo) === clean.replace(/^LOT-?/i, ''));
+    if (match) {
+      applyInwardDataToWhiteForm(match);
+      return;
+    }
+    // 2. Fallback to API lookup
+    try {
+      const numOnly = clean.replace(/[^0-9]/g, '');
+      if (numOnly) {
+        const res = await api.getFabricLotInfo(numOnly);
+        if (res && res.data && res.data.lotNo) {
+          applyInwardDataToWhiteForm({
+            lotNo: res.data.lotNo,
+            vendorName: res.data.vendor,
+            fabricQuality: res.data.fabricQuality || res.data.fabricName,
+            panna: res.data.panna,
+            qty: res.data.qty || res.data.totalMtr,
+            challanNo: res.data.challanNo,
+            date: res.data.date
+          });
+        }
+      }
+    } catch (e) {
+      // quiet fallback
+    }
+  };
+
+  const handleChallanBlur = (val) => {
+    if (!val || !val.trim()) return;
+    const clean = val.trim().toLowerCase();
+    const match = inwardLots.find(tx => (tx.challanNo || '').toLowerCase() === clean);
+    if (match) {
+      applyInwardDataToWhiteForm(match);
+    }
+  };
+
   // Submit White Fabric Inspection Log
-  const handleWhiteFormSubmit = (e) => {
+  const handleWhiteFormSubmit = async (e) => {
     e.preventDefault();
     if (!whiteForm.fabricQuality || !whiteForm.totalMtr) {
       triggerEliteAlert('Please fill in Fabric Quality and Total Roll Meters.');
@@ -219,19 +345,42 @@ export default function QADepartment({ department = 'digital_print' }) {
     const totDefect = wF + sF + shF + wdF;
     const usableFresh = Math.max(0, totMtr - totDefect);
 
-    const newLog = {
-      id: `WF-QA-${Date.now().toString().slice(-5)}`,
-      ...whiteForm,
-      totalDefectMtr: totDefect.toFixed(2),
-      usableFreshMtr: usableFresh.toFixed(2),
-      createdAt: new Date().toISOString()
+    const logPayload = {
+      department,
+      date: whiteForm.date,
+      challanNo: whiteForm.challanNo,
+      vendorName: whiteForm.vendorName,
+      fabricQuality: whiteForm.fabricQuality,
+      panna: whiteForm.panna,
+      lotNo: whiteForm.lotNo,
+      totalMtr: totMtr,
+      weavingFaultMtr: wF,
+      stainFaultMtr: sF,
+      shadingFaultMtr: shF,
+      widthShortageMtr: wdF,
+      totalDefectMtr: parseFloat(totDefect.toFixed(2)),
+      usableFreshMtr: parseFloat(usableFresh.toFixed(2)),
+      status: whiteForm.status,
+      inspectorName: whiteForm.inspectorName || accountFullName,
+      notes: whiteForm.notes || ''
     };
 
-    const updatedLogs = [newLog, ...whiteFabricLogs];
-    setWhiteFabricLogs(updatedLogs);
-    localStorage.setItem(`qa_white_fabric_logs_${department}`, JSON.stringify(updatedLogs));
+    try {
+      const res = await api.createWhiteFabricLog(logPayload);
+      const savedDoc = res?.data || { ...logPayload, _id: `WF-${Date.now()}` };
+      const updatedLogs = [savedDoc, ...whiteFabricLogs];
+      setWhiteFabricLogs(updatedLogs);
+      localStorage.setItem(`qa_white_fabric_logs_${department}`, JSON.stringify(updatedLogs));
+    } catch (err) {
+      console.warn('API save failed, falling back to local storage:', err);
+      const fallbackDoc = { ...logPayload, _id: `WF-${Date.now()}` };
+      const updatedLogs = [fallbackDoc, ...whiteFabricLogs];
+      setWhiteFabricLogs(updatedLogs);
+      localStorage.setItem(`qa_white_fabric_logs_${department}`, JSON.stringify(updatedLogs));
+    }
 
     triggerPushNotification('🥼 White Fabric Inspected', `Lot #${whiteForm.lotNo || 'N/A'}: ${usableFresh.toFixed(2)}m Usable | ${totDefect.toFixed(2)}m Defect`, 'success');
+    setSelectedInwardBadge('');
     
     // Reset form
     setWhiteForm({
@@ -253,10 +402,19 @@ export default function QADepartment({ department = 'digital_print' }) {
   };
 
   // Delete White Fabric Log
-  const handleDeleteWhiteLog = async (id) => {
+  const handleDeleteWhiteLog = async (logItem) => {
     const confirm = await triggerEliteConfirm('Are you sure you want to delete this white fabric inspection log?');
     if (!confirm) return;
-    const updated = whiteFabricLogs.filter(l => l.id !== id);
+
+    const id = typeof logItem === 'object' ? (logItem._id || logItem.id) : logItem;
+    try {
+      if (id && !String(id).startsWith('WF-QA-') && !String(id).startsWith('WF-')) {
+        await api.deleteWhiteFabricLog(id);
+      }
+    } catch (err) {
+      console.warn('API delete error, deleting locally:', err);
+    }
+    const updated = whiteFabricLogs.filter(l => (l._id || l.id) !== id);
     setWhiteFabricLogs(updated);
     localStorage.setItem(`qa_white_fabric_logs_${department}`, JSON.stringify(updated));
     triggerPushNotification('Deleted', 'Inspection log removed.', 'info');
@@ -902,6 +1060,99 @@ export default function QADepartment({ department = 'digital_print' }) {
               </h3>
             </div>
 
+            {/* Auto-Fill from Fabric Inward Banner (White Fabric Only) */}
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.75rem',
+              padding: '0.85rem 1rem',
+              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+              border: '1px solid #86efac',
+              borderRadius: '12px',
+              marginBottom: '1rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '8px',
+                  background: '#16a34a',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.3)'
+                }}>
+                  <Zap size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#14532d', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    AUTO-FILL FROM FABRIC INWARD
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, background: '#bbf7d0', color: '#15803d', padding: '1px 6px', borderRadius: '6px' }}>
+                      White Fabric Only
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#166534' }}>
+                    Select an inward lot to automatically populate Date, Vendor, Challan, Fabric, Panna &amp; Roll Meters.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: '1 1 300px', maxWidth: '440px' }}>
+                <select
+                  style={{
+                    width: '100%',
+                    padding: '0.55rem 0.75rem',
+                    borderRadius: '8px',
+                    border: '1.5px solid #22c55e',
+                    background: '#ffffff',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    color: '#0f172a',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  }}
+                  onChange={e => handleSelectInwardLot(e.target.value)}
+                  defaultValue=""
+                >
+                  <option value="">⚡ Select Recent Inward Lot to Auto-Fill...</option>
+                  {inwardLots.map((tx, idx) => (
+                    <option key={tx._id || idx} value={tx.lotNo || tx._id}>
+                      Lot #{tx.lotNo || 'N/A'} — {tx.fabricQuality || 'Fabric'} ({tx.qty || 0}m) | Challan: {tx.challanNo || '—'} | {tx.vendorName || '—'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Selected Inward Lot Active Badge */}
+            {selectedInwardBadge && (
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                color: '#15803d',
+                background: '#dcfce7',
+                border: '1px solid #86efac',
+                padding: '0.3rem 0.65rem',
+                borderRadius: '8px',
+                marginBottom: '1rem'
+              }}>
+                <CheckCircle2 size={14} color="#16a34a" />
+                <span>Linked Inward: <strong>{selectedInwardBadge}</strong></span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedInwardBadge('')}
+                  style={{ background: 'none', border: 'none', color: '#15803d', cursor: 'pointer', padding: 0, marginLeft: '0.3rem' }}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            )}
+
             <form onSubmit={handleWhiteFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               
               {/* Row 1: Date, Vendor Name, Challan No, Fabric Quality, Panna */}
@@ -916,7 +1167,14 @@ export default function QADepartment({ department = 'digital_print' }) {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Challan No.</label>
-                  <input type="text" placeholder="CH-1002" value={whiteForm.challanNo} onChange={e => setWhiteForm(f => ({ ...f, challanNo: e.target.value }))} style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 700 }} />
+                  <input
+                    type="text"
+                    placeholder="CH-1002"
+                    value={whiteForm.challanNo}
+                    onChange={e => setWhiteForm(f => ({ ...f, challanNo: e.target.value }))}
+                    onBlur={e => handleChallanBlur(e.target.value)}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 700 }}
+                  />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#4f46e5', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Fabric Quality *</label>
@@ -938,7 +1196,14 @@ export default function QADepartment({ department = 'digital_print' }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Lot / Roll No.</label>
-                    <input type="text" placeholder="LOT-88" value={whiteForm.lotNo} onChange={e => setWhiteForm(f => ({ ...f, lotNo: e.target.value }))} style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 800 }} />
+                    <input
+                      type="text"
+                      placeholder="LOT-88"
+                      value={whiteForm.lotNo}
+                      onChange={e => setWhiteForm(f => ({ ...f, lotNo: e.target.value }))}
+                      onBlur={e => handleLotNoBlur(e.target.value)}
+                      style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 800 }}
+                    />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#059669', marginBottom: '0.3rem', textTransform: 'uppercase' }}>Total Roll Meters (Mtr) *</label>
@@ -1014,9 +1279,9 @@ export default function QADepartment({ department = 'digital_print' }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {whiteFabricLogs.map((l) => (
-                      <tr key={l.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 10px', fontWeight: 700 }}>{l.date}</td>
+                    {whiteFabricLogs.map((l, idx) => (
+                      <tr key={l._id || l.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '8px 10px', fontWeight: 700 }}>{formatDateDDMMYYYY(l.date)}</td>
                         <td style={{ padding: '8px 10px' }}>{l.vendorName || '—'} {l.challanNo ? `(${l.challanNo})` : ''}</td>
                         <td style={{ padding: '8px 10px', fontWeight: 800, color: '#4f46e5' }}>{l.fabricQuality} ({l.panna}) {l.lotNo ? `| Lot: ${l.lotNo}` : ''}</td>
                         <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800 }}>{l.totalMtr} m</td>
@@ -1028,7 +1293,7 @@ export default function QADepartment({ department = 'digital_print' }) {
                           </span>
                         </td>
                         <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                          <button type="button" onClick={() => handleDeleteWhiteLog(l.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
+                          <button type="button" onClick={() => handleDeleteWhiteLog(l)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
                             <Trash2 size={14} />
                           </button>
                         </td>

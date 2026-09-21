@@ -237,8 +237,15 @@ const createOutward = async (req, res) => {
 // Get all transactions
 const getTransactions = async (req, res) => {
   try {
-    const deptFilter = getDepartmentFilter(req.query.department);
-    const transactions = await FabricTransaction.find(deptFilter).sort({ date: -1, createdAt: -1 });
+    const filter = getDepartmentFilter(req.query.department);
+    if (req.query.type) {
+      filter.type = req.query.type;
+    }
+    let query = FabricTransaction.find(filter).sort({ date: -1, createdAt: -1 });
+    if (req.query.limit) {
+      query = query.limit(parseInt(req.query.limit, 10));
+    }
+    const transactions = await query;
     res.status(200).json({ success: true, data: transactions });
   } catch (error) {
     console.error('Error fetching fabric transactions:', error);
@@ -4135,6 +4142,40 @@ const deleteLotTransfer = async (req, res) => {
   }
 };
 
+// ── White Fabric Inward Checking & Defect Logs ──
+const WhiteFabricLog = require('../db/models/whiteFabricLog.model');
+
+const getWhiteFabricLogs = async (req, res) => {
+  try {
+    const { department = 'digital_print' } = req.query;
+    const filter = department === 'all' ? {} : { department };
+    const logs = await WhiteFabricLog.find(filter).sort({ createdAt: -1, date: -1 });
+    res.json({ success: true, data: logs });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const createWhiteFabricLog = async (req, res) => {
+  try {
+    const body = req.body;
+    const log = await WhiteFabricLog.create(body);
+    res.json({ success: true, data: log });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+const deleteWhiteFabricLog = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await WhiteFabricLog.findByIdAndDelete(id);
+    res.json({ success: true, message: 'Deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 module.exports = {
   createInward,
   createOutward,
@@ -4166,4 +4207,7 @@ module.exports = {
   getLotTransfers,
   autoLotTransfer,
   deleteLotTransfer,
+  getWhiteFabricLogs,
+  createWhiteFabricLog,
+  deleteWhiteFabricLog,
 };
