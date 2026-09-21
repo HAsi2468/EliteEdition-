@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom';
 import { api, getBaseUrl, setBaseUrl } from './services/api';
 import Login from './components/Login';
+import ClientLogin from './components/ClientLogin';
+import ClientPortal from './components/ClientPortal';
 import DashboardStats from './components/DashboardStats';
 import InventoryGrid from './components/InventoryGrid';
 import ProductCatalogGrid from './components/ProductCatalogGrid';
@@ -108,6 +110,46 @@ export default function App() {
   const socket = useSocket();
   const [isAuthenticated, setIsAuthenticated] = useState(api.isAuthenticated());
   const [currentUser, setCurrentUser] = useState(() => api.getCurrentUser());
+
+  const checkIsClientUrl = () => {
+    try {
+      if (typeof window === 'undefined') return false;
+      const hash = (window.location.hash || '').toLowerCase();
+      const path = (window.location.pathname || '').toLowerCase();
+      const search = new URLSearchParams(window.location.search || '');
+      return (
+        hash === '#client-login' ||
+        hash === '#client' ||
+        hash === '#/client-login' ||
+        hash === '#/client' ||
+        path.startsWith('/client') ||
+        search.get('portal') === 'client' ||
+        search.get('client') === 'true'
+      );
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const [isClientPortalMode, setIsClientPortalMode] = useState(() => checkIsClientUrl() || api.isClientUser());
+
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const isClient = checkIsClientUrl();
+      if (isClient || api.isClientUser()) {
+        setIsClientPortalMode(true);
+      } else {
+        setIsClientPortalMode(false);
+      }
+    };
+    window.addEventListener('hashchange', handleUrlChange);
+    window.addEventListener('popstate', handleUrlChange);
+    return () => {
+      window.removeEventListener('hashchange', handleUrlChange);
+      window.removeEventListener('popstate', handleUrlChange);
+    };
+  }, []);
+
   const [activeTab, setActiveTab] = useState(initialNav.tab);
   const [items, setItems] = useState([]);
   const [catalogItems, setCatalogItems] = useState([]);
@@ -1009,7 +1051,38 @@ export default function App() {
   };
 
   if (!isAuthenticated) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+    if (isClientPortalMode) {
+      return (
+        <ClientLogin
+          onLoginSuccess={handleLoginSuccess}
+          onSwitchToStaff={() => {
+            if (window.location.hash.includes('client')) {
+              window.location.hash = '';
+            }
+            setIsClientPortalMode(false);
+          }}
+        />
+      );
+    }
+    return (
+      <Login
+        onLoginSuccess={handleLoginSuccess}
+        onSwitchToClient={() => {
+          window.location.hash = '#client-login';
+          setIsClientPortalMode(true);
+        }}
+      />
+    );
+  }
+
+  // If authenticated as a Client Partner
+  if (api.isClientUser() || currentUser?.isClient || currentUser?.role === 'Client') {
+    return (
+      <ClientPortal
+        client={currentUser}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   return (

@@ -3,6 +3,9 @@ const clientController = require('../../controllers/client.controller');
 
 const router = express.Router();
 
+router.post('/login', clientController.clientLogin);
+router.put('/profile/:id', clientController.updateClientProfile);
+
 router.get('/', clientController.getClients);
 router.post('/', clientController.createClient);
 router.get('/:id', clientController.getClientById);

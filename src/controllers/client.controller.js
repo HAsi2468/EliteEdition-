@@ -1,4 +1,5 @@
 const Client = require('../db/models/client.model');
+const tokenService = require('../services/token.service');
 
 /**
  * Get all clients with search and filter
@@ -199,10 +200,127 @@ const deleteClient = async (req, res) => {
   }
 };
 
+/**
+ * Client Login with Mobile Number and Password
+ */
+const clientLogin = async (req, res) => {
+  try {
+    const { mobile, password } = req.body;
+
+    if (!mobile || !String(mobile).trim()) {
+      return res.status(400).json({ success: false, message: 'Please enter your mobile number.' });
+    }
+    if (!password || !String(password).trim()) {
+      return res.status(400).json({ success: false, message: 'Please enter your password.' });
+    }
+
+    const cleanInput = String(mobile).trim();
+    const digitsOnly = cleanInput.replace(/\D/g, '');
+
+    // Search client by mobile (raw, digits, or +91 format) or username
+    const mobileQueries = [{ mobile: cleanInput }];
+    if (digitsOnly.length >= 10) {
+      const last10 = digitsOnly.slice(-10);
+      mobileQueries.push({ mobile: { $regex: last10, $options: 'i' } });
+    }
+    mobileQueries.push({ username: { $regex: `^${cleanInput}$`, $options: 'i' } });
+
+    const client = await Client.findOne({ $or: mobileQueries });
+
+    if (!client) {
+      return res.status(401).json({
+        success: false,
+        message: 'No client account found with this mobile number. Please check your number or contact support.'
+      });
+    }
+
+    if (client.status === 'Inactive') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your client account is currently marked inactive. Please contact Elite Edition administration.'
+      });
+    }
+
+    if (String(client.password).trim() !== String(password).trim()) {
+      return res.status(401).json({
+        success: false,
+        message: 'Incorrect password. Please verify your password and try again.'
+      });
+    }
+
+    // Generate authentication tokens
+    let tokens = null;
+    try {
+      tokens = await tokenService.generateAuthTokens({ userId: client.id || client._id });
+    } catch (tokenErr) {
+      console.warn('Could not generate JWT tokens for client:', tokenErr.message);
+    }
+
+    const clientData = client.toObject ? client.toObject() : { ...client };
+    delete clientData.password;
+
+    res.json({
+      success: true,
+      message: 'Login successful! Welcome back.',
+      client: clientData,
+      user: {
+        ...clientData,
+        id: clientData._id,
+        role: 'Client',
+        isClient: true,
+        name: clientData.username || clientData.companyName,
+        email: `${clientData.username}@client.eliteedition.in`,
+      },
+      tokens,
+      token: tokens?.access?.token || `client_session_${client._id}_${Date.now()}`,
+    });
+  } catch (error) {
+    console.error('Error in clientLogin:', error);
+    res.status(500).json({ success: false, message: 'Server error during login', error: error.message });
+  }
+};
+
+/**
+ * Client update own profile (e.g. upload/update picture)
+ */
+const updateClientProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { image, mobile, password } = req.body;
+
+    const client = await Client.findById(id);
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+
+    if (image !== undefined) client.image = (image || '').trim();
+    if (mobile && mobile.trim()) client.mobile = mobile.trim();
+    if (password && password.trim()) client.password = password.trim();
+    client.modified_date_time = new Date();
+
+    await client.save();
+
+    const clientData = client.toObject ? client.toObject() : { ...client };
+    delete clientData.password;
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: clientData,
+      client: clientData,
+    });
+  } catch (error) {
+    console.error('Error updating client profile:', error);
+    res.status(500).json({ success: false, message: 'Failed to update profile', error: error.message });
+  }
+};
+
 module.exports = {
   getClients,
   getClientById,
   createClient,
   updateClient,
   deleteClient,
+  clientLogin,
+  updateClientProfile,
 };

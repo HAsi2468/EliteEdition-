@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { api } from '../services/api';
 import { Shield, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
-export default function Login({ onLoginSuccess }) {
+export default function Login({ onLoginSuccess, onSwitchToClient }) {
   const [email, setEmail] = useState('admin@elite.com');
   const [password, setPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
@@ -91,6 +91,29 @@ export default function Login({ onLoginSuccess }) {
             )}
           </button>
         </form>
+
+        <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
+          <button
+            type="button"
+            onClick={onSwitchToClient || (() => { window.location.hash = '#client-login'; })}
+            style={{
+              background: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.28)',
+              color: '#34d399',
+              padding: '0.55rem 1rem',
+              borderRadius: '10px',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <span>🏢 Are you a Client / Partner? Client Login →</span>
+          </button>
+        </div>
       </div>
     </div>
   );

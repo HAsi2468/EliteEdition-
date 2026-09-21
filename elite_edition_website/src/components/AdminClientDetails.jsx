@@ -387,6 +387,34 @@ export default function AdminClientDetails() {
             <RotateCw size={14} className={loading ? 'spin' : ''} />
           </button>
 
+          {/* Copy Client Portal Link Button */}
+          <button
+            type="button"
+            onClick={() => {
+              const link = `${window.location.origin}/#client-login`;
+              navigator.clipboard.writeText(link);
+              setSuccess(`Copied Client Portal Link to clipboard! (${link})`);
+              setTimeout(() => setSuccess(''), 4000);
+            }}
+            style={{
+              padding: '0.5rem 0.9rem',
+              fontSize: '0.85rem',
+              fontWeight: 700,
+              borderRadius: '8px',
+              background: 'rgba(16, 185, 129, 0.12)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              color: '#34d399',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer'
+            }}
+            title="Copy Client Login URL to share with clients"
+          >
+            <Copy size={15} />
+            <span>Copy Client Link</span>
+          </button>
+
           {/* Add Client Button */}
           <button
             onClick={handleOpenAdd}

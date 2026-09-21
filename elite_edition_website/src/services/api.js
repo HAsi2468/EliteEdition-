@@ -136,6 +136,8 @@ export const api = {
   logout() {
     localStorage.removeItem('elite_auth_token');
     localStorage.removeItem('elite_user');
+    localStorage.removeItem('elite_is_client');
+    localStorage.removeItem('elite_client_data');
   },
 
   getCurrentUser() {
@@ -2248,6 +2250,56 @@ export const api = {
 
   async uploadClientImage(file) {
     return this.uploadImage(file, 'clients/avatars');
+  },
+
+  async clientLogin({ mobile, password }) {
+    const res = await request('/clients/login', {
+      method: 'POST',
+      body: JSON.stringify({ mobile, password }),
+    });
+    if (res && res.success) {
+      const token = res.tokens?.access?.token || res.token;
+      if (token) {
+        localStorage.setItem('elite_auth_token', token);
+      }
+      const user = res.user || { ...res.client, role: 'Client', isClient: true };
+      localStorage.setItem('elite_user', JSON.stringify(user));
+      localStorage.setItem('elite_is_client', 'true');
+      localStorage.setItem('elite_client_data', JSON.stringify(res.client || user));
+    }
+    return res;
+  },
+
+  async updateClientProfile(id, data) {
+    const res = await request(`/clients/profile/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+    if (res && res.success && res.data) {
+      const existingUser = this.getCurrentUser() || {};
+      const updatedUser = { ...existingUser, ...res.data, role: 'Client', isClient: true };
+      localStorage.setItem('elite_user', JSON.stringify(updatedUser));
+      localStorage.setItem('elite_client_data', JSON.stringify(res.data));
+    }
+    return res;
+  },
+
+  isClientUser() {
+    try {
+      const user = this.getCurrentUser();
+      return !!(user?.isClient || user?.role === 'Client' || localStorage.getItem('elite_is_client') === 'true');
+    } catch (e) {
+      return false;
+    }
+  },
+
+  getClientData() {
+    try {
+      const raw = localStorage.getItem('elite_client_data');
+      return raw ? JSON.parse(raw) : this.getCurrentUser();
+    } catch (e) {
+      return this.getCurrentUser();
+    }
   }
 };
 
