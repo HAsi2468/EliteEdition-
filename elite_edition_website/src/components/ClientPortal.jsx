@@ -24,13 +24,11 @@ import {
   PlusCircle,
   Plus,
   Trash2,
-  Printer,
   X
 } from 'lucide-react';
 import DesignImage from './DesignImage';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { useSocket } from '../contexts/SocketContext';
-import { triggerJobCardPrint } from './JobCardPanel';
 
 export default function ClientPortal({ client, onLogout }) {
   const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'designs' | 'profile'
@@ -732,18 +730,18 @@ export default function ClientPortal({ client, onLogout }) {
           }
         }
 
-        /* ── Place Order Modal: Dark Slate & Emerald Mobile-Friendly Theme ── */
+        /* ── Place Order Modal: Executive White & Blue Theme ── */
         .order-modal-container {
-          background: #0f172a !important;
+          background: #ffffff !important;
           border-radius: 16px !important;
           width: 100% !important;
           max-width: 900px !important;
           max-height: 90vh !important;
           overflow-y: auto !important;
           padding: 1.5rem !important;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
-          border: 1px solid #334155 !important;
-          color: #f8fafc !important;
+          box-shadow: 0 25px 50px -12px rgba(30, 58, 138, 0.2), 0 0 0 1px rgba(191, 219, 254, 0.6) !important;
+          border: 1px solid #bfdbfe !important;
+          color: #0f172a !important;
         }
 
         .order-entries-desktop {
@@ -758,23 +756,23 @@ export default function ClientPortal({ client, onLogout }) {
           border-collapse: separate;
           border-spacing: 0;
           text-align: left;
-          background: #0f172a;
+          background: #ffffff;
           min-width: 650px;
         }
         .order-table-custom th {
-          background: #1e293b !important;
-          color: #94a3b8 !important;
+          background: #f0f7ff !important;
+          color: #1e40af !important;
           font-weight: 700 !important;
           font-size: 0.74rem !important;
           text-transform: uppercase !important;
           letter-spacing: 0.04em !important;
           padding: 0.75rem 0.65rem !important;
-          border-bottom: 2px solid #334155 !important;
+          border-bottom: 2px solid #bfdbfe !important;
         }
         .order-table-custom td {
           padding: 0.6rem 0.65rem !important;
-          border-bottom: 1px solid #1e293b !important;
-          background: #0f172a;
+          border-bottom: 1px solid #f1f5f9 !important;
+          background: #ffffff;
           vertical-align: middle;
         }
         .order-table-custom tr:last-child td {
@@ -785,42 +783,42 @@ export default function ClientPortal({ client, onLogout }) {
           width: 100%;
           padding: 0.55rem 0.75rem;
           border-radius: 8px;
-          border: 1px solid #334155;
+          border: 1px solid #cbd5e1;
           font-size: 0.84rem;
-          color: #f8fafc;
-          background: #1e293b;
+          color: #0f172a;
+          background: #ffffff;
           outline: none;
           box-sizing: border-box;
-          color-scheme: dark;
+          color-scheme: light;
           transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
         .order-input-custom:focus {
-          border-color: #10b981 !important;
-          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.22) !important;
+          border-color: #2563eb !important;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
         }
 
         .order-card-item {
-          background: #1e293b;
-          border: 1px solid #334155;
+          background: #ffffff;
+          border: 1px solid #bfdbfe;
           border-radius: 12px;
           overflow: hidden;
-          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+          box-shadow: 0 4px 14px rgba(30, 58, 138, 0.06);
           transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
         .order-card-item:focus-within {
-          border-color: #10b981;
-          box-shadow: 0 4px 14px rgba(16, 185, 129, 0.18);
+          border-color: #2563eb;
+          box-shadow: 0 4px 14px rgba(37, 99, 235, 0.15);
         }
         .order-card-topbar {
-          background: #0f172a;
+          background: #f0f7ff;
           padding: 0.65rem 0.85rem;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          border-bottom: 1px solid #334155;
+          border-bottom: 1px solid #dbeafe;
         }
         .order-card-id-badge {
-          background: #059669;
+          background: #1d4ed8;
           color: #ffffff;
           font-size: 0.75rem;
           font-weight: 800;
@@ -842,7 +840,7 @@ export default function ClientPortal({ client, onLogout }) {
           display: block;
           font-size: 0.72rem;
           font-weight: 700;
-          color: #94a3b8;
+          color: #475569;
           margin-bottom: 0.3rem;
           text-transform: uppercase;
           letter-spacing: 0.03em;
@@ -949,7 +947,7 @@ export default function ClientPortal({ client, onLogout }) {
               {clientData.image ? (
                 <img src={clientData.image} alt="Logo" style={styles.welcomeAvatar} />
               ) : (
-                <Building2 size={24} color="#10b981" />
+                <Building2 size={24} color="#1d4ed8" />
               )}
             </div>
             <div>
@@ -960,8 +958,8 @@ export default function ClientPortal({ client, onLogout }) {
               <div style={styles.welcomeDetailsRow}>
                 {partyCode && (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <Shield size={12} color="#10b981" />
-                    <span>Party: <strong style={{ color: '#fbbf24' }}>{partyCode}</strong></span>
+                    <Shield size={12} color="#1d4ed8" />
+                    <span>Party: <strong style={{ color: '#1d4ed8' }}>{partyCode}</strong></span>
                   </span>
                 )}
                 {mobile && (
@@ -1068,11 +1066,11 @@ export default function ClientPortal({ client, onLogout }) {
             {/* Stage Filter Pills */}
             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
               {[
-                { id: 'all', label: 'All Orders', count: orderCounts.all, dot: '#10b981' },
+                { id: 'all', label: 'All Orders', count: orderCounts.all, dot: '#2563eb' },
                 { id: 'print-pending', label: 'Print Pending', count: orderCounts['print-pending'], dot: '#d97706' },
                 { id: 'fusing-pending', label: 'Fusing Pending', count: orderCounts['fusing-pending'], dot: '#7c3aed' },
-                { id: 'delivery-pending', label: 'Delivery Pending', count: orderCounts['delivery-pending'], dot: '#059669' },
-                { id: 'delivered', label: 'Delivered', count: orderCounts['delivered'], dot: '#16a34a' }
+                { id: 'delivery-pending', label: 'Delivery Pending', count: orderCounts['delivery-pending'], dot: '#0284c7' },
+                { id: 'delivered', label: 'Delivered', count: orderCounts['delivered'], dot: '#1d4ed8' }
               ].map((pill) => {
                 const isSelected = orderStageFilter === pill.id;
                 return (
@@ -1081,8 +1079,8 @@ export default function ClientPortal({ client, onLogout }) {
                     type="button"
                     onClick={() => setOrderStageFilter(pill.id)}
                     style={{
-                      border: isSelected ? '1px solid #10b981' : '1px solid #e2e8f0',
-                      background: isSelected ? '#10b981' : '#ffffff',
+                      border: isSelected ? '1px solid #1d4ed8' : '1px solid #e2e8f0',
+                      background: isSelected ? '#1d4ed8' : '#ffffff',
                       color: isSelected ? '#ffffff' : '#475569',
                       padding: '0.32rem 0.72rem',
                       borderRadius: '20px',
@@ -1093,7 +1091,7 @@ export default function ClientPortal({ client, onLogout }) {
                       alignItems: 'center',
                       gap: '6px',
                       transition: 'all 0.15s ease',
-                      boxShadow: isSelected ? '0 1px 4px rgba(16,185,129,0.3)' : 'none'
+                      boxShadow: isSelected ? '0 2px 6px rgba(29,78,216,0.25)' : 'none'
                     }}
                   >
                     <span
@@ -1171,9 +1169,9 @@ export default function ClientPortal({ client, onLogout }) {
                         >
                           <td style={{ fontWeight: 800 }}>
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <span style={{ color: '#10b981', letterSpacing: '0.02em', fontSize: '0.9rem' }}>{displayJobNo}</span>
+                              <span style={{ color: '#1d4ed8', letterSpacing: '0.02em', fontSize: '0.9rem' }}>{displayJobNo}</span>
                               {String(ord.createdBy || ord.createdByName || '').toLowerCase().includes('client') && (
-                                <span style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 600, marginTop: '2px' }}>
+                                <span style={{ fontSize: '0.68rem', color: '#2563eb', fontWeight: 600, marginTop: '2px' }}>
                                   📱 Client Order
                                 </span>
                               )}
@@ -1191,8 +1189,8 @@ export default function ClientPortal({ client, onLogout }) {
                                   borderRadius: '8px',
                                   overflow: 'hidden',
                                   flexShrink: 0,
-                                  background: '#0f172a',
-                                  border: '1px solid #334155'
+                                  background: '#f8fafc',
+                                  border: '1px solid #e2e8f0'
                                 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1225,7 +1223,7 @@ export default function ClientPortal({ client, onLogout }) {
                           </td>
                           <td style={{ whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <span style={{ fontWeight: 800, color: '#059669', fontSize: '0.86rem' }}>{mtrVal}</span>
+                              <span style={{ fontWeight: 800, color: '#0284c7', fontSize: '0.86rem' }}>{mtrVal}</span>
                               {consVal && <span style={{ fontSize: '0.7rem', color: '#64748b' }}>({consVal})</span>}
                             </div>
                           </td>
@@ -1264,16 +1262,19 @@ export default function ClientPortal({ client, onLogout }) {
                               style={{
                                 padding: '6px 12px',
                                 borderRadius: '7px',
-                                background: 'rgba(16, 185, 129, 0.1)',
-                                border: '1px solid rgba(16, 185, 129, 0.3)',
-                                color: '#059669',
+                                background: '#eff6ff',
+                                border: '1px solid #bfdbfe',
+                                color: '#1d4ed8',
                                 fontWeight: 700,
                                 fontSize: '0.78rem',
                                 cursor: 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '5px'
+                                gap: '5px',
+                                transition: 'all 0.15s ease'
                               }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = '#dbeafe'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
                             >
                               <Eye size={13} />
                               <span>Job Card</span>
@@ -1389,7 +1390,7 @@ export default function ClientPortal({ client, onLogout }) {
                           {matchingOrders.length > 0 && (
                             <div>
                               <span style={styles.metaLabel}>Orders</span>
-                              <span style={{ ...styles.metaVal, color: '#10b981' }}>
+                              <span style={{ ...styles.metaVal, color: '#1d4ed8' }}>
                                 {matchingOrders.length} {matchingOrders.length === 1 ? 'Order' : 'Orders'} {totalPcs > 0 ? `(${totalPcs} pcs)` : ''}
                               </span>
                             </div>
@@ -1397,14 +1398,14 @@ export default function ClientPortal({ client, onLogout }) {
                           {d.partySkuId && (
                             <div>
                               <span style={styles.metaLabel}>Party SKU</span>
-                              <span style={{ ...styles.metaVal, color: '#10b981' }}>{d.partySkuId}</span>
+                              <span style={{ ...styles.metaVal, color: '#1d4ed8' }}>{d.partySkuId}</span>
                             </div>
                           )}
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px dashed #e2e8f0', gap: '8px', flexWrap: 'wrap' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#fbbf24', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.35)', padding: '2px 8px', borderRadius: '6px' }}>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '6px' }}>
                               Party: {partyCode || 'VG'}
                             </span>
                             <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 500 }}>
@@ -1418,7 +1419,7 @@ export default function ClientPortal({ client, onLogout }) {
                               handleOpenPlaceOrder(d);
                             }}
                             style={{
-                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                               border: 'none',
                               color: '#ffffff',
                               padding: '4px 10px',
@@ -1429,7 +1430,7 @@ export default function ClientPortal({ client, onLogout }) {
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '4px',
-                              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)'
+                              boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)'
                             }}
                             title={`Place order for ${d.designName}`}
                           >
@@ -1451,13 +1452,13 @@ export default function ClientPortal({ client, onLogout }) {
           <div style={styles.tabContent}>
             <div style={styles.profileCard}>
               <h3 style={styles.profileSectionHeading}>
-                <Building2 size={18} color="#10b981" />
+                <Building2 size={18} color="#1d4ed8" />
                 <span>Company Profile & Logo</span>
               </h3>
 
               {profileMessage && (
                 <div style={styles.alertSuccess}>
-                  <CheckCircle2 size={16} color="#10b981" />
+                  <CheckCircle2 size={16} color="#1d4ed8" />
                   <span>{profileMessage}</span>
                 </div>
               )}
@@ -1511,7 +1512,7 @@ export default function ClientPortal({ client, onLogout }) {
 
                 <div style={styles.detailItem}>
                   <label style={styles.detailLabel}>Assigned Party Code</label>
-                  <div style={{ ...styles.detailVal, color: '#fbbf24', fontWeight: 800 }}>{partyCode || '—'}</div>
+                  <div style={{ ...styles.detailVal, color: '#1d4ed8', fontWeight: 800 }}>{partyCode || '—'}</div>
                 </div>
 
                 <div style={styles.detailItem}>
@@ -1528,7 +1529,7 @@ export default function ClientPortal({ client, onLogout }) {
               {/* Change Password Form */}
               <div style={{ marginTop: '2rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
                 <h4 style={{ margin: '0 0 1rem 0', color: '#0f172a', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Key size={16} color="#10b981" />
+                  <Key size={16} color="#1d4ed8" />
                   <span>Update Account Password</span>
                 </h4>
 
@@ -1634,7 +1635,7 @@ export default function ClientPortal({ client, onLogout }) {
                         return (
                           <tr key={row.id}>
                             {/* Auto ID */}
-                            <td style={{ textAlign: 'center', fontWeight: 800, color: '#34d399', fontSize: '0.82rem' }}>
+                            <td style={{ textAlign: 'center', fontWeight: 800, color: '#1d4ed8', fontSize: '0.82rem' }}>
                               #{idx + 1}
                             </td>
 
@@ -1667,9 +1668,9 @@ export default function ClientPortal({ client, onLogout }) {
                                 </select>
 
                                 {selectedDesignDoc && (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#94a3b8', flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#64748b', flexWrap: 'wrap' }}>
                                     {selectedDesignDoc.category && (
-                                      <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                      <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
                                         {selectedDesignDoc.category}
                                       </span>
                                     )}
@@ -1738,7 +1739,7 @@ export default function ClientPortal({ client, onLogout }) {
                       <div className="order-card-topbar">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span className="order-card-id-badge">#{idx + 1}</span>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#34d399' }}>
+                          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1d4ed8' }}>
                             Order Item #{idx + 1}
                           </span>
                         </div>
@@ -1775,9 +1776,9 @@ export default function ClientPortal({ client, onLogout }) {
                             ))}
                           </select>
                           {selectedDesignDoc && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#94a3b8', marginTop: '5px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#64748b', marginTop: '5px', flexWrap: 'wrap' }}>
                               {selectedDesignDoc.category && (
-                                <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                <span style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
                                   {selectedDesignDoc.category}
                                 </span>
                               )}
@@ -1845,10 +1846,10 @@ export default function ClientPortal({ client, onLogout }) {
 
               {/* Modal Footer */}
               <div className="order-modal-footer-wrap" style={styles.orderModalFooter}>
-                <div style={{ fontSize: '0.84rem', color: '#94a3b8' }}>
-                  <span>Total Items: <strong style={{ color: '#f8fafc' }}>{orderRows.length}</strong></span>
+                <div style={{ fontSize: '0.84rem', color: '#64748b' }}>
+                  <span>Total Items: <strong style={{ color: '#0f172a' }}>{orderRows.length}</strong></span>
                   <span style={{ margin: '0 8px' }}>•</span>
-                  <span>Total Pieces: <strong style={{ color: '#34d399' }}>
+                  <span>Total Pieces: <strong style={{ color: '#1d4ed8' }}>
                     {orderRows.reduce((sum, r) => sum + (Number(r.pcs) || 0), 0)} Pcs
                   </strong></span>
                 </div>
@@ -1887,43 +1888,68 @@ export default function ClientPortal({ client, onLogout }) {
         </div>
       )}
 
-      {/* ── Job Card Specifications Modal ── */}
+      {/* ── Job Card Specifications Modal (White & Blue Theme) ── */}
       {selectedOrderDetails && (
         <div
-          style={styles.modalOverlay}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(5px)',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
           onClick={() => setSelectedOrderDetails(null)}
         >
           <div
             className="order-modal-content-wrap"
             style={{
-              ...styles.orderModalContent,
+              width: '100%',
               maxWidth: '750px',
               maxHeight: '92vh',
-              overflowY: 'auto'
+              background: '#ffffff',
+              borderRadius: '16px',
+              border: '1px solid #bfdbfe',
+              boxShadow: '0 25px 50px -12px rgba(30, 58, 138, 0.25), 0 0 0 1px rgba(191, 219, 254, 0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              animation: 'fadeIn 0.2s ease-out',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div style={styles.orderModalHeader}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '1.1rem 1.4rem',
+              background: 'linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%)',
+              borderBottom: '1px solid #bfdbfe',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  width: '38px',
-                  height: '38px',
+                  width: '40px',
+                  height: '40px',
                   borderRadius: '10px',
-                  background: 'rgba(16, 185, 129, 0.15)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  background: '#ffffff',
+                  border: '1px solid #93c5fd',
+                  boxShadow: '0 2px 4px rgba(37,99,235,0.08)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#10b981'
+                  color: '#1d4ed8'
                 }}>
-                  <Layers size={20} />
+                  <Layers size={22} />
                 </div>
                 <div>
-                  <h3 style={styles.orderModalTitle}>
-                    {selectedOrderDetails.jobNo || 'Job Card Details'}
+                  <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>{selectedOrderDetails.jobNo || 'Job Card Details'}</span>
                   </h3>
-                  <p style={styles.orderModalSubtitle}>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#475569', fontWeight: 500 }}>
                     Complete Manufacturing & Technical Specifications
                   </p>
                 </div>
@@ -1931,14 +1957,28 @@ export default function ClientPortal({ client, onLogout }) {
               <button
                 type="button"
                 onClick={() => setSelectedOrderDetails(null)}
-                style={styles.modalCloseBtn}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  color: '#475569',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = '#fca5a5'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.color = '#475569'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
               >
-                <X size={18} />
+                <X size={17} />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div style={{ padding: '1.25rem' }}>
+            <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1, background: '#f8fafc' }}>
               {/* Top Overview Cards */}
               <div style={{
                 display: 'grid',
@@ -1946,9 +1986,9 @@ export default function ClientPortal({ client, onLogout }) {
                 gap: '0.75rem',
                 marginBottom: '1.25rem'
               }}>
-                <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '0.75rem' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</div>
-                  <div style={{ marginTop: '4px' }}>
+                <div style={{ background: '#ffffff', border: '1px solid #dbeafe', borderRadius: '10px', padding: '0.8rem', boxShadow: '0 1px 3px rgba(37,99,235,0.05)' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Status</div>
+                  <div style={{ marginTop: '5px' }}>
                     {(() => {
                       const s = getOrderStatusInfo(selectedOrderDetails);
                       return (
@@ -1967,23 +2007,23 @@ export default function ClientPortal({ client, onLogout }) {
                   </div>
                 </div>
 
-                <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '0.75rem' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Order Date</div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#f8fafc', marginTop: '4px' }}>
+                <div style={{ background: '#ffffff', border: '1px solid #dbeafe', borderRadius: '10px', padding: '0.8rem', boxShadow: '0 1px 3px rgba(37,99,235,0.05)' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Order Date</div>
+                  <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', marginTop: '5px' }}>
                     {formatDateDDMMYYYY(selectedOrderDetails.created_date_time || selectedOrderDetails.createdAt || selectedOrderDetails.date)}
                   </div>
                 </div>
 
-                <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '0.75rem' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Quantity</div>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#34d399', marginTop: '4px' }}>
+                <div style={{ background: '#ffffff', border: '1px solid #dbeafe', borderRadius: '10px', padding: '0.8rem', boxShadow: '0 1px 3px rgba(37,99,235,0.05)' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Quantity</div>
+                  <div style={{ fontSize: '0.96rem', fontWeight: 800, color: '#1d4ed8', marginTop: '5px' }}>
                     {selectedOrderDetails.pcs || 0} Pcs
                   </div>
                 </div>
 
-                <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '0.75rem' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total Meters</div>
-                  <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#fbbf24', marginTop: '4px' }}>
+                <div style={{ background: '#ffffff', border: '1px solid #dbeafe', borderRadius: '10px', padding: '0.8rem', boxShadow: '0 1px 3px rgba(37,99,235,0.05)' }}>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Total Meters</div>
+                  <div style={{ fontSize: '0.96rem', fontWeight: 800, color: '#0284c7', marginTop: '5px' }}>
                     {selectedOrderDetails.totalMtr ? `${selectedOrderDetails.totalMtr} m` : '—'}
                   </div>
                 </div>
@@ -1998,13 +2038,14 @@ export default function ClientPortal({ client, onLogout }) {
               }}>
                 {/* Left: Design Artwork & Meta */}
                 <div style={{
-                  background: '#0f172a',
-                  border: '1px solid #334155',
+                  background: '#ffffff',
+                  border: '1px solid #dbeafe',
                   borderRadius: '12px',
                   padding: '1rem',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '0.75rem'
+                  gap: '0.85rem',
+                  boxShadow: '0 2px 6px rgba(37,99,235,0.04)'
                 }}>
                   <div
                     style={{
@@ -2012,8 +2053,8 @@ export default function ClientPortal({ client, onLogout }) {
                       height: '180px',
                       borderRadius: '8px',
                       overflow: 'hidden',
-                      background: '#1e293b',
-                      border: '1px solid #475569',
+                      background: '#f8fafc',
+                      border: '1px solid #cbd5e1',
                       cursor: 'pointer'
                     }}
                     onClick={() => {
@@ -2031,28 +2072,38 @@ export default function ClientPortal({ client, onLogout }) {
                   </div>
 
                   <div>
-                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc' }}>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
                       {selectedOrderDetails.designName || selectedOrderDetails.designNo || '—'}
                     </div>
                     {selectedOrderDetails.category && (
-                      <span style={{ ...styles.designCat, display: 'inline-block', marginTop: '4px' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        marginTop: '4px',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        border: '1px solid #bfdbfe'
+                      }}>
                         {selectedOrderDetails.category}
                       </span>
                     )}
                   </div>
 
-                  <div style={{ borderTop: '1px solid #334155', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem' }}>
+                  <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.65rem', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#94a3b8' }}>Fabric:</span>
-                      <span style={{ color: '#f8fafc', fontWeight: 600 }}>{selectedOrderDetails.fabric || '—'}</span>
+                      <span style={{ color: '#64748b' }}>Fabric:</span>
+                      <span style={{ color: '#0f172a', fontWeight: 700 }}>{selectedOrderDetails.fabric || '—'}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#94a3b8' }}>Width (Panna):</span>
-                      <span style={{ color: '#f8fafc', fontWeight: 600 }}>{selectedOrderDetails.panna ? `${selectedOrderDetails.panna}"` : '—'}</span>
+                      <span style={{ color: '#64748b' }}>Width (Panna):</span>
+                      <span style={{ color: '#0f172a', fontWeight: 700 }}>{selectedOrderDetails.panna ? `${selectedOrderDetails.panna}"` : '—'}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#94a3b8' }}>Colors:</span>
-                      <span style={{ color: '#f8fafc', fontWeight: 600 }}>{selectedOrderDetails.colors || selectedOrderDetails.colourMatching || '—'}</span>
+                      <span style={{ color: '#64748b' }}>Colors:</span>
+                      <span style={{ color: '#0f172a', fontWeight: 700 }}>{selectedOrderDetails.colors || selectedOrderDetails.colourMatching || '—'}</span>
                     </div>
                   </div>
                 </div>
@@ -2060,8 +2111,8 @@ export default function ClientPortal({ client, onLogout }) {
                 {/* Right: Breakdown & Specs */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {/* Manufacturing Breakdown */}
-                  <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '12px', padding: '1rem' }}>
-                    <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.82rem', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                  <div style={{ background: '#ffffff', border: '1px solid #dbeafe', borderRadius: '12px', padding: '1rem', boxShadow: '0 2px 6px rgba(37,99,235,0.04)' }}>
+                    <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.82rem', color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 800 }}>
                       Manufacturing & Cutting Breakdown
                     </h4>
                     <div style={{
@@ -2069,36 +2120,36 @@ export default function ClientPortal({ client, onLogout }) {
                       gridTemplateColumns: 'repeat(3, 1fr)',
                       gap: '0.6rem'
                     }}>
-                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Consumption</span>
-                        <strong style={{ fontSize: '0.85rem', color: '#34d399' }}>{selectedOrderDetails.consumption ? `${selectedOrderDetails.consumption} m/pc` : '—'}</strong>
+                      <div style={{ background: '#f0f7ff', padding: '0.65rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#1e40af', display: 'block', fontWeight: 600 }}>Consumption</span>
+                        <strong style={{ fontSize: '0.88rem', color: '#1d4ed8' }}>{selectedOrderDetails.consumption ? `${selectedOrderDetails.consumption} m/pc` : '—'}</strong>
                       </div>
-                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Top</span>
-                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.top ? `${selectedOrderDetails.top} m` : '—'}</strong>
+                      <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Top</span>
+                        <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{selectedOrderDetails.top ? `${selectedOrderDetails.top} m` : '—'}</strong>
                       </div>
-                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Sleeve</span>
-                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.sleeve ? `${selectedOrderDetails.sleeve} m` : '—'}</strong>
+                      <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Sleeve</span>
+                        <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{selectedOrderDetails.sleeve ? `${selectedOrderDetails.sleeve} m` : '—'}</strong>
                       </div>
-                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Bottom</span>
-                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.bottom ? `${selectedOrderDetails.bottom} m` : '—'}</strong>
+                      <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Bottom</span>
+                        <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{selectedOrderDetails.bottom ? `${selectedOrderDetails.bottom} m` : '—'}</strong>
                       </div>
-                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Dupatta</span>
-                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.dupatta ? `${selectedOrderDetails.dupatta} m` : '—'}</strong>
+                      <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Dupatta</span>
+                        <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{selectedOrderDetails.dupatta ? `${selectedOrderDetails.dupatta} m` : '—'}</strong>
                       </div>
-                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Cut</span>
-                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.cut || '—'}</strong>
+                      <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Cut</span>
+                        <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{selectedOrderDetails.cut || '—'}</strong>
                       </div>
                     </div>
                   </div>
 
                   {/* Technical & Machine Parameters */}
-                  <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '12px', padding: '1rem' }}>
-                    <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.82rem', color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                  <div style={{ background: '#ffffff', border: '1px solid #dbeafe', borderRadius: '12px', padding: '1rem', boxShadow: '0 2px 6px rgba(37,99,235,0.04)' }}>
+                    <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.82rem', color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 800 }}>
                       Technical & Print Parameters
                     </h4>
                     <div style={{
@@ -2106,31 +2157,31 @@ export default function ClientPortal({ client, onLogout }) {
                       gridTemplateColumns: 'repeat(3, 1fr)',
                       gap: '0.6rem'
                     }}>
-                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Pass</span>
-                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.pass || '—'}</strong>
+                      <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Pass</span>
+                        <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{selectedOrderDetails.pass || '—'}</strong>
                       </div>
-                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Speed</span>
-                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.speed || '—'}</strong>
+                      <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Speed</span>
+                        <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{selectedOrderDetails.speed || '—'}</strong>
                       </div>
-                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Fusing Temp</span>
-                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>
+                      <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Fusing Temp</span>
+                        <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>
                           {selectedOrderDetails.fusingTemp || selectedOrderDetails.temperature ? `${selectedOrderDetails.fusingTemp || selectedOrderDetails.temperature} °C` : '—'}
                         </strong>
                       </div>
-                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Designer</span>
-                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.designer || '—'}</strong>
+                      <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Designer</span>
+                        <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{selectedOrderDetails.designer || '—'}</strong>
                       </div>
-                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Paper Type</span>
-                        <strong style={{ fontSize: '0.85rem', color: '#f8fafc' }}>{selectedOrderDetails.paperType || '—'}</strong>
+                      <div style={{ background: '#f8fafc', padding: '0.65rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>Paper Type</span>
+                        <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{selectedOrderDetails.paperType || '—'}</strong>
                       </div>
-                      <div style={{ background: '#1e293b', padding: '0.6rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block' }}>Exp. Time</span>
-                        <strong style={{ fontSize: '0.85rem', color: '#60a5fa' }}>{selectedOrderDetails.expTime || '—'}</strong>
+                      <div style={{ background: '#f0f7ff', padding: '0.65rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+                        <span style={{ fontSize: '0.68rem', color: '#1e40af', display: 'block', fontWeight: 600 }}>Exp. Time</span>
+                        <strong style={{ fontSize: '0.88rem', color: '#0284c7' }}>{selectedOrderDetails.expTime || '—'}</strong>
                       </div>
                     </div>
                   </div>
@@ -2140,14 +2191,14 @@ export default function ClientPortal({ client, onLogout }) {
               {/* Notes */}
               {(selectedOrderDetails.notes || selectedOrderDetails.note1 || selectedOrderDetails.emergencyNotes) && (
                 <div style={{
-                  background: '#0f172a',
-                  border: '1px solid #334155',
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
                   borderRadius: '10px',
-                  padding: '0.75rem 1rem',
-                  fontSize: '0.82rem',
-                  color: '#cbd5e1'
+                  padding: '0.85rem 1rem',
+                  fontSize: '0.84rem',
+                  color: '#1e3a8a'
                 }}>
-                  <strong style={{ color: '#f8fafc' }}>Instructions / Notes: </strong>
+                  <strong style={{ color: '#1d4ed8' }}>Instructions / Notes: </strong>
                   {selectedOrderDetails.notes || selectedOrderDetails.note1 || selectedOrderDetails.emergencyNotes}
                 </div>
               )}
@@ -2155,47 +2206,29 @@ export default function ClientPortal({ client, onLogout }) {
 
             {/* Modal Footer */}
             <div style={{
-              ...styles.orderModalFooter,
-              borderTop: '1px solid #334155',
-              padding: '0.85rem 1.25rem',
+              background: '#ffffff',
+              borderTop: '1px solid #e2e8f0',
+              padding: '0.9rem 1.4rem',
               display: 'flex',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
               alignItems: 'center'
             }}>
               <button
                 type="button"
-                onClick={() => triggerJobCardPrint(selectedOrderDetails)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  background: 'rgba(16, 185, 129, 0.15)',
-                  border: '1px solid rgba(16, 185, 129, 0.35)',
-                  color: '#34d399',
-                  fontWeight: 700,
-                  fontSize: '0.84rem',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <Printer size={15} />
-                <span>Print Job Card</span>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setSelectedOrderDetails(null)}
                 style={{
-                  padding: '8px 18px',
+                  padding: '9px 24px',
                   borderRadius: '8px',
-                  background: '#334155',
-                  border: '1px solid #475569',
-                  color: '#f8fafc',
+                  background: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  color: '#334155',
                   fontWeight: 600,
-                  fontSize: '0.84rem',
-                  cursor: 'pointer'
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s ease'
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#e2e8f0'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
               >
                 Close
               </button>

@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Edit2, Trash2, Printer, Search, Plus, Minus, SlidersHorizontal, 
   TrendingDown, MoreVertical, Sparkles, Package, AlertTriangle, 
   CheckCircle2, XCircle, DollarSign, Download, Filter, Calendar,
-  RefreshCw, FileText, TrendingUp, Layers3, IndianRupee, ArrowDownRight, ArrowUpRight, Building2, BookOpen, Eye, X
+  RefreshCw, FileText, TrendingUp, Layers3, IndianRupee, ArrowDownRight, ArrowUpRight, Building2, BookOpen, Eye, X,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
@@ -113,6 +114,13 @@ export default function InventoryGrid({
   const [inwardLoading, setInwardLoading] = useState(false);
   const [inwardError, setInwardError] = useState('');
   const [downloadingInwardPdf, setDownloadingInwardPdf] = useState(false);
+
+  // Challan-Wise Inward View States
+  const [inwardViewMode, setInwardViewMode] = useState('challan'); // 'challan' (default) | 'items'
+  const [selectedChallan, setSelectedChallan] = useState(null);
+  const [expandedChallanId, setExpandedChallanId] = useState(null);
+  const [inwardChallanSortField, setInwardChallanSortField] = useState('date');
+  const [inwardChallanSortOrder, setInwardChallanSortOrder] = useState('desc');
 
   // --- Sub-Screen 3: Outward Stock State ---
   const [outwardDateStart, setOutwardDateStart] = useState('');
@@ -396,6 +404,286 @@ export default function InventoryGrid({
       if (aVal > bVal) return inwardSortOrder === 'asc' ? 1 : -1;
       return 0;
     });
+
+  // Sort Handler for Inward Challans
+  const handleInwardChallanSort = (field) => {
+    if (inwardChallanSortField === field) {
+      setInwardChallanSortOrder(inwardChallanSortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setInwardChallanSortField(field);
+      setInwardChallanSortOrder('asc');
+    }
+  };
+
+  // Group Inward Items into Challan Batches
+  const inwardChallans = useMemo(() => {
+    const rawItems = inwardData.items || [];
+    if (!rawItems.length) return [];
+
+    // Sort chronologically descending
+    const sorted = [...rawItems].sort((a, b) => {
+      const tA = new Date(a.created_date_time || a.date || a.createdAt || 0).getTime();
+      const tB = new Date(b.created_date_time || b.date || b.createdAt || 0).getTime();
+      return tB - tA;
+    });
+
+    const groups = [];
+    let curGroup = null;
+
+    sorted.forEach((item, idx) => {
+      const rawDt = item.created_date_time || item.date || item.createdAt;
+      const timeMs = new Date(rawDt).getTime();
+      const challanNo = (item.challanNo || '').trim();
+      const party = (item.party || 'Vendor').trim();
+
+      if (curGroup) {
+        const sameExplicitChallan = challanNo && curGroup.challanNo && challanNo.toLowerCase() === curGroup.challanNo.toLowerCase();
+        const sameParty = (party || '').toLowerCase() === (curGroup.party || '').toLowerCase();
+        const timeDiff = Math.abs(curGroup.earliestTimeMs - timeMs);
+        const sameTimeBatch = (!challanNo || !curGroup.challanNo) && sameParty && (timeDiff <= 300000 || Math.abs(curGroup.latestTimeMs - timeMs) <= 90000);
+
+        if (sameExplicitChallan || sameTimeBatch) {
+          curGroup.items.push(item);
+          const itemQty = Number(item.qty || item.total || item.currentlyAvailableStock || 0);
+          const itemPrice = Number(item.purchasePrice || 0);
+          curGroup.totalQty += itemQty;
+          curGroup.totalAmount += Number(item.totalPurchaseAmount || (itemQty * itemPrice));
+          curGroup.skuCodes.add(item.skuCode || item.sku || `ITEM-${idx}`);
+          curGroup.latestTimeMs = Math.max(curGroup.latestTimeMs, timeMs);
+          curGroup.earliestTimeMs = Math.min(curGroup.earliestTimeMs, timeMs);
+          if (!curGroup.sampleImage && item.imageUrl) {
+            curGroup.sampleImage = item.imageUrl;
+          }
+          return;
+        }
+      }
+
+      const itemQty = Number(item.qty || item.total || item.currentlyAvailableStock || 0);
+      const itemPrice = Number(item.purchasePrice || 0);
+
+      curGroup = {
+        id: challanNo ? `CH-${challanNo}-${timeMs}` : `BATCH-${item._id || item.id || idx}`,
+        challanNo: challanNo,
+        party: party,
+        date: rawDt,
+        latestTimeMs: timeMs,
+        earliestTimeMs: timeMs,
+        items: [item],
+        totalQty: itemQty,
+        totalAmount: Number(item.totalPurchaseAmount || (itemQty * itemPrice)),
+        skuCodes: new Set([item.skuCode || item.sku || `ITEM-${idx}`]),
+        sampleImage: item.imageUrl || ''
+      };
+      groups.push(curGroup);
+    });
+
+    let autoSeq = groups.length;
+    groups.forEach((g) => {
+      if (!g.challanNo) {
+        const dt = new Date(g.date);
+        const dayStr = String(dt.getDate()).padStart(2, '0') + String(dt.getMonth() + 1).padStart(2, '0');
+        g.displayChallanNo = `INW-${dayStr}-${autoSeq--}`;
+      } else {
+        g.displayChallanNo = g.challanNo.startsWith('CH-') || g.challanNo.startsWith('INW-') ? g.challanNo : `CH-${g.challanNo}`;
+      }
+    });
+
+    return groups;
+  }, [inwardData.items]);
+
+  // Filtered & Sorted Inward Challans
+  const filteredInwardChallans = useMemo(() => {
+    let list = inwardChallans;
+    if (inwardSearchTerm.trim()) {
+      const q = inwardSearchTerm.trim().toLowerCase();
+      list = list.filter(ch => {
+        if (ch.displayChallanNo.toLowerCase().includes(q)) return true;
+        if (ch.party.toLowerCase().includes(q)) return true;
+        return ch.items.some(it => 
+          (it.skuCode && it.skuCode.toLowerCase().includes(q)) ||
+          (it.itemName && it.itemName.toLowerCase().includes(q)) ||
+          (it.size && it.size.toLowerCase().includes(q))
+        );
+      });
+    }
+
+    return [...list].sort((a, b) => {
+      let aVal = a[inwardChallanSortField];
+      let bVal = b[inwardChallanSortField];
+
+      if (inwardChallanSortField === 'date') {
+        aVal = new Date(a.date || 0).getTime();
+        bVal = new Date(b.date || 0).getTime();
+      } else if (inwardChallanSortField === 'totalQty') {
+        aVal = Number(a.totalQty || 0);
+        bVal = Number(b.totalQty || 0);
+      } else if (inwardChallanSortField === 'totalSkus') {
+        aVal = a.skuCodes.size;
+        bVal = b.skuCodes.size;
+      } else if (inwardChallanSortField === 'totalAmount') {
+        aVal = Number(a.totalAmount || 0);
+        bVal = Number(b.totalAmount || 0);
+      } else if (inwardChallanSortField === 'party') {
+        aVal = (a.party || '').toLowerCase();
+        bVal = (b.party || '').toLowerCase();
+      } else if (inwardChallanSortField === 'challanNo') {
+        aVal = (a.displayChallanNo || '').toLowerCase();
+        bVal = (b.displayChallanNo || '').toLowerCase();
+      }
+
+      if (aVal < bVal) return inwardChallanSortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return inwardChallanSortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [inwardChallans, inwardSearchTerm, inwardChallanSortField, inwardChallanSortOrder]);
+
+  // Total unique SKUs across inward items
+  const totalUniqueInwardSkus = useMemo(() => {
+    const set = new Set();
+    (inwardData.items || []).forEach(it => {
+      const code = it.skuCode || it.sku;
+      if (code) set.add(code);
+    });
+    return set.size;
+  }, [inwardData.items]);
+
+  // Printable Challan Receiving Slip
+  const handlePrintChallan = (challan) => {
+    if (!challan) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to print Challan');
+      return;
+    }
+    const dtObj = new Date(challan.date);
+    const dateFormatted = !isNaN(dtObj.getTime())
+      ? dtObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+      : 'N/A';
+    const timeFormatted = !isNaN(dtObj.getTime())
+      ? dtObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+      : '';
+
+    const rowsHtml = (challan.items || []).map((item, index) => {
+      const itemQty = Number(item.qty || item.total || item.currentlyAvailableStock || 0);
+      const buyPrice = Number(item.purchasePrice || 0);
+      const totalAmount = Number(item.totalPurchaseAmount || (itemQty * buyPrice));
+      const sizeStr = item.sizes && item.sizes.length > 0
+        ? item.sizes.map(s => `${s.size}: ${s.qty}`).join(', ')
+        : (item.size || 'Free Size');
+
+      return `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 8px 10px; font-size: 12px; text-align: center;">${index + 1}</td>
+          <td style="padding: 8px 10px; font-size: 12px; font-weight: 600;">${item.skuCode || item.sku || '-'}</td>
+          <td style="padding: 8px 10px; font-size: 12px;">${item.itemName || '-'}</td>
+          <td style="padding: 8px 10px; font-size: 11px; color: #475569;">${sizeStr}</td>
+          <td style="padding: 8px 10px; font-size: 12px; font-weight: 700; text-align: center;">${itemQty} Pcs</td>
+          <td style="padding: 8px 10px; font-size: 12px; text-align: right;">₹${buyPrice.toFixed(2)}</td>
+          <td style="padding: 8px 10px; font-size: 12px; font-weight: 700; text-align: right;">₹${totalAmount.toFixed(2)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Inward Challan - ${challan.displayChallanNo}</title>
+          <style>
+            @media print {
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+              @page { margin: 12mm; }
+            }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #0f172a; margin: 0; padding: 20px; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0284c7; padding-bottom: 14px; margin-bottom: 16px; }
+            .title { font-size: 20px; font-weight: 800; color: #0369a1; text-transform: uppercase; letter-spacing: 0.5px; }
+            .subtitle { font-size: 12px; color: #64748b; margin-top: 2px; }
+            .badge { background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 14px; border: 1px solid #bae6fd; }
+            .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: #f8fafc; padding: 12px 14px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 16px; font-size: 12px; }
+            .info-label { font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
+            .info-val { font-size: 13px; font-weight: 700; color: #0f172a; }
+            table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+            th { background: #0369a1; color: #ffffff; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 10px; text-align: left; }
+            .summary-box { margin-top: 16px; display: flex; justify-content: flex-end; }
+            .summary-table { width: 280px; border-collapse: collapse; }
+            .summary-table td { padding: 6px 10px; font-size: 13px; }
+            .signatures { margin-top: 48px; display: flex; justify-content: space-between; padding: 0 24px; }
+            .sig-line { border-top: 1px dashed #94a3b8; width: 180px; text-align: center; padding-top: 6px; font-size: 11px; color: #475569; font-weight: 600; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="title">ELITE EDITION - GOODS INWARD CHALLAN</div>
+              <div class="subtitle">Official Inventory Receiving Slip & Verification Voucher</div>
+            </div>
+            <div class="badge">${challan.displayChallanNo}</div>
+          </div>
+
+          <div class="info-grid">
+            <div>
+              <div class="info-label">Challan / Ref No</div>
+              <div class="info-val">${challan.displayChallanNo}</div>
+            </div>
+            <div>
+              <div class="info-label">Vendor / Supplier</div>
+              <div class="info-val">${challan.party || 'Vendor'}</div>
+            </div>
+            <div>
+              <div class="info-label">Received Date & Time</div>
+              <div class="info-val">${dateFormatted} ${timeFormatted}</div>
+            </div>
+            <div>
+              <div class="info-label">Total SKUs & Items</div>
+              <div class="info-val">${challan.skuCodes ? challan.skuCodes.size : (challan.items || []).length} SKUs (${(challan.items || []).length} items)</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 30px; text-align: center;">#</th>
+                <th>SKU Code</th>
+                <th>Product Description</th>
+                <th>Sizes Breakdown</th>
+                <th style="text-align: center;">Received Qty</th>
+                <th style="text-align: right;">Buy Price</th>
+                <th style="text-align: right;">Total (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <div class="summary-box">
+            <table class="summary-table">
+              <tr style="border-top: 2px solid #0369a1; border-bottom: 2px solid #0369a1; background: #f0fdf4;">
+                <td style="font-weight: 800; color: #166534;">TOTAL PCS RECEIVED:</td>
+                <td style="font-weight: 800; color: #166534; text-align: right; font-size: 15px;">${challan.totalQty} Pcs</td>
+              </tr>
+              <tr style="border-bottom: 2px solid #0369a1;">
+                <td style="font-weight: 800; color: #0369a1;">TOTAL VALUE (₹):</td>
+                <td style="font-weight: 800; color: #0369a1; text-align: right; font-size: 15px;">₹${(challan.totalAmount || 0).toFixed(2)}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="signatures">
+            <div class="sig-line">Received By (Store Incharge)</div>
+            <div class="sig-line">Checked & Verified By</div>
+            <div class="sig-line">Supplier / Courier Sign</div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
 
   // Filtered Outward Log Items
   const handleOutwardSort = (field) => {
@@ -1017,26 +1305,38 @@ export default function InventoryGrid({
         <>
           {/* Summary Metric Cards for Inward Stock */}
           <div style={styles.statsGrid}>
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #10b981' }}>
-              <div style={styles.statIconWrap('#10b981', '#ecfdf5')}>
-                <Layers3 size={22} color="#10b981" />
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #0284c7' }}>
+              <div style={styles.statIconWrap('#0284c7', '#eff6ff')}>
+                <FileText size={22} color="#0284c7" />
               </div>
               <div>
-                <div style={styles.statLabel}>INWARD LOG RECORDS</div>
-                <div style={{ ...styles.statVal, color: '#047857' }}>
-                  {inwardData.items?.length || 0} <span style={styles.statSubText}>records</span>
+                <div style={styles.statLabel}>TOTAL INWARD CHALLANS</div>
+                <div style={{ ...styles.statVal, color: '#0369a1' }}>
+                  {inwardChallans.length} <span style={styles.statSubText}>challans</span>
                 </div>
               </div>
             </div>
 
-            <div style={{ ...styles.statCard, borderLeft: '4px solid #3b82f6' }}>
-              <div style={styles.statIconWrap('#3b82f6', '#eff6ff')}>
-                <ArrowDownRight size={22} color="#3b82f6" />
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #10b981' }}>
+              <div style={styles.statIconWrap('#10b981', '#ecfdf5')}>
+                <ArrowDownRight size={22} color="#10b981" />
               </div>
               <div>
-                <div style={styles.statLabel}>TOTAL UNITS RECEIVED</div>
-                <div style={{ ...styles.statVal, color: '#1d4ed8' }}>
-                  {(inwardData.totalQty || 0).toLocaleString()} <span style={styles.statSubText}>units</span>
+                <div style={styles.statLabel}>TOTAL PIECES RECEIVED</div>
+                <div style={{ ...styles.statVal, color: '#047857' }}>
+                  {(inwardData.totalQty || 0).toLocaleString()} <span style={styles.statSubText}>pcs</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #8b5cf6' }}>
+              <div style={styles.statIconWrap('#8b5cf6', '#f5f3ff')}>
+                <Layers3 size={22} color="#8b5cf6" />
+              </div>
+              <div>
+                <div style={styles.statLabel}>TOTAL SKUs LOGGED</div>
+                <div style={{ ...styles.statVal, color: '#6d28d9' }}>
+                  {totalUniqueInwardSkus} <span style={styles.statSubText}>SKUs</span>
                 </div>
               </div>
             </div>
@@ -1049,7 +1349,7 @@ export default function InventoryGrid({
             display: 'flex',
             flexDirection: 'row',
             alignItems: 'center',
-            justify: 'space-between',
+            justifyContent: 'space-between',
             flexWrap: 'nowrap',
             gap: '0.5rem',
             overflowX: 'auto',
@@ -1063,7 +1363,7 @@ export default function InventoryGrid({
                   type="text"
                   value={inwardSearchTerm}
                   onChange={(e) => setInwardSearchTerm(e.target.value)}
-                  placeholder="Search inward SKU, item..."
+                  placeholder="Search Challan, SKU, Vendor..."
                   style={styles.searchInput}
                 />
               </div>
@@ -1084,6 +1384,84 @@ export default function InventoryGrid({
                   setCustomInwardEnd(e);
                 }}
               />
+
+              {/* View Switcher: Challan Wise (Default) vs Individual SKUs */}
+              <div style={{
+                display: 'flex',
+                background: '#f1f5f9',
+                padding: '3px',
+                borderRadius: '9px',
+                border: '1px solid #cbd5e1',
+                gap: '3px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setInwardViewMode('challan')}
+                  style={{
+                    padding: '0.35rem 0.7rem',
+                    borderRadius: '7px',
+                    border: 'none',
+                    background: inwardViewMode === 'challan' ? '#0284c7' : 'transparent',
+                    color: inwardViewMode === 'challan' ? '#ffffff' : '#475569',
+                    fontWeight: inwardViewMode === 'challan' ? 700 : 500,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    transition: 'all 0.15s ease',
+                    boxShadow: inwardViewMode === 'challan' ? '0 2px 6px rgba(2, 132, 199, 0.3)' : 'none'
+                  }}
+                  title="View Inward Stock grouped by Challan"
+                >
+                  <FileText size={13} />
+                  <span>Challan Wise</span>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    padding: '1px 5px',
+                    borderRadius: '10px',
+                    background: inwardViewMode === 'challan' ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                    color: inwardViewMode === 'challan' ? '#ffffff' : '#64748b',
+                    fontWeight: 700
+                  }}>
+                    {filteredInwardChallans.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setInwardViewMode('items')}
+                  style={{
+                    padding: '0.35rem 0.7rem',
+                    borderRadius: '7px',
+                    border: 'none',
+                    background: inwardViewMode === 'items' ? '#0284c7' : 'transparent',
+                    color: inwardViewMode === 'items' ? '#ffffff' : '#475569',
+                    fontWeight: inwardViewMode === 'items' ? 700 : 500,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    transition: 'all 0.15s ease',
+                    boxShadow: inwardViewMode === 'items' ? '0 2px 6px rgba(2, 132, 199, 0.3)' : 'none'
+                  }}
+                  title="View flattened individual SKU log"
+                >
+                  <Layers3 size={13} />
+                  <span>Individual SKUs</span>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    padding: '1px 5px',
+                    borderRadius: '10px',
+                    background: inwardViewMode === 'items' ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                    color: inwardViewMode === 'items' ? '#ffffff' : '#64748b',
+                    fontWeight: 700
+                  }}>
+                    {filteredInwardItems.length}
+                  </span>
+                </button>
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
@@ -1115,7 +1493,7 @@ export default function InventoryGrid({
           <div style={styles.tablePanel}>
             {inwardLoading ? (
               <div style={styles.loadingBox}>
-                <RefreshCw size={28} color="#10b981" style={{ animation: 'spin 1s linear infinite' }} />
+                <RefreshCw size={28} color="#0284c7" style={{ animation: 'spin 1s linear infinite' }} />
                 <p style={{ color: '#475569', fontWeight: 600, marginTop: '0.8rem' }}>Loading Inward Stock History...</p>
               </div>
             ) : inwardError ? (
@@ -1124,209 +1502,579 @@ export default function InventoryGrid({
                 <span>{inwardError}</span>
                 <button onClick={() => fetchInwardData()} style={styles.retryBtn}>Retry</button>
               </div>
-            ) : filteredInwardItems.length === 0 ? (
-              <div style={styles.emptyState}>
-                <span style={{ fontSize: '2.8rem' }}>📥</span>
-                <h4 style={{ margin: '0.5rem 0 0.2rem 0', color: '#1e293b', fontSize: '1.1rem' }}>No inward stock records found</h4>
-                <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try clearing date filters or add inward stock.</p>
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
-                <table style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', background: '#ffffff', fontSize: '0.8rem' }}>
-                  <thead>
-                    <tr style={{ background: '#065f46', color: '#ffffff' }}>
-                      <th onClick={() => handleInwardSort('created_date_time')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Date & Time">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <span>DATE & TIME</span>
-                          <span style={{ fontSize: '0.7rem', color: inwardSortField === 'created_date_time' ? '#6ee7b7' : 'rgba(255,255,255,0.6)' }}>
-                            {inwardSortField === 'created_date_time' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
-                          </span>
-                        </div>
-                      </th>
-                      <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }}>PHOTO</th>
-                      <th onClick={() => handleInwardSort('skuCode')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by SKU Code">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <span>SKU CODE</span>
-                          <span style={{ fontSize: '0.7rem', color: inwardSortField === 'skuCode' ? '#6ee7b7' : 'rgba(255,255,255,0.6)' }}>
-                            {inwardSortField === 'skuCode' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
-                          </span>
-                        </div>
-                      </th>
-                      <th onClick={() => handleInwardSort('itemName')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff' }} title="Sort by Product Name">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <span>PRODUCT NAME</span>
-                          <span style={{ fontSize: '0.7rem', color: inwardSortField === 'itemName' ? '#6ee7b7' : 'rgba(255,255,255,0.6)' }}>
-                            {inwardSortField === 'itemName' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
-                          </span>
-                        </div>
-                      </th>
-                      <th onClick={() => handleInwardSort('party')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Vendor / Supplier">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <span>VENDOR</span>
-                          <span style={{ fontSize: '0.7rem', color: inwardSortField === 'party' ? '#6ee7b7' : 'rgba(255,255,255,0.6)' }}>
-                            {inwardSortField === 'party' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
-                          </span>
-                        </div>
-                      </th>
-                      <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', textAlign: 'center', color: '#ffffff', whiteSpace: 'nowrap' }}>SIZES & QTY</th>
-                      <th onClick={() => handleInwardSort('qty')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'center', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Quantity Inwarded">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
-                          <span>QTY IN</span>
-                          <span style={{ fontSize: '0.7rem', color: inwardSortField === 'qty' ? '#6ee7b7' : 'rgba(255,255,255,0.6)' }}>
-                            {inwardSortField === 'qty' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
-                          </span>
-                        </div>
-                      </th>
-                      <th onClick={() => handleInwardSort('purchasePrice')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Buy Price Unit">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
-                          <span>BUY PRICE</span>
-                          <span style={{ fontSize: '0.7rem', color: inwardSortField === 'purchasePrice' ? '#6ee7b7' : 'rgba(255,255,255,0.6)' }}>
-                            {inwardSortField === 'purchasePrice' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
-                          </span>
-                        </div>
-                      </th>
-                      <th onClick={() => handleInwardSort('totalPurchaseAmount')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Total Purchase Value">
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
-                          <span>TOTAL VALUE</span>
-                          <span style={{ fontSize: '0.7rem', color: inwardSortField === 'totalPurchaseAmount' ? '#6ee7b7' : 'rgba(255,255,255,0.6)' }}>
-                            {inwardSortField === 'totalPurchaseAmount' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
-                          </span>
-                        </div>
-                      </th>
-                      <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.03em', color: '#ffffff', whiteSpace: 'nowrap' }}>
-                        ACTIONS
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredInwardItems.map((item, idx) => {
-                      const rawDt = item.created_date_time || item.date;
-                      const dtObj = rawDt ? new Date(rawDt) : null;
-                      const dateStr = dtObj
-                        ? dtObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-                        : 'N/A';
-                      const timeStr = dtObj
-                        ? dtObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
-                        : '';
-
-                      const totalQty = item.qty || item.total || 0;
-                      const buyPrice = Number(item.purchasePrice || 0);
-                      const totalPurchase = Number(item.totalPurchaseAmount || (buyPrice * totalQty));
-
-                      return (
-                        <tr key={item.id || item._id || idx} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                          <td style={{ padding: '0.55rem 0.5rem', fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
-                            <div style={{ fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>{dateStr}</div>
-                            {timeStr && <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', lineHeight: 1.2 }}>{timeStr}</div>}
-                          </td>
-                          <td style={{ padding: '0.55rem 0.5rem' }}>
-                            <div style={{ ...styles.itemImgWrapper, width: '36px', height: '36px', borderRadius: '8px' }}>
-                              {item.imageUrl ? (
-                                <img 
-                                  src={item.imageUrl} 
-                                  alt={item.sku} 
-                                  style={styles.itemImg}
-                                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                                />
-                              ) : null}
-                              <div style={{ ...styles.imgPlaceholder, display: item.imageUrl ? 'none' : 'flex', fontSize: '0.85rem' }}>
-                                {item.itemName ? item.itemName[0].toUpperCase() : 'E'}
-                              </div>
-                            </div>
-                          </td>
-                          <td style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap' }}>
-                            <span style={{ ...styles.skuText, padding: '0.2rem 0.45rem', fontSize: '0.76rem' }}>{item.skuCode || item.sku || 'N/A'}</span>
-                          </td>
-                          <td style={{ padding: '0.55rem 0.5rem', fontWeight: 700, color: '#0f172a', fontSize: '0.82rem' }}>
-                            {item.itemName}
-                          </td>
-                          <td style={{ padding: '0.55rem 0.5rem', fontSize: '0.8rem', color: '#334155', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                            {item.party || 'N/A'}
-                          </td>
-                          <td style={{ padding: '0.55rem 0.5rem', textAlign: 'center' }}>
-                            <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                              {item.sizes?.map((s, sIdx) => (
-                                <span key={sIdx} style={{ ...styles.sizeTagBadge, padding: '2px 6px', fontSize: '0.7rem' }}>
-                                  {s.size}: <strong>{s.qty}</strong>
-                                </span>
-                              )) || (
-                                <span style={{ ...styles.sizeTagBadge, padding: '2px 6px', fontSize: '0.7rem' }}>Size: {item.size || 'N/A'}</span>
-                              )}
-                            </div>
-                          </td>
-                          <td style={{ padding: '0.55rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                            <span style={{ ...styles.qtyInwardBadge, padding: '3px 8px', fontSize: '0.74rem' }}>
-                              +{totalQty} Units
+            ) : inwardViewMode === 'challan' ? (
+              /* ================= CHALLAN-WISE VIEW ================= */
+              filteredInwardChallans.length === 0 ? (
+                <div style={styles.emptyState}>
+                  <span style={{ fontSize: '2.8rem' }}>📋</span>
+                  <h4 style={{ margin: '0.5rem 0 0.2rem 0', color: '#1e293b', fontSize: '1.1rem' }}>No inward challans found</h4>
+                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try clearing date filters or add inward stock.</p>
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
+                  <table style={{ width: '100%', minWidth: '980px', borderCollapse: 'collapse', background: '#ffffff', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr style={{ background: '#0369a1', color: '#ffffff' }}>
+                        <th style={{ width: '40px', padding: '0.65rem 0.4rem', textAlign: 'center' }}></th>
+                        <th onClick={() => handleInwardChallanSort('date')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Date & Time">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span>DATE & TIME</span>
+                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'date' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                              {inwardChallanSortField === 'date' ? (inwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
                             </span>
-                          </td>
-                          <td style={{ padding: '0.55rem 0.5rem', textAlign: 'right', fontSize: '0.8rem', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
-                            ₹ {buyPrice.toFixed(2)}
-                          </td>
-                          <td style={{ padding: '0.55rem 0.5rem', textAlign: 'right', fontSize: '0.82rem', fontWeight: 800, color: '#d97706', whiteSpace: 'nowrap' }}>
-                            ₹ {totalPurchase.toFixed(2)}
-                          </td>
-                          <td style={{ padding: '0.55rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'center' }}>
-                              {/* Display / View Item Button */}
-                              <button
-                                type="button"
-                                onClick={() => setViewingItem(item)}
-                                style={{
-                                  width: '32px',
-                                  height: '32px',
-                                  padding: 0,
-                                  background: '#eff6ff',
-                                  border: '1px solid #bfdbfe',
-                                  color: '#2563eb',
-                                  borderRadius: '8px',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                                  transition: 'all 0.15s ease'
-                                }}
-                                title="Display Item Details"
-                              >
-                                <Eye size={15} />
-                              </button>
+                          </div>
+                        </th>
+                        <th onClick={() => handleInwardChallanSort('challanNo')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Challan No">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span>CHALLAN NO</span>
+                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'challanNo' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                              {inwardChallanSortField === 'challanNo' ? (inwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th onClick={() => handleInwardChallanSort('party')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Vendor / Supplier">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span>VENDOR / SUPPLIER</span>
+                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'party' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                              {inwardChallanSortField === 'party' ? (inwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th onClick={() => handleInwardChallanSort('totalSkus')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'center', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Total SKUs">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
+                            <span>TOTAL SKUs</span>
+                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'totalSkus' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                              {inwardChallanSortField === 'totalSkus' ? (inwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th onClick={() => handleInwardChallanSort('totalQty')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'center', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Total Pieces (Qty)">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
+                            <span>TOTAL PIECES (QTY)</span>
+                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'totalQty' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                              {inwardChallanSortField === 'totalQty' ? (inwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }}>ITEMS PREVIEW</th>
+                        <th onClick={() => handleInwardChallanSort('totalAmount')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Total Value">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                            <span>TOTAL VALUE</span>
+                            <span style={{ fontSize: '0.7rem', color: inwardChallanSortField === 'totalAmount' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                              {inwardChallanSortField === 'totalAmount' ? (inwardChallanSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.03em', color: '#ffffff', whiteSpace: 'nowrap' }}>
+                          ACTIONS
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredInwardChallans.map((ch, idx) => {
+                        const dtObj = ch.date ? new Date(ch.date) : null;
+                        const dateStr = dtObj && !isNaN(dtObj.getTime())
+                          ? dtObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                          : 'N/A';
+                        const timeStr = dtObj && !isNaN(dtObj.getTime())
+                          ? dtObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                          : '';
 
-                              {/* Edit Button */}
-                              <button
-                                type="button"
-                                onClick={() => onEdit(item)}
-                                style={{
-                                  width: '32px',
-                                  height: '32px',
-                                  padding: 0,
-                                  background: '#f0fdf4',
-                                  border: '1px solid #bbf7d0',
-                                  color: '#16a34a',
-                                  borderRadius: '8px',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                                  transition: 'all 0.15s ease'
-                                }}
-                                title="Edit Item Details"
-                              >
-                                <Edit2 size={15} />
-                              </button>
+                        const isExpanded = expandedChallanId === ch.id;
+                        const skuList = Array.from(ch.skuCodes || []);
+                        const visibleSkus = skuList.slice(0, 2);
+                        const extraSkusCount = skuList.length - visibleSkus.length;
 
-                              {/* Delete Button */}
-                              {onDelete && (
+                        return (
+                          <React.Fragment key={ch.id || idx}>
+                            <tr style={{
+                              borderBottom: isExpanded ? 'none' : '1px solid #e2e8f0',
+                              background: isExpanded ? '#f0f9ff' : (idx % 2 === 0 ? '#ffffff' : '#f8fafc'),
+                              transition: 'background 0.15s ease'
+                            }}>
+                              {/* Expand Toggle */}
+                              <td style={{ padding: '0.6rem 0.4rem', textAlign: 'center' }}>
                                 <button
                                   type="button"
-                                  onClick={() => onDelete(item._id || item.id)}
+                                  onClick={() => setExpandedChallanId(isExpanded ? null : ch.id)}
+                                  style={{
+                                    border: 'none',
+                                    background: isExpanded ? '#0284c7' : '#e2e8f0',
+                                    color: isExpanded ? '#ffffff' : '#475569',
+                                    width: '26px',
+                                    height: '26px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  title={isExpanded ? 'Collapse Items' : 'Expand Items'}
+                                >
+                                  {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                                </button>
+                              </td>
+
+                              {/* Date & Time */}
+                              <td style={{ padding: '0.6rem 0.5rem', fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>{dateStr}</div>
+                                {timeStr && <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', lineHeight: 1.2 }}>{timeStr}</div>}
+                              </td>
+
+                              {/* Challan No */}
+                              <td style={{ padding: '0.6rem 0.5rem', whiteSpace: 'nowrap' }}>
+                                <span style={{
+                                  background: '#eff6ff',
+                                  color: '#1d4ed8',
+                                  border: '1px solid #bfdbfe',
+                                  padding: '0.25rem 0.55rem',
+                                  borderRadius: '6px',
+                                  fontWeight: 800,
+                                  fontSize: '0.78rem',
+                                  letterSpacing: '0.02em',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem'
+                                }}>
+                                  <FileText size={12} color="#2563eb" />
+                                  {ch.displayChallanNo}
+                                </span>
+                              </td>
+
+                              {/* Vendor */}
+                              <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700, color: '#1e293b', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                                {ch.party || 'Vendor'}
+                              </td>
+
+                              {/* Total SKUs */}
+                              <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <span style={{
+                                  background: '#f5f3ff',
+                                  color: '#6d28d9',
+                                  border: '1px solid #ddd6fe',
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  fontWeight: 800,
+                                  fontSize: '0.76rem'
+                                }}>
+                                  {ch.skuCodes ? ch.skuCodes.size : ch.items.length} SKUs
+                                </span>
+                              </td>
+
+                              {/* Total Pieces */}
+                              <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <span style={{
+                                  background: '#ecfdf5',
+                                  color: '#047857',
+                                  border: '1px solid #a7f3d0',
+                                  padding: '4px 10px',
+                                  borderRadius: '6px',
+                                  fontWeight: 800,
+                                  fontSize: '0.82rem'
+                                }}>
+                                  +{ch.totalQty} Pcs
+                                </span>
+                              </td>
+
+                              {/* Items Preview */}
+                              <td style={{ padding: '0.6rem 0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                  {ch.sampleImage && (
+                                    <img
+                                      src={ch.sampleImage}
+                                      alt="preview"
+                                      style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'cover', border: '1px solid #e2e8f0' }}
+                                    />
+                                  )}
+                                  {visibleSkus.map((sku, sIdx) => (
+                                    <span key={sIdx} style={{
+                                      background: '#f1f5f9',
+                                      color: '#334155',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.7rem',
+                                      fontWeight: 600,
+                                      border: '1px solid #cbd5e1'
+                                    }}>
+                                      {sku}
+                                    </span>
+                                  ))}
+                                  {extraSkusCount > 0 && (
+                                    <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
+                                      +{extraSkusCount} more
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Total Value */}
+                              <td style={{ padding: '0.6rem 0.5rem', textAlign: 'right', fontSize: '0.84rem', fontWeight: 800, color: '#0369a1', whiteSpace: 'nowrap' }}>
+                                ₹{(ch.totalAmount || 0).toFixed(2)}
+                              </td>
+
+                              {/* Actions */}
+                              <td style={{ padding: '0.6rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'center' }}>
+                                  {/* View Challan Details Modal */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedChallan(ch)}
+                                    style={{
+                                      width: '30px',
+                                      height: '30px',
+                                      padding: 0,
+                                      background: '#eff6ff',
+                                      border: '1px solid #bfdbfe',
+                                      color: '#0284c7',
+                                      borderRadius: '7px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    title="View Full Challan Breakdown"
+                                  >
+                                    <Eye size={15} />
+                                  </button>
+
+                                  {/* Print Challan Slip */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePrintChallan(ch)}
+                                    style={{
+                                      width: '30px',
+                                      height: '30px',
+                                      padding: 0,
+                                      background: '#f0fdf4',
+                                      border: '1px solid #bbf7d0',
+                                      color: '#16a34a',
+                                      borderRadius: '7px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    title="Print Challan Slip"
+                                  >
+                                    <Printer size={15} />
+                                  </button>
+
+                                  {/* Expand / Collapse Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedChallanId(isExpanded ? null : ch.id)}
+                                    style={{
+                                      padding: '0 0.5rem',
+                                      height: '30px',
+                                      background: isExpanded ? '#0284c7' : '#f8fafc',
+                                      border: isExpanded ? '1px solid #0284c7' : '1px solid #cbd5e1',
+                                      color: isExpanded ? '#ffffff' : '#475569',
+                                      borderRadius: '7px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.2rem',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 700,
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    title={isExpanded ? 'Hide Items' : 'Show All Items'}
+                                  >
+                                    <span>{isExpanded ? 'Hide' : 'Items'}</span>
+                                    {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+
+                            {/* Inline Expandable Subtable */}
+                            {isExpanded && (
+                              <tr style={{ background: '#f0f9ff', borderBottom: '2px solid #bae6fd' }}>
+                                <td colSpan="9" style={{ padding: '0.85rem 1.25rem' }}>
+                                  <div style={{
+                                    background: '#ffffff',
+                                    borderRadius: '10px',
+                                    border: '1px solid #bae6fd',
+                                    overflow: 'hidden',
+                                    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.08)'
+                                  }}>
+                                    <div style={{
+                                      padding: '0.55rem 0.85rem',
+                                      background: '#e0f2fe',
+                                      borderBottom: '1px solid #bae6fd',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center'
+                                    }}>
+                                      <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0369a1', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <Layers3 size={14} />
+                                        <span>Items Breakdown in Challan {ch.displayChallanNo} ({ch.items.length} items logged)</span>
+                                      </div>
+                                      <div style={{ fontSize: '0.74rem', color: '#0284c7', fontWeight: 700 }}>
+                                        Total: {ch.totalQty} Pcs | ₹{(ch.totalAmount || 0).toFixed(2)}
+                                      </div>
+                                    </div>
+
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem' }}>
+                                      <thead>
+                                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b' }}>
+                                          <th style={{ padding: '0.45rem 0.6rem', textAlign: 'left', fontWeight: 700, width: '30px' }}>#</th>
+                                          <th style={{ padding: '0.45rem 0.6rem', textAlign: 'left', fontWeight: 700, width: '40px' }}>PHOTO</th>
+                                          <th style={{ padding: '0.45rem 0.6rem', textAlign: 'left', fontWeight: 700 }}>SKU CODE</th>
+                                          <th style={{ padding: '0.45rem 0.6rem', textAlign: 'left', fontWeight: 700 }}>PRODUCT NAME</th>
+                                          <th style={{ padding: '0.45rem 0.6rem', textAlign: 'center', fontWeight: 700 }}>SIZES</th>
+                                          <th style={{ padding: '0.45rem 0.6rem', textAlign: 'center', fontWeight: 700 }}>QTY (PCS)</th>
+                                          <th style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 700 }}>BUY PRICE</th>
+                                          <th style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 700 }}>TOTAL VALUE</th>
+                                          <th style={{ padding: '0.45rem 0.6rem', textAlign: 'center', fontWeight: 700, width: '70px' }}>ACTIONS</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {ch.items.map((subItem, sIdx) => {
+                                          const subQty = Number(subItem.qty || subItem.total || subItem.currentlyAvailableStock || 0);
+                                          const subBuyPrice = Number(subItem.purchasePrice || 0);
+                                          const subTotal = Number(subItem.totalPurchaseAmount || (subQty * subBuyPrice));
+
+                                          return (
+                                            <tr key={subItem._id || subItem.id || sIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                              <td style={{ padding: '0.45rem 0.6rem', color: '#94a3b8' }}>{sIdx + 1}</td>
+                                              <td style={{ padding: '0.45rem 0.6rem' }}>
+                                                <div style={{ width: '28px', height: '28px', borderRadius: '4px', overflow: 'hidden', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                  {subItem.imageUrl ? (
+                                                    <img src={subItem.imageUrl} alt={subItem.sku} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                  ) : (
+                                                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8' }}>{subItem.itemName ? subItem.itemName[0] : 'E'}</span>
+                                                  )}
+                                                </div>
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', fontWeight: 700, color: '#0369a1' }}>
+                                                {subItem.skuCode || subItem.sku || '-'}
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', fontWeight: 600, color: '#0f172a' }}>
+                                                {subItem.itemName || '-'}
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', textAlign: 'center' }}>
+                                                <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                                  {subItem.sizes && subItem.sizes.length > 0 ? (
+                                                    subItem.sizes.map((sz, szIdx) => (
+                                                      <span key={szIdx} style={{ background: '#e0f2fe', color: '#0369a1', padding: '1px 5px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
+                                                        {sz.size}: {sz.qty}
+                                                      </span>
+                                                    ))
+                                                  ) : (
+                                                    <span style={{ color: '#64748b', fontSize: '0.7rem' }}>{subItem.size || '-'}</span>
+                                                  )}
+                                                </div>
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', textAlign: 'center' }}>
+                                                <span style={{ background: '#ecfdf5', color: '#047857', padding: '2px 6px', borderRadius: '4px', fontWeight: 800, fontSize: '0.72rem' }}>
+                                                  +{subQty} Pcs
+                                                </span>
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 600, color: '#475569' }}>
+                                                ₹{subBuyPrice.toFixed(2)}
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 800, color: '#0369a1' }}>
+                                                ₹{subTotal.toFixed(2)}
+                                              </td>
+                                              <td style={{ padding: '0.45rem 0.6rem', textAlign: 'center' }}>
+                                                <div style={{ display: 'inline-flex', gap: '0.25rem' }}>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => setViewingItem(subItem)}
+                                                    style={{ border: 'none', background: '#eff6ff', color: '#0284c7', padding: '3px 6px', borderRadius: '4px', cursor: 'pointer' }}
+                                                    title="View item"
+                                                  >
+                                                    <Eye size={12} />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => onEdit(subItem)}
+                                                    style={{ border: 'none', background: '#f0fdf4', color: '#16a34a', padding: '3px 6px', borderRadius: '4px', cursor: 'pointer' }}
+                                                    title="Edit item"
+                                                  >
+                                                    <Edit2 size={12} />
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            ) : (
+              /* ================= INDIVIDUAL SKUs VIEW ================= */
+              filteredInwardItems.length === 0 ? (
+                <div style={styles.emptyState}>
+                  <span style={{ fontSize: '2.8rem' }}>📥</span>
+                  <h4 style={{ margin: '0.5rem 0 0.2rem 0', color: '#1e293b', fontSize: '1.1rem' }}>No inward stock records found</h4>
+                  <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>Try clearing date filters or add inward stock.</p>
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto', borderRadius: '8px' }}>
+                  <table style={{ width: '100%', minWidth: '920px', borderCollapse: 'collapse', background: '#ffffff', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr style={{ background: '#0369a1', color: '#ffffff' }}>
+                        <th onClick={() => handleInwardSort('created_date_time')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Date & Time">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span>DATE & TIME</span>
+                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'created_date_time' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                              {inwardSortField === 'created_date_time' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }}>PHOTO</th>
+                        <th onClick={() => handleInwardSort('skuCode')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by SKU Code">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span>SKU CODE</span>
+                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'skuCode' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                              {inwardSortField === 'skuCode' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th onClick={() => handleInwardSort('itemName')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff' }} title="Sort by Product Name">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span>PRODUCT NAME</span>
+                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'itemName' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                              {inwardSortField === 'itemName' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th onClick={() => handleInwardSort('party')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Vendor / Supplier">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span>VENDOR</span>
+                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'party' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                              {inwardSortField === 'party' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th style={{ ...styles.thStatic, padding: '0.65rem 0.5rem', textAlign: 'center', color: '#ffffff', whiteSpace: 'nowrap' }}>SIZES & QTY</th>
+                        <th onClick={() => handleInwardSort('qty')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'center', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Quantity Inwarded">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'center' }}>
+                            <span>QTY IN</span>
+                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'qty' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                              {inwardSortField === 'qty' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th onClick={() => handleInwardSort('purchasePrice')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Buy Price Unit">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                            <span>BUY PRICE</span>
+                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'purchasePrice' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                              {inwardSortField === 'purchasePrice' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th onClick={() => handleInwardSort('totalPurchaseAmount')} style={{ ...styles.thSort, padding: '0.65rem 0.5rem', textAlign: 'right', color: '#ffffff', whiteSpace: 'nowrap' }} title="Sort by Total Purchase Value">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                            <span>TOTAL VALUE</span>
+                            <span style={{ fontSize: '0.7rem', color: inwardSortField === 'totalPurchaseAmount' ? '#bae6fd' : 'rgba(255,255,255,0.6)' }}>
+                              {inwardSortField === 'totalPurchaseAmount' ? (inwardSortOrder === 'asc' ? '▲' : '▼') : '▲▼'}
+                            </span>
+                          </div>
+                        </th>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'center', fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.03em', color: '#ffffff', whiteSpace: 'nowrap' }}>
+                          ACTIONS
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredInwardItems.map((item, idx) => {
+                        const rawDt = item.created_date_time || item.date;
+                        const dtObj = rawDt ? new Date(rawDt) : null;
+                        const dateStr = dtObj
+                          ? dtObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                          : 'N/A';
+                        const timeStr = dtObj
+                          ? dtObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                          : '';
+
+                        const totalQty = item.qty || item.total || 0;
+                        const buyPrice = Number(item.purchasePrice || 0);
+                        const totalPurchase = Number(item.totalPurchaseAmount || (buyPrice * totalQty));
+
+                        return (
+                          <tr key={item.id || item._id || idx} style={{ borderBottom: '1px solid #e2e8f0', background: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                            <td style={{ padding: '0.55rem 0.5rem', fontSize: '0.74rem', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>{dateStr}</div>
+                              {timeStr && <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', lineHeight: 1.2 }}>{timeStr}</div>}
+                            </td>
+                            <td style={{ padding: '0.55rem 0.5rem' }}>
+                              <div style={{ ...styles.itemImgWrapper, width: '36px', height: '36px', borderRadius: '8px' }}>
+                                {item.imageUrl ? (
+                                  <img 
+                                    src={item.imageUrl} 
+                                    alt={item.sku} 
+                                    style={styles.itemImg}
+                                    onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                                  />
+                                ) : null}
+                                <div style={{ ...styles.imgPlaceholder, display: item.imageUrl ? 'none' : 'flex', fontSize: '0.85rem' }}>
+                                  {item.itemName ? item.itemName[0].toUpperCase() : 'E'}
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ padding: '0.55rem 0.5rem', whiteSpace: 'nowrap' }}>
+                              <span style={{ ...styles.skuText, padding: '0.2rem 0.45rem', fontSize: '0.76rem' }}>{item.skuCode || item.sku || 'N/A'}</span>
+                            </td>
+                            <td style={{ padding: '0.55rem 0.5rem', fontWeight: 700, color: '#0f172a', fontSize: '0.82rem' }}>
+                              {item.itemName}
+                            </td>
+                            <td style={{ padding: '0.55rem 0.5rem', fontSize: '0.8rem', color: '#334155', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              {item.party || 'N/A'}
+                            </td>
+                            <td style={{ padding: '0.55rem 0.5rem', textAlign: 'center' }}>
+                              <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                {item.sizes?.map((s, sIdx) => (
+                                  <span key={sIdx} style={{ ...styles.sizeTagBadge, padding: '2px 6px', fontSize: '0.7rem' }}>
+                                    {s.size}: <strong>{s.qty}</strong>
+                                  </span>
+                                )) || (
+                                  <span style={{ ...styles.sizeTagBadge, padding: '2px 6px', fontSize: '0.7rem' }}>Size: {item.size || 'N/A'}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td style={{ padding: '0.55rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              <span style={{ ...styles.qtyInwardBadge, padding: '3px 8px', fontSize: '0.74rem' }}>
+                                +{totalQty} Units
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.55rem 0.5rem', textAlign: 'right', fontSize: '0.8rem', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>
+                              ₹ {buyPrice.toFixed(2)}
+                            </td>
+                            <td style={{ padding: '0.55rem 0.5rem', textAlign: 'right', fontSize: '0.82rem', fontWeight: 800, color: '#d97706', whiteSpace: 'nowrap' }}>
+                              ₹ {totalPurchase.toFixed(2)}
+                            </td>
+                            <td style={{ padding: '0.55rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'center' }}>
+                                {/* Display / View Item Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingItem(item)}
                                   style={{
                                     width: '32px',
                                     height: '32px',
                                     padding: 0,
-                                    background: '#fef2f2',
-                                    border: '1px solid #fecaca',
-                                    color: '#dc2626',
+                                    background: '#eff6ff',
+                                    border: '1px solid #bfdbfe',
+                                    color: '#2563eb',
                                     borderRadius: '8px',
                                     cursor: 'pointer',
                                     display: 'inline-flex',
@@ -1335,24 +2083,73 @@ export default function InventoryGrid({
                                     boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                                     transition: 'all 0.15s ease'
                                   }}
-                                  title="Delete Item"
+                                  title="Display Item Details"
                                 >
-                                  <Trash2 size={15} />
+                                  <Eye size={15} />
                                 </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+
+                                {/* Edit Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => onEdit(item)}
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    padding: 0,
+                                    background: '#f0fdf4',
+                                    border: '1px solid #bbf7d0',
+                                    color: '#16a34a',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  title="Edit Item Details"
+                                >
+                                  <Edit2 size={15} />
+                                </button>
+
+                                {/* Delete Button */}
+                                {onDelete && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onDelete(item._id || item.id)}
+                                    style={{
+                                      width: '32px',
+                                      height: '32px',
+                                      padding: 0,
+                                      background: '#fef2f2',
+                                      border: '1px solid #fecaca',
+                                      color: '#dc2626',
+                                      borderRadius: '8px',
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    title="Delete Item"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )
             )}
           </div>
         </>
       )}
-
 
       {/* ========================================================================= */}
       {/* SCREEN 3: OUTWARD STOCK                                                   */}
@@ -1781,6 +2578,223 @@ export default function InventoryGrid({
               <button onClick={() => setViewingItem(null)} style={{ padding: '0.5rem 1.2rem', background: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Challan Details Modal */}
+      {selectedChallan && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '900px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid #bfdbfe',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span style={{ fontSize: '1.25rem', fontWeight: 800 }}>Challan {selectedChallan.displayChallanNo}</span>
+                  <span style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 600 }}>
+                    {selectedChallan.party || 'Vendor'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#e0f2fe', marginTop: '2px' }}>
+                  Received on {new Date(selectedChallan.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} at {new Date(selectedChallan.date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedChallan(null)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#ffffff',
+                  width: '32px',
+                  height: '32px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Metrics Ribbon */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '0.75rem',
+              padding: '0.85rem 1.5rem',
+              background: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0'
+            }}>
+              <div style={{ background: '#ffffff', padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>TOTAL PIECES</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#047857', marginTop: '2px' }}>{selectedChallan.totalQty} Pcs</div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>TOTAL SKUs</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#6d28d9', marginTop: '2px' }}>{selectedChallan.skuCodes ? selectedChallan.skuCodes.size : selectedChallan.items.length} SKUs</div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>TOTAL VALUE</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0369a1', marginTop: '2px' }}>₹{(selectedChallan.totalAmount || 0).toFixed(2)}</div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>TOTAL ITEMS</div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#1e293b', marginTop: '2px' }}>{(selectedChallan.items || []).length} Entries</div>
+              </div>
+            </div>
+
+            {/* Items Table */}
+            <div style={{ padding: '1rem 1.5rem', overflowY: 'auto', flex: 1 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                <thead>
+                  <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>#</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>PHOTO</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>SKU CODE</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', fontWeight: 800, color: '#475569' }}>PRODUCT NAME</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'center', fontWeight: 800, color: '#475569' }}>SIZES</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'center', fontWeight: 800, color: '#475569' }}>QTY</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#475569' }}>BUY PRICE</th>
+                    <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#475569' }}>TOTAL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(selectedChallan.items || []).map((item, idx) => {
+                    const itemQty = Number(item.qty || item.total || item.currentlyAvailableStock || 0);
+                    const buyPrice = Number(item.purchasePrice || 0);
+                    const totalPurchase = Number(item.totalPurchaseAmount || (buyPrice * itemQty));
+
+                    return (
+                      <tr key={item._id || item.id || idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '0.6rem 0.75rem', color: '#64748b' }}>{idx + 1}</td>
+                        <td style={{ padding: '0.6rem 0.75rem' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '6px', overflow: 'hidden', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {item.imageUrl ? (
+                              <img src={item.imageUrl} alt={item.sku} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>{item.itemName ? item.itemName[0] : 'E'}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.6rem 0.75rem', fontWeight: 700, color: '#0369a1' }}>{item.skuCode || item.sku || '-'}</td>
+                        <td style={{ padding: '0.6rem 0.75rem', fontWeight: 600, color: '#0f172a' }}>{item.itemName || '-'}</td>
+                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                            {item.sizes && item.sizes.length > 0 ? (
+                              item.sizes.map((s, sIdx) => (
+                                <span key={sIdx} style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700 }}>
+                                  {s.size}: {s.qty}
+                                </span>
+                              ))
+                            ) : (
+                              <span style={{ color: '#64748b', fontSize: '0.72rem' }}>{item.size || '-'}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>
+                          <span style={{ background: '#ecfdf5', color: '#047857', padding: '3px 8px', borderRadius: '6px', fontWeight: 800, fontSize: '0.78rem' }}>
+                            +{itemQty} Pcs
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 600, color: '#475569' }}>
+                          ₹{buyPrice.toFixed(2)}
+                        </td>
+                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'right', fontWeight: 800, color: '#0369a1' }}>
+                          ₹{totalPurchase.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '0.85rem 1.5rem',
+              borderTop: '1px solid #e2e8f0',
+              background: '#f8fafc',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                Total Received Value: <strong style={{ color: '#0369a1', fontSize: '0.95rem' }}>₹{(selectedChallan.totalAmount || 0).toFixed(2)}</strong>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => handlePrintChallan(selectedChallan)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    background: '#0284c7',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}
+                >
+                  <Printer size={15} />
+                  <span>Print Challan Slip</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedChallan(null)}
+                  style={{
+                    padding: '0.5rem 1.2rem',
+                    background: '#64748b',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    fontSize: '0.82rem'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

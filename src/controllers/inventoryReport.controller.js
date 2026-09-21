@@ -1062,6 +1062,7 @@ const getStockInwardData = async (req, res) => {
         sku: item.skuCode,
         itemName: item.itemName || item.skuCode,
         party: item.party || 'N/A',
+        challanNo: item.challanNo || '',
         size: item.size || 'N/A',
         sizes: [{ size: item.size || 'N/A', qty }],
         qty: qty,
