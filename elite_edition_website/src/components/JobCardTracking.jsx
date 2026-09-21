@@ -20,6 +20,7 @@ const formatDateDDMMYYYY = (d) => {
 };
 
 export default function JobCardTracking({ onPreview }) {
+  const currentUser = api.getCurrentUser();
   const isAdmin = currentUser?.role?.toLowerCase() === 'admin' || currentUser?.username?.toLowerCase() === 'admin' || currentUser?.isAdmin === true;
   const isExternalCard = (card) => {
     if (!card) return false;
