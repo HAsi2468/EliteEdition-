@@ -157,9 +157,32 @@ export const api = {
 
     if (this.isClientUser()) {
       try {
-        const res = await this.getClientById(userId);
-        if (res && (res.data || res.client)) {
-          const clientData = res.data || res.client;
+        let clientData = null;
+
+        // 1. Prioritize lookup by mobile number to auto-heal stale IDs
+        if (user.mobile) {
+          const cRes = await this.getClients({ search: user.mobile }).catch(() => null);
+          const list = cRes?.data || [];
+          clientData = list.find((c) => c.mobile === user.mobile) || list[0];
+        }
+
+        // 2. Lookup by username if still not found
+        if (!clientData && (user.username || user.name)) {
+          const query = user.username || user.name;
+          const cRes = await this.getClients({ search: query }).catch(() => null);
+          const list = cRes?.data || [];
+          clientData = list.find((c) => c.username === query) || list[0];
+        }
+
+        // 3. Fallback to getClientById if id exists and no clientData found
+        if (!clientData && userId) {
+          const res = await this.getClientById(userId).catch(() => null);
+          if (res && (res.data || res.client)) {
+            clientData = res.data || res.client;
+          }
+        }
+
+        if (clientData) {
           const updated = {
             ...user,
             ...clientData,

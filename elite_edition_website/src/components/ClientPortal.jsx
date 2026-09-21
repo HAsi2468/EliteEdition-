@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api } from '../services/api';
 import {
   Building2,
@@ -44,6 +44,7 @@ export default function ClientPortal({ client, onLogout }) {
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [loadingDesigns, setLoadingDesigns] = useState(false);
   const [searchOrder, setSearchOrder] = useState('');
+  const [orderStageFilter, setOrderStageFilter] = useState('all');
   const [searchDesign, setSearchDesign] = useState('');
 
   // Profile update state
@@ -74,32 +75,56 @@ export default function ClientPortal({ client, onLogout }) {
 
   // Fetch fresh client profile from server on mount
   useEffect(() => {
-    const activeId = clientData._id || clientData.id;
-    if (activeId) {
-      api.getClientById(activeId).then((res) => {
-        if (res && res.data) {
-          setClientData(prev => ({ ...prev, ...res.data }));
-          localStorage.setItem('elite_client_data', JSON.stringify(res.data));
-          localStorage.setItem('elite_user', JSON.stringify({ ...api.getCurrentUser(), ...res.data, role: 'Client', isClient: true }));
-        }
-      }).catch((err) => {
-        // If stale ID (404), resolve client using mobile number
-        const fallbackMobile = clientData.mobile || mobile;
-        if (fallbackMobile) {
-          api.getClients({ search: fallbackMobile }).then((cRes) => {
-            const list = cRes?.data || [];
-            if (list.length > 0) {
-              const matched = list.find((c) => c.mobile === fallbackMobile) || list[0];
-              if (matched) {
-                setClientData((prev) => ({ ...prev, ...matched }));
-                localStorage.setItem('elite_client_data', JSON.stringify(matched));
-                localStorage.setItem('elite_user', JSON.stringify({ ...api.getCurrentUser(), ...matched, role: 'Client', isClient: true }));
-              }
-            }
-          }).catch(() => {});
-        }
-      });
-    }
+    const refreshProfile = async () => {
+      const activeMobile = clientData.mobile || mobile;
+      const activeUsername = clientData.username || username;
+      const activeId = clientData._id || clientData.id;
+
+      // 1. Prioritize lookup by mobile number to get the real, fresh DB record
+      if (activeMobile) {
+        try {
+          const cRes = await api.getClients({ search: activeMobile });
+          const list = cRes?.data || [];
+          const matched = list.find((c) => c.mobile === activeMobile) || list[0];
+          if (matched) {
+            setClientData((prev) => ({ ...prev, ...matched }));
+            localStorage.setItem('elite_client_data', JSON.stringify(matched));
+            localStorage.setItem('elite_user', JSON.stringify({ ...api.getCurrentUser(), ...matched, id: matched._id, role: 'Client', isClient: true }));
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // 2. If username exists, query by username
+      if (activeUsername) {
+        try {
+          const cRes = await api.getClients({ search: activeUsername });
+          const list = cRes?.data || [];
+          const matched = list.find((c) => c.username === activeUsername) || list[0];
+          if (matched) {
+            setClientData((prev) => ({ ...prev, ...matched }));
+            localStorage.setItem('elite_client_data', JSON.stringify(matched));
+            localStorage.setItem('elite_user', JSON.stringify({ ...api.getCurrentUser(), ...matched, id: matched._id, role: 'Client', isClient: true }));
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // 3. Fallback to activeId if mobile and username didn't match
+      if (activeId) {
+        try {
+          const res = await api.getClientById(activeId).catch(() => null);
+          if (res && res.data) {
+            setClientData((prev) => ({ ...prev, ...res.data }));
+            localStorage.setItem('elite_client_data', JSON.stringify(res.data));
+            localStorage.setItem('elite_user', JSON.stringify({ ...api.getCurrentUser(), ...res.data, id: res.data._id, role: 'Client', isClient: true }));
+            return;
+          }
+        } catch (err) {}
+      }
+    };
+
+    refreshProfile();
   }, []);
 
   // Ensure body and html can scroll on PC and mobile
@@ -240,14 +265,35 @@ export default function ClientPortal({ client, onLogout }) {
     }
   };
 
+  // Calculate order counts per workflow stage
+  const orderCounts = useMemo(() => {
+    const counts = { all: orders.length, 'print-pending': 0, 'fusing-pending': 0, 'delivery-pending': 0, 'delivered': 0 };
+    orders.forEach(o => {
+      const info = getOrderStatusInfo(o);
+      if (info.key && counts[info.key] !== undefined) {
+        counts[info.key]++;
+      }
+    });
+    return counts;
+  }, [orders]);
+
   const filteredOrders = orders.filter(o => {
+    const sInfo = getOrderStatusInfo(o);
+    if (orderStageFilter !== 'all' && sInfo.key !== orderStageFilter) {
+      return false;
+    }
     const term = searchOrder.toLowerCase().trim();
     if (!term) return true;
     return (
+      (o.jobNo && o.jobNo.toLowerCase().includes(term)) ||
       (o.orderNo && o.orderNo.toLowerCase().includes(term)) ||
+      (o.jobCardNo && o.jobCardNo.toLowerCase().includes(term)) ||
       (o.designName && o.designName.toLowerCase().includes(term)) ||
+      (o.designNo && o.designNo.toLowerCase().includes(term)) ||
       (o.fabric && o.fabric.toLowerCase().includes(term)) ||
-      (o.status && o.status.toLowerCase().includes(term))
+      (sInfo.label && sInfo.label.toLowerCase().includes(term)) ||
+      (sInfo.sublabel && sInfo.sublabel.toLowerCase().includes(term)) ||
+      (o.notes && o.notes.toLowerCase().includes(term))
     );
   });
 
@@ -573,16 +619,67 @@ export default function ClientPortal({ client, onLogout }) {
         {activeTab === 'orders' && (
           <div style={styles.tabContent}>
             <div style={styles.toolbarRow}>
-              <div style={styles.searchBox}>
-                <Search size={15} color="#64748b" style={styles.searchIcon} />
-                <input
-                  type="text"
-                  value={searchOrder}
-                  onChange={(e) => setSearchOrder(e.target.value)}
-                  placeholder="Search order number, design, fabric..."
-                  className="client-search-input"
-                  style={styles.searchInput}
-                />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', flex: 1 }}>
+                <div style={styles.searchBox}>
+                  <Search size={15} color="#64748b" style={styles.searchIcon} />
+                  <input
+                    type="text"
+                    value={searchOrder}
+                    onChange={(e) => setSearchOrder(e.target.value)}
+                    placeholder="Search order/job number, design, fabric, status..."
+                    className="client-search-input"
+                    style={styles.searchInput}
+                  />
+                </div>
+
+                {/* Stage Filter Pills */}
+                <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {[
+                    { id: 'all', label: 'All Orders', count: orderCounts.all, activeBg: '#1d4ed8' },
+                    { id: 'print-pending', label: 'Print Pending', count: orderCounts['print-pending'], activeBg: '#d97706' },
+                    { id: 'fusing-pending', label: 'Fusing Pending', count: orderCounts['fusing-pending'], activeBg: '#7c3aed' },
+                    { id: 'delivery-pending', label: 'Delivery Pending', count: orderCounts['delivery-pending'], activeBg: '#2563eb' },
+                    { id: 'delivered', label: 'Delivered', count: orderCounts['delivered'], activeBg: '#16a34a' }
+                  ].map((pill) => {
+                    const isSelected = orderStageFilter === pill.id;
+                    return (
+                      <button
+                        key={pill.id}
+                        type="button"
+                        onClick={() => setOrderStageFilter(pill.id)}
+                        style={{
+                          border: isSelected ? '1px solid transparent' : '1px solid #e2e8f0',
+                          background: isSelected ? pill.activeBg : '#ffffff',
+                          color: isSelected ? '#ffffff' : '#475569',
+                          padding: '0.32rem 0.7rem',
+                          borderRadius: '20px',
+                          fontSize: '0.76rem',
+                          fontWeight: isSelected ? 700 : 500,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: isSelected ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span>{pill.label}</span>
+                        <span
+                          style={{
+                            background: isSelected ? 'rgba(255,255,255,0.25)' : '#f1f5f9',
+                            color: isSelected ? '#ffffff' : '#64748b',
+                            fontSize: '0.68rem',
+                            padding: '1px 6px',
+                            borderRadius: '10px',
+                            fontWeight: 700
+                          }}
+                        >
+                          {pill.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <button
@@ -625,18 +722,20 @@ export default function ClientPortal({ client, onLogout }) {
                   </thead>
                   <tbody>
                     {filteredOrders.map((ord, idx) => {
-                      const statusColor = getStatusColor(ord.status);
-                      const qtyStr = ord.totalMtr ? `${ord.totalMtr} Mtrs` : (ord.pcs ? `${ord.pcs} Pcs` : '—');
+                      const statusInfo = getOrderStatusInfo(ord);
+                      const qtyStr = ord.totalMtr ? `${ord.totalMtr} Mtrs` : (ord.meters ? `${ord.meters} Mtrs` : (ord.pcs ? `${ord.pcs} Pcs` : '—'));
+                      const displayJobNo = ord.jobNo || ord.orderNo || ord.jobCardNo || `JC-${idx + 1}`;
+                      const displayDesign = ord.designName || ord.designNo || '—';
                       return (
                         <tr key={ord._id || ord.id || idx} className="client-table-row">
                           <td style={{ fontWeight: 800 }}>
-                            <span style={{ color: '#1d4ed8' }}>{ord.orderNo || ord.jobCardNo || `JC-${idx + 1}`}</span>
+                            <span style={{ color: '#1d4ed8', letterSpacing: '0.02em' }}>{displayJobNo}</span>
                           </td>
                           <td style={{ color: '#64748b', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                            {formatDateDDMMYYYY(ord.created_date_time || ord.createdAt)}
+                            {formatDateDDMMYYYY(ord.created_date_time || ord.createdAt || ord.date)}
                           </td>
                           <td style={{ fontWeight: 700, color: '#0f172a' }}>
-                            {ord.designName || '—'}
+                            {displayDesign}
                           </td>
                           <td style={{ color: '#475569' }}>
                             {ord.fabric || '—'}
@@ -645,18 +744,34 @@ export default function ClientPortal({ client, onLogout }) {
                             {qtyStr}
                           </td>
                           <td style={{ whiteSpace: 'nowrap' }}>
-                            <span style={{
-                              ...styles.statusBadge,
-                              background: statusColor.bg,
-                              color: statusColor.text,
-                              border: `1px solid ${statusColor.border}`,
-                              display: 'inline-block'
-                            }}>
-                              {ord.status || 'In Process'}
-                            </span>
+                            <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-start' }}>
+                              <span style={{
+                                ...styles.statusBadge,
+                                background: statusInfo.badgeBg,
+                                color: statusInfo.text,
+                                border: `1px solid ${statusInfo.border}`,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontWeight: 700,
+                                fontSize: '0.78rem'
+                              }}>
+                                <span style={{
+                                  width: '7px',
+                                  height: '7px',
+                                  borderRadius: '50%',
+                                  backgroundColor: statusInfo.dotColor,
+                                  display: 'inline-block'
+                                }}></span>
+                                {statusInfo.label}
+                              </span>
+                              <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 500 }}>
+                                {statusInfo.sublabel}
+                              </span>
+                            </div>
                           </td>
                           <td style={{ color: '#64748b', fontSize: '0.8rem', maxWidth: '240px', whiteSpace: 'normal', wordBreak: 'break-word' }}>
-                            {ord.notes || '—'}
+                            {ord.notes || ord.note1 || ord.emergencyNotes || '—'}
                           </td>
                         </tr>
                       );
@@ -920,19 +1035,65 @@ export default function ClientPortal({ client, onLogout }) {
   );
 }
 
-// Helpers
-function getStatusColor(status = '') {
-  const s = String(status).toLowerCase();
-  if (s.includes('complete') || s.includes('dispatch') || s.includes('deliver')) {
-    return { bg: '#ecfdf5', text: '#047857', border: '#a7f3d0' };
+// Helpers: Determine exact factory workflow stage for client order
+export function getOrderStatusInfo(ord = {}) {
+  const pStatus = String(ord.printStatus || '').toLowerCase();
+  const fStatus = String(ord.fusingStatus || '').toLowerCase();
+  const dStatus = String(ord.deliveryStatus || '').toLowerCase();
+  const genStatus = String(ord.status || '').toLowerCase();
+
+  // 1. Delivered / Delivery Done
+  const isDeliveryDone = dStatus.includes('done') || dStatus.includes('deliver') || genStatus === 'done' || genStatus.includes('deliver');
+  if (isDeliveryDone) {
+    return {
+      key: 'delivered',
+      label: 'Delivered',
+      sublabel: 'Delivery Done',
+      badgeBg: '#dcfce7',
+      text: '#15803d',
+      border: '#86efac',
+      dotColor: '#16a34a'
+    };
   }
-  if (s.includes('print') || s.includes('stitch') || s.includes('process')) {
-    return { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' };
+
+  // 2. Fusing Done -> Waiting for delivery (Delivery Pending)
+  const isFusingDone = fStatus.includes('done');
+  if (isFusingDone) {
+    return {
+      key: 'delivery-pending',
+      label: 'Delivery Pending',
+      sublabel: 'Fusing Done • Ready for Delivery',
+      badgeBg: '#eff6ff',
+      text: '#1d4ed8',
+      border: '#bfdbfe',
+      dotColor: '#2563eb'
+    };
   }
-  if (s.includes('pend') || s.includes('hold')) {
-    return { bg: '#fffbeb', text: '#b45309', border: '#fde68a' };
+
+  // 3. Printing Done -> In fusing queue (Fusing Pending)
+  const isPrintDone = pStatus.includes('done');
+  if (isPrintDone) {
+    return {
+      key: 'fusing-pending',
+      label: 'Fusing Pending',
+      sublabel: 'Print Done • In Fusing Queue',
+      badgeBg: '#f5f3ff',
+      text: '#6d28d9',
+      border: '#ddd6fe',
+      dotColor: '#7c3aed'
+    };
   }
-  return { bg: '#f8fafc', text: '#475569', border: '#e2e8f0' };
+
+  // 4. Default: Printing not yet done (Print Pending)
+  return {
+    key: 'print-pending',
+    label: 'Print Pending',
+    sublabel: 'In Printing Queue',
+    badgeBg: '#fffbeb',
+    text: '#b45309',
+    border: '#fde68a',
+    dotColor: '#d97706'
+  };
 }
 
 const styles = {
