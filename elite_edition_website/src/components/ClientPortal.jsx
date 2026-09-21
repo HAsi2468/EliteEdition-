@@ -295,6 +295,7 @@ export default function ClientPortal({ client, onLogout }) {
       (o.designName && o.designName.toLowerCase().includes(term)) ||
       (o.designNo && o.designNo.toLowerCase().includes(term)) ||
       (o.fabric && o.fabric.toLowerCase().includes(term)) ||
+      (o.pcs && String(o.pcs).toLowerCase().includes(term)) ||
       (sInfo.label && sInfo.label.toLowerCase().includes(term)) ||
       (sInfo.sublabel && sInfo.sublabel.toLowerCase().includes(term)) ||
       (o.notes && o.notes.toLowerCase().includes(term))
@@ -719,7 +720,7 @@ export default function ClientPortal({ client, onLogout }) {
                       <th>Date</th>
                       <th>Design Name</th>
                       <th>Fabric</th>
-                      <th>Quantity</th>
+                      <th>Quantity (Pcs)</th>
                       <th>Status</th>
                       <th>Notes</th>
                     </tr>
@@ -727,7 +728,10 @@ export default function ClientPortal({ client, onLogout }) {
                   <tbody>
                     {filteredOrders.map((ord, idx) => {
                       const statusInfo = getOrderStatusInfo(ord);
-                      const qtyStr = ord.totalMtr ? `${ord.totalMtr} Mtrs` : (ord.meters ? `${ord.meters} Mtrs` : (ord.pcs ? `${ord.pcs} Pcs` : '—'));
+                      const pcsVal = (ord.pcs !== undefined && ord.pcs !== null && String(ord.pcs).trim() !== '')
+                        ? String(ord.pcs).trim()
+                        : ((ord.pieces !== undefined && ord.pieces !== null && String(ord.pieces).trim() !== '') ? String(ord.pieces).trim() : '');
+                      const qtyStr = pcsVal ? `${pcsVal} Pcs` : (ord.totalMtr ? `${ord.totalMtr} Mtrs` : '—');
                       const displayJobNo = ord.jobNo || ord.orderNo || ord.jobCardNo || `JC-${idx + 1}`;
                       const displayDesign = ord.designName || ord.designNo || '—';
                       return (
