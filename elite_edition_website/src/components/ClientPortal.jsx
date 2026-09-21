@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import DesignImage from './DesignImage';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
+import { useSocket } from '../contexts/SocketContext';
 
 export default function ClientPortal({ client, onLogout }) {
   const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'designs' | 'profile'
@@ -203,12 +204,62 @@ export default function ClientPortal({ client, onLogout }) {
       setLoadingDesigns(false);
     }
   };
+  const socket = useSocket();
 
   useEffect(() => {
     if (partyCode || clientData.companyCode) {
       fetchOrders();
       fetchDesigns();
     }
+  }, [partyCode, clientData.companyCode]);
+
+  // Real-time socket updates for orders and designs
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleJobChange = () => {
+      fetchOrders();
+    };
+    const handleDesignChange = () => {
+      fetchDesigns();
+    };
+
+    socket.on('job-created', handleJobChange);
+    socket.on('job-updated', handleJobChange);
+    socket.on('job-stage-updated', handleJobChange);
+    socket.on('job-deleted', handleJobChange);
+    socket.on('design-created', handleDesignChange);
+    socket.on('design-updated', handleDesignChange);
+    socket.on('design-deleted', handleDesignChange);
+
+    return () => {
+      socket.off('job-created', handleJobChange);
+      socket.off('job-updated', handleJobChange);
+      socket.off('job-stage-updated', handleJobChange);
+      socket.off('job-deleted', handleJobChange);
+      socket.off('design-created', handleDesignChange);
+      socket.off('design-updated', handleDesignChange);
+      socket.off('design-deleted', handleDesignChange);
+    };
+  }, [socket, partyCode, clientData.companyCode]);
+
+  // Global event refresh (triggered by other components) & window focus & 30s polling
+  useEffect(() => {
+    const handleRefresh = () => {
+      if (partyCode || clientData.companyCode) {
+        fetchOrders();
+        fetchDesigns();
+      }
+    };
+    window.addEventListener('elite-data-refresh', handleRefresh);
+    window.addEventListener('focus', handleRefresh);
+    const interval = setInterval(handleRefresh, 30000);
+
+    return () => {
+      window.removeEventListener('elite-data-refresh', handleRefresh);
+      window.removeEventListener('focus', handleRefresh);
+      clearInterval(interval);
+    };
   }, [partyCode, clientData.companyCode]);
 
   // Handle client avatar upload to Cloudflare R2
@@ -276,15 +327,29 @@ export default function ClientPortal({ client, onLogout }) {
   };
 
   // ── Place Order Action Handlers ──
-  const handleOpenPlaceOrder = () => {
+  const handleOpenPlaceOrder = (presetDesign = null) => {
     setOrderModalError('');
     setOrderModalSuccess('');
-    const defaultDesign = designs.length > 0 ? designs[0].designName : '';
+    let defaultDesign = '';
+    let presetDoc = null;
+    if (presetDesign) {
+      if (typeof presetDesign === 'string') {
+        defaultDesign = presetDesign;
+        presetDoc = designs.find(d => d.designName === presetDesign || d.designNo === presetDesign);
+      } else {
+        defaultDesign = presetDesign.designName || presetDesign.designNo || '';
+        presetDoc = presetDesign;
+      }
+    } else if (designs.length > 0) {
+      defaultDesign = designs[0].designName;
+      presetDoc = designs[0];
+    }
     setOrderRows([
       {
         id: 1,
         date: new Date().toISOString().split('T')[0],
         designName: defaultDesign,
+        designId: presetDoc?._id || '',
         pcs: '',
         note: ''
       }
@@ -293,12 +358,15 @@ export default function ClientPortal({ client, onLogout }) {
   };
 
   const handleAddOrderRow = () => {
+    const defaultDesign = designs.length > 0 ? designs[0].designName : '';
+    const presetDoc = designs.length > 0 ? designs[0] : null;
     setOrderRows(prev => [
       ...prev,
       {
         id: prev.length > 0 ? Math.max(...prev.map(r => r.id)) + 1 : 1,
         date: new Date().toISOString().split('T')[0],
-        designName: designs.length > 0 ? designs[0].designName : '',
+        designName: defaultDesign,
+        designId: presetDoc?._id || '',
         pcs: '',
         note: ''
       }
@@ -311,7 +379,18 @@ export default function ClientPortal({ client, onLogout }) {
   };
 
   const handleUpdateOrderRow = (id, field, val) => {
-    setOrderRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
+    setOrderRows(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      if (field === 'designName') {
+        const matched = designs.find(d => d.designName === val || d.designNo === val || d._id === val);
+        return {
+          ...r,
+          designName: val,
+          designId: matched?._id || ''
+        };
+      }
+      return { ...r, [field]: val };
+    }));
   };
 
   const handleSubmitOrder = async (e) => {
@@ -334,8 +413,39 @@ export default function ClientPortal({ client, onLogout }) {
 
     setSubmittingOrder(true);
     try {
+      // Enrich items with full design catalog metadata
+      const enrichedItems = orderRows.map(row => {
+        const d = designs.find(x => x.designName === row.designName || x.designNo === row.designName || x._id === row.designId) || {};
+        return {
+          ...row,
+          designId: d._id || row.designId || '',
+          designName: d.designName || row.designName,
+          designNo: d.designNo || d.designName || row.designName,
+          fabric: d.fabricName || '',
+          category: d.category || '',
+          colors: d.colors || '',
+          panna: d.panna || '',
+          pass: d.pass || '',
+          speed: d.speed || '',
+          designer: d.designerName || '',
+          colourMatching: d.colourMatching || '',
+          paperType: d.paperType || '',
+          fusingTemp: d.fusingTemp || '',
+          imageUrl: d.imageUrl || '',
+          imageUrl1: d.imageUrl || '',
+          imageUrl2: d.imageUrl2 || '',
+          top100: d.top100 || 0,
+          sleeve100: d.sleeve100 || 0,
+          bottom100: d.bottom100 || 0,
+          dupatta100: d.dupatta100 || 0,
+          cut100: d.cut100 || 0,
+          totalMtr100: d.totalMtr100 || 0,
+          setCopy100: d.setCopy100 || 0
+        };
+      });
+
       const res = await api.placeClientBulkOrder({
-        items: orderRows,
+        items: enrichedItems,
         clientInfo: {
           companyCode: partyCode,
           companyName,
@@ -345,11 +455,21 @@ export default function ClientPortal({ client, onLogout }) {
       });
 
       const cards = res.jobCards || [];
+      // Immediately update local orders state
+      if (cards.length > 0) {
+        setOrders(prev => {
+          const existingIds = new Set(prev.map(p => String(p._id || p.jobNo)));
+          const newCards = cards.filter(c => !existingIds.has(String(c._id || c.jobNo)));
+          return [...newCards, ...prev];
+        });
+      }
+
       const jobNos = cards.map(c => c.jobNo).join(', ');
       setOrderModalSuccess(`🎉 Order placed successfully! Generated Job Card(s): ${jobNos || 'Created'}`);
 
-      // Refresh orders immediately
+      // Refresh orders and designs from backend
       await fetchOrders();
+      await fetchDesigns();
 
       // Close modal after delay
       setTimeout(() => {
@@ -593,6 +713,166 @@ export default function ClientPortal({ client, onLogout }) {
             max-width: 80px !important;
           }
         }
+
+        /* ── Place Order Modal: Dark Slate & Emerald Mobile-Friendly Theme ── */
+        .order-modal-container {
+          background: #0f172a !important;
+          border-radius: 16px !important;
+          width: 100% !important;
+          max-width: 900px !important;
+          max-height: 90vh !important;
+          overflow-y: auto !important;
+          padding: 1.5rem !important;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+          border: 1px solid #334155 !important;
+          color: #f8fafc !important;
+        }
+
+        .order-entries-desktop {
+          display: block;
+        }
+        .order-entries-mobile {
+          display: none;
+        }
+
+        .order-table-custom {
+          width: 100%;
+          border-collapse: separate;
+          border-spacing: 0;
+          text-align: left;
+          background: #0f172a;
+          min-width: 650px;
+        }
+        .order-table-custom th {
+          background: #1e293b !important;
+          color: #94a3b8 !important;
+          font-weight: 700 !important;
+          font-size: 0.74rem !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.04em !important;
+          padding: 0.75rem 0.65rem !important;
+          border-bottom: 2px solid #334155 !important;
+        }
+        .order-table-custom td {
+          padding: 0.6rem 0.65rem !important;
+          border-bottom: 1px solid #1e293b !important;
+          background: #0f172a;
+          vertical-align: middle;
+        }
+        .order-table-custom tr:last-child td {
+          border-bottom: none !important;
+        }
+
+        .order-input-custom {
+          width: 100%;
+          padding: 0.55rem 0.75rem;
+          border-radius: 8px;
+          border: 1px solid #334155;
+          font-size: 0.84rem;
+          color: #f8fafc;
+          background: #1e293b;
+          outline: none;
+          box-sizing: border-box;
+          color-scheme: dark;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .order-input-custom:focus {
+          border-color: #10b981 !important;
+          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.22) !important;
+        }
+
+        .order-card-item {
+          background: #1e293b;
+          border: 1px solid #334155;
+          border-radius: 12px;
+          overflow: hidden;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .order-card-item:focus-within {
+          border-color: #10b981;
+          box-shadow: 0 4px 14px rgba(16, 185, 129, 0.18);
+        }
+        .order-card-topbar {
+          background: #0f172a;
+          padding: 0.65rem 0.85rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 1px solid #334155;
+        }
+        .order-card-id-badge {
+          background: #059669;
+          color: #ffffff;
+          font-size: 0.75rem;
+          font-weight: 800;
+          padding: 2px 8px;
+          border-radius: 6px;
+        }
+        .order-card-content {
+          padding: 0.85rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+        .order-card-grid-2col {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0.65rem;
+        }
+        .order-field-label {
+          display: block;
+          font-size: 0.72rem;
+          font-weight: 700;
+          color: #94a3b8;
+          margin-bottom: 0.3rem;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+        }
+
+        @media (max-width: 768px) {
+          .order-modal-container {
+            padding: 1rem 0.85rem !important;
+            max-height: 94vh !important;
+            border-radius: 14px !important;
+          }
+          .order-entries-desktop {
+            display: none !important;
+          }
+          .order-entries-mobile {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 0.85rem !important;
+          }
+          .order-input-custom {
+            font-size: 16px !important; /* Prevents auto-zoom on iOS */
+            padding: 0.65rem 0.75rem !important;
+            min-height: 44px !important;
+          }
+          .order-card-grid-2col {
+            grid-template-columns: 1fr 1fr;
+          }
+          .order-modal-footer-wrap {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 0.85rem !important;
+          }
+          .order-modal-footer-actions {
+            display: flex !important;
+            width: 100% !important;
+            gap: 0.5rem !important;
+          }
+          .order-modal-footer-actions button {
+            flex: 1 !important;
+            justify-content: center !important;
+            min-height: 44px !important;
+          }
+        }
+        @media (max-width: 420px) {
+          .order-card-grid-2col {
+            grid-template-columns: 1fr !important;
+          }
+        }
       `}</style>
 
       {/* ── Top Navigation Bar ── */}
@@ -651,7 +931,7 @@ export default function ClientPortal({ client, onLogout }) {
               {clientData.image ? (
                 <img src={clientData.image} alt="Logo" style={styles.welcomeAvatar} />
               ) : (
-                <Building2 size={24} color="#2563eb" />
+                <Building2 size={24} color="#10b981" />
               )}
             </div>
             <div>
@@ -662,8 +942,8 @@ export default function ClientPortal({ client, onLogout }) {
               <div style={styles.welcomeDetailsRow}>
                 {partyCode && (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                    <Shield size={12} color="#2563eb" />
-                    <span>Party: <strong style={{ color: '#1d4ed8' }}>{partyCode}</strong></span>
+                    <Shield size={12} color="#10b981" />
+                    <span>Party: <strong style={{ color: '#fbbf24' }}>{partyCode}</strong></span>
                   </span>
                 )}
                 {mobile && (
@@ -770,10 +1050,10 @@ export default function ClientPortal({ client, onLogout }) {
             {/* Stage Filter Pills */}
             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
               {[
-                { id: 'all', label: 'All Orders', count: orderCounts.all, dot: '#2563eb' },
+                { id: 'all', label: 'All Orders', count: orderCounts.all, dot: '#10b981' },
                 { id: 'print-pending', label: 'Print Pending', count: orderCounts['print-pending'], dot: '#d97706' },
                 { id: 'fusing-pending', label: 'Fusing Pending', count: orderCounts['fusing-pending'], dot: '#7c3aed' },
-                { id: 'delivery-pending', label: 'Delivery Pending', count: orderCounts['delivery-pending'], dot: '#0284c7' },
+                { id: 'delivery-pending', label: 'Delivery Pending', count: orderCounts['delivery-pending'], dot: '#059669' },
                 { id: 'delivered', label: 'Delivered', count: orderCounts['delivered'], dot: '#16a34a' }
               ].map((pill) => {
                 const isSelected = orderStageFilter === pill.id;
@@ -783,8 +1063,8 @@ export default function ClientPortal({ client, onLogout }) {
                     type="button"
                     onClick={() => setOrderStageFilter(pill.id)}
                     style={{
-                      border: isSelected ? '1px solid #2563eb' : '1px solid #e2e8f0',
-                      background: isSelected ? '#2563eb' : '#ffffff',
+                      border: isSelected ? '1px solid #10b981' : '1px solid #e2e8f0',
+                      background: isSelected ? '#10b981' : '#ffffff',
                       color: isSelected ? '#ffffff' : '#475569',
                       padding: '0.32rem 0.72rem',
                       borderRadius: '20px',
@@ -795,7 +1075,7 @@ export default function ClientPortal({ client, onLogout }) {
                       alignItems: 'center',
                       gap: '6px',
                       transition: 'all 0.15s ease',
-                      boxShadow: isSelected ? '0 1px 3px rgba(37,99,235,0.25)' : 'none'
+                      boxShadow: isSelected ? '0 1px 4px rgba(16,185,129,0.3)' : 'none'
                     }}
                   >
                     <span
@@ -864,7 +1144,7 @@ export default function ClientPortal({ client, onLogout }) {
                       return (
                         <tr key={ord._id || ord.id || idx} className="client-table-row">
                           <td style={{ fontWeight: 800 }}>
-                            <span style={{ color: '#1d4ed8', letterSpacing: '0.02em' }}>{displayJobNo}</span>
+                            <span style={{ color: '#10b981', letterSpacing: '0.02em' }}>{displayJobNo}</span>
                           </td>
                           <td style={{ color: '#64748b', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
                             {formatDateDDMMYYYY(ord.created_date_time || ord.createdAt || ord.date)}
@@ -875,7 +1155,7 @@ export default function ClientPortal({ client, onLogout }) {
                           <td style={{ color: '#475569' }}>
                             {ord.fabric || '—'}
                           </td>
-                          <td style={{ fontWeight: 800, color: '#1d4ed8', whiteSpace: 'nowrap' }}>
+                          <td style={{ fontWeight: 800, color: '#10b981', whiteSpace: 'nowrap' }}>
                             {qtyStr}
                           </td>
                           <td style={{ whiteSpace: 'nowrap' }}>
@@ -915,9 +1195,9 @@ export default function ClientPortal({ client, onLogout }) {
                                   gap: '4px',
                                   fontSize: '0.68rem',
                                   fontWeight: 600,
-                                  color: '#0369a1',
-                                  background: '#e0f2fe',
-                                  border: '1px solid #bae6fd',
+                                  color: '#059669',
+                                  background: 'rgba(16, 185, 129, 0.1)',
+                                  border: '1px solid rgba(16, 185, 129, 0.25)',
                                   padding: '1px 6px',
                                   borderRadius: '6px'
                                 }}>
@@ -1036,7 +1316,7 @@ export default function ClientPortal({ client, onLogout }) {
                           {matchingOrders.length > 0 && (
                             <div>
                               <span style={styles.metaLabel}>Orders</span>
-                              <span style={{ ...styles.metaVal, color: '#1d4ed8' }}>
+                              <span style={{ ...styles.metaVal, color: '#10b981' }}>
                                 {matchingOrders.length} {matchingOrders.length === 1 ? 'Order' : 'Orders'} {totalPcs > 0 ? `(${totalPcs} pcs)` : ''}
                               </span>
                             </div>
@@ -1044,18 +1324,45 @@ export default function ClientPortal({ client, onLogout }) {
                           {d.partySkuId && (
                             <div>
                               <span style={styles.metaLabel}>Party SKU</span>
-                              <span style={{ ...styles.metaVal, color: '#2563eb' }}>{d.partySkuId}</span>
+                              <span style={{ ...styles.metaVal, color: '#10b981' }}>{d.partySkuId}</span>
                             </div>
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px dashed #e2e8f0' }}>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#1d4ed8', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '6px' }}>
-                            Party: {partyCode || 'VG'}
-                          </span>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 500 }}>
-                            {matchingOrders.length > 0 ? `${matchingOrders.length} active orders` : (d.department ? d.department.replace('_', ' ') : 'Catalog Design')}
-                          </span>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px dashed #e2e8f0', gap: '8px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#fbbf24', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.35)', padding: '2px 8px', borderRadius: '6px' }}>
+                              Party: {partyCode || 'VG'}
+                            </span>
+                            <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 500 }}>
+                              {matchingOrders.length > 0 ? `${matchingOrders.length} active orders` : ''}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenPlaceOrder(d);
+                            }}
+                            style={{
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              border: 'none',
+                              color: '#ffffff',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)'
+                            }}
+                            title={`Place order for ${d.designName}`}
+                          >
+                            <PlusCircle size={12} />
+                            <span>Order</span>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1071,13 +1378,13 @@ export default function ClientPortal({ client, onLogout }) {
           <div style={styles.tabContent}>
             <div style={styles.profileCard}>
               <h3 style={styles.profileSectionHeading}>
-                <Building2 size={18} color="#2563eb" />
+                <Building2 size={18} color="#10b981" />
                 <span>Company Profile & Logo</span>
               </h3>
 
               {profileMessage && (
                 <div style={styles.alertSuccess}>
-                  <CheckCircle2 size={16} color="#2563eb" />
+                  <CheckCircle2 size={16} color="#10b981" />
                   <span>{profileMessage}</span>
                 </div>
               )}
@@ -1131,7 +1438,7 @@ export default function ClientPortal({ client, onLogout }) {
 
                 <div style={styles.detailItem}>
                   <label style={styles.detailLabel}>Assigned Party Code</label>
-                  <div style={{ ...styles.detailVal, color: '#1d4ed8', fontWeight: 800 }}>{partyCode || '—'}</div>
+                  <div style={{ ...styles.detailVal, color: '#fbbf24', fontWeight: 800 }}>{partyCode || '—'}</div>
                 </div>
 
                 <div style={styles.detailItem}>
@@ -1148,7 +1455,7 @@ export default function ClientPortal({ client, onLogout }) {
               {/* Change Password Form */}
               <div style={{ marginTop: '2rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
                 <h4 style={{ margin: '0 0 1rem 0', color: '#0f172a', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Key size={16} color="#2563eb" />
+                  <Key size={16} color="#10b981" />
                   <span>Update Account Password</span>
                 </h4>
 
@@ -1196,7 +1503,7 @@ export default function ClientPortal({ client, onLogout }) {
       {/* ── Place Order Multi-Entry Modal ── */}
       {showPlaceOrderModal && (
         <div style={styles.modalOverlay} onClick={() => !submittingOrder && setShowPlaceOrderModal(false)}>
-          <div style={styles.orderModalContainer} onClick={(e) => e.stopPropagation()}>
+          <div className="order-modal-container" style={styles.orderModalContainer} onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div style={styles.orderModalHeader}>
               <div>
@@ -1234,72 +1541,193 @@ export default function ClientPortal({ client, onLogout }) {
 
             {/* Multi-Entry Form */}
             <form onSubmit={handleSubmitOrder}>
-              <div style={styles.orderEntriesTableWrapper}>
-                <table style={styles.orderEntriesTable}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc', borderBottom: '1.5px solid #e2e8f0' }}>
-                      <th style={{ width: '45px', textAlign: 'center', padding: '0.65rem 0.5rem', fontSize: '0.72rem', color: '#475569', fontWeight: 700, textTransform: 'uppercase' }}>ID</th>
-                      <th style={{ width: '135px', padding: '0.65rem 0.5rem', fontSize: '0.72rem', color: '#475569', fontWeight: 700, textTransform: 'uppercase' }}>Date</th>
-                      <th style={{ minWidth: '220px', padding: '0.65rem 0.5rem', fontSize: '0.72rem', color: '#475569', fontWeight: 700, textTransform: 'uppercase' }}>Design No. (Assigned)</th>
-                      <th style={{ width: '120px', padding: '0.65rem 0.5rem', fontSize: '0.72rem', color: '#475569', fontWeight: 700, textTransform: 'uppercase' }}>Quantity (Pcs)</th>
-                      <th style={{ padding: '0.65rem 0.5rem', fontSize: '0.72rem', color: '#475569', fontWeight: 700, textTransform: 'uppercase' }}>Note</th>
-                      <th style={{ width: '45px', textAlign: 'center', padding: '0.65rem 0.5rem' }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orderRows.map((row, idx) => {
-                      const selectedDesignDoc = designs.find(d => d.designName === row.designName);
-                      return (
-                        <tr key={row.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          {/* Auto ID */}
-                          <td style={{ textAlign: 'center', fontWeight: 700, color: '#64748b', fontSize: '0.8rem', padding: '0.5rem' }}>
-                            #{idx + 1}
-                          </td>
+              {/* Desktop Table View (screens >= 769px) */}
+              <div className="order-entries-desktop">
+                <div style={styles.orderEntriesTableWrapper}>
+                  <table className="order-table-custom">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '45px', textAlign: 'center' }}>ID</th>
+                        <th style={{ width: '140px' }}>Date</th>
+                        <th style={{ minWidth: '220px' }}>Design No. (Assigned)</th>
+                        <th style={{ width: '120px' }}>Quantity (Pcs)</th>
+                        <th>Note</th>
+                        <th style={{ width: '45px', textAlign: 'center' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orderRows.map((row, idx) => {
+                        const selectedDesignDoc = designs.find(d => d.designName === row.designName);
+                        return (
+                          <tr key={row.id}>
+                            {/* Auto ID */}
+                            <td style={{ textAlign: 'center', fontWeight: 800, color: '#34d399', fontSize: '0.82rem' }}>
+                              #{idx + 1}
+                            </td>
 
-                          {/* Date (default today) */}
-                          <td style={{ padding: '0.5rem' }}>
+                            {/* Date (default today) */}
+                            <td>
+                              <input
+                                type="date"
+                                value={row.date}
+                                onChange={(e) => handleUpdateOrderRow(row.id, 'date', e.target.value)}
+                                className="order-input-custom"
+                                required
+                              />
+                            </td>
+
+                            {/* Design No. (Assigned to them) */}
+                            <td>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <select
+                                  value={row.designName}
+                                  onChange={(e) => handleUpdateOrderRow(row.id, 'designName', e.target.value)}
+                                  className="order-input-custom"
+                                  required
+                                >
+                                  <option value="">-- Choose Assigned Design --</option>
+                                  {designs.map((d) => (
+                                    <option key={d._id || d.id || d.designName} value={d.designName}>
+                                      {d.designName} {d.category ? `[${d.category}]` : ''} {d.fabricName ? `- ${d.fabricName}` : ''}
+                                    </option>
+                                  ))}
+                                </select>
+
+                                {selectedDesignDoc && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#94a3b8', flexWrap: 'wrap' }}>
+                                    {selectedDesignDoc.category && (
+                                      <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                        {selectedDesignDoc.category}
+                                      </span>
+                                    )}
+                                    {selectedDesignDoc.fabricName && <span>Fabric: {selectedDesignDoc.fabricName}</span>}
+                                    {selectedDesignDoc.colors && <span>• Color: {selectedDesignDoc.colors}</span>}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Pcs */}
+                            <td>
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                placeholder="e.g. 50"
+                                value={row.pcs}
+                                onChange={(e) => handleUpdateOrderRow(row.id, 'pcs', e.target.value)}
+                                className="order-input-custom"
+                                required
+                              />
+                            </td>
+
+                            {/* Note */}
+                            <td>
+                              <input
+                                type="text"
+                                placeholder="Notes (optional)"
+                                value={row.note}
+                                onChange={(e) => handleUpdateOrderRow(row.id, 'note', e.target.value)}
+                                className="order-input-custom"
+                              />
+                            </td>
+
+                            {/* Remove Action */}
+                            <td style={{ textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveOrderRow(row.id)}
+                                disabled={orderRows.length <= 1}
+                                style={{
+                                  ...styles.rowDeleteBtn,
+                                  opacity: orderRows.length <= 1 ? 0.3 : 1,
+                                  cursor: orderRows.length <= 1 ? 'not-allowed' : 'pointer'
+                                }}
+                                title="Delete row"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Mobile Cards View (screens <= 768px) */}
+              <div className="order-entries-mobile">
+                {orderRows.map((row, idx) => {
+                  const selectedDesignDoc = designs.find(d => d.designName === row.designName);
+                  return (
+                    <div key={row.id} className="order-card-item">
+                      <div className="order-card-topbar">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="order-card-id-badge">#{idx + 1}</span>
+                          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#34d399' }}>
+                            Order Item #{idx + 1}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveOrderRow(row.id)}
+                          disabled={orderRows.length <= 1}
+                          style={{
+                            ...styles.rowDeleteBtn,
+                            opacity: orderRows.length <= 1 ? 0.3 : 1,
+                            cursor: orderRows.length <= 1 ? 'not-allowed' : 'pointer'
+                          }}
+                          title="Delete item"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+
+                      <div className="order-card-content">
+                        {/* Design No. */}
+                        <div>
+                          <label className="order-field-label">Design No. (Assigned) *</label>
+                          <select
+                            value={row.designName}
+                            onChange={(e) => handleUpdateOrderRow(row.id, 'designName', e.target.value)}
+                            className="order-input-custom"
+                            required
+                          >
+                            <option value="">-- Choose Assigned Design --</option>
+                            {designs.map((d) => (
+                              <option key={d._id || d.id || d.designName} value={d.designName}>
+                                {d.designName} {d.category ? `[${d.category}]` : ''} {d.fabricName ? `- ${d.fabricName}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                          {selectedDesignDoc && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', color: '#94a3b8', marginTop: '5px', flexWrap: 'wrap' }}>
+                              {selectedDesignDoc.category && (
+                                <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                  {selectedDesignDoc.category}
+                                </span>
+                              )}
+                              {selectedDesignDoc.fabricName && <span>Fabric: {selectedDesignDoc.fabricName}</span>}
+                              {selectedDesignDoc.colors && <span>• Color: {selectedDesignDoc.colors}</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 2-Col: Date + Quantity */}
+                        <div className="order-card-grid-2col">
+                          <div>
+                            <label className="order-field-label">Date *</label>
                             <input
                               type="date"
                               value={row.date}
                               onChange={(e) => handleUpdateOrderRow(row.id, 'date', e.target.value)}
-                              style={styles.modalInput}
+                              className="order-input-custom"
                               required
                             />
-                          </td>
-
-                          {/* Design No. (Assigned to them) */}
-                          <td style={{ padding: '0.5rem' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              <select
-                                value={row.designName}
-                                onChange={(e) => handleUpdateOrderRow(row.id, 'designName', e.target.value)}
-                                style={styles.modalSelect}
-                                required
-                              >
-                                <option value="">-- Choose Assigned Design --</option>
-                                {designs.map((d) => (
-                                  <option key={d._id || d.id || d.designName} value={d.designName}>
-                                    {d.designName} {d.category ? `[${d.category}]` : ''} {d.fabricName ? `- ${d.fabricName}` : ''}
-                                  </option>
-                                ))}
-                              </select>
-
-                              {selectedDesignDoc && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: '#64748b' }}>
-                                  {selectedDesignDoc.category && (
-                                    <span style={{ background: '#eff6ff', color: '#1d4ed8', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                                      {selectedDesignDoc.category}
-                                    </span>
-                                  )}
-                                  {selectedDesignDoc.fabricName && <span>Fabric: {selectedDesignDoc.fabricName}</span>}
-                                  {selectedDesignDoc.colors && <span>• Color: {selectedDesignDoc.colors}</span>}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Pcs */}
-                          <td style={{ padding: '0.5rem' }}>
+                          </div>
+                          <div>
+                            <label className="order-field-label">Quantity (Pcs) *</label>
                             <input
                               type="number"
                               min="1"
@@ -1307,43 +1735,27 @@ export default function ClientPortal({ client, onLogout }) {
                               placeholder="e.g. 50"
                               value={row.pcs}
                               onChange={(e) => handleUpdateOrderRow(row.id, 'pcs', e.target.value)}
-                              style={styles.modalInput}
+                              className="order-input-custom"
                               required
                             />
-                          </td>
+                          </div>
+                        </div>
 
-                          {/* Note */}
-                          <td style={{ padding: '0.5rem' }}>
-                            <input
-                              type="text"
-                              placeholder="Notes (optional)"
-                              value={row.note}
-                              onChange={(e) => handleUpdateOrderRow(row.id, 'note', e.target.value)}
-                              style={styles.modalInput}
-                            />
-                          </td>
-
-                          {/* Remove Action */}
-                          <td style={{ textAlign: 'center', padding: '0.5rem' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveOrderRow(row.id)}
-                              disabled={orderRows.length <= 1}
-                              style={{
-                                ...styles.rowDeleteBtn,
-                                opacity: orderRows.length <= 1 ? 0.3 : 1,
-                                cursor: orderRows.length <= 1 ? 'not-allowed' : 'pointer'
-                              }}
-                              title="Delete row"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                        {/* Note */}
+                        <div>
+                          <label className="order-field-label">Note (Optional)</label>
+                          <input
+                            type="text"
+                            placeholder="Special instructions or notes..."
+                            value={row.note}
+                            onChange={(e) => handleUpdateOrderRow(row.id, 'note', e.target.value)}
+                            className="order-input-custom"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Add Row Button */}
@@ -1353,22 +1765,22 @@ export default function ClientPortal({ client, onLogout }) {
                   onClick={handleAddOrderRow}
                   style={styles.addOrderRowBtn}
                 >
-                  <Plus size={14} />
+                  <Plus size={15} />
                   <span>Add Another Design</span>
                 </button>
               </div>
 
               {/* Modal Footer */}
-              <div style={styles.orderModalFooter}>
-                <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                  <span>Total Items: <strong style={{ color: '#0f172a' }}>{orderRows.length}</strong></span>
+              <div className="order-modal-footer-wrap" style={styles.orderModalFooter}>
+                <div style={{ fontSize: '0.84rem', color: '#94a3b8' }}>
+                  <span>Total Items: <strong style={{ color: '#f8fafc' }}>{orderRows.length}</strong></span>
                   <span style={{ margin: '0 8px' }}>•</span>
-                  <span>Total Pieces: <strong style={{ color: '#1d4ed8' }}>
+                  <span>Total Pieces: <strong style={{ color: '#34d399' }}>
                     {orderRows.reduce((sum, r) => sum + (Number(r.pcs) || 0), 0)} Pcs
                   </strong></span>
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.65rem' }}>
+                <div className="order-modal-footer-actions" style={{ display: 'flex', gap: '0.65rem' }}>
                   <button
                     type="button"
                     onClick={() => setShowPlaceOrderModal(false)}
@@ -1390,7 +1802,7 @@ export default function ClientPortal({ client, onLogout }) {
                       </>
                     ) : (
                       <>
-                        <Check size={14} />
+                        <Check size={15} />
                         <span>Submit Order ({orderRows.length} {orderRows.length === 1 ? 'item' : 'items'})</span>
                       </>
                     )}
@@ -1448,10 +1860,10 @@ export function getOrderStatusInfo(ord = {}) {
       key: 'delivery-pending',
       label: 'Delivery Pending',
       sublabel: 'Fusing Done • Ready for Delivery',
-      badgeBg: '#eff6ff',
-      text: '#1d4ed8',
-      border: '#bfdbfe',
-      dotColor: '#2563eb'
+      badgeBg: 'rgba(16, 185, 129, 0.1)',
+      text: '#059669',
+      border: 'rgba(16, 185, 129, 0.25)',
+      dotColor: '#10b981'
     };
   }
 
@@ -1513,11 +1925,11 @@ const styles = {
     width: '38px',
     height: '38px',
     borderRadius: '10px',
-    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
+    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
   },
   brandTitle: {
     margin: 0,
@@ -1530,9 +1942,9 @@ const styles = {
     fontWeight: 800,
     padding: '2px 7px',
     borderRadius: '6px',
-    background: '#eff6ff',
-    color: '#1d4ed8',
-    border: '1px solid #bfdbfe',
+    background: 'rgba(245, 158, 11, 0.15)',
+    color: '#fbbf24',
+    border: '1px solid rgba(245, 158, 11, 0.35)',
     letterSpacing: '0.04em'
   },
   brandSubtitle: {
@@ -1559,13 +1971,13 @@ const styles = {
     height: '30px',
     borderRadius: '50%',
     objectFit: 'cover',
-    border: '1.5px solid #bfdbfe'
+    border: '1.5px solid rgba(16, 185, 129, 0.4)'
   },
   avatarFallback: {
     width: '30px',
     height: '30px',
     borderRadius: '50%',
-    background: '#dbeafe',
+    background: 'rgba(16, 185, 129, 0.15)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center'
@@ -1623,8 +2035,8 @@ const styles = {
     width: '46px',
     height: '46px',
     borderRadius: '10px',
-    background: '#eff6ff',
-    border: '1px solid #bfdbfe',
+    background: 'rgba(16, 185, 129, 0.1)',
+    border: '1px solid rgba(16, 185, 129, 0.25)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1676,7 +2088,7 @@ const styles = {
     display: 'block',
     fontSize: '1.3rem',
     fontWeight: 700,
-    color: '#1d4ed8',
+    color: '#10b981',
     lineHeight: 1.1
   },
   statLabel: {
@@ -1720,9 +2132,9 @@ const styles = {
     borderRadius: '7px',
     background: '#ffffff',
     border: 'none',
-    color: '#1d4ed8',
+    color: '#10b981',
     fontSize: '0.84rem',
-    fontWeight: 600,
+    fontWeight: 700,
     cursor: 'pointer',
     boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
     whiteSpace: 'nowrap'
@@ -1786,82 +2198,84 @@ const styles = {
     height: '38px',
     padding: '0 15px',
     borderRadius: '8px',
-    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
     color: '#ffffff',
     border: 'none',
     fontSize: '0.82rem',
     fontWeight: 600,
     cursor: 'pointer',
     transition: 'all 0.15s ease',
-    boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)'
+    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
   },
   modalOverlay: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(15, 23, 42, 0.65)',
-    backdropFilter: 'blur(6px)',
+    background: 'rgba(15, 23, 42, 0.75)',
+    backdropFilter: 'blur(8px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 99999,
-    padding: '1rem',
+    padding: '0.75rem',
     overflowY: 'auto'
   },
   orderModalContainer: {
-    background: '#ffffff',
+    background: '#0f172a',
     borderRadius: '16px',
     width: '100%',
     maxWidth: '880px',
     maxHeight: '90vh',
     overflowY: 'auto',
     padding: '1.5rem',
-    boxShadow: '0 20px 60px rgba(15, 23, 42, 0.25)',
-    border: '1px solid #e2e8f0'
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08)',
+    border: '1px solid #334155',
+    color: '#f8fafc'
   },
   orderModalHeader: {
     display: 'flex',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: '1rem',
-    borderBottom: '1px solid #f1f5f9',
+    borderBottom: '1px solid #1e293b',
     paddingBottom: '0.85rem'
   },
   orderModalTitle: {
     margin: 0,
     fontSize: '1.25rem',
     fontWeight: 700,
-    color: '#0f172a'
+    color: '#f8fafc'
   },
   orderModalSubtitle: {
     margin: '4px 0 0 0',
     fontSize: '0.8rem',
-    color: '#64748b'
+    color: '#94a3b8'
   },
   partyBadgePill: {
-    fontSize: '0.7rem',
+    fontSize: '0.72rem',
     fontWeight: 700,
-    color: '#1d4ed8',
-    background: '#eff6ff',
-    border: '1px solid #bfdbfe',
-    padding: '2px 8px',
+    color: '#fbbf24',
+    background: 'rgba(245, 158, 11, 0.15)',
+    border: '1px solid rgba(245, 158, 11, 0.35)',
+    padding: '3px 9px',
     borderRadius: '6px'
   },
   modalCloseBtn: {
-    background: '#f1f5f9',
-    border: 'none',
-    color: '#64748b',
+    background: '#1e293b',
+    border: '1px solid #334155',
+    color: '#94a3b8',
     cursor: 'pointer',
     padding: '6px',
     borderRadius: '8px',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    transition: 'all 0.15s ease'
   },
   orderEntriesTableWrapper: {
     overflowX: 'auto',
-    border: '1px solid #e2e8f0',
+    border: '1px solid #334155',
     borderRadius: '10px',
-    background: '#ffffff'
+    background: '#0f172a'
   },
   orderEntriesTable: {
     width: '100%',
@@ -1871,82 +2285,89 @@ const styles = {
   },
   modalInput: {
     width: '100%',
-    padding: '0.45rem 0.65rem',
-    borderRadius: '6px',
-    border: '1px solid #cbd5e1',
-    fontSize: '0.82rem',
-    color: '#0f172a',
+    padding: '0.55rem 0.75rem',
+    borderRadius: '8px',
+    border: '1px solid #334155',
+    fontSize: '0.84rem',
+    color: '#f8fafc',
+    background: '#1e293b',
     outline: 'none',
     boxSizing: 'border-box'
   },
   modalSelect: {
     width: '100%',
-    padding: '0.45rem 0.65rem',
-    borderRadius: '6px',
-    border: '1px solid #cbd5e1',
-    fontSize: '0.82rem',
-    color: '#0f172a',
+    padding: '0.55rem 0.75rem',
+    borderRadius: '8px',
+    border: '1px solid #334155',
+    fontSize: '0.84rem',
+    color: '#f8fafc',
     outline: 'none',
-    background: '#ffffff',
+    background: '#1e293b',
     boxSizing: 'border-box'
   },
   rowDeleteBtn: {
-    background: '#fee2e2',
-    border: '1px solid #fecaca',
-    color: '#dc2626',
+    background: 'rgba(239, 68, 68, 0.15)',
+    border: '1px solid rgba(239, 68, 68, 0.3)',
+    color: '#f87171',
     borderRadius: '6px',
-    padding: '5px 8px',
+    padding: '6px 9px',
     cursor: 'pointer',
     display: 'inline-flex',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    transition: 'background 0.15s ease'
   },
   addOrderRowBtn: {
     display: 'inline-flex',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: '6px',
-    padding: '0.45rem 0.85rem',
+    padding: '0.55rem 1rem',
     borderRadius: '8px',
-    background: '#f8fafc',
-    border: '1.5px dashed #cbd5e1',
-    color: '#2563eb',
-    fontSize: '0.82rem',
-    fontWeight: 600,
-    cursor: 'pointer'
+    background: 'rgba(16, 185, 129, 0.08)',
+    border: '1.5px dashed #10b981',
+    color: '#34d399',
+    fontSize: '0.84rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+    width: '100%',
+    transition: 'all 0.15s ease'
   },
   orderModalFooter: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: '1.5rem',
-    borderTop: '1px solid #f1f5f9',
+    marginTop: '1.25rem',
+    borderTop: '1px solid #1e293b',
     paddingTop: '1rem',
     flexWrap: 'wrap',
     gap: '1rem'
   },
   cancelBtn: {
-    padding: '0.55rem 1.1rem',
+    padding: '0.6rem 1.2rem',
     borderRadius: '8px',
-    background: '#ffffff',
-    border: '1px solid #cbd5e1',
-    color: '#475569',
-    fontSize: '0.84rem',
+    background: '#1e293b',
+    border: '1px solid #334155',
+    color: '#cbd5e1',
+    fontSize: '0.85rem',
     fontWeight: 600,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    transition: 'all 0.15s ease'
   },
   submitOrderBtn: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '6px',
-    padding: '0.55rem 1.25rem',
+    padding: '0.6rem 1.35rem',
     borderRadius: '8px',
-    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
     border: 'none',
     color: '#ffffff',
-    fontSize: '0.84rem',
-    fontWeight: 600,
+    fontSize: '0.85rem',
+    fontWeight: 700,
     cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+    transition: 'all 0.15s ease'
   },
   emptyState: {
     padding: '3rem 1.5rem',
@@ -2145,14 +2566,14 @@ const styles = {
     gap: '0.4rem',
     padding: '0.55rem 1rem',
     borderRadius: '10px',
-    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
     color: '#fff',
     border: 'none',
     fontSize: '0.82rem',
     fontWeight: 700,
     cursor: 'pointer',
     width: 'fit-content',
-    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
+    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
   },
   detailsGrid: {
     display: 'grid',
@@ -2199,13 +2620,13 @@ const styles = {
     marginTop: '0.65rem',
     padding: '0.8rem 1.25rem',
     borderRadius: '10px',
-    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
     color: '#fff',
     border: 'none',
     fontWeight: 700,
     fontSize: '0.92rem',
     cursor: 'pointer',
-    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)'
+    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
   },
   zoomOverlay: {
     position: 'fixed',

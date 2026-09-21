@@ -143,8 +143,14 @@ const getAllJobCards = async (req, res) => {
       const partyOrs = [];
       partyParts.forEach(p => {
         const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        partyOrs.push({ party: { $regex: new RegExp(`^\\s*${escaped}\\s*$`, 'i') } });
-        partyOrs.push({ party: p });
+        const subRegex = { $regex: escaped, $options: 'i' };
+        partyOrs.push(
+          { party: subRegex },
+          { billTo: subRegex },
+          { shipTo: subRegex },
+          { createdBy: subRegex },
+          { createdByName: subRegex }
+        );
       });
       if (partyOrs.length > 0) {
         baseAndClauses.push({ $or: partyOrs });
@@ -597,24 +603,82 @@ const createClientBulkOrder = async (req, res) => {
     const createdCards = [];
 
     for (const item of items) {
-      const designName = String(item.designName || item.designNo || '').trim();
-      if (!designName) continue;
+      const rawDesignName = String(item.designName || item.designNo || '').trim();
+      if (!rawDesignName) continue;
 
       const jobNo = `JOB NO.- ${nextNum++}`;
 
-      // Lookup design in DB for artwork, fabric, colors, category
-      let designDoc = await db.Design.findOne({ designName }).lean();
-      if (!designDoc) {
-        designDoc = await db.Design.findOne({ designNo: designName }).lean();
+      // 1. Lookup design in DB by ID if provided
+      let designDoc = null;
+      if (item.designId && mongoose.Types.ObjectId.isValid(item.designId)) {
+        try {
+          designDoc = await db.Design.findById(item.designId).lean();
+        } catch (e) {}
       }
 
+      // 2. Lookup design by exact designName or designNo
+      if (!designDoc) {
+        designDoc = await db.Design.findOne({ designName: rawDesignName }).lean();
+      }
+      if (!designDoc) {
+        designDoc = await db.Design.findOne({ designNo: rawDesignName }).lean();
+      }
+
+      // 3. Fallback: Lookup design case-insensitively, handling optional ED- prefix
+      if (!designDoc) {
+        const cleanName = rawDesignName.replace(/^ED-/i, '').trim();
+        const escaped = cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        designDoc = await db.Design.findOne({
+          $or: [
+            { designName: { $regex: new RegExp(`^(ED-)?${escaped}$`, 'i') } },
+            { designNo: { $regex: new RegExp(`^(ED-)?${escaped}$`, 'i') } },
+            { designName: { $regex: new RegExp(escaped, 'i') } }
+          ]
+        }).lean();
+      }
+
+      const designName = designDoc?.designName || rawDesignName;
       const fabric = (item.fabric || designDoc?.fabricName || 'FRENCH CREP').trim();
       const category = (item.category || designDoc?.category || 'KURTI-SET').trim();
       const colors = (item.colors || designDoc?.colors || '').trim();
       const panna = (item.panna || designDoc?.panna || '58').trim();
+      const pass = (item.pass || designDoc?.pass || '').trim();
+      const speed = (item.speed || designDoc?.speed || '').trim();
+      const designer = (item.designer || designDoc?.designerName || '').trim();
+      const colourMatching = (item.colourMatching || designDoc?.colourMatching || '').trim();
+      const paperType = (item.paperType || designDoc?.paperType || '').trim();
+      const fusingTemp = (item.fusingTemp || item.temperature || designDoc?.fusingTemp || '').trim();
+      const temperature = fusingTemp;
       const pcs = String(item.pcs || item.pieces || '0').trim();
       const note = String(item.note || item.notes || '').trim();
       const date = item.date ? normalizeDateStr(item.date) : normalizeDateStr(new Date().toISOString().split('T')[0]);
+
+      // 100 Pcs Standards auto-calculations
+      const pcsNum = parseFloat(pcs) || 0;
+      const top100 = Number(designDoc?.top100 ?? item.top100 ?? 0);
+      const sleeve100 = Number(designDoc?.sleeve100 ?? item.sleeve100 ?? 0);
+      const bottom100 = Number(designDoc?.bottom100 ?? item.bottom100 ?? 0);
+      const dupatta100 = Number(designDoc?.dupatta100 ?? item.dupatta100 ?? 0);
+      const cut100 = Number(designDoc?.cut100 ?? item.cut100 ?? 0);
+      const totalMtr100 = Number(designDoc?.totalMtr100 ?? item.totalMtr100 ?? 0);
+      const setCopy100 = Number(designDoc?.setCopy100 ?? item.setCopy100 ?? 0);
+
+      const consumption = totalMtr100 > 0 ? (totalMtr100 / 100).toFixed(2) : (item.consumption || '');
+      const totalMtr = totalMtr100 > 0 && pcsNum > 0 ? ((totalMtr100 / 100) * pcsNum).toFixed(2) : (item.totalMtr || '');
+      const top = top100 > 0 && pcsNum > 0 ? ((top100 / 100) * pcsNum).toFixed(2) : (item.top || '');
+      const sleeve = sleeve100 > 0 && pcsNum > 0 ? ((sleeve100 / 100) * pcsNum).toFixed(2) : (item.sleeve || '');
+      const bottom = bottom100 > 0 && pcsNum > 0 ? ((bottom100 / 100) * pcsNum).toFixed(2) : (item.bottom || '');
+      const dupatta = dupatta100 > 0 && pcsNum > 0 ? ((dupatta100 / 100) * pcsNum).toFixed(2) : (item.dupatta || '');
+      const cut = cut100 > 0 ? cut100.toString() : (item.cut || '');
+      const setCopy = setCopy100 > 0 && pcsNum > 0 ? Math.round((setCopy100 / 100) * pcsNum).toString() : (item.setCopy || '');
+      const expTime = calcExpTime(panna, pass, totalMtr, '');
+
+      // Normalize artwork image URLs
+      const { normalizeImageUrl } = require('../utils/imageUrlHelper');
+      let rawImg1 = designDoc?.imageUrl || item.imageUrl1 || item.imageUrl || '';
+      let rawImg2 = designDoc?.imageUrl2 || item.imageUrl2 || '';
+      let img1 = rawImg1 ? normalizeImageUrl(rawImg1, designName) : '';
+      let img2 = rawImg2 ? normalizeImageUrl(rawImg2, designName ? `${designName}-2` : '') : '';
 
       const cardData = {
         jobNo,
@@ -626,6 +690,22 @@ const createClientBulkOrder = async (req, res) => {
         pcs,
         colors,
         panna,
+        pass,
+        speed,
+        designer,
+        colourMatching,
+        paperType,
+        temperature,
+        fusingTemp,
+        consumption,
+        totalMtr,
+        top,
+        sleeve,
+        bottom,
+        dupatta,
+        cut,
+        setCopy,
+        expTime,
         date,
         party: partyCode || companyName,
         billTo: companyName || partyCode,
@@ -634,23 +714,28 @@ const createClientBulkOrder = async (req, res) => {
         printStatus: 'Printing Pending',
         fusingStatus: 'Fusing Pending',
         deliveryStatus: 'Delivery Pending',
+        productionStage: 'Order Received',
         note1: note,
         emergencyNotes: `[Order placed by ${creatorString}]`,
         createdBy: creatorString,
         createdByName: creatorString,
-        imageUrl1: designDoc?.imageUrl || '',
-        imageUrl: designDoc?.imageUrl || '',
+        imageUrl1: img1,
+        imageUrl2: img2,
+        imageUrl: img1,
         auditTrail: [
           {
             performedBy: creatorString,
             performedByName: creatorString,
             action: 'CREATE',
             timestamp: new Date(),
-            details: `Online Order placed by ${creatorString} (Qty: ${pcs} pcs, Design: ${designName}, Fabric: ${fabric})`,
+            details: `Online Order placed by ${creatorString} (Qty: ${pcs} pcs, Design: ${designName}, Fabric: ${fabric}, Total Mtr: ${totalMtr || '0'}m)`,
             changesSummary: 'Job Card created via Client Portal'
           }
         ]
       };
+
+      await syncDesignImage(cardData).catch(e => logger.warn('syncDesignImage failed in client order: %s', e.message));
+      if (cardData.imageUrl1 && !cardData.imageUrl) cardData.imageUrl = cardData.imageUrl1;
 
       const card = await db.JobCard.create(cardData);
       createdCards.push(card);
@@ -663,7 +748,7 @@ const createClientBulkOrder = async (req, res) => {
         recordId: card._id,
         permissionScope: 'jobcards',
         department: 'Production',
-        description: `📋 **New Client Order #${card.jobNo}** placed by **${creatorString}** | Design: **${designName}** | Qty: **${pcs} pcs** | Fabric: **${fabric}**.`
+        description: `📋 **New Client Order #${card.jobNo}** placed by **${creatorString}** | Design: **${designName}** | Qty: **${pcs} pcs** (${totalMtr ? `${totalMtr}m` : '0m'}) | Fabric: **${fabric}**.`
       }).catch(e => logger.warn('publishActivity failed on client order: %s', e.message));
 
       emitSocketEvent(req, 'job-created', card);

@@ -228,6 +228,12 @@ th {
   letter-spacing: 0.05em;
 }
 
+.order-table-white-blue th {
+  background: #eff6ff !important;
+  color: #1e40af !important;
+  border-bottom: 2px solid #bfdbfe !important;
+}
+
 td {
   padding: 1rem;
   border-bottom: 1px solid var(--border-light);
