@@ -53,6 +53,8 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   const [error, setError] = useState('');
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const [showVendorManager, setShowVendorManager] = useState(false);
+  const [justScannedSku, setJustScannedSku] = useState(null);
+  const scannedTimeoutRef = React.useRef(null);
   
   // Master Reference Lists
   const [vendorsList, setVendorsList] = useState([]);
@@ -270,16 +272,21 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
       const size = resolveEffectiveSize(matchedInventory || matchedCatalog, cleanSku);
       const masterSku = resolveMasterSku(matchedInventory, matchedCatalog, cleanSku, size);
 
+      setJustScannedSku(masterSku);
+      if (scannedTimeoutRef.current) clearTimeout(scannedTimeoutRef.current);
+      scannedTimeoutRef.current = setTimeout(() => setJustScannedSku(null), 3000);
+
       const existingIndex = prev.findIndex(r => r.skuCode && (r.skuCode.trim().toLowerCase() === cleanSku.toLowerCase() || r.skuCode.trim().toLowerCase() === masterSku.toLowerCase()));
       if (existingIndex !== -1) {
-        const updated = [...prev];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
+        const existingItem = prev[existingIndex];
+        const updatedItem = {
+          ...existingItem,
           skuCode: masterSku,
           size,
-          qty: (updated[existingIndex].qty || 0) + 1
+          qty: (existingItem.qty || 0) + 1
         };
-        return updated;
+        const otherItems = prev.filter((_, i) => i !== existingIndex);
+        return [updatedItem, ...otherItems]; // Always bring active scanned item to TOP
       } else {
         let itemName = masterSku;
         let purchasePrice = matchedInventory?.purchasePrice || matchedCatalog?.basePrice || 0;
@@ -301,7 +308,6 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
 
         const validRows = prev.filter(r => r.skuCode && r.skuCode.trim() !== '');
         return [
-          ...validRows,
           {
             skuCode: masterSku,
             itemName,
@@ -313,7 +319,8 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
             challanNo,
             imageUrl,
             status
-          }
+          },
+          ...validRows // Always place newly scanned item at TOP
         ];
       }
     });
@@ -469,108 +476,163 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
 
         {/* Embedded Mobile Camera Scanner */}
         {showCameraScanner && (
-          <CameraBarcodeScanner
-            onScan={(code) => processScannedSku(code)}
-            onClose={() => setShowCameraScanner(false)}
-          />
+          <div style={{ marginBottom: isMobile ? '0.4rem' : '0.85rem' }}>
+            <CameraBarcodeScanner
+              compact={isMobile}
+              onScan={(code) => processScannedSku(code)}
+              onClose={() => setShowCameraScanner(false)}
+            />
+          </div>
         )}
 
         {/* MAIN FORM VIEW */}
         <div style={styles.formContainer}>
           
-          {/* Quick Set Header Bar */}
-          <div className="bulk-inward-quickset" style={styles.quickSetPanel}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#d97706', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              ⚡ Quick Set All Rows:
-            </span>
-            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', gap: '0.35rem', flex: 1, minWidth: isMobile ? '100%' : '240px', alignItems: 'center' }}>
+          {/* Quick Set Header Bar - Compact when camera is active on mobile */}
+          {isMobile && showCameraScanner ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.35rem 0.65rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.75rem' }}>
+              <span style={{ fontWeight: 700, color: '#475569' }}>
+                🏢 Default Vendor: <strong style={{ color: '#059669' }}>{bulkVendor || 'All Rows'}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowVendorManager(true)}
+                style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.25rem 0.5rem', fontSize: '0.72rem', fontWeight: 800, color: '#059669', cursor: 'pointer' }}
+              >
+                + Manage Vendor
+              </button>
+            </div>
+          ) : (
+            <div className="bulk-inward-quickset" style={styles.quickSetPanel}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#d97706', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                ⚡ Quick Set All Rows:
+              </span>
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '0.35rem', flex: 1, minWidth: isMobile ? '100%' : '240px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    list="master-vendors-list"
+                    value={bulkVendor}
+                    onChange={e => applyQuickSetVendor(e.target.value)}
+                    placeholder="Bulk Vendor for all rows..."
+                    style={{ ...styles.quickInput, flex: 1, fontSize: isMobile ? '16px' : '0.82rem' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowVendorManager(true)}
+                    style={{
+                      padding: '0.5rem 0.65rem',
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      color: '#059669',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                    }}
+                    title="Manage Vendors & Suppliers"
+                  >
+                    <Building2 size={14} />
+                    <span>+ Vendors</span>
+                  </button>
+                </div>
                 <input
                   type="text"
-                  list="master-vendors-list"
-                  value={bulkVendor}
-                  onChange={e => applyQuickSetVendor(e.target.value)}
-                  placeholder="Bulk Vendor for all rows..."
-                  style={{ ...styles.quickInput, flex: 1, fontSize: isMobile ? '16px' : '0.82rem' }}
+                  value={bulkChallanNo}
+                  onChange={e => applyQuickSetChallan(e.target.value)}
+                  placeholder="Bulk Challan No for all rows..."
+                  style={{ ...styles.quickInput, width: isMobile ? '100%' : 'auto', fontSize: isMobile ? '16px' : '0.82rem' }}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowVendorManager(true)}
-                  style={{
-                    padding: '0.5rem 0.65rem',
-                    background: '#ffffff',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '8px',
-                    fontSize: '0.78rem',
-                    fontWeight: 800,
-                    color: '#059669',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.3rem',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                  }}
-                  title="Manage Vendors & Suppliers"
-                >
-                  <Building2 size={14} />
-                  <span>+ Vendors</span>
-                </button>
               </div>
-              <input
-                type="text"
-                value={bulkChallanNo}
-                onChange={e => applyQuickSetChallan(e.target.value)}
-                placeholder="Bulk Challan No for all rows..."
-                style={{ ...styles.quickInput, width: isMobile ? '100%' : 'auto', fontSize: isMobile ? '16px' : '0.82rem' }}
-              />
             </div>
+          )}
+
+          {/* Live Scanned Items Status Banner */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.4rem 0.75rem',
+            background: showCameraScanner ? '#ecfdf5' : '#f8fafc',
+            border: showCameraScanner ? '1.5px solid #10b981' : '1px solid #e2e8f0',
+            borderRadius: '8px',
+            fontSize: '0.8rem',
+            fontWeight: 800,
+            color: showCameraScanner ? '#065f46' : '#334155'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span>📋 Inward Data List ({activeRowsCount} items • {totalInwardUnits} units)</span>
+            </div>
+            {justScannedSku ? (
+              <span style={{ color: '#ffffff', background: '#059669', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 900 }}>
+                ✨ Scanned: {justScannedSku}
+              </span>
+            ) : showCameraScanner ? (
+              <span style={{ color: '#059669', fontSize: '0.72rem', fontWeight: 800 }}>
+                ● Camera Live
+              </span>
+            ) : null}
           </div>
 
           {/* Dynamic Form View: Mobile Card View vs Desktop Table */}
           {isMobile ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto', maxHeight: '56vh', padding: '2px' }}>
-              {formRows.map((row, idx) => (
-                <div key={idx} style={{
-                  background: '#ffffff',
-                  border: '1.5px solid #e2e8f0',
-                  borderRadius: '12px',
-                  padding: '0.85rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.65rem',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-                }}>
-                  {/* Card Top: Thumbnail + SKU input + Size badge + Delete button */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
-                      {row.imageUrl ? (
-                        <img
-                          src={convertDriveUrl(row.imageUrl, row.skuCode)}
-                          alt={row.skuCode || 'Item'}
-                          style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }}
-                          onError={(e) => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; }}
-                        />
-                      ) : null}
-                      <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '8px',
-                        background: '#f0fdf4',
-                        color: '#059669',
-                        border: '1px solid #bbf7d0',
-                        display: row.imageUrl ? 'none' : 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0
-                      }}>
-                        <Package size={18} />
-                      </div>
-
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', marginBottom: '2px' }}>
-                          ROW #{idx + 1} • SKU CODE
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', overflowY: 'auto', flex: 1, minHeight: 0, padding: '2px' }}>
+              {formRows.map((row, idx) => {
+                const isJustScanned = justScannedSku && (row.skuCode === justScannedSku || (row.skuCode && row.skuCode.toLowerCase() === justScannedSku.toLowerCase()));
+                return (
+                  <div key={idx} style={{
+                    background: isJustScanned ? '#f0fdf4' : '#ffffff',
+                    border: isJustScanned ? '2px solid #10b981' : '1.5px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '0.75rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.55rem',
+                    boxShadow: isJustScanned ? '0 0 14px rgba(16,185,129,0.35)' : '0 2px 6px rgba(0,0,0,0.04)',
+                    transition: 'all 0.25s ease'
+                  }}>
+                    {/* Card Top: Thumbnail + SKU input + Size badge + Delete button */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                        {row.imageUrl ? (
+                          <img
+                            src={convertDriveUrl(row.imageUrl, row.skuCode)}
+                            alt={row.skuCode || 'Item'}
+                            style={{ width: '42px', height: '42px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }}
+                            onError={(e) => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; }}
+                          />
+                        ) : null}
+                        <div style={{
+                          width: '42px',
+                          height: '42px',
+                          borderRadius: '8px',
+                          background: isJustScanned ? '#bbf7d0' : '#f0fdf4',
+                          color: '#059669',
+                          border: '1px solid #bbf7d0',
+                          display: row.imageUrl ? 'none' : 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          <Package size={18} />
                         </div>
+
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '2px' }}>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
+                              #{idx + 1} • SKU CODE
+                            </span>
+                            {isJustScanned && (
+                              <span style={{ fontSize: '0.62rem', fontWeight: 900, background: '#10b981', color: '#ffffff', padding: '1px 5px', borderRadius: '4px' }}>
+                                SCANNED +1
+                              </span>
+                            )}
+                          </div>
                         <input
                           type="text"
                           value={row.skuCode}
@@ -703,8 +765,9 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
+          </div>
           ) : (
             <div style={styles.tableWrapper}>
               <table style={styles.table}>

@@ -68,6 +68,8 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const [showPartyManager, setShowPartyManager] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [justScannedSku, setJustScannedSku] = useState(null);
+  const scannedTimeoutRef = useRef(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -226,6 +228,10 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
 
     const partyValue = useCustomParty ? customParty.trim() : (defaultParty.trim() || '');
 
+    setJustScannedSku(masterSku);
+    if (scannedTimeoutRef.current) clearTimeout(scannedTimeoutRef.current);
+    scannedTimeoutRef.current = setTimeout(() => setJustScannedSku(null), 3000);
+
     setFormRows(prev => {
       const existingIndex = prev.findIndex(r => r.skuCode && (r.skuCode.trim().toLowerCase() === cleanSku.toLowerCase() || r.skuCode.trim().toLowerCase() === masterSku.toLowerCase()));
 
@@ -236,21 +242,21 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
           playErrorBeep();
           return prev;
         }
-        const updated = [...prev];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
+        const existingItem = prev[existingIndex];
+        const updatedItem = {
+          ...existingItem,
           skuCode: masterSku,
           size: resolvedSize,
           availableStock: available,
-          party: partyValue || updated[existingIndex].party,
+          party: partyValue || existingItem.party,
           qtyOut: currentQty + 1
         };
-        return updated;
+        const otherItems = prev.filter((_, i) => i !== existingIndex);
+        return [updatedItem, ...otherItems]; // Always bring to TOP of list!
       } else {
         const validRows = prev.filter(r => r.skuCode && r.skuCode.trim() !== '');
 
         return [
-          ...validRows,
           {
             skuCode: masterSku,
             itemName: foundInv.itemName || masterSku,
@@ -260,7 +266,8 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
             party: partyValue,
             imageUrl: foundInv.imageUrl || '',
             originalItem: foundInv
-          }
+          },
+          ...validRows // Always place new scan at TOP of list!
         ];
       }
     });
@@ -478,129 +485,184 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
               </div>
             </form>
 
-            {/* Camera Scanner View */}
-            {showCameraScanner && (
-              <div style={{ margin: '0.25rem 0', padding: '0.5rem', background: '#000', borderRadius: '12px' }}>
-                <CameraBarcodeScanner
-                  onScan={(code) => {
-                    processBarcodeScan(code);
-                  }}
-                  onScanSuccess={(code) => {
-                    processBarcodeScan(code);
-                  }}
-                  onClose={() => setShowCameraScanner(false)}
-                />
+            {/* Default Recipient Party & Reference - Compact when camera is active on mobile */}
+            {isMobile && showCameraScanner ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.35rem 0.65rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem' }}>
+                <span style={{ fontWeight: 700, color: '#475569' }}>
+                  🏢 Default Party: <strong style={{ color: '#2563eb' }}>{defaultParty || customParty || 'All Rows'}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowPartyManager(true)}
+                  style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.25rem 0.5rem', fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', cursor: 'pointer' }}
+                >
+                  + Parties
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ flex: 1, minWidth: isMobile ? '100%' : '220px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem', display: 'block' }}>
+                    Default Recipient Party / Customer
+                  </label>
+                  {!useCustomParty ? (
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        list="outward-parties-list"
+                        placeholder="Select party for all..."
+                        value={defaultParty}
+                        onChange={(e) => {
+                          const val = resolveVendorName(e.target.value);
+                          setDefaultParty(val);
+                          setFormRows(prev => prev.map(r => ({ ...r, party: val })));
+                        }}
+                        style={{ flex: 1, padding: '0.5rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: isMobile ? '16px' : '0.82rem', color: '#0f172a' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPartyManager(true)}
+                        style={{
+                          padding: '0.5rem 0.65rem',
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '8px',
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          color: '#3b82f6',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          whiteSpace: 'nowrap'
+                        }}
+                        title="Manage Recipient Parties"
+                      >
+                        <Building2 size={14} />
+                        <span>+ Parties</span>
+                      </button>
+                      <button type="button" onClick={() => setUseCustomParty(true)} style={{ padding: '0.5rem 0.65rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
+                        + Custom
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <input
+                        type="text"
+                        placeholder="Enter custom party name..."
+                        value={customParty}
+                        onChange={(e) => {
+                          setCustomParty(e.target.value);
+                          setFormRows(prev => prev.map(r => ({ ...r, party: e.target.value })));
+                        }}
+                        style={{ flex: 1, padding: '0.5rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: isMobile ? '16px' : '0.82rem', color: '#0f172a' }}
+                      />
+                      <button type="button" onClick={() => setUseCustomParty(false)} style={{ padding: '0.5rem 0.65rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
+                        List
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ width: isMobile ? '100%' : '200px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem', display: 'block' }}>
+                    Challan / Ref No. (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. OUT-10492"
+                    value={bulkChallanNo}
+                    onChange={(e) => setBulkChallanNo(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: isMobile ? '16px' : '0.82rem', color: '#0f172a', boxSizing: 'border-box' }}
+                  />
+                </div>
               </div>
             )}
 
-            {/* Default Recipient Party & Reference */}
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <div style={{ flex: 1, minWidth: isMobile ? '100%' : '220px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem', display: 'block' }}>
-                  Default Recipient Party / Customer
-                </label>
-                {!useCustomParty ? (
-                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                    <input
-                      type="text"
-                      list="outward-parties-list"
-                      placeholder="Select party for all..."
-                      value={defaultParty}
-                      onChange={(e) => {
-                        const val = resolveVendorName(e.target.value);
-                        setDefaultParty(val);
-                        setFormRows(prev => prev.map(r => ({ ...r, party: val })));
-                      }}
-                      style={{ flex: 1, padding: '0.5rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: isMobile ? '16px' : '0.82rem', color: '#0f172a' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPartyManager(true)}
-                      style={{
-                        padding: '0.5rem 0.65rem',
-                        background: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '8px',
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        color: '#3b82f6',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.3rem',
-                        whiteSpace: 'nowrap'
-                      }}
-                      title="Manage Recipient Parties"
-                    >
-                      <Building2 size={14} />
-                      <span>+ Parties</span>
-                    </button>
-                    <button type="button" onClick={() => setUseCustomParty(true)} style={{ padding: '0.5rem 0.65rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
-                      + Custom
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <input
-                      type="text"
-                      placeholder="Enter custom party name..."
-                      value={customParty}
-                      onChange={(e) => {
-                        setCustomParty(e.target.value);
-                        setFormRows(prev => prev.map(r => ({ ...r, party: e.target.value })));
-                      }}
-                      style={{ flex: 1, padding: '0.5rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: isMobile ? '16px' : '0.82rem', color: '#0f172a' }}
-                    />
-                    <button type="button" onClick={() => setUseCustomParty(false)} style={{ padding: '0.5rem 0.65rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
-                      List
-                    </button>
-                  </div>
-                )}
-              </div>
+          </div>
 
-              <div style={{ width: isMobile ? '100%' : '200px' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem', display: 'block' }}>
-                  Challan / Ref No. (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. OUT-10492"
-                  value={bulkChallanNo}
-                  onChange={(e) => setBulkChallanNo(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: isMobile ? '16px' : '0.82rem', color: '#0f172a', boxSizing: 'border-box' }}
-                />
-              </div>
+          {/* Camera Scanner View - Compact & Top-Level */}
+          {showCameraScanner && (
+            <div style={{ marginBottom: isMobile ? '0.35rem' : '0.75rem' }}>
+              <CameraBarcodeScanner
+                compact={isMobile}
+                onScan={(code) => {
+                  processBarcodeScan(code);
+                }}
+                onScanSuccess={(code) => {
+                  processBarcodeScan(code);
+                }}
+                onClose={() => setShowCameraScanner(false)}
+              />
             </div>
+          )}
 
+          {/* Live Outward Items Status Header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.4rem 0.75rem',
+            background: showCameraScanner ? '#eff6ff' : '#f8fafc',
+            border: showCameraScanner ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+            borderRadius: '8px',
+            fontSize: '0.8rem',
+            fontWeight: 800,
+            color: showCameraScanner ? '#1e40af' : '#334155'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span>📋 Outward Items List ({formRows.filter(r => r.skuCode && r.skuCode.trim()).length} items • {totalUnitsOut} units)</span>
+            </div>
+            {justScannedSku ? (
+              <span style={{ color: '#ffffff', background: '#2563eb', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 900 }}>
+                ✨ Scanned: {justScannedSku}
+              </span>
+            ) : showCameraScanner ? (
+              <span style={{ color: '#2563eb', fontSize: '0.72rem', fontWeight: 800 }}>
+                ● Camera Live
+              </span>
+            ) : null}
           </div>
 
           {/* Multi-Item Outward View: Mobile Card View vs Desktop Table */}
           {isMobile ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', overflowY: 'auto', flex: 1, minHeight: 0, padding: '2px' }}>
               {formRows.map((row, idx) => {
+                const isJustScanned = justScannedSku && (row.skuCode === justScannedSku || (row.skuCode && row.skuCode.toLowerCase() === justScannedSku.toLowerCase()));
                 const isStockDeficit = row.availableStock > 0 && row.qtyOut > row.availableStock;
                 return (
                   <div key={idx} style={{
-                    background: isStockDeficit ? '#fff1f2' : '#ffffff',
-                    border: isStockDeficit ? '1.5px solid #fca5a5' : '1.5px solid #e2e8f0',
+                    background: isJustScanned ? '#eff6ff' : (isStockDeficit ? '#fff1f2' : '#ffffff'),
+                    border: isJustScanned ? '2px solid #2563eb' : (isStockDeficit ? '1.5px solid #fca5a5' : '1.5px solid #e2e8f0'),
                     borderRadius: '12px',
-                    padding: '0.85rem',
+                    padding: '0.75rem',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '0.65rem',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                    gap: '0.55rem',
+                    boxShadow: isJustScanned ? '0 0 14px rgba(37,99,235,0.35)' : '0 2px 6px rgba(0,0,0,0.04)',
+                    transition: 'all 0.25s ease'
                   }}>
                     {/* Card Top: Thumbnail + SKU + Size + Delete */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
                         {row.imageUrl ? (
-                          <img src={convertDriveUrl(row.imageUrl, row.skuCode || row.sku)} alt="Thumbnail" style={{ width: '38px', height: '38px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0 }} />
+                          <img src={convertDriveUrl(row.imageUrl, row.skuCode || row.sku)} alt="Thumbnail" style={{ width: '42px', height: '42px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0 }} />
                         ) : (
-                          <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: '#eff6ff', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0 }}>
+                          <div style={{ width: '42px', height: '42px', borderRadius: '8px', background: isJustScanned ? '#bfdbfe' : '#eff6ff', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0 }}>
                             <Package size={18} />
                           </div>
                         )}
                         <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '2px' }}>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b' }}>
+                              #{idx + 1} • SKU CODE
+                            </span>
+                            {isJustScanned && (
+                              <span style={{ fontSize: '0.62rem', fontWeight: 900, background: '#2563eb', color: '#ffffff', padding: '1px 5px', borderRadius: '4px' }}>
+                                SCANNED +1
+                              </span>
+                            )}
+                          </div>
                           <input
                             type="text"
                             value={row.skuCode}
