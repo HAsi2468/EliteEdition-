@@ -70,6 +70,7 @@ import {
   Scissors,
   Building,
   Receipt,
+  TrendingUp,
   PanelLeftClose,
   PanelLeftOpen,
   Clock,
@@ -275,7 +276,7 @@ export default function App() {
   // Department permission helpers
   // Department permission helpers
   const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
-  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
+  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
   const STITCHING_PERMISSIONS = [
     'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
     'jobcards_stitching_challan', 'jobcards_stitching_settings', 'stitching'
@@ -421,7 +422,7 @@ export default function App() {
       'es_dashboard', 'es_settings', 'es_complaints', 'es_expenses', 'eo_complaints', 'eo_expenses',
       'jobcards', 'jobcards_list', 'jobcards_catalogue', 'jobcards_tracking', 'jobcards_master', 'jobcards_fabric', 'jobcards_raw_materials', 'jobcards_settings',
       'jobcards_stitching_challan', 'jobcards_stitching_settings',
-      'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense',
+      'jobcards_printing_log', 'jobcards_fusing_log', 'jobcards_print_entry', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_split_view', 'jobcards_challan', 'jobcards_complain', 'jobcards_expense',
       'jobcards_expenses', 'expense_dashboard', 'expense_create', 'expenses', 'jobcards_qa', 'qa', 'qa_dashboard', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent',
       'jobcards_business_connection', 'business_connection', 'complaint_dashboard', 'complaint_create'
     ];
@@ -1573,6 +1574,11 @@ export default function App() {
                       <Receipt size={18} /><span>Finance</span>
                     </button>
                   )}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_costing') || currentUser.permissions?.includes('jobcards_billing')) && (
+                    <button onClick={() => { setActiveTab('jobcards_costing'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_costing' ? styles.navItemActive : {}) }}>
+                      <TrendingUp size={18} /><span>Costing & P&L</span>
+                    </button>
+                  )}
 
                   {/* CRM Department */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_crm') || currentUser.permissions?.includes('crm_department') || currentUser.permissions?.includes('crm')) && (
@@ -1994,6 +2000,9 @@ export default function App() {
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_billing')) &&
                       renderNavItem('jobcards_billing', 'Finance', Receipt, null, 'Finance')
+                    }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_costing') || currentUser.permissions?.includes('jobcards_billing')) &&
+                      renderNavItem('jobcards_costing', 'Costing & P&L', TrendingUp, null, 'Costing')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_crm') || currentUser.permissions?.includes('crm_department') || currentUser.permissions?.includes('crm')) &&
                       renderNavItem('jobcards_crm', 'CRM Department', Users, null, 'CRM')

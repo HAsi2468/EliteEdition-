@@ -2409,8 +2409,8 @@ export default function JobCardPanel({ activeSubTab = 'jobcards', department }) 
         <DesignCatalogue department={department} initialSubTab={effectiveSubTab === 'master' ? 'master' : 'catalogue'} />
       ) : effectiveSubTab === 'fabric' ? (
         <FabricInventoryPanel department={department} onNavigateToBilling={(ch) => { setBillingChallanData(ch); setOverrideSubTab('billing'); }} />
-      ) : effectiveSubTab === 'billing' || effectiveSubTab === 'billing_digital' || effectiveSubTab === 'billing_elite' ? (
-        <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity={department === 'stitching' ? "Elite Stitching" : "Elite Digital Print"} />
+      ) : effectiveSubTab === 'billing' || effectiveSubTab === 'billing_digital' || effectiveSubTab === 'billing_elite' || effectiveSubTab === 'costing' || effectiveSubTab === 'costing_pl' ? (
+        <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity={department === 'stitching' ? "Elite Stitching" : "Elite Digital Print"} initialTab={(effectiveSubTab === 'costing' || effectiveSubTab === 'costing_pl') ? 'costing' : undefined} />
       ) : effectiveSubTab === 'billing_fabtex' ? (
         <EliteBillingDepartment initialChallanData={billingChallanData} department={department} companyEntity="Elite Fabtex" />
       ) : effectiveSubTab === 'printing_log' || effectiveSubTab === 'print_entry' ? (

@@ -61,5 +61,6 @@ router.use('/leads', require('./lead.route'));
 router.use('/business-connections', require('./businessConnection.route'));
 router.use('/signed-documents', require('./signedDocument.route'));
 router.use('/clients', require('./client.route'));
+router.use('/costing', require('./costing.route'));
 
 module.exports = router;

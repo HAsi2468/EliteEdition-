@@ -57,6 +57,7 @@ const db = {
   Task: require('./task.model').Task,
   OrderActivityLog: require('./orderActivityLog.model'),
   Client: require('./client.model'),
+  MonthlyCosting: require('./monthlyCosting.model'),
   mongoose,
 };
 

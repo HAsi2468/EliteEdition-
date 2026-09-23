@@ -487,6 +487,10 @@ const getAllJobCards = async (req, res) => {
 
     res.json({
       data: normalizedCards,
+      total,
+      totalMtr,
+      statusCounts,
+      pages: Math.ceil(total / Number(limit)),
       pagination: {
         total,
         page: Number(page),
