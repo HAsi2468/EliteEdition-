@@ -159,13 +159,13 @@ export default function ClientPortal({ client, onLogout }) {
   }, []);
 
   // Load Client Orders strictly by assigned party code (Company code in jobcard's party)
-  const fetchOrders = async () => {
+  const fetchOrders = async (silent = false) => {
     const code = clientData.companyCode || partyCode;
     if (!code) {
       setOrders([]);
       return;
     }
-    setLoadingOrders(true);
+    if (!silent) setLoadingOrders(true);
     try {
       const partyQuery = [clientData.companyCode, partyCode, clientData.companyName].filter(Boolean);
       const uniqueParties = [...new Set(partyQuery)].join(',');
@@ -180,18 +180,18 @@ export default function ClientPortal({ client, onLogout }) {
     } catch (err) {
       console.warn('Failed to fetch client orders:', err);
     } finally {
-      setLoadingOrders(false);
+      if (!silent) setLoadingOrders(false);
     }
   };
 
   // Load Client Designs strictly by assigned party code
-  const fetchDesigns = async () => {
+  const fetchDesigns = async (silent = false) => {
     const code = clientData.companyCode || partyCode;
     if (!code) {
       setDesigns([]);
       return;
     }
-    setLoadingDesigns(true);
+    if (!silent) setLoadingDesigns(true);
     try {
       const partyQuery = [clientData.companyCode, partyCode, clientData.companyName].filter(Boolean);
       const uniqueParties = [...new Set(partyQuery)].join(',');
@@ -204,7 +204,7 @@ export default function ClientPortal({ client, onLogout }) {
     } catch (err) {
       console.warn('Failed to fetch client designs:', err);
     } finally {
-      setLoadingDesigns(false);
+      if (!silent) setLoadingDesigns(false);
     }
   };
   const socket = useSocket();
@@ -216,15 +216,15 @@ export default function ClientPortal({ client, onLogout }) {
     }
   }, [partyCode, clientData.companyCode]);
 
-  // Real-time socket updates for orders and designs
+  // Real-time socket updates for orders and designs (seamless silent updates)
   useEffect(() => {
     if (!socket) return;
 
     const handleJobChange = () => {
-      fetchOrders();
+      fetchOrders(true);
     };
     const handleDesignChange = () => {
-      fetchDesigns();
+      fetchDesigns(true);
     };
 
     socket.on('job-created', handleJobChange);
@@ -246,22 +246,18 @@ export default function ClientPortal({ client, onLogout }) {
     };
   }, [socket, partyCode, clientData.companyCode]);
 
-  // Global event refresh (triggered by other components) & window focus & 30s polling
+  // Global manual event refresh (only when explicitly requested by user actions)
   useEffect(() => {
     const handleRefresh = () => {
       if (partyCode || clientData.companyCode) {
-        fetchOrders();
-        fetchDesigns();
+        fetchOrders(true);
+        fetchDesigns(true);
       }
     };
     window.addEventListener('elite-data-refresh', handleRefresh);
-    window.addEventListener('focus', handleRefresh);
-    const interval = setInterval(handleRefresh, 30000);
 
     return () => {
       window.removeEventListener('elite-data-refresh', handleRefresh);
-      window.removeEventListener('focus', handleRefresh);
-      clearInterval(interval);
     };
   }, [partyCode, clientData.companyCode]);
 

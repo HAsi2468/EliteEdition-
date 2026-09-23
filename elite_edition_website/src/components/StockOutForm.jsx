@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { X, QrCode, ClipboardList, Info, AlertTriangle, Camera, Check, Plus, Trash2, Sparkles, Package, Building2 } from 'lucide-react';
+import { X, QrCode, ClipboardList, Info, AlertTriangle, Camera, Check, Plus, Minus, Trash2, Sparkles, Package, Building2 } from 'lucide-react';
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 import CameraBarcodeScanner from './CameraBarcodeScanner';
 import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
@@ -648,9 +648,10 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                           <button
                             type="button"
                             onClick={() => handleRowFieldChange(idx, 'qtyOut', Math.max(1, row.qtyOut - 1))}
-                            style={{ width: '26px', height: '26px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            style={{ width: '26px', height: '26px', padding: 0, borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                            title="Decrease Qty"
                           >
-                            -
+                            <Minus size={13} color="#475569" strokeWidth={2.5} />
                           </button>
                           <input
                             type="number"
@@ -662,9 +663,10 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                           <button
                             type="button"
                             onClick={() => handleRowFieldChange(idx, 'qtyOut', row.qtyOut + 1)}
-                            style={{ width: '26px', height: '26px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            style={{ width: '26px', height: '26px', padding: 0, borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                            title="Increase Qty"
                           >
-                            +
+                            <Plus size={13} color="#475569" strokeWidth={2.5} />
                           </button>
                         </div>
                       </td>

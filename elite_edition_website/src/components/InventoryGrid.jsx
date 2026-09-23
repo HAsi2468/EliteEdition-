@@ -4,7 +4,7 @@ import {
   TrendingDown, MoreVertical, Sparkles, Package, AlertTriangle, 
   CheckCircle2, XCircle, DollarSign, Download, Filter, Calendar,
   RefreshCw, FileText, TrendingUp, Layers3, IndianRupee, ArrowDownRight, ArrowUpRight, Building2, BookOpen, Eye, X,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, Camera, Tag
 } from 'lucide-react';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
@@ -2639,7 +2639,7 @@ export default function InventoryGrid({
                 <Package size={20} color="#2563eb" />
                 <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Item Details Display</h4>
               </div>
-              <button onClick={() => setViewingItem(null)} style={{ background: '#f1f5f9', border: 'none', color: '#64748b', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <button onClick={() => setViewingItem(null)} style={{ background: '#f1f5f9', border: 'none', color: '#64748b', borderRadius: '50%', width: '32px', height: '32px', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} title="Close">
                 <X size={18} />
               </button>
             </div>
@@ -2765,12 +2765,14 @@ export default function InventoryGrid({
                   color: '#ffffff',
                   width: '32px',
                   height: '32px',
+                  padding: 0,
                   cursor: 'pointer',
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   transition: 'all 0.15s ease'
                 }}
+                title="Close"
               >
                 <X size={18} />
               </button>
@@ -2995,16 +2997,18 @@ export default function InventoryGrid({
                   color: '#ffffff',
                   width: '34px',
                   height: '34px',
+                  padding: 0,
                   cursor: 'pointer',
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   transition: 'background 0.15s ease'
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
                 onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                title="Close"
               >
-                <X size={18} />
+                <X size={18} color="#ffffff" strokeWidth={2.5} />
               </button>
             </div>
 
@@ -3116,19 +3120,22 @@ export default function InventoryGrid({
               flexWrap: 'wrap',
               gap: '0.75rem'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-                <div style={{ fontSize: '0.78rem', color: '#1e40af' }}>
-                  Total Items: <strong style={{ color: '#0369a1', fontSize: '0.85rem' }}>{editItems.length} SKUs</strong>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '0.78rem', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Package size={14} color="#0284c7" />
+                  <span>Total Items: <strong style={{ color: '#0369a1', fontSize: '0.85rem' }}>{editItems.length} SKUs</strong></span>
                 </div>
-                <div style={{ fontSize: '0.78rem', color: '#1e40af' }}>
-                  Total Inward Quantity: <strong style={{ color: '#047857', fontSize: '0.85rem' }}>
+                <div style={{ fontSize: '0.78rem', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <TrendingUp size={14} color="#047857" />
+                  <span>Total Inward Quantity: <strong style={{ color: '#047857', fontSize: '0.85rem' }}>
                     +{editItems.reduce((sum, it) => sum + (Number(it.qty) || 0), 0)} Pcs
-                  </strong>
+                  </strong></span>
                 </div>
-                <div style={{ fontSize: '0.78rem', color: '#1e40af' }}>
-                  Challan Value: <strong style={{ color: '#0f172a', fontSize: '0.85rem' }}>
+                <div style={{ fontSize: '0.78rem', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <IndianRupee size={14} color="#0f172a" />
+                  <span>Challan Value: <strong style={{ color: '#0f172a', fontSize: '0.85rem' }}>
                     ₹{editItems.reduce((sum, it) => sum + ((Number(it.qty) || 0) * (Number(it.purchasePrice) || 0)), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </strong>
+                  </strong></span>
                 </div>
               </div>
               <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
@@ -3142,13 +3149,21 @@ export default function InventoryGrid({
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
                     <th style={{ padding: '0.6rem 0.65rem', textAlign: 'left', fontWeight: 800, width: '30px' }}>#</th>
-                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'left', fontWeight: 800, width: '45px' }}>PHOTO</th>
-                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'left', fontWeight: 800 }}>SKU CODE & PRODUCT</th>
+                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'left', fontWeight: 800, width: '45px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Camera size={13} color="#64748b" /> PHOTO</span>
+                    </th>
+                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'left', fontWeight: 800 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Tag size={13} color="#64748b" /> SKU CODE & PRODUCT</span>
+                    </th>
                     <th style={{ padding: '0.6rem 0.65rem', textAlign: 'center', fontWeight: 800, width: '90px' }}>SIZE</th>
-                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'center', fontWeight: 800, width: '130px' }}>INWARD QTY</th>
-                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'center', fontWeight: 800, width: '130px' }}>BUY PRICE (₹)</th>
+                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'center', fontWeight: 800, width: '130px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><Layers3 size={13} color="#64748b" /> INWARD QTY</span>
+                    </th>
+                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'center', fontWeight: 800, width: '130px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><IndianRupee size={13} color="#64748b" /> BUY PRICE (₹)</span>
+                    </th>
                     <th style={{ padding: '0.6rem 0.65rem', textAlign: 'right', fontWeight: 800, width: '110px' }}>TOTAL (₹)</th>
-                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'center', fontWeight: 800, width: '50px' }}>ACTION</th>
+                    <th style={{ padding: '0.6rem 0.65rem', textAlign: 'center', fontWeight: 800, width: '60px' }}>ACTION</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3199,19 +3214,24 @@ export default function InventoryGrid({
                               type="button"
                               onClick={() => handleEditItemField(idx, 'qty', Math.max(0, itemQty - 1))}
                               style={{
-                                width: '24px',
-                                height: '24px',
+                                width: '26px',
+                                height: '26px',
+                                padding: 0,
                                 borderRadius: '4px',
                                 border: '1px solid #cbd5e1',
                                 background: '#ffffff',
                                 cursor: 'pointer',
-                                display: 'flex',
+                                display: 'inline-flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                color: '#475569'
+                                color: '#475569',
+                                flexShrink: 0
                               }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
+                              title="Decrease Qty"
                             >
-                              <Minus size={12} />
+                              <Minus size={13} color="#475569" strokeWidth={2.5} />
                             </button>
                             <input
                               type="number"
@@ -3235,19 +3255,24 @@ export default function InventoryGrid({
                               type="button"
                               onClick={() => handleEditItemField(idx, 'qty', itemQty + 1)}
                               style={{
-                                width: '24px',
-                                height: '24px',
+                                width: '26px',
+                                height: '26px',
+                                padding: 0,
                                 borderRadius: '4px',
                                 border: '1px solid #cbd5e1',
                                 background: '#ffffff',
                                 cursor: 'pointer',
-                                display: 'flex',
+                                display: 'inline-flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                color: '#475569'
+                                color: '#475569',
+                                flexShrink: 0
                               }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = '#ffffff'}
+                              title="Increase Qty"
                             >
-                              <Plus size={12} />
+                              <Plus size={13} color="#475569" strokeWidth={2.5} />
                             </button>
                           </div>
                         </td>
@@ -3282,20 +3307,25 @@ export default function InventoryGrid({
                             type="button"
                             onClick={() => handleRemoveEditItem(idx)}
                             style={{
-                              border: 'none',
+                              border: '1px solid #fecaca',
                               background: '#fee2e2',
                               color: '#dc2626',
-                              width: '26px',
-                              height: '26px',
+                              width: '28px',
+                              height: '28px',
+                              padding: 0,
                               borderRadius: '6px',
                               cursor: 'pointer',
                               display: 'inline-flex',
                               alignItems: 'center',
-                              justifyContent: 'center'
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              transition: 'all 0.15s ease'
                             }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#fca5a5'; e.currentTarget.style.color = '#b91c1c'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color = '#dc2626'; }}
                             title="Remove SKU from Challan"
                           >
-                            <Trash2 size={13} />
+                            <Trash2 size={14} color="#dc2626" />
                           </button>
                         </td>
                       </tr>
@@ -3326,10 +3356,16 @@ export default function InventoryGrid({
                   fontWeight: 700,
                   cursor: 'pointer',
                   fontSize: '0.82rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
                   transition: 'background 0.15s ease'
                 }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
               >
-                Cancel
+                <X size={15} color="#64748b" />
+                <span>Cancel</span>
               </button>
 
               <button
