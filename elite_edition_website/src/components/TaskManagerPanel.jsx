@@ -1178,7 +1178,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       </div>
 
       {/* ── MOBILE: COMPACT ACTION & DROPDOWN BAR ── */}
-      <div className="glass-panel task-mobile-control-card" style={{ padding: '0.6rem 0.75rem', borderRadius: '12px', background: '#ffffff', border: '1px solid var(--border-light)', boxShadow: '0 2px 8px rgba(37,99,235,0.06)', gap: '0.5rem', position: 'relative' }}>
+      <div className="glass-panel task-mobile-control-card" style={{ padding: '0.6rem 0.75rem', borderRadius: '12px', background: '#ffffff', border: '1px solid var(--border-light)', boxShadow: '0 2px 8px rgba(37,99,235,0.06)', gap: '0.5rem', position: 'relative', zIndex: (showMobileViewMenu || showMobileScopeMenu) ? 1000 : 1 }}>
         
         {/* Mobile Row 1: Header + Create Task */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
@@ -1331,133 +1331,171 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
         {/* ── MOBILE VIEW DROPDOWN MENU ── */}
         {showMobileViewMenu && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: '0.75rem',
-              right: '0.75rem',
-              marginTop: '4px',
-              background: '#ffffff',
-              borderRadius: '10px',
-              border: '1px solid var(--border-light)',
-              boxShadow: '0 8px 24px rgba(15,23,42,0.18)',
-              zIndex: 1000,
-              padding: '6px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '2px'
-            }}
-          >
-            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '4px 8px' }}>
-              Select View
+          <>
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMobileViewMenu(false);
+              }}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 1001,
+                background: 'rgba(15, 23, 42, 0.25)',
+                backdropFilter: 'blur(1px)'
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: '0.75rem',
+                right: '0.75rem',
+                marginTop: '4px',
+                background: '#ffffff',
+                borderRadius: '12px',
+                border: '1px solid var(--border-light)',
+                boxShadow: '0 12px 30px rgba(15,23,42,0.22)',
+                zIndex: 1002,
+                padding: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}
+            >
+              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '4px 8px' }}>
+                Select View
+              </div>
+              {viewsList.map((v) => {
+                const IconComp = v.icon;
+                const isSelected = activeView === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveView(v.id);
+                      setShowMobileViewMenu(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      background: isSelected ? '#eff6ff' : 'transparent',
+                      border: 'none',
+                      color: isSelected ? '#2563eb' : 'var(--text-primary)',
+                      fontWeight: isSelected ? 800 : 600,
+                      fontSize: '0.84rem',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      minHeight: '42px',
+                      touchAction: 'manipulation'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <IconComp size={16} color={isSelected ? '#2563eb' : '#64748b'} />
+                      <span>{v.label}</span>
+                    </div>
+                    {isSelected && <span style={{ color: '#2563eb', fontWeight: 800 }}>✓</span>}
+                  </button>
+                );
+              })}
             </div>
-            {viewsList.map((v) => {
-              const IconComp = v.icon;
-              const isSelected = activeView === v.id;
-              return (
-                <button
-                  key={v.id}
-                  onClick={() => {
-                    setActiveView(v.id);
-                    setShowMobileViewMenu(false);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    background: isSelected ? '#eff6ff' : 'transparent',
-                    border: 'none',
-                    color: isSelected ? '#2563eb' : 'var(--text-primary)',
-                    fontWeight: isSelected ? 800 : 600,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    textAlign: 'left'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <IconComp size={15} color={isSelected ? '#2563eb' : '#64748b'} />
-                    <span>{v.label}</span>
-                  </div>
-                  {isSelected && <span style={{ color: '#2563eb', fontWeight: 800 }}>✓</span>}
-                </button>
-              );
-            })}
-          </div>
+          </>
         )}
 
         {/* ── MOBILE SCOPE DROPDOWN MENU ── */}
         {showMobileScopeMenu && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: '0.75rem',
-              right: '0.75rem',
-              marginTop: '4px',
-              background: '#ffffff',
-              borderRadius: '10px',
-              border: '1px solid var(--border-light)',
-              boxShadow: '0 8px 24px rgba(15,23,42,0.18)',
-              zIndex: 1000,
-              padding: '6px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '2px'
-            }}
-          >
-            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '4px 8px' }}>
-              Filter by Task Scope
+          <>
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMobileScopeMenu(false);
+              }}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 1001,
+                background: 'rgba(15, 23, 42, 0.25)',
+                backdropFilter: 'blur(1px)'
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: '0.75rem',
+                right: '0.75rem',
+                marginTop: '4px',
+                background: '#ffffff',
+                borderRadius: '12px',
+                border: '1px solid var(--border-light)',
+                boxShadow: '0 12px 30px rgba(15,23,42,0.22)',
+                zIndex: 1002,
+                padding: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}
+            >
+              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '4px 8px' }}>
+                Filter by Task Scope
+              </div>
+              {scopeTabs.map((tab) => {
+                const isSelected = taskScope === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTaskScope(tab.id);
+                      setShowMobileScopeMenu(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      background: isSelected ? '#eff6ff' : 'transparent',
+                      border: 'none',
+                      color: isSelected ? '#2563eb' : 'var(--text-primary)',
+                      fontWeight: isSelected ? 800 : 600,
+                      fontSize: '0.84rem',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      minHeight: '42px',
+                      touchAction: 'manipulation'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '1rem' }}>{tab.icon}</span>
+                      <span>{tab.label}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span
+                        style={{
+                          background: isSelected ? '#2563eb' : (tab.isAlert ? '#fee2e2' : '#e2e8f0'),
+                          color: isSelected ? '#ffffff' : (tab.isAlert ? '#dc2626' : 'var(--text-muted)'),
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 800
+                        }}
+                      >
+                        {tab.count}
+                      </span>
+                      {isSelected && <span style={{ color: '#2563eb', fontWeight: 800 }}>✓</span>}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-            {scopeTabs.map((tab) => {
-              const isSelected = taskScope === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setTaskScope(tab.id);
-                    setShowMobileScopeMenu(false);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    background: isSelected ? '#eff6ff' : 'transparent',
-                    border: 'none',
-                    color: isSelected ? '#2563eb' : 'var(--text-primary)',
-                    fontWeight: isSelected ? 800 : 600,
-                    fontSize: '0.78rem',
-                    cursor: 'pointer',
-                    textAlign: 'left'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '0.9rem' }}>{tab.icon}</span>
-                    <span>{tab.label}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span
-                      style={{
-                        background: isSelected ? '#2563eb' : (tab.isAlert ? '#fee2e2' : '#e2e8f0'),
-                        color: isSelected ? '#ffffff' : (tab.isAlert ? '#dc2626' : 'var(--text-muted)'),
-                        padding: '1px 6px',
-                        borderRadius: '10px',
-                        fontSize: '0.68rem',
-                        fontWeight: 800
-                      }}
-                    >
-                      {tab.count}
-                    </span>
-                    {isSelected && <span style={{ color: '#2563eb', fontWeight: 800 }}>✓</span>}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          </>
         )}
 
         {/* ── MOBILE COLLAPSIBLE FILTER PANEL ── */}
@@ -1533,22 +1571,6 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
 
       </div>
 
-      {/* ── BACKDROP OVERLAY FOR MOBILE DROPDOWNS ── */}
-      {(showMobileViewMenu || showMobileScopeMenu) && (
-        <div
-          onClick={() => {
-            setShowMobileViewMenu(false);
-            setShowMobileScopeMenu(false);
-          }}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 999,
-            background: 'rgba(15, 23, 42, 0.25)',
-            backdropFilter: 'blur(1px)'
-          }}
-        />
-      )}
 
       {/* ── MAIN CONTENT AREA ── */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>

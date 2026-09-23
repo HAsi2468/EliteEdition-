@@ -1,13 +1,55 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Plus, Trash2, CheckCircle, Sparkles, AlertCircle, Scan, Image as ImageIcon, Camera, Building2 } from 'lucide-react';
+import { X, Plus, Minus, Trash2, CheckCircle, Sparkles, AlertCircle, Scan, Image as ImageIcon, Camera, Building2, Package } from 'lucide-react';
 import { api } from '../services/api';
 import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 import CameraBarcodeScanner from './CameraBarcodeScanner';
 import VendorPartyManagerModal from './VendorPartyManagerModal';
 
+const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
+
+function convertDriveUrl(link, sku = '') {
+  if (!link || typeof link !== 'string' || !link.trim()) {
+    if (sku && typeof sku === 'string' && sku.trim()) {
+      return `${R2_PUBLIC_BASE}/${encodeURIComponent(sku.trim())}.jpg`;
+    }
+    return '';
+  }
+  const trimmed = link.trim();
+  if (trimmed.startsWith('data:')) return trimmed;
+
+  if (trimmed.includes('drive.google.com') || trimmed.includes('googleusercontent') || trimmed.includes('lh3.google')) {
+    if (trimmed.includes('/folders/')) return '';
+    let fid = '';
+    const fileMatch = trimmed.match(/\/d\/([-\w]{20,})/);
+    if (fileMatch) fid = fileMatch[1];
+    if (!fid) {
+      const openMatch = trimmed.match(/[?&]id=([-\w]{20,})/);
+      if (openMatch) fid = openMatch[1];
+    }
+    if (!fid) {
+      const uMatches = trimmed.match(/([-\w]{25,})/g);
+      if (uMatches && uMatches.length > 0) fid = uMatches[0];
+    }
+    if (fid) {
+      return `https://lh3.googleusercontent.com/d/${fid}=s400`;
+    }
+  }
+  return trimmed;
+}
+
 export default function BulkInwardModal({ onSubmit, onClose }) {
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false));
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [error, setError] = useState('');
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const [showVendorManager, setShowVendorManager] = useState(false);
@@ -343,7 +385,20 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
     >
       <div
         className="bulk-inward-modal-content"
-        style={styles.modalContent}
+        style={{
+          ...styles.modalContent,
+          ...(isMobile ? {
+            width: '100vw',
+            maxWidth: '100vw',
+            height: '100vh',
+            maxHeight: '100vh',
+            borderRadius: 0,
+            padding: '0.75rem',
+            paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+            border: 'none',
+            boxShadow: 'none'
+          } : {})
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         
@@ -367,10 +422,14 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
               style={{
                 ...styles.scanBtn,
                 background: showCameraScanner ? '#dc2626' : '#10b981',
-                padding: '0.45rem 0.75rem',
+                color: '#ffffff',
+                padding: '0.5rem 0.85rem',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.35rem'
+                gap: '0.4rem',
+                fontSize: isMobile ? '0.85rem' : '0.82rem',
+                fontWeight: 800,
+                borderRadius: '8px'
               }}
               title="Toggle Mobile Camera Scanner"
             >
@@ -378,7 +437,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
               <span>{showCameraScanner ? 'Close Camera' : '📷 Camera Scan'}</span>
             </button>
 
-            <form className="bulk-inward-scan-form" onSubmit={handleScanSubmit} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '260px' }}>
+            <form className="bulk-inward-scan-form" onSubmit={handleScanSubmit} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: isMobile ? '100%' : '260px' }}>
               <div style={{ position: 'relative', width: '100%' }}>
                 <Scan size={15} color="#475569" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
@@ -386,7 +445,10 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                   value={scanSkuInput}
                   onChange={e => setScanSkuInput(e.target.value)}
                   placeholder="Scan SKU barcode..."
-                  style={styles.scannerInput}
+                  style={{
+                    ...styles.scannerInput,
+                    fontSize: isMobile ? '16px' : '0.82rem'
+                  }}
                 />
               </div>
               <button type="submit" style={styles.scanBtn}>+ Scan</button>
@@ -422,20 +484,20 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
               ⚡ Quick Set All Rows:
             </span>
             <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', gap: '0.35rem', flex: 1, minWidth: '240px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '0.35rem', flex: 1, minWidth: isMobile ? '100%' : '240px', alignItems: 'center' }}>
                 <input
                   type="text"
                   list="master-vendors-list"
                   value={bulkVendor}
                   onChange={e => applyQuickSetVendor(e.target.value)}
                   placeholder="Bulk Vendor for all rows..."
-                  style={{ ...styles.quickInput, flex: 1 }}
+                  style={{ ...styles.quickInput, flex: 1, fontSize: isMobile ? '16px' : '0.82rem' }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowVendorManager(true)}
                   style={{
-                    padding: '0.45rem 0.65rem',
+                    padding: '0.5rem 0.65rem',
                     background: '#ffffff',
                     border: '1px solid #cbd5e1',
                     borderRadius: '8px',
@@ -452,7 +514,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                   title="Manage Vendors & Suppliers"
                 >
                   <Building2 size={14} />
-                  <span>+ Manage Vendors</span>
+                  <span>+ Vendors</span>
                 </button>
               </div>
               <input
@@ -460,174 +522,353 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
                 value={bulkChallanNo}
                 onChange={e => applyQuickSetChallan(e.target.value)}
                 placeholder="Bulk Challan No for all rows..."
-                style={styles.quickInput}
+                style={{ ...styles.quickInput, width: isMobile ? '100%' : 'auto', fontSize: isMobile ? '16px' : '0.82rem' }}
               />
             </div>
           </div>
 
-          {/* Dynamic Form Table */}
-          <div style={styles.tableWrapper}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={{ width: '4%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>SR NO</th>
-                  <th style={{ width: '6%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>IMAGE</th>
-                  <th style={{ width: '20%', padding: '0.75rem 0.6rem' }}>SKU CODE *</th>
-                  <th style={{ width: '20%', padding: '0.75rem 0.6rem' }}>ITEM NAME / DETAILS</th>
-                  <th style={{ width: '10%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>SIZE</th>
-                  <th style={{ width: '9%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>QTY *</th>
-                  <th style={{ width: '11%', padding: '0.75rem 0.4rem', textAlign: 'right' }}>BUY PRICE</th>
-                  <th style={{ width: '12%', padding: '0.75rem 0.6rem' }}>VENDOR / COMPANY *</th>
-                  <th style={{ width: '10%', padding: '0.75rem 0.6rem' }}>CHALLAN NO.</th>
-                  <th style={{ width: '4%', padding: '0.75rem 0.4rem', textAlign: 'center' }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {formRows.map((row, idx) => (
-                  <tr key={idx} style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
-                    
-                    {/* Sr. No */}
-                    <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center', fontWeight: '800', color: '#64748b', fontSize: '0.82rem' }}>
-                      #{idx + 1}
-                    </td>
-
-                    {/* Image Thumbnail */}
-                    <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+          {/* Dynamic Form View: Mobile Card View vs Desktop Table */}
+          {isMobile ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto', maxHeight: '56vh', padding: '2px' }}>
+              {formRows.map((row, idx) => (
+                <div key={idx} style={{
+                  background: '#ffffff',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '0.85rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                }}>
+                  {/* Card Top: Thumbnail + SKU input + Size badge + Delete button */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
                       {row.imageUrl ? (
                         <img
-                          src={row.imageUrl}
+                          src={convertDriveUrl(row.imageUrl, row.skuCode)}
                           alt={row.skuCode || 'Item'}
-                          style={{ width: '38px', height: '38px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'inline-block' }}
-                          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                          style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0', flexShrink: 0 }}
+                          onError={(e) => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; }}
                         />
                       ) : null}
                       <div style={{
-                        width: '38px',
-                        height: '38px',
-                        borderRadius: '6px',
-                        background: '#f1f5f9',
-                        border: '1px solid #e2e8f0',
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '8px',
+                        background: '#f0fdf4',
+                        color: '#059669',
+                        border: '1px solid #bbf7d0',
                         display: row.imageUrl ? 'none' : 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        margin: '0 auto',
-                        color: '#94a3b8'
+                        flexShrink: 0
                       }}>
-                        <ImageIcon size={16} />
+                        <Package size={18} />
                       </div>
-                    </td>
 
-                    {/* SKU Code Input with Autocomplete */}
-                    <td style={{ padding: '0.5rem 0.6rem' }}>
-                      <input
-                        type="text"
-                        value={row.skuCode}
-                        onChange={(e) => handleSkuChange(idx, e.target.value)}
-                        list="master-catalog-skus"
-                        placeholder="Select/type SKU..."
-                        style={styles.cellInput}
-                        required
-                      />
-                    </td>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', marginBottom: '2px' }}>
+                          ROW #{idx + 1} • SKU CODE
+                        </div>
+                        <input
+                          type="text"
+                          value={row.skuCode}
+                          onChange={(e) => handleSkuChange(idx, e.target.value)}
+                          list="master-catalog-skus"
+                          placeholder="Type / Scan SKU..."
+                          style={{
+                            width: '100%',
+                            padding: '0.4rem 0.5rem',
+                            fontSize: '16px',
+                            fontWeight: 800,
+                            fontFamily: 'monospace',
+                            color: '#059669',
+                            background: '#f0fdf4',
+                            border: '1.5px solid #a7f3d0',
+                            borderRadius: '6px',
+                            boxSizing: 'border-box'
+                          }}
+                          required
+                        />
+                      </div>
+                    </div>
 
-                    {/* Item Name */}
-                    <td style={{ padding: '0.5rem 0.6rem' }}>
-                      <input
-                        type="text"
-                        value={row.itemName}
-                        onChange={(e) => handleRowFieldChange(idx, 'itemName', e.target.value)}
-                        placeholder="Item Description..."
-                        style={styles.cellInput}
-                      />
-                    </td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ padding: '0.25rem 0.5rem', background: '#f1f5f9', borderRadius: '6px', fontWeight: 800, color: '#334155', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                        {typeof row.size === 'string' ? row.size : (Array.isArray(row.size) ? row.size.join('/') : (row.size || 'N/A'))}
+                      </span>
+                      {formRows.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveRow(idx)}
+                          style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#fee2e2', border: 'none', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                          title="Remove Row"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
-                    {/* Size (Auto-populated / Read-only) */}
-                    <td style={{ padding: '0.5rem 0.4rem' }}>
-                      <input
-                        type="text"
-                        value={typeof row.size === 'string' ? row.size : (Array.isArray(row.size) ? row.size.join('/') : (row.size || ''))}
-                        readOnly
-                        tabIndex={-1}
-                        placeholder="Size..."
-                        style={{
-                          ...styles.cellInput,
-                          textAlign: 'center',
-                          fontWeight: 700,
-                          background: '#f8fafc',
-                          color: '#64748b',
-                          cursor: 'not-allowed',
-                          borderColor: '#e2e8f0'
-                        }}
-                      />
-                    </td>
+                  {/* Card Item Name Description */}
+                  <div>
+                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '2px' }}>
+                      ITEM DESCRIPTION
+                    </label>
+                    <input
+                      type="text"
+                      value={row.itemName}
+                      onChange={(e) => handleRowFieldChange(idx, 'itemName', e.target.value)}
+                      placeholder="Item Description..."
+                      style={{ width: '100%', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '16px', color: '#0f172a', boxSizing: 'border-box' }}
+                    />
+                  </div>
 
-                    {/* Quantity */}
-                    <td style={{ padding: '0.5rem 0.4rem' }}>
-                      <input
-                        type="number"
-                        value={row.qty}
-                        onChange={(e) => handleRowFieldChange(idx, 'qty', e.target.value)}
-                        min="1"
-                        style={{ ...styles.cellInput, textAlign: 'center', fontWeight: '800', color: '#1d4ed8', fontSize: '0.95rem' }}
-                        required
-                      />
-                    </td>
+                  {/* Card Middle: Stepper & Buy Price */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '0.6rem', background: '#f8fafc', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
+                    <div>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, display: 'block', marginBottom: '4px' }}>
+                        INWARD QUANTITY
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleRowFieldChange(idx, 'qty', Math.max(1, (row.qty || 1) - 1))}
+                          style={{ width: '38px', height: '38px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <Minus size={18} strokeWidth={2.5} />
+                        </button>
+                        <input
+                          type="number"
+                          value={row.qty}
+                          onChange={(e) => handleRowFieldChange(idx, 'qty', e.target.value)}
+                          min="1"
+                          style={{ width: '56px', height: '38px', padding: 0, textAlign: 'center', fontWeight: 900, fontSize: '16px', borderRadius: '8px', border: '1.5px solid #059669', color: '#059669', background: '#ffffff' }}
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRowFieldChange(idx, 'qty', (row.qty || 0) + 1)}
+                          style={{ width: '38px', height: '38px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#334155', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <Plus size={18} strokeWidth={2.5} />
+                        </button>
+                      </div>
+                    </div>
 
-                    {/* Buy Price */}
-                    <td style={{ padding: '0.5rem 0.4rem' }}>
+                    <div>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, display: 'block', marginBottom: '4px' }}>
+                        BUY PRICE (₹)
+                      </span>
                       <input
                         type="number"
                         value={row.purchasePrice}
                         onChange={(e) => handleRowFieldChange(idx, 'purchasePrice', e.target.value)}
                         step="0.01"
                         min="0"
-                        style={{ ...styles.cellInput, textAlign: 'right', color: '#0f172a' }}
+                        placeholder="0.00"
+                        style={{ width: '100%', height: '38px', padding: '0.4rem 0.6rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '16px', fontWeight: 700, color: '#0f172a', boxSizing: 'border-box' }}
                       />
-                    </td>
+                    </div>
+                  </div>
 
-                    {/* Vendor Business Name */}
-                    <td style={{ padding: '0.5rem 0.6rem' }}>
+                  {/* Card Bottom: Vendor & Challan */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.5rem' }}>
+                    <div>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '2px' }}>
+                        VENDOR / COMPANY *
+                      </label>
                       <input
                         type="text"
                         value={row.party}
                         onChange={(e) => handleRowFieldChange(idx, 'party', e.target.value)}
                         list="master-vendors-list"
                         placeholder="Select Vendor..."
-                        style={styles.cellInput}
+                        style={{ width: '100%', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '16px', color: '#0f172a', boxSizing: 'border-box' }}
                         required
                       />
-                    </td>
-
-                    {/* Challan No. */}
-                    <td style={{ padding: '0.5rem 0.6rem' }}>
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '2px' }}>
+                        CHALLAN NO.
+                      </label>
                       <input
                         type="text"
                         value={row.challanNo}
                         onChange={(e) => handleRowFieldChange(idx, 'challanNo', e.target.value)}
                         placeholder="CH-001..."
-                        style={styles.cellInput}
+                        style={{ width: '100%', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '16px', color: '#0f172a', boxSizing: 'border-box' }}
                       />
-                    </td>
-
-                    {/* Delete Row Button */}
-                    <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
-                      {formRows.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveRow(idx)}
-                          style={styles.deleteRowBtn}
-                          title="Remove Row"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )}
-                    </td>
-
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={styles.tableWrapper}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={{ width: '4%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>SR NO</th>
+                    <th style={{ width: '6%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>IMAGE</th>
+                    <th style={{ width: '20%', padding: '0.75rem 0.6rem' }}>SKU CODE *</th>
+                    <th style={{ width: '20%', padding: '0.75rem 0.6rem' }}>ITEM NAME / DETAILS</th>
+                    <th style={{ width: '10%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>SIZE</th>
+                    <th style={{ width: '9%', padding: '0.75rem 0.4rem', textAlign: 'center' }}>QTY *</th>
+                    <th style={{ width: '11%', padding: '0.75rem 0.4rem', textAlign: 'right' }}>BUY PRICE</th>
+                    <th style={{ width: '12%', padding: '0.75rem 0.6rem' }}>VENDOR / COMPANY *</th>
+                    <th style={{ width: '10%', padding: '0.75rem 0.6rem' }}>CHALLAN NO.</th>
+                    <th style={{ width: '4%', padding: '0.75rem 0.4rem', textAlign: 'center' }}></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {formRows.map((row, idx) => (
+                    <tr key={idx} style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+                      
+                      {/* Sr. No */}
+                      <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center', fontWeight: '800', color: '#64748b', fontSize: '0.82rem' }}>
+                        #{idx + 1}
+                      </td>
+
+                      {/* Image Thumbnail */}
+                      <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+                        {row.imageUrl ? (
+                          <img
+                            src={convertDriveUrl(row.imageUrl, row.skuCode)}
+                            alt={row.skuCode || 'Item'}
+                            style={{ width: '38px', height: '38px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'inline-block' }}
+                            onError={(e) => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; }}
+                          />
+                        ) : null}
+                        <div style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '6px',
+                          background: '#f1f5f9',
+                          border: '1px solid #e2e8f0',
+                          display: row.imageUrl ? 'none' : 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: '0 auto',
+                          color: '#94a3b8'
+                        }}>
+                          <ImageIcon size={16} />
+                        </div>
+                      </td>
+
+                      {/* SKU Code Input with Autocomplete */}
+                      <td style={{ padding: '0.5rem 0.6rem' }}>
+                        <input
+                          type="text"
+                          value={row.skuCode}
+                          onChange={(e) => handleSkuChange(idx, e.target.value)}
+                          list="master-catalog-skus"
+                          placeholder="Select/type SKU..."
+                          style={styles.cellInput}
+                          required
+                        />
+                      </td>
+
+                      {/* Item Name */}
+                      <td style={{ padding: '0.5rem 0.6rem' }}>
+                        <input
+                          type="text"
+                          value={row.itemName}
+                          onChange={(e) => handleRowFieldChange(idx, 'itemName', e.target.value)}
+                          placeholder="Item Description..."
+                          style={styles.cellInput}
+                        />
+                      </td>
+
+                      {/* Size (Auto-populated / Read-only) */}
+                      <td style={{ padding: '0.5rem 0.4rem' }}>
+                        <input
+                          type="text"
+                          value={typeof row.size === 'string' ? row.size : (Array.isArray(row.size) ? row.size.join('/') : (row.size || ''))}
+                          readOnly
+                          tabIndex={-1}
+                          placeholder="Size..."
+                          style={{
+                            ...styles.cellInput,
+                            textAlign: 'center',
+                            fontWeight: 700,
+                            background: '#f8fafc',
+                            color: '#64748b',
+                            cursor: 'not-allowed',
+                            borderColor: '#e2e8f0'
+                          }}
+                        />
+                      </td>
+
+                      {/* Quantity */}
+                      <td style={{ padding: '0.5rem 0.4rem' }}>
+                        <input
+                          type="number"
+                          value={row.qty}
+                          onChange={(e) => handleRowFieldChange(idx, 'qty', e.target.value)}
+                          min="1"
+                          style={{ ...styles.cellInput, textAlign: 'center', fontWeight: '800', color: '#1d4ed8', fontSize: '0.95rem' }}
+                          required
+                        />
+                      </td>
+
+                      {/* Buy Price */}
+                      <td style={{ padding: '0.5rem 0.4rem' }}>
+                        <input
+                          type="number"
+                          value={row.purchasePrice}
+                          onChange={(e) => handleRowFieldChange(idx, 'purchasePrice', e.target.value)}
+                          step="0.01"
+                          min="0"
+                          style={{ ...styles.cellInput, textAlign: 'right', color: '#0f172a' }}
+                        />
+                      </td>
+
+                      {/* Vendor Business Name */}
+                      <td style={{ padding: '0.5rem 0.6rem' }}>
+                        <input
+                          type="text"
+                          value={row.party}
+                          onChange={(e) => handleRowFieldChange(idx, 'party', e.target.value)}
+                          list="master-vendors-list"
+                          placeholder="Select Vendor..."
+                          style={styles.cellInput}
+                          required
+                        />
+                      </td>
+
+                      {/* Challan No. */}
+                      <td style={{ padding: '0.5rem 0.6rem' }}>
+                        <input
+                          type="text"
+                          value={row.challanNo}
+                          onChange={(e) => handleRowFieldChange(idx, 'challanNo', e.target.value)}
+                          placeholder="CH-001..."
+                          style={styles.cellInput}
+                        />
+                      </td>
+
+                      {/* Delete Row Button */}
+                      <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center' }}>
+                        {formRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveRow(idx)}
+                            style={styles.deleteRowBtn}
+                            title="Remove Row"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </td>
+
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Datalists for autocompletion */}
           <datalist id="master-catalog-skus">
@@ -713,11 +954,14 @@ if (typeof document !== 'undefined') {
     styleEl.innerHTML = `
       @media (max-width: 768px) {
         .bulk-inward-modal-content {
-          width: 95vw !important;
-          max-width: 95vw !important;
-          padding: 0.85rem !important;
-          max-height: 94vh !important;
-          border-radius: 12px !important;
+          width: 100vw !important;
+          max-width: 100vw !important;
+          height: 100vh !important;
+          max-height: 100vh !important;
+          padding: 0.75rem !important;
+          padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+          border-radius: 0px !important;
+          border: none !important;
           box-sizing: border-box !important;
         }
         .bulk-inward-header {
@@ -750,6 +994,7 @@ if (typeof document !== 'undefined') {
           align-items: stretch !important;
           gap: 0.65rem !important;
           padding-top: 0.65rem !important;
+          padding-bottom: env(safe-area-inset-bottom, 0px) !important;
         }
         .bulk-inward-footer > div {
           width: 100% !important;
@@ -763,8 +1008,9 @@ if (typeof document !== 'undefined') {
         .bulk-inward-btn-group button {
           width: 100% !important;
           justify-content: center !important;
-          font-size: 0.8rem !important;
-          padding: 0.55rem 0.4rem !important;
+          font-size: 0.88rem !important;
+          padding: 0.65rem 0.5rem !important;
+          min-height: 44px !important;
           white-space: nowrap !important;
         }
       }

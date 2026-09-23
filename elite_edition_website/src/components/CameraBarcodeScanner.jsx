@@ -3,7 +3,7 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Camera, CameraOff, RefreshCw, Volume2, Zap, ZapOff, CheckCircle2 } from 'lucide-react';
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 
-export default function CameraBarcodeScanner({ onScan, onClose }) {
+export default function CameraBarcodeScanner({ onScan, onScanSuccess, onClose }) {
   const regionId = 'reader-camera-scanner-viewport';
   const [cameraActive, setCameraActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -17,10 +17,10 @@ export default function CameraBarcodeScanner({ onScan, onClose }) {
   const lastScanTimeRef = useRef(0);
   const lastCodeRef = useRef('');
 
-  const onScanRef = useRef(onScan);
+  const onScanRef = useRef(onScan || onScanSuccess);
   useEffect(() => {
-    onScanRef.current = onScan;
-  });
+    onScanRef.current = onScan || onScanSuccess;
+  }, [onScan, onScanSuccess]);
 
   // Fetch available camera devices on mount
   useEffect(() => {
@@ -84,13 +84,46 @@ export default function CameraBarcodeScanner({ onScan, onClose }) {
         html5QrcodeScannerRef.current = html5Qrcode;
 
         const config = {
-          fps: 20, // Increased frame rate for fast mobile capture
+          fps: 22, // High frame rate for fast mobile capture
           qrbox: (viewfinderWidth, viewfinderHeight) => {
-            const w = Math.floor(viewfinderWidth * 0.88);
-            const h = Math.floor(Math.min(viewfinderHeight * 0.65, 150));
-            return { width: Math.max(w, 220), height: Math.max(h, 100) };
+            const w = Math.floor(Math.min(viewfinderWidth * 0.9, 300));
+            const h = Math.floor(Math.min(viewfinderHeight * 0.65, 160));
+            return { width: Math.max(w, 220), height: Math.max(h, 110) };
           },
-          aspectRatio: 1.777778
+          aspectRatio: 1.333333
+        };
+
+        const onScanSuccessCallback = (decodedText) => {
+          const now = Date.now();
+          const cleanText = (decodedText || '').trim();
+          if (!cleanText) return;
+          
+          // Throttle identical scans within 800ms
+          if (cleanText === lastCodeRef.current && now - lastScanTimeRef.current < 800) {
+            return;
+          }
+
+          lastScanTimeRef.current = now;
+          lastCodeRef.current = cleanText;
+
+          // Trigger haptic vibration feedback on mobile phones (Android / supported)
+          try {
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              navigator.vibrate(80);
+            }
+          } catch (e) {}
+
+          if (isMounted) {
+            setLastScannedCode(cleanText);
+            playSuccessBeep();
+            if (onScanRef.current) {
+              onScanRef.current(cleanText);
+            }
+          }
+        };
+
+        const onScanFailureCallback = () => {
+          // Frame scan failure - normal when no barcode present in frame
         };
 
         // Determine camera target (device ID or facingMode environment)
@@ -98,41 +131,25 @@ export default function CameraBarcodeScanner({ onScan, onClose }) {
           ? cameras[selectedCameraIndex].id 
           : { facingMode: 'environment' };
 
-        await html5Qrcode.start(
-          cameraTarget,
-          config,
-          (decodedText) => {
-            const now = Date.now();
-            const cleanText = (decodedText || '').trim();
-            if (!cleanText) return;
-            
-            // Throttle identical scans within 800ms
-            if (cleanText === lastCodeRef.current && now - lastScanTimeRef.current < 800) {
-              return;
-            }
+        try {
+          await html5Qrcode.start(cameraTarget, config, onScanSuccessCallback, onScanFailureCallback);
+        } catch (initialErr) {
+          console.warn('Initial camera target failed, trying fallback to facingMode environment:', initialErr);
+          // Fallback for iPhone / Safari when specific device ID fails
+          await html5Qrcode.start({ facingMode: 'environment' }, config, onScanSuccessCallback, onScanFailureCallback);
+        }
 
-            lastScanTimeRef.current = now;
-            lastCodeRef.current = cleanText;
-
-            // Trigger haptic vibration feedback on mobile phones
-            try {
-              if (typeof navigator !== 'undefined' && navigator.vibrate) {
-                navigator.vibrate(80);
-              }
-            } catch (e) {}
-
-            if (isMounted) {
-              setLastScannedCode(cleanText);
-              playSuccessBeep();
-              if (onScanRef.current) {
-                onScanRef.current(cleanText);
-              }
-            }
-          },
-          () => {
-            // Frame scan failure - normal when no barcode present in frame
+        // iPhone / iOS Safari: Ensure video element plays inline without fullscreen popup
+        setTimeout(() => {
+          if (!isMounted) return;
+          const videoEl = viewportEl.querySelector('video');
+          if (videoEl) {
+            videoEl.setAttribute('playsinline', 'true');
+            videoEl.setAttribute('webkit-playsinline', 'true');
+            videoEl.setAttribute('muted', 'true');
+            videoEl.play().catch(() => {});
           }
-        );
+        }, 100);
 
         if (isMounted) {
           setCameraActive(true);
