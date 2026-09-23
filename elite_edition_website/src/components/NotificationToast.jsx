@@ -223,6 +223,7 @@ export default function NotificationToastContainer({ toasts, setToasts }) {
 export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
   const [history, setHistory] = useState(getNotificationHistory());
   const [permStatus, setPermStatus] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'));
+  const [selectedNotifIds, setSelectedNotifIds] = useState([]);
 
   const refreshHistory = () => setHistory(getNotificationHistory());
 
@@ -259,8 +260,6 @@ export function NotificationHistoryDrawer({ isOpen, onClose, onSelectTab }) {
   if (!isOpen) return null;
 
   const unreadCount = history.filter(h => !h.read).length;
-
-  const [selectedNotifIds, setSelectedNotifIds] = useState([]);
 
   const toggleSelectNotif = (id, e) => {
     if (e) e.stopPropagation();
