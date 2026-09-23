@@ -2076,8 +2076,40 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
 
       {/* ─── INWARD MODAL ─── */}
       {isInwardOpen && (
-        <div className="modal-backdrop">
-          <div className="modal-content glass-panel" style={{ maxWidth: '500px', padding: '2rem', position: 'relative' }}>
+        <div
+          className="modal-overlay modal-backdrop"
+          onClick={closeInwardModal}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+            overflowY: 'auto'
+          }}
+        >
+          <div
+            className="modal-content glass-panel"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '540px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              background: '#ffffff',
+              borderRadius: '16px',
+              border: '1.5px solid #bfdbfe',
+              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
+              padding: '1.75rem',
+              position: 'relative',
+              margin: 'auto'
+            }}
+          >
             <button onClick={closeInwardModal} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
               <X size={20} />
             </button>
@@ -2389,8 +2421,40 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
 
       {/* ─── OUTWARD MODAL ─── */}
       {isOutwardOpen && (
-        <div className="modal-backdrop">
-          <div className="modal-content glass-panel" style={{ maxWidth: '500px', padding: '2rem', position: 'relative' }}>
+        <div
+          className="modal-overlay modal-backdrop"
+          onClick={() => setIsOutwardOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+            overflowY: 'auto'
+          }}
+        >
+          <div
+            className="modal-content glass-panel"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '540px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              background: '#ffffff',
+              borderRadius: '16px',
+              border: '1.5px solid #fecaca',
+              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
+              padding: '1.75rem',
+              position: 'relative',
+              margin: 'auto'
+            }}
+          >
             <button onClick={() => setIsOutwardOpen(false)} style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
               <X size={20} />
             </button>
@@ -2697,8 +2761,38 @@ export default function RawMaterialsPanel({ companyEntity = 'Elite Digital Print
 
       {/* ─── DELETE TRANSACTION CONFIRMATION MODAL ─── */}
       {deleteTarget && (
-        <div className="modal-backdrop">
-          <div className="modal-content glass-panel" style={{ maxWidth: '400px', padding: '2rem', textAlign: 'center' }}>
+        <div
+          className="modal-overlay modal-backdrop"
+          onClick={() => setDeleteTarget(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem'
+          }}
+        >
+          <div
+            className="modal-content glass-panel"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '420px',
+              width: '100%',
+              background: '#ffffff',
+              borderRadius: '16px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)',
+              padding: '1.75rem',
+              textAlign: 'center',
+              position: 'relative',
+              margin: 'auto'
+            }}
+          >
             <h3 style={{ margin: '0 0 1rem 0', color: 'var(--danger)' }}>Confirm Deletion</h3>
             <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
               Are you sure you want to delete this transaction record?
