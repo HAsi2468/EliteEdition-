@@ -54,6 +54,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const [showVendorManager, setShowVendorManager] = useState(false);
   const [justScannedSku, setJustScannedSku] = useState(null);
+  const [lastScannedItem, setLastScannedItem] = useState(null);
   const scannedTimeoutRef = React.useRef(null);
   
   // Master Reference Lists
@@ -279,11 +280,18 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
       const existingIndex = prev.findIndex(r => r.skuCode && (r.skuCode.trim().toLowerCase() === cleanSku.toLowerCase() || r.skuCode.trim().toLowerCase() === masterSku.toLowerCase()));
       if (existingIndex !== -1) {
         const existingItem = prev[existingIndex];
+        const newQty = (existingItem.qty || 0) + 1;
+        setLastScannedItem({
+          skuCode: masterSku,
+          qty: newQty,
+          size,
+          itemName: existingItem.itemName
+        });
         const updatedItem = {
           ...existingItem,
           skuCode: masterSku,
           size,
-          qty: (existingItem.qty || 0) + 1
+          qty: newQty
         };
         const otherItems = prev.filter((_, i) => i !== existingIndex);
         return [updatedItem, ...otherItems]; // Always bring active scanned item to TOP
@@ -305,6 +313,13 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
           party = party || resolveVendorName(matchedCatalog.brand) || '';
           status = 'CATALOG_MATCH';
         }
+
+        setLastScannedItem({
+          skuCode: masterSku,
+          qty: 1,
+          size,
+          itemName
+        });
 
         const validRows = prev.filter(r => r.skuCode && r.skuCode.trim() !== '');
         return [
@@ -479,6 +494,10 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
           <div style={{ marginBottom: isMobile ? '0.4rem' : '0.85rem' }}>
             <CameraBarcodeScanner
               compact={isMobile}
+              totalPieces={totalInwardUnits}
+              totalItems={activeRowsCount}
+              lastScannedItem={lastScannedItem}
+              itemsList={formRows.filter(r => r.skuCode && r.skuCode.trim())}
               onScan={(code) => processScannedSku(code)}
               onClose={() => setShowCameraScanner(false)}
             />
@@ -557,24 +576,38 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0.4rem 0.75rem',
+            padding: '0.45rem 0.8rem',
             background: showCameraScanner ? '#ecfdf5' : '#f8fafc',
-            border: showCameraScanner ? '1.5px solid #10b981' : '1px solid #e2e8f0',
-            borderRadius: '8px',
+            border: showCameraScanner ? '1.5px solid #10b981' : '1px solid #cbd5e1',
+            borderRadius: '10px',
             fontSize: '0.8rem',
             fontWeight: 800,
-            color: showCameraScanner ? '#065f46' : '#334155'
+            color: showCameraScanner ? '#065f46' : '#334155',
+            gap: '0.5rem',
+            flexWrap: 'wrap'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span>📋 Inward Data List ({activeRowsCount} items • {totalInwardUnits} units)</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span>📋 Inward Items ({activeRowsCount} Styles)</span>
+              <span style={{
+                background: '#059669',
+                color: '#ffffff',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                fontWeight: 900,
+                fontSize: '0.78rem',
+                boxShadow: '0 2px 6px rgba(5,150,105,0.25)'
+              }}>
+                📦 {totalInwardUnits} PCS TOTAL
+              </span>
             </div>
             {justScannedSku ? (
               <span style={{ color: '#ffffff', background: '#059669', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 900 }}>
                 ✨ Scanned: {justScannedSku}
               </span>
             ) : showCameraScanner ? (
-              <span style={{ color: '#059669', fontSize: '0.72rem', fontWeight: 800 }}>
-                ● Camera Live
+              <span style={{ color: '#059669', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#059669', display: 'inline-block' }}></span>
+                Camera Live
               </span>
             ) : null}
           </div>

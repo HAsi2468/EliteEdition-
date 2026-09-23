@@ -70,6 +70,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
   const [showPartyManager, setShowPartyManager] = useState(false);
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [justScannedSku, setJustScannedSku] = useState(null);
+  const [lastScannedItem, setLastScannedItem] = useState(null);
   const scannedTimeoutRef = useRef(null);
 
   useEffect(() => {
@@ -250,6 +251,13 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
 
       if (existingIndex !== -1) {
         const currentQty = prev[existingIndex].qtyOut || 0;
+        const newQty = currentQty + 1;
+        setLastScannedItem({
+          skuCode: masterSku,
+          qty: newQty,
+          size: resolvedSize,
+          itemName
+        });
         const existingItem = prev[existingIndex];
         const updatedItem = {
           ...existingItem,
@@ -257,11 +265,17 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
           size: resolvedSize !== 'N/A' ? resolvedSize : existingItem.size,
           availableStock: available || existingItem.availableStock,
           party: partyValue || existingItem.party,
-          qtyOut: currentQty + 1
+          qtyOut: newQty
         };
         const otherItems = prev.filter((_, i) => i !== existingIndex);
         return [updatedItem, ...otherItems]; // Always bring to TOP of list!
       } else {
+        setLastScannedItem({
+          skuCode: masterSku,
+          qty: 1,
+          size: resolvedSize,
+          itemName
+        });
         const validRows = prev.filter(r => r.skuCode && r.skuCode.trim() !== '');
 
         return [
@@ -464,6 +478,10 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
             <div style={{ marginBottom: isMobile ? '0.35rem' : '0.75rem' }}>
               <CameraBarcodeScanner
                 compact={isMobile}
+                totalPieces={totalOutwardUnits}
+                totalItems={formRows.filter(r => r.skuCode && r.skuCode.trim()).length}
+                lastScannedItem={lastScannedItem}
+                itemsList={formRows.filter(r => r.skuCode && r.skuCode.trim())}
                 onScan={(code) => {
                   processBarcodeScan(code);
                 }}
@@ -622,24 +640,38 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0.4rem 0.75rem',
+            padding: '0.45rem 0.8rem',
             background: showCameraScanner ? '#eff6ff' : '#f8fafc',
-            border: showCameraScanner ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
-            borderRadius: '8px',
+            border: showCameraScanner ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+            borderRadius: '10px',
             fontSize: '0.8rem',
             fontWeight: 800,
-            color: showCameraScanner ? '#1e40af' : '#334155'
+            color: showCameraScanner ? '#1e40af' : '#334155',
+            gap: '0.5rem',
+            flexWrap: 'wrap'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span>📋 Outward Items List ({formRows.filter(r => r.skuCode && r.skuCode.trim()).length} items • {totalOutwardUnits} units)</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span>📋 Outward Items ({formRows.filter(r => r.skuCode && r.skuCode.trim()).length} Styles)</span>
+              <span style={{
+                background: '#2563eb',
+                color: '#ffffff',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                fontWeight: 900,
+                fontSize: '0.78rem',
+                boxShadow: '0 2px 6px rgba(37,99,235,0.25)'
+              }}>
+                📦 {totalOutwardUnits} PCS TOTAL
+              </span>
             </div>
             {justScannedSku ? (
-              <span style={{ color: '#ffffff', background: '#2563eb', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 900 }}>
+              <span style={{ color: '#ffffff', background: '#059669', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 900 }}>
                 ✨ Scanned: {justScannedSku}
               </span>
             ) : showCameraScanner ? (
-              <span style={{ color: '#2563eb', fontSize: '0.72rem', fontWeight: 800 }}>
-                ● Camera Live
+              <span style={{ color: '#2563eb', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2563eb', display: 'inline-block' }}></span>
+                Camera Live
               </span>
             ) : null}
           </div>

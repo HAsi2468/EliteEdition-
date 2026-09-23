@@ -3,7 +3,16 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Camera, CameraOff, RefreshCw, Zap, ZapOff, CheckCircle2, AlertCircle } from 'lucide-react';
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 
-export default function CameraBarcodeScanner({ onScan, onScanSuccess, onClose, compact = false }) {
+export default function CameraBarcodeScanner({ 
+  onScan, 
+  onScanSuccess, 
+  onClose, 
+  compact = false,
+  totalPieces,
+  totalItems,
+  lastScannedItem,
+  itemsList = []
+}) {
   const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false));
 
   useEffect(() => {
@@ -15,7 +24,7 @@ export default function CameraBarcodeScanner({ onScan, onScanSuccess, onClose, c
   }, []);
 
   const isCompact = isMobile || compact;
-  
+
   // Unique DOM ID per component instance to avoid DOM collisions
   const reactId = useId();
   const regionId = `reader-camera-scanner-${reactId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
@@ -58,7 +67,7 @@ export default function CameraBarcodeScanner({ onScan, onScanSuccess, onClose, c
               await html5QrcodeRef.current.stop();
             }
             html5QrcodeRef.current.clear();
-          } catch (e) {}
+          } catch (e) { }
           html5QrcodeRef.current = null;
           isScanningRef.current = false;
         }
@@ -107,7 +116,7 @@ export default function CameraBarcodeScanner({ onScan, onScanSuccess, onClose, c
             if (typeof navigator !== 'undefined' && navigator.vibrate) {
               navigator.vibrate(80);
             }
-          } catch (e) {}
+          } catch (e) { }
 
           if (isMounted) {
             setLastScannedCode(cleanText);
@@ -146,7 +155,7 @@ export default function CameraBarcodeScanner({ onScan, onScanSuccess, onClose, c
             videoEl.setAttribute('playsinline', 'true');
             videoEl.setAttribute('webkit-playsinline', 'true');
             videoEl.setAttribute('muted', 'true');
-            videoEl.play().catch(() => {});
+            videoEl.play().catch(() => { });
           }
         }, 100);
 
@@ -158,7 +167,7 @@ export default function CameraBarcodeScanner({ onScan, onScanSuccess, onClose, c
             if (track && track.getCapabilities && track.getCapabilities().torch) {
               setHasTorchSupport(true);
             }
-          } catch (e) {}
+          } catch (e) { }
         }
       } catch (err) {
         console.error('Camera initialization error:', err);
@@ -183,12 +192,12 @@ export default function CameraBarcodeScanner({ onScan, onScanSuccess, onClose, c
         try {
           if (isScanningRef.current) {
             scanner.stop().then(() => {
-              try { scanner.clear(); } catch (e) {}
-            }).catch(() => {});
+              try { scanner.clear(); } catch (e) { }
+            }).catch(() => { });
           } else {
-            try { scanner.clear(); } catch (e) {}
+            try { scanner.clear(); } catch (e) { }
           }
-        } catch (e) {}
+        } catch (e) { }
       }
       html5QrcodeRef.current = null;
       isScanningRef.current = false;
@@ -227,20 +236,42 @@ export default function CameraBarcodeScanner({ onScan, onScanSuccess, onClose, c
     <div style={styles.scannerWrapper}>
       {/* Header Bar */}
       <div style={styles.topHeader}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0, flexWrap: 'wrap' }}>
           <Camera size={16} color="#10b981" />
-          <span style={styles.headerTitle}>Mobile Barcode Scanner</span>
+          <span style={styles.headerTitle}>Mobile Scanner</span>
+
+          {totalPieces !== undefined && (
+            <div style={{
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
+              padding: '0.15rem 0.55rem',
+              borderRadius: '20px',
+              fontSize: '0.78rem',
+              fontWeight: 900,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem',
+              boxShadow: '0 2px 6px rgba(16,185,129,0.3)',
+              letterSpacing: '0.2px'
+            }}>
+              <span>📦 {totalPieces} PCS</span>
+              {totalItems !== undefined && (
+                <span style={{ opacity: 0.88, fontSize: '0.7rem', fontWeight: 800 }}>({totalItems} styles)</span>
+              )}
+            </div>
+          )}
+
           <span style={{
             ...styles.statusBadge,
             background: cameraActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(234, 179, 8, 0.15)',
             color: cameraActive ? '#34d399' : '#facc15',
             borderColor: cameraActive ? 'rgba(16, 185, 129, 0.25)' : 'rgba(234, 179, 8, 0.25)',
           }}>
-            {cameraActive ? '⚡ Live HD Scan' : (errorMsg ? '⚠️ Error' : 'Connecting...')}
+            {cameraActive ? '⚡ Live' : (errorMsg ? '⚠️ Error' : 'Connecting...')}
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
           {/* Torch / Flashlight Toggle */}
           {hasTorchSupport && (
             <button
@@ -313,8 +344,52 @@ export default function CameraBarcodeScanner({ onScan, onScanSuccess, onClose, c
         )}
       </div>
 
-      {/* Footer Scanned Code Banner */}
-      {lastScannedCode && (
+      {/* Real-time Last Scanned Item Banner */}
+      {lastScannedItem ? (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.5rem 0.85rem',
+          background: 'linear-gradient(135deg, #064e3b 0%, #0f172a 100%)',
+          borderTop: '2px solid #10b981'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+            <CheckCircle2 size={18} color="#34d399" style={{ flexShrink: 0 }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: '0.86rem', fontWeight: 900, color: '#ecfdf5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {lastScannedItem.skuCode}
+                {lastScannedItem.size && lastScannedItem.size !== 'N/A' && (
+                  <span style={{ marginLeft: '6px', background: 'rgba(255,255,255,0.18)', padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800 }}>
+                    {lastScannedItem.size}
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '0.7rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {lastScannedItem.itemName || 'Scanned Item'}
+              </div>
+            </div>
+          </div>
+
+          {/* Big Live Piece Counter for this scanned SKU */}
+          <div style={{
+            background: '#10b981',
+            color: '#ffffff',
+            padding: '0.25rem 0.75rem',
+            borderRadius: '8px',
+            textAlign: 'center',
+            flexShrink: 0,
+            boxShadow: '0 2px 8px rgba(16,185,129,0.4)'
+          }}>
+            <div style={{ fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.9 }}>
+              This Style
+            </div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 900, lineHeight: 1.1 }}>
+              {lastScannedItem.qty || 1} <span style={{ fontSize: '0.72rem', fontWeight: 800 }}>PCS</span>
+            </div>
+          </div>
+        </div>
+      ) : lastScannedCode ? (
         <div style={{
           ...styles.lastScannedBanner,
           padding: isCompact ? '0.35rem 0.65rem' : '0.5rem 0.85rem'
@@ -323,6 +398,54 @@ export default function CameraBarcodeScanner({ onScan, onScanSuccess, onClose, c
           <span style={{ fontSize: isCompact ? '0.78rem' : '0.82rem', fontWeight: 800, color: '#ecfdf5' }}>
             Scanned SKU: <span style={{ color: '#34d399', textDecoration: 'underline' }}>{lastScannedCode}</span>
           </span>
+        </div>
+      ) : null}
+
+      {/* Live Horizontal Scanned SKUs & Pieces Chip Strip */}
+      {itemsList && itemsList.length > 0 && (
+        <div style={{
+          display: 'flex',
+          gap: '0.4rem',
+          padding: '0.35rem 0.65rem',
+          background: '#090d16',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          borderTop: '1px solid rgba(255,255,255,0.07)'
+        }}>
+          {itemsList.map((item, i) => {
+            const isLatest = lastScannedItem && (
+              item.skuCode === lastScannedItem.skuCode || 
+              (item.skuCode && item.skuCode.toLowerCase() === lastScannedItem.skuCode.toLowerCase())
+            );
+            return (
+              <div key={i} style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                background: isLatest ? 'rgba(16, 185, 129, 0.28)' : 'rgba(255,255,255,0.06)',
+                border: isLatest ? '1.5px solid #10b981' : '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '6px',
+                padding: '0.2rem 0.5rem',
+                whiteSpace: 'nowrap',
+                fontSize: '0.74rem',
+                color: '#f8fafc',
+                flexShrink: 0,
+                transition: 'all 0.2s ease'
+              }}>
+                <span style={{ fontWeight: 800 }}>{item.skuCode}</span>
+                <span style={{
+                  background: isLatest ? '#10b981' : '#334155',
+                  color: '#ffffff',
+                  padding: '1px 6px',
+                  borderRadius: '4px',
+                  fontWeight: 900,
+                  fontSize: '0.72rem'
+                }}>
+                  {item.qty || item.qtyOut || 1} pcs
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
