@@ -611,7 +611,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
             color: showCameraScanner ? '#1e40af' : '#334155'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span>📋 Outward Items List ({formRows.filter(r => r.skuCode && r.skuCode.trim()).length} items • {totalUnitsOut} units)</span>
+              <span>📋 Outward Items List ({formRows.filter(r => r.skuCode && r.skuCode.trim()).length} items • {totalOutwardUnits} units)</span>
             </div>
             {justScannedSku ? (
               <span style={{ color: '#ffffff', background: '#2563eb', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 900 }}>
