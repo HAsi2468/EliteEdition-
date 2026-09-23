@@ -854,6 +854,7 @@ export default function InventoryGrid({
   const printBarcode = (item) => {
     const sku = item.skuCode || 'NO-SKU';
     const size = item.size || 'N/A';
+    const companyTitle = (item.brand && item.brand.toUpperCase() !== 'ELITE ONLINE' && item.brand.toUpperCase() !== 'ALL') ? item.brand.toUpperCase() : 'EON';
 
     const countStr = window.prompt(`How many barcode stickers to print for SKU "${sku}"?`, "1");
     if (countStr === null) return;
@@ -874,7 +875,7 @@ export default function InventoryGrid({
       
       const sticker1Html = `
         <div class="sticker">
-          <div class="title">ELITE ONLINE</div>
+          <div class="title">${companyTitle}</div>
           <div class="barcode-container">
             <svg class="barcode-img" id="barcode_${idx1}"></svg>
           </div>
@@ -888,7 +889,7 @@ export default function InventoryGrid({
       const sticker2Html = idx2 < count 
         ? `
           <div class="sticker">
-            <div class="title">ELITE ONLINE</div>
+            <div class="title">${companyTitle}</div>
             <div class="barcode-container">
               <svg class="barcode-img" id="barcode_${idx2}"></svg>
             </div>

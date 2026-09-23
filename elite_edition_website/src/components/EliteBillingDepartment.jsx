@@ -92,7 +92,8 @@ import {
   Lock,
   BookOpen,
   FileSpreadsheet,
-  ShoppingBag
+  ShoppingBag,
+  FileCode
 } from 'lucide-react';
 
 // Helper for Indian Currency formatting
@@ -671,6 +672,151 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
     };
   };
 
+  // ── Helper to Generate Standard Tally XML (Tally.ERP 9 / TallyPrime) ───────
+  const generateTallyXML = ({ mode, partyName, partyGstin, partyPhone, ledger, customers, startD, endD }) => {
+    const toTallyDate = (dateStr) => {
+      if (!dateStr) return new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      if (typeof dateStr === 'string' && dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          const day = parts[0].padStart(2, '0');
+          const month = parts[1].padStart(2, '0');
+          const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+          return `${year}${month}${day}`;
+        }
+      }
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}${m}${day}`;
+    };
+
+    const escapeXml = (str) => {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    };
+
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xml += '<ENVELOPE>\n';
+    xml += '  <HEADER>\n';
+    xml += '    <TALLYREQUEST>Import Data</TALLYREQUEST>\n';
+    xml += '  </HEADER>\n';
+    xml += '  <BODY>\n';
+    xml += '    <IMPORTDATA>\n';
+    xml += '      <REQUESTDESC>\n';
+    xml += `        <REPORTNAME>${mode === 'party' ? 'All Masters &amp; Vouchers' : 'All Masters'}</REPORTNAME>\n`;
+    xml += '        <STATICVARIABLES>\n';
+    xml += '          <SVCURRENTCOMPANY>ELITE DIGITAL PRINTS</SVCURRENTCOMPANY>\n';
+    xml += '        </STATICVARIABLES>\n';
+    xml += '      </REQUESTDESC>\n';
+    xml += '      <REQUESTDATA>\n';
+
+    if (mode === 'party') {
+      // 1. Ledger Master
+      xml += '        <TALLYMESSAGE xmlns:UDF="TallyUDF">\n';
+      xml += `          <LEDGER NAME="${escapeXml(partyName)}" ACTION="Create">\n`;
+      xml += `            <NAME>${escapeXml(partyName)}</NAME>\n`;
+      xml += '            <PARENT>Sundry Debtors</PARENT>\n';
+      xml += `            <OPENINGBALANCE>${(ledger.openingBalance || 0) > 0 ? (ledger.openingBalance * -1).toFixed(2) : Math.abs(ledger.openingBalance || 0).toFixed(2)}</OPENINGBALANCE>\n`;
+      xml += '            <ISBILLWISEON>Yes</ISBILLWISEON>\n';
+      if (partyGstin) xml += `            <PARTYGSTIN>${escapeXml(partyGstin)}</PARTYGSTIN>\n`;
+      if (partyPhone) xml += `            <LEDGERPHONE>${escapeXml(partyPhone)}</LEDGERPHONE>\n`;
+      xml += `            <MAILINGNAME>${escapeXml(partyName)}</MAILINGNAME>\n`;
+      xml += '          </LEDGER>\n';
+      xml += '        </TALLYMESSAGE>\n';
+
+      // 2. Transactions as Tally Vouchers
+      (ledger.transactions || []).forEach(t => {
+        const isSales = (t.debit || 0) > 0;
+        const vchType = isSales ? 'Sales' : 'Receipt';
+        const tallyDate = toTallyDate(t.date);
+        const amt = Math.abs(isSales ? t.debit : t.credit);
+
+        xml += '        <TALLYMESSAGE xmlns:UDF="TallyUDF">\n';
+        xml += `          <VOUCHER VCHTYPE="${vchType}" ACTION="Create" OBJVIEW="Accounting Voucher View">\n`;
+        xml += `            <DATE>${tallyDate}</DATE>\n`;
+        xml += `            <EFFECTIVEDATE>${tallyDate}</EFFECTIVEDATE>\n`;
+        xml += `            <VOUCHERTYPENAME>${vchType}</VOUCHERTYPENAME>\n`;
+        xml += `            <VOUCHERNUMBER>${escapeXml(t.voucherNo || 'GEN')}</VOUCHERNUMBER>\n`;
+        xml += `            <PARTYLEDGERNAME>${escapeXml(partyName)}</PARTYLEDGERNAME>\n`;
+        xml += `            <NARRATION>${escapeXml(t.particulars || '')} - ${escapeXml(t.department || 'Digital Print')}</NARRATION>\n`;
+        xml += '            <PERSISTEDVIEW>Accounting Voucher View</PERSISTEDVIEW>\n';
+
+        if (isSales) {
+          xml += '            <ALLLEDGERENTRIES.LIST>\n';
+          xml += `              <LEDGERNAME>${escapeXml(partyName)}</LEDGERNAME>\n`;
+          xml += '              <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>\n';
+          xml += `              <AMOUNT>-${amt.toFixed(2)}</AMOUNT>\n`;
+          xml += '              <BILLALLOCATIONS.LIST>\n';
+          xml += `                <NAME>${escapeXml(t.voucherNo || 'INV')}</NAME>\n`;
+          xml += '                <BILLTYPE>New Ref</BILLTYPE>\n';
+          xml += `                <AMOUNT>-${amt.toFixed(2)}</AMOUNT>\n`;
+          xml += '              </BILLALLOCATIONS.LIST>\n';
+          xml += '            </ALLLEDGERENTRIES.LIST>\n';
+
+          xml += '            <ALLLEDGERENTRIES.LIST>\n';
+          xml += '              <LEDGERNAME>Sales - Digital Print</LEDGERNAME>\n';
+          xml += '              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n';
+          xml += `              <AMOUNT>${amt.toFixed(2)}</AMOUNT>\n`;
+          xml += '            </ALLLEDGERENTRIES.LIST>\n';
+        } else {
+          xml += '            <ALLLEDGERENTRIES.LIST>\n';
+          xml += '              <LEDGERNAME>Bank / Cash Account</LEDGERNAME>\n';
+          xml += '              <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>\n';
+          xml += `              <AMOUNT>-${amt.toFixed(2)}</AMOUNT>\n`;
+          xml += '            </ALLLEDGERENTRIES.LIST>\n';
+
+          xml += '            <ALLLEDGERENTRIES.LIST>\n';
+          xml += `              <LEDGERNAME>${escapeXml(partyName)}</LEDGERNAME>\n`;
+          xml += '              <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n';
+          xml += `              <AMOUNT>${amt.toFixed(2)}</AMOUNT>\n`;
+          xml += '              <BILLALLOCATIONS.LIST>\n';
+          xml += `                <NAME>${escapeXml(t.voucherNo || 'Advance')}</NAME>\n`;
+          xml += '                <BILLTYPE>Agst Ref</BILLTYPE>\n';
+          xml += `                <AMOUNT>${amt.toFixed(2)}</AMOUNT>\n`;
+          xml += '              </BILLALLOCATIONS.LIST>\n';
+          xml += '            </ALLLEDGERENTRIES.LIST>\n';
+        }
+
+        xml += '          </VOUCHER>\n';
+        xml += '        </TALLYMESSAGE>\n';
+      });
+    } else {
+      // Mode B: All-Parties Master Ledger
+      customers.forEach(cust => {
+        const custName = cust.businessName || cust.name || 'Unknown';
+        const partyLedger = computePartyLedger(cust._id, startD, endD);
+        const opBal = partyLedger.openingBalance || 0;
+
+        xml += '        <TALLYMESSAGE xmlns:UDF="TallyUDF">\n';
+        xml += `          <LEDGER NAME="${escapeXml(custName)}" ACTION="Create">\n`;
+        xml += `            <NAME>${escapeXml(custName)}</NAME>\n`;
+        xml += '            <PARENT>Sundry Debtors</PARENT>\n';
+        xml += `            <OPENINGBALANCE>${opBal > 0 ? (opBal * -1).toFixed(2) : Math.abs(opBal).toFixed(2)}</OPENINGBALANCE>\n`;
+        xml += '            <ISBILLWISEON>Yes</ISBILLWISEON>\n';
+        if (cust.gstin) xml += `            <PARTYGSTIN>${escapeXml(cust.gstin)}</PARTYGSTIN>\n`;
+        if (cust.phone) xml += `            <LEDGERPHONE>${escapeXml(cust.phone)}</LEDGERPHONE>\n`;
+        xml += `            <MAILINGNAME>${escapeXml(custName)}</MAILINGNAME>\n`;
+        xml += '          </LEDGER>\n';
+        xml += '        </TALLYMESSAGE>\n';
+      });
+    }
+
+    xml += '      </REQUESTDATA>\n';
+    xml += '    </IMPORTDATA>\n';
+    xml += '  </BODY>\n';
+    xml += '</ENVELOPE>\n';
+
+    return xml;
+  };
+
   const handleGenerateLedgerExport = () => {
     const { startD, endD } = getLedgerDateRange();
 
@@ -678,6 +824,29 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       const selectedParty = customers.find(c => c._id === selectedPartyId) || { name: 'All Customers', businessName: 'Global Account Ledger' };
       const partyName = selectedParty.businessName || selectedParty.name;
       const ledger = computePartyLedger(selectedPartyId, startD, endD);
+
+      if (ledgerFormat === 'tally' || ledgerFormat === 'xml') {
+        const xmlContent = generateTallyXML({
+          mode: 'party',
+          partyName,
+          partyGstin: selectedParty.gstin,
+          partyPhone: selectedParty.phone,
+          ledger,
+          customers,
+          startD,
+          endD
+        });
+        const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Tally_Ledger_${partyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xml`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        triggerPushNotification('🏛️ Tally XML Ready', `Tally XML ledger statement for ${partyName} exported successfully.`, 'success');
+        return;
+      }
 
       if (ledgerFormat === 'csv' || ledgerFormat === 'excel') {
         let csvContent = `ELITE DIGITAL PRINTS — PARTY LEDGER STATEMENT\n`;
@@ -825,6 +994,25 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
       }
     } else {
       // Mode B: Master Ledger Export
+      if (ledgerFormat === 'tally' || ledgerFormat === 'xml') {
+        const xmlContent = generateTallyXML({
+          mode: 'master',
+          customers,
+          startD,
+          endD
+        });
+        const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Tally_Master_Ledgers_${new Date().toISOString().split('T')[0]}.xml`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        triggerPushNotification('🏛️ Tally XML Ready', `All-Parties Tally XML Master Ledgers exported successfully.`, 'success');
+        return;
+      }
+
       let csvContent = `ELITE DIGITAL PRINTS — ALL-PARTIES MASTER LEDGER SUMMARY\n`;
       csvContent += `Report Date: ${new Date().toLocaleDateString('en-IN')}\n\n`;
       csvContent += `Party Code,Party Name,GSTIN,Phone,Opening Balance (₹),Total Billed (₹),Total Paid (₹),Closing Balance (₹),Status\n`;
@@ -3861,38 +4049,41 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         </div>
       )}
 
-      {/* ── DOWNLOAD ACCOUNTS & PARTY LEDGER MODAL ─────────────────────────────── */}
+      {/* ── DOWNLOAD ACCOUNTS & PARTY LEDGER MODAL (WHITE & BLUE THEME) ─────────────── */}
       {showLedgerModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1050, background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '16px', width: '100%', maxWidth: '720px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', color: '#f8fafc', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1050, background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#ffffff', border: '1.5px solid #bfdbfe', borderRadius: '16px', width: '100%', maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.25)', color: '#0f172a', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
             
             {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #1e293b', paddingBottom: '0.8rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <BookOpen size={22} color="#10b981" />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.8rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7' }}>
+                  <BookOpen size={22} color="#0284c7" />
+                </div>
                 <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#ffffff' }}>Ledger Export & Accounts Statement</h3>
-                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Download Party Account Statements & Global Master Ledgers</span>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: '#0f172a' }}>Ledger Export &amp; Accounts Statement</h3>
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Download Party Account Statements &amp; Global Master Ledgers</span>
                 </div>
               </div>
-              <button onClick={() => setShowLedgerModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.2rem' }}>
-                <X size={20} />
+              <button onClick={() => setShowLedgerModal(false)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', color: '#64748b', cursor: 'pointer', padding: '0.35rem 0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} />
               </button>
             </div>
 
             {/* Mode Selector Tabs */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', background: '#1e293b', padding: '0.3rem', borderRadius: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '0.35rem', borderRadius: '10px' }}>
               <button
                 onClick={() => setLedgerMode('party')}
                 style={{
                   padding: '0.65rem',
-                  borderRadius: '6px',
+                  borderRadius: '7px',
                   border: 'none',
                   fontWeight: 800,
                   fontSize: '0.82rem',
                   cursor: 'pointer',
-                  background: ledgerMode === 'party' ? 'linear-gradient(135deg,#10b981,#059669)' : 'transparent',
-                  color: ledgerMode === 'party' ? '#ffffff' : '#94a3b8',
+                  background: ledgerMode === 'party' ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'transparent',
+                  color: ledgerMode === 'party' ? '#ffffff' : '#64748b',
+                  boxShadow: ledgerMode === 'party' ? '0 4px 12px rgba(37, 99, 235, 0.25)' : 'none',
                   transition: 'all 0.2s'
                 }}
               >
@@ -3902,13 +4093,14 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                 onClick={() => setLedgerMode('master')}
                 style={{
                   padding: '0.65rem',
-                  borderRadius: '6px',
+                  borderRadius: '7px',
                   border: 'none',
                   fontWeight: 800,
                   fontSize: '0.82rem',
                   cursor: 'pointer',
-                  background: ledgerMode === 'master' ? 'linear-gradient(135deg,#7c3aed,#6366f1)' : 'transparent',
-                  color: ledgerMode === 'master' ? '#ffffff' : '#94a3b8',
+                  background: ledgerMode === 'master' ? 'linear-gradient(135deg, #0284c7, #2563eb)' : 'transparent',
+                  color: ledgerMode === 'master' ? '#ffffff' : '#64748b',
+                  boxShadow: ledgerMode === 'master' ? '0 4px 12px rgba(37, 99, 235, 0.25)' : 'none',
                   transition: 'all 0.2s'
                 }}
               >
@@ -3919,11 +4111,11 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
             {/* Mode A: Select Party */}
             {ledgerMode === 'party' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1' }}>Select Customer / Party Account</label>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>Select Customer / Party Account</label>
                 <select
                   value={selectedPartyId}
                   onChange={e => setSelectedPartyId(e.target.value)}
-                  style={{ width: '100%', padding: '0.6rem 0.8rem', background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#ffffff', fontSize: '0.85rem', outline: 'none' }}
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '8px', color: '#0f172a', fontSize: '0.85rem', fontWeight: 600, outline: 'none' }}
                 >
                   <option value="ALL">All Parties (Combined)</option>
                   {customers.map(c => (
@@ -3937,7 +4129,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
             {/* Date Range Presets */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1' }}>Date Range Filter</label>
+              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>Date Range Filter</label>
               <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                 {[
                   { id: 'this_month', label: 'This Month' },
@@ -3945,49 +4137,53 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                   { id: 'fy_ytd', label: 'Financial Year (YTD)' },
                   { id: 'all_time', label: 'All Time' },
                   { id: 'custom', label: 'Custom Date' }
-                ].map(preset => (
-                  <button
-                    key={preset.id}
-                    onClick={() => setLedgerPreset(preset.id)}
-                    style={{
-                      padding: '0.4rem 0.85rem',
-                      borderRadius: '6px',
-                      border: '1px solid',
-                      borderColor: ledgerPreset === preset.id ? '#10b981' : '#334155',
-                      background: ledgerPreset === preset.id ? 'rgba(16,185,129,0.18)' : '#1e293b',
-                      color: ledgerPreset === preset.id ? '#34d399' : '#94a3b8',
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {preset.label}
-                  </button>
-                ))}
+                ].map(preset => {
+                  const isSel = ledgerPreset === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      onClick={() => setLedgerPreset(preset.id)}
+                      style={{
+                        padding: '0.4rem 0.85rem',
+                        borderRadius: '6px',
+                        border: '1.5px solid',
+                        borderColor: isSel ? '#0284c7' : '#cbd5e1',
+                        background: isSel ? '#eff6ff' : '#ffffff',
+                        color: isSel ? '#0284c7' : '#64748b',
+                        fontSize: '0.78rem',
+                        fontWeight: isSel ? 800 : 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
               </div>
 
               {ledgerPreset === 'custom' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginTop: '0.3rem' }}>
                   <div>
-                    <label style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>From Date</label>
-                    <input type="date" value={ledgerDateStart} onChange={e => setLedgerDateStart(e.target.value)} style={{ width: '100%', padding: '0.45rem', background: '#1e293b', border: '1px solid #334155', borderRadius: '6px', color: '#ffffff', fontSize: '0.8rem' }} />
+                    <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>From Date</label>
+                    <input type="date" value={ledgerDateStart} onChange={e => setLedgerDateStart(e.target.value)} style={{ width: '100%', padding: '0.45rem', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontSize: '0.8rem' }} />
                   </div>
                   <div>
-                    <label style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>To Date</label>
-                    <input type="date" value={ledgerDateEnd} onChange={e => setLedgerDateEnd(e.target.value)} style={{ width: '100%', padding: '0.45rem', background: '#1e293b', border: '1px solid #334155', borderRadius: '6px', color: '#ffffff', fontSize: '0.8rem' }} />
+                    <label style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>To Date</label>
+                    <input type="date" value={ledgerDateEnd} onChange={e => setLedgerDateEnd(e.target.value)} style={{ width: '100%', padding: '0.45rem', background: '#ffffff', border: '1.5px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontSize: '0.8rem' }} />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Export Format Selector */}
+            {/* Export Format Selector — 5 Formats (Excel, PDF, CSV, Tally XML, Quick Print) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#cbd5e1' }}>Select Export Format</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>Select Export Format</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
                 {[
                   { id: 'excel', label: '📊 Excel (.xlsx)', icon: FileSpreadsheet },
                   { id: 'pdf', label: '📄 PDF Document', icon: FileText },
                   { id: 'csv', label: '📁 CSV File', icon: Download },
+                  { id: 'tally', label: '🏛️ Tally (XML)', icon: FileCode },
                   { id: 'print', label: '🖨️ Quick Print', icon: Printer }
                 ].map(fmt => {
                   const Icon = fmt.icon;
@@ -4000,49 +4196,50 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
+                        justifyContent: 'center',
                         gap: '0.35rem',
-                        padding: '0.75rem 0.5rem',
-                        borderRadius: '8px',
-                        border: '1px solid',
-                        borderColor: isSel ? '#38bdf8' : '#334155',
-                        background: isSel ? 'rgba(56,189,248,0.18)' : '#1e293b',
-                        color: isSel ? '#38bdf8' : '#cbd5e1',
-                        fontWeight: 700,
+                        padding: '0.75rem 0.4rem',
+                        borderRadius: '10px',
+                        border: isSel ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                        background: isSel ? '#eff6ff' : '#ffffff',
+                        color: isSel ? '#0284c7' : '#475569',
+                        fontWeight: isSel ? 800 : 700,
                         fontSize: '0.78rem',
                         cursor: 'pointer',
+                        boxShadow: isSel ? '0 4px 12px rgba(2, 132, 199, 0.15)' : 'none',
                         transition: 'all 0.15s'
                       }}
                     >
-                      <Icon size={18} />
-                      <span>{fmt.label}</span>
+                      <Icon size={20} color={isSel ? '#0284c7' : '#64748b'} />
+                      <span style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{fmt.label}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Live Calculated Summary Box */}
+            {/* Live Calculated Summary Box (White & Blue) */}
             {(() => {
               const { startD, endD } = getLedgerDateRange();
               if (ledgerMode === 'party') {
                 const ledger = computePartyLedger(selectedPartyId, startD, endD);
                 return (
-                  <div style={{ background: '#1e293b', borderRadius: '10px', padding: '1rem', border: '1px solid #334155', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
+                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '1rem', border: '1.5px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Opening Balance</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#f8fafc', marginTop: 2 }}>{fmtINR(ledger.openingBalance)}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Opening Balance</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>{fmtINR(ledger.openingBalance)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Total Debit (Billed)</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#38bdf8', marginTop: 2 }}>{fmtINR(ledger.totalDebit)}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Total Debit (Billed)</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0284c7', marginTop: 2 }}>{fmtINR(ledger.totalDebit)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Total Credit (Paid)</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#34d399', marginTop: 2 }}>{fmtINR(ledger.totalCredit)}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Total Credit (Paid)</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#16a34a', marginTop: 2 }}>{fmtINR(ledger.totalCredit)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Closing Balance</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: ledger.closingBalance > 0 ? '#fbbf24' : '#34d399', marginTop: 2 }}>{fmtINR(ledger.closingBalance)} ({ledger.closingBalance >= 0 ? 'Dr' : 'Cr'})</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Closing Balance</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: ledger.closingBalance > 0 ? '#ea580c' : '#16a34a', marginTop: 2 }}>{fmtINR(ledger.closingBalance)} ({ledger.closingBalance >= 0 ? 'Dr' : 'Cr'})</div>
                     </div>
                   </div>
                 );
@@ -4057,22 +4254,22 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
                   grandBal += pL.closingBalance;
                 });
                 return (
-                  <div style={{ background: '#1e293b', borderRadius: '10px', padding: '1rem', border: '1px solid #334155', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
+                  <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '1rem', border: '1.5px solid #e2e8f0', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Parties Count</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#f8fafc', marginTop: 2 }}>{customers.length} Accounts</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Parties Count</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>{customers.length} Accounts</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Period Billed</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#38bdf8', marginTop: 2 }}>{fmtINR(grandBilled)}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Period Billed</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#0284c7', marginTop: 2 }}>{fmtINR(grandBilled)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Period Collected</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#34d399', marginTop: 2 }}>{fmtINR(grandPaid)}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Period Collected</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#16a34a', marginTop: 2 }}>{fmtINR(grandPaid)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Total Outstanding</div>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fbbf24', marginTop: 2 }}>{fmtINR(grandBal)}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>Total Outstanding</div>
+                      <div style={{ fontSize: '1rem', fontWeight: 900, color: '#ea580c', marginTop: 2 }}>{fmtINR(grandBal)}</div>
                     </div>
                   </div>
                 );
@@ -4081,13 +4278,12 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
 
             {/* Modal Actions */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.5rem' }}>
-              <button className="btn-secondary" onClick={() => setShowLedgerModal(false)} style={{ padding: '0.55rem 1.1rem' }}>Cancel</button>
+              <button onClick={() => setShowLedgerModal(false)} style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
               <button
-                className="btn-primary"
                 onClick={handleGenerateLedgerExport}
-                style={{ padding: '0.55rem 1.4rem', background: 'linear-gradient(135deg,#10b981,#059669)', border: 'none', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+                style={{ padding: '0.6rem 1.5rem', borderRadius: '8px', background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)', border: 'none', color: '#ffffff', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)' }}
               >
-                <Download size={16} /> Generate & Download Ledger
+                <Download size={16} /> Generate &amp; Download Ledger
               </button>
             </div>
 

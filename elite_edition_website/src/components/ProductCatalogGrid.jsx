@@ -188,6 +188,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
   const printStockBarcode = (item) => {
     const sku = item.skuCode || item.sku || 'NO-SKU';
     const size = Array.isArray(item.size) ? item.size.join('/') : (item.size || 'N/A');
+    const companyTitle = (item.brand && item.brand.toUpperCase() !== 'ELITE ONLINE' && item.brand.toUpperCase() !== 'ALL') ? item.brand.toUpperCase() : 'EON';
 
     const countStr = window.prompt(`How many barcode stickers to print for SKU "${sku}"?`, "1");
     if (countStr === null) return;
@@ -208,7 +209,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
       
       const sticker1Html = `
         <div class="sticker">
-          <div class="title">ELITE ONLINE</div>
+          <div class="title">${companyTitle}</div>
           <div class="barcode-container">
             <svg class="barcode-img" id="barcode_${idx1}"></svg>
           </div>
@@ -222,7 +223,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
       const sticker2Html = idx2 < count 
         ? `
           <div class="sticker">
-            <div class="title">ELITE ONLINE</div>
+            <div class="title">${companyTitle}</div>
             <div class="barcode-container">
               <svg class="barcode-img" id="barcode_${idx2}"></svg>
             </div>
@@ -375,7 +376,7 @@ export default function ProductCatalogGrid({ items, onEdit, onDelete, onAdd, onS
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Print Product Barcodes - Elite Online</title>
+        <title>Print Product Barcodes - EON</title>
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
         <style>
           @page { size: A4; margin: 8mm; }
