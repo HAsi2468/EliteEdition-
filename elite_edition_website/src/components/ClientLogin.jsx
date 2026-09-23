@@ -64,7 +64,7 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: radial-gradient(ellipse at 50% 0%, #1e293b 0%, #0f172a 60%, #0b0f19 100%);
+          background: radial-gradient(ellipse at 50% 0%, #dbeafe 0%, #eff6ff 45%, #f8fafc 100%);
           position: relative;
           overflow: hidden;
           padding: 1.5rem;
@@ -78,9 +78,9 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
           max-width: 440px;
           padding: 2.5rem 2rem;
           border-radius: 24px;
-          background: #111827;
-          border: 1px solid #334155;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.06);
+          background: #ffffff;
+          border: 1px solid #dbeafe;
+          box-shadow: 0 20px 45px -12px rgba(37, 99, 235, 0.15), 0 0 0 1px rgba(219, 234, 254, 0.8);
           box-sizing: border-box;
           transition: transform 0.2s ease;
         }
@@ -88,30 +88,30 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
           position: relative;
           display: flex;
           align-items: center;
-          background: #1e293b;
-          border: 1.5px solid #334155;
+          background: #f8fafc;
+          border: 1.5px solid #cbd5e1;
           border-radius: 12px;
           transition: all 0.2s ease;
           overflow: hidden;
         }
         .client-input-wrapper:focus-within {
-          border-color: #10b981 !important;
-          background: #1e293b !important;
-          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2) !important;
+          border-color: #2563eb !important;
+          background: #ffffff !important;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16) !important;
         }
         .client-input-field {
           width: 100%;
           padding: 0.85rem 1rem 0.85rem 2.6rem;
           background: transparent;
           border: none;
-          color: #f8fafc;
+          color: #0f172a;
           font-size: 16px; /* Prevents auto-zoom on iOS Safari */
-          font-weight: 500;
+          font-weight: 600;
           outline: none;
           box-sizing: border-box;
         }
         .client-input-field::placeholder {
-          color: #64748b;
+          color: #94a3b8;
           font-weight: 400;
         }
         .client-btn-primary {
@@ -119,7 +119,7 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
           padding: 0.9rem 1.25rem;
           border-radius: 12px;
           border: none;
-          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
           color: #ffffff;
           font-size: 0.96rem;
           font-weight: 700;
@@ -127,15 +127,15 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
           align-items: center;
           justify-content: center;
           gap: 0.6rem;
-          box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+          box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
           cursor: pointer;
           transition: all 0.18s ease;
           width: 100%;
           box-sizing: border-box;
         }
         .client-btn-primary:hover:not(:disabled) {
-          background: linear-gradient(135deg, #059669 0%, #047857 100%);
-          box-shadow: 0 8px 25px rgba(16, 185, 129, 0.45);
+          background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+          box-shadow: 0 8px 25px rgba(37, 99, 235, 0.45);
           transform: translateY(-1px);
         }
         .client-btn-primary:active:not(:disabled) {
@@ -145,19 +145,20 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
           display: inline-flex;
           align-items: center;
           gap: 0.4rem;
-          background: rgba(16, 185, 129, 0.12);
-          border: 1px solid rgba(16, 185, 129, 0.3);
+          background: #eff6ff;
+          border: 1px solid #bfdbfe;
           border-radius: 8px;
           padding: 0.35rem 0.65rem;
-          color: #34d399;
+          color: #2563eb;
           font-size: 0.72rem;
-          font-weight: 600;
+          font-weight: 700;
           cursor: pointer;
           transition: all 0.15s ease;
         }
         .client-copy-btn:hover {
-          background: rgba(16, 185, 129, 0.2);
-          border-color: rgba(16, 185, 129, 0.5);
+          background: #dbeafe;
+          border-color: #93c5fd;
+          color: #1d4ed8;
         }
         @media (max-width: 480px) {
           .client-login-container {
@@ -190,7 +191,7 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
         {/* Top Header Badge & Copy Link */}
         <div style={styles.badgeRow}>
           <div style={styles.badge}>
-            <Sparkles size={13} color="#fbbf24" />
+            <Sparkles size={13} color="#2563eb" />
             <span>CLIENT & PARTNER PORTAL</span>
           </div>
           <button
@@ -201,12 +202,12 @@ export default function ClientLogin({ onLoginSuccess, onSwitchToStaff }) {
           >
             {copiedLink ? (
               <>
-                <Check size={13} color="#34d399" />
+                <Check size={13} color="#2563eb" />
                 <span>Link Copied!</span>
               </>
             ) : (
               <>
-                <Copy size={13} color="#34d399" />
+                <Copy size={13} color="#2563eb" />
                 <span>Copy Link</span>
               </>
             )}
@@ -327,7 +328,7 @@ const styles = {
     transform: 'translateX(-50%)',
     width: '700px',
     height: '450px',
-    background: 'radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, rgba(15, 23, 42, 0) 70%)',
+    background: 'radial-gradient(circle, rgba(37, 99, 235, 0.12) 0%, rgba(239, 246, 255, 0) 70%)',
     pointerEvents: 'none',
     zIndex: 0
   },
@@ -337,7 +338,7 @@ const styles = {
     right: '10%',
     width: '600px',
     height: '400px',
-    background: 'radial-gradient(circle, rgba(16, 185, 129, 0.05) 0%, rgba(15, 23, 42, 0) 70%)',
+    background: 'radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, rgba(248, 250, 252, 0) 70%)',
     pointerEvents: 'none',
     zIndex: 0
   },
@@ -355,10 +356,10 @@ const styles = {
     gap: '0.45rem',
     padding: '0.35rem 0.75rem',
     borderRadius: '20px',
-    background: 'rgba(245, 158, 11, 0.15)',
-    border: '1px solid rgba(245, 158, 11, 0.35)',
-    color: '#fbbf24',
-    fontSize: '0.7rem',
+    background: 'rgba(37, 99, 235, 0.08)',
+    border: '1px solid rgba(37, 99, 235, 0.25)',
+    color: '#1d4ed8',
+    fontSize: '0.72rem',
     fontWeight: 800,
     letterSpacing: '0.04em'
   },
@@ -370,23 +371,23 @@ const styles = {
     width: '60px',
     height: '60px',
     borderRadius: '18px',
-    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     margin: '0 auto 1rem auto',
-    boxShadow: '0 10px 22px rgba(16, 185, 129, 0.3)'
+    boxShadow: '0 10px 22px rgba(37, 99, 235, 0.28)'
   },
   title: {
     fontSize: '1.75rem',
     fontWeight: 800,
-    color: '#f8fafc',
+    color: '#0f172a',
     margin: '0 0 0.4rem 0',
     letterSpacing: '-0.02em'
   },
   subtitle: {
     fontSize: '0.88rem',
-    color: '#94a3b8',
+    color: '#64748b',
     margin: 0,
     lineHeight: 1.45
   },
@@ -394,9 +395,9 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '0.65rem',
-    background: 'rgba(239, 68, 68, 0.15)',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
-    color: '#f87171',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    color: '#dc2626',
     padding: '0.8rem 1rem',
     borderRadius: '12px',
     fontSize: '0.83rem',
@@ -416,14 +417,14 @@ const styles = {
   label: {
     fontSize: '0.74rem',
     fontWeight: 700,
-    color: '#94a3b8',
+    color: '#1e3a8a',
     textTransform: 'uppercase',
     letterSpacing: '0.04em'
   },
   inputIcon: {
     position: 'absolute',
     left: '12px',
-    color: '#10b981',
+    color: '#2563eb',
     pointerEvents: 'none'
   },
   eyeBtn: {
@@ -451,7 +452,7 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '0.85rem',
-    borderTop: '1px solid #1e293b',
+    borderTop: '1px solid #e2e8f0',
     paddingTop: '1.25rem'
   },
   securityNote: {
@@ -459,12 +460,12 @@ const styles = {
     alignItems: 'center',
     gap: '0.45rem',
     fontSize: '0.78rem',
-    color: '#94a3b8'
+    color: '#64748b'
   },
   switchBtn: {
     background: 'none',
     border: 'none',
-    color: '#94a3b8',
+    color: '#64748b',
     fontSize: '0.82rem',
     cursor: 'pointer',
     padding: '5px 10px',
