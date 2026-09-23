@@ -42,6 +42,24 @@ export function getFabricFusingPreset(fabricName) {
 
 export const FUSING_SPEED_OPTIONS = [50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80];
 
+// Helper to cleanly format Job Number without duplicate "JOB NO.- JOB NO.-"
+export const formatJobCardNo = (jobNo) => {
+  if (!jobNo) return '';
+  const str = String(jobNo).trim();
+  if (/^#?\s*job\s*no\.?/i.test(str)) {
+    return str.replace(/^#?\s*job\s*no\.?\s*[-:]?\s*/i, 'JOB NO.- ');
+  }
+  return `JOB NO.- ${str}`;
+};
+
+// Helper to extract numeric printed meters from card (prioritizing printMtr synced from print logs)
+export const getCardPrintedMeters = (card) => {
+  if (!card) return '';
+  const raw = card.printMtr || card.printedMtr || card.freshMtr || card.fusingMtr || card.totalMtr || '';
+  const match = String(raw).match(/[\d.]+/);
+  return match ? match[0] : '';
+};
+
 const DEFAULT_FUSING_MACHINES = [
   'Fusing Machine 1 (Rotary)',
   'Fusing Machine 2 (High Speed)',
@@ -415,10 +433,11 @@ export default function FusingDepartment() {
       : cards.find(c => String(c._id) === String(cardOrId) || String(c.id) === String(cardOrId) || String(c.jobNo) === String(cardOrId));
 
     if (card) {
-      const pMtr = card.printedMtr || card.freshMtr || card.fusingMtr || card.totalMtr || '';
-      const defaultMtr = card.fusingMtr || pMtr || '';
+      const pMtr = getCardPrintedMeters(card);
+      const defaultMtr = pMtr || (card.fusingMtr ? String(card.fusingMtr).match(/[\d.]+/)?.[0] : '') || '';
       const cardPanna = card.panna ? (String(card.panna).includes('"') ? card.panna : `${card.panna}"`) : '58"';
       const preset = getFabricFusingPreset(card.fabric);
+      const jobDisplay = formatJobCardNo(card.jobNo);
       setTopForm(prev => ({
         ...prev,
         jobCardId: card._id || card.id,
@@ -431,7 +450,7 @@ export default function FusingDepartment() {
         fusingMachine: card.fusingMachine || prev.fusingMachine,
         butterPaperWeightKg: card.butterPaperWeightKg || ''
       }));
-      setJobSearchText(`JOB NO.- ${card.jobNo || ''} — ${card.party || ''} | ${card.designName || ''} (${card.fabric || ''} ${cardPanna})`);
+      setJobSearchText(`${jobDisplay} — ${card.party || ''} | ${card.designName || ''} (${card.fabric || ''} ${cardPanna})`);
     } else {
       setTopForm(prev => ({
         ...prev,
@@ -548,7 +567,8 @@ export default function FusingDepartment() {
 
   // Compute fresh meters dynamically in Edit Modal (Printed Mtr - Wastage Mtr)
   const computedModalFreshMtr = useMemo(() => {
-    const base = parseFloat(selectedCard?.printedMtr || selectedCard?.totalMtr || form.freshMtr) || 0;
+    const printed = getCardPrintedMeters(selectedCard);
+    const base = parseFloat(printed || form.freshMtr || selectedCard?.totalMtr) || 0;
     const waste = parseFloat(calculatedWastageMtr) || 0;
     return Math.max(0, base - waste).toFixed(2);
   }, [selectedCard, form.freshMtr, calculatedWastageMtr]);
@@ -556,7 +576,8 @@ export default function FusingDepartment() {
   // Open Edit Modal for a card
   const openFusingModal = (card) => {
     setSelectedCard(card);
-    const defaultFresh = card.freshMtr || card.fusingMtr || card.printedMtr || card.totalMtr || '';
+    const printedM = getCardPrintedMeters(card);
+    const defaultFresh = card.freshMtr || card.fusingMtr || printedM || card.totalMtr || '';
     const cardPanna = card.panna ? (String(card.panna).includes('"') ? card.panna : `${card.panna}"`) : '58"';
     const cardButterUsed = card.useButterPaper || (parseFloat(card.butterPaperWeightKg) > 0 ? 'Yes' : 'No');
 
@@ -598,7 +619,7 @@ export default function FusingDepartment() {
       useButterPaper: cardButterUsed,
       butterPaperWeightKg: card.butterPaperWeightKg || '',
       rollCompleted: card.fusingStatus === 'Fusing Done' ? 'Yes' : 'No',
-      printedMtr: card.printedMtr || card.totalMtr || defaultFresh,
+      printedMtr: printedM || defaultFresh,
       fusingMtr: defaultFresh,
       fusingOperator: card.fusingOperator || accountFullName,
       notes: card.emergencyNotes || card.note1 || ''
@@ -614,7 +635,8 @@ export default function FusingDepartment() {
       return;
     }
 
-    const baseMtr = parseFloat(selectedCard?.printedMtr || selectedCard?.totalMtr || form.freshMtr) || 0;
+    const printed = getCardPrintedMeters(selectedCard);
+    const baseMtr = parseFloat(printed || form.freshMtr || selectedCard?.totalMtr) || 0;
     const wasteMtr = parseFloat(calculatedWastageMtr) || 0;
     const computedFreshMtr = Math.max(0, baseMtr - wasteMtr).toFixed(2);
     const finalButterKg = form.useButterPaper === 'No' ? '0' : String(form.butterPaperWeightKg || 0);
@@ -1113,7 +1135,7 @@ export default function FusingDepartment() {
                             <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                                 <span style={{ fontWeight: 900, color: '#0369a1', fontSize: '0.9rem' }}>
-                                  #{c.jobNo || 'JOB'}
+                                  {formatJobCardNo(c.jobNo)}
                                 </span>
                                 <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
                                   {c.party || 'Party'}
@@ -1133,7 +1155,7 @@ export default function FusingDepartment() {
                                 color: '#15803d',
                                 border: '1px solid #bbf7d0'
                               }}>
-                                🖨️ {c.printedMtr || c.freshMtr || 0}m Printed
+                                🖨️ {getCardPrintedMeters(c) || 0}m Printed
                               </span>
                               <span style={{
                                 padding: '1px 6px',
@@ -2383,7 +2405,7 @@ export default function FusingDepartment() {
               </div>
               <div>
                 <span style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 700, display: 'block' }}>PRINTED METERS</span>
-                <strong style={{ color: '#059669', fontWeight: 800 }}>{speedTempCard.printedMtr || speedTempCard.totalMtr || '0'} mtr</strong>
+                <strong style={{ color: '#059669', fontWeight: 800 }}>{getCardPrintedMeters(speedTempCard) || '0'} mtr</strong>
               </div>
             </div>
 
