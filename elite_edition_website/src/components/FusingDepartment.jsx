@@ -20,24 +20,24 @@ function getAutoShift() {
 export function getFabricFusingPreset(fabricName) {
   const f = String(fabricName || '').toLowerCase();
   if (f.includes('crepe') || f.includes('french')) {
-    return { temp: '210°C', speed: '18 m/min', note: 'Standard Sublimation' };
+    return { temp: '210°C', speed: '80', note: 'Standard Sublimation' };
   }
   if (f.includes('organza')) {
-    return { temp: '195°C', speed: '22 m/min', note: 'Low Temp (Anti-Shrink)' };
+    return { temp: '195°C', speed: '80', note: 'Low Temp (Anti-Shrink)' };
   }
   if (f.includes('satin')) {
-    return { temp: '205°C', speed: '16 m/min', note: 'High Tension' };
+    return { temp: '205°C', speed: '80', note: 'High Tension' };
   }
   if (f.includes('georgette') || f.includes('chiffon')) {
-    return { temp: '200°C', speed: '20 m/min', note: 'Medium Heat' };
+    return { temp: '200°C', speed: '80', note: 'Medium Heat' };
   }
   if (f.includes('modal') || f.includes('rayon')) {
-    return { temp: '190°C', speed: '20 m/min', note: 'Pre-dry Recommended' };
+    return { temp: '190°C', speed: '80', note: 'Pre-dry Recommended' };
   }
   if (f.includes('velvet') || f.includes('heavy')) {
-    return { temp: '205°C', speed: '14 m/min', note: 'Slow Speed Feed' };
+    return { temp: '205°C', speed: '80', note: 'Slow Speed Feed' };
   }
-  return { temp: '205°C', speed: '18 m/min', note: 'General Polyester' };
+  return { temp: '205°C', speed: '80', note: 'General Polyester' };
 }
 
 const DEFAULT_FUSING_MACHINES = [
@@ -146,7 +146,7 @@ export default function FusingDepartment() {
     jobNo: '',
     fusingMachine: DEFAULT_FUSING_MACHINES[0],
     fusingTemp: '210°C',
-    fusingSpeed: '18 m/min',
+    fusingSpeed: '80',
     panna: '58"',
     useButterPaper: 'Yes',
     butterPaperWeightKg: '',
@@ -254,7 +254,7 @@ export default function FusingDepartment() {
     
     // Machine & Process Specs
     fusingTemp: '210°C',
-    fusingSpeed: '18 m/min',
+    fusingSpeed: '80',
     fusingMachine: DEFAULT_FUSING_MACHINES[0],
     fusingOperator: accountFullName,
     shift: getAutoShift(),
@@ -268,7 +268,7 @@ export default function FusingDepartment() {
   const [speedTempForm, setSpeedTempForm] = useState({
     fusingMachine: DEFAULT_FUSING_MACHINES[0],
     fusingTemp: '210°C',
-    fusingSpeed: '18 m/min'
+    fusingSpeed: '80'
   });
 
   const openSpeedTempModal = (card) => {
@@ -277,7 +277,7 @@ export default function FusingDepartment() {
     setSpeedTempForm({
       fusingMachine: card.fusingMachine || DEFAULT_FUSING_MACHINES[0],
       fusingTemp: card.fusingTemp || card.temperature || preset.temp,
-      fusingSpeed: card.fusingSpeed || card.speed || preset.speed
+      fusingSpeed: card.fusingSpeed || card.speed || preset.speed || '80'
     });
     setShowSpeedTempModal(true);
   };
@@ -360,7 +360,7 @@ export default function FusingDepartment() {
         printedMtr: pMtr,
         fusingMtr: defaultMtr,
         fusingTemp: card.fusingTemp || card.temperature || preset.temp,
-        fusingSpeed: card.fusingSpeed || card.speed || preset.speed,
+        fusingSpeed: card.fusingSpeed || card.speed || preset.speed || '80',
         fusingMachine: card.fusingMachine || prev.fusingMachine,
         butterPaperWeightKg: card.butterPaperWeightKg || ''
       }));
@@ -503,7 +503,7 @@ export default function FusingDepartment() {
       genuineFaultMtr: card.genuineFaultMtr !== undefined && card.genuineFaultMtr !== '' ? String(card.genuineFaultMtr) : '0',
       
       fusingTemp: card.fusingTemp || card.temperature || '210°C',
-      fusingSpeed: card.fusingSpeed || card.speed || '18 m/min',
+      fusingSpeed: card.fusingSpeed || card.speed || '80',
       fusingMachine: card.fusingMachine || DEFAULT_FUSING_MACHINES[0],
       fusingOperator: card.fusingOperator || accountFullName,
       shift: card.shift || getAutoShift(),
@@ -521,7 +521,7 @@ export default function FusingDepartment() {
       jobNo: card.jobNo || '',
       fusingMachine: card.fusingMachine || DEFAULT_FUSING_MACHINES[0],
       fusingTemp: card.fusingTemp || card.temperature || '210°C',
-      fusingSpeed: card.fusingSpeed || card.speed || '18 m/min',
+      fusingSpeed: card.fusingSpeed || card.speed || '80',
       panna: cardPanna,
       useButterPaper: cardButterUsed,
       butterPaperWeightKg: card.butterPaperWeightKg || '',
@@ -908,7 +908,7 @@ export default function FusingDepartment() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. 18 m/min"
+                  placeholder="e.g. 80"
                   value={topForm.fusingSpeed}
                   onChange={e => setTopForm(f => ({ ...f, fusingSpeed: e.target.value }))}
                   style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '2px solid #bfdbfe', fontSize: '0.92rem', fontWeight: 900, background: '#eff6ff', color: '#1e40af' }}
@@ -1315,7 +1315,7 @@ export default function FusingDepartment() {
                           </span>
                           <span style={{ fontSize: '0.72rem', background: '#eff6ff', color: '#1e40af', padding: '2px 7px', borderRadius: '4px', fontWeight: 800, border: '1px solid #bfdbfe' }}>
                             <Gauge size={10} style={{ display: 'inline', marginRight: 2 }} />
-                            {c.fusingSpeed || c.speed || '18 m/min'}
+                            {c.fusingSpeed || c.speed || '80'}
                           </span>
                         </button>
                       </td>
@@ -2162,13 +2162,13 @@ export default function FusingDepartment() {
                     required
                     value={speedTempForm.fusingSpeed}
                     onChange={e => setSpeedTempForm(f => ({ ...f, fusingSpeed: e.target.value }))}
-                    placeholder="e.g. 18 m/min"
+                    placeholder="e.g. 80"
                     style={{ flex: 1, padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1.5px solid #bfdbfe', fontSize: '0.92rem', fontWeight: 800, background: '#eff6ff', color: '#1e40af' }}
                   />
                 </div>
                 {/* Preset Chips */}
                 <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                  {['10 m/min', '12 m/min', '15 m/min', '18 m/min', '20 m/min', '22 m/min', '25 m/min'].map(spd => (
+                  {['80', '10 m/min', '12 m/min', '15 m/min', '18 m/min', '20 m/min', '22 m/min', '25 m/min'].map(spd => (
                     <button
                       key={spd}
                       type="button"
