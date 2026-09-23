@@ -899,16 +899,11 @@ body:has(.client-portal-container) {
   100% { top: 15%; opacity: 0.9; }
 }
 
-/* Html5Qrcode video canvas container responsive overrides */
+/* Html5Qrcode video container default styling */
 #reader-camera-scanner-viewport video {
   width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
+  max-width: 100% !important;
   border-radius: 8px !important;
-}
-
-#reader-camera-scanner-viewport canvas {
-  display: none !important;
 }
 
 /* Mobile Phone UI Optimizations (max-width: 768px) */
@@ -935,11 +930,6 @@ body:has(.client-portal-container) {
   /* Improve mobile table horizontal scrolling touch UX */
   .table-responsive, table {
     -webkit-overflow-scrolling: touch;
-  }
-
-  /* Barcode Scanner modal viewport on mobile phones */
-  #reader-camera-scanner-viewport {
-    min-height: 220px !important;
   }
 }
 
