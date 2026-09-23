@@ -1779,7 +1779,7 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
           {[
             { id: 'challans', label: '🚚 Challan' },
             { id: 'invoices', label: '🧾 Invoices Directory', count: stats.totalInvoices },
-            { id: 'costing', label: '📊 Costing & P&L' },
+            { id: 'costing', label: '📊 Costing' },
             { id: 'purchase', label: '🛒 Purchase Invoices' },
             ...(activeTab === 'create' ? [{ id: 'create', label: editingInvoiceId ? '✍️ Edit Invoice' : '✍️ New Invoice' }] : []),
             { id: 'expense', label: '💰 Expenses & Ledger' },

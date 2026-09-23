@@ -1576,7 +1576,7 @@ export default function App() {
                   )}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_costing') || currentUser.permissions?.includes('jobcards_billing')) && (
                     <button onClick={() => { setActiveTab('jobcards_costing'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_costing' ? styles.navItemActive : {}) }}>
-                      <TrendingUp size={18} /><span>Costing & P&L</span>
+                      <TrendingUp size={18} /><span>Costing</span>
                     </button>
                   )}
 
@@ -2002,7 +2002,7 @@ export default function App() {
                       renderNavItem('jobcards_billing', 'Finance', Receipt, null, 'Finance')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_costing') || currentUser.permissions?.includes('jobcards_billing')) &&
-                      renderNavItem('jobcards_costing', 'Costing & P&L', TrendingUp, null, 'Costing')
+                      renderNavItem('jobcards_costing', 'Costing', TrendingUp, null, 'Costing')
                     }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_crm') || currentUser.permissions?.includes('crm_department') || currentUser.permissions?.includes('crm')) &&
                       renderNavItem('jobcards_crm', 'CRM Department', Users, null, 'CRM')
