@@ -415,8 +415,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
             height: '100vh',
             maxHeight: '100vh',
             borderRadius: 0,
-            padding: '0.75rem',
-            paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+            padding: 0,
             border: 'none',
             boxShadow: 'none'
           } : {})
@@ -425,7 +424,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
       >
         
         {/* Header */}
-        <div className="bulk-inward-header" style={styles.header}>
+        <div className="bulk-inward-header" style={{ ...styles.header, padding: isMobile ? '0.75rem 1rem' : '1rem 1.25rem' }}>
           <div className="bulk-inward-title-group" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
             <div style={styles.headerBadge}>
               <Sparkles size={22} color="#059669" />
@@ -482,30 +481,38 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
           </div>
         </div>
 
-        {error && (
-          <div style={styles.errorBanner}>
-            <AlertCircle size={18} style={{ flexShrink: 0 }} />
-            <span>{error}</span>
-          </div>
-        )}
+        {/* Modal Body - Single unified smooth scroll container */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          padding: isMobile ? '0.75rem' : '1rem 1.25rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.85rem',
+          minHeight: 0
+        }}>
+          {error && (
+            <div style={styles.errorBanner}>
+              <AlertCircle size={18} style={{ flexShrink: 0 }} />
+              <span>{error}</span>
+            </div>
+          )}
 
-        {/* Embedded Mobile Camera Scanner */}
-        {showCameraScanner && (
-          <div style={{ marginBottom: isMobile ? '0.4rem' : '0.85rem' }}>
-            <CameraBarcodeScanner
-              compact={isMobile}
-              totalPieces={totalInwardUnits}
-              totalItems={activeRowsCount}
-              lastScannedItem={lastScannedItem}
-              itemsList={formRows.filter(r => r.skuCode && r.skuCode.trim())}
-              onScan={(code) => processScannedSku(code)}
-              onClose={() => setShowCameraScanner(false)}
-            />
-          </div>
-        )}
-
-        {/* MAIN FORM VIEW */}
-        <div style={styles.formContainer}>
+          {/* Embedded Mobile Camera Scanner */}
+          {showCameraScanner && (
+            <div style={{ marginBottom: isMobile ? '0.35rem' : '0.75rem' }}>
+              <CameraBarcodeScanner
+                compact={isMobile}
+                totalPieces={totalInwardUnits}
+                totalItems={activeRowsCount}
+                lastScannedItem={lastScannedItem}
+                itemsList={formRows.filter(r => r.skuCode && r.skuCode.trim())}
+                onScan={(code) => processScannedSku(code)}
+                onClose={() => setShowCameraScanner(false)}
+              />
+            </div>
+          )}
           
           {/* Quick Set Header Bar - Compact when camera is active on mobile */}
           {isMobile && showCameraScanner ? (
@@ -614,7 +621,7 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
 
           {/* Dynamic Form View: Mobile Card View vs Desktop Table */}
           {isMobile ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', overflowY: 'auto', flex: 1, minHeight: 0, padding: '2px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', padding: '2px' }}>
               {formRows.map((row, idx) => {
                 const isJustScanned = justScannedSku && (row.skuCode === justScannedSku || (row.skuCode && row.skuCode.toLowerCase() === justScannedSku.toLowerCase()));
                 return (
@@ -1001,7 +1008,11 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
         </div>
 
         {/* Footer */}
-        <div className="bulk-inward-footer" style={styles.footer}>
+        <div className="bulk-inward-footer" style={{
+          ...styles.footer,
+          padding: isMobile ? '0.75rem 1rem' : '0.85rem 1.25rem',
+          paddingBottom: isMobile ? 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' : '0.85rem',
+        }}>
           <div style={styles.statsSummary}>
             <CheckCircle size={18} color="#059669" />
             <span style={{ fontSize: '0.88rem', color: '#059669', fontWeight: 600 }}>
@@ -1009,11 +1020,11 @@ export default function BulkInwardModal({ onSubmit, onClose }) {
             </span>
           </div>
           
-          <div className="bulk-inward-btn-group" style={{ display: 'flex', gap: '0.85rem' }}>
-            <button type="button" onClick={onClose} style={styles.cancelBtn}>
+          <div className="bulk-inward-btn-group" style={{ display: 'flex', gap: '0.85rem', width: isMobile ? '100%' : 'auto' }}>
+            <button type="button" onClick={onClose} style={{ ...styles.cancelBtn, flex: isMobile ? 1 : 'none' }}>
               Cancel
             </button>
-            <button onClick={handleFinalSubmit} style={styles.submitBtn}>
+            <button onClick={handleFinalSubmit} style={{ ...styles.submitBtn, flex: isMobile ? 2 : 'none' }}>
               <Sparkles size={16} style={{ marginRight: '0.4rem' }} /> Confirm & Submit All Inwards
             </button>
           </div>
@@ -1117,7 +1128,7 @@ if (typeof document !== 'undefined') {
 
 const styles = {
   modalContent: {
-    padding: '1.5rem',
+    padding: 0,
     maxWidth: '1240px',
     width: '98vw',
     display: 'flex',
@@ -1128,14 +1139,15 @@ const styles = {
     borderRadius: '18px',
     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
     color: '#0f172a',
+    overflow: 'hidden',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '1rem',
     borderBottom: '1px solid #e2e8f0',
-    paddingBottom: '0.85rem',
+    background: '#f8fafc',
+    flexShrink: 0,
   },
   headerBadge: {
     padding: '0.65rem',

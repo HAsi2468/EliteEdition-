@@ -462,8 +462,17 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '0.75rem' : '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        {/* Modal Body - Single unified smooth scroll container */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          padding: isMobile ? '0.75rem' : '1rem 1.25rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.85rem',
+          minHeight: 0
+        }}>
           
           {/* Error Alert */}
           {error && (
@@ -678,7 +687,7 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
 
           {/* Multi-Item Outward View: Mobile Card View vs Desktop Table */}
           {isMobile ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', overflowY: 'auto', flex: 1, minHeight: 0, padding: '2px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', padding: '2px' }}>
               {formRows.map((row, idx) => {
                 const isJustScanned = justScannedSku && (row.skuCode === justScannedSku || (row.skuCode && row.skuCode.toLowerCase() === justScannedSku.toLowerCase()));
                 const isStockDeficit = row.availableStock > 0 && row.qtyOut > row.availableStock;

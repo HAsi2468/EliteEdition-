@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useId } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { Camera, CameraOff, RefreshCw, Zap, ZapOff, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Camera, CameraOff, RefreshCw, Zap, ZapOff, CheckCircle2, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 
 export default function CameraBarcodeScanner({ 
@@ -37,6 +37,7 @@ export default function CameraBarcodeScanner({
   const [torchOn, setTorchOn] = useState(false);
   const [hasTorchSupport, setHasTorchSupport] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   const html5QrcodeRef = useRef(null);
   const isStartingRef = useRef(false);
@@ -294,6 +295,20 @@ export default function CameraBarcodeScanner({
             <RefreshCw size={14} />
           </button>
 
+          {/* Minimize / Expand Toggle */}
+          <button
+            type="button"
+            onClick={() => setIsMinimized(prev => !prev)}
+            style={{
+              ...styles.iconBtn,
+              background: isMinimized ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255,255,255,0.08)',
+              color: isMinimized ? '#34d399' : '#cbd5e1'
+            }}
+            title={isMinimized ? "Expand Camera View" : "Minimize Camera (Keep Scanning)"}
+          >
+            {isMinimized ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          </button>
+
           {/* Close Scanner */}
           {onClose && (
             <button type="button" onClick={onClose} style={styles.closeBtn} title="Close Camera Scanner">
@@ -303,10 +318,35 @@ export default function CameraBarcodeScanner({
         </div>
       </div>
 
+      {/* When Minimized Notice Bar */}
+      {isMinimized && (
+        <div 
+          onClick={() => setIsMinimized(false)}
+          style={{
+            padding: '0.35rem 0.75rem',
+            background: 'rgba(16, 185, 129, 0.15)',
+            borderBottom: '1px solid rgba(16, 185, 129, 0.25)',
+            color: '#34d399',
+            fontSize: '0.72rem',
+            fontWeight: 800,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer'
+          }}
+        >
+          <span>📷 Camera active in background (scan barcodes freely)</span>
+          <span style={{ textDecoration: 'underline', color: '#6ee7b7' }}>Show Camera ⌄</span>
+        </div>
+      )}
+
       {/* Camera Viewport & Laser Scan Effect */}
       <div style={{
         ...styles.cameraViewportContainer,
-        minHeight: isCompact ? '180px' : '220px',
+        display: isMinimized ? 'none' : 'flex',
+        minHeight: isCompact ? '135px' : '190px',
+        maxHeight: isCompact ? '170px' : '240px',
+        touchAction: 'pan-y',
       }}>
         {errorMsg ? (
           <div style={styles.errorBox}>
@@ -460,6 +500,7 @@ const styles = {
     overflow: 'hidden',
     marginBottom: '0.5rem',
     boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.4), 0 0 15px rgba(16, 185, 129, 0.15)',
+    touchAction: 'pan-y',
   },
   topHeader: {
     display: 'flex',
