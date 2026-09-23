@@ -565,13 +565,12 @@ export default function FusingDepartment() {
     return (fab + fus + prt + gen).toFixed(2);
   }, [form.fabricFaultMtr, form.fusingFaultMtr, form.printFaultMtr, form.genuineFaultMtr]);
 
-  // Compute fresh meters dynamically in Edit Modal (Printed Mtr - Wastage Mtr)
-  const computedModalFreshMtr = useMemo(() => {
-    const printed = getCardPrintedMeters(selectedCard);
-    const base = parseFloat(printed || form.freshMtr || selectedCard?.totalMtr) || 0;
+  // ── Compute Total Fabric Used Dynamically (Fresh MTR + Total Wastage) ──
+  const calculatedTotalFabricUsedMtr = useMemo(() => {
+    const fresh = parseFloat(form.freshMtr) || 0;
     const waste = parseFloat(calculatedWastageMtr) || 0;
-    return Math.max(0, base - waste).toFixed(2);
-  }, [selectedCard, form.freshMtr, calculatedWastageMtr]);
+    return (fresh + waste).toFixed(2);
+  }, [form.freshMtr, calculatedWastageMtr]);
 
   // Open Edit Modal for a card
   const openFusingModal = (card) => {
@@ -635,10 +634,9 @@ export default function FusingDepartment() {
       return;
     }
 
-    const printed = getCardPrintedMeters(selectedCard);
-    const baseMtr = parseFloat(printed || form.freshMtr || selectedCard?.totalMtr) || 0;
+    const freshMtrVal = parseFloat(form.freshMtr) || 0;
     const wasteMtr = parseFloat(calculatedWastageMtr) || 0;
-    const computedFreshMtr = Math.max(0, baseMtr - wasteMtr).toFixed(2);
+    const totalFabricUsed = (freshMtrVal + wasteMtr).toFixed(2);
     const finalButterKg = form.useButterPaper === 'No' ? '0' : String(form.butterPaperWeightKg || 0);
 
     setSubmitting(true);
@@ -650,29 +648,28 @@ export default function FusingDepartment() {
         panna: form.panna,
         useButterPaper: form.useButterPaper,
         butterPaperWeightKg: finalButterKg,
-        freshMtr: String(computedFreshMtr),
+        freshMtr: String(freshMtrVal),
+        totalWastageMtr: String(wasteMtr),
+        totalFabricUsedMtr: String(totalFabricUsed),
         fabricFaultMtr: String(form.fabricFaultMtr || 0),
         fusingFaultMtr: String(form.fusingFaultMtr || 0),
         printFaultMtr: String(form.printFaultMtr || 0),
         genuineFaultMtr: String(form.genuineFaultMtr || 0),
-        totalWastageMtr: String(calculatedWastageMtr),
-        fusingMtr: String(computedFreshMtr),
+        fusingMtr: String(freshMtrVal),
         fusingTemp: form.fusingTemp,
-        temperature: form.fusingTemp,
-        fusingSpeed: form.fusingSpeed,
-        speed: form.fusingSpeed,
+        fusingSpeed: String(form.fusingSpeed),
         fusingMachine: form.fusingMachine,
         fusingOperator: form.fusingOperator,
-        emergencyNotes: form.notes
+        emergencyNotes: form.notes,
+        notes: form.notes
       };
 
       await api.updateJobCard(form.jobCardId, payload);
-      triggerPushNotification('🔥 Fusing Record Updated', `Job #${form.jobNo}: ${computedFreshMtr}m Fresh | ${calculatedWastageMtr}m Wastage updated.`, 'success');
-      triggerGlobalDataRefresh('fusing');
+      triggerPushNotification('🔥 Fusing Record Updated', `Job #${form.jobNo}: ${freshMtrVal}m Fresh | ${wasteMtr}m Wastage updated.`, 'success');
       setShowFormModal(false);
       fetchData();
     } catch (err) {
-      triggerEliteAlert('Save Error', err.message || 'Failed to save fusing record.', 'error');
+      triggerEliteAlert('Update Failed', err.message || 'Failed to update fusing record.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -1727,12 +1724,14 @@ export default function FusingDepartment() {
             {/* Modal Header */}
             <div style={{ padding: '1rem 1.25rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <Flame size={20} color="#2563eb" />
+                <Flame size={22} color="#2563eb" />
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
-                    Edit Fusing Production Entry — Job #{form.jobNo}
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                    Edit Fusing Production Entry — {formatJobCardNo(form.jobNo)}
                   </h3>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Enter Butter Paper weight &amp; 4 Wastage fault breakdown</span>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    Verify Fresh Output, 4-Fault Wastage breakdown &amp; calculate Total Fabric Used
+                  </span>
                 </div>
               </div>
               <button type="button" onClick={() => setShowFormModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
@@ -1740,27 +1739,102 @@ export default function FusingDepartment() {
               </button>
             </div>
 
-            {/* Modal Body */}
-            <form onSubmit={handleFormSubmit} style={{ padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Modal Body Form */}
+            <form onSubmit={handleFormSubmit} style={{ padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
               
-              {/* Fresh Mtr & Butter Paper Used / Weight */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem' }}>
+              {/* Fresh Output MTR & Total Fabric Used formula box */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                
+                {/* 1. Fresh Output (Net Usable MTR) */}
                 <div>
                   <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#059669', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                    Fresh Output (Net Usable MTR)
+                    Fresh Output (Net Usable MTR) *
                   </label>
-                  <div style={{
-                    width: '100%', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #a7f3d0',
-                    fontWeight: 900, fontSize: '0.95rem', background: '#ecfdf5', color: '#047857',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-                  }}>
-                    <span>{computedModalFreshMtr} Mtr</span>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#059669', opacity: 0.85 }}>Auto-calculated</span>
-                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    value={form.freshMtr}
+                    onChange={e => setForm(f => ({ ...f, freshMtr: e.target.value }))}
+                    placeholder="e.g. 138.00"
+                    style={{
+                      width: '100%', padding: '0.55rem', borderRadius: '8px',
+                      border: '2px solid #10b981', fontWeight: 900, fontSize: '0.95rem',
+                      background: '#ecfdf5', color: '#047857'
+                    }}
+                  />
                 </div>
 
+                {/* 2. Total Fabric Used (Fresh MTR + Total Wastage) */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#6d28d9', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 900, color: '#0284c7', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                    Total Fabric Used (MTR)
+                  </label>
+                  <div style={{
+                    width: '100%', padding: '0.55rem 0.75rem', borderRadius: '8px', border: '2px solid #0284c7',
+                    fontWeight: 900, fontSize: '1rem', background: '#f0f9ff', color: '#0369a1',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                  }}>
+                    <span>{calculatedTotalFabricUsedMtr} Mtr</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0284c7', background: '#e0f2fe', padding: '2px 6px', borderRadius: '4px' }}>
+                      Total = Fresh MTR + Total Wastage
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4 Wastage Fault Breakdown */}
+              <div style={{ background: '#fff1f2', padding: '0.9rem 1rem', borderRadius: '10px', border: '1px solid #fecdd3' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#be123c', textTransform: 'uppercase', marginBottom: '0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Wastage Breakdown (4 Fault Types)</span>
+                  <span style={{ background: '#ffe4e6', padding: '2px 8px', borderRadius: '6px' }}>Total Wastage: <b>{calculatedWastageMtr} Mtr</b></span>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.85rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9f1239', marginBottom: '0.2rem', display: 'block' }}>1. Fabric Fault (Mtr)</label>
+                    <input
+                      type="number" step="0.01" min="0"
+                      value={form.fabricFaultMtr}
+                      onChange={e => setForm(f => ({ ...f, fabricFaultMtr: e.target.value }))}
+                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.9rem', fontWeight: 800, background: '#ffffff', color: '#0f172a' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9f1239', marginBottom: '0.2rem', display: 'block' }}>2. Fusing Fault (Mtr)</label>
+                    <input
+                      type="number" step="0.01" min="0"
+                      value={form.fusingFaultMtr}
+                      onChange={e => setForm(f => ({ ...f, fusingFaultMtr: e.target.value }))}
+                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.9rem', fontWeight: 800, background: '#ffffff', color: '#0f172a' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9f1239', marginBottom: '0.2rem', display: 'block' }}>3. Print Fault (Mtr)</label>
+                    <input
+                      type="number" step="0.01" min="0"
+                      value={form.printFaultMtr}
+                      onChange={e => setForm(f => ({ ...f, printFaultMtr: e.target.value }))}
+                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.9rem', fontWeight: 800, background: '#ffffff', color: '#0f172a' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9f1239', marginBottom: '0.2rem', display: 'block' }}>4. Genuine Fault (Mtr)</label>
+                    <input
+                      type="number" step="0.01" min="0"
+                      value={form.genuineFaultMtr}
+                      onChange={e => setForm(f => ({ ...f, genuineFaultMtr: e.target.value }))}
+                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.9rem', fontWeight: 800, background: '#ffffff', color: '#0f172a' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Butter Paper Specs */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#6d28d9', marginBottom: '0.25rem', textTransform: 'uppercase' }}>
                     Butter Paper Used?
                   </label>
                   <select
@@ -1769,7 +1843,7 @@ export default function FusingDepartment() {
                       const val = e.target.value;
                       setForm(f => ({ ...f, useButterPaper: val, butterPaperWeightKg: val === 'No' ? '0' : f.butterPaperWeightKg }));
                     }}
-                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #d8b4fe', fontWeight: 800, fontSize: '0.88rem', background: '#f5f3ff', color: '#6d28d9' }}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #d8b4fe', fontWeight: 800, fontSize: '0.88rem', background: '#f5f3ff', color: '#6d28d9' }}
                   >
                     <option value="Yes">✓ YES (Used Butter Paper)</option>
                     <option value="No">✕ NO (No Butter Paper)</option>
@@ -1777,7 +1851,7 @@ export default function FusingDepartment() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#6d28d9', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#6d28d9', marginBottom: '0.25rem', textTransform: 'uppercase' }}>
                     Butter Paper Weight (KG)
                   </label>
                   <input
@@ -1787,118 +1861,104 @@ export default function FusingDepartment() {
                     value={form.butterPaperWeightKg}
                     onChange={e => setForm(f => ({ ...f, butterPaperWeightKg: e.target.value }))}
                     placeholder="e.g. 12.50 kg"
-                    style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '0.9rem', background: form.useButterPaper === 'No' ? '#f1f5f9' : '#ffffff', color: '#0f172a' }}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: 700, fontSize: '0.88rem', background: form.useButterPaper === 'No' ? '#f1f5f9' : '#ffffff', color: '#0f172a' }}
                   />
                 </div>
               </div>
 
-              {/* 4 Wastage Fault Breakdown */}
-              <div style={{ background: '#fff1f2', padding: '0.85rem', borderRadius: '8px', border: '1px solid #fecdd3' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#be123c', textTransform: 'uppercase', marginBottom: '0.6rem', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Wastage Breakdown (4 Fault Types)</span>
-                  <span>Total Wastage: <b>{calculatedWastageMtr} Mtr</b></span>
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
-                  <div>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#9f1239' }}>1. Fabric Fault (Mtr)</label>
-                    <input
-                      type="number" step="0.01"
-                      value={form.fabricFaultMtr}
-                      onChange={e => setForm(f => ({ ...f, fabricFaultMtr: e.target.value }))}
-                      style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.85rem', fontWeight: 700 }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#9f1239' }}>2. Fusing Fault (Mtr)</label>
-                    <input
-                      type="number" step="0.01"
-                      value={form.fusingFaultMtr}
-                      onChange={e => setForm(f => ({ ...f, fusingFaultMtr: e.target.value }))}
-                      style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.85rem', fontWeight: 700 }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#9f1239' }}>3. Print Fault (Mtr)</label>
-                    <input
-                      type="number" step="0.01"
-                      value={form.printFaultMtr}
-                      onChange={e => setForm(f => ({ ...f, printFaultMtr: e.target.value }))}
-                      style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.85rem', fontWeight: 700 }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#9f1239' }}>4. Genuine Fault (Mtr)</label>
-                    <input
-                      type="number" step="0.01"
-                      value={form.genuineFaultMtr}
-                      onChange={e => setForm(f => ({ ...f, genuineFaultMtr: e.target.value }))}
-                      style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #fda4af', fontSize: '0.85rem', fontWeight: 700 }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Machine, Temperature, Speed & Specs */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+              {/* Machine Specs: Panna, Temp, Speed, Status */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.2rem' }}>Panna</label>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Panna</label>
                   <select
                     value={form.panna}
                     onChange={e => setForm(f => ({ ...f, panna: e.target.value }))}
-                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 700 }}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700 }}
                   >
                     {pannaOptions.map(p => <option key={p} value={p}>{p} Panna</option>)}
                   </select>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#d97706', marginBottom: '0.2rem' }}>Fusing Temp (°C)</label>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#d97706', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Fusing Temp (°C)</label>
                   <input
                     type="text"
                     value={form.fusingTemp}
                     onChange={e => setForm(f => ({ ...f, fusingTemp: e.target.value }))}
-                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #fde68a', fontSize: '0.82rem', fontWeight: 800, background: '#fffbe6', color: '#92400e' }}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #fde68a', fontSize: '0.85rem', fontWeight: 800, background: '#fffbe6', color: '#92400e' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.2rem' }}>Fusing Speed (m/min)</label>
-                  <input
-                    type="text"
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Fusing Speed</label>
+                  <select
                     value={form.fusingSpeed}
                     onChange={e => setForm(f => ({ ...f, fusingSpeed: e.target.value }))}
-                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #bfdbfe', fontSize: '0.82rem', fontWeight: 800, background: '#eff6ff', color: '#1e40af' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.2rem' }}>Fusing Status</label>
-                  <select
-                    value={form.fusingStatus}
-                    onChange={e => setForm(f => ({ ...f, fusingStatus: e.target.value }))}
-                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 700 }}
+                    style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #bfdbfe', fontSize: '0.85rem', fontWeight: 800, background: '#eff6ff', color: '#1e40af', cursor: 'pointer' }}
                   >
-                    <option value="Fusing Pending">Fusing Pending</option>
-                    <option value="Fusing Done">Fusing Done</option>
+                    {FUSING_SPEED_OPTIONS.map(spd => (
+                      <option key={spd} value={spd}>{spd} m/min</option>
+                    ))}
                   </select>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.2rem' }}>Operator Name</label>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 800, color: '#64748b', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Fusing Status</label>
+                  <select
+                    value={form.fusingStatus}
+                    onChange={e => setForm(f => ({ ...f, fusingStatus: e.target.value }))}
+                    style={{
+                      width: '100%', padding: '0.5rem', borderRadius: '8px',
+                      border: form.fusingStatus === 'Fusing Done' ? '2px solid #10b981' : '2px solid #f59e0b',
+                      fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer',
+                      background: form.fusingStatus === 'Fusing Done' ? '#f0fdf4' : '#fffbe5',
+                      color: form.fusingStatus === 'Fusing Done' ? '#15803d' : '#b45309'
+                    }}
+                  >
+                    <option value="Fusing Done">✓ Fusing Done</option>
+                    <option value="Fusing Pending">⏳ Fusing Pending</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Operator Name & Remarks */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Operator Name</label>
                   <input
                     type="text"
                     value={form.fusingOperator}
                     onChange={e => setForm(f => ({ ...f, fusingOperator: e.target.value }))}
-                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontWeight: 700 }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#64748b', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Fusing Remarks / Notes</label>
+                  <input
+                    type="text"
+                    value={form.notes}
+                    onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                    placeholder="Optional notes e.g. Butter Paper Roll #2..."
+                    style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
                   />
                 </div>
               </div>
 
               {/* Modal Actions */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.5rem' }}>
-                <button type="button" onClick={() => setShowFormModal(false)} className="btn-secondary">Cancel</button>
-                <button type="submit" disabled={submitting} className="btn-primary" style={{ background: '#2563eb' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowFormModal(false)}
+                  style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  style={{ padding: '0.6rem 1.35rem', borderRadius: '8px', background: '#2563eb', color: '#ffffff', fontWeight: 800, fontSize: '0.9rem', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)' }}
+                >
                   {submitting ? 'Saving...' : 'Update Fusing Record'}
                 </button>
               </div>
