@@ -45,7 +45,8 @@ import {
   TrendingUp,
   Star,
   Download,
-  ChevronLeft
+  ChevronLeft,
+  ChevronDown
 } from 'lucide-react';
 
 const TASK_TEMPLATES = [
@@ -151,6 +152,11 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const [assigneeFilter, setAssigneeFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // Mobile Dropdowns & Control State
+  const [showMobileViewMenu, setShowMobileViewMenu] = useState(false);
+  const [showMobileScopeMenu, setShowMobileScopeMenu] = useState(false);
+  const [showMobileFilterMenu, setShowMobileFilterMenu] = useState(false);
 
   // Task Creation Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -282,6 +288,31 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   const myId = String(currentUser?._id || currentUser?.id || '');
   const myName = currentUser?.name || currentUser?.username || 'Staff';
 
+  const isMasterAdmin = Boolean(
+    (currentUser?.role || '').toLowerCase() === 'admin' ||
+    currentUser?.isMainAdmin ||
+    (currentUser?.username || '').toLowerCase() === 'admin' ||
+    (currentUser?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com'
+  );
+  const isAdmin = isMasterAdmin;
+
+  const isTaskAssignedToMe = (t) => {
+    return (t?.assignees || []).some((a) => {
+      const aId = String(typeof a === 'object' ? (a?._id || a?.id) : a);
+      return aId === String(myId);
+    });
+  };
+
+  const isTaskCreatedByMe = (t) => {
+    const cId = String(typeof t?.createdBy === 'object' ? (t?.createdBy?._id || t?.createdBy?.id) : (t?.createdBy || ''));
+    return cId === String(myId);
+  };
+
+  const isTaskVisible = (t) => {
+    if (isMasterAdmin) return true;
+    return isTaskAssignedToMe(t) || isTaskCreatedByMe(t);
+  };
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -291,6 +322,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     if (!socket) return;
 
     const handleTaskCreated = (newTask) => {
+      if (!isTaskVisible(newTask)) return;
       setTasks((prev) => {
         if (prev.some((t) => String(t._id) === String(newTask._id))) return prev;
         return [newTask, ...prev];
@@ -298,8 +330,22 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     };
 
     const handleTaskUpdated = (updatedTask) => {
-      setTasks((prev) => prev.map((t) => (String(t._id) === String(updatedTask._id) ? updatedTask : t)));
-      setSelectedTask((prev) => (prev && String(prev._id) === String(updatedTask._id) ? updatedTask : prev));
+      setTasks((prev) => {
+        if (!isTaskVisible(updatedTask)) {
+          return prev.filter((t) => String(t._id) !== String(updatedTask._id));
+        }
+        const exists = prev.some((t) => String(t._id) === String(updatedTask._id));
+        if (exists) {
+          return prev.map((t) => (String(t._id) === String(updatedTask._id) ? updatedTask : t));
+        }
+        return [updatedTask, ...prev];
+      });
+      setSelectedTask((prev) => {
+        if (prev && String(prev._id) === String(updatedTask._id)) {
+          return isTaskVisible(updatedTask) ? updatedTask : null;
+        }
+        return prev;
+      });
     };
 
     const handleTaskDeleted = (deletedData) => {
@@ -317,7 +363,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       socket.off('task-updated', handleTaskUpdated);
       socket.off('task-deleted', handleTaskDeleted);
     };
-  }, [socket]);
+  }, [socket, isMasterAdmin, myId]);
 
   // Timer ticker interval
   useEffect(() => {
@@ -336,7 +382,8 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
       ]);
 
       if (tasksRes.success && tasksRes.data) {
-        setTasks(tasksRes.data);
+        const rawTasks = tasksRes.data;
+        setTasks(isMasterAdmin ? rawTasks : rawTasks.filter(isTaskVisible));
       }
       if (usersRes.success && usersRes.data) {
         setAllUsers(usersRes.data);
@@ -671,29 +718,32 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     }
   };
 
+  // Tasks filtered by role visibility (defense in depth)
+  const visibleTasks = React.useMemo(() => {
+    return isMasterAdmin ? tasks : tasks.filter(isTaskVisible);
+  }, [tasks, isMasterAdmin, myId]);
+
   // TaskOPad Scope Badge Counters
-  const allCount = tasks.length;
-  const myTasksCount = tasks.filter((t) =>
-    (t.assignees || []).some((a) => String(typeof a === 'object' ? (a._id || a.id) : a) === String(myId))
-  ).length;
-  const delegatedCount = tasks.filter((t) => {
-    const cId = String(t.createdBy?._id || t.createdBy || '');
+  const allCount = visibleTasks.length;
+  const myTasksCount = visibleTasks.filter((t) => isTaskAssignedToMe(t)).length;
+  const delegatedCount = visibleTasks.filter((t) => {
+    const cId = String(typeof t.createdBy === 'object' ? (t.createdBy?._id || t.createdBy?.id) : (t.createdBy || ''));
     if (cId !== String(myId)) return false;
     return (t.assignees || []).some(
       (a) => String(typeof a === 'object' ? (a._id || a.id) : a) !== String(myId)
     );
   }).length;
-  const todayCount = tasks.filter((t) => {
+  const todayCount = visibleTasks.filter((t) => {
     if (!t.dueDate || t.status === 'Done') return false;
     return new Date(t.dueDate).toDateString() === new Date().toDateString();
   }).length;
-  const overdueCount = tasks.filter((t) => {
+  const overdueCount = visibleTasks.filter((t) => {
     return t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Done';
   }).length;
-  const completedCount = tasks.filter((t) => t.status === 'Done').length;
+  const completedCount = visibleTasks.filter((t) => t.status === 'Done').length;
 
   // Filter tasks logic based on TaskOPad Scope, Priority, Status, Assignee, Search
-  const filteredTasks = tasks.filter((t) => {
+  const filteredTasks = visibleTasks.filter((t) => {
     if (priorityFilter !== 'all' && t.priority !== priorityFilter) return false;
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
     if (assigneeFilter !== 'all') {
@@ -705,13 +755,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     }
 
     if (taskScope === 'my_tasks') {
-      const isMine = (t.assignees || []).some((a) => {
-        const aId = String(typeof a === 'object' ? (a._id || a.id) : a);
-        return aId === String(myId);
-      });
-      if (!isMine) return false;
+      if (!isTaskAssignedToMe(t)) return false;
     } else if (taskScope === 'delegated') {
-      const cId = String(t.createdBy?._id || t.createdBy || '');
+      const cId = String(typeof t.createdBy === 'object' ? (t.createdBy?._id || t.createdBy?.id) : (t.createdBy || ''));
       if (cId !== String(myId)) return false;
       const isDelegated = (t.assignees || []).some(
         (a) => String(typeof a === 'object' ? (a._id || a.id) : a) !== String(myId)
@@ -897,7 +943,29 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
     return 'Admin';
   };
 
-  const isAdmin = (currentUser?.role || '').toLowerCase() === 'admin' || currentUser?.username === 'admin';
+  const viewsList = [
+    { id: 'kanban', label: 'Kanban Board', shortLabel: 'Kanban', icon: LayoutGrid },
+    { id: 'list', label: 'List View', shortLabel: 'List', icon: List },
+    { id: 'calendar', label: 'Calendar View', shortLabel: 'Calendar', icon: Calendar },
+    ...(isAdmin ? [
+      { id: 'timeline', label: 'Timeline / Gantt', shortLabel: 'Timeline', icon: CalendarRange },
+      { id: 'leaderboard', label: 'Leaderboard', shortLabel: 'Leaderboard', icon: Trophy },
+      { id: 'timesheets', label: 'Timesheets', shortLabel: 'Timesheets', icon: Clock },
+    ] : [])
+  ];
+
+  const scopeTabs = [
+    { id: 'all', label: 'All Tasks', shortLabel: 'All Tasks', icon: '🎯', count: allCount, color: '#2563eb' },
+    { id: 'my_tasks', label: 'My Tasks', shortLabel: 'My Tasks', icon: '👤', count: myTasksCount, color: '#0284c7' },
+    { id: 'delegated', label: 'Assigned by Me (Delegated)', shortLabel: 'Delegated', icon: '🤝', count: delegatedCount, color: '#7c3aed' },
+    { id: 'today', label: 'Due Today', shortLabel: 'Due Today', icon: '⏰', count: todayCount, color: '#d97706' },
+    { id: 'overdue', label: 'Overdue', shortLabel: 'Overdue', icon: '🚨', count: overdueCount, color: '#dc2626', isAlert: overdueCount > 0 },
+    { id: 'completed', label: 'Completed', shortLabel: 'Completed', icon: '✅', count: completedCount, color: '#16a34a' }
+  ];
+
+  const currentViewObj = viewsList.find(v => v.id === activeView) || viewsList[0];
+  const currentScopeObj = scopeTabs.find(s => s.id === taskScope) || scopeTabs[0];
+  const CurrentViewIcon = currentViewObj.icon;
 
   useEffect(() => {
     if (!isAdmin && ['timeline', 'leaderboard', 'timesheets'].includes(activeView)) {
@@ -908,8 +976,35 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '0.75rem', background: 'var(--bg-main)', boxSizing: 'border-box' }}>
       
-      {/* ── TOP HEADER CONTROL BAR ── */}
-      <div className="glass-panel" style={{ padding: '0.75rem 1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '12px', background: '#ffffff', border: '1px solid var(--border-light)', boxShadow: '0 2px 10px rgba(37,99,235,0.05)', flexWrap: 'wrap', gap: '0.6rem' }}>
+      {/* ── RESPONSIVE EMBEDDED CSS ── */}
+      <style>{`
+        @media (max-width: 768px) {
+          .task-desktop-header { display: none !important; }
+          .task-desktop-scopes { display: none !important; }
+          .task-desktop-filters { display: none !important; }
+          .task-mobile-control-card { display: flex !important; flex-direction: column !important; }
+          .kanban-grid-responsive {
+            grid-template-columns: repeat(5, minmax(84vw, 1fr)) !important;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+          }
+          .kanban-col-snap {
+            scroll-snap-align: start;
+          }
+        }
+        @media (min-width: 769px) {
+          .task-desktop-header { display: flex !important; }
+          .task-desktop-scopes { display: flex !important; }
+          .task-desktop-filters { display: flex !important; }
+          .task-mobile-control-card { display: none !important; }
+          .kanban-grid-responsive {
+            grid-template-columns: repeat(5, minmax(260px, 1fr)) !important;
+          }
+        }
+      `}</style>
+
+      {/* ── DESKTOP: TOP HEADER CONTROL BAR ── */}
+      <div className="glass-panel task-desktop-header" style={{ padding: '0.75rem 1.1rem', alignItems: 'center', justifyContent: 'space-between', borderRadius: '12px', background: '#ffffff', border: '1px solid var(--border-light)', boxShadow: '0 2px 10px rgba(37,99,235,0.05)', flexWrap: 'wrap', gap: '0.6rem' }}>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
           <div style={{ width: 38, height: 38, borderRadius: '10px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}>
@@ -934,16 +1029,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
           
           {/* View Switcher Pills */}
           <div style={{ display: 'flex', background: '#f8fafc', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-light)', flexWrap: 'wrap', gap: '2px' }}>
-            {[
-              { id: 'kanban', label: 'Kanban Board', icon: LayoutGrid },
-              { id: 'list', label: 'List View', icon: List },
-              { id: 'calendar', label: '📅 Calendar View', icon: Calendar },
-              ...(isAdmin ? [
-                { id: 'timeline', label: '📊 Timeline / Gantt', icon: CalendarRange },
-                { id: 'leaderboard', label: '🏆 Leaderboard', icon: Trophy },
-                { id: 'timesheets', label: 'Timesheets', icon: Clock },
-              ] : [])
-            ].map((v) => {
+            {viewsList.map((v) => {
               const IconComp = v.icon;
               return (
                 <button
@@ -1006,16 +1092,9 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         </div>
       </div>
 
-      {/* ── TASKOPAD SCOPE NAVIGATION BAR ── */}
-      <div className="glass-panel" style={{ padding: '0.6rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', borderRadius: '10px', background: '#ffffff', border: '1px solid var(--border-light)' }}>
-        {[
-          { id: 'all', label: 'All Tasks', count: allCount, color: '#2563eb' },
-          { id: 'my_tasks', label: '👤 My Tasks', count: myTasksCount, color: '#0284c7' },
-          { id: 'delegated', label: '🤝 Assigned by Me (Delegated)', count: delegatedCount, color: '#7c3aed' },
-          { id: 'today', label: '⏰ Due Today', count: todayCount, color: '#d97706' },
-          { id: 'overdue', label: '🚨 Overdue', count: overdueCount, color: '#dc2626', isAlert: overdueCount > 0 },
-          { id: 'completed', label: '✅ Completed', count: completedCount, color: '#16a34a' }
-        ].map((tab) => {
+      {/* ── DESKTOP: TASKOPAD SCOPE NAVIGATION BAR ── */}
+      <div className="glass-panel task-desktop-scopes" style={{ padding: '0.6rem 0.9rem', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', borderRadius: '10px', background: '#ffffff', border: '1px solid var(--border-light)' }}>
+        {scopeTabs.map((tab) => {
           const isActive = taskScope === tab.id;
           return (
             <button
@@ -1037,7 +1116,7 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
                 transition: 'all 0.15s ease'
               }}
             >
-              <span>{tab.label}</span>
+              <span>{tab.icon} {tab.shortLabel}</span>
               <span
                 style={{
                   background: isActive ? 'rgba(255,255,255,0.25)' : tab.isAlert ? '#fee2e2' : '#e2e8f0',
@@ -1055,8 +1134,8 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         })}
       </div>
 
-      {/* ── FILTERING & SEARCH BAR ── */}
-      <div className="glass-panel" style={{ padding: '0.6rem 0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderRadius: '10px', background: '#ffffff', border: '1px solid var(--border-light)', gap: '0.6rem', flexWrap: 'wrap' }}>
+      {/* ── DESKTOP: FILTERING & SEARCH BAR ── */}
+      <div className="glass-panel task-desktop-filters" style={{ padding: '0.6rem 0.9rem', alignItems: 'center', justifyContent: 'space-between', borderRadius: '10px', background: '#ffffff', border: '1px solid var(--border-light)', gap: '0.6rem', flexWrap: 'wrap' }}>
         
         <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
           <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -1098,6 +1177,379 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         </div>
       </div>
 
+      {/* ── MOBILE: COMPACT ACTION & DROPDOWN BAR ── */}
+      <div className="glass-panel task-mobile-control-card" style={{ padding: '0.6rem 0.75rem', borderRadius: '12px', background: '#ffffff', border: '1px solid var(--border-light)', boxShadow: '0 2px 8px rgba(37,99,235,0.06)', gap: '0.5rem', position: 'relative' }}>
+        
+        {/* Mobile Row 1: Header + Create Task */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ width: 32, height: 32, borderRadius: '8px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 2px 8px rgba(37,99,235,0.25)', flexShrink: 0 }}>
+              <CheckSquare size={17} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+                Workforce Tasks
+              </div>
+              <div style={{ fontSize: '0.64rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span>{filteredTasks.length} tasks</span>
+                {tasks.filter(t => t.activeTimer && t.activeTimer.startTime).length > 0 && (
+                  <span style={{ color: '#16a34a', background: '#dcfce7', padding: '1px 5px', borderRadius: '3px', fontWeight: 800 }}>
+                    ⏱️ {tasks.filter(t => t.activeTimer && t.activeTimer.startTime).length}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={handleOpenCreateModal}
+            className="btn-primary"
+            style={{ fontSize: '0.74rem', padding: '0.4rem 0.75rem', gap: '0.3rem', borderRadius: '8px', background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)', boxShadow: '0 3px 10px rgba(37,99,235,0.25)', whiteSpace: 'nowrap' }}
+          >
+            <Plus size={14} />
+            <span>Create</span>
+          </button>
+        </div>
+
+        {/* Mobile Row 2: View Switcher Button + Scope Selector Button + Filter Toggle + Export */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          
+          {/* 1. View Selector Dropdown Button */}
+          <button
+            onClick={() => {
+              setShowMobileViewMenu(prev => !prev);
+              setShowMobileScopeMenu(false);
+            }}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '4px',
+              padding: '0.42rem 0.6rem',
+              borderRadius: '8px',
+              background: showMobileViewMenu ? '#eff6ff' : '#f8fafc',
+              border: showMobileViewMenu ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
+              cursor: 'pointer',
+              color: showMobileViewMenu ? '#2563eb' : 'var(--text-primary)',
+              fontSize: '0.74rem',
+              fontWeight: 700
+            }}
+            title="Switch View"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              <CurrentViewIcon size={13} color={showMobileViewMenu ? '#2563eb' : '#64748b'} style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentViewObj.shortLabel}</span>
+            </div>
+            <ChevronDown size={13} color="#64748b" style={{ transform: showMobileViewMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
+          </button>
+
+          {/* 2. Scope Selector Dropdown Button */}
+          <button
+            onClick={() => {
+              setShowMobileScopeMenu(prev => !prev);
+              setShowMobileViewMenu(false);
+            }}
+            style={{
+              flex: 1.2,
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '4px',
+              padding: '0.42rem 0.6rem',
+              borderRadius: '8px',
+              background: showMobileScopeMenu ? '#eff6ff' : (currentScopeObj.isAlert ? '#fef2f2' : '#f8fafc'),
+              border: showMobileScopeMenu ? '1.5px solid #2563eb' : (currentScopeObj.isAlert ? '1px solid #fecaca' : '1px solid var(--border-light)'),
+              cursor: 'pointer',
+              color: currentScopeObj.isAlert ? '#dc2626' : (showMobileScopeMenu ? '#2563eb' : 'var(--text-primary)'),
+              fontSize: '0.74rem',
+              fontWeight: 700
+            }}
+            title="Filter by Scope"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '0.78rem', flexShrink: 0 }}>{currentScopeObj.icon}</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentScopeObj.shortLabel}</span>
+              <span style={{
+                background: currentScopeObj.isAlert ? '#dc2626' : '#2563eb',
+                color: '#ffffff',
+                padding: '1px 5px',
+                borderRadius: '8px',
+                fontSize: '0.62rem',
+                fontWeight: 800,
+                flexShrink: 0
+              }}>
+                {currentScopeObj.count}
+              </span>
+            </div>
+            <ChevronDown size={13} color="#64748b" style={{ transform: showMobileScopeMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
+          </button>
+
+          {/* 3. Filter Toggle Button */}
+          <button
+            onClick={() => setShowMobileFilterMenu(prev => !prev)}
+            style={{
+              padding: '0.42rem 0.55rem',
+              borderRadius: '8px',
+              background: (showMobileFilterMenu || searchQuery || assigneeFilter !== 'all' || priorityFilter !== 'all') ? '#eff6ff' : '#f8fafc',
+              border: (showMobileFilterMenu || searchQuery || assigneeFilter !== 'all' || priorityFilter !== 'all') ? '1.5px solid #2563eb' : '1px solid var(--border-light)',
+              cursor: 'pointer',
+              color: (showMobileFilterMenu || searchQuery || assigneeFilter !== 'all' || priorityFilter !== 'all') ? '#2563eb' : '#64748b',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '3px',
+              position: 'relative'
+            }}
+            title="Search & Filters"
+          >
+            <Filter size={13} />
+            {(searchQuery || assigneeFilter !== 'all' || priorityFilter !== 'all') && (
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2563eb' }} />
+            )}
+          </button>
+
+          {/* 4. Export CSV Button */}
+          <button
+            onClick={handleExportCSV}
+            style={{
+              padding: '0.42rem 0.55rem',
+              borderRadius: '8px',
+              background: '#f8fafc',
+              border: '1px solid var(--border-light)',
+              cursor: 'pointer',
+              color: '#2563eb',
+              display: 'flex',
+              alignItems: 'center'
+            }}
+            title="Export CSV"
+          >
+            <Download size={13} />
+          </button>
+        </div>
+
+        {/* ── MOBILE VIEW DROPDOWN MENU ── */}
+        {showMobileViewMenu && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: '0.75rem',
+              right: '0.75rem',
+              marginTop: '4px',
+              background: '#ffffff',
+              borderRadius: '10px',
+              border: '1px solid var(--border-light)',
+              boxShadow: '0 8px 24px rgba(15,23,42,0.18)',
+              zIndex: 1000,
+              padding: '6px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px'
+            }}
+          >
+            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '4px 8px' }}>
+              Select View
+            </div>
+            {viewsList.map((v) => {
+              const IconComp = v.icon;
+              const isSelected = activeView === v.id;
+              return (
+                <button
+                  key={v.id}
+                  onClick={() => {
+                    setActiveView(v.id);
+                    setShowMobileViewMenu(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    background: isSelected ? '#eff6ff' : 'transparent',
+                    border: 'none',
+                    color: isSelected ? '#2563eb' : 'var(--text-primary)',
+                    fontWeight: isSelected ? 800 : 600,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <IconComp size={15} color={isSelected ? '#2563eb' : '#64748b'} />
+                    <span>{v.label}</span>
+                  </div>
+                  {isSelected && <span style={{ color: '#2563eb', fontWeight: 800 }}>✓</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── MOBILE SCOPE DROPDOWN MENU ── */}
+        {showMobileScopeMenu && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: '0.75rem',
+              right: '0.75rem',
+              marginTop: '4px',
+              background: '#ffffff',
+              borderRadius: '10px',
+              border: '1px solid var(--border-light)',
+              boxShadow: '0 8px 24px rgba(15,23,42,0.18)',
+              zIndex: 1000,
+              padding: '6px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px'
+            }}
+          >
+            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '4px 8px' }}>
+              Filter by Task Scope
+            </div>
+            {scopeTabs.map((tab) => {
+              const isSelected = taskScope === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setTaskScope(tab.id);
+                    setShowMobileScopeMenu(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '6px',
+                    background: isSelected ? '#eff6ff' : 'transparent',
+                    border: 'none',
+                    color: isSelected ? '#2563eb' : 'var(--text-primary)',
+                    fontWeight: isSelected ? 800 : 600,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.9rem' }}>{tab.icon}</span>
+                    <span>{tab.label}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span
+                      style={{
+                        background: isSelected ? '#2563eb' : (tab.isAlert ? '#fee2e2' : '#e2e8f0'),
+                        color: isSelected ? '#ffffff' : (tab.isAlert ? '#dc2626' : 'var(--text-muted)'),
+                        padding: '1px 6px',
+                        borderRadius: '10px',
+                        fontSize: '0.68rem',
+                        fontWeight: 800
+                      }}
+                    >
+                      {tab.count}
+                    </span>
+                    {isSelected && <span style={{ color: '#2563eb', fontWeight: 800 }}>✓</span>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── MOBILE COLLAPSIBLE FILTER PANEL ── */}
+        {showMobileFilterMenu && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', paddingTop: '0.35rem', borderTop: '1px solid var(--border-light)' }}>
+            <div style={{ position: 'relative', width: '100%' }}>
+              <Search size={13} style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                placeholder="Search tasks by title, JC, client..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ width: '100%', paddingLeft: '28px', paddingRight: '24px', fontSize: '0.75rem', height: '30px', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: '6px', boxSizing: 'border-box' }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '0.8rem', padding: 0 }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+              <select
+                value={assigneeFilter}
+                onChange={(e) => setAssigneeFilter(e.target.value)}
+                style={{ fontSize: '0.72rem', height: '30px', padding: '0 0.4rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', color: 'var(--text-primary)', fontWeight: 600, width: '100%' }}
+              >
+                <option value="all">All Staff</option>
+                {allUsers.map((u) => (
+                  <option key={u._id} value={u._id}>{u.name || u.username}</option>
+                ))}
+              </select>
+
+              <select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+                style={{ fontSize: '0.72rem', height: '30px', padding: '0 0.4rem', borderRadius: '6px', border: '1px solid var(--border-light)', background: '#ffffff', color: 'var(--text-primary)', fontWeight: 600, width: '100%' }}
+              >
+                <option value="all">All Priorities</option>
+                <option value="urgent">Urgent</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+
+            {(searchQuery || assigneeFilter !== 'all' || priorityFilter !== 'all') && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setAssigneeFilter('all');
+                  setPriorityFilter('all');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#2563eb',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textAlign: 'right',
+                  padding: '2px 0'
+                }}
+              >
+                Reset All Filters
+              </button>
+            )}
+          </div>
+        )}
+
+      </div>
+
+      {/* ── BACKDROP OVERLAY FOR MOBILE DROPDOWNS ── */}
+      {(showMobileViewMenu || showMobileScopeMenu) && (
+        <div
+          onClick={() => {
+            setShowMobileViewMenu(false);
+            setShowMobileScopeMenu(false);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 999,
+            background: 'rgba(15, 23, 42, 0.25)',
+            backdropFilter: 'blur(1px)'
+          }}
+        />
+      )}
+
       {/* ── MAIN CONTENT AREA ── */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         
@@ -1109,13 +1561,14 @@ export default function TaskManagerPanel({ currentUser, onNavigateTab }) {
         ) : activeView === 'kanban' ? (
           
           /* ════ VIEW 1: KANBAN BOARD ════ */
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(260px, 1fr))', gap: '0.75rem', height: '100%', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+          <div className="kanban-grid-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(260px, 1fr))', gap: '0.75rem', height: '100%', overflowX: 'auto', paddingBottom: '0.5rem' }}>
             {KANBAN_COLUMNS.map((col) => {
               const colTasks = filteredTasks.filter((t) => t.status === col.id);
 
               return (
                 <div
                   key={col.id}
+                  className="kanban-col-snap"
                   style={{
                     background: '#f8fafc',
                     border: '1px solid var(--border-light)',

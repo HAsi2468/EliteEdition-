@@ -34,18 +34,49 @@ const getTasks = async (req, res) => {
     if (projectRef) {
       query.projectRef = { $regex: projectRef, $options: 'i' };
     }
-    if (assignee) {
+    if (assignee && mongoose.Types.ObjectId.isValid(assignee)) {
       query.assignees = new mongoose.Types.ObjectId(assignee);
     }
 
+    const andConditions = [];
+
     if (search && search.trim()) {
       const term = search.trim();
-      query.$or = [
-        { title: { $regex: term, $options: 'i' } },
-        { description: { $regex: term, $options: 'i' } },
-        { projectRef: { $regex: term, $options: 'i' } },
-        { clientName: { $regex: term, $options: 'i' } },
-      ];
+      andConditions.push({
+        $or: [
+          { title: { $regex: term, $options: 'i' } },
+          { description: { $regex: term, $options: 'i' } },
+          { projectRef: { $regex: term, $options: 'i' } },
+          { clientName: { $regex: term, $options: 'i' } },
+        ]
+      });
+    }
+
+    // Role-based Access Control:
+    // Master admin can see all tasks.
+    // Regular users can ONLY see tasks assigned to them or created/assigned by them.
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isMasterAdmin = userRole === 'admin' ||
+      Boolean(req.user?.isMainAdmin) ||
+      (req.user?.username || '').toLowerCase() === 'admin' ||
+      (req.user?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com';
+
+    const currentUserId = req.user?._id || req.headers['x-user-id'] || req.query.userId;
+
+    if (!isMasterAdmin && currentUserId && mongoose.Types.ObjectId.isValid(currentUserId)) {
+      const userObjId = new mongoose.Types.ObjectId(currentUserId);
+      andConditions.push({
+        $or: [
+          { assignees: userObjId },
+          { createdBy: userObjId }
+        ]
+      });
+    }
+
+    if (andConditions.length === 1) {
+      Object.assign(query, andConditions[0]);
+    } else if (andConditions.length > 1) {
+      query.$and = andConditions;
     }
 
     const pageNum = parseInt(page, 10);
@@ -95,6 +126,22 @@ const getTaskById = async (req, res) => {
 
     if (!task) {
       return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+
+    // Check visibility permissions for non-master admin
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isMasterAdmin = userRole === 'admin' ||
+      Boolean(req.user?.isMainAdmin) ||
+      (req.user?.username || '').toLowerCase() === 'admin' ||
+      (req.user?.email || '').toLowerCase() === 'harshitsidapara2468@gmail.com';
+    const currentUserId = String(req.user?._id || req.headers['x-user-id'] || req.query.userId || '');
+
+    if (!isMasterAdmin && currentUserId) {
+      const isAssigned = (task.assignees || []).some(a => String(a._id || a) === currentUserId);
+      const isCreator = String(task.createdBy?._id || task.createdBy || '') === currentUserId;
+      if (!isAssigned && !isCreator) {
+        return res.status(403).json({ success: false, message: 'You do not have permission to view this task' });
+      }
     }
 
     res.json({ success: true, data: task });
