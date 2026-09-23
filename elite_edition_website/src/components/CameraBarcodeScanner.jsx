@@ -97,9 +97,9 @@ export default function CameraBarcodeScanner({ onScan, onScanSuccess, onClose, c
         const config = {
           fps: 22, // High frame rate for fast mobile capture
           qrbox: (viewfinderWidth, viewfinderHeight) => {
-            const w = Math.floor(Math.min(viewfinderWidth * 0.92, 300));
-            const h = Math.floor(Math.min(viewfinderHeight * (isCompact ? 0.75 : 0.65), isCompact ? 100 : 160));
-            return { width: Math.max(w, 200), height: Math.max(h, 80) };
+            const w = Math.floor(Math.min(viewfinderWidth * 0.88, 300));
+            const h = Math.floor(Math.min(viewfinderHeight * 0.7, 130));
+            return { width: Math.max(w, 200), height: Math.max(h, 75) };
           },
           aspectRatio: isCompact ? 1.777778 : 1.333333
         };
@@ -268,9 +268,9 @@ export default function CameraBarcodeScanner({ onScan, onScanSuccess, onClose, c
       {/* Camera Viewport & Laser Scan Effect */}
       <div style={{
         ...styles.cameraViewportContainer,
-        height: isCompact ? '135px' : '30vh',
-        minHeight: isCompact ? '120px' : '190px',
-        maxHeight: isCompact ? '150px' : '260px'
+        height: isCompact ? '180px' : '30vh',
+        minHeight: isCompact ? '160px' : '190px',
+        maxHeight: isCompact ? '200px' : '260px'
       }}>
         {errorMsg ? (
           <div style={styles.errorBox}>

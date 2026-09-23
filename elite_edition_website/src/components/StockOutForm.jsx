@@ -5,6 +5,7 @@ import { playSuccessBeep, playErrorBeep } from '../utils/audioHelper';
 import CameraBarcodeScanner from './CameraBarcodeScanner';
 import { extractSizeFromSku, matchSkuOrBrandCode } from '../utils/skuHelper';
 import VendorPartyManagerModal from './VendorPartyManagerModal';
+import { api } from '../services/api';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -111,10 +112,17 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
 
   // Real registered parties for autocompletion
   const [allParties, setAllParties] = useState([]);
+  const [catalogItems, setCatalogItems] = useState([]);
 
   useEffect(() => {
     setAllParties(parties || []);
   }, [parties]);
+
+  useEffect(() => {
+    api.getProductsCatalog()
+      .then(res => setCatalogItems(res || []))
+      .catch(() => {});
+  }, []);
 
   // Preserve scroll position on mount/unmount
   useEffect(() => {
@@ -205,23 +213,25 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     const cleanSku = (scannedCode || '').trim();
     if (!cleanSku) return;
 
-    const foundInv = (items || []).find((item) => matchSkuOrBrandCode(item, cleanSku));
+    // 1. Search in current inventory items
+    let foundInv = (items || []).find((item) => matchSkuOrBrandCode(item, cleanSku));
+    
+    // 2. Search in catalogItems (for brand barcodes like Myntra, Flipkart, Brand Barcodes)
+    const matchedCatalog = (catalogItems || []).find((cat) => matchSkuOrBrandCode(cat, cleanSku));
 
-    if (!foundInv) {
-      setError(`SKU / Barcode "${cleanSku}" not found in store inventory.`);
-      playErrorBeep();
-      return;
+    if (!foundInv && matchedCatalog) {
+      // Find matching inventory item for this catalog item
+      foundInv = (items || []).find((item) => 
+        (item.skuCode && matchedCatalog.skuCode && item.skuCode.trim().toLowerCase() === matchedCatalog.skuCode.trim().toLowerCase()) ||
+        matchSkuOrBrandCode(item, matchedCatalog.skuCode)
+      );
     }
 
-    const available = foundInv.currentlyAvailableStock ?? foundInv.qty ?? 0;
-    const resolvedSize = resolveEffectiveSize(foundInv, cleanSku);
-    const masterSku = resolveMasterSku(foundInv, cleanSku, resolvedSize);
-
-    if (available <= 0) {
-      setError(`SKU "${masterSku}" has 0 available stock.`);
-      playErrorBeep();
-      return;
-    }
+    const available = foundInv ? (foundInv.currentlyAvailableStock ?? foundInv.qty ?? 0) : 0;
+    const resolvedSize = resolveEffectiveSize(foundInv || matchedCatalog, cleanSku);
+    const masterSku = resolveMasterSku(foundInv, (matchedCatalog?.skuCode || cleanSku), resolvedSize);
+    const itemName = foundInv?.itemName || matchedCatalog?.description || masterSku;
+    const imageUrl = foundInv?.imageUrl || matchedCatalog?.imageUrl || '';
 
     playSuccessBeep();
     setError('');
@@ -233,21 +243,19 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     scannedTimeoutRef.current = setTimeout(() => setJustScannedSku(null), 3000);
 
     setFormRows(prev => {
-      const existingIndex = prev.findIndex(r => r.skuCode && (r.skuCode.trim().toLowerCase() === cleanSku.toLowerCase() || r.skuCode.trim().toLowerCase() === masterSku.toLowerCase()));
+      const existingIndex = prev.findIndex(r => r.skuCode && (
+        r.skuCode.trim().toLowerCase() === cleanSku.toLowerCase() || 
+        r.skuCode.trim().toLowerCase() === masterSku.toLowerCase()
+      ));
 
       if (existingIndex !== -1) {
         const currentQty = prev[existingIndex].qtyOut || 0;
-        if (currentQty + 1 > available) {
-          setError(`Cannot outward ${currentQty + 1} units for "${masterSku}". Only ${available} units available in stock.`);
-          playErrorBeep();
-          return prev;
-        }
         const existingItem = prev[existingIndex];
         const updatedItem = {
           ...existingItem,
           skuCode: masterSku,
-          size: resolvedSize,
-          availableStock: available,
+          size: resolvedSize !== 'N/A' ? resolvedSize : existingItem.size,
+          availableStock: available || existingItem.availableStock,
           party: partyValue || existingItem.party,
           qtyOut: currentQty + 1
         };
@@ -259,13 +267,13 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
         return [
           {
             skuCode: masterSku,
-            itemName: foundInv.itemName || masterSku,
+            itemName,
             size: resolvedSize,
             qtyOut: 1,
             availableStock: available,
             party: partyValue,
-            imageUrl: foundInv.imageUrl || '',
-            originalItem: foundInv
+            imageUrl,
+            originalItem: foundInv || matchedCatalog
           },
           ...validRows // Always place new scan at TOP of list!
         ];
@@ -310,19 +318,26 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
     } else if (field === 'skuCode') {
       const skuRaw = value.trim();
       updated[index].skuCode = value;
-      const foundInv = (items || []).find((item) => matchSkuOrBrandCode(item, skuRaw));
-      if (foundInv) {
-        const resolvedSize = resolveEffectiveSize(foundInv, skuRaw);
-        const masterSku = resolveMasterSku(foundInv, skuRaw, resolvedSize);
+      let foundInv = (items || []).find((item) => matchSkuOrBrandCode(item, skuRaw));
+      const matchedCatalog = (catalogItems || []).find((cat) => matchSkuOrBrandCode(cat, skuRaw));
+      if (!foundInv && matchedCatalog) {
+        foundInv = (items || []).find((item) => 
+          (item.skuCode && matchedCatalog.skuCode && item.skuCode.trim().toLowerCase() === matchedCatalog.skuCode.trim().toLowerCase()) ||
+          matchSkuOrBrandCode(item, matchedCatalog.skuCode)
+        );
+      }
+      if (foundInv || matchedCatalog) {
+        const resolvedSize = resolveEffectiveSize(foundInv || matchedCatalog, skuRaw);
+        const masterSku = resolveMasterSku(foundInv, (matchedCatalog?.skuCode || skuRaw), resolvedSize);
         updated[index].skuCode = masterSku;
-        updated[index].itemName = foundInv.itemName || masterSku;
+        updated[index].itemName = foundInv?.itemName || matchedCatalog?.description || masterSku;
         updated[index].size = resolvedSize;
-        updated[index].availableStock = foundInv.currentlyAvailableStock ?? foundInv.qty ?? 0;
+        updated[index].availableStock = foundInv ? (foundInv.currentlyAvailableStock ?? foundInv.qty ?? 0) : 0;
         updated[index].party = updated[index].party || defaultParty || '';
-        updated[index].imageUrl = foundInv.imageUrl || '';
+        updated[index].imageUrl = foundInv?.imageUrl || matchedCatalog?.imageUrl || '';
         setError('');
       } else {
-        updated[index].itemName = '';
+        updated[index].itemName = skuRaw;
         updated[index].size = extractSizeFromSku(value) || 'N/A';
         updated[index].availableStock = 0;
         updated[index].party = updated[index].party || defaultParty || '';
@@ -444,53 +459,26 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
             </div>
           )}
 
-          {/* Top Controls: Scanner Input & Default Vendor */}
-          <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: isMobile ? '0.75rem' : '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-            
-            {/* Barcode Scanner Bar */}
-            <form onSubmit={handleManualScanSubmit} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
-              <div style={{ position: 'relative', flex: 1, minWidth: isMobile ? '100%' : '200px' }}>
-                <QrCode size={18} color="#64748b" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
-                <input
-                  ref={scanInputRef}
-                  type="text"
-                  placeholder="Scan SKU or Brand Barcode..."
-                  value={scanInput}
-                  onChange={(e) => setScanInput(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.6rem 0.85rem 0.6rem 2.6rem',
-                    fontSize: isMobile ? '16px' : '0.9rem',
-                    borderRadius: '10px',
-                    border: '2px solid #3b82f6',
-                    outline: 'none',
-                    fontWeight: 700,
-                    fontFamily: 'monospace',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem', width: isMobile ? '100%' : 'auto' }}>
-                <button type="submit" style={{ flex: isMobile ? 1 : 'none', padding: '0.6rem 1.1rem', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  + Scan / Add
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowCameraScanner(prev => !prev)}
-                  style={{ flex: isMobile ? 1 : 'none', padding: '0.6rem 0.85rem', background: showCameraScanner ? '#ef4444' : '#059669', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', boxShadow: '0 2px 8px rgba(5,150,105,0.25)' }}
-                >
-                  <Camera size={16} />
-                  <span>{showCameraScanner ? 'Close Camera' : '📷 Camera Scan'}</span>
-                </button>
-              </div>
-            </form>
+          {/* Camera Scanner View - Compact & Top-Level */}
+          {showCameraScanner && (
+            <div style={{ marginBottom: isMobile ? '0.35rem' : '0.75rem' }}>
+              <CameraBarcodeScanner
+                compact={isMobile}
+                onScan={(code) => {
+                  processBarcodeScan(code);
+                }}
+                onClose={() => setShowCameraScanner(false)}
+              />
+            </div>
+          )}
 
-            {/* Default Recipient Party & Reference - Compact when camera is active on mobile */}
-            {isMobile && showCameraScanner ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.35rem 0.65rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem' }}>
-                <span style={{ fontWeight: 700, color: '#475569' }}>
-                  🏢 Default Party: <strong style={{ color: '#2563eb' }}>{defaultParty || customParty || 'All Rows'}</strong>
-                </span>
+          {/* Top Controls: Scanner Input & Default Vendor */}
+          {isMobile && showCameraScanner ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.35rem 0.65rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.75rem' }}>
+              <span style={{ fontWeight: 700, color: '#475569' }}>
+                🏢 Party: <strong style={{ color: '#2563eb' }}>{defaultParty || customParty || 'All Rows'}</strong>
+              </span>
+              <div style={{ display: 'flex', gap: '0.35rem' }}>
                 <button
                   type="button"
                   onClick={() => setShowPartyManager(true)}
@@ -498,8 +486,57 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                 >
                   + Parties
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCameraScanner(false)}
+                  style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', padding: '0.25rem 0.5rem', fontSize: '0.72rem', fontWeight: 800, color: '#dc2626', cursor: 'pointer' }}
+                >
+                  ✕ Close Camera
+                </button>
               </div>
-            ) : (
+            </div>
+          ) : (
+            <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: isMobile ? '0.75rem' : '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              
+              {/* Barcode Scanner Bar */}
+              <form onSubmit={handleManualScanSubmit} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+                <div style={{ position: 'relative', flex: 1, minWidth: isMobile ? '100%' : '200px' }}>
+                  <QrCode size={18} color="#64748b" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input
+                    ref={scanInputRef}
+                    type="text"
+                    placeholder="Scan SKU or Brand Barcode..."
+                    value={scanInput}
+                    onChange={(e) => setScanInput(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem 0.85rem 0.6rem 2.6rem',
+                      fontSize: isMobile ? '16px' : '0.9rem',
+                      borderRadius: '10px',
+                      border: '2px solid #3b82f6',
+                      outline: 'none',
+                      fontWeight: 700,
+                      fontFamily: 'monospace',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', width: isMobile ? '100%' : 'auto' }}>
+                  <button type="submit" style={{ flex: isMobile ? 1 : 'none', padding: '0.6rem 1.1rem', background: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    + Scan / Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCameraScanner(prev => !prev)}
+                    style={{ flex: isMobile ? 1 : 'none', padding: '0.6rem 0.85rem', background: showCameraScanner ? '#ef4444' : '#059669', color: '#ffffff', border: 'none', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', boxShadow: '0 2px 8px rgba(5,150,105,0.25)' }}
+                  >
+                    <Camera size={16} />
+                    <span>{showCameraScanner ? 'Close Camera' : '📷 Camera Scan'}</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* Default Recipient Party & Reference */}
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 <div style={{ flex: 1, minWidth: isMobile ? '100%' : '220px' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem', display: 'block' }}>
@@ -577,23 +614,6 @@ export default function StockOutForm({ items = [], parties = [], prefilledItem, 
                   />
                 </div>
               </div>
-            )}
-
-          </div>
-
-          {/* Camera Scanner View - Compact & Top-Level */}
-          {showCameraScanner && (
-            <div style={{ marginBottom: isMobile ? '0.35rem' : '0.75rem' }}>
-              <CameraBarcodeScanner
-                compact={isMobile}
-                onScan={(code) => {
-                  processBarcodeScan(code);
-                }}
-                onScanSuccess={(code) => {
-                  processBarcodeScan(code);
-                }}
-                onClose={() => setShowCameraScanner(false)}
-              />
             </div>
           )}
 
