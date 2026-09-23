@@ -25,54 +25,22 @@ import {
   Package
 } from 'lucide-react';
 import { api } from '../services/api';
+import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 
 const fmtINR = (n) => `₹ ${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 const fmtMtr = (n) => `${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m`;
 
 export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }) {
-  const getTodayStr = () => {
-    const d = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  };
-
   const [datePreset, setDatePreset] = useState('today');
-  const [dateStart, setDateStart] = useState(getTodayStr);
-  const [dateEnd, setDateEnd] = useState(getTodayStr);
+  const [dateStart, setDateStart] = useState(() => getDatePresetRange('today').dateStart);
+  const [dateEnd, setDateEnd] = useState(() => getDatePresetRange('today').dateEnd);
+  const [customDateStart, setCustomDateStart] = useState('');
+  const [customDateEnd, setCustomDateEnd] = useState('');
   const [shift, setShift] = useState('All');
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
-
-  const handlePresetChange = (preset) => {
-    setDatePreset(preset);
-    const d = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const toYMD = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-
-    if (preset === 'today') {
-      const s = toYMD(d);
-      setDateStart(s);
-      setDateEnd(s);
-    } else if (preset === 'yesterday') {
-      const y = new Date(d);
-      y.setDate(y.getDate() - 1);
-      const s = toYMD(y);
-      setDateStart(s);
-      setDateEnd(s);
-    } else if (preset === 'this_week') {
-      const day = d.getDay(); // 0 is Sunday
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
-      const monday = new Date(d.setDate(diff));
-      setDateStart(toYMD(monday));
-      setDateEnd(toYMD(new Date()));
-    } else if (preset === 'this_month') {
-      const firstDay = new Date(d.getFullYear(), d.getMonth(), 1);
-      setDateStart(toYMD(firstDay));
-      setDateEnd(toYMD(new Date()));
-    }
-  };
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -179,70 +147,24 @@ export default function DigitalPrintOperationsDashboard({ onNavigateDepartment }
 
         {/* Date Filter Presets, Shift & Refresh */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-          {/* Presets */}
-          <div style={{ display: 'flex', background: '#eff6ff', borderRadius: '10px', padding: '3px', border: '1px solid #bfdbfe' }}>
-            {[
-              { id: 'today', label: 'Today' },
-              { id: 'yesterday', label: 'Yesterday' },
-              { id: 'this_week', label: 'This Week' },
-              { id: 'this_month', label: 'This Month' }
-            ].map(p => (
-              <button
-                key={p.id}
-                onClick={() => handlePresetChange(p.id)}
-                style={{
-                  padding: '0.35rem 0.75rem',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  borderRadius: '7px',
-                  border: 'none',
-                  background: datePreset === p.id ? '#2563eb' : 'transparent',
-                  color: datePreset === p.id ? '#ffffff' : '#1e40af',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s'
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Date Picker */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <input
-              type="date"
-              value={dateStart}
-              onChange={e => { setDateStart(e.target.value); setDatePreset('custom'); }}
-              style={{
-                padding: '0.45rem 0.65rem',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                color: '#0f172a',
-                fontSize: '0.82rem',
-                fontWeight: 600
-              }}
-            />
-            {datePreset === 'this_week' || datePreset === 'this_month' || datePreset === 'custom' ? (
-              <>
-                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>to</span>
-                <input
-                  type="date"
-                  value={dateEnd}
-                  onChange={e => { setDateEnd(e.target.value); setDatePreset('custom'); }}
-                  style={{
-                    padding: '0.45rem 0.65rem',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    color: '#0f172a',
-                    fontSize: '0.82rem',
-                    fontWeight: 600
-                  }}
-                />
-              </>
-            ) : null}
-          </div>
+          {/* Standard ERP DateRangePicker */}
+          <DateRangePicker
+            preset={datePreset}
+            onChange={({ preset: p, dateStart: ds, dateEnd: de }) => {
+              setDatePreset(p);
+              setDateStart(ds);
+              setDateEnd(de);
+            }}
+            customStart={customDateStart}
+            customEnd={customDateEnd}
+            onCustomChange={(s, e) => {
+              setCustomDateStart(s);
+              setCustomDateEnd(e);
+              setDateStart(s);
+              setDateEnd(e);
+            }}
+            theme="light"
+          />
 
           {/* Shift Filter */}
           <select
