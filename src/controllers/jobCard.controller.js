@@ -287,6 +287,8 @@ const getAllJobCards = async (req, res) => {
         filter.fusingStatus = 'Fusing Done';
       } else if (fusingStatus === 'Fusing Pending') {
         andClauses.push({ fusingStatus: { $ne: 'Fusing Done' } });
+      } else {
+        filter.fusingStatus = fusingStatus;
       }
     }
 
@@ -1011,7 +1013,7 @@ const updateJobCard = async (req, res) => {
     body.updatedByName = editorName;
 
     if (printStatus==='Printing Done' && fusingStatus==='Fusing Done' && deliveryStatus==='Delivery Done') body.status='Done';
-    else if (printStatus==='Printing Done' || fusingStatus==='Fusing Done' || deliveryStatus==='Delivery Done') body.status='In Progress';
+    else if (printStatus==='Printing Done' || printStatus==='Printing In Progress' || fusingStatus==='Fusing Done' || fusingStatus==='Fusing In Progress' || fusingStatus==='Partial Complete' || deliveryStatus==='Delivery Done' || deliveryStatus==='Delivery In Progress') body.status='In Progress';
     else body.status='Pending';
 
     // Track detailed field diffs for Mistakes & Revision History Audit Log

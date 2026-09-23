@@ -1220,14 +1220,15 @@ export default function JobCardTracking({ onPreview }) {
                           title={!canEditCard(c) ? "Auto-updated from Fusing Department" : "Edit Fusing Status"}
                           style={{
                             ...selectStyle,
-                            color: getValue(c, 'fusingStatus') === 'Fusing Done' ? '#34d399' : '#fbbf24',
-                            borderColor: getValue(c, 'fusingStatus') === 'Fusing Done' ? 'rgba(52,211,153,0.3)' : 'rgba(245,158,11,0.3)',
-                            background: getValue(c, 'fusingStatus') === 'Fusing Done' ? 'rgba(52,211,153,0.06)' : 'rgba(245,158,11,0.06)',
+                            color: getValue(c, 'fusingStatus') === 'Fusing Done' ? '#34d399' : (getValue(c, 'fusingStatus') === 'Fusing In Progress' ? '#38bdf8' : '#fbbf24'),
+                            borderColor: getValue(c, 'fusingStatus') === 'Fusing Done' ? 'rgba(52,211,153,0.3)' : (getValue(c, 'fusingStatus') === 'Fusing In Progress' ? 'rgba(56,189,248,0.3)' : 'rgba(245,158,11,0.3)'),
+                            background: getValue(c, 'fusingStatus') === 'Fusing Done' ? 'rgba(52,211,153,0.06)' : (getValue(c, 'fusingStatus') === 'Fusing In Progress' ? 'rgba(56,189,248,0.06)' : 'rgba(245,158,11,0.06)'),
                             opacity: !canEditCard(c) ? 0.9 : 1,
                             cursor: !canEditCard(c) ? 'default' : 'pointer'
                           }}
                         >
                           <option value="Fusing Pending" style={{ color: '#000' }}>FP</option>
+                          <option value="Fusing In Progress" style={{ color: '#000' }}>FIP</option>
                           <option value="Fusing Done" style={{ color: '#000' }}>FD</option>
                         </select>
                       </td>

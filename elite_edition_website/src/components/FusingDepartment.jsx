@@ -448,7 +448,8 @@ export default function FusingDepartment() {
         fusingTemp: card.fusingTemp || card.temperature || preset.temp,
         fusingSpeed: card.fusingSpeed || card.speed || preset.speed || '80',
         fusingMachine: card.fusingMachine || prev.fusingMachine,
-        butterPaperWeightKg: card.butterPaperWeightKg || ''
+        butterPaperWeightKg: card.butterPaperWeightKg || '',
+        rollCompleted: card.fusingStatus === 'Fusing Done' ? 'Complete' : ((card.fusingStatus === 'Fusing In Progress' || card.fusingStatus === 'Partial Complete') ? 'Partial Complete' : prev.rollCompleted || 'Complete')
       }));
       setJobSearchText(`${jobDisplay} — ${card.party || ''} | ${card.designName || ''} (${card.fabric || ''} ${cardPanna})`);
     } else {
@@ -625,7 +626,7 @@ export default function FusingDepartment() {
       panna: cardPanna,
       useButterPaper: cardButterUsed,
       butterPaperWeightKg: card.butterPaperWeightKg || '',
-      rollCompleted: card.fusingStatus === 'Fusing Done' ? 'Yes' : 'No',
+      rollCompleted: card.fusingStatus === 'Fusing Done' ? 'Complete' : ((card.fusingStatus === 'Fusing In Progress' || card.fusingStatus === 'Partial Complete') ? 'Partial Complete' : 'Pending'),
       printedMtr: printedM || defaultFresh,
       fusingMtr: defaultFresh,
       fusingOperator: card.fusingOperator || accountFullName,
@@ -713,7 +714,7 @@ export default function FusingDepartment() {
         const curStatus = c.fusingStatus || 'Fusing Pending';
         if (statusFilter === 'Ready for Fusing') {
           if (c.printStatus !== 'Printing Done' || curStatus === 'Fusing Done') return false;
-        } else if (statusFilter === 'Fusing Pending' && curStatus !== 'Fusing Pending') return false;
+        } else if (statusFilter === 'Fusing Pending' && curStatus === 'Fusing Done') return false;
         else if (statusFilter === 'Fusing Done' && curStatus !== 'Fusing Done') return false;
       }
       if (filterMachine && (c.fusingMachine || '') !== filterMachine) {
@@ -1695,7 +1696,7 @@ export default function FusingDepartment() {
                       <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                         {(() => {
                           const isDone = c.fusingStatus === 'Fusing Done';
-                          const isPartial = c.fusingStatus === 'Fusing In Progress';
+                          const isPartial = c.fusingStatus === 'Fusing In Progress' || c.fusingStatus === 'Partial Complete';
                           return (
                             <button
                               type="button"
