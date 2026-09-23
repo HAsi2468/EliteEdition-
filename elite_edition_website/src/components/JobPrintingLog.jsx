@@ -3,7 +3,8 @@ import { api } from '../services/api';
 import {
   Printer, PlusCircle, Search, RefreshCw, Trash2, Edit2, Edit, CheckCircle2,
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
-  X, Download, Eye, Layers3, Activity, Tag, Sparkles, FileText, ArrowUpFromLine, ArrowDownToLine
+  X, Download, Eye, Layers3, Activity, Tag, Sparkles, FileText, ArrowUpFromLine, ArrowDownToLine,
+  Zap, Droplets, TrendingUp, BarChart3, ListFilter, PlayCircle
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
@@ -67,6 +68,9 @@ export default function JobPrintingLog() {
 
   // Edit Mode state
   const [editingLogId, setEditingLogId] = useState(null);
+  const [activeView, setActiveView] = useState('log'); // 'log' | 'queue'
+  const [queueFabricFilter, setQueueFabricFilter] = useState('All');
+  const [queueSearch, setQueueSearch] = useState('');
 
   const user = api.getCurrentUser();
   const accountFullName = user ? (user.name || user.fullName || user.username || '') : '';
@@ -1040,6 +1044,129 @@ export default function JobPrintingLog() {
   // Selected Job Progress Stats
   const selectedJobStats = selectedJob ? getJobProgressStats(selectedJob) : null;
 
+  // ── Print Efficiency & Consumable Consumption Metrics ──
+  const printMetrics = useMemo(() => {
+    let totalMtr = 0;
+    let morningMtr = 0;
+    let nightMtr = 0;
+    const operatorMap = {};
+    const machineMap = {};
+
+    logs.forEach(l => {
+      const m = Number(l.meters) || 0;
+      totalMtr += m;
+      if (l.shift === 'Morning') morningMtr += m;
+      else if (l.shift === 'Night') nightMtr += m;
+
+      const op = l.operatorName || 'Standard Operator';
+      operatorMap[op] = (operatorMap[op] || 0) + m;
+
+      const mach = l.machineName || 'Machine 1';
+      machineMap[mach] = (machineMap[mach] || 0) + m;
+    });
+
+    // Sublimation Ink consumption: industry standard 16 ml / meter
+    const estimatedInkLiters = (totalMtr * 0.016).toFixed(1);
+    // Sublimation Paper: approx 1.45 sq. meters per running meter (58" width)
+    const estimatedPaperSqM = (totalMtr * 1.45).toFixed(1);
+
+    const topOperator = Object.entries(operatorMap).sort((a, b) => b[1] - a[1])[0] || ['—', 0];
+    const topMachine = Object.entries(machineMap).sort((a, b) => b[1] - a[1])[0] || ['—', 0];
+
+    return {
+      totalMtr,
+      morningMtr,
+      nightMtr,
+      estimatedInkLiters,
+      estimatedPaperSqM,
+      topOperator: { name: topOperator[0], mtr: topOperator[1] },
+      topMachine: { name: topMachine[0], mtr: topMachine[1] }
+    };
+  }, [logs]);
+
+  // ── Pending Job Cards for Machine Queue & Batch Scheduling ──
+  const printQueueJobs = useMemo(() => {
+    return jobCards.filter(jc => {
+      // Must not be fully printed
+      const isPrinted = jc.printStatus === 'Printing Done';
+      if (isPrinted) return false;
+
+      if (queueFabricFilter !== 'All' && (jc.fabric || '') !== queueFabricFilter) return false;
+      if (queueSearch) {
+        const q = queueSearch.toLowerCase();
+        const jNo = String(jc.jobNo || '').toLowerCase();
+        const dName = String(jc.designName || jc.designNo || '').toLowerCase();
+        const party = String(jc.party || '').toLowerCase();
+        if (!jNo.includes(q) && !dName.includes(q) && !party.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [jobCards, queueFabricFilter, queueSearch]);
+
+  const queueFabricsList = useMemo(() => {
+    const set = new Set();
+    jobCards.forEach(jc => {
+      if (jc.printStatus !== 'Printing Done' && jc.fabric) set.add(jc.fabric);
+    });
+    return Array.from(set).sort();
+  }, [jobCards]);
+
+  // One-Click Quick Print Action
+  const handleQuickLogJob = async (job) => {
+    const targetStr = job.totalMtr || job.consumption || '0';
+    const targetMatch = String(targetStr).match(/[\d.]+/);
+    const targetMtr = targetMatch ? parseFloat(targetMatch[0]) : 0;
+    const printedMtr = parseFloat(String(job.printMtr || '0').replace(/[^\d.]/g, '')) || 0;
+    const remainingMtr = Math.max(0, targetMtr - printedMtr) || targetMtr || 10;
+
+    const confirmed = window.confirm(`Quick Complete Printing for Job #${job.jobNo}?\n\nTarget: ${targetMtr} mtr\nRemaining to Log: ${remainingMtr.toFixed(2)} mtr\nMachine: ${machinesList[0] || 'Machine 1 (Grando)'}\nOperator: ${accountFullName || 'Operator'}`);
+    if (!confirmed) return;
+
+    setSubmitting(true);
+    try {
+      await api.createJobPrintLog({
+        jobCardId: job._id,
+        jobNo: job.jobNo,
+        machineName: machinesList[0] || 'Machine 1 (Grando)',
+        pass: job.pass || '4 PASS',
+        meters: remainingMtr,
+        date: toLocalYMD(),
+        operatorName: accountFullName || 'Operator',
+        shift: getAutoShift(),
+        notes: 'Quick Completed via Print Queue Dashboard'
+      });
+
+      triggerPushNotification('⚡ Quick Print Completed', `Job #${job.jobNo} (${remainingMtr.toFixed(2)} mtr) logged and marked Printing Done!`, 'success');
+      await fetchJobCards();
+      await fetchLogs(dateStart, dateEnd);
+      triggerGlobalDataRefresh('jobcards');
+    } catch (err) {
+      alert(err.message || 'Failed to quick log job.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Switch to Entry Form with Selected Queued Job
+  const handleSelectJobForForm = (job) => {
+    setSelectedJob(job);
+    const targetStr = job.totalMtr || job.consumption || '0';
+    const targetMatch = String(targetStr).match(/[\d.]+/);
+    const targetMtr = targetMatch ? parseFloat(targetMatch[0]) : 0;
+    const printedMtr = parseFloat(String(job.printMtr || '0').replace(/[^\d.]/g, '')) || 0;
+    const remainingMtr = Math.max(0, targetMtr - printedMtr) || targetMtr || '';
+
+    setForm(prev => ({
+      ...prev,
+      jobNo: job.jobNo || '',
+      jobCardId: job._id || '',
+      meters: remainingMtr ? String(remainingMtr) : '',
+      pass: job.pass || prev.pass
+    }));
+    setActiveView('log');
+    window.scrollTo({ top: 120, behavior: 'smooth' });
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '2rem' }}>
 
@@ -1065,8 +1192,311 @@ export default function JobPrintingLog() {
         </div>
       </div>
 
-      {/* ── 2. NEW PRINTING ENTRY FORM ── */}
-      <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: selectedJob ? 'minmax(0, 1.4fr) minmax(0, 1fr)' : '1fr', gap: '1.25rem' }}>
+      {/* ── 1.1 CONSUMABLES & SHIFT EFFICIENCY BAR ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
+        {/* Metric 1: Total Meters & Shift Ratio */}
+        <div className="glass-panel" style={{ padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '4px solid #38bdf8' }}>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(56,189,248,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Activity size={18} color="#38bdf8" />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Total Output (Logged)</div>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>{printMetrics.totalMtr.toFixed(1)} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>mtr</span></div>
+            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
+              ☀️ Day: <strong style={{ color: '#38bdf8' }}>{printMetrics.morningMtr.toFixed(0)}m</strong> | 🌙 Night: <strong style={{ color: '#a78bfa' }}>{printMetrics.nightMtr.toFixed(0)}m</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Metric 2: Sublimation Ink Consumption Estimate */}
+        <div className="glass-panel" style={{ padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '4px solid #ec4899' }}>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(236,72,153,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Droplets size={18} color="#ec4899" />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Est. Ink Consumed</div>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ec4899' }}>{printMetrics.estimatedInkLiters} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Liters</span></div>
+            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
+              Avg. 16 ml / printed meter
+            </div>
+          </div>
+        </div>
+
+        {/* Metric 3: Sublimation Paper Consumption Estimate */}
+        <div className="glass-panel" style={{ padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '4px solid #f59e0b' }}>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Layers3 size={18} color="#f59e0b" />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Est. Paper Used</div>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f59e0b' }}>{printMetrics.estimatedPaperSqM} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>sq. mtr</span></div>
+            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
+              Approx. {(Number(printMetrics.estimatedPaperSqM) / 100).toFixed(1)} rolls used
+            </div>
+          </div>
+        </div>
+
+        {/* Metric 4: Top Machine & Operator */}
+        <div className="glass-panel" style={{ padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', borderLeft: '4px solid #10b981' }}>
+          <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <TrendingUp size={18} color="#10b981" />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Top Machine</div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
+              {printMetrics.topMachine.name}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#10b981', marginTop: 2 }}>
+              {printMetrics.topMachine.mtr.toFixed(0)}m logged • {printMetrics.topOperator.name}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 1.2 VIEW SWITCHER NAVIGATION TABS ── */}
+      <div style={{ display: 'flex', gap: '0.6rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.4rem', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={() => setActiveView('log')}
+          style={{
+            padding: '0.55rem 1.1rem',
+            borderRadius: '8px',
+            fontSize: '0.84rem',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            border: activeView === 'log' ? '1px solid #38bdf8' : '1px solid transparent',
+            background: activeView === 'log' ? 'rgba(56,189,248,0.15)' : 'transparent',
+            color: activeView === 'log' ? '#38bdf8' : 'var(--text-muted)',
+            cursor: 'pointer'
+          }}
+        >
+          <Printer size={15} /> Print Runs Log
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveView('queue')}
+          style={{
+            padding: '0.55rem 1.1rem',
+            borderRadius: '8px',
+            fontSize: '0.84rem',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            border: activeView === 'queue' ? '1px solid #f59e0b' : '1px solid transparent',
+            background: activeView === 'queue' ? 'rgba(245,158,11,0.15)' : 'transparent',
+            color: activeView === 'queue' ? '#f59e0b' : 'var(--text-muted)',
+            cursor: 'pointer'
+          }}
+        >
+          <Zap size={15} /> Machine Queue & Batch Scheduling
+          <span style={{
+            marginLeft: 4,
+            padding: '0.1rem 0.45rem',
+            borderRadius: '999px',
+            background: activeView === 'queue' ? '#f59e0b' : 'rgba(255,255,255,0.1)',
+            color: activeView === 'queue' ? '#000' : 'var(--text-muted)',
+            fontSize: '0.72rem',
+            fontWeight: 800
+          }}>
+            {printQueueJobs.length}
+          </span>
+        </button>
+      </div>
+
+      {/* ── BATCH QUEUE VIEW (When activeView === 'queue') ── */}
+      {activeView === 'queue' && (
+        <div className="glass-panel" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderLeft: '4px solid #f59e0b' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
+            <div>
+              <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Zap size={18} /> Digital Print Batch Queue & Roll Optimization
+              </div>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                Batch identical fabrics together to prevent roll change downtime. Use Quick Complete for fast 1-click execution.
+              </p>
+            </div>
+
+            {/* Queue Filter Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', width: 220 }}>
+                <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  value={queueSearch}
+                  onChange={e => setQueueSearch(e.target.value)}
+                  placeholder="Filter queue by job/party..."
+                  style={{ paddingLeft: 30, width: '100%', fontSize: '0.82rem', borderRadius: 6 }}
+                />
+              </div>
+
+              <select
+                value={queueFabricFilter}
+                onChange={e => setQueueFabricFilter(e.target.value)}
+                style={{ padding: '0.45rem 0.75rem', fontSize: '0.82rem', background: 'var(--bg-input)', border: '1px solid var(--border-light)', borderRadius: 6, color: 'var(--text-primary)' }}
+              >
+                <option value="All">All Fabrics ({printQueueJobs.length})</option>
+                {queueFabricsList.map(fab => (
+                  <option key={fab} value={fab}>{fab}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Queue Table */}
+          <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border-light)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid var(--border-light)' }}>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)' }}>Priority</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)' }}>Job No.</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)' }}>Party</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)' }}>Design</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)' }}>Fabric (Batching)</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-muted)' }}>Panna & Pass</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 700, color: 'var(--text-muted)' }}>Target</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 700, color: 'var(--text-muted)' }}>Printed</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 700, color: 'var(--text-muted)' }}>Remaining</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 700, color: 'var(--text-muted)' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {printQueueJobs.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      🎉 Great job! No pending printing jobs in this queue filter.
+                    </td>
+                  </tr>
+                ) : (
+                  printQueueJobs.map(job => {
+                    const targetStr = job.totalMtr || job.consumption || '0';
+                    const targetMatch = String(targetStr).match(/[\d.]+/);
+                    const targetMtr = targetMatch ? parseFloat(targetMatch[0]) : 0;
+                    const printedMtr = parseFloat(String(job.printMtr || '0').replace(/[^\d.]/g, '')) || 0;
+                    const remainingMtr = Math.max(0, targetMtr - printedMtr);
+                    const isClientOrder = String(job.createdBy || job.createdByName || '').toLowerCase().includes('client');
+
+                    return (
+                      <tr key={job._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                        {/* Priority Badge */}
+                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                          {isClientOrder ? (
+                            <span style={{ padding: '0.15rem 0.45rem', borderRadius: 4, background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)', fontSize: '0.72rem', fontWeight: 800 }}>
+                              ⚡ Online Urgent
+                            </span>
+                          ) : (
+                            <span style={{ padding: '0.15rem 0.45rem', borderRadius: 4, background: 'rgba(148,163,184,0.12)', color: '#94a3b8', fontSize: '0.72rem' }}>
+                              Normal
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Job No */}
+                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#38bdf8' }}>
+                          #{job.jobNo}
+                        </td>
+
+                        {/* Party */}
+                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {job.party || 'Standard Client'}
+                        </td>
+
+                        {/* Design */}
+                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                          <span style={{ fontWeight: 700, color: 'var(--primary)' }}>
+                            {cleanDesignNameString(job.designName || job.designNo || '—')}
+                          </span>
+                        </td>
+
+                        {/* Fabric (Batch tag) */}
+                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                          <span style={{ padding: '0.2rem 0.55rem', borderRadius: 6, background: 'rgba(139,92,246,0.12)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.25)', fontWeight: 700, fontSize: '0.76rem' }}>
+                            {job.fabric || 'FRENCH CREP'}
+                          </span>
+                        </td>
+
+                        {/* Panna & Pass */}
+                        <td style={{ padding: '0.65rem 0.85rem', color: 'var(--text-muted)' }}>
+                          {job.panna || '58"'} • {job.pass || '4 PASS'}
+                        </td>
+
+                        {/* Target Mtr */}
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 600 }}>
+                          {targetMtr.toFixed(1)}m
+                        </td>
+
+                        {/* Printed Mtr */}
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#38bdf8' }}>
+                          {printedMtr.toFixed(1)}m
+                        </td>
+
+                        {/* Remaining Mtr */}
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: remainingMtr > 0 ? '#ef4444' : '#10b981' }}>
+                          {remainingMtr.toFixed(1)}m
+                        </td>
+
+                        {/* Actions */}
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickLogJob(job)}
+                              disabled={submitting}
+                              style={{
+                                padding: '0.3rem 0.65rem',
+                                borderRadius: 6,
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                color: '#ffffff',
+                                border: 'none',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 6px rgba(16,185,129,0.25)'
+                              }}
+                              title="Quick Log full remaining meters as printed"
+                            >
+                              <Zap size={13} /> Quick Done
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSelectJobForForm(job)}
+                              style={{
+                                padding: '0.3rem 0.6rem',
+                                borderRadius: 6,
+                                background: 'rgba(56,189,248,0.1)',
+                                color: '#38bdf8',
+                                border: '1px solid rgba(56,189,248,0.25)',
+                                fontSize: '0.74rem',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                              title="Load job into custom print run form"
+                            >
+                              Custom
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── 2. NEW PRINTING ENTRY FORM (Visible when activeView === 'log') ── */}
+      {activeView === 'log' && (
+        <>
+        <div className="responsive-form-grid" style={{ display: 'grid', gridTemplateColumns: selectedJob ? 'minmax(0, 1.4fr) minmax(0, 1fr)' : '1fr', gap: '1.25rem' }}>
 
         {/* Entry Form */}
         <div className="glass-panel" style={{ padding: '1.25rem', borderLeft: `4px solid ${editingLogId ? '#f59e0b' : '#38bdf8'}` }}>
@@ -1722,10 +2152,12 @@ export default function JobPrintingLog() {
                 </div>
               </div>
 
-            </div>
-          );
-        })()}
+        </div>
+        );
+      })()}
       </div>
+      </>
+      )}
 
       {/* ── 4. JOB CARD MULTI-RUN HISTORY MODAL ── */}
       {jobHistoryData && viewingJobHistory && (

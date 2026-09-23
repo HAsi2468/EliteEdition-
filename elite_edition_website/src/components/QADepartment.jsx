@@ -461,6 +461,10 @@ export default function QADepartment({ department = 'digital_print' }) {
     let totalFreshMtr = 0;
     let totalWastageMtr = 0;
     let totalFabricUsedMtr = 0;
+    let totalFabricFaultMtr = 0;
+    let totalPrintFaultMtr = 0;
+    let totalFusingFaultMtr = 0;
+    let totalGenuineFaultMtr = 0;
     let passedCount = 0;
     let pendingCount = 0;
     let rejectedCount = 0;
@@ -469,10 +473,18 @@ export default function QADepartment({ department = 'digital_print' }) {
       const fresh = parseFloat(c.freshMtr || c.fusingMtr || c.printedMtr) || 0;
       const waste = parseFloat(c.totalWastageMtr) || 0;
       const used = parseFloat(c.totalFabricUsedMtr) || (fresh + waste);
+      const fabFault = parseFloat(c.fabricFaultMtr) || 0;
+      const printFault = parseFloat(c.printFaultMtr) || 0;
+      const fuseFault = parseFloat(c.fusingFaultMtr) || 0;
+      const genFault = parseFloat(c.genuineFaultMtr) || 0;
 
       totalFreshMtr += fresh;
       totalWastageMtr += waste;
       totalFabricUsedMtr += used;
+      totalFabricFaultMtr += fabFault;
+      totalPrintFaultMtr += printFault;
+      totalFusingFaultMtr += fuseFault;
+      totalGenuineFaultMtr += genFault;
 
       const st = c.qaStatus || 'QA Pending';
       if (st === 'QA Passed') passedCount++;
@@ -483,17 +495,83 @@ export default function QADepartment({ department = 'digital_print' }) {
     const totalCards = filteredPrintedCards.length;
     const passRate = totalCards > 0 ? ((passedCount / totalCards) * 100).toFixed(1) : '100.0';
 
+    const fabricFaultPct = totalWastageMtr > 0 ? ((totalFabricFaultMtr / totalWastageMtr) * 100).toFixed(1) : '0';
+    const printFaultPct = totalWastageMtr > 0 ? ((totalPrintFaultMtr / totalWastageMtr) * 100).toFixed(1) : '0';
+    const fusingFaultPct = totalWastageMtr > 0 ? ((totalFusingFaultMtr / totalWastageMtr) * 100).toFixed(1) : '0';
+    const genuineFaultPct = totalWastageMtr > 0 ? ((totalGenuineFaultMtr / totalWastageMtr) * 100).toFixed(1) : '0';
+
     return {
       totalCards,
       totalFreshMtr,
       totalWastageMtr,
       totalFabricUsedMtr,
+      totalFabricFaultMtr,
+      totalPrintFaultMtr,
+      totalFusingFaultMtr,
+      totalGenuineFaultMtr,
+      fabricFaultPct,
+      printFaultPct,
+      fusingFaultPct,
+      genuineFaultPct,
       passedCount,
       pendingCount,
       rejectedCount,
       passRate
     };
   }, [filteredPrintedCards]);
+
+  // One-Click Re-Print Sub-Job Generator
+  const handleGenerateReprintSubJob = async (card) => {
+    const waste = parseFloat(card.totalWastageMtr) || 0;
+    if (waste <= 0) {
+      triggerEliteAlert('No Defect Meters', 'This job card has 0 meters recorded as wastage.', 'info');
+      return;
+    }
+
+    const confirmed = await triggerEliteConfirm({
+      title: 'Generate Re-Print Sub-Job',
+      message: `Create a replacement Re-Print Job Card for #${card.jobNo}?\n\nDefect Meters to Re-print: ${waste.toFixed(2)} mtr\nFabric: ${card.fabric || '—'}\nDesign: ${card.designName || card.designNo || '—'}`,
+      confirmText: 'Create Re-Print Job',
+      type: 'warning'
+    });
+    if (!confirmed) return;
+
+    setSubmitting(true);
+    try {
+      const reprintJobNo = `${card.jobNo}-R1`;
+      await api.createJobCard({
+        ...card,
+        _id: undefined,
+        id: undefined,
+        jobNo: reprintJobNo,
+        totalMtr: `${waste.toFixed(2)} mtr`,
+        consumption: `${waste.toFixed(2)} mtr`,
+        printMtr: '',
+        fusingMtr: '',
+        freshMtr: '',
+        totalWastageMtr: '0',
+        fabricFaultMtr: '0',
+        fusingFaultMtr: '0',
+        printFaultMtr: '0',
+        genuineFaultMtr: '0',
+        printStatus: 'Printing Pending',
+        fusingStatus: 'Fusing Pending',
+        deliveryStatus: 'Delivery Pending',
+        qaStatus: 'QA Pending',
+        status: 'Pending',
+        emergencyNotes: `[⚡ RE-PRINT SUB-JOB: Replacement for ${waste.toFixed(2)}m defect on #${card.jobNo}]`,
+        note1: `Re-print for defect on #${card.jobNo}`
+      });
+
+      triggerPushNotification('⚡ Re-Print Sub-Job Created', `Generated #${reprintJobNo} for ${waste.toFixed(2)}m defect meters. Sent to Print Queue!`, 'success');
+      triggerGlobalDataRefresh('jobcards');
+      fetchData();
+    } catch (err) {
+      triggerEliteAlert('Creation Failed', err.message || 'Failed to create re-print sub-job.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   // Export CSV Report for Printed QA
   const handleExportPrintedCSV = () => {
@@ -797,6 +875,55 @@ export default function QADepartment({ department = 'digital_print' }) {
             </div>
           </div>
 
+          {/* ── 2. WASTAGE ROOT-CAUSE BREAKDOWN BAR ── */}
+          <div className="glass-panel" style={{ padding: '1rem 1.25rem', background: '#ffffff', borderRadius: '12px', borderLeft: '4px solid #ef4444' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, fontSize: '0.85rem', color: '#1e293b' }}>
+                <AlertTriangle size={16} color="#ef4444" />
+                <span>Defect Root-Cause Breakdown ({printedStats.totalWastageMtr.toFixed(1)}m Total Wastage)</span>
+              </div>
+              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                Visual allocation of fabric faults across production stages
+              </span>
+            </div>
+
+            {/* Proportion Bar */}
+            <div style={{ width: '100%', height: '14px', borderRadius: '7px', background: '#f1f5f9', display: 'flex', overflow: 'hidden', marginBottom: '0.85rem' }}>
+              {printedStats.totalWastageMtr > 0 ? (
+                <>
+                  <div style={{ width: `${printedStats.fabricFaultPct}%`, background: '#f59e0b', height: '100%' }} title={`Fabric Fault: ${printedStats.totalFabricFaultMtr}m (${printedStats.fabricFaultPct}%)`} />
+                  <div style={{ width: `${printedStats.printFaultPct}%`, background: '#3b82f6', height: '100%' }} title={`Print Fault: ${printedStats.totalPrintFaultMtr}m (${printedStats.printFaultPct}%)`} />
+                  <div style={{ width: `${printedStats.fusingFaultPct}%`, background: '#8b5cf6', height: '100%' }} title={`Fusing Fault: ${printedStats.totalFusingFaultMtr}m (${printedStats.fusingFaultPct}%)`} />
+                  <div style={{ width: `${printedStats.genuineFaultPct}%`, background: '#ec4899', height: '100%' }} title={`Genuine Fault: ${printedStats.totalGenuineFaultMtr}m (${printedStats.genuineFaultPct}%)`} />
+                </>
+              ) : (
+                <div style={{ width: '100%', background: '#10b981', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '0.68rem', fontWeight: 800 }}>
+                  0% Wastage — 100% Usable Output 🎉
+                </div>
+              )}
+            </div>
+
+            {/* Defect Legend Badges */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.65rem', fontSize: '0.76rem' }}>
+              <div style={{ padding: '0.45rem 0.75rem', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#b45309', fontWeight: 700 }}>🧵 Fabric Fault (Client)</span>
+                <strong style={{ color: '#d97706' }}>{printedStats.totalFabricFaultMtr.toFixed(1)}m ({printedStats.fabricFaultPct}%)</strong>
+              </div>
+              <div style={{ padding: '0.45rem 0.75rem', borderRadius: 8, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#1d4ed8', fontWeight: 700 }}>🖨️ Print Fault (Machine)</span>
+                <strong style={{ color: '#2563eb' }}>{printedStats.totalPrintFaultMtr.toFixed(1)}m ({printedStats.printFaultPct}%)</strong>
+              </div>
+              <div style={{ padding: '0.45rem 0.75rem', borderRadius: 8, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#6d28d9', fontWeight: 700 }}>♨️ Fusing Fault (Press)</span>
+                <strong style={{ color: '#7c3aed' }}>{printedStats.totalFusingFaultMtr.toFixed(1)}m ({printedStats.fusingFaultPct}%)</strong>
+              </div>
+              <div style={{ padding: '0.45rem 0.75rem', borderRadius: 8, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#be185d', fontWeight: 700 }}>✂️ Genuine / Sample</span>
+                <strong style={{ color: '#db2777' }}>{printedStats.totalGenuineFaultMtr.toFixed(1)}m ({printedStats.genuineFaultPct}%)</strong>
+              </div>
+            </div>
+          </div>
+
           {/* Filter Toolbar */}
           <div className="glass-panel" style={{ padding: '0.85rem 1.25rem', background: '#ffffff', borderRadius: '12px' }}>
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
@@ -1010,27 +1137,55 @@ export default function QADepartment({ department = 'digital_print' }) {
 
                           {/* Actions */}
                           <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              onClick={() => openQaModal(c)}
-                              style={{
-                                padding: '0.45rem 0.9rem',
-                                background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
-                                border: 'none',
-                                color: '#ffffff',
-                                borderRadius: '8px',
-                                fontWeight: 800,
-                                fontSize: '0.78rem',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                boxShadow: '0 3px 8px rgba(79, 70, 229, 0.25)',
-                                transition: 'all 0.15s'
-                              }}
-                            >
-                              <Edit2 size={13} /> QA Check
-                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                              <button
+                                type="button"
+                                onClick={() => openQaModal(c)}
+                                style={{
+                                  padding: '0.45rem 0.85rem',
+                                  background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)',
+                                  border: 'none',
+                                  color: '#ffffff',
+                                  borderRadius: '8px',
+                                  fontWeight: 800,
+                                  fontSize: '0.78rem',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  boxShadow: '0 3px 8px rgba(79, 70, 229, 0.25)',
+                                  transition: 'all 0.15s'
+                                }}
+                              >
+                                <Edit2 size={13} /> QA Check
+                              </button>
+
+                              {waste > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleGenerateReprintSubJob(c)}
+                                  disabled={submitting}
+                                  style={{
+                                    padding: '0.45rem 0.75rem',
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                                    color: '#dc2626',
+                                    borderRadius: '8px',
+                                    fontWeight: 800,
+                                    fontSize: '0.74rem',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    transition: 'all 0.15s'
+                                  }}
+                                  title={`Create a replacement sub-job for ${waste.toFixed(2)}m defect meters`}
+                                >
+                                  <RefreshCw size={12} className={submitting ? 'spin-loader' : ''} />
+                                  <span>Re-Print ({waste.toFixed(1)}m)</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );

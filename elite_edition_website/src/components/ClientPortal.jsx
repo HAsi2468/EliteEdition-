@@ -24,7 +24,11 @@ import {
   PlusCircle,
   Plus,
   Trash2,
-  X
+  X,
+  Printer,
+  Flame,
+  ShieldCheck,
+  Truck
 } from 'lucide-react';
 import DesignImage from './DesignImage';
 import { formatDateDDMMYYYY } from '../utils/dateUtils';
@@ -497,7 +501,7 @@ export default function ClientPortal({ client, onLogout }) {
 
   // Calculate order counts per workflow stage
   const orderCounts = useMemo(() => {
-    const counts = { all: sortedOrders.length, 'print-pending': 0, 'fusing-pending': 0, 'delivery-pending': 0, 'delivered': 0 };
+    const counts = { all: sortedOrders.length, 'print-pending': 0, 'fusing-pending': 0, 'qa-pending': 0, 'delivery-pending': 0, 'delivered': 0 };
     sortedOrders.forEach(o => {
       const info = getOrderStatusInfo(o);
       if (info.key && counts[info.key] !== undefined) {
@@ -1065,8 +1069,9 @@ export default function ClientPortal({ client, onLogout }) {
                 { id: 'all', label: 'All Orders', count: orderCounts.all, dot: '#2563eb' },
                 { id: 'print-pending', label: 'Print Pending', count: orderCounts['print-pending'], dot: '#d97706' },
                 { id: 'fusing-pending', label: 'Fusing Pending', count: orderCounts['fusing-pending'], dot: '#7c3aed' },
-                { id: 'delivery-pending', label: 'Delivery Pending', count: orderCounts['delivery-pending'], dot: '#0284c7' },
-                { id: 'delivered', label: 'Delivered', count: orderCounts['delivered'], dot: '#1d4ed8' }
+                { id: 'qa-pending', label: 'QA Inspection', count: orderCounts['qa-pending'], dot: '#ea580c' },
+                { id: 'delivery-pending', label: 'Ready for Dispatch', count: orderCounts['delivery-pending'], dot: '#0284c7' },
+                { id: 'delivered', label: 'Delivered', count: orderCounts['delivered'], dot: '#16a34a' }
               ].map((pill) => {
                 const isSelected = orderStageFilter === pill.id;
                 return (
@@ -1246,6 +1251,7 @@ export default function ClientPortal({ client, onLogout }) {
                                 }}></span>
                                 {statusInfo.label}
                               </span>
+                              <OrderTrackingStepper ord={ord} compact={true} />
                             </div>
                           </td>
                           <td style={{ whiteSpace: 'nowrap' }}>
@@ -1975,6 +1981,9 @@ export default function ClientPortal({ client, onLogout }) {
 
             {/* Modal Body */}
             <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1, background: '#f8fafc' }}>
+              {/* Visual Live Order Tracking Stepper */}
+              <OrderTrackingStepper ord={selectedOrderDetails} />
+
               {/* Top Overview Cards */}
               <div style={{
                 display: 'grid',
@@ -2250,6 +2259,7 @@ export default function ClientPortal({ client, onLogout }) {
 export function getOrderStatusInfo(ord = {}) {
   const pStatus = String(ord.printStatus || '').toLowerCase().trim();
   const fStatus = String(ord.fusingStatus || '').toLowerCase().trim();
+  const qStatus = String(ord.qaStatus || ord.qualityStatus || '').toLowerCase().trim();
   const dStatus = String(ord.deliveryStatus || '').toLowerCase().trim();
   const genStatus = String(ord.status || '').toLowerCase().trim();
 
@@ -2264,7 +2274,7 @@ export function getOrderStatusInfo(ord = {}) {
     return {
       key: 'delivered',
       label: 'Delivered',
-      sublabel: 'Delivery Done',
+      sublabel: 'Delivery Done • Received by Client',
       badgeBg: '#dcfce7',
       text: '#15803d',
       border: '#86efac',
@@ -2272,21 +2282,37 @@ export function getOrderStatusInfo(ord = {}) {
     };
   }
 
-  // 2. Fusing Done -> Waiting for delivery (Delivery Pending)
+  // 2. Ready for Dispatch / Delivery Pending
   const isFusingDone = fStatus === 'fusing done' || (fStatus.includes('done') && !fStatus.includes('pending'));
-  if (isFusingDone) {
+  const isQaPassed = qStatus === 'qa passed' || qStatus === 'passed';
+  const isDeliveryPending = dStatus === 'delivery pending' || dStatus.includes('dispatch') || isQaPassed;
+
+  if (isDeliveryPending) {
     return {
       key: 'delivery-pending',
-      label: 'Delivery Pending',
-      sublabel: 'Fusing Done • Ready for Delivery',
-      badgeBg: 'rgba(16, 185, 129, 0.1)',
-      text: '#059669',
-      border: 'rgba(16, 185, 129, 0.25)',
-      dotColor: '#10b981'
+      label: 'Ready for Dispatch',
+      sublabel: 'QA Passed • Ready for Delivery',
+      badgeBg: '#e0f2fe',
+      text: '#0284c7',
+      border: '#bae6fd',
+      dotColor: '#0284c7'
     };
   }
 
-  // 3. Printing Done -> In fusing queue (Fusing Pending)
+  // 3. QA Inspection: Fusing Done -> Under QA Inspection
+  if (isFusingDone) {
+    return {
+      key: 'qa-pending',
+      label: 'QA Inspection',
+      sublabel: 'Fusing Done • Under Quality Check',
+      badgeBg: '#fef3c7',
+      text: '#b45309',
+      border: '#fde68a',
+      dotColor: '#d97706'
+    };
+  }
+
+  // 4. Printing Done -> In fusing queue (Fusing Pending)
   const isPrintDone = pStatus === 'printing done' || (pStatus.includes('done') && !pStatus.includes('pending'));
   if (isPrintDone) {
     return {
@@ -2300,7 +2326,7 @@ export function getOrderStatusInfo(ord = {}) {
     };
   }
 
-  // 4. Default: Printing not yet done (Print Pending)
+  // 5. Default: Printing not yet done (Print Pending)
   return {
     key: 'print-pending',
     label: 'Print Pending',
@@ -2310,6 +2336,285 @@ export function getOrderStatusInfo(ord = {}) {
     border: '#fde68a',
     dotColor: '#d97706'
   };
+}
+
+// 5-Stage Live Production Tracking Stepper Model
+export function getOrderStagePipeline(ord = {}) {
+  const pStatus = String(ord.printStatus || '').toLowerCase().trim();
+  const fStatus = String(ord.fusingStatus || '').toLowerCase().trim();
+  const qStatus = String(ord.qaStatus || ord.qualityStatus || '').toLowerCase().trim();
+  const dStatus = String(ord.deliveryStatus || '').toLowerCase().trim();
+  const genStatus = String(ord.status || '').toLowerCase().trim();
+
+  const isDeliveryDone = 
+    dStatus === 'delivery done' || 
+    dStatus === 'delivered' || 
+    (dStatus.includes('done') && !dStatus.includes('pending')) || 
+    (genStatus === 'done' && !dStatus.includes('pending') && !fStatus.includes('pending'));
+
+  const isQADone = isDeliveryDone || qStatus === 'qa passed' || qStatus === 'passed';
+  const isFusingDone = isQADone || fStatus === 'fusing done' || (fStatus.includes('done') && !fStatus.includes('pending'));
+  const isPrintDone = isFusingDone || pStatus === 'printing done' || (pStatus.includes('done') && !pStatus.includes('pending'));
+
+  let currentStep = 1;
+  if (isDeliveryDone) {
+    currentStep = 5;
+  } else if (isQADone || dStatus.includes('dispatch') || dStatus === 'delivery pending') {
+    currentStep = 5; // Ready / Dispatched
+  } else if (isFusingDone) {
+    currentStep = 4; // In QA Inspection
+  } else if (isPrintDone) {
+    currentStep = 3; // In Fusing
+  } else {
+    currentStep = 2; // In Printing
+  }
+
+  const stages = [
+    {
+      step: 1,
+      id: 'placed',
+      title: 'Order Placed',
+      shortTitle: 'Placed',
+      isCompleted: true,
+      isActive: false,
+      timestamp: formatDateDDMMYYYY(ord.created_date_time || ord.createdAt || ord.date),
+      detail: ord.jobNo || ord.orderNo || 'Job Card Created'
+    },
+    {
+      step: 2,
+      id: 'printing',
+      title: 'Digital Printing',
+      shortTitle: 'Printing',
+      isCompleted: isPrintDone,
+      isActive: currentStep === 2 && !isPrintDone,
+      timestamp: ord.printedDate || ord.printCompletedAt || (isPrintDone ? 'Completed' : null),
+      detail: isPrintDone ? 'Print Done' : (ord.printMachine ? `Machine: ${ord.printMachine}` : 'In Print Queue')
+    },
+    {
+      step: 3,
+      id: 'fusing',
+      title: 'Heat Press (Fusing)',
+      shortTitle: 'Fusing',
+      isCompleted: isFusingDone,
+      isActive: currentStep === 3 && !isFusingDone,
+      timestamp: ord.fusedDate || ord.fusingCompletedAt || (isFusingDone ? 'Completed' : null),
+      detail: isFusingDone ? 'Fusing Done' : (ord.temperature ? `${ord.temperature}°C Press` : 'Pending Fusing')
+    },
+    {
+      step: 4,
+      id: 'qa',
+      title: 'Quality Inspection',
+      shortTitle: 'QA Check',
+      isCompleted: isQADone,
+      isActive: currentStep === 4 && !isQADone,
+      timestamp: ord.qaInspectedAt || (isQADone ? 'Passed' : null),
+      detail: isQADone ? 'QA Passed' : (ord.freshMtr ? `${ord.freshMtr}m Fresh Inspected` : 'Quality Check')
+    },
+    {
+      step: 5,
+      id: 'dispatch',
+      title: 'Ready / Dispatched',
+      shortTitle: 'Dispatched',
+      isCompleted: isDeliveryDone,
+      isActive: currentStep === 5 && !isDeliveryDone,
+      timestamp: ord.dispatchedDate || ord.deliveredDate || (isDeliveryDone ? 'Delivered' : null),
+      detail: isDeliveryDone ? 'Delivered to Client' : (isQADone ? 'Ready for Dispatch' : 'Final Delivery')
+    }
+  ];
+
+  return { currentStep, stages, isDeliveryDone };
+}
+
+// Visual Live Order Tracking Stepper
+export function OrderTrackingStepper({ ord, compact = false }) {
+  if (!ord) return null;
+  const { currentStep, stages, isDeliveryDone } = getOrderStagePipeline(ord);
+
+  if (compact) {
+    const activeStage = stages.find(s => s.step === currentStep) || stages[0];
+    return (
+      <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '3px', marginTop: '3px' }} title={`Production Stage ${currentStep} of 5: ${activeStage.title}`}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+          {stages.map((st) => {
+            const isDone = st.isCompleted;
+            const isActive = st.isActive;
+            return (
+              <div
+                key={st.step}
+                style={{
+                  width: '11px',
+                  height: '4px',
+                  borderRadius: '2px',
+                  backgroundColor: isDone ? '#10b981' : isActive ? '#2563eb' : '#cbd5e1',
+                  transition: 'background-color 0.2s ease',
+                  boxShadow: isActive ? '0 0 4px rgba(37,99,235,0.4)' : 'none'
+                }}
+              />
+            );
+          })}
+        </div>
+        <span style={{ fontSize: '0.67rem', color: '#64748b', fontWeight: 600 }}>
+          {isDeliveryDone ? '✓ Completed' : `Stage ${currentStep}/5: ${activeStage.shortTitle}`}
+        </span>
+      </div>
+    );
+  }
+
+  // Full detailed interactive horizontal pipeline for Job Card Modal
+  return (
+    <div style={{
+      background: '#ffffff',
+      border: '1px solid #bfdbfe',
+      borderRadius: '12px',
+      padding: '1.15rem 1.25rem',
+      marginBottom: '1.25rem',
+      boxShadow: '0 2px 8px rgba(37, 99, 235, 0.05)'
+    }}>
+      {/* Stepper Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '26px',
+            height: '26px',
+            borderRadius: '50%',
+            background: '#eff6ff',
+            color: '#1d4ed8'
+          }}>
+            <Sparkles size={14} />
+          </span>
+          <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>
+            Live Factory Production Pipeline
+          </span>
+          <span style={{
+            fontSize: '0.68rem',
+            fontWeight: 700,
+            background: '#ecfdf5',
+            color: '#059669',
+            border: '1px solid #a7f3d0',
+            borderRadius: '12px',
+            padding: '2px 8px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+            Live Sync
+          </span>
+        </div>
+
+        <div style={{
+          fontSize: '0.78rem',
+          fontWeight: 700,
+          color: '#1d4ed8',
+          background: '#eff6ff',
+          padding: '3px 10px',
+          borderRadius: '20px',
+          border: '1px solid #dbeafe'
+        }}>
+          {isDeliveryDone ? '✓ Order Completed & Delivered' : `Stage ${currentStep} of 5: ${stages[currentStep - 1]?.title}`}
+        </div>
+      </div>
+
+      {/* Visual Stepper Nodes & Line */}
+      <div style={{ position: 'relative', margin: '0.5rem 0 0.5rem 0' }}>
+        {/* Background Connecting Line */}
+        <div style={{
+          position: 'absolute',
+          top: '19px',
+          left: '10%',
+          right: '10%',
+          height: '4px',
+          background: '#e2e8f0',
+          zIndex: 1,
+          borderRadius: '2px'
+        }} />
+        
+        {/* Active Connecting Fill Line */}
+        <div style={{
+          position: 'absolute',
+          top: '19px',
+          left: '10%',
+          width: `${((Math.min(currentStep, 5) - 1) / 4) * 80}%`,
+          height: '4px',
+          background: 'linear-gradient(90deg, #10b981, #2563eb)',
+          zIndex: 2,
+          borderRadius: '2px',
+          transition: 'width 0.4s ease'
+        }} />
+
+        {/* 5 Stages Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(5, 1fr)',
+          position: 'relative',
+          zIndex: 3,
+          textAlign: 'center',
+          gap: '4px'
+        }}>
+          {stages.map((st) => {
+            const isDone = st.isCompleted;
+            const isActive = st.isActive;
+
+            let IconComp = Check;
+            if (st.id === 'placed') IconComp = Package;
+            else if (st.id === 'printing') IconComp = Printer;
+            else if (st.id === 'fusing') IconComp = Flame;
+            else if (st.id === 'qa') IconComp = ShieldCheck;
+            else if (st.id === 'dispatch') IconComp = Truck;
+
+            return (
+              <div key={st.step} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: isDone ? '#10b981' : isActive ? '#2563eb' : '#ffffff',
+                  border: isDone ? '2px solid #10b981' : isActive ? '2px solid #2563eb' : '2px solid #cbd5e1',
+                  color: isDone || isActive ? '#ffffff' : '#94a3b8',
+                  boxShadow: isActive ? '0 0 0 4px rgba(37,99,235,0.2), 0 2px 6px rgba(0,0,0,0.1)' : isDone ? '0 2px 6px rgba(16,185,129,0.2)' : 'none',
+                  transition: 'all 0.25s ease',
+                  fontWeight: 800,
+                  fontSize: '0.85rem'
+                }}>
+                  {isDone ? <Check size={18} strokeWidth={2.8} /> : <IconComp size={17} />}
+                </div>
+
+                <div style={{ marginTop: '8px', padding: '0 4px' }}>
+                  <div style={{
+                    fontSize: '0.78rem',
+                    fontWeight: isActive || isDone ? 800 : 600,
+                    color: isActive ? '#1d4ed8' : isDone ? '#0f172a' : '#64748b',
+                    lineHeight: 1.2
+                  }}>
+                    {st.title}
+                  </div>
+                  <div style={{
+                    fontSize: '0.7rem',
+                    color: isActive ? '#2563eb' : isDone ? '#059669' : '#94a3b8',
+                    fontWeight: 600,
+                    marginTop: '3px'
+                  }}>
+                    {st.detail}
+                  </div>
+                  {st.timestamp && (
+                    <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '2px' }}>
+                      {st.timestamp}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const styles = {

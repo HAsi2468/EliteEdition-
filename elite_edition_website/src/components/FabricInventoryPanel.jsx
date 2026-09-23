@@ -2168,16 +2168,38 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
               </div>
             </div>
 
-            {/* Summary Bar */}
-            {displayStock.length > 0 && (
-              <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Fabrics</span><br /><strong>{displayStock.length}</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Received</span><br /><strong style={{ color: 'var(--success)' }}>{Number(displayStock.reduce((a, i) => a + (i.totalInward || 0), 0)).toFixed(2)} mtr</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Total Used</span><br /><strong style={{ color: 'var(--danger)' }}>{Number(displayStock.reduce((a, i) => a + (i.totalOutward || 0), 0)).toFixed(2)} mtr</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Net Available</span><br /><strong style={{ color: 'var(--primary)' }}>{Number(displayStock.reduce((a, i) => a + (i.currentStock || 0), 0)).toFixed(2)} mtr</strong></div>
-                <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Low Stock</span><br /><strong style={{ color: '#f59e0b' }}>{displayStock.filter(i => i.currentStock > 0 && i.currentStock <= 50).length}</strong></div>
-              </div>
-            )}
+            {/* Summary Bar & Yield Reconciliation */}
+            {displayStock.length > 0 && (() => {
+              const totalInward = displayStock.reduce((a, i) => a + (i.totalInward || 0), 0);
+              const totalOutward = displayStock.reduce((a, i) => a + (i.totalOutward || 0), 0);
+              const netAvailable = displayStock.reduce((a, i) => a + (i.currentStock || 0), 0);
+              const lowStockItems = displayStock.filter(i => i.currentStock > 0 && i.currentStock <= 50);
+              const outOfStockItems = displayStock.filter(i => i.currentStock <= 0);
+              const deliveryYieldPct = totalInward > 0 ? ((totalOutward / totalInward) * 100).toFixed(1) : '0';
+
+              return (
+                <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.04)', borderRadius: '10px', display: 'flex', gap: '1.8rem', flexWrap: 'wrap', border: '1px solid var(--border-light)' }}>
+                    <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700 }}>Total Fabrics</span><br /><strong style={{ fontSize: '1.15rem' }}>{displayStock.length}</strong></div>
+                    <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700 }}>Total Received</span><br /><strong style={{ color: 'var(--success)', fontSize: '1.15rem' }}>{totalInward.toFixed(2)} mtr</strong></div>
+                    <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700 }}>Total Used</span><br /><strong style={{ color: 'var(--danger)', fontSize: '1.15rem' }}>{totalOutward.toFixed(2)} mtr</strong></div>
+                    <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700 }}>Net Available</span><br /><strong style={{ color: 'var(--primary)', fontSize: '1.15rem' }}>{netAvailable.toFixed(2)} mtr</strong></div>
+                    <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700 }}>Dispatched Yield</span><br /><strong style={{ color: '#38bdf8', fontSize: '1.15rem' }}>{deliveryYieldPct}%</strong></div>
+                    <div><span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700 }}>Low Stock Alert</span><br /><strong style={{ color: lowStockItems.length + outOfStockItems.length > 0 ? '#ef4444' : '#10b981', fontSize: '1.15rem' }}>{lowStockItems.length + outOfStockItems.length} Qualities</strong></div>
+                  </div>
+
+                  {/* Critical Low Stock Warning Banner */}
+                  {(lowStockItems.length > 0 || outOfStockItems.length > 0) && (
+                    <div style={{ padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                      <AlertTriangle size={18} color="#ef4444" style={{ flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 200, fontSize: '0.8rem', color: '#f87171' }}>
+                        <strong>⚠️ Critical Stock Alert:</strong> {outOfStockItems.length > 0 && <span><strong>{outOfStockItems.length}</strong> out-of-stock quality ({outOfStockItems.slice(0, 3).map(x => x.fabricQuality).join(', ')})</span>} {lowStockItems.length > 0 && <span>• <strong>{lowStockItems.length}</strong> low-stock (&le;50m) qualities. Notify client partners to dispatch grey rolls for upcoming job cards.</span>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Fabric Quality Cards with Panna breakdown */}
             {displayStock.length === 0 && !loading && <p>No stock data found.</p>}

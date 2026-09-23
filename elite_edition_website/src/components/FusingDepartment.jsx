@@ -17,6 +17,29 @@ function getAutoShift() {
   return (hours >= 9 && hours < 21) ? 'Morning' : 'Night';
 }
 
+export function getFabricFusingPreset(fabricName) {
+  const f = String(fabricName || '').toLowerCase();
+  if (f.includes('crepe') || f.includes('french')) {
+    return { temp: '210°C', speed: '18 m/min', note: 'Standard Sublimation' };
+  }
+  if (f.includes('organza')) {
+    return { temp: '195°C', speed: '22 m/min', note: 'Low Temp (Anti-Shrink)' };
+  }
+  if (f.includes('satin')) {
+    return { temp: '205°C', speed: '16 m/min', note: 'High Tension' };
+  }
+  if (f.includes('georgette') || f.includes('chiffon')) {
+    return { temp: '200°C', speed: '20 m/min', note: 'Medium Heat' };
+  }
+  if (f.includes('modal') || f.includes('rayon')) {
+    return { temp: '190°C', speed: '20 m/min', note: 'Pre-dry Recommended' };
+  }
+  if (f.includes('velvet') || f.includes('heavy')) {
+    return { temp: '205°C', speed: '14 m/min', note: 'Slow Speed Feed' };
+  }
+  return { temp: '205°C', speed: '18 m/min', note: 'General Polyester' };
+}
+
 const DEFAULT_FUSING_MACHINES = [
   'Fusing Machine 1 (Rotary)',
   'Fusing Machine 2 (High Speed)',
@@ -250,10 +273,11 @@ export default function FusingDepartment() {
 
   const openSpeedTempModal = (card) => {
     setSpeedTempCard(card);
+    const preset = getFabricFusingPreset(card.fabric);
     setSpeedTempForm({
       fusingMachine: card.fusingMachine || DEFAULT_FUSING_MACHINES[0],
-      fusingTemp: card.fusingTemp || card.temperature || '210°C',
-      fusingSpeed: card.fusingSpeed || card.speed || '18 m/min'
+      fusingTemp: card.fusingTemp || card.temperature || preset.temp,
+      fusingSpeed: card.fusingSpeed || card.speed || preset.speed
     });
     setShowSpeedTempModal(true);
   };
@@ -327,6 +351,7 @@ export default function FusingDepartment() {
       const pMtr = card.printedMtr || card.freshMtr || card.fusingMtr || card.totalMtr || '';
       const defaultMtr = card.fusingMtr || pMtr || '';
       const cardPanna = card.panna ? (String(card.panna).includes('"') ? card.panna : `${card.panna}"`) : '58"';
+      const preset = getFabricFusingPreset(card.fabric);
       setTopForm(prev => ({
         ...prev,
         jobCardId: card._id || card.id,
@@ -334,8 +359,8 @@ export default function FusingDepartment() {
         panna: cardPanna,
         printedMtr: pMtr,
         fusingMtr: defaultMtr,
-        fusingTemp: card.fusingTemp || card.temperature || '210°C',
-        fusingSpeed: card.fusingSpeed || card.speed || '18 m/min',
+        fusingTemp: card.fusingTemp || card.temperature || preset.temp,
+        fusingSpeed: card.fusingSpeed || card.speed || preset.speed,
         fusingMachine: card.fusingMachine || prev.fusingMachine,
         butterPaperWeightKg: card.butterPaperWeightKg || ''
       }));
@@ -567,8 +592,10 @@ export default function FusingDepartment() {
       }
       if (statusFilter !== 'All') {
         const curStatus = c.fusingStatus || 'Fusing Pending';
-        if (statusFilter === 'Fusing Pending' && curStatus !== 'Fusing Pending') return false;
-        if (statusFilter === 'Fusing Done' && curStatus !== 'Fusing Done') return false;
+        if (statusFilter === 'Ready for Fusing') {
+          if (c.printStatus !== 'Printing Done' || curStatus === 'Fusing Done') return false;
+        } else if (statusFilter === 'Fusing Pending' && curStatus !== 'Fusing Pending') return false;
+        else if (statusFilter === 'Fusing Done' && curStatus !== 'Fusing Done') return false;
       }
       if (filterMachine && (c.fusingMachine || '') !== filterMachine) {
         return false;
@@ -587,12 +614,16 @@ export default function FusingDepartment() {
     let totalButterPaperKg = 0;
     let pendingCount = 0;
     let doneCount = 0;
+    let readyForFusingCount = 0;
     const todayStr = toLocalYMD();
     let todayFreshMtr = 0;
     const pannaButterKgMap = {};
 
     cards.forEach(c => {
       const isDone = c.fusingStatus === 'Fusing Done';
+      if (c.printStatus === 'Printing Done' && c.fusingStatus !== 'Fusing Done') {
+        readyForFusingCount++;
+      }
       if (isDone) {
         doneCount++;
         const fresh = parseFloat(c.freshMtr || c.fusingMtr) || 0;
@@ -631,6 +662,7 @@ export default function FusingDepartment() {
 
     const butterPaperOutwardKg = Math.max(totalButterPaperKg, butterPaperRawOutwardKg);
     const butterPaperBalanceKg = butterPaperInwardKg - butterPaperOutwardKg;
+    const yieldRatio = totalButterPaperKg > 0 ? (totalFreshMtr / totalButterPaperKg).toFixed(1) : '—';
 
     return {
       totalFreshMtr,
@@ -642,6 +674,8 @@ export default function FusingDepartment() {
       pannaButterKgMap,
       pendingCount,
       doneCount,
+      readyForFusingCount,
+      yieldRatio,
       todayFreshMtr
     };
   }, [cards, rawMatTxns]);
@@ -1023,7 +1057,7 @@ export default function FusingDepartment() {
       </div>
 
       {/* Summary KPI Statistics Bar */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
         {/* Today Fresh Output */}
         <div className="glass-panel" style={{ padding: '0.85rem 1.1rem', borderLeft: '4px solid #2563eb' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1043,6 +1077,20 @@ export default function FusingDepartment() {
           </div>
           <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#6d28d9', marginTop: 4 }}>
             {stats.totalButterPaperKg.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>kg</span>
+          </div>
+        </div>
+
+        {/* Butter Paper Yield Efficiency */}
+        <div className="glass-panel" style={{ padding: '0.85rem 1.1rem', borderLeft: '4px solid #0d9488' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Paper Yield Ratio</span>
+            <Zap size={18} color="#0d9488" />
+          </div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0d9488', marginTop: 4 }}>
+            {stats.yieldRatio} <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>m/kg</span>
+          </div>
+          <div style={{ fontSize: '0.68rem', color: Number(stats.yieldRatio) >= 12 ? '#10b981' : '#f59e0b', marginTop: 2, fontWeight: 700 }}>
+            {Number(stats.yieldRatio) >= 12 ? '✓ Optimal Paper Yield' : Number(stats.yieldRatio) > 0 ? '⚠️ High Paper Usage' : 'Awaiting Output'}
           </div>
         </div>
 
@@ -1097,19 +1145,31 @@ export default function FusingDepartment() {
           />
 
           {/* Status Buttons Filter */}
-          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-light)', height: '34px', alignItems: 'center' }}>
-            {['All', 'Fusing Pending', 'Fusing Done'].map(st => (
+          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-light)', height: '34px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {['All', 'Ready for Fusing', 'Fusing Pending', 'Fusing Done'].map(st => (
               <button
                 key={st}
                 type="button"
                 onClick={() => setStatusFilter(st)}
                 style={{
                   padding: '0.2rem 0.7rem', fontSize: '0.76rem', fontWeight: 800, borderRadius: '4px', border: 'none',
-                  background: statusFilter === st ? (st === 'Fusing Done' ? '#10b981' : st === 'Fusing Pending' ? '#f59e0b' : '#2563eb') : 'transparent',
-                  color: statusFilter === st ? '#ffffff' : 'var(--text-muted)', cursor: 'pointer', transition: 'all 0.15s', height: '28px'
+                  background: statusFilter === st ? (st === 'Fusing Done' ? '#10b981' : st === 'Ready for Fusing' ? 'linear-gradient(135deg, #f59e0b, #ef4444)' : st === 'Fusing Pending' ? '#f59e0b' : '#2563eb') : 'transparent',
+                  color: statusFilter === st ? '#ffffff' : 'var(--text-muted)', cursor: 'pointer', transition: 'all 0.15s', height: '28px',
+                  display: 'flex', alignItems: 'center', gap: '4px'
                 }}
               >
-                {st}
+                {st === 'Ready for Fusing' && <Flame size={12} color={statusFilter === st ? '#fff' : '#f59e0b'} />}
+                <span>{st}</span>
+                {st === 'Ready for Fusing' && stats.readyForFusingCount > 0 && (
+                  <span style={{
+                    padding: '0 5px', borderRadius: '10px',
+                    background: statusFilter === st ? 'rgba(0,0,0,0.35)' : 'rgba(239,68,68,0.2)',
+                    color: statusFilter === st ? '#fff' : '#ef4444',
+                    fontSize: '0.68rem', fontWeight: 900
+                  }}>
+                    {stats.readyForFusingCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -1212,10 +1272,25 @@ export default function FusingDepartment() {
 
                       {/* Design & Fabric */}
                       <td style={{ padding: '10px 12px' }}>
-                        <div style={{ fontWeight: 800, color: '#0284c7' }}>{c.designName || c.designNo || '—'}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 800, color: '#0284c7' }}>{c.designName || c.designNo || '—'}</span>
+                          {c.printStatus === 'Printing Done' && c.fusingStatus !== 'Fusing Done' && (
+                            <span style={{ padding: '1px 5px', borderRadius: 4, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)', color: '#059669', fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                              ⚡ Print Ready
+                            </span>
+                          )}
+                        </div>
                         <div style={{ fontSize: '0.74rem', color: '#475569', marginTop: 2 }}>
                           {c.fabric || 'Fabric'} {c.panna ? `(${c.panna}")` : ''}
                         </div>
+                        {(() => {
+                          const preset = getFabricFusingPreset(c.fabric);
+                          return (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: 3, padding: '1px 6px', borderRadius: 4, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', fontSize: '0.68rem', color: '#d97706', fontWeight: 700 }}>
+                              <Flame size={10} /> Preset: {preset.temp} @ {preset.speed}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Speed & Temp (Clickable to change) */}
