@@ -163,9 +163,9 @@ const getDailyOperationsSummary = async (req, res) => {
             meters: {
               $sum: {
                 $cond: [
-                  { $gt: [{ $toDouble: '$fusingMtr' }, 0] },
-                  { $toDouble: '$fusingMtr' },
-                  { $toDouble: '$totalMtr' }
+                  { $gt: [{ $convert: { input: '$fusingMtr', to: 'double', onError: 0, onNull: 0 } }, 0] },
+                  { $convert: { input: '$fusingMtr', to: 'double', onError: 0, onNull: 0 } },
+                  { $convert: { input: '$totalMtr', to: 'double', onError: 0, onNull: 0 } }
                 ]
               }
             },
@@ -187,13 +187,7 @@ const getDailyOperationsSummary = async (req, res) => {
           $group: {
             _id: null,
             pendingMeters: {
-              $sum: {
-                $cond: [
-                  { $gt: [{ $toDouble: '$totalMtr' }, 0] },
-                  { $toDouble: '$totalMtr' },
-                  0
-                ]
-              }
+              $sum: { $convert: { input: '$totalMtr', to: 'double', onError: 0, onNull: 0 } }
             },
             pendingCards: { $sum: 1 }
           }
@@ -221,13 +215,7 @@ const getDailyOperationsSummary = async (req, res) => {
             },
             count: { $sum: 1 },
             meters: {
-              $sum: {
-                $cond: [
-                  { $gt: [{ $toDouble: '$totalMtr' }, 0] },
-                  { $toDouble: '$totalMtr' },
-                  0
-                ]
-              }
+              $sum: { $convert: { input: '$totalMtr', to: 'double', onError: 0, onNull: 0 } }
             }
           }
         }
@@ -246,13 +234,7 @@ const getDailyOperationsSummary = async (req, res) => {
             _id: null,
             count: { $sum: 1 },
             meters: {
-              $sum: {
-                $cond: [
-                  { $gt: [{ $toDouble: '$totalMtr' }, 0] },
-                  { $toDouble: '$totalMtr' },
-                  0
-                ]
-              }
+              $sum: { $convert: { input: '$totalMtr', to: 'double', onError: 0, onNull: 0 } }
             }
           }
         }
