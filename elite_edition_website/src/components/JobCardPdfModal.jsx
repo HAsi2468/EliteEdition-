@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Printer, Download, ExternalLink, Loader2, Image as ImageIcon, AlertCircle, FileText } from 'lucide-react';
 import { api } from '../services/api';
 import { triggerJobCardPrint } from './JobCardPanel';
+import DesignImage from './DesignImage';
 
 export default function JobCardPdfModal({ card, loading, error, onClose, onNavigateToJobCards }) {
   const [resolvedImages, setResolvedImages] = useState({
@@ -394,20 +395,28 @@ export default function JobCardPdfModal({ card, loading, error, onClose, onNavig
                 {resolvedImages.imageUrl1 || resolvedImages.imageUrl2 ? (
                   <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
                     {resolvedImages.imageUrl1 && (
-                      <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}>
-                        <img
-                          src={resolvedImages.imageUrl1}
-                          alt="Design 1"
-                          style={{ maxWidth: '100%', maxHeight: '190px', objectFit: 'contain' }}
+                      <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', minHeight: '130px' }}>
+                        <DesignImage
+                          rawUrl={resolvedImages.imageUrl1}
+                          designName={card?.designName || card?.designNo || ''}
+                          thumbnail={true}
+                          width={450}
+                          style={{ width: '100%', height: '100%', maxHeight: '190px' }}
+                          imgStyle={{ objectFit: 'contain' }}
+                          showPlaceholderBadge={true}
                         />
                       </div>
                     )}
                     {resolvedImages.imageUrl2 && (
-                      <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', borderLeft: '1.2px solid #000' }}>
-                        <img
-                          src={resolvedImages.imageUrl2}
-                          alt="Design 2"
-                          style={{ maxWidth: '100%', maxHeight: '190px', objectFit: 'contain' }}
+                      <div style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', borderLeft: '1.2px solid #000', minHeight: '130px' }}>
+                        <DesignImage
+                          rawUrl={resolvedImages.imageUrl2}
+                          designName={`${card?.designName || card?.designNo || ''}-2`}
+                          thumbnail={true}
+                          width={450}
+                          style={{ width: '100%', height: '100%', maxHeight: '190px' }}
+                          imgStyle={{ objectFit: 'contain' }}
+                          showPlaceholderBadge={true}
                         />
                       </div>
                     )}

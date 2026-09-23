@@ -150,9 +150,36 @@ app.get(['/v1/designs/:filename', '/designs/:filename'], async (req, res, next) 
     return next();
   }
 
-  // 1. Check if any matching photo file exists locally in imagesDir or uploads
+  const isThumb = req.query.thumb === '1' || req.query.thumbnail === '1' || Boolean(req.query.w);
+  const targetWidth = Math.min(1000, Math.max(100, parseInt(req.query.w, 10) || 360));
+  const thumbsDir = path.join(process.cwd(), 'uploads/thumbs');
+  const cacheDir = path.join(process.cwd(), 'uploads/cache');
   try {
-    const searchDirs = [imagesDir, path.join(__dirname, '../uploads'), path.join(process.cwd(), 'uploads')];
+    if (!fs.existsSync(thumbsDir)) fs.mkdirSync(thumbsDir, { recursive: true });
+    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
+  } catch (e) {}
+
+  let sharp;
+  try { sharp = require('sharp'); } catch (e) {}
+
+  const thumbCacheKey = `${cleanName.toUpperCase().replace(/[^A-Z0-9_-]/g, '_')}_w${targetWidth}.jpg`;
+  const thumbPath = path.join(thumbsDir, thumbCacheKey);
+
+  // 1. If thumbnail was requested and is already cached on disk, send it immediately in < 5ms
+  if (isThumb && fs.existsSync(thumbPath)) {
+    try {
+      if (fs.statSync(thumbPath).size > 50) {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+        return res.sendFile(thumbPath);
+      }
+    } catch (e) {}
+  }
+
+  // 2. Check if any matching photo file exists locally in imagesDir, uploads, or cache
+  try {
+    const searchDirs = [imagesDir, path.join(__dirname, '../uploads'), path.join(process.cwd(), 'uploads'), cacheDir];
     for (const sDir of searchDirs) {
       if (!fs.existsSync(sDir)) continue;
       const files = fs.readdirSync(sDir);
@@ -179,7 +206,24 @@ app.get(['/v1/designs/:filename', '/designs/:filename'], async (req, res, next) 
       if (matchedFile) {
         const fullPath = path.join(sDir, matchedFile);
         if (fs.existsSync(fullPath) && fs.statSync(fullPath).size > 100) {
+          // If thumbnail requested and sharp is available, generate & cache thumbnail
+          if (isThumb && sharp) {
+            try {
+              await sharp(fullPath)
+                .resize({ width: targetWidth, withoutEnlargement: true })
+                .jpeg({ quality: 80, progressive: true })
+                .toFile(thumbPath);
+              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.setHeader('Content-Type', 'image/jpeg');
+              res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+              return res.sendFile(thumbPath);
+            } catch (sharpErr) {
+              console.warn('Sharp thumbnail resize error on local file:', sharpErr.message);
+            }
+          }
+
           res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Cache-Control', 'public, max-age=2592000');
           return res.sendFile(fullPath);
         }
       }
@@ -188,7 +232,7 @@ app.get(['/v1/designs/:filename', '/designs/:filename'], async (req, res, next) 
     console.warn('Smart local image lookup error:', e.message);
   }
 
-  // 2. If not found locally and not an explicit fallback request, stream directly from Cloudflare R2
+  // 3. If not found locally and not an explicit fallback request, fetch from Cloudflare R2
   const isExplicitFallback = req.query.fallback === '1' || req.query.svg === '1';
   if (!isExplicitFallback && config.r2 && config.r2.publicUrl) {
     const r2Base = config.r2.publicUrl.replace(/\/+$/, '');
@@ -238,17 +282,41 @@ app.get(['/v1/designs/:filename', '/designs/:filename'], async (req, res, next) 
 
     for (const key of uniqueKeys) {
       try {
-        const streamRes = await axios.get(`${r2Base}/${key}`, {
-          responseType: 'stream',
+        const r2Res = await axios.get(`${r2Base}/${key}`, {
+          responseType: 'arraybuffer',
           timeout: 4500,
           headers: { 'User-Agent': 'Mozilla/5.0 EliteEdition-Proxy' }
         });
-        if (streamRes.status === 200) {
+        if (r2Res.status === 200 && r2Res.data && r2Res.data.length > 50) {
+          const buffer = Buffer.from(r2Res.data);
+          
+          // Save master copy to local cache so R2 is never hit twice
+          const localMasterCachePath = path.join(cacheDir, `${cleanName.toUpperCase().replace(/[^A-Z0-9_-]/g, '_')}.jpg`);
+          try {
+            fs.writeFileSync(localMasterCachePath, buffer);
+          } catch (writeErr) {}
+
+          // If thumbnail requested and sharp is available, generate & cache thumbnail
+          if (isThumb && sharp) {
+            try {
+              await sharp(buffer)
+                .resize({ width: targetWidth, withoutEnlargement: true })
+                .jpeg({ quality: 80, progressive: true })
+                .toFile(thumbPath);
+              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.setHeader('Content-Type', 'image/jpeg');
+              res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
+              return res.sendFile(thumbPath);
+            } catch (sharpErr) {
+              console.warn('Sharp thumbnail resize error on R2 buffer:', sharpErr.message);
+            }
+          }
+
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-          res.setHeader('Content-Type', streamRes.headers['content-type'] || 'image/jpeg');
-          res.setHeader('Cache-Control', 'public, max-age=86400');
-          return streamRes.data.pipe(res);
+          res.setHeader('Content-Type', r2Res.headers['content-type'] || 'image/jpeg');
+          res.setHeader('Cache-Control', 'public, max-age=2592000');
+          return res.send(buffer);
         }
       } catch (err) {
         // Continue to next candidate

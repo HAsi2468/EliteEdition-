@@ -17,14 +17,19 @@ export default function DesignImage({
   onZoom,
   onClick,
   category = '',
-  showPlaceholderBadge = true
+  showPlaceholderBadge = true,
+  thumbnail = true,
+  width = 360
 }) {
-  const candidates = useMemo(() => getImageCandidates(rawUrl, designName), [rawUrl, designName]);
+  const candidates = useMemo(
+    () => getImageCandidates(rawUrl, designName, { thumbnail, width }),
+    [rawUrl, designName, thumbnail, width]
+  );
   const [candidateIdx, setCandidateIdx] = useState(0);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [allFailed, setAllFailed] = useState(false);
 
-  // Reset state when rawUrl or designName changes
+  // Reset state when candidates change
   useEffect(() => {
     setCandidateIdx(0);
     setHasLoaded(false);
@@ -47,8 +52,10 @@ export default function DesignImage({
   };
 
   const handleClick = (e) => {
-    if (onZoom && currentSrc && !allFailed) {
-      onZoom(currentSrc);
+    if (onZoom && !allFailed) {
+      const fullCandidates = getImageCandidates(rawUrl, designName, { thumbnail: false });
+      const hdSrc = fullCandidates[0] || currentSrc;
+      onZoom(hdSrc);
     } else if (onClick) {
       onClick(e);
     }

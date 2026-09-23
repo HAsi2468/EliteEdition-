@@ -775,7 +775,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
         sortBy,
         sortOrder,
         page: effectivePage,
-        limit: 40
+        limit: 24
       });
       if (res && res.data) {
         setDesigns(res.data);
@@ -807,7 +807,7 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
         sortBy,
         sortOrder,
         page: nextPage,
-        limit: 40
+        limit: 24
       });
       if (res && res.data && res.data.length > 0) {
         setDesigns(prev => {
@@ -1432,6 +1432,8 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                           designName={d.designName}
                           category={d.category}
                           department={department}
+                          thumbnail={true}
+                          width={360}
                           onZoom={(src) => setZoomImg(src)}
                           style={{ width: '100%', height: '100%' }}
                         />
@@ -1441,7 +1443,8 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                           <div
                             onClick={(e) => {
                               e.stopPropagation();
-                              setZoomImg(convertDriveUrl(d.imageUrl2, `${d.designName}-2`));
+                              const hdCandidates = getImageCandidates(d.imageUrl2, `${d.designName}-2`, { thumbnail: false });
+                              setZoomImg(hdCandidates[0] || convertDriveUrl(d.imageUrl2, `${d.designName}-2`));
                             }}
                             style={{
                               position: 'absolute', bottom: 6, right: 6, width: '38px', height: '38px',
@@ -1454,6 +1457,8 @@ export default function DesignCatalogue({ department, initialSubTab = 'catalogue
                               rawUrl={d.imageUrl2}
                               designName={`${d.designName}-2`}
                               showPlaceholderBadge={false}
+                              thumbnail={true}
+                              width={120}
                               style={{ width: '100%', height: '100%' }}
                             />
                           </div>
