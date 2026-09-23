@@ -4,7 +4,7 @@ import {
   Flame, PlusCircle, Search, RefreshCw, Trash2, Edit2, Edit, CheckCircle2,
   AlertCircle, Cpu, Calendar, Clock, User, Layers, ArrowUpRight, Check,
   X, Download, Eye, Layers3, Activity, Tag, Sparkles, FileText, FileSpreadsheet,
-  AlertTriangle, Gauge, Thermometer, Zap, Scale, Settings, XCircle
+  AlertTriangle, Gauge, Thermometer, Zap, Scale, Settings, XCircle, ChevronDown
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
 import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
@@ -40,6 +40,8 @@ export function getFabricFusingPreset(fabricName) {
   return { temp: '205°C', speed: '80', note: 'General Polyester' };
 }
 
+export const FUSING_SPEED_OPTIONS = [50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80];
+
 const DEFAULT_FUSING_MACHINES = [
   'Fusing Machine 1 (Rotary)',
   'Fusing Machine 2 (High Speed)',
@@ -63,6 +65,22 @@ export default function FusingDepartment() {
   const [dateEnd, setDateEnd] = useState('');
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
+
+  // Top Form Job Search & Eligibility State
+  const [jobSearchText, setJobSearchText] = useState('');
+  const [showJobDropdown, setShowJobDropdown] = useState(false);
+  const [showAllCardsFilter, setShowAllCardsFilter] = useState(false);
+  const jobDropdownRef = React.useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (jobDropdownRef.current && !jobDropdownRef.current.contains(e.target)) {
+        setShowJobDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Report Modal State
   const [showReportModal, setShowReportModal] = useState(false);
@@ -343,10 +361,59 @@ export default function FusingDepartment() {
     }
   };
 
+  // Filter only cards that are Done for Printing and Pending for Fusing
+  const eligibleFusingCards = useMemo(() => {
+    return cards.filter(c => {
+      if (showAllCardsFilter) return true;
+      if (topForm.jobCardId && (String(c._id) === String(topForm.jobCardId) || String(c.id) === String(topForm.jobCardId))) {
+        return true;
+      }
+      const pStatus = String(c.printStatus || '').toLowerCase();
+      const isPrintDone = pStatus === 'printing done' || (pStatus.includes('done') && !pStatus.includes('pending'));
+      const fStatus = String(c.fusingStatus || 'fusing pending').toLowerCase();
+      const isFusingPending = fStatus !== 'fusing done';
+      return isPrintDone && isFusingPending;
+    });
+  }, [cards, topForm.jobCardId, showAllCardsFilter]);
+
+  const searchMatchingCards = useMemo(() => {
+    const list = eligibleFusingCards;
+    if (!jobSearchText || !jobSearchText.trim()) return list;
+    const q = jobSearchText.toLowerCase().trim();
+    const cleanNum = q.replace(/[^0-9]/g, '');
+    return list.filter(c => {
+      const jNo = String(c.jobNo || '').toLowerCase();
+      const party = String(c.party || c.clientName || c.partyName || '').toLowerCase();
+      const design = String(c.designName || c.designNo || '').toLowerCase();
+      const fabric = String(c.fabric || '').toLowerCase();
+      return (
+        jNo.includes(q) ||
+        (cleanNum && jNo.includes(cleanNum)) ||
+        party.includes(q) ||
+        design.includes(q) ||
+        fabric.includes(q)
+      );
+    });
+  }, [eligibleFusingCards, jobSearchText]);
+
   // Handle Selection of Job Card in Top Form
-  const handleTopJobCardSelect = (e) => {
-    const jId = e.target.value;
-    const card = cards.find(c => String(c._id) === String(jId) || String(c.id) === String(jId));
+  const handleTopJobCardSelect = (cardOrId) => {
+    if (!cardOrId) {
+      setTopForm(prev => ({
+        ...prev,
+        jobCardId: '',
+        jobNo: '',
+        printedMtr: '',
+        fusingMtr: '',
+        butterPaperWeightKg: ''
+      }));
+      setJobSearchText('');
+      return;
+    }
+    const card = typeof cardOrId === 'object' && cardOrId !== null
+      ? (cardOrId.target ? cards.find(c => String(c._id) === String(cardOrId.target.value) || String(c.id) === String(cardOrId.target.value)) : cardOrId)
+      : cards.find(c => String(c._id) === String(cardOrId) || String(c.id) === String(cardOrId) || String(c.jobNo) === String(cardOrId));
+
     if (card) {
       const pMtr = card.printedMtr || card.freshMtr || card.fusingMtr || card.totalMtr || '';
       const defaultMtr = card.fusingMtr || pMtr || '';
@@ -364,6 +431,7 @@ export default function FusingDepartment() {
         fusingMachine: card.fusingMachine || prev.fusingMachine,
         butterPaperWeightKg: card.butterPaperWeightKg || ''
       }));
+      setJobSearchText(`JOB NO.- ${card.jobNo || ''} — ${card.party || ''} | ${card.designName || ''} (${card.fabric || ''} ${cardPanna})`);
     } else {
       setTopForm(prev => ({
         ...prev,
@@ -373,6 +441,7 @@ export default function FusingDepartment() {
         fusingMtr: '',
         butterPaperWeightKg: ''
       }));
+      setJobSearchText('');
     }
   };
 
@@ -447,6 +516,8 @@ export default function FusingDepartment() {
         jobCardId: '',
         jobNo: '',
         fusingMachine: DEFAULT_FUSING_MACHINES[0],
+        fusingTemp: '210°C',
+        fusingSpeed: '80',
         panna: '58"',
         useButterPaper: 'Yes',
         butterPaperWeightKg: '',
@@ -456,6 +527,7 @@ export default function FusingDepartment() {
         fusingOperator: accountFullName,
         notes: ''
       });
+      setJobSearchText('');
 
       fetchData();
     } catch (err) {
@@ -851,24 +923,235 @@ export default function FusingDepartment() {
           {/* Primary Required Fields: JOB CARD NO, PRINTED METERS, FUSING TEMP, FUSING SPEED, BUTTER PAPER USED?, ROLL COMPLETED?, PANNA */}
             <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', background: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
               
-              {/* 1. JOB TYPE / JOBCARD NO. */}
-              <div style={{ gridColumn: 'span 2 / span 2' }}>
-                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                  JOB TYPE / JOBCARD NO. *
-                </label>
-                <select
-                  required
-                  value={topForm.jobCardId}
-                  onChange={handleTopJobCardSelect}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '2px solid #38bdf8', fontSize: '0.92rem', fontWeight: 800, background: '#ffffff', color: '#0369a1', cursor: 'pointer' }}
-                >
-                  <option value="">Select Job Card No. (e.g. 1001)</option>
-                  {cards.map(c => (
-                    <option key={c._id || c.id} value={c._id || c.id}>
-                      {c.jobNo || 'JOB'} — {c.party || 'Party'} | {c.designName || 'Design'} ({c.fabric || 'Fabric'} {c.panna ? `${c.panna}"` : ''}) {c.printedMtr ? `| ${c.printedMtr}m Printed` : ''} {c.fusingStatus === 'Fusing Done' ? '✓ Done' : '⏳ Pending'}
-                    </option>
-                  ))}
-                </select>
+              {/* 1. JOB TYPE / JOBCARD NO. - Searchable & Filtered to Printing Done & Fusing Pending */}
+              <div ref={jobDropdownRef} style={{ gridColumn: 'span 2 / span 2', position: 'relative' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem', flexWrap: 'wrap', gap: '4px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0284c7', textTransform: 'uppercase' }}>
+                    JOB TYPE / JOBCARD NO. *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAllCardsFilter(prev => !prev)}
+                    style={{
+                      background: showAllCardsFilter ? '#e0f2fe' : '#f0fdf4',
+                      color: showAllCardsFilter ? '#0369a1' : '#15803d',
+                      border: `1px solid ${showAllCardsFilter ? '#7dd3fc' : '#86efac'}`,
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.7rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                    title="Toggle between only Ready for Fusing jobs vs All Job Cards"
+                  >
+                    <span>{showAllCardsFilter ? '🔍 Showing: All Cards' : `⚡ Filter: Ready for Fusing (${eligibleFusingCards.length})`}</span>
+                    <span style={{ textDecoration: 'underline', opacity: 0.8 }}>({showAllCardsFilter ? 'Switch to Ready' : 'Show All'})</span>
+                  </button>
+                </div>
+
+                {/* Search Input Box with Clear & Dropdown Caret */}
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <Search size={16} color="#0284c7" style={{ position: 'absolute', left: '10px', pointerEvents: 'none' }} />
+                  <input
+                    type="text"
+                    required
+                    placeholder="Search Job No. (e.g. 3135), Party or Design..."
+                    value={jobSearchText}
+                    onFocus={() => setShowJobDropdown(true)}
+                    onChange={e => {
+                      setJobSearchText(e.target.value);
+                      setShowJobDropdown(true);
+                      if (!e.target.value) {
+                        handleTopJobCardSelect('');
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem 2.8rem 0.65rem 2.2rem',
+                      borderRadius: '8px',
+                      border: '2px solid #38bdf8',
+                      fontSize: '0.92rem',
+                      fontWeight: 800,
+                      background: '#ffffff',
+                      color: '#0369a1',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                  {/* Clear / Dropdown Toggle Button */}
+                  <div style={{ position: 'absolute', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {topForm.jobCardId ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleTopJobCardSelect('');
+                          setJobSearchText('');
+                          setShowJobDropdown(true);
+                        }}
+                        style={{
+                          background: '#fee2e2',
+                          color: '#dc2626',
+                          border: 'none',
+                          borderRadius: '4px',
+                          width: '22px',
+                          height: '22px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          fontWeight: 900,
+                          fontSize: '0.75rem'
+                        }}
+                        title="Clear Selection"
+                      >
+                        ✕
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => setShowJobDropdown(prev => !prev)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#0284c7',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                      title="Open List"
+                    >
+                      <ChevronDown size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Floating Interactive Dropdown Menu */}
+                {showJobDropdown && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    maxHeight: '280px',
+                    overflowY: 'auto',
+                    background: '#ffffff',
+                    border: '2px solid #38bdf8',
+                    borderRadius: '10px',
+                    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.2)',
+                    zIndex: 1000,
+                    marginTop: '4px'
+                  }}>
+                    <div style={{
+                      padding: '6px 12px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      color: '#64748b',
+                      background: '#f8fafc',
+                      borderBottom: '1px solid #e2e8f0',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <span>
+                        {showAllCardsFilter ? 'ALL JOBCARDS' : 'PRINTING DONE & FUSING PENDING'} ({searchMatchingCards.length})
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: '#0284c7' }}>
+                        Click card to select
+                      </span>
+                    </div>
+
+                    {searchMatchingCards.length === 0 ? (
+                      <div style={{ padding: '1.25rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                        <p style={{ margin: 0, fontWeight: 700 }}>No matching job cards found.</p>
+                        {!showAllCardsFilter && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllCardsFilter(true)}
+                            style={{
+                              marginTop: '0.5rem',
+                              background: '#eff6ff',
+                              color: '#2563eb',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '6px',
+                              padding: '0.3rem 0.75rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 800,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Click to Search All Job Cards
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      searchMatchingCards.map(c => {
+                        const isSelected = String(topForm.jobCardId) === String(c._id || c.id);
+                        const cardPanna = c.panna ? (String(c.panna).includes('"') ? c.panna : `${c.panna}"`) : '58"';
+                        return (
+                          <div
+                            key={c._id || c.id}
+                            onMouseDown={() => {
+                              handleTopJobCardSelect(c);
+                              setShowJobDropdown(false);
+                            }}
+                            style={{
+                              padding: '8px 12px',
+                              borderBottom: '1px solid #f1f5f9',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              background: isSelected ? '#e0f2fe' : '#ffffff',
+                              transition: 'background 0.15s ease'
+                            }}
+                            onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f0fdf4'; }}
+                            onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = '#ffffff'; }}
+                          >
+                            <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                                <span style={{ fontWeight: 900, color: '#0369a1', fontSize: '0.9rem' }}>
+                                  #{c.jobNo || 'JOB'}
+                                </span>
+                                <span style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
+                                  {c.party || 'Party'}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                Design: <strong style={{ color: '#475569' }}>{c.designName || '—'}</strong> • Fabric: <strong>{c.fabric || '—'} ({cardPanna})</strong>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px', flexShrink: 0 }}>
+                              <span style={{
+                                padding: '1px 7px',
+                                borderRadius: '4px',
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                background: '#dcfce7',
+                                color: '#15803d',
+                                border: '1px solid #bbf7d0'
+                              }}>
+                                🖨️ {c.printedMtr || c.freshMtr || 0}m Printed
+                              </span>
+                              <span style={{
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                background: c.fusingStatus === 'Fusing Done' ? '#f1f5f9' : '#fef3c7',
+                                color: c.fusingStatus === 'Fusing Done' ? '#64748b' : '#b45309'
+                              }}>
+                                {c.fusingStatus === 'Fusing Done' ? '✓ Fusing Done' : '⏳ Fusing Pending'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* 2. PRINTED METERS (DISPLAYED) */}
@@ -900,19 +1183,26 @@ export default function FusingDepartment() {
                 />
               </div>
 
-              {/* 4. FUSING MACHINE SPEED */}
+              {/* 4. FUSING MACHINE SPEED - Dropdown with 50, 52, 54 ... up to 80 */}
               <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
                   <Gauge size={14} color="#2563eb" /> FUSING SPEED (m/min) *
                 </label>
-                <input
-                  type="text"
+                <select
                   required
-                  placeholder="e.g. 80"
-                  value={topForm.fusingSpeed}
+                  value={topForm.fusingSpeed || '80'}
                   onChange={e => setTopForm(f => ({ ...f, fusingSpeed: e.target.value }))}
-                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '2px solid #bfdbfe', fontSize: '0.92rem', fontWeight: 900, background: '#eff6ff', color: '#1e40af' }}
-                />
+                  style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '2px solid #bfdbfe', fontSize: '0.92rem', fontWeight: 900, background: '#eff6ff', color: '#1e40af', cursor: 'pointer' }}
+                >
+                  {topForm.fusingSpeed && !FUSING_SPEED_OPTIONS.map(String).includes(String(topForm.fusingSpeed).replace(/[^0-9]/g, '')) && (
+                    <option value={topForm.fusingSpeed}>{topForm.fusingSpeed}</option>
+                  )}
+                  {FUSING_SPEED_OPTIONS.map(spd => (
+                    <option key={spd} value={String(spd)}>
+                      {spd}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* 6. IS BUTTER PAPER USED? */}
@@ -2157,26 +2447,33 @@ export default function FusingDepartment() {
                   <Gauge size={14} /> FUSING MACHINE SPEED (m/min) *
                 </label>
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                  <input
-                    type="text"
+                  <select
                     required
-                    value={speedTempForm.fusingSpeed}
+                    value={speedTempForm.fusingSpeed || '80'}
                     onChange={e => setSpeedTempForm(f => ({ ...f, fusingSpeed: e.target.value }))}
-                    placeholder="e.g. 80"
-                    style={{ flex: 1, padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1.5px solid #bfdbfe', fontSize: '0.92rem', fontWeight: 800, background: '#eff6ff', color: '#1e40af' }}
-                  />
+                    style={{ flex: 1, padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1.5px solid #bfdbfe', fontSize: '0.92rem', fontWeight: 800, background: '#eff6ff', color: '#1e40af', cursor: 'pointer' }}
+                  >
+                    {speedTempForm.fusingSpeed && !FUSING_SPEED_OPTIONS.map(String).includes(String(speedTempForm.fusingSpeed).replace(/[^0-9]/g, '')) && (
+                      <option value={speedTempForm.fusingSpeed}>{speedTempForm.fusingSpeed}</option>
+                    )}
+                    {FUSING_SPEED_OPTIONS.map(spd => (
+                      <option key={spd} value={String(spd)}>
+                        {spd}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 {/* Preset Chips */}
                 <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                  {['80', '10 m/min', '12 m/min', '15 m/min', '18 m/min', '20 m/min', '22 m/min', '25 m/min'].map(spd => (
+                  {FUSING_SPEED_OPTIONS.map(spd => (
                     <button
                       key={spd}
                       type="button"
-                      onClick={() => setSpeedTempForm(f => ({ ...f, fusingSpeed: spd }))}
+                      onClick={() => setSpeedTempForm(f => ({ ...f, fusingSpeed: String(spd) }))}
                       style={{
                         padding: '2px 8px', fontSize: '0.72rem', fontWeight: 800, borderRadius: '4px', cursor: 'pointer',
-                        background: speedTempForm.fusingSpeed === spd ? '#2563eb' : '#dbeafe',
-                        color: speedTempForm.fusingSpeed === spd ? '#ffffff' : '#1e40af',
+                        background: String(speedTempForm.fusingSpeed) === String(spd) ? '#2563eb' : '#dbeafe',
+                        color: String(speedTempForm.fusingSpeed) === String(spd) ? '#ffffff' : '#1e40af',
                         border: '1px solid #bfdbfe', transition: 'all 0.1s'
                       }}
                     >
