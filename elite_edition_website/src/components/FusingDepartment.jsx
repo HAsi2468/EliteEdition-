@@ -186,7 +186,7 @@ export default function FusingDepartment() {
     panna: '58"',
     useButterPaper: 'Yes',
     butterPaperWeightKg: '',
-    rollCompleted: 'Yes',
+    rollCompleted: 'Complete',
     printedMtr: '',
     fusingMtr: '',
     fusingOperator: accountFullName,
@@ -473,7 +473,15 @@ export default function FusingDepartment() {
     }
 
     const fusingMtrVal = topForm.fusingMtr || topForm.printedMtr || '0';
-    const isRollDone = topForm.rollCompleted === 'Yes';
+    const rollStatus = (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes')
+      ? 'Complete'
+      : (topForm.rollCompleted === 'Partial Complete' ? 'Partial Complete' : 'Pending');
+    const isComplete = rollStatus === 'Complete';
+    const isPartial = rollStatus === 'Partial Complete';
+
+    const fusingStatusToSave = isComplete 
+      ? 'Fusing Done' 
+      : (isPartial ? 'Fusing In Progress' : 'Fusing Pending');
 
     setSubmitting(true);
     try {
@@ -482,7 +490,7 @@ export default function FusingDepartment() {
 
       if (targetId) {
         const payload = {
-          fusingStatus: isRollDone ? 'Fusing Done' : 'Fusing In Progress',
+          fusingStatus: fusingStatusToSave,
           fusingDate: topForm.date,
           shift: topForm.shift,
           fusingMachine: topForm.fusingMachine,
@@ -495,7 +503,7 @@ export default function FusingDepartment() {
           fusingMtr: String(fusingMtrVal),
           freshMtr: String(fusingMtrVal),
           fusingOperator: topForm.fusingOperator,
-          emergencyNotes: `Roll Status: ${isRollDone ? 'Completed' : 'In Progress'}${topForm.notes ? ' | ' + topForm.notes : ''}`
+          emergencyNotes: `Roll Status: ${rollStatus}${topForm.notes ? ' | ' + topForm.notes : ''}`
         };
         await api.updateJobCard(targetId, payload);
       }
@@ -511,7 +519,7 @@ export default function FusingDepartment() {
             unit: 'Kg',
             panna: topForm.panna,
             jobNo: topForm.jobNo,
-            notes: `Fusing Entry — Machine: ${topForm.fusingMachine} | Operator: ${topForm.fusingOperator} | Roll Status: ${topForm.rollCompleted}`
+            notes: `Fusing Entry — Machine: ${topForm.fusingMachine} | Operator: ${topForm.fusingOperator} | Roll Status: ${rollStatus}`
           });
         } catch (rmErr) {
           console.warn('Raw material log failed:', rmErr.message);
@@ -520,7 +528,7 @@ export default function FusingDepartment() {
 
       triggerPushNotification(
         '🔥 Fusing Entry Submitted',
-        `Job #${topForm.jobNo}: ${fusingMtrVal}m Fused | Roll: ${isRollDone ? 'Completed' : 'In Progress'} | ${topForm.useButterPaper === 'Yes' ? (topForm.butterPaperWeightKg || 0) + 'kg Butter Paper' : 'No Butter Paper'} logged!`,
+        `Job #${topForm.jobNo}: ${fusingMtrVal}m Fused | Roll: ${rollStatus} | ${topForm.useButterPaper === 'Yes' ? (topForm.butterPaperWeightKg || 0) + 'kg Butter Paper' : 'No Butter Paper'} logged!`,
         'success'
       );
 
@@ -540,7 +548,7 @@ export default function FusingDepartment() {
         panna: '58"',
         useButterPaper: 'Yes',
         butterPaperWeightKg: '',
-        rollCompleted: 'Yes',
+        rollCompleted: 'Complete',
         printedMtr: '',
         fusingMtr: '',
         fusingOperator: accountFullName,
@@ -672,6 +680,26 @@ export default function FusingDepartment() {
       triggerEliteAlert('Update Failed', err.message || 'Failed to update fusing record.', 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Quick Toggle Status in Main Table (Pending -> Partial Complete -> Complete -> Pending)
+  const handleQuickToggleStatus = async (card) => {
+    const cur = card.fusingStatus || 'Fusing Pending';
+    const nextStatus = cur === 'Fusing Pending' 
+      ? 'Fusing In Progress' 
+      : (cur === 'Fusing In Progress' ? 'Fusing Done' : 'Fusing Pending');
+
+    try {
+      await api.updateJobCard(card._id || card.id, {
+        fusingStatus: nextStatus,
+        fusingDate: nextStatus === 'Fusing Done' ? (card.fusingDate || toLocalYMD()) : card.fusingDate
+      });
+      triggerPushNotification('⚡ Fusing Status Updated', `Job #${card.jobNo} set to ${nextStatus === 'Fusing Done' ? 'Complete' : (nextStatus === 'Fusing In Progress' ? 'Partial Complete' : 'Pending')}`, 'success');
+      triggerGlobalDataRefresh('fusing');
+      fetchData();
+    } catch (err) {
+      triggerEliteAlert('Update Failed', err.message || 'Failed to toggle status.', 'error');
     }
   };
 
@@ -1159,10 +1187,10 @@ export default function FusingDepartment() {
                                 borderRadius: '4px',
                                 fontSize: '0.68rem',
                                 fontWeight: 800,
-                                background: c.fusingStatus === 'Fusing Done' ? '#f1f5f9' : '#fef3c7',
-                                color: c.fusingStatus === 'Fusing Done' ? '#64748b' : '#b45309'
+                                background: c.fusingStatus === 'Fusing Done' ? '#f1f5f9' : (c.fusingStatus === 'Fusing In Progress' ? '#e0f2fe' : '#fef3c7'),
+                                color: c.fusingStatus === 'Fusing Done' ? '#64748b' : (c.fusingStatus === 'Fusing In Progress' ? '#0369a1' : '#b45309')
                               }}>
-                                {c.fusingStatus === 'Fusing Done' ? '✓ Fusing Done' : '⏳ Fusing Pending'}
+                                {c.fusingStatus === 'Fusing Done' ? '✓ Complete' : (c.fusingStatus === 'Fusing In Progress' ? '⏳ Partial' : '⏸️ Pending')}
                               </span>
                             </div>
                           </div>
@@ -1258,26 +1286,45 @@ export default function FusingDepartment() {
 
               {/* 7. ROLL COMPLETED? */}
               <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 800, color: topForm.rollCompleted === 'Yes' ? '#16a34a' : '#ea580c', marginBottom: '0.3rem', textTransform: 'uppercase' }}>
-                  <CheckCircle2 size={14} color={topForm.rollCompleted === 'Yes' ? '#16a34a' : '#ea580c'} /> ROLL COMPLETED? *
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  color: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#16a34a' : (topForm.rollCompleted === 'Partial Complete' ? '#0284c7' : '#ea580c'),
+                  marginBottom: '0.3rem',
+                  textTransform: 'uppercase'
+                }}>
+                  {(topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? (
+                    <CheckCircle2 size={14} color="#16a34a" />
+                  ) : topForm.rollCompleted === 'Partial Complete' ? (
+                    <Clock size={14} color="#0284c7" />
+                  ) : (
+                    <AlertCircle size={14} color="#ea580c" />
+                  )}
+                  ROLL COMPLETED? *
                 </label>
                 <select
-                  value={topForm.rollCompleted}
+                  value={topForm.rollCompleted === 'Yes' ? 'Complete' : (topForm.rollCompleted === 'No' ? 'Partial Complete' : (topForm.rollCompleted || 'Complete'))}
                   onChange={e => setTopForm(f => ({ ...f, rollCompleted: e.target.value }))}
                   style={{
                     width: '100%',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '8px',
-                    border: `2px solid ${topForm.rollCompleted === 'Yes' ? '#4ade80' : '#fb923c'}`,
+                    border: `2px solid ${
+                      (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#4ade80' : (topForm.rollCompleted === 'Partial Complete' ? '#38bdf8' : '#fb923c')
+                    }`,
                     fontSize: '0.92rem',
                     fontWeight: 800,
-                    background: topForm.rollCompleted === 'Yes' ? '#f0fdf4' : '#fff7ed',
-                    color: topForm.rollCompleted === 'Yes' ? '#15803d' : '#c2410c',
+                    background: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#f0fdf4' : (topForm.rollCompleted === 'Partial Complete' ? '#f0f9ff' : '#fff7ed'),
+                    color: (topForm.rollCompleted === 'Complete' || topForm.rollCompleted === 'Yes') ? '#15803d' : (topForm.rollCompleted === 'Partial Complete' ? '#0369a1' : '#c2410c'),
                     cursor: 'pointer'
                   }}
                 >
-                  <option value="Yes">✓ YES (Roll Completed)</option>
-                  <option value="No">⏳ NO (Partial / In Progress)</option>
+                  <option value="Complete">✓ Complete</option>
+                  <option value="Partial Complete">⏳ Partial Complete</option>
+                  <option value="Pending">⏸️ Pending</option>
                 </select>
               </div>
 
@@ -1646,26 +1693,32 @@ export default function FusingDepartment() {
 
                       {/* Status */}
                       <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleQuickToggleStatus(c)}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: '20px',
-                            fontSize: '0.72rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                            background: isDone ? '#d1fae5' : '#fef3c7',
-                            color: isDone ? '#047857' : '#b45309',
-                            border: `1px solid ${isDone ? '#6ee7b7' : '#fde68a'}`,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px'
-                          }}
-                        >
-                          {isDone ? <CheckCircle2 size={12} /> : <Clock size={12} />}
-                          <span>{isDone ? 'Fusing Done' : 'Pending'}</span>
-                        </button>
+                        {(() => {
+                          const isDone = c.fusingStatus === 'Fusing Done';
+                          const isPartial = c.fusingStatus === 'Fusing In Progress';
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => handleQuickToggleStatus(c)}
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: '20px',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                background: isDone ? '#d1fae5' : (isPartial ? '#e0f2fe' : '#fef3c7'),
+                                color: isDone ? '#047857' : (isPartial ? '#0369a1' : '#b45309'),
+                                border: `1px solid ${isDone ? '#6ee7b7' : (isPartial ? '#7dd3fc' : '#fde68a')}`,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              {isDone ? <CheckCircle2 size={12} /> : isPartial ? <Clock size={12} /> : <AlertCircle size={12} />}
+                              <span>{isDone ? 'Complete' : (isPartial ? 'Partial' : 'Pending')}</span>
+                            </button>
+                          );
+                        })()}
                       </td>
 
                       {/* Fresh Output */}
@@ -1909,14 +1962,15 @@ export default function FusingDepartment() {
                     onChange={e => setForm(f => ({ ...f, fusingStatus: e.target.value }))}
                     style={{
                       width: '100%', padding: '0.5rem', borderRadius: '8px',
-                      border: form.fusingStatus === 'Fusing Done' ? '2px solid #10b981' : '2px solid #f59e0b',
+                      border: form.fusingStatus === 'Fusing Done' ? '2px solid #10b981' : (form.fusingStatus === 'Fusing In Progress' ? '2px solid #38bdf8' : '2px solid #f59e0b'),
                       fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer',
-                      background: form.fusingStatus === 'Fusing Done' ? '#f0fdf4' : '#fffbe5',
-                      color: form.fusingStatus === 'Fusing Done' ? '#15803d' : '#b45309'
+                      background: form.fusingStatus === 'Fusing Done' ? '#f0fdf4' : (form.fusingStatus === 'Fusing In Progress' ? '#f0f9ff' : '#fffbe5'),
+                      color: form.fusingStatus === 'Fusing Done' ? '#15803d' : (form.fusingStatus === 'Fusing In Progress' ? '#0369a1' : '#b45309')
                     }}
                   >
-                    <option value="Fusing Done">✓ Fusing Done</option>
-                    <option value="Fusing Pending">⏳ Fusing Pending</option>
+                    <option value="Fusing Done">✓ Complete</option>
+                    <option value="Fusing In Progress">⏳ Partial Complete</option>
+                    <option value="Fusing Pending">⏸️ Pending</option>
                   </select>
                 </div>
               </div>
