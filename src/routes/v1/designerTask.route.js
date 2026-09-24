@@ -1,26 +1,25 @@
 const express = require('express');
-const auth = require('../../middlewares/auth');
 const designerTaskController = require('../../controllers/designerTask.controller');
 
 const router = express.Router();
 
 router
   .route('/')
-  .post(auth(), designerTaskController.createDesignerTask)
-  .get(auth(), designerTaskController.getDesignerTasks);
+  .post(designerTaskController.createDesignerTask)
+  .get(designerTaskController.getDesignerTasks);
 
 router
   .route('/stats')
-  .get(auth(), designerTaskController.getDesignerStats);
+  .get(designerTaskController.getDesignerStats);
 
 router
   .route('/:id')
-  .get(auth(), designerTaskController.getDesignerTaskById)
-  .put(auth(), designerTaskController.updateDesignerTask)
-  .delete(auth(), designerTaskController.deleteDesignerTask);
+  .get(designerTaskController.getDesignerTaskById)
+  .put(designerTaskController.updateDesignerTask)
+  .delete(designerTaskController.deleteDesignerTask);
 
 router
   .route('/:id/stage')
-  .put(auth(), designerTaskController.updateTaskStage);
+  .put(designerTaskController.updateTaskStage);
 
 module.exports = router;

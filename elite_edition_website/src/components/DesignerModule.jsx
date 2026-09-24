@@ -121,8 +121,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
   // Settings dropdown data
   const [printConfig, setPrintConfig] = useState({
     designers: [],
-    fabrics: [],
-    colourMatchings: []
+    fabrics: []
   });
 
   // Filter States
@@ -188,11 +187,8 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
 
       if (cfg) {
         setPrintConfig({
-          designers: cfg.designers || [],
-          fabrics: cfg.fabrics || [],
-          colourMatchings: (cfg.colourMatchings && cfg.colourMatchings.length > 0)
-            ? cfg.colourMatchings
-            : (cfg.designers || [])
+          designers: Array.isArray(cfg.designers) ? cfg.designers : [],
+          fabrics: Array.isArray(cfg.fabrics) ? cfg.fabrics : []
         });
       }
 
@@ -301,19 +297,23 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
   // Submit Create or Edit
   const handleSubmitTask = async (e) => {
     e.preventDefault();
-    if (!formData.designName.trim()) {
-      alert('Please enter a Design Name or Title.');
-      return;
-    }
+    const finalDesignName = (formData.designName && formData.designName.trim())
+      ? formData.designName.trim()
+      : `Design-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const submissionPayload = {
+      ...formData,
+      designName: finalDesignName
+    };
 
     setSavingTask(true);
     try {
       if (editingId) {
-        await api.updateDesignerTask(editingId, formData);
-        triggerPushNotification('Design Task Updated', `Design "${formData.designName}" updated.`, 'success');
+        await api.updateDesignerTask(editingId, submissionPayload);
+        triggerPushNotification('Design Task Updated', `Design "${finalDesignName}" updated.`, 'success');
       } else {
-        await api.createDesignerTask(formData);
-        triggerPushNotification('Design Task Created', `New design task "${formData.designName}" registered.`, 'success');
+        await api.createDesignerTask(submissionPayload);
+        triggerPushNotification('Design Task Created', `New design task "${finalDesignName}" registered.`, 'success');
       }
       setShowCreateModal(false);
       loadData(true);
@@ -392,32 +392,45 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', boxSizing: 'border-box' }}>
       
-      {/* ─── HEADER BAR ──────────────────────────────────────────────────────── */}
-      <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', borderRadius: '14px' }}>
+      {/* ─── HEADER BAR (WHITE & BLUE THEME) ───────────────────────────────── */}
+      <div
+        style={{
+          background: '#ffffff',
+          border: '1px solid #dbeafe',
+          boxShadow: '0 4px 16px rgba(37, 99, 235, 0.06)',
+          padding: '1.25rem 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '1rem',
+          borderRadius: '14px'
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
           <div style={{
             width: 44,
             height: 44,
             borderRadius: 12,
-            background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
+            background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: '#fff',
-            boxShadow: '0 4px 14px rgba(236, 72, 153, 0.3)',
+            boxShadow: '0 4px 14px rgba(29, 78, 216, 0.35)',
             flexShrink: 0
           }}>
             <Palette size={22} color="#ffffff" />
           </div>
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               Designer Team Module
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: 'rgba(236, 72, 153, 0.15)', color: '#ec4899', border: '1px solid rgba(236, 72, 153, 0.3)' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
                 DESIGN PIPELINE &amp; HISTORY
               </span>
             </h2>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0 0', fontWeight: 500 }}>
-              Track where designs are in each stage, assign to designers, preview sample media, and review history.
+            <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '2px 0 0 0', fontWeight: 500 }}>
+              Track where designs are in each stage, assign designers, manage colour matching, preview sample media, and review history.
             </p>
           </div>
         </div>
@@ -426,8 +439,20 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
           <button
             type="button"
             onClick={() => loadData(false)}
-            className="btn-secondary"
-            style={{ padding: '0.55rem 0.85rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem', borderRadius: '8px' }}
+            style={{
+              padding: '0.55rem 0.95rem',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              borderRadius: '8px',
+              background: '#ffffff',
+              color: '#1d4ed8',
+              border: '1px solid #bfdbfe',
+              cursor: 'pointer',
+              boxShadow: '0 1px 3px rgba(37, 99, 235, 0.08)'
+            }}
             title="Refresh Data"
           >
             <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
@@ -438,18 +463,18 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
             type="button"
             onClick={handleOpenCreate}
             style={{
-              padding: '0.55rem 1.25rem',
+              padding: '0.55rem 1.3rem',
               fontSize: '0.82rem',
               fontWeight: 800,
               borderRadius: '8px',
               border: 'none',
-              background: 'linear-gradient(135deg, #ec4899 0%, #d946ef 100%)',
+              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
               color: '#ffffff',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '0.45rem',
-              boxShadow: '0 4px 14px rgba(236, 72, 153, 0.35)',
+              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
               transition: 'all 0.15s ease'
             }}
           >
@@ -459,15 +484,15 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
         </div>
       </div>
 
-      {/* ─── QUICK METRICS STATS BAR ────────────────────────────────────────── */}
+      {/* ─── QUICK METRICS STATS BAR (WHITE & BLUE) ─────────────────────────── */}
       {stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
           {[
-            { label: 'Total Designs', val: stats.total || 0, color: '#38bdf8', icon: Layers },
-            { label: 'New / Assigned', val: (stats.new || 0) + (stats.assigned || 0), color: '#818cf8', icon: Clock },
-            { label: 'In Progress', val: stats.inProgress || 0, color: '#fbbf24', icon: RefreshCw },
-            { label: 'Colour Matching', val: stats.colourMatching || 0, color: '#ec4899', icon: Palette },
-            { label: 'Sample Proof Ready', val: stats.sampleReady || 0, color: '#a855f7', icon: Sparkles },
+            { label: 'Total Designs', val: stats.total || 0, color: '#2563eb', icon: Layers },
+            { label: 'New / Assigned', val: (stats.new || 0) + (stats.assigned || 0), color: '#3b82f6', icon: Clock },
+            { label: 'In Progress', val: stats.inProgress || 0, color: '#d97706', icon: RefreshCw },
+            { label: 'Colour Matching', val: stats.colourMatching || 0, color: '#0284c7', icon: Palette },
+            { label: 'Sample Proof Ready', val: stats.sampleReady || 0, color: '#7c3aed', icon: Sparkles },
             { label: 'Approved Ready', val: stats.approved || 0, color: '#10b981', icon: CheckCircle },
             { label: 'Urgent / High', val: (stats.urgent || 0) + (stats.high || 0), color: '#ef4444', icon: AlertTriangle },
           ].map((item, idx) => {
@@ -475,8 +500,10 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
             return (
               <div
                 key={idx}
-                className="glass-panel"
                 style={{
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 2px 8px rgba(37, 99, 235, 0.05)',
                   padding: '0.85rem 1rem',
                   borderRadius: '10px',
                   display: 'flex',
@@ -486,10 +513,10 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     {item.label}
                   </div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
                     {item.val}
                   </div>
                 </div>
@@ -502,11 +529,22 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
         </div>
       )}
 
-      {/* ─── MULTI-FILTER & HISTORY TOOLBAR ─────────────────────────────────── */}
-      <div className="glass-panel" style={{ padding: '1rem 1.25rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+      {/* ─── MULTI-FILTER & HISTORY TOOLBAR (WHITE & BLUE) ──────────────────── */}
+      <div
+        style={{
+          background: '#ffffff',
+          border: '1px solid #bfdbfe',
+          boxShadow: '0 2px 10px rgba(37, 99, 235, 0.05)',
+          padding: '1rem 1.25rem',
+          borderRadius: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.85rem'
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-            <Filter size={15} color="var(--primary)" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', fontWeight: 800, color: '#1e40af' }}>
+            <Filter size={15} color="#2563eb" />
             <span>History &amp; Stage Filters</span>
           </div>
 
@@ -532,31 +570,31 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
           
           {/* Search Box */}
           <div style={{ position: 'relative' }}>
-            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
             <input
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search design, task no, notes..."
-              style={{ paddingLeft: 32, width: '100%', fontSize: '0.82rem', height: '36px' }}
+              style={{ paddingLeft: 32, width: '100%', fontSize: '0.82rem', height: '36px', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '6px' }}
             />
           </div>
 
           {/* Date Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-input, rgba(0,0,0,0.25))', border: '1px solid var(--border-light)', borderRadius: '6px', padding: '0 0.5rem', height: '36px' }}>
-            <Calendar size={14} color="var(--text-muted)" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0 0.5rem', height: '36px' }}>
+            <Calendar size={14} color="#2563eb" />
             <input
               type="date"
               value={dateFilter}
               onChange={e => setDateFilter(e.target.value)}
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: '0.8rem', outline: 'none', width: '100%' }}
+              style={{ background: 'transparent', border: 'none', color: '#0f172a', fontSize: '0.8rem', outline: 'none', width: '100%' }}
               title="Filter by Entry Date"
             />
             {dateFilter && (
               <button
                 type="button"
                 onClick={() => setDateFilter('')}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 0 }}
                 title="Clear Date"
               >
                 <X size={13} />
@@ -569,7 +607,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
             <select
               value={designerFilter}
               onChange={e => setDesignerFilter(e.target.value)}
-              style={{ width: '100%', fontSize: '0.82rem', height: '36px', padding: '0 0.6rem' }}
+              style={{ width: '100%', fontSize: '0.82rem', height: '36px', padding: '0 0.6rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '6px' }}
             >
               <option value="All">All Designers</option>
               {printConfig.designers.map((d, i) => (
@@ -583,10 +621,10 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
             <select
               value={colourMatchFilter}
               onChange={e => setColourMatchFilter(e.target.value)}
-              style={{ width: '100%', fontSize: '0.82rem', height: '36px', padding: '0 0.6rem' }}
+              style={{ width: '100%', fontSize: '0.82rem', height: '36px', padding: '0 0.6rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '6px' }}
             >
               <option value="All">All Colour Matches</option>
-              {printConfig.colourMatchings.map((c, i) => (
+              {printConfig.designers.map((c, i) => (
                 <option key={i} value={c}>{c}</option>
               ))}
             </select>
@@ -597,7 +635,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
             <select
               value={stageFilter}
               onChange={e => setStageFilter(e.target.value)}
-              style={{ width: '100%', fontSize: '0.82rem', height: '36px', padding: '0 0.6rem' }}
+              style={{ width: '100%', fontSize: '0.82rem', height: '36px', padding: '0 0.6rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '6px' }}
             >
               <option value="All">All Stages</option>
               {DESIGN_STAGES.map(s => (
@@ -611,7 +649,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
             <select
               value={priorityFilter}
               onChange={e => setPriorityFilter(e.target.value)}
-              style={{ width: '100%', fontSize: '0.82rem', height: '36px', padding: '0 0.6rem' }}
+              style={{ width: '100%', fontSize: '0.82rem', height: '36px', padding: '0 0.6rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '6px' }}
             >
               <option value="All">All Priorities</option>
               {PRIORITIES.map(p => (
@@ -623,7 +661,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
         </div>
 
         {/* Stage Filter Chips for 1-click Quick Filtering */}
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', paddingTop: '0.3rem', borderTop: '1px dashed var(--border-light)' }}>
+        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', paddingTop: '0.4rem', borderTop: '1px dashed #dbeafe' }}>
           <button
             type="button"
             onClick={() => setStageFilter('All')}
@@ -633,9 +671,9 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
               fontSize: '0.72rem',
               fontWeight: 700,
               cursor: 'pointer',
-              border: stageFilter === 'All' ? '1px solid #38bdf8' : '1px solid var(--border-light)',
-              background: stageFilter === 'All' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-              color: stageFilter === 'All' ? '#38bdf8' : 'var(--text-muted)'
+              border: stageFilter === 'All' ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+              background: stageFilter === 'All' ? '#eff6ff' : '#ffffff',
+              color: stageFilter === 'All' ? '#1d4ed8' : '#64748b'
             }}
           >
             All Stages ({tasks.length})
@@ -654,16 +692,16 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                   fontSize: '0.72rem',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  border: isSelected ? `1.5px solid ${s.border}` : '1px solid var(--border-light)',
-                  background: isSelected ? s.bg : 'transparent',
-                  color: isSelected ? s.color : 'var(--text-muted)',
+                  border: isSelected ? `1.5px solid ${s.border}` : '1px solid #e2e8f0',
+                  background: isSelected ? s.bg : '#ffffff',
+                  color: isSelected ? s.color : '#64748b',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.35rem'
                 }}
               >
                 <span>{s.label}</span>
-                <span style={{ fontSize: '0.65rem', opacity: 0.85, background: 'rgba(0,0,0,0.2)', padding: '1px 5px', borderRadius: '4px' }}>
+                <span style={{ fontSize: '0.65rem', opacity: 0.85, background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: '4px' }}>
                   {count}
                 </span>
               </button>
@@ -724,8 +762,10 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
             return (
               <div
                 key={task._id}
-                className="glass-panel"
                 style={{
+                  background: '#ffffff',
+                  border: '1px solid #dbeafe',
+                  boxShadow: '0 2px 12px rgba(37, 99, 235, 0.05)',
                   padding: '1.2rem',
                   borderRadius: '12px',
                   display: 'flex',
@@ -739,11 +779,11 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                 {/* Top Task Header */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--primary)', fontFamily: 'monospace' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1d4ed8', fontFamily: 'monospace' }}>
                       {task.taskNo}
                     </span>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <Calendar size={11} />
+                    <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <Calendar size={11} color="#2563eb" />
                       {task.date || 'Today'}
                     </span>
                   </div>
@@ -770,24 +810,24 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
 
                 {/* Design Title */}
                 <div>
-                  <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, lineHeight: 1.3 }}>
+                  <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.3 }}>
                     {task.designName}
                   </h4>
                   {task.notes && (
-                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '4px 0 0 0', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                    <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '4px 0 0 0', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                       {task.notes}
                     </p>
                   )}
                 </div>
 
                 {/* Media Preview Box (Sample Image & Sample Link) */}
-                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '0.6rem', border: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', background: '#f8faff', borderRadius: '8px', padding: '0.6rem', border: '1px solid #e2e8f0' }}>
                   
                   {/* Sample Image Thumbnail */}
                   {task.sampleImage ? (
                     <div
                       onClick={() => setShowMediaModal({ type: 'image', url: task.sampleImage, title: `${task.taskNo} - Sample Image` })}
-                      style={{ width: 64, height: 64, borderRadius: '6px', overflow: 'hidden', position: 'relative', cursor: 'pointer', flexShrink: 0, border: '1px solid rgba(255,255,255,0.1)' }}
+                      style={{ width: 64, height: 64, borderRadius: '6px', overflow: 'hidden', position: 'relative', cursor: 'pointer', flexShrink: 0, border: '1px solid #cbd5e1' }}
                       title="Click to view sample image"
                     >
                       <img
@@ -800,8 +840,8 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                       </div>
                     </div>
                   ) : (
-                    <div style={{ width: 64, height: 64, borderRadius: '6px', background: 'rgba(255,255,255,0.03)', border: '1px dashed var(--border-light)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--text-muted)' }}>
-                      <ImageIcon size={18} style={{ opacity: 0.4 }} />
+                    <div style={{ width: 64, height: 64, borderRadius: '6px', background: '#ffffff', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#94a3b8' }}>
+                      <ImageIcon size={18} style={{ opacity: 0.6 }} />
                       <span style={{ fontSize: '9px', marginTop: 2 }}>No Image</span>
                     </div>
                   )}
@@ -810,7 +850,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                     {task.sampleLink ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 700, color: linkMediaType === 'video' ? '#a855f7' : '#38bdf8' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.72rem', fontWeight: 700, color: linkMediaType === 'video' ? '#7c3aed' : '#0284c7' }}>
                           {linkMediaType === 'video' ? <VideoIcon size={13} /> : <LinkIcon size={13} />}
                           <span>{linkMediaType === 'video' ? 'Reference Video' : 'Reference Link'}</span>
                         </div>
@@ -824,9 +864,9 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                               fontSize: '0.7rem',
                               fontWeight: 700,
                               borderRadius: '4px',
-                              border: '1px solid var(--border-light)',
-                              background: 'rgba(255,255,255,0.05)',
-                              color: 'var(--text-primary)',
+                              border: '1px solid #bfdbfe',
+                              background: '#ffffff',
+                              color: '#1d4ed8',
                               cursor: 'pointer',
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -843,7 +883,8 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                             rel="noopener noreferrer"
                             style={{
                               fontSize: '0.7rem',
-                              color: 'var(--primary)',
+                              color: '#2563eb',
+                              fontWeight: 700,
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '0.25rem',
@@ -859,14 +900,14 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                         </div>
                       </div>
                     ) : (
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
                         No sample link provided
                       </span>
                     )}
 
                     {/* Output artwork indicator if ready */}
                     {task.outputImage && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem', color: '#10b981', fontWeight: 700, marginTop: '2px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem', color: '#059669', fontWeight: 700, marginTop: '2px' }}>
                         <CheckCircle size={12} /> Output Artwork Uploaded
                       </div>
                     )}
@@ -874,24 +915,24 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                 </div>
 
                 {/* Attributes Grid (Designer, Fabric, Colour Matching) */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem 0.6rem', fontSize: '0.78rem', borderTop: '1px dashed var(--border-light)', paddingTop: '0.6rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem 0.6rem', fontSize: '0.78rem', borderTop: '1px dashed #e2e8f0', paddingTop: '0.6rem' }}>
                   <div>
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Designer</span>
-                    <span style={{ fontWeight: 700, color: task.designerName ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                    <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Designer</span>
+                    <span style={{ fontWeight: 700, color: task.designerName ? '#0f172a' : '#94a3b8' }}>
                       {task.designerName || 'Unassigned'}
                     </span>
                   </div>
 
                   <div>
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Fabric</span>
-                    <span style={{ fontWeight: 700, color: task.fabricName ? '#38bdf8' : 'var(--text-muted)' }}>
+                    <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Fabric</span>
+                    <span style={{ fontWeight: 700, color: task.fabricName ? '#0284c7' : '#94a3b8' }}>
                       {task.fabricName || '—'}
                     </span>
                   </div>
 
                   <div style={{ gridColumn: 'span 2' }}>
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Colour Match</span>
-                    <span style={{ fontWeight: 700, color: task.colourMatching ? '#ec4899' : 'var(--text-muted)' }}>
+                    <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Colour Match</span>
+                    <span style={{ fontWeight: 700, color: task.colourMatching ? '#1d4ed8' : '#94a3b8' }}>
                       {task.colourMatching || '—'}
                     </span>
                   </div>
@@ -923,7 +964,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.3rem',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
                     }}
                   >
                     <span>Update Stage</span>
@@ -932,14 +973,14 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                 </div>
 
                 {/* Bottom Card Actions */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border-light)', paddingTop: '0.6rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '0.6rem' }}>
                   <button
                     type="button"
                     onClick={() => handleOpenHistory(task)}
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: 'var(--text-muted)',
+                      color: '#1d4ed8',
                       fontSize: '0.72rem',
                       fontWeight: 700,
                       cursor: 'pointer',
@@ -948,7 +989,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                       gap: '0.3rem'
                     }}
                   >
-                    <History size={13} color="var(--primary)" />
+                    <History size={13} color="#2563eb" />
                     <span>View History ({task.stageHistory?.length || 1})</span>
                   </button>
 
@@ -956,8 +997,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(task)}
-                      className="btn-secondary"
-                      style={{ padding: '0.3rem 0.5rem', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                      style={{ padding: '0.3rem 0.55rem', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.2rem', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '6px', cursor: 'pointer' }}
                       title="Edit Design Details"
                     >
                       <Edit2 size={12} />
@@ -966,12 +1006,12 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                       type="button"
                       onClick={() => handleDeleteTask(task)}
                       style={{
-                        padding: '0.3rem 0.5rem',
+                        padding: '0.3rem 0.55rem',
                         fontSize: '0.72rem',
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        borderRadius: 'var(--radius-sm)',
-                        color: '#f87171',
+                        background: '#fef2f2',
+                        border: '1px solid #fecaca',
+                        borderRadius: '6px',
+                        color: '#ef4444',
                         cursor: 'pointer'
                       }}
                       title="Delete Design Task"
@@ -1005,33 +1045,33 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
           boxSizing: 'border-box'
         }}>
           <div
-            className="glass-panel"
             style={{
               width: '100%',
               maxWidth: '620px',
               maxHeight: '90vh',
               overflowY: 'auto',
               borderRadius: '16px',
-              border: '1px solid var(--border-light)',
+              background: '#ffffff',
+              border: '1px solid #bfdbfe',
               padding: '1.5rem',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+              boxShadow: '0 20px 45px rgba(30, 58, 138, 0.25)',
               display: 'flex',
               flexDirection: 'column',
               gap: '1.2rem'
             }}
           >
             {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
                   <Palette size={18} />
                 </div>
                 <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                     {editingId ? 'Edit Design Task' : 'Input New Design (Admin)'}
                   </h3>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    Fill design details, select designer, fabric, colour matching, and sample media.
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    Select fabric, designer, colour match, and sample media for the designer pipeline.
                   </span>
                 </div>
               </div>
@@ -1039,7 +1079,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.4rem' }}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0.4rem' }}
               >
                 <X size={20} />
               </button>
@@ -1051,27 +1091,27 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
               {/* Row 1: Date & Priority */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
-                    Entry Date <span style={{ color: 'var(--danger)' }}>*</span>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
+                    Entry Date <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <input
                     type="date"
                     value={formData.date}
                     onChange={e => setFormData({ ...formData, date: e.target.value })}
                     required
-                    style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem' }}
+                    style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px' }}
                   />
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '2px', display: 'block' }}>Default is set to today</span>
+                  <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '2px', display: 'block' }}>Default is set to today</span>
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
                     Priority
                   </label>
                   <select
                     value={formData.priority}
                     onChange={e => setFormData({ ...formData, priority: e.target.value })}
-                    style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem' }}
+                    style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px' }}
                   >
                     {PRIORITIES.map(p => (
                       <option key={p.id} value={p.id}>{p.badge} {p.label}</option>
@@ -1082,93 +1122,86 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
 
               {/* Row 2: Design Name / Title */}
               <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
-                  Design Name / Reference <span style={{ color: 'var(--danger)' }}>*</span>
+                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
+                  Design Name / Reference
                 </label>
                 <input
                   type="text"
                   value={formData.designName}
                   onChange={e => setFormData({ ...formData, designName: e.target.value })}
                   placeholder="e.g. ED-709 Floral Digital Print Kurti"
-                  required
-                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem' }}
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px' }}
                 />
               </div>
 
-              {/* Row 3: Dropdowns from Settings (Fabric, Designer, Colour Match) */}
+              {/* Row 3: Dropdowns from Settings (Fabric, Designer Name, Colour Match) */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem' }}>
                 
-                {/* Fabric Name Dropdown */}
+                {/* Fabric Name Dropdown (from Settings -> Fabrics) */}
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
                     Fabric Name
                   </label>
-                  <input
-                    type="text"
-                    list="fabric-options"
+                  <select
                     value={formData.fabricName}
                     onChange={e => setFormData({ ...formData, fabricName: e.target.value })}
-                    placeholder="Select or type fabric..."
-                    style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem' }}
-                  />
-                  <datalist id="fabric-options">
+                    style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px' }}
+                  >
+                    <option value="">-- Select Fabric --</option>
                     {printConfig.fabrics.map((f, i) => (
                       <option key={i} value={f}>{f}</option>
                     ))}
-                  </datalist>
+                  </select>
                 </div>
 
-                {/* Designer Select Dropdown */}
+                {/* Designer Name Select Dropdown (from Settings -> Designers) */}
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
-                    Assign Designer
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
+                    Designer Name
                   </label>
                   <select
                     value={formData.designerName}
                     onChange={e => setFormData({ ...formData, designerName: e.target.value })}
-                    style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem' }}
+                    style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px' }}
                   >
-                    <option value="">-- Choose Designer --</option>
+                    <option value="">-- Select Designer --</option>
                     {printConfig.designers.map((d, i) => (
                       <option key={i} value={d}>{d}</option>
                     ))}
                   </select>
                 </div>
 
-                {/* Colour Match Dropdown */}
+                {/* Colour Match Dropdown (from Settings -> Designers) */}
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
+                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
                     Colour Match
                   </label>
-                  <input
-                    type="text"
-                    list="colourmatch-options"
+                  <select
                     value={formData.colourMatching}
                     onChange={e => setFormData({ ...formData, colourMatching: e.target.value })}
-                    placeholder="e.g. Green Matching / Shade 02"
-                    style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem' }}
-                  />
-                  <datalist id="colourmatch-options">
-                    {printConfig.colourMatchings.map((c, i) => (
+                    style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px' }}
+                  >
+                    <option value="">-- Select Colour Match --</option>
+                    {printConfig.designers.map((c, i) => (
                       <option key={i} value={c}>{c}</option>
                     ))}
-                  </datalist>
+                  </select>
                 </div>
 
               </div>
 
               {/* Row 4: Sample Image (Stored into Cloudflare R2) */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: '10px', padding: '1rem' }}>
+              <div style={{ background: '#f8faff', border: '1.5px dashed #93c5fd', borderRadius: '10px', padding: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <ImageIcon size={15} color="#ec4899" />
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <ImageIcon size={15} color="#2563eb" />
                     Sample Image (Auto-saved to Cloudflare R2)
                   </label>
                   {formData.sampleImage && (
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, sampleImage: '' })}
-                      style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 700 }}
+                      style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 700 }}
                     >
                       Remove Image
                     </button>
@@ -1176,17 +1209,17 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                 </div>
 
                 {formData.sampleImage ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(0,0,0,0.3)', padding: '0.6rem', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: '#ffffff', border: '1px solid #bfdbfe', padding: '0.6rem', borderRadius: '8px' }}>
                     <img
                       src={formData.sampleImage}
                       alt="Sample Preview"
-                      style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)' }}
+                      style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: '6px', border: '1px solid #e2e8f0' }}
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                         <CheckCircle size={14} /> Image Stored on Cloudflare R2
                       </div>
-                      <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', wordBreak: 'break-all', display: 'block', marginTop: 2 }}>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b', wordBreak: 'break-all', display: 'block', marginTop: 2 }}>
                         {formData.sampleImage}
                       </span>
                     </div>
@@ -1194,7 +1227,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                 ) : (
                   <label
                     style={{
-                      border: '2px dashed var(--border-light)',
+                      border: '1.5px dashed #bfdbfe',
                       borderRadius: '8px',
                       padding: '1.25rem',
                       display: 'flex',
@@ -1203,7 +1236,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                       justifyContent: 'center',
                       gap: '0.45rem',
                       cursor: uploadingImage ? 'wait' : 'pointer',
-                      background: 'rgba(255,255,255,0.01)',
+                      background: '#ffffff',
                       transition: 'border-color 0.15s ease'
                     }}
                   >
@@ -1214,11 +1247,11 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                       disabled={uploadingImage}
                       style={{ display: 'none' }}
                     />
-                    <Upload size={24} color={uploadingImage ? 'var(--primary)' : 'var(--text-muted)'} className={uploadingImage ? 'spin-loader' : ''} />
-                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    <Upload size={24} color={uploadingImage ? '#2563eb' : '#94a3b8'} className={uploadingImage ? 'spin-loader' : ''} />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>
                       {uploadingImage ? 'Compressing & Uploading to R2...' : 'Click to Upload Sample Photo'}
                     </span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
                       Supports PNG, JPG, WebP. Compressed &amp; uploaded automatically.
                     </span>
                   </label>
@@ -1226,9 +1259,9 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
               </div>
 
               {/* Row 5: Sample Link (Image or Video preview) */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: '10px', padding: '1rem' }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.5rem' }}>
-                  <LinkIcon size={15} color="#38bdf8" />
+              <div style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '10px', padding: '1rem' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.5rem' }}>
+                  <LinkIcon size={15} color="#2563eb" />
                   Sample Link (Image, Video, Drive or Reference URL)
                 </label>
                 
@@ -1237,23 +1270,23 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                   value={formData.sampleLink}
                   onChange={e => setFormData({ ...formData, sampleLink: e.target.value })}
                   placeholder="https://drive.google.com/... or https://youtu.be/... or image url"
-                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem' }}
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px' }}
                 />
 
                 {/* Live Link Preview Indicator */}
                 {formData.sampleLink && (
-                  <div style={{ marginTop: '0.6rem', padding: '0.5rem 0.75rem', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                  <div style={{ marginTop: '0.6rem', padding: '0.5rem 0.75rem', background: '#ffffff', border: '1px solid #bfdbfe', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       {getLinkMediaType(formData.sampleLink) === 'video' ? (
-                        <span style={{ color: '#a855f7', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <span style={{ color: '#7c3aed', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                           <VideoIcon size={13} /> Video detected (Will show player preview)
                         </span>
                       ) : getLinkMediaType(formData.sampleLink) === 'image' ? (
-                        <span style={{ color: '#38bdf8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <span style={{ color: '#0284c7', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                           <ImageIcon size={13} /> Image link detected
                         </span>
                       ) : (
-                        <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                           <ExternalLink size={13} /> External link
                         </span>
                       )}
@@ -1263,7 +1296,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                       href={formData.sampleLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: 'var(--primary)', fontWeight: 700, textDecoration: 'none' }}
+                      style={{ color: '#2563eb', fontWeight: 700, textDecoration: 'none' }}
                     >
                       Test Link ↗
                     </a>
@@ -1273,7 +1306,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
 
               {/* Row 6: Instructions / Notes */}
               <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
+                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
                   Instructions / Specifications for Designer
                 </label>
                 <textarea
@@ -1281,17 +1314,16 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                   value={formData.notes}
                   onChange={e => setFormData({ ...formData, notes: e.target.value })}
                   placeholder="e.g. Match tone with sample saree, scale motifs to 44 panna, create seamless pattern..."
-                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem', resize: 'vertical' }}
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem', resize: 'vertical', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px' }}
                 />
               </div>
 
               {/* Action Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid var(--border-light)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem', marginTop: '0.5rem' }}>
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="btn-secondary"
-                  style={{ padding: '0.55rem 1.25rem', fontSize: '0.85rem' }}
+                  style={{ padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, borderRadius: '8px', border: '1px solid #cbd5e1', background: '#f1f5f9', color: '#475569', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
@@ -1304,10 +1336,10 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                     fontWeight: 800,
                     borderRadius: '8px',
                     border: 'none',
-                    background: 'linear-gradient(135deg, #ec4899 0%, #d946ef 100%)',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                     color: '#ffffff',
                     cursor: (savingTask || uploadingImage) ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 4px 14px rgba(236, 72, 153, 0.4)'
+                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)'
                   }}
                 >
                   {savingTask ? 'Saving Task...' : (editingId ? 'Save Changes' : '✓ Create Design Task')}
@@ -1319,7 +1351,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
         </div>
       )}
 
-      {/* ─── MODAL 2: UPDATE DESIGN STAGE ───────────────────────────────────── */}
+      {/* ─── MODAL 2: UPDATE DESIGN STAGE (WHITE & BLUE) ────────────────────── */}
       {showStageModal && activeTask && (
         <div style={{
           position: 'fixed',
@@ -1327,8 +1359,8 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(3, 7, 18, 0.8)',
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(6px)',
           zIndex: 9999,
           display: 'flex',
           alignItems: 'center',
@@ -1337,31 +1369,32 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
           boxSizing: 'border-box'
         }}>
           <div
-            className="glass-panel"
             style={{
               width: '100%',
               maxWidth: '540px',
               borderRadius: '16px',
+              background: '#ffffff',
+              border: '1px solid #bfdbfe',
               padding: '1.5rem',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+              boxShadow: '0 20px 45px rgba(30, 58, 138, 0.25)',
               display: 'flex',
               flexDirection: 'column',
               gap: '1.1rem'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                   Advance Design Stage
                 </h3>
-                <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700 }}>
+                <span style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 700 }}>
                   {activeTask.taskNo} — {activeTask.designName}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowStageModal(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
               >
                 <X size={20} />
               </button>
@@ -1371,14 +1404,14 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
               
               {/* Select Stage */}
               <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.35rem' }}>
-                  Target Stage <span style={{ color: 'var(--danger)' }}>*</span>
+                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.35rem' }}>
+                  Target Stage <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <select
                   value={stageFormData.stage}
                   onChange={e => setStageFormData({ ...stageFormData, stage: e.target.value })}
                   required
-                  style={{ width: '100%', fontSize: '0.88rem', padding: '0.6rem 0.75rem' }}
+                  style={{ width: '100%', fontSize: '0.88rem', padding: '0.6rem 0.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px' }}
                 >
                   {DESIGN_STAGES.map(s => (
                     <option key={s.id} value={s.id}>{s.label}</option>
@@ -1388,7 +1421,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
 
               {/* Stage Note */}
               <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.35rem' }}>
+                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.35rem' }}>
                   Stage Transition Note / Comments
                 </label>
                 <textarea
@@ -1396,13 +1429,13 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                   value={stageFormData.note}
                   onChange={e => setStageFormData({ ...stageFormData, note: e.target.value })}
                   placeholder="e.g. Color matching approved, sending sample proof..."
-                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem' }}
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px' }}
                 />
               </div>
 
               {/* Optional Output Image (Artwork) */}
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '0.75rem' }}>
-                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '0.3rem' }}>
+              <div style={{ background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '8px', padding: '0.75rem' }}>
+                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1e40af', display: 'block', marginBottom: '0.3rem' }}>
                   Upload Completed Artwork / Proof Image (Optional - saved to R2)
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1413,10 +1446,10 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                     disabled={uploadingImage}
                     style={{ fontSize: '0.78rem' }}
                   />
-                  {uploadingImage && <span style={{ fontSize: '0.72rem', color: 'var(--primary)' }}>Uploading...</span>}
+                  {uploadingImage && <span style={{ fontSize: '0.72rem', color: '#2563eb' }}>Uploading...</span>}
                 </div>
                 {stageFormData.outputImage && (
-                  <span style={{ fontSize: '0.68rem', color: '#10b981', display: 'block', marginTop: '0.3rem' }}>
+                  <span style={{ fontSize: '0.68rem', color: '#059669', display: 'block', marginTop: '0.3rem' }}>
                     ✓ Artwork uploaded: {stageFormData.outputImage}
                   </span>
                 )}
@@ -1424,7 +1457,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
 
               {/* Optional Output Link (Drive/File) */}
               <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
+                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
                   Output Artwork Link (Optional)
                 </label>
                 <input
@@ -1432,16 +1465,15 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                   value={stageFormData.outputLink}
                   onChange={e => setStageFormData({ ...stageFormData, outputLink: e.target.value })}
                   placeholder="e.g. Google Drive link to completed TIFF/PSD/CDR"
-                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem' }}
+                  style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px' }}
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid var(--border-light)', paddingTop: '0.85rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
                 <button
                   type="button"
                   onClick={() => setShowStageModal(false)}
-                  className="btn-secondary"
-                  style={{ padding: '0.5rem 1.1rem', fontSize: '0.82rem' }}
+                  style={{ padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '8px', border: '1px solid #cbd5e1', background: '#f1f5f9', color: '#475569', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
@@ -1454,9 +1486,10 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                     fontWeight: 800,
                     borderRadius: '8px',
                     border: 'none',
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                     color: '#ffffff',
-                    cursor: (updatingStage || uploadingImage) ? 'not-allowed' : 'pointer'
+                    cursor: (updatingStage || uploadingImage) ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
                   }}
                 >
                   {updatingStage ? 'Updating...' : 'Confirm Stage Change'}
@@ -1468,7 +1501,7 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
         </div>
       )}
 
-      {/* ─── MODAL 3: AUDIT HISTORY TIMELINE ───────────────────────────────── */}
+      {/* ─── MODAL 3: AUDIT HISTORY TIMELINE (WHITE & BLUE) ─────────────────── */}
       {showHistoryModal && activeTask && (
         <div style={{
           position: 'fixed',
@@ -1476,8 +1509,8 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(3, 7, 18, 0.8)',
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(6px)',
           zIndex: 9999,
           display: 'flex',
           alignItems: 'center',
@@ -1486,34 +1519,35 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
           boxSizing: 'border-box'
         }}>
           <div
-            className="glass-panel"
             style={{
               width: '100%',
               maxWidth: '580px',
               maxHeight: '85vh',
               overflowY: 'auto',
               borderRadius: '16px',
+              background: '#ffffff',
+              border: '1px solid #bfdbfe',
               padding: '1.5rem',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+              boxShadow: '0 20px 45px rgba(30, 58, 138, 0.25)',
               display: 'flex',
               flexDirection: 'column',
               gap: '1.2rem'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                  <History size={18} color="var(--primary)" />
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <History size={18} color="#2563eb" />
                   Stage Transition History
                 </h3>
-                <span style={{ fontSize: '0.78rem', color: 'var(--primary)', fontWeight: 700 }}>
+                <span style={{ fontSize: '0.78rem', color: '#2563eb', fontWeight: 700 }}>
                   {activeTask.taskNo} — {activeTask.designName}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowHistoryModal(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
               >
                 <X size={20} />
               </button>
@@ -1523,42 +1557,42 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingLeft: '0.5rem' }}>
               {(activeTask.stageHistory && activeTask.stageHistory.length > 0) ? (
                 activeTask.stageHistory.map((entry, idx) => {
-                  const stageObj = DESIGN_STAGES.find(s => s.id === entry.stage) || { color: '#38bdf8', bg: 'rgba(56,189,248,0.1)' };
+                  const stageObj = DESIGN_STAGES.find(s => s.id === entry.stage) || { color: '#2563eb', bg: '#eff6ff' };
                   return (
                     <div key={idx} style={{ display: 'flex', gap: '0.85rem', position: 'relative' }}>
                       
                       {/* Timeline dot */}
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <div style={{ width: 14, height: 14, borderRadius: '50%', background: stageObj.color, border: '2px solid #fff', marginTop: '2px', flexShrink: 0 }} />
+                        <div style={{ width: 14, height: 14, borderRadius: '50%', background: stageObj.color, border: '2px solid #fff', marginTop: '2px', flexShrink: 0, boxShadow: '0 0 0 2px #dbeafe' }} />
                         {idx < activeTask.stageHistory.length - 1 && (
-                          <div style={{ width: 2, background: 'var(--border-light)', flex: 1, marginTop: '4px' }} />
+                          <div style={{ width: 2, background: '#cbd5e1', flex: 1, marginTop: '4px' }} />
                         )}
                       </div>
 
                       {/* Content */}
-                      <div style={{ flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-light)', borderRadius: '8px', padding: '0.75rem', marginBottom: '0.25rem' }}>
+                      <div style={{ flex: 1, background: '#f8faff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem', marginBottom: '0.25rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
                           <span style={{ fontSize: '0.82rem', fontWeight: 800, color: stageObj.color }}>
                             {entry.stage}
                           </span>
-                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
                             {entry.updatedAt ? new Date(entry.updatedAt).toLocaleString('en-IN') : 'Recent'}
                           </span>
                         </div>
 
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                          By: <strong style={{ color: 'var(--text-primary)' }}>{entry.updatedByName || 'Admin / User'}</strong>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                          By: <strong style={{ color: '#0f172a' }}>{entry.updatedByName || 'Admin / User'}</strong>
                         </div>
 
                         {entry.note && (
-                          <p style={{ fontSize: '0.78rem', color: 'var(--text-primary)', margin: '6px 0 0 0', background: 'rgba(0,0,0,0.2)', padding: '0.4rem 0.6rem', borderRadius: '4px' }}>
+                          <p style={{ fontSize: '0.78rem', color: '#0f172a', margin: '6px 0 0 0', background: '#ffffff', border: '1px solid #e2e8f0', padding: '0.4rem 0.6rem', borderRadius: '4px' }}>
                             {entry.note}
                           </p>
                         )}
 
                         {entry.outputImage && (
                           <div style={{ marginTop: '0.5rem' }}>
-                            <a href={entry.outputImage} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <a href={entry.outputImage} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                               <ImageIcon size={12} /> View Attached Artwork ↗
                             </a>
                           </div>
@@ -1569,16 +1603,15 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                   );
                 })
               ) : (
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>No stage history recorded yet.</p>
+                <p style={{ fontSize: '0.82rem', color: '#64748b' }}>No stage history recorded yet.</p>
               )}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
               <button
                 type="button"
                 onClick={() => setShowHistoryModal(false)}
-                className="btn-secondary"
-                style={{ padding: '0.45rem 1.2rem', fontSize: '0.82rem' }}
+                style={{ padding: '0.45rem 1.2rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '8px', border: '1px solid #cbd5e1', background: '#f1f5f9', color: '#475569', cursor: 'pointer' }}
               >
                 Close
               </button>
