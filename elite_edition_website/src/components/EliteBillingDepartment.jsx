@@ -13,6 +13,7 @@ import { triggerEliteAlert } from './EliteModalDialog';
 import DateRangePicker from './DateRangePicker';
 import SignedDocumentUploadModal from './SignedDocumentUploadModal';
 import SignedDocumentPreviewModal from './SignedDocumentPreviewModal';
+import * as XLSX from 'xlsx';
 
 const R2_PUBLIC_BASE = 'https://pub-66cb4aaa7dca442893dd7569e70ff7bd.r2.dev';
 
@@ -848,7 +849,65 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         return;
       }
 
-      if (ledgerFormat === 'csv' || ledgerFormat === 'excel') {
+      if (ledgerFormat === 'excel') {
+        const wb = XLSX.utils.book_new();
+        const rows = [
+          ['ELITE DIGITAL PRINTS — PARTY LEDGER STATEMENT'],
+          ['Party Name:', partyName],
+          ['GSTIN:', selectedParty.gstin || 'N/A', 'Phone:', selectedParty.phone || 'N/A'],
+          ['Period:', `${startD ? formatDateDDMMYYYY(startD) : 'Start'} to ${endD ? formatDateDDMMYYYY(endD) : 'Present'}`],
+          ['Opening Balance (₹):', Number(ledger.openingBalance) || 0],
+          [],
+          ['Date', 'Voucher No', 'Particulars', 'Department', 'Debit (₹)', 'Credit (₹)', 'Running Balance (₹)', 'Dr/Cr']
+        ];
+
+        ledger.transactions.forEach(t => {
+          rows.push([
+            t.date,
+            t.voucherNo,
+            t.particulars,
+            t.department,
+            Number(t.debit) || 0,
+            Number(t.credit) || 0,
+            Number(Math.abs(t.runningBalance)) || 0,
+            t.balType
+          ]);
+        });
+
+        rows.push([]);
+        rows.push([
+          'TOTALS',
+          '',
+          '',
+          '',
+          Number(ledger.totalDebit) || 0,
+          Number(ledger.totalCredit) || 0,
+          Number(Math.abs(ledger.closingBalance)) || 0,
+          ledger.closingBalance >= 0 ? 'Dr' : 'Cr'
+        ]);
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+
+        // Column widths for professional formatting
+        ws['!cols'] = [
+          { wch: 14 },
+          { wch: 22 },
+          { wch: 45 },
+          { wch: 18 },
+          { wch: 16 },
+          { wch: 16 },
+          { wch: 20 },
+          { wch: 8 },
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Party Ledger');
+        const fileName = `Ledger_${partyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        triggerPushNotification('📊 Excel Export Ready', `Party statement for ${partyName} exported as XLSX.`, 'success');
+        return;
+      }
+
+      if (ledgerFormat === 'csv') {
         let csvContent = `ELITE DIGITAL PRINTS — PARTY LEDGER STATEMENT\n`;
         csvContent += `Party Name: "${partyName}"\n`;
         csvContent += `Period: ${startD ? formatDateDDMMYYYY(startD) : 'Start'} to ${endD ? formatDateDDMMYYYY(endD) : 'Present'}\n`;
@@ -1010,6 +1069,74 @@ export default function EliteBillingDepartment({ initialChallanData = null, depa
         link.click();
         document.body.removeChild(link);
         triggerPushNotification('🏛️ Tally XML Ready', `All-Parties Tally XML Master Ledgers exported successfully.`, 'success');
+        return;
+      }
+
+      if (ledgerFormat === 'excel') {
+        const wb = XLSX.utils.book_new();
+        const rows = [
+          ['ELITE DIGITAL PRINTS — ALL-PARTIES MASTER LEDGER SUMMARY'],
+          ['Report Date:', new Date().toLocaleDateString('en-IN')],
+          ['Period:', `${startD ? formatDateDDMMYYYY(startD) : 'Start'} to ${endD ? formatDateDDMMYYYY(endD) : 'Present'}`],
+          [],
+          ['Party Code', 'Party Name', 'GSTIN', 'Phone', 'Opening Balance (₹)', 'Total Billed (₹)', 'Total Paid (₹)', 'Closing Balance (₹)', 'Status']
+        ];
+
+        let grandBilled = 0;
+        let grandPaid = 0;
+        let grandBal = 0;
+
+        customers.forEach(cust => {
+          const partyLedger = computePartyLedger(cust._id, startD, endD);
+          grandBilled += partyLedger.totalDebit;
+          grandPaid += partyLedger.totalCredit;
+          grandBal += partyLedger.closingBalance;
+
+          rows.push([
+            `CUST-${cust._id.slice(-4).toUpperCase()}`,
+            cust.businessName || cust.name,
+            cust.gstin || 'N/A',
+            cust.phone || 'N/A',
+            Number(partyLedger.openingBalance) || 0,
+            Number(partyLedger.totalDebit) || 0,
+            Number(partyLedger.totalCredit) || 0,
+            Number(partyLedger.closingBalance) || 0,
+            partyLedger.closingBalance > 0 ? 'Overdue' : 'Active'
+          ]);
+        });
+
+        rows.push([]);
+        rows.push([
+          'GRAND TOTALS',
+          '',
+          '',
+          '',
+          '',
+          Number(grandBilled) || 0,
+          Number(grandPaid) || 0,
+          Number(grandBal) || 0,
+          ''
+        ]);
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+
+        // Column widths for professional formatting
+        ws['!cols'] = [
+          { wch: 14 },
+          { wch: 35 },
+          { wch: 20 },
+          { wch: 16 },
+          { wch: 20 },
+          { wch: 20 },
+          { wch: 20 },
+          { wch: 22 },
+          { wch: 12 },
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Master Ledger');
+        const fileName = `Master_Ledger_Summary_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+        triggerPushNotification('📊 Excel Export Ready', `All-Parties Master Ledger exported as XLSX.`, 'success');
         return;
       }
 
