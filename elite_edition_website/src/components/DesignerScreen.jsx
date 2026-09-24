@@ -32,7 +32,9 @@ import {
   Edit2,
   Trash2,
   Link as LinkIcon,
-  Video as VideoIcon
+  Video as VideoIcon,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { triggerPushNotification } from './NotificationToast';
 
@@ -51,8 +53,8 @@ export const COLOUR_MATCHING_OPTIONS = [
 
 export const FINAL_DESIGN_OPTIONS = [
   { id: 'FINAL SAMPLE', label: 'FINAL SAMPLE', color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', icon: FileCheck },
-  { id: 'REJECT SAMPLE drowning', label: 'REJECT SAMPLE drowning', color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: Ban },
-  { id: 'REJECT SAMPLE FOR C.M.', label: 'REJECT SAMPLE FOR C.M.', color: '#ea580c', bg: '#fff7ed', border: '#ffedd5', icon: RotateCcw },
+  { id: 'REJECT SAMPLE DRAWING', legacyId: 'REJECT SAMPLE drowning', label: 'REJECT DRAWING', color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: Ban },
+  { id: 'REJECT SAMPLE FOR C.M.', legacyId: 'REJECT SAMPLE FOR C.M.', label: 'REJECT C.M.', color: '#ea580c', bg: '#fff7ed', border: '#ffedd5', icon: RotateCcw },
   { id: 'APPROVED SAMPLE', label: 'APPROVED SAMPLE', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', icon: CheckCircle2 },
 ];
 
@@ -272,6 +274,10 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
   // Dropdown options from settings
   const [printConfig, setPrintConfig] = useState({ designers: [], fabrics: [] });
 
+  // View Mode & Operational Stage Tabs
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
+  const [stageTab, setStageTab] = useState('ALL'); // 'ALL' | 'DROW' | 'CM' | 'PENDING_APPROVAL' | 'APPROVED' | 'REVISION'
+
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [datePreset, setDatePreset] = useState('all');
@@ -434,6 +440,41 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
     primaryDesignerIdentifier,
   ]);
 
+  // Stage tab statistics based on current active list
+  const stageCounts = useMemo(() => {
+    let drow = 0, cm = 0, pending = 0, approved = 0, revision = 0;
+    let base = tasks;
+    if (isUserRestricted) {
+      if (effectiveDesignerTokens.length === 0) return { all: 0, drow: 0, cm: 0, pending: 0, approved: 0, revision: 0 };
+      base = base.filter(t => {
+        const checkMatch = (val) => {
+          if (!val) return false;
+          const str = String(val).toLowerCase().trim();
+          return effectiveDesignerTokens.some(tok => str === tok || str.includes(tok) || tok.includes(str));
+        };
+        return checkMatch(t.designerName) || (Array.isArray(t.designers) && t.designers.some(checkMatch)) ||
+               checkMatch(t.colourMatching) || (Array.isArray(t.colourMatches) && t.colourMatches.some(checkMatch));
+      });
+    }
+
+    base.forEach(t => {
+      const isApproved = t.finalDesignStatus === 'APPROVED SAMPLE';
+      const isRevision = String(t.finalDesignStatus || '').startsWith('REJECT');
+      if (isApproved) {
+        approved++;
+      } else if (isRevision) {
+        revision++;
+      } else if (t.drowDesignStatus === 'FINAL SAMPLE' || t.colourMatchingStatus === 'FINAL SAMPLE') {
+        pending++;
+      } else if (t.colourMatchingStatus && t.colourMatchingStatus !== 'START WORKING') {
+        cm++;
+      } else {
+        drow++;
+      }
+    });
+    return { all: base.length, drow, cm, pending, approved, revision };
+  }, [tasks, isUserRestricted, effectiveDesignerTokens]);
+
   // Client-side quick filter: STRICT isolation for non-admin users
   const filteredTasks = useMemo(() => {
     let result = tasks;
@@ -459,6 +500,26 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
       });
     }
 
+    // Filter by Operational Stage Tab
+    if (stageTab !== 'ALL') {
+      result = result.filter(t => {
+        const isApproved = t.finalDesignStatus === 'APPROVED SAMPLE';
+        const isRevision = String(t.finalDesignStatus || '').startsWith('REJECT');
+        if (stageTab === 'APPROVED') return isApproved;
+        if (stageTab === 'REVISION') return isRevision;
+        if (stageTab === 'PENDING_APPROVAL') {
+          return !isApproved && !isRevision && (t.drowDesignStatus === 'FINAL SAMPLE' || t.colourMatchingStatus === 'FINAL SAMPLE');
+        }
+        if (stageTab === 'CM') {
+          return !isApproved && !isRevision && t.colourMatchingStatus && t.colourMatchingStatus !== 'START WORKING';
+        }
+        if (stageTab === 'DROW') {
+          return !isApproved && !isRevision && (t.drowDesignStatus === 'START WORKING' || t.drowDesignStatus === 'REVIEW SAMPLE' || !t.drowDesignStatus);
+        }
+        return true;
+      });
+    }
+
     if (!searchQuery.trim()) return result;
     const q = searchQuery.toLowerCase().trim();
     return result.filter((t) => {
@@ -481,7 +542,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
         finSt.includes(q)
       );
     });
-  }, [tasks, searchQuery, isUserRestricted, effectiveDesignerTokens]);
+  }, [tasks, searchQuery, stageTab, isUserRestricted, effectiveDesignerTokens]);
 
   // Create & Edit Task Handlers
   const handleOpenCreate = () => {
@@ -744,8 +805,32 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
     });
   };
 
+  // Helper to compute workflow stage states for each task
+  const getTaskStageProgress = (task) => {
+    const isFinalApproved = task.finalDesignStatus === 'APPROVED SAMPLE';
+    const isFinalRejectedDrow = task.finalDesignStatus === 'REJECT SAMPLE DRAWING' || task.finalDesignStatus === 'REJECT SAMPLE drowning';
+    const isFinalRejectedCM = task.finalDesignStatus === 'REJECT SAMPLE FOR C.M.';
+
+    let s1 = 'pending';
+    if (task.drowDesignStatus === 'FINAL SAMPLE') s1 = 'done';
+    else if (task.drowDesignStatus) s1 = 'active';
+    if (isFinalRejectedDrow) s1 = 'revision';
+
+    let s2 = 'pending';
+    if (task.colourMatchingStatus === 'FINAL SAMPLE') s2 = 'done';
+    else if (task.colourMatchingStatus) s2 = 'active';
+    if (isFinalRejectedCM) s2 = 'revision';
+
+    let s3 = 'pending';
+    if (isFinalApproved) s3 = 'approved';
+    else if (isFinalRejectedDrow || isFinalRejectedCM) s3 = 'revision';
+    else if (task.finalDesignStatus) s3 = 'active';
+
+    return { s1, s2, s3, isFinalApproved, isFinalRejectedDrow, isFinalRejectedCM };
+  };
+
   return (
-    <div style={{ padding: '1.25rem', maxWidth: '1600px', margin: '0 auto', color: '#0f172a' }}>
+    <div style={{ padding: '1rem', maxWidth: '1600px', margin: '0 auto', color: '#0f172a', boxSizing: 'border-box' }}>
       {/* ─── Top Header Bar ────────────────────────────────────────────── */}
       <div
         style={{
@@ -759,35 +844,105 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
           borderBottom: '1px solid #e2e8f0',
         }}
       >
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <div
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                boxShadow: '0 4px 12px rgba(29, 78, 216, 0.25)',
-              }}
-            >
-              <Palette size={22} />
-            </div>
-            <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff',
+              boxShadow: '0 4px 14px rgba(29, 78, 216, 0.3)',
+              flexShrink: 0,
+            }}
+          >
+            <Palette size={22} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
               <h1 style={{ margin: 0, fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
                 Designer Screen
               </h1>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>
-                Elite Digital Prints • Live Design Workflow & Multi-Image Cloudflare R2 Proofs
-              </p>
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '12px',
+                  padding: '0.15rem 0.6rem',
+                }}
+              >
+                {filteredTasks.length} {filteredTasks.length === 1 ? 'Design' : 'Designs'}
+              </span>
             </div>
+            <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: '#64748b', fontWeight: 500 }}>
+              Live Design Workflow • Cloudflare R2 Proofs • Drawing & Colour Matching Studio
+            </p>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {/* View Mode Toggle (Cards / Table) */}
+          <div
+            style={{
+              display: 'inline-flex',
+              background: '#f1f5f9',
+              padding: '3px',
+              borderRadius: '10px',
+              border: '1px solid #cbd5e1',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.4rem 0.75rem',
+                borderRadius: '7px',
+                border: 'none',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                background: viewMode === 'grid' ? '#ffffff' : 'transparent',
+                color: viewMode === 'grid' ? '#2563eb' : '#64748b',
+                boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.15s ease',
+              }}
+              title="Cards Grid View"
+            >
+              <LayoutGrid size={14} /> <span>Cards</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.4rem 0.75rem',
+                borderRadius: '7px',
+                border: 'none',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                background: viewMode === 'table' ? '#ffffff' : 'transparent',
+                color: viewMode === 'table' ? '#2563eb' : '#64748b',
+                boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.15s ease',
+              }}
+              title="High-Density Table View"
+            >
+              <List size={14} /> <span>Table</span>
+            </button>
+          </div>
+
           <button
             onClick={() => loadData(false)}
             disabled={loading}
@@ -807,7 +962,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
             }}
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            Refresh
+            <span>Refresh</span>
           </button>
 
           {canInputNewDesign && (
@@ -828,7 +983,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                 boxShadow: '0 2px 6px rgba(37,99,235,0.25)',
               }}
             >
-              <Plus size={15} /> Input New Design
+              <Plus size={15} /> <span>Input New Design</span>
             </button>
           )}
         </div>
@@ -848,8 +1003,9 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
           style={{
             background: '#ffffff',
             border: '1px solid #dbeafe',
+            borderTop: '3px solid #2563eb',
             borderRadius: '12px',
-            padding: '1rem',
+            padding: '0.9rem',
             boxShadow: '0 2px 6px rgba(37, 99, 235, 0.04)',
           }}
         >
@@ -857,18 +1013,18 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
             <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Clock size={14} color="#2563eb" /> 1. Drow Design Status
             </span>
-            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>In Drawing</span>
+            <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600, background: '#f8fafc', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>Stage 1</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-            <div style={{ flex: 1, background: '#eff6ff', padding: '0.5rem 0.6rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#eff6ff', padding: '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#1d4ed8' }}>START WORK</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1e3a8a' }}>{stats?.drow?.startWorking || 0}</div>
             </div>
-            <div style={{ flex: 1, background: '#fffbeb', padding: '0.5rem 0.6rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#fffbeb', padding: '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#b45309' }}>REVIEW</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#92400e' }}>{stats?.drow?.reviewSample || 0}</div>
             </div>
-            <div style={{ flex: 1, background: '#eef2ff', padding: '0.5rem 0.6rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#eef2ff', padding: '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4338ca' }}>FINAL</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#312e81' }}>{stats?.drow?.finalSample || 0}</div>
             </div>
@@ -880,8 +1036,9 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
           style={{
             background: '#ffffff',
             border: '1px solid #fce7f3',
+            borderTop: '3px solid #db2777',
             borderRadius: '12px',
-            padding: '1rem',
+            padding: '0.9rem',
             boxShadow: '0 2px 6px rgba(219, 39, 119, 0.04)',
           }}
         >
@@ -889,18 +1046,18 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
             <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#9d174d', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Palette size={14} color="#db2777" /> 2. Colour Matching Status
             </span>
-            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>C.M. Studio</span>
+            <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600, background: '#f8fafc', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>Stage 2</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-            <div style={{ flex: 1, background: '#fdf2f8', padding: '0.5rem 0.6rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#fdf2f8', padding: '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#be185d' }}>PANTON</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#831843' }}>{stats?.cm?.colourPanton || 0}</div>
             </div>
-            <div style={{ flex: 1, background: '#fffbeb', padding: '0.5rem 0.6rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#fffbeb', padding: '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#b45309' }}>REVIEW</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#92400e' }}>{stats?.cm?.reviewSample || 0}</div>
             </div>
-            <div style={{ flex: 1, background: '#eef2ff', padding: '0.5rem 0.6rem', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ flex: 1, background: '#eef2ff', padding: '0.5rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#4338ca' }}>FINAL</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#312e81' }}>{stats?.cm?.finalSample || 0}</div>
             </div>
@@ -912,8 +1069,9 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
           style={{
             background: '#ffffff',
             border: '1px solid #dcfce7',
+            borderTop: '3px solid #16a34a',
             borderRadius: '12px',
-            padding: '1rem',
+            padding: '0.9rem',
             boxShadow: '0 2px 6px rgba(22, 163, 74, 0.04)',
           }}
         >
@@ -921,7 +1079,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
             <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <CheckCircle2 size={14} color="#16a34a" /> 3. Final Design Status
             </span>
-            <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Approval Gate</span>
+            <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600, background: '#f8fafc', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>Stage 3</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.4rem' }}>
             <div style={{ flex: 1, background: '#f0fdf4', padding: '0.5rem 0.4rem', borderRadius: '8px', textAlign: 'center' }}>
@@ -938,6 +1096,65 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ─── Operational Stage Navigation Tabs ───────────────────────────── */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '0.4rem',
+          overflowX: 'auto',
+          paddingBottom: '0.35rem',
+          marginBottom: '1rem',
+          scrollbarWidth: 'thin',
+        }}
+      >
+        {[
+          { id: 'ALL', label: 'All Designs', count: stageCounts.all, color: '#1d4ed8', bg: '#eff6ff' },
+          { id: 'DROW', label: '1. Drawing', count: stageCounts.drow, color: '#0284c7', bg: '#f0f9ff' },
+          { id: 'CM', label: '2. Colour Match', count: stageCounts.cm, color: '#db2777', bg: '#fdf2f8' },
+          { id: 'PENDING_APPROVAL', label: '3. Pending Gate', count: stageCounts.pending, color: '#ca8a04', bg: '#fefce8' },
+          { id: 'APPROVED', label: 'Approved', count: stageCounts.approved, color: '#16a34a', bg: '#f0fdf4' },
+          { id: 'REVISION', label: 'Revisions', count: stageCounts.revision, color: '#dc2626', bg: '#fef2f2' },
+        ].map((tab) => {
+          const isActive = stageTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setStageTab(tab.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.45rem 0.85rem',
+                borderRadius: '8px',
+                border: isActive ? `1.5px solid ${tab.color}` : '1px solid #cbd5e1',
+                background: isActive ? tab.color : '#ffffff',
+                color: isActive ? '#ffffff' : '#475569',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                boxShadow: isActive ? `0 2px 8px ${tab.color}35` : 'none',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <span>{tab.label}</span>
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 800,
+                  padding: '0.1rem 0.45rem',
+                  borderRadius: '10px',
+                  background: isActive ? 'rgba(255, 255, 255, 0.25)' : tab.bg,
+                  color: isActive ? '#ffffff' : tab.color,
+                }}
+              >
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* ─── Search & Date Range Toolbar ───────────────────────────────── */}
@@ -1068,7 +1285,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
         </div>
 
         {/* Reset Filters */}
-        {(datePreset !== 'all' || (!isDesignerRestricted && selectedDesigner !== 'All') || selectedFabric !== 'All' || drowFilter !== 'All' || cmFilter !== 'All' || finalFilter !== 'All' || searchQuery) && (
+        {(datePreset !== 'all' || (!isDesignerRestricted && selectedDesigner !== 'All') || selectedFabric !== 'All' || drowFilter !== 'All' || cmFilter !== 'All' || finalFilter !== 'All' || stageTab !== 'ALL' || searchQuery) && (
           <button
             onClick={() => {
               setDatePreset('all');
@@ -1077,6 +1294,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
               setDrowFilter('All');
               setCmFilter('All');
               setFinalFilter('All');
+              setStageTab('ALL');
               setSearchQuery('');
             }}
             style={{
@@ -1095,7 +1313,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
         )}
       </div>
 
-      {/* ─── Task Cards Grid ───────────────────────────────────────────── */}
+      {/* ─── Task Content: Cards Grid vs Table View ───────────────────────── */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '4rem 1rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
           <RefreshCw size={28} className="animate-spin" color="#2563eb" style={{ margin: '0 auto 0.75rem' }} />
@@ -1115,10 +1333,317 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                   : 'No design tasks found matching the selected filters.')}
           </p>
         </div>
+      ) : viewMode === 'table' ? (
+        /* ─── TABLE VIEW ──────────────────────────────────────────────── */
+        <div style={{ background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8rem' }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Task # / Date</th>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Design & Priority</th>
+                  <th style={{ padding: '0.85rem 0.75rem', fontWeight: 800 }}>Sample Ref</th>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Assigned Team</th>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>1. Drow Status</th>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>2. Colour Match</th>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>3. Final Approval</th>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800, textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTasks.map((task, idx) => {
+                  const priorityConfig = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.Medium;
+                  const allFabrics = Array.isArray(task.fabrics) && task.fabrics.length > 0
+                    ? task.fabrics
+                    : task.fabricName ? task.fabricName.split(',').map((s) => s.trim()).filter(Boolean) : [];
+                  const allDesigners = Array.isArray(task.designers) && task.designers.length > 0
+                    ? task.designers
+                    : task.designerName ? task.designerName.split(',').map((s) => s.trim()).filter(Boolean) : [];
+                  const allColourMatches = Array.isArray(task.colourMatches) && task.colourMatches.length > 0
+                    ? task.colourMatches
+                    : task.colourMatching ? task.colourMatching.split(',').map((s) => s.trim()).filter(Boolean) : [];
+
+                  const drowImgs = task.drowDesignImages || [];
+                  const cmImgs = task.colourMatchingImages || [];
+                  const finalImgs = task.finalDesignImages || [];
+
+                  return (
+                    <tr
+                      key={task._id}
+                      style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        background: idx % 2 === 0 ? '#ffffff' : '#fcfdff',
+                        transition: 'background 0.1s ease',
+                      }}
+                    >
+                      {/* Task # & Date */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'inline-block', fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', padding: '0.15rem 0.5rem', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
+                          {task.taskNo}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                          {task.date}
+                        </div>
+                      </td>
+
+                      {/* Design & Priority */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
+                        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>
+                          {task.designName}
+                        </div>
+                        <div style={{ marginTop: '0.25rem' }}>
+                          <span
+                            style={{
+                              fontSize: '0.66rem',
+                              fontWeight: 800,
+                              padding: '0.15rem 0.45rem',
+                              borderRadius: '5px',
+                              background: priorityConfig.bg,
+                              color: priorityConfig.color,
+                              border: `1px solid ${priorityConfig.border}`,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.2rem',
+                            }}
+                          >
+                            <span>{priorityConfig.badge}</span>
+                            <span>{task.priority || 'Medium'}</span>
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Sample Ref */}
+                      <td style={{ padding: '0.85rem 0.75rem', verticalAlign: 'middle' }}>
+                        {task.sampleImage ? (
+                          <div
+                            onClick={() => handleOpenLightbox([task.sampleImage], 0, `Sample: ${task.designName}`)}
+                            style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '6px',
+                              overflow: 'hidden',
+                              border: '1px solid #cbd5e1',
+                              cursor: 'pointer',
+                              position: 'relative',
+                            }}
+                            title="Click to view sample"
+                          >
+                            <img src={task.sampleImage} alt="Sample" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                        ) : task.sampleLink ? (
+                          <a
+                            href={task.sampleLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.75rem', fontWeight: 700 }}
+                            title="Open reference link"
+                          >
+                            <ExternalLink size={14} /> Link
+                          </a>
+                        ) : (
+                          <span style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>—</span>
+                        )}
+                      </td>
+
+                      {/* Assigned Team & Fabrics */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          {allDesigners.length > 0 && (
+                            <div style={{ fontSize: '0.72rem', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <User size={12} color="#2563eb" /> <span>{allDesigners.join(', ')}</span>
+                            </div>
+                          )}
+                          {allColourMatches.length > 0 && (
+                            <div style={{ fontSize: '0.72rem', color: '#9d174d', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <Palette size={12} color="#db2777" /> <span>{allColourMatches.join(', ')}</span>
+                            </div>
+                          )}
+                          {allFabrics.length > 0 && (
+                            <div style={{ fontSize: '0.7rem', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <Scissors size={11} color="#0284c7" /> <span>{allFabrics.join(', ')}</span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 1. Drow Status */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', task.drowDesignStatus)}
+                            style={{
+                              padding: '0.25rem 0.55rem',
+                              borderRadius: '6px',
+                              fontSize: '0.7rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              border: task.drowDesignStatus ? '1px solid #bfdbfe' : '1px dashed #cbd5e1',
+                              background: task.drowDesignStatus === 'FINAL SAMPLE' ? '#eef2ff' : task.drowDesignStatus ? '#eff6ff' : '#f8fafc',
+                              color: task.drowDesignStatus === 'FINAL SAMPLE' ? '#4338ca' : task.drowDesignStatus ? '#1d4ed8' : '#94a3b8',
+                            }}
+                          >
+                            {task.drowDesignStatus || '+ Set Status'}
+                          </button>
+                          {drowImgs.length > 0 && (
+                            <button
+                              onClick={() => handleOpenLightbox(drowImgs, 0, `Drow Proof: ${task.designName}`)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
+                              title={`${drowImgs.length} proof image(s)`}
+                            >
+                              🖼️ {drowImgs.length}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 2. Colour Match */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', task.colourMatchingStatus)}
+                            style={{
+                              padding: '0.25rem 0.55rem',
+                              borderRadius: '6px',
+                              fontSize: '0.7rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              border: task.colourMatchingStatus ? '1px solid #fbcfe8' : '1px dashed #cbd5e1',
+                              background: task.colourMatchingStatus === 'FINAL SAMPLE' ? '#eef2ff' : task.colourMatchingStatus ? '#fdf2f8' : '#f8fafc',
+                              color: task.colourMatchingStatus === 'FINAL SAMPLE' ? '#4338ca' : task.colourMatchingStatus ? '#be185d' : '#94a3b8',
+                            }}
+                          >
+                            {task.colourMatchingStatus || '+ Set Status'}
+                          </button>
+                          {cmImgs.length > 0 && (
+                            <button
+                              onClick={() => handleOpenLightbox(cmImgs, 0, `Colour Proof: ${task.designName}`)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#db2777', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
+                              title={`${cmImgs.length} proof image(s)`}
+                            >
+                              🎨 {cmImgs.length}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 3. Final Approval */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', task.finalDesignStatus)}
+                            style={{
+                              padding: '0.25rem 0.55rem',
+                              borderRadius: '6px',
+                              fontSize: '0.7rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              border: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                ? '1.5px solid #16a34a'
+                                : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                ? '1.5px solid #dc2626'
+                                : '1px dashed #cbd5e1',
+                              background: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                ? '#dcfce7'
+                                : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                ? '#fee2e2'
+                                : '#f8fafc',
+                              color: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                ? '#15803d'
+                                : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                ? '#b91c1c'
+                                : '#94a3b8',
+                            }}
+                          >
+                            {task.finalDesignStatus?.includes('drowning') || task.finalDesignStatus === 'REJECT SAMPLE DRAWING'
+                              ? 'REJECT DRAWING'
+                              : task.finalDesignStatus || '+ Gate Review'}
+                          </button>
+                          {finalImgs.length > 0 && (
+                            <button
+                              onClick={() => handleOpenLightbox(finalImgs, 0, `Final Proof: ${task.designName}`)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
+                              title={`${finalImgs.length} final proof image(s)`}
+                            >
+                              ✨ {finalImgs.length}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Actions */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <button
+                            onClick={() => setHistoryTask(task)}
+                            title="View Complete Stage History"
+                            style={{
+                              padding: '0.35rem 0.5rem',
+                              background: '#f8fafc',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              color: '#475569',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.2rem',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                            }}
+                          >
+                            <History size={13} />
+                            <span>{task.stageHistory?.length || 0}</span>
+                          </button>
+                          {isUserAdmin && (
+                            <>
+                              <button
+                                onClick={() => handleOpenEdit(task)}
+                                title="Edit Task"
+                                style={{
+                                  padding: '0.35rem 0.5rem',
+                                  background: '#eff6ff',
+                                  border: '1px solid #bfdbfe',
+                                  borderRadius: '6px',
+                                  color: '#1d4ed8',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTask(task)}
+                                title="Delete Task"
+                                style={{
+                                  padding: '0.35rem 0.5rem',
+                                  background: '#fef2f2',
+                                  border: '1px solid #fecaca',
+                                  borderRadius: '6px',
+                                  color: '#dc2626',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '1.15rem' }}>
+        /* ─── CARDS GRID VIEW ─────────────────────────────────────────── */
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 360px), 1fr))', gap: '1.15rem' }}>
           {filteredTasks.map((task) => {
             const priorityConfig = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.Medium;
+            const progress = getTaskStageProgress(task);
 
             const allFabrics = Array.isArray(task.fabrics) && task.fabrics.length > 0
               ? task.fabrics
@@ -1142,19 +1667,78 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                 style={{
                   background: '#ffffff',
                   border: '1px solid #e2e8f0',
-                  borderRadius: '14px',
+                  borderRadius: '16px',
                   padding: '1.15rem',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '0.9rem',
+                  gap: '0.85rem',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
                   transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                  position: 'relative',
                 }}
               >
+                {/* ── Workflow Progress Pipeline Strip ── */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: '#f8fafc',
+                    padding: '0.35rem 0.6rem',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                  }}
+                >
+                  {/* Step 1: Drawing */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      color: progress.s1 === 'done' ? '#16a34a' : progress.s1 === 'active' ? '#2563eb' : progress.s1 === 'revision' ? '#dc2626' : '#94a3b8',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.65rem' }}>{progress.s1 === 'done' ? '✓' : '1'}</span>
+                    <span>Drow</span>
+                  </div>
+
+                  <span style={{ color: '#cbd5e1' }}>──</span>
+
+                  {/* Step 2: Colour Match */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      color: progress.s2 === 'done' ? '#16a34a' : progress.s2 === 'active' ? '#db2777' : progress.s2 === 'revision' ? '#ea580c' : '#94a3b8',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.65rem' }}>{progress.s2 === 'done' ? '✓' : '2'}</span>
+                    <span>C.M.</span>
+                  </div>
+
+                  <span style={{ color: '#cbd5e1' }}>──</span>
+
+                  {/* Step 3: Final Gate */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      color: progress.s3 === 'approved' ? '#16a34a' : progress.s3 === 'revision' ? '#dc2626' : progress.s3 === 'active' ? '#4f46e5' : '#94a3b8',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.65rem' }}>{progress.s3 === 'approved' ? '✓' : '3'}</span>
+                    <span>{progress.s3 === 'approved' ? 'Approved' : 'Gate'}</span>
+                  </div>
+                </div>
+
                 {/* ── Card Header ── */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                       <span
                         style={{
                           fontSize: '0.72rem',
@@ -1172,24 +1756,24 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                         {task.date}
                       </span>
                     </div>
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', wordBreak: 'break-word' }}>
                       {task.designName}
                     </h3>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
                     <span
                       style={{
-                        fontSize: '0.7rem',
+                        fontSize: '0.68rem',
                         fontWeight: 800,
-                        padding: '0.2rem 0.55rem',
+                        padding: '0.18rem 0.5rem',
                         borderRadius: '6px',
                         background: priorityConfig.bg,
                         color: priorityConfig.color,
                         border: `1px solid ${priorityConfig.border}`,
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.25rem',
+                        gap: '0.2rem',
                       }}
                     >
                       <span>{priorityConfig.badge}</span>
@@ -1198,9 +1782,9 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
 
                     <button
                       onClick={() => setHistoryTask(task)}
-                      title="View Complete Stage & Audit History"
+                      title="View Complete Stage History"
                       style={{
-                        padding: '0.3rem 0.5rem',
+                        padding: '0.3rem 0.45rem',
                         background: '#f8fafc',
                         border: '1px solid #cbd5e1',
                         borderRadius: '6px',
@@ -1208,7 +1792,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.25rem',
+                        gap: '0.2rem',
                         fontSize: '0.7rem',
                         fontWeight: 700,
                       }}
@@ -1221,9 +1805,9 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                       <>
                         <button
                           onClick={() => handleOpenEdit(task)}
-                          title="Edit Design Task"
+                          title="Edit Task"
                           style={{
-                            padding: '0.3rem 0.5rem',
+                            padding: '0.3rem 0.45rem',
                             background: '#eff6ff',
                             border: '1px solid #bfdbfe',
                             borderRadius: '6px',
@@ -1231,17 +1815,15 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            fontSize: '0.7rem',
-                            fontWeight: 700,
                           }}
                         >
                           <Edit2 size={13} />
                         </button>
                         <button
                           onClick={() => handleDeleteTask(task)}
-                          title="Delete Design Task"
+                          title="Delete Task"
                           style={{
-                            padding: '0.3rem 0.5rem',
+                            padding: '0.3rem 0.45rem',
                             background: '#fef2f2',
                             border: '1px solid #fecaca',
                             borderRadius: '6px',
@@ -1249,8 +1831,6 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            fontSize: '0.7rem',
-                            fontWeight: 700,
                           }}
                         >
                           <Trash2 size={13} />
@@ -1322,7 +1902,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                 </div>
 
                 {/* ── Admin Sample Image / Reference Link ── */}
-                {(task.sampleImage || task.sampleLink) && (
+                {(task.sampleImage || task.sampleLink || task.notes) && (
                   <div
                     style={{
                       background: '#f8fafc',
@@ -1338,8 +1918,8 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                       <div
                         onClick={() => handleOpenLightbox([task.sampleImage], 0, `Sample: ${task.designName}`)}
                         style={{
-                          width: '54px',
-                          height: '54px',
+                          width: '52px',
+                          height: '52px',
                           borderRadius: '6px',
                           overflow: 'hidden',
                           border: '1px solid #cbd5e1',
@@ -1415,7 +1995,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
                     <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <Clock size={13} color="#2563eb" />
-                      <span>DROW DESIGN STATUS</span>
+                      <span>1. DROW DESIGN STATUS</span>
                     </div>
                     {task.drowDesignStatus ? (
                       <span
@@ -1455,8 +2035,8 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                           key={opt.id}
                           onClick={() => handleOpenStatusModal(task, 'drow_design', 'DROW DESIGN STATUS', opt.id)}
                           style={{
-                            flex: 1,
-                            minWidth: '85px',
+                            flex: '1 1 calc(33.33% - 0.35rem)',
+                            minWidth: '70px',
                             padding: '0.32rem 0.45rem',
                             fontSize: '0.68rem',
                             fontWeight: 800,
@@ -1502,7 +2082,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                           </div>
                         ))
                       ) : (
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>No drow images uploaded yet</span>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>No proofs uploaded</span>
                       )}
                     </div>
 
@@ -1522,7 +2102,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                         gap: '0.25rem',
                       }}
                     >
-                      <Upload size={11} /> + Upload Image(s)
+                      <Upload size={11} /> + Proof
                     </button>
                   </div>
                 </div>
@@ -1539,7 +2119,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
                     <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#9d174d', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <Palette size={13} color="#db2777" />
-                      <span>COLOUR MATCHING STATUS</span>
+                      <span>2. COLOUR MATCHING STATUS</span>
                     </div>
                     {task.colourMatchingStatus ? (
                       <span
@@ -1579,8 +2159,8 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                           key={opt.id}
                           onClick={() => handleOpenStatusModal(task, 'colour_matching', 'COLOUR MATCHING STATUS', opt.id)}
                           style={{
-                            flex: 1,
-                            minWidth: '85px',
+                            flex: '1 1 calc(33.33% - 0.35rem)',
+                            minWidth: '70px',
                             padding: '0.32rem 0.45rem',
                             fontSize: '0.68rem',
                             fontWeight: 800,
@@ -1626,7 +2206,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                           </div>
                         ))
                       ) : (
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>No C.M. images uploaded yet</span>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>No proofs uploaded</span>
                       )}
                     </div>
 
@@ -1646,7 +2226,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                         gap: '0.25rem',
                       }}
                     >
-                      <Upload size={11} /> + Upload Image(s)
+                      <Upload size={11} /> + Proof
                     </button>
                   </div>
                 </div>
@@ -1663,7 +2243,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
                     <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <CheckCircle2 size={13} color="#16a34a" />
-                      <span>FINAL DESIGN STATUS</span>
+                      <span>3. FINAL DESIGN STATUS</span>
                     </div>
                     {task.finalDesignStatus ? (
                       <span
@@ -1687,7 +2267,9 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                           border: '1px solid rgba(0,0,0,0.06)',
                         }}
                       >
-                        {task.finalDesignStatus}
+                        {task.finalDesignStatus?.includes('drowning') || task.finalDesignStatus === 'REJECT SAMPLE DRAWING'
+                          ? 'REJECT DRAWING'
+                          : task.finalDesignStatus}
                       </span>
                     ) : (
                       <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic' }}>Pending Review</span>
@@ -1697,7 +2279,10 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                   {/* Action Buttons for Final Design */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.35rem', marginBottom: '0.45rem' }}>
                     {FINAL_DESIGN_OPTIONS.map((opt) => {
-                      const isActive = task.finalDesignStatus === opt.id;
+                      const isActive =
+                        task.finalDesignStatus === opt.id ||
+                        (opt.legacyId && task.finalDesignStatus === opt.legacyId) ||
+                        (opt.id.includes('DRAWING') && task.finalDesignStatus?.includes('drowning'));
                       const IconComp = opt.icon || CheckCircle2;
                       return (
                         <button
@@ -1705,7 +2290,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                           onClick={() => handleOpenStatusModal(task, 'final_design', 'FINAL DESIGN STATUS', opt.id)}
                           style={{
                             padding: '0.35rem 0.45rem',
-                            fontSize: '0.66rem',
+                            fontSize: '0.68rem',
                             fontWeight: 800,
                             borderRadius: '6px',
                             cursor: 'pointer',
@@ -1749,7 +2334,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                           </div>
                         ))
                       ) : (
-                        <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>No final proofs uploaded yet</span>
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>No final proofs</span>
                       )}
                     </div>
 
@@ -1769,7 +2354,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                         gap: '0.25rem',
                       }}
                     >
-                      <Upload size={11} /> + Upload Image(s)
+                      <Upload size={11} /> + Proof
                     </button>
                   </div>
                 </div>

@@ -1,3 +1,22 @@
+// Immediate self-destruction if service worker runs on raw IP address
+if (self.location.hostname === '3.7.174.180' || /^(\d{1,3}\.){3}\d{1,3}$/.test(self.location.hostname)) {
+  self.addEventListener('install', () => self.skipWaiting());
+  self.addEventListener('activate', (event) => {
+    event.waitUntil(
+      caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))).then(() => {
+        return self.registration.unregister();
+      }).then(() => {
+        return self.clients.matchAll({ type: 'window' }).then((clients) => {
+          clients.forEach((client) => {
+            const url = new URL(client.url);
+            client.navigate('https://erp.eliteedition.in' + url.pathname + url.search + url.hash);
+          });
+        });
+      })
+    );
+  });
+}
+
 const CACHE_NAME = 'elite-edition-cache-v' + Date.now();
 
 // Force service worker to activate immediately and take control of the clients

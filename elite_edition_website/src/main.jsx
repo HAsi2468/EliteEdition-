@@ -15,8 +15,21 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-// Register service worker for PWA support
-if ('serviceWorker' in navigator) {
+// Strict Host Verification: Ensure users are never stranded on raw IP address
+if (window.location.hostname === '3.7.174.180' || /^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname)) {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      registrations.forEach((r) => r.unregister());
+    });
+  }
+  if ('caches' in window) {
+    caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)));
+  }
+  window.location.replace('https://erp.eliteedition.in' + window.location.pathname + window.location.search + window.location.hash);
+}
+
+// Register service worker for PWA support only on official domain
+if ('serviceWorker' in navigator && window.location.hostname.includes('eliteedition.in')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then((reg) => {
