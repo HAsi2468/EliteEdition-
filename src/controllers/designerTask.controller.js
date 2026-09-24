@@ -158,6 +158,9 @@ const getDesignerTasks = async (req, res) => {
       fabricName,
       priority,
       status,
+      drowDesignStatus,
+      colourMatchingStatus,
+      finalDesignStatus,
       search,
       sortBy = 'createdAt',
       sortOrder = 'desc',
@@ -198,9 +201,20 @@ const getDesignerTasks = async (req, res) => {
       filter.priority = priority.trim();
     }
 
-    // Status / Stage filter
+    // Overall Status / Stage filter
     if (status && status.trim() && status !== 'All') {
       filter.status = status.trim();
+    }
+
+    // ─── Granular Workflow Status Filters ────────────────────────
+    if (drowDesignStatus && drowDesignStatus.trim() && drowDesignStatus !== 'All') {
+      filter.drowDesignStatus = drowDesignStatus.trim();
+    }
+    if (colourMatchingStatus && colourMatchingStatus.trim() && colourMatchingStatus !== 'All') {
+      filter.colourMatchingStatus = colourMatchingStatus.trim();
+    }
+    if (finalDesignStatus && finalDesignStatus.trim() && finalDesignStatus !== 'All') {
+      filter.finalDesignStatus = finalDesignStatus.trim();
     }
 
     // Text search filter
@@ -212,6 +226,9 @@ const getDesignerTasks = async (req, res) => {
         { designerName: { $regex: q, $options: 'i' } },
         { fabricName: { $regex: q, $options: 'i' } },
         { colourMatching: { $regex: q, $options: 'i' } },
+        { drowDesignStatus: { $regex: q, $options: 'i' } },
+        { colourMatchingStatus: { $regex: q, $options: 'i' } },
+        { finalDesignStatus: { $regex: q, $options: 'i' } },
         { notes: { $regex: q, $options: 'i' } },
       ];
     }
@@ -312,6 +329,17 @@ const updateDesignerTask = async (req, res) => {
       task.status = body.status;
     }
 
+    // Handle updates to workflow status images
+    if (Array.isArray(body.newDrowImages) && body.newDrowImages.length > 0) {
+      task.drowDesignImages = Array.from(new Set([...(task.drowDesignImages || []), ...body.newDrowImages]));
+    }
+    if (Array.isArray(body.newColourMatchingImages) && body.newColourMatchingImages.length > 0) {
+      task.colourMatchingImages = Array.from(new Set([...(task.colourMatchingImages || []), ...body.newColourMatchingImages]));
+    }
+    if (Array.isArray(body.newFinalDesignImages) && body.newFinalDesignImages.length > 0) {
+      task.finalDesignImages = Array.from(new Set([...(task.finalDesignImages || []), ...body.newFinalDesignImages]));
+    }
+
     if (body.sampleLink) {
       body.sampleLinkType = detectLinkType(body.sampleLink);
     }
@@ -329,15 +357,25 @@ const updateDesignerTask = async (req, res) => {
 };
 
 /**
- * Update task stage directly with note / output files
+ * Update task stage or specific workflow status with multi-image support
  */
 const updateTaskStage = async (req, res) => {
   try {
     const { id } = req.params;
-    const { stage, note = '', outputImage = '', outputLink = '' } = req.body;
+    const {
+      stage,
+      statusValue,
+      category = 'general', // 'drow_design' | 'colour_matching' | 'final_design' | 'general'
+      statusType = '',      // 'DROW DESIGN STATUS' | 'COLOUR MATCHING STATUS' | 'FINAL DESIGN STATUS'
+      images = [],          // Array of Cloudflare R2 image URLs
+      note = '',
+      outputImage = '',
+      outputLink = '',
+    } = req.body;
 
-    if (!stage) {
-      return res.status(400).json({ error: 'Stage is required' });
+    const targetStage = (statusValue || stage || '').trim();
+    if (!targetStage && (!images || images.length === 0)) {
+      return res.status(400).json({ error: 'Stage, status value, or image upload is required' });
     }
 
     let task = await db.DesignerTask.findById(id);
@@ -348,21 +386,86 @@ const updateTaskStage = async (req, res) => {
       return res.status(404).json({ error: 'Designer task not found' });
     }
 
-    const editorName = req.user?.name || req.headers['x-user-name'] || 'Designer / Admin';
+    const editorName = req.user?.name || req.headers['x-user-name'] || 'Designer';
     const editorId = req.user?._id || req.headers['x-user-id'] || '';
 
-    task.status = stage;
-    if (outputImage) task.outputImage = outputImage;
+    // Collect array of incoming R2 images
+    const incomingImages = Array.isArray(images)
+      ? images.filter(Boolean)
+      : (outputImage ? [outputImage] : []);
+
+    let detectedCategory = category;
+    let detectedStatusType = statusType;
+
+    // Detect category if not explicitly given
+    if (!detectedCategory || detectedCategory === 'general') {
+      if (['START WORKING', 'REVIEW SAMPLE', 'FINAL SAMPLE'].includes(targetStage)) {
+        detectedCategory = 'drow_design';
+        detectedStatusType = 'DROW DESIGN STATUS';
+      } else if (targetStage === 'COLOUR PANTON') {
+        detectedCategory = 'colour_matching';
+        detectedStatusType = 'COLOUR MATCHING STATUS';
+      } else if (['REJECT SAMPLE drowning', 'REJECT SAMPLE FOR C.M.', 'APPROVED SAMPLE'].includes(targetStage)) {
+        detectedCategory = 'final_design';
+        detectedStatusType = 'FINAL DESIGN STATUS';
+      }
+    }
+
+    // 1. Drow Design Status
+    if (detectedCategory === 'drow_design' || detectedStatusType.toUpperCase().includes('DROW')) {
+      if (targetStage) task.drowDesignStatus = targetStage;
+      if (incomingImages.length > 0) {
+        task.drowDesignImages = Array.from(new Set([...(task.drowDesignImages || []), ...incomingImages]));
+      }
+      if (task.status === 'New' || task.status === 'Assigned') {
+        task.status = 'In Progress';
+      }
+    }
+
+    // 2. Colour Matching Status
+    if (detectedCategory === 'colour_matching' || detectedStatusType.toUpperCase().includes('COLOUR')) {
+      if (targetStage) task.colourMatchingStatus = targetStage;
+      if (incomingImages.length > 0) {
+        task.colourMatchingImages = Array.from(new Set([...(task.colourMatchingImages || []), ...incomingImages]));
+      }
+      if (task.status !== 'Approved') {
+        task.status = 'Colour Matching';
+      }
+    }
+
+    // 3. Final Design Status
+    if (detectedCategory === 'final_design' || detectedStatusType.toUpperCase().includes('FINAL')) {
+      if (targetStage) task.finalDesignStatus = targetStage;
+      if (incomingImages.length > 0) {
+        task.finalDesignImages = Array.from(new Set([...(task.finalDesignImages || []), ...incomingImages]));
+      }
+      if (targetStage === 'APPROVED SAMPLE') {
+        task.status = 'Approved';
+      } else if (targetStage.startsWith('REJECT')) {
+        task.status = 'Revision Requested';
+      }
+    }
+
+    // Always update overall output image/link if new images provided
+    if (incomingImages.length > 0) {
+      task.outputImage = incomingImages[0];
+    } else if (outputImage) {
+      task.outputImage = outputImage;
+    }
     if (outputLink) task.outputLink = outputLink;
 
+    // Add to complete stage audit trail
     task.stageHistory.push({
-      stage,
+      category: detectedCategory || 'general',
+      statusType: detectedStatusType || '',
+      stage: targetStage || 'Image Update',
+      images: incomingImages,
+      outputImage: incomingImages[0] || outputImage || task.outputImage || '',
+      outputLink: outputLink || task.outputLink || '',
+      note: note || (targetStage ? `Status updated to "${targetStage}"` : `Uploaded ${incomingImages.length} image(s)`),
       updatedBy: String(editorId),
       updatedByName: editorName,
       updatedAt: new Date(),
-      note: note || `Stage updated to "${stage}"`,
-      outputImage: outputImage || task.outputImage || '',
-      outputLink: outputLink || task.outputLink || '',
     });
 
     await task.save();
@@ -401,12 +504,21 @@ const deleteDesignerTask = async (req, res) => {
  */
 const getDesignerStats = async (req, res) => {
   try {
-    const [statusStats, priorityStats, totalCount] = await Promise.all([
+    const [statusStats, priorityStats, drowStats, cmStats, finalStats, totalCount] = await Promise.all([
       db.DesignerTask.aggregate([
         { $group: { _id: '$status', count: { $sum: 1 } } },
       ]),
       db.DesignerTask.aggregate([
         { $group: { _id: '$priority', count: { $sum: 1 } } },
+      ]),
+      db.DesignerTask.aggregate([
+        { $group: { _id: '$drowDesignStatus', count: { $sum: 1 } } },
+      ]),
+      db.DesignerTask.aggregate([
+        { $group: { _id: '$colourMatchingStatus', count: { $sum: 1 } } },
+      ]),
+      db.DesignerTask.aggregate([
+        { $group: { _id: '$finalDesignStatus', count: { $sum: 1 } } },
       ]),
       db.DesignerTask.countDocuments(),
     ]);
@@ -416,6 +528,15 @@ const getDesignerStats = async (req, res) => {
 
     const priorityMap = {};
     priorityStats.forEach(p => { priorityMap[p._id] = p.count; });
+
+    const drowMap = {};
+    drowStats.forEach(d => { if (d._id) drowMap[d._id] = d.count; });
+
+    const cmMap = {};
+    cmStats.forEach(c => { if (c._id) cmMap[c._id] = c.count; });
+
+    const finalMap = {};
+    finalStats.forEach(f => { if (f._id) finalMap[f._id] = f.count; });
 
     return res.status(200).json({
       success: true,
@@ -433,6 +554,25 @@ const getDesignerStats = async (req, res) => {
         high: priorityMap['High'] || 0,
         medium: priorityMap['Medium'] || 0,
         low: priorityMap['Low'] || 0,
+        // Drow Design status counts
+        drow: {
+          startWorking: drowMap['START WORKING'] || 0,
+          reviewSample: drowMap['REVIEW SAMPLE'] || 0,
+          finalSample: drowMap['FINAL SAMPLE'] || 0,
+        },
+        // Colour Matching status counts
+        cm: {
+          colourPanton: cmMap['COLOUR PANTON'] || 0,
+          reviewSample: cmMap['REVIEW SAMPLE'] || 0,
+          finalSample: cmMap['FINAL SAMPLE'] || 0,
+        },
+        // Final Design status counts
+        final: {
+          finalSample: finalMap['FINAL SAMPLE'] || 0,
+          rejectDrow: finalMap['REJECT SAMPLE drowning'] || 0,
+          rejectCM: finalMap['REJECT SAMPLE FOR C.M.'] || 0,
+          approvedSample: finalMap['APPROVED SAMPLE'] || 0,
+        },
       },
     });
   } catch (err) {

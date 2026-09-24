@@ -2,6 +2,16 @@ const mongoose = require('mongoose');
 
 const stageHistorySchema = new mongoose.Schema(
   {
+    category: {
+      type: String,
+      default: 'general',
+      trim: true,
+    },
+    statusType: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     stage: {
       type: String,
       required: true,
@@ -23,6 +33,10 @@ const stageHistorySchema = new mongoose.Schema(
       type: String,
       default: '',
       trim: true,
+    },
+    images: {
+      type: [String],
+      default: [],
     },
     outputImage: {
       type: String,
@@ -123,6 +137,40 @@ const designerTaskSchema = new mongoose.Schema(
       ],
       default: 'New',
       index: true,
+    },
+    // ─── Three Core Workflow Statuses ─────────────────────────────
+    // 1. Drow Design Status: 'START WORKING' | 'REVIEW SAMPLE' | 'FINAL SAMPLE'
+    drowDesignStatus: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true,
+    },
+    drowDesignImages: {
+      type: [String],
+      default: [],
+    },
+    // 2. Colour Matching Status: 'COLOUR PANTON' | 'REVIEW SAMPLE' | 'FINAL SAMPLE'
+    colourMatchingStatus: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true,
+    },
+    colourMatchingImages: {
+      type: [String],
+      default: [],
+    },
+    // 3. Final Design Status: 'FINAL SAMPLE' | 'REJECT SAMPLE drowning' | 'REJECT SAMPLE FOR C.M.' | 'APPROVED SAMPLE'
+    finalDesignStatus: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true,
+    },
+    finalDesignImages: {
+      type: [String],
+      default: [],
     },
     notes: {
       type: String,

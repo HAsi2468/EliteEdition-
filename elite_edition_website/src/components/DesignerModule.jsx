@@ -310,7 +310,7 @@ function MultiSelectBox({
   );
 }
 
-export default function DesignerModule({ currentUser, isAdmin = false }) {
+export default function DesignerModule({ currentUser, isAdmin = false, onNavigate }) {
   const [tasks, setTasks] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -712,6 +712,31 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
             <RefreshCw size={14} className={loading ? 'spin-loader' : ''} />
             <span>Refresh</span>
           </button>
+
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('designer_screen')}
+              style={{
+                padding: '0.55rem 1rem',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                borderRadius: '8px',
+                background: '#eff6ff',
+                color: '#1d4ed8',
+                border: '1px solid #bfdbfe',
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px rgba(37, 99, 235, 0.08)'
+              }}
+              title="Switch to Designer Studio Screen"
+            >
+              <Palette size={14} color="#2563eb" />
+              <span>Go to Designer Screen</span>
+            </button>
+          )}
 
           <button
             type="button"
