@@ -39,6 +39,34 @@ const detectLinkType = (url = '') => {
 };
 
 /**
+ * Helper to construct robust multi-token matching conditions for an assigned user
+ * Matches full name, first name, last name, designer tag in designers array and colourMatches array
+ */
+const buildAssignedUserOrConditions = (rawUserStr) => {
+  if (!rawUserStr || rawUserStr === 'All' || rawUserStr === '__NO_NAME_ASSIGNED__') return [];
+  const rawParts = rawUserStr.trim().split(/[\s,._-]+/).filter(t => t && t.length >= 2);
+  const tokens = Array.from(new Set([
+    rawUserStr.trim(),
+    ...rawParts
+  ]));
+
+  const orArr = [];
+  tokens.forEach(tok => {
+    const esc = tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const reg = new RegExp(esc, 'i');
+    orArr.push(
+      { designerName: { $regex: reg } },
+      { designers: { $regex: reg } },
+      { designers: tok },
+      { colourMatching: { $regex: reg } },
+      { colourMatches: { $regex: reg } },
+      { colourMatches: tok }
+    );
+  });
+  return orArr;
+};
+
+/**
  * Helper to generate next task number (e.g. DES-1001, DES-1002)
  */
 const getNextTaskNo = async () => {
@@ -194,18 +222,10 @@ const getDesignerTasks = async (req, res) => {
     }
 
     if (activeAssignedUser && activeAssignedUser !== 'All') {
-      const esc = activeAssignedUser.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const reg = new RegExp(esc, 'i');
-      andConditions.push({
-        $or: [
-          { designerName: { $regex: reg } },
-          { designers: { $in: [new RegExp(`^${esc}$`, 'i'), reg] } },
-          { designers: activeAssignedUser },
-          { colourMatching: { $regex: reg } },
-          { colourMatches: { $in: [new RegExp(`^${esc}$`, 'i'), reg] } },
-          { colourMatches: activeAssignedUser },
-        ],
-      });
+      const userOrs = buildAssignedUserOrConditions(activeAssignedUser);
+      if (userOrs.length > 0) {
+        andConditions.push({ $or: userOrs });
+      }
     } else {
       // Designer filter (matches designerName string or designers array)
       if (designerName && designerName.trim() && designerName !== 'All') {
@@ -576,16 +596,10 @@ const getDesignerStats = async (req, res) => {
     }
 
     if (activeAssigned && activeAssigned !== 'All') {
-      const esc = activeAssigned.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const reg = new RegExp(esc, 'i');
-      matchStage.$or = [
-        { designerName: { $regex: reg } },
-        { designers: { $in: [new RegExp(`^${esc}$`, 'i'), reg] } },
-        { designers: activeAssigned },
-        { colourMatching: { $regex: reg } },
-        { colourMatches: { $in: [new RegExp(`^${esc}$`, 'i'), reg] } },
-        { colourMatches: activeAssigned },
-      ];
+      const userOrs = buildAssignedUserOrConditions(activeAssigned);
+      if (userOrs.length > 0) {
+        matchStage.$or = userOrs;
+      }
     } else if (designerName && designerName.trim() && designerName !== 'All') {
       const esc = designerName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const reg = new RegExp(esc, 'i');

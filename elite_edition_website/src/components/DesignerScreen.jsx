@@ -324,13 +324,46 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
   const [historyTask, setHistoryTask] = useState(null);
   const [lightboxImages, setLightboxImages] = useState(null); // { images: [], activeIndex: 0, title: '' }
 
+  // Resolve effective designer identifier from currentUser profile & registered designers
+  const effectiveDesignerTokens = useMemo(() => {
+    const dName = (currentUser?.designerName || '').trim();
+    const uName = (currentUser?.name || '').trim();
+    const tokens = new Set();
+    if (dName) tokens.add(dName.toLowerCase());
+    if (uName) {
+      tokens.add(uName.toLowerCase());
+      uName.split(/[\s._-]+/).forEach(p => {
+        if (p.length >= 2) tokens.add(p.toLowerCase());
+      });
+    }
+
+    // Also check if any registered designer in settings matches any of user's tokens
+    (printConfig.designers || []).forEach(des => {
+      const dLower = String(des).toLowerCase();
+      if (tokens.has(dLower) || Array.from(tokens).some(t => dLower === t || dLower.includes(t) || t.includes(dLower))) {
+        tokens.add(dLower);
+      }
+    });
+
+    return Array.from(tokens);
+  }, [currentUser?.designerName, currentUser?.name, printConfig.designers]);
+
+  const primaryDesignerIdentifier = useMemo(() => {
+    if (currentUser?.designerName) return currentUser.designerName;
+    const matched = (printConfig.designers || []).find(des => {
+      const dLow = String(des).toLowerCase();
+      return effectiveDesignerTokens.includes(dLow);
+    });
+    return matched || userAssignedName || '';
+  }, [currentUser?.designerName, printConfig.designers, effectiveDesignerTokens, userAssignedName]);
+
   // Load Data
   const loadData = async (silent = false) => {
     if (!silent) setLoading(true);
     setError('');
     try {
       const activeAssignedUserParam = isUserRestricted
-        ? (userAssignedName || '__NO_NAME_ASSIGNED__')
+        ? (primaryDesignerIdentifier || userAssignedName || '__NO_NAME_ASSIGNED__')
         : (selectedDesigner !== 'All' ? selectedDesigner : '');
 
       const [cfg, resTasks, resStats] = await Promise.all([
@@ -381,6 +414,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
     cmFilter,
     finalFilter,
     userAssignedName,
+    primaryDesignerIdentifier,
   ]);
 
   // Real-time listener
@@ -397,6 +431,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
     cmFilter,
     finalFilter,
     userAssignedName,
+    primaryDesignerIdentifier,
   ]);
 
   // Client-side quick filter: STRICT isolation for non-admin users
@@ -405,18 +440,19 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
 
     // Strict non-admin user isolation: user MUST be in designers OR colourMatches
     if (isUserRestricted) {
-      if (!userAssignedName) {
+      if (effectiveDesignerTokens.length === 0) {
         return []; // Non-admin without assigned profile cannot see any designs
       }
-      const uTarget = userAssignedName.toLowerCase();
-      result = result.filter(t => {
-        const dStr = String(t.designerName || '').toLowerCase();
-        const dArr = Array.isArray(t.designers) ? t.designers.map(s => String(s).toLowerCase()) : [];
-        const isDesigner = dStr.includes(uTarget) || dArr.some(d => d.includes(uTarget));
 
-        const cmStr = String(t.colourMatching || '').toLowerCase();
-        const cmArr = Array.isArray(t.colourMatches) ? t.colourMatches.map(s => String(s).toLowerCase()) : [];
-        const isColourMatcher = cmStr.includes(uTarget) || cmArr.some(c => c.includes(uTarget));
+      result = result.filter(t => {
+        const checkMatch = (val) => {
+          if (!val) return false;
+          const str = String(val).toLowerCase().trim();
+          return effectiveDesignerTokens.some(tok => str === tok || str.includes(tok) || tok.includes(str));
+        };
+
+        const isDesigner = checkMatch(t.designerName) || (Array.isArray(t.designers) && t.designers.some(checkMatch));
+        const isColourMatcher = checkMatch(t.colourMatching) || (Array.isArray(t.colourMatches) && t.colourMatches.some(checkMatch));
 
         // Design is ONLY visible if user is named in Designer OR Colour Matching
         return isDesigner || isColourMatcher;
@@ -445,7 +481,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
         finSt.includes(q)
       );
     });
-  }, [tasks, searchQuery, isUserRestricted, userAssignedName]);
+  }, [tasks, searchQuery, isUserRestricted, effectiveDesignerTokens]);
 
   // Create & Edit Task Handlers
   const handleOpenCreate = () => {
