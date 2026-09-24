@@ -21,6 +21,9 @@ const userModel = require('./db/models/user.model');
 
 const app = express();
 
+// Trust reverse proxy (Nginx) so client IP and rate limiting are properly identified
+app.set('trust proxy', 1);
+
 if (config.env !== 'test') {
 	app.use(morgan.successHandler);
 	app.use(morgan.errorHandler);
