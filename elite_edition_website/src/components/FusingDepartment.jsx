@@ -664,7 +664,7 @@ export default function FusingDepartment() {
         fusingFaultMtr: String(form.fusingFaultMtr || 0),
         printFaultMtr: String(form.printFaultMtr || 0),
         genuineFaultMtr: String(form.genuineFaultMtr || 0),
-        fusingMtr: String(freshMtrVal),
+        fusingMtr: wasteMtr > 0 ? String(totalFabricUsed) : String(freshMtrVal),
         fusingTemp: form.fusingTemp,
         fusingSpeed: String(form.fusingSpeed),
         fusingMachine: form.fusingMachine,

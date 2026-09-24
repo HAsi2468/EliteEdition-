@@ -44,6 +44,7 @@ const jobCardSchema = new mongoose.Schema(
       }
     ],
     deliveredMtr:     { type: Number, default: 0 },
+    deliveryMtr:      { type: String, default: '', trim: true },
     machineName:      { type: String, default: '', trim: true },
     note1:            { type: String, default: '', trim: true },
     note2:            { type: String, default: '', trim: true },

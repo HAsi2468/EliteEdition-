@@ -59,7 +59,8 @@ import {
   BarChart2,
   Reply,
   CornerUpRight,
-  ChevronDown
+  ChevronDown,
+  Calendar
 } from 'lucide-react';
 
 
@@ -248,6 +249,156 @@ export default function CommunicationPanel({ currentUser, onNavigateTab, initial
   // Admin Clear All Data Modal State
   const [showClearAllModal, setShowClearAllModal] = useState(false);
   const [clearingData, setClearingData] = useState(false);
+
+  // Direct In-Chat Task Creation State
+  const [showChatTaskModal, setShowChatTaskModal] = useState(false);
+  const [chatTaskForm, setChatTaskForm] = useState({
+    title: '',
+    description: '',
+    priority: 'medium',
+    dueDate: '',
+    assignees: [],
+    projectRef: '',
+    clientName: ''
+  });
+  const [staffUsers, setStaffUsers] = useState([]);
+  const [isCreatingChatTask, setIsCreatingChatTask] = useState(false);
+
+  useEffect(() => {
+    api.getUsers({ limit: 100 })
+      .then(res => {
+        const uList = Array.isArray(res) ? res : (res?.data || res?.results || []);
+        if (Array.isArray(uList)) setStaffUsers(uList);
+      })
+      .catch(err => console.warn('Could not load staff users for chat task creation:', err));
+  }, []);
+
+  const handleOpenTaskModalFromChat = () => {
+    const today = new Date();
+    today.setDate(today.getDate() + 1);
+    const tomorrowStr = today.toISOString().split('T')[0];
+
+    let defaultAssignees = [];
+    if (activeGroup?.type === 'direct' && Array.isArray(activeGroup.members)) {
+      const myId = currentUser?._id || currentUser?.id;
+      const otherMember = activeGroup.members.find(m => {
+        const mId = typeof m === 'object' ? (m._id || m.id) : m;
+        return String(mId) !== String(myId);
+      });
+      if (otherMember) {
+        defaultAssignees = [typeof otherMember === 'object' ? (otherMember._id || otherMember.id) : otherMember];
+      }
+    }
+
+    setChatTaskForm({
+      title: '',
+      description: '',
+      priority: 'medium',
+      dueDate: tomorrowStr,
+      assignees: defaultAssignees,
+      projectRef: activeGroup?.name || '',
+      clientName: ''
+    });
+    setShowChatTaskModal(true);
+  };
+
+  const handleOpenTaskModalFromMsg = (msg) => {
+    const today = new Date();
+    today.setDate(today.getDate() + 1);
+    const tomorrowStr = today.toISOString().split('T')[0];
+
+    const senderName = typeof msg.senderId === 'object' ? (msg.senderId?.name || msg.senderId?.username) : (msg.senderName || 'Staff Member');
+    const text = msg.content || msg.text || '';
+    const firstLine = text.split('\n')[0].trim();
+    const suggestedTitle = firstLine ? (firstLine.length > 70 ? firstLine.slice(0, 67) + '...' : firstLine) : 'Task from Chat';
+
+    let defaultAssignees = [];
+    if (activeGroup?.type === 'direct' && Array.isArray(activeGroup.members)) {
+      const myId = currentUser?._id || currentUser?.id;
+      const otherMember = activeGroup.members.find(m => {
+        const mId = typeof m === 'object' ? (m._id || m.id) : m;
+        return String(mId) !== String(myId);
+      });
+      if (otherMember) {
+        defaultAssignees = [typeof otherMember === 'object' ? (otherMember._id || otherMember.id) : otherMember];
+      }
+    } else if (msg.senderId) {
+      const sId = typeof msg.senderId === 'object' ? (msg.senderId._id || msg.senderId.id) : msg.senderId;
+      if (sId) defaultAssignees = [sId];
+    }
+
+    const jobMatch = text.match(/#?(\d{3,6})/);
+    const projectRef = jobMatch ? `Job #${jobMatch[1]}` : (activeGroup?.name || '');
+
+    setChatTaskForm({
+      title: suggestedTitle,
+      description: `Reference: Message by ${senderName} in ${activeGroup?.name || 'Chat'}:\n"${text}"`,
+      priority: msg.priority === 'urgent' ? 'urgent' : 'medium',
+      dueDate: tomorrowStr,
+      assignees: defaultAssignees,
+      projectRef: projectRef,
+      clientName: ''
+    });
+    setShowChatTaskModal(true);
+  };
+
+  const handleSubmitChatTask = async (e) => {
+    e.preventDefault();
+    if (!chatTaskForm.title.trim()) {
+      alert('Please enter a task title.');
+      return;
+    }
+    setIsCreatingChatTask(true);
+    try {
+      const myId = currentUser?._id || currentUser?.id;
+      const myName = currentUser?.name || currentUser?.username || 'Staff User';
+
+      const res = await api.createTask({
+        title: chatTaskForm.title.trim(),
+        description: chatTaskForm.description.trim(),
+        priority: chatTaskForm.priority,
+        status: 'todo',
+        projectRef: chatTaskForm.projectRef.trim(),
+        clientName: chatTaskForm.clientName.trim(),
+        dueDate: chatTaskForm.dueDate || undefined,
+        assignees: chatTaskForm.assignees && chatTaskForm.assignees.length > 0 ? chatTaskForm.assignees : (myId ? [myId] : []),
+        createdBy: myId,
+        createdByName: myName
+      });
+
+      if (res.success && res.data) {
+        const task = res.data;
+        const assigneeNames = Array.isArray(chatTaskForm.assignees) && chatTaskForm.assignees.length > 0
+          ? chatTaskForm.assignees.map(aId => {
+              const matched = staffUsers.find(u => String(u._id || u.id) === String(aId));
+              return matched?.name || matched?.username || 'Staff';
+            }).join(', ')
+          : myName;
+
+        // Post chat confirmation
+        if (activeGroup?._id) {
+          const chatNotice = `📋 *Task Created:* "${task.title}"\n🎯 Assigned to: ${assigneeNames}\n⚡ Priority: ${task.priority.toUpperCase()} | Due: ${task.dueDate ? task.dueDate.split('T')[0] : 'N/A'}`;
+          try {
+            await api.sendCommunicationMessage(activeGroup._id, {
+              roomId: activeGroup._id,
+              senderId: myId,
+              content: chatNotice,
+              priority: task.priority === 'urgent' ? 'urgent' : 'normal'
+            });
+          } catch (mErr) {
+            console.warn('Could not post chat notice for task creation:', mErr);
+          }
+        }
+
+        window.dispatchEvent(new CustomEvent('elite-data-refresh', { detail: 'task' }));
+        setShowChatTaskModal(false);
+      }
+    } catch (err) {
+      alert('Failed to create task: ' + err.message);
+    } finally {
+      setIsCreatingChatTask(false);
+    }
+  };
 
   const socket = useSocket();
   const chatBottomRef = useRef(null);

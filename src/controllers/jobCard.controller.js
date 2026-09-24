@@ -1769,8 +1769,15 @@ const syncFusingFromDelivery = async (req, res) => {
 
       let modified = false;
 
-      // 1. Write delivery mtr in Fusing mtr
-      if (delMtr > 0) {
+      // 1. Write delivery mtr in Fusing mtr (Only if card does not already have fusing fabric/wastage logged)
+      const hasFusingFabricData = (card.totalFabricUsedMtr && parseFloat(card.totalFabricUsedMtr) > 0) || (parseFloat(card.totalWastageMtr) > 0);
+      if (hasFusingFabricData) {
+        const fabricUsedStr = card.totalFabricUsedMtr || String(((parseFloat(card.freshMtr) || parseFloat(card.fusingMtr) || 0) + (parseFloat(card.totalWastageMtr) || 0)).toFixed(2));
+        if (card.fusingMtr !== fabricUsedStr) {
+          card.fusingMtr = fabricUsedStr;
+          modified = true;
+        }
+      } else if (delMtr > 0) {
         const delMtrStr = String(delMtr);
         if (card.fusingMtr !== delMtrStr) {
           card.fusingMtr = delMtrStr;
@@ -1786,8 +1793,8 @@ const syncFusingFromDelivery = async (req, res) => {
         }
       }
 
-      // 3. Date put same as in invoice
-      if (invDate && card.fusingDate !== invDate) {
+      // 3. Date put same as in invoice (if not already set by fusing dept)
+      if (invDate && (!card.fusingDate || card.fusingDate === '')) {
         card.fusingDate = invDate;
         modified = true;
       }

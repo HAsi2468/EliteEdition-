@@ -245,11 +245,16 @@ export default function JobCardTracking({ onPreview }) {
       deliveryDate: c.deliveryDate || '',
     };
 
+    const hasFusingFabricData = (c.totalFabricUsedMtr && parseFloat(c.totalFabricUsedMtr) > 0) || (parseFloat(c.totalWastageMtr) > 0);
+    const resolvedFMtr = hasFusingFabricData
+      ? (c.totalFabricUsedMtr || String(((parseFloat(c.freshMtr) || parseFloat(c.fusingMtr) || 0) + (parseFloat(c.totalWastageMtr) || 0)).toFixed(2)))
+      : (delMtr > 0 ? delMtr : currentMod.fusingMtr);
+
     const updated = {
       ...currentMod,
-      fusingMtr: delMtr > 0 ? delMtr : currentMod.fusingMtr,
+      fusingMtr: resolvedFMtr,
       fusingStatus: 'Fusing Done',
-      fusingDate: invDate
+      fusingDate: currentMod.fusingDate || c.fusingDate || invDate
     };
 
     setSavingIds(prev => new Set(prev).add(c._id));
@@ -305,6 +310,7 @@ export default function JobCardTracking({ onPreview }) {
         fusingMtr: originalCard.fusingMtr || 0,
         deliveryStatus: originalCard.deliveryStatus || 'Delivery Pending',
         deliveryDate: originalCard.deliveryDate || '',
+        deliveryMtr: originalCard.deliveryMtr !== undefined && originalCard.deliveryMtr !== '' ? originalCard.deliveryMtr : (getCardDeliveryMtr(originalCard) || 0),
       };
 
       const updated = { ...currentMod, [field]: value };
@@ -330,6 +336,14 @@ export default function JobCardTracking({ onPreview }) {
           updated.fusingDate = value;
         }
       }
+      if (field === 'fusingMtr' && parseFloat(value) > 0) {
+        if (!updated.fusingDate) updated.fusingDate = todayStr;
+        if (!updated.fusingStatus || updated.fusingStatus === 'Fusing Pending') updated.fusingStatus = 'Fusing Done';
+      }
+      if (field === 'deliveryMtr' && parseFloat(value) > 0) {
+        if (!updated.deliveryDate) updated.deliveryDate = todayStr;
+        if (!updated.deliveryStatus || updated.deliveryStatus === 'Delivery Pending') updated.deliveryStatus = 'Delivery Done';
+      }
 
       return { ...prev, [cardId]: updated };
     });
@@ -350,6 +364,7 @@ export default function JobCardTracking({ onPreview }) {
       fusingMtr: originalCard.fusingMtr || 0,
       deliveryStatus: originalCard.deliveryStatus || 'Delivery Pending',
       deliveryDate: originalCard.deliveryDate || '',
+      deliveryMtr: originalCard.deliveryMtr !== undefined && originalCard.deliveryMtr !== '' ? originalCard.deliveryMtr : (getCardDeliveryMtr(originalCard) || 0),
     };
 
     const updated = { ...currentMod, [field]: value };
@@ -372,6 +387,17 @@ export default function JobCardTracking({ onPreview }) {
     if (field === 'deliveryDate' && value) {
       if (updated.fusingStatus === 'Fusing Done' || updated.deliveryStatus === 'Delivery Done') {
         updated.fusingDate = value;
+      }
+    }
+    if (field === 'fusingMtr' && parseFloat(value) > 0) {
+      if (!updated.fusingDate) updated.fusingDate = todayStr;
+      if (!updated.fusingStatus || updated.fusingStatus === 'Fusing Pending') updated.fusingStatus = 'Fusing Done';
+    }
+    if (field === 'deliveryMtr') {
+      updated.deliveredMtr = parseFloat(value) || 0;
+      if (parseFloat(value) > 0) {
+        if (!updated.deliveryDate) updated.deliveryDate = todayStr;
+        if (!updated.deliveryStatus || updated.deliveryStatus === 'Delivery Pending') updated.deliveryStatus = 'Delivery Done';
       }
     }
 
@@ -409,6 +435,23 @@ export default function JobCardTracking({ onPreview }) {
     let val = card[field] ?? '';
     if (modifiedCards[card._id] && modifiedCards[card._id][field] !== undefined) {
       val = modifiedCards[card._id][field];
+    } else if (field === 'fusingMtr') {
+      // If card has wastage or total fabric used logged from Fusing/QA, display Total Fabric Used (MTR)
+      const hasWastage = parseFloat(card.totalWastageMtr) > 0;
+      const totalFabric = parseFloat(card.totalFabricUsedMtr);
+      if (totalFabric > 0) {
+        val = totalFabric.toFixed(2);
+      } else if (hasWastage) {
+        const fresh = parseFloat(card.freshMtr) || parseFloat(card.fusingMtr) || 0;
+        const waste = parseFloat(card.totalWastageMtr) || 0;
+        val = (fresh + waste).toFixed(2);
+      }
+    } else if (field === 'deliveryMtr') {
+      const delMtr = getCardDeliveryMtr(card);
+      if (delMtr > 0) return delMtr;
+      if (card.deliveryMtr !== undefined && card.deliveryMtr !== null && card.deliveryMtr !== '') return card.deliveryMtr;
+      if (card.deliveredMtr !== undefined && card.deliveredMtr !== null && card.deliveredMtr !== 0) return card.deliveredMtr;
+      return '';
     }
     if ((field === 'printDate' || field === 'fusingDate' || field === 'deliveryDate') && val) {
       if (typeof val === 'string' && val.includes('T')) {
@@ -447,17 +490,20 @@ export default function JobCardTracking({ onPreview }) {
     let totalPrintMtrSum = 0;
     let totalPendingPrintMtrSum = 0;
     let totalFusingMtrSum = 0;
+    let totalDeliveryMtrSum = 0;
 
     cards.forEach(c => {
       const jm = parseFloat(String(c.totalMtr || c.consumption || '0').replace(/[^\d.]/g, '')) || 0;
       const pm = parseFloat(String(getValue(c, 'printMtr') || '0').replace(/[^\d.]/g, '')) || 0;
       const fm = parseFloat(String(getValue(c, 'fusingMtr') || '0').replace(/[^\d.]/g, '')) || 0;
+      const dm = parseFloat(String(getValue(c, 'deliveryMtr') || getCardDeliveryMtr(c) || '0').replace(/[^\d.]/g, '')) || 0;
       const ppm = getValue(c, 'printStatus') === 'Printing Done' ? 0 : Math.max(0, jm - pm);
 
       totalJobMtrSum += jm;
       totalPrintMtrSum += pm;
       totalPendingPrintMtrSum += ppm;
       totalFusingMtrSum += fm;
+      totalDeliveryMtrSum += dm;
     });
 
     const activeRangeText = dateStart && dateEnd ? `${formatDateDDMMYYYY(dateStart)} to ${formatDateDDMMYYYY(dateEnd)}` : (dateStart ? `From ${formatDateDDMMYYYY(dateStart)}` : 'All Dates');
@@ -486,8 +532,8 @@ export default function JobCardTracking({ onPreview }) {
           .kpi-val { font-size: 15px; font-weight: 900; color: #0f172a; margin-top: 2px; }
 
           table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 9.5px; }
-          th { background: #0f172a; color: #fff; font-size: 8px; text-transform: uppercase; padding: 6px 6px; text-align: left; font-weight: 800; letter-spacing: 0.03em; }
-          td { padding: 5px 6px; border-bottom: 1px solid #e2e8f0; color: #334155; vertical-align: middle; }
+          th { background: #0f172a; color: #fff; font-size: 8px; text-transform: uppercase; padding: 6px 5px; text-align: left; font-weight: 800; letter-spacing: 0.03em; }
+          td { padding: 5px 5px; border-bottom: 1px solid #e2e8f0; color: #334155; vertical-align: middle; }
           tr:nth-child(even) td { background: #f8fafc; }
           .bold { font-weight: 800; }
           .text-center { text-align: center; }
@@ -536,9 +582,13 @@ export default function JobCardTracking({ onPreview }) {
             <div class="kpi-label">Total Printed Meters</div>
             <div class="kpi-val" style="color: #047857;">${totalPrintMtrSum.toFixed(2)} mtr</div>
           </div>
-          <div class="kpi-card" style="border-left: 4px solid #d97706;">
-            <div class="kpi-label">Total Pending Print Meters</div>
-            <div class="kpi-val" style="color: #b45309;">${totalPendingPrintMtrSum.toFixed(2)} mtr</div>
+          <div class="kpi-card" style="border-left: 4px solid #ea580c;">
+            <div class="kpi-label">Total Fused Meters</div>
+            <div class="kpi-val" style="color: #c2410c;">${totalFusingMtrSum.toFixed(2)} mtr</div>
+          </div>
+          <div class="kpi-card" style="border-left: 4px solid #10b981;">
+            <div class="kpi-label">Total Delivered Meters</div>
+            <div class="kpi-val" style="color: #047857;">${totalDeliveryMtrSum.toFixed(2)} mtr</div>
           </div>
         </div>
 
@@ -549,17 +599,21 @@ export default function JobCardTracking({ onPreview }) {
               <th style="width: 25px; text-align: center;">#</th>
               <th style="width: 70px;">JOB NO</th>
               <th>PARTY / CLIENT NAME</th>
-              <th style="width: 75px;">BILL NO</th>
-              <th style="width: 60px; text-align: center;">JOB MTR</th>
-              <th style="width: 40px; text-align: center;">PRINT</th>
-              <th style="width: 70px; text-align: center;">PRINT DATE</th>
-              <th style="width: 60px; text-align: center;">PRINT MTR</th>
-              <th style="width: 65px; text-align: center;">PENDING MTR</th>
-              <th style="width: 40px; text-align: center;">FUSING</th>
-              <th style="width: 70px; text-align: center;">FUSING DATE</th>
-              <th style="width: 60px; text-align: center;">FUSING MTR</th>
-              <th style="width: 40px; text-align: center;">DELIVERY</th>
-              <th style="width: 70px; text-align: center;">DELIVERY DATE</th>
+              <th style="width: 70px;">BILL NO</th>
+              <th style="width: 55px; text-align: center;">JOB MTR</th>
+              <th style="width: 35px; text-align: center;">PRINT</th>
+              <th style="width: 65px; text-align: center;">PRINT DATE</th>
+              <th style="width: 55px; text-align: center;">PRINT MTR</th>
+              <th style="width: 50px; text-align: center;">PRINT DIFF</th>
+              <th style="width: 55px; text-align: center;">PENDING MTR</th>
+              <th style="width: 35px; text-align: center;">FUSING</th>
+              <th style="width: 65px; text-align: center;">FUSING DATE</th>
+              <th style="width: 55px; text-align: center;">FUSING MTR</th>
+              <th style="width: 50px; text-align: center;">FUSING DIFF</th>
+              <th style="width: 35px; text-align: center;">DELIVERY</th>
+              <th style="width: 65px; text-align: center;">DELIVERY DATE</th>
+              <th style="width: 55px; text-align: center;">DELIVERY MTR</th>
+              <th style="width: 50px; text-align: center;">DELIVERY DIFF</th>
             </tr>
           </thead>
           <tbody>
@@ -574,12 +628,28 @@ export default function JobCardTracking({ onPreview }) {
 
               const jmVal = parseFloat(String(c.totalMtr || c.consumption || '0').replace(/[^\d.]/g, '')) || 0;
               const pmVal = parseFloat(String(getValue(c, 'printMtr') || '0').replace(/[^\d.]/g, '')) || 0;
+              const fmVal = parseFloat(String(getValue(c, 'fusingMtr') || '0').replace(/[^\d.]/g, '')) || 0;
+              const dmVal = parseFloat(String(getValue(c, 'deliveryMtr') || getCardDeliveryMtr(c) || '0').replace(/[^\d.]/g, '')) || 0;
               const ppmVal = pStatus === 'Printing Done' ? 0 : Math.max(0, jmVal - pmVal);
 
               const jMtrStr = c.totalMtr ? `${c.totalMtr} mtr` : (c.consumption ? `${c.consumption} mtr` : '—');
               const pMtrStr = getValue(c, 'printMtr') || '—';
               const ppmStr = ppmVal > 0 ? `${ppmVal.toFixed(1)} mtr` : '0 mtr';
               const fMtrStr = getValue(c, 'fusingMtr') ? `${getValue(c, 'fusingMtr')} mtr` : '—';
+              const dMtrStr = dmVal > 0 ? `${dmVal} mtr` : '—';
+
+              const printDiff = pmVal > 0 ? (pmVal - jmVal) : null;
+              const printDiffStr = printDiff !== null ? `${printDiff > 0 ? '+' : ''}${printDiff.toFixed(1)} m` : '—';
+              const printDiffColor = printDiff !== null ? (printDiff > 0.05 ? '#059669' : (printDiff < -0.05 ? '#dc2626' : '#64748b')) : '#64748b';
+
+              const fusingDiff = (fmVal > 0 && pmVal > 0) ? (fmVal - pmVal) : null;
+              const fusingDiffStr = fusingDiff !== null ? `${fusingDiff > 0 ? '+' : ''}${fusingDiff.toFixed(1)} m` : '—';
+              const fusingDiffColor = fusingDiff !== null ? (fusingDiff > 0.05 ? '#059669' : (fusingDiff < -0.05 ? '#dc2626' : '#64748b')) : '#64748b';
+
+              const prevMForDel = fmVal > 0 ? fmVal : (pmVal > 0 ? pmVal : jmVal);
+              const delDiff = (dmVal > 0 && prevMForDel > 0) ? (dmVal - prevMForDel) : null;
+              const delDiffStr = delDiff !== null ? `${delDiff > 0 ? '+' : ''}${delDiff.toFixed(1)} m` : '—';
+              const delDiffColor = delDiff !== null ? (delDiff > 0.05 ? '#059669' : (delDiff < -0.05 ? '#dc2626' : '#64748b')) : '#64748b';
 
               return `
                 <tr>
@@ -593,16 +663,20 @@ export default function JobCardTracking({ onPreview }) {
                   </td>
                   <td class="text-center">${pDate}</td>
                   <td class="text-center bold" style="color: #0284c7;">${pMtrStr}</td>
+                  <td class="text-center bold" style="color: ${printDiffColor};">${printDiffStr}</td>
                   <td class="text-center bold" style="color: ${ppmVal > 0 ? '#b45309' : '#059669'};">${ppmStr}</td>
                   <td class="text-center">
                     <span class="status-badge ${fStatus === 'Fusing Done' ? 'done-badge' : 'pending-badge'}">${fStatus === 'Fusing Done' ? 'FD' : 'FP'}</span>
                   </td>
                   <td class="text-center">${fDate}</td>
-                  <td class="text-center bold" style="color: #059669;">${fMtrStr}</td>
+                  <td class="text-center bold" style="color: #ea580c;">${fMtrStr}</td>
+                  <td class="text-center bold" style="color: ${fusingDiffColor};">${fusingDiffStr}</td>
                   <td class="text-center">
                     <span class="status-badge ${dStatus === 'Delivery Done' ? 'done-badge' : 'pending-badge'}">${dStatus === 'Delivery Done' ? 'DD' : 'DP'}</span>
                   </td>
                   <td class="text-center">${dDate}</td>
+                  <td class="text-center bold" style="color: #059669;">${dMtrStr}</td>
+                  <td class="text-center bold" style="color: ${delDiffColor};">${delDiffStr}</td>
                 </tr>
               `;
             }).join('')}
@@ -611,10 +685,14 @@ export default function JobCardTracking({ onPreview }) {
               <td class="text-center bold" style="color: #6d28d9;">${totalJobMtrSum.toFixed(2)} mtr</td>
               <td colSpan="2"></td>
               <td class="text-center bold" style="color: #0284c7;">${totalPrintMtrSum.toFixed(2)} mtr</td>
+              <td class="text-center bold" style="color: ${totalPrintMtrSum - totalJobMtrSum >= 0 ? '#059669' : '#dc2626'};">${(totalPrintMtrSum - totalJobMtrSum > 0 ? '+' : '') + (totalPrintMtrSum - totalJobMtrSum).toFixed(2)} mtr</td>
               <td class="text-center bold" style="color: #b45309;">${totalPendingPrintMtrSum.toFixed(2)} mtr</td>
               <td colSpan="2"></td>
-              <td class="text-center bold" style="color: #059669;">${totalFusingMtrSum.toFixed(2)} mtr</td>
+              <td class="text-center bold" style="color: #ea580c;">${totalFusingMtrSum.toFixed(2)} mtr</td>
+              <td class="text-center bold" style="color: ${totalFusingMtrSum - totalPrintMtrSum >= 0 ? '#059669' : '#dc2626'};">${(totalFusingMtrSum - totalPrintMtrSum > 0 ? '+' : '') + (totalFusingMtrSum - totalPrintMtrSum).toFixed(2)} mtr</td>
               <td colSpan="2"></td>
+              <td class="text-center bold" style="color: #059669;">${totalDeliveryMtrSum.toFixed(2)} mtr</td>
+              <td class="text-center bold" style="color: ${totalDeliveryMtrSum - totalFusingMtrSum >= 0 ? '#059669' : '#dc2626'};">${(totalDeliveryMtrSum - totalFusingMtrSum > 0 ? '+' : '') + (totalDeliveryMtrSum - totalFusingMtrSum).toFixed(2)} mtr</td>
             </tr>
           </tbody>
         </table>
@@ -884,6 +962,7 @@ export default function JobCardTracking({ onPreview }) {
                   Print Date {sortBy === 'printDate' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                 </th>
                 <th style={{ ...thStyle, textAlign: 'center' }}>Print Mtr</th>
+                <th style={{ ...thStyle, textAlign: 'center' }} title="Difference between Print Mtr and Job Card Mtr (Print Mtr - Job Mtr)">Print Diff</th>
                 <th style={{ ...thStyle, textAlign: 'center' }}>Pending Mtr</th>
                 <th style={{ ...thStyle, textAlign: 'center' }}>Fusing</th>
                 <th 
@@ -901,6 +980,7 @@ export default function JobCardTracking({ onPreview }) {
                   Fusing Date {sortBy === 'fusingDate' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                 </th>
                 <th style={{ ...thStyle, textAlign: 'center' }}>Fusing Mtr</th>
+                <th style={{ ...thStyle, textAlign: 'center' }} title="Difference between Fusing Mtr and Print Mtr (Fusing Mtr - Print Mtr)">Fusing Diff</th>
                 <th style={{ ...thStyle, textAlign: 'center' }}>Delivery</th>
                 <th 
                   onClick={() => {
@@ -916,6 +996,8 @@ export default function JobCardTracking({ onPreview }) {
                 >
                   Delivery Date {sortBy === 'deliveryDate' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ''}
                 </th>
+                <th style={{ ...thStyle, textAlign: 'center' }}>Delivery Mtr</th>
+                <th style={{ ...thStyle, textAlign: 'center' }} title="Difference between Delivery Mtr and Fusing Mtr (Delivery Mtr - Fusing Mtr)">Delivery Diff</th>
                 <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
               </tr>
             </thead>
@@ -1193,6 +1275,29 @@ export default function JobCardTracking({ onPreview }) {
                         </div>
                       </td>
 
+                      {/* Print Diff (Print Mtr - Job Mtr) */}
+                      <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 800 }}>
+                        {(() => {
+                          const targetM = parseFloat(String(c.totalMtr || c.consumption || '0').replace(/[^\d.]/g, '')) || 0;
+                          const printM = parseFloat(String(getValue(c, 'printMtr') || '0').replace(/[^\d.]/g, '')) || 0;
+                          if (!printM) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+                          const diff = printM - targetM;
+                          const isExcess = diff > 0.05;
+                          const isShort = diff < -0.05;
+                          return (
+                            <span style={{
+                              color: isExcess ? '#10b981' : (isShort ? '#ef4444' : '#94a3b8'),
+                              background: isExcess ? 'rgba(16, 185, 129, 0.1)' : (isShort ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.04)'),
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '0.74rem'
+                            }}>
+                              {diff > 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)} m
+                            </span>
+                          );
+                        })()}
+                      </td>
+
                       {/* Pending Print Mtr */}
                       <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 800 }}>
                         {(() => {
@@ -1321,6 +1426,29 @@ export default function JobCardTracking({ onPreview }) {
                         })()}
                       </td>
 
+                      {/* Fusing Diff (Fusing Mtr - Print Mtr) */}
+                      <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 800 }}>
+                        {(() => {
+                          const printM = parseFloat(String(getValue(c, 'printMtr') || '0').replace(/[^\d.]/g, '')) || 0;
+                          const fusingM = parseFloat(String(getValue(c, 'fusingMtr') || '0').replace(/[^\d.]/g, '')) || 0;
+                          if (!fusingM || !printM) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+                          const diff = fusingM - printM;
+                          const isExcess = diff > 0.05;
+                          const isShort = diff < -0.05;
+                          return (
+                            <span style={{
+                              color: isExcess ? '#10b981' : (isShort ? '#ef4444' : '#94a3b8'),
+                              background: isExcess ? 'rgba(16, 185, 129, 0.1)' : (isShort ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.04)'),
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '0.74rem'
+                            }}>
+                              {diff > 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)} m
+                            </span>
+                          );
+                        })()}
+                      </td>
+
                       {/* Delivery Status */}
                       <td style={{ ...tdStyle, textAlign: 'center' }}>
                         <select
@@ -1353,6 +1481,79 @@ export default function JobCardTracking({ onPreview }) {
                         )}
                       </td>
 
+                      {/* Delivery Mtr */}
+                      <td style={{ ...tdStyle, textAlign: 'center' }}>
+                        {(() => {
+                          const val = getValue(c, 'deliveryMtr');
+                          const delMtr = getCardDeliveryMtr(c);
+                          const displayVal = val !== undefined && val !== '' ? val : (delMtr > 0 ? delMtr : '');
+                          return (
+                            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <input
+                                type="text"
+                                value={displayVal}
+                                disabled={!canEditCard(c)}
+                                readOnly={!canEditCard(c)}
+                                onChange={e => canEditCard(c) && handleCellChange(c._id, 'deliveryMtr', e.target.value)}
+                                onBlur={e => canEditCard(c) && handleAutoSave(c._id, 'deliveryMtr', e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && canEditCard(c) && e.target.blur()}
+                                placeholder="0 mtr"
+                                title={!canEditCard(c) ? "Auto-synced from Delivery Invoices" : "Edit Delivery Meters"}
+                                style={{
+                                  ...inputStyle,
+                                  width: '75px',
+                                  fontWeight: 700,
+                                  color: '#34d399',
+                                  opacity: !canEditCard(c) ? 0.85 : 1,
+                                  cursor: !canEditCard(c) ? 'default' : 'text',
+                                  background: !canEditCard(c) ? 'rgba(255,255,255,0.03)' : inputStyle.background
+                                }}
+                              />
+                              {c.invoices && c.invoices.length > 0 && delMtr > 0 && (
+                                <span style={{ fontSize: '0.62rem', color: '#38bdf8', marginTop: '2px', whiteSpace: 'nowrap' }} title={`Synced from ${c.invoices.length} delivery invoice(s)`}>
+                                  Bill ({delMtr}m)
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
+
+                      {/* Delivery Diff (Delivery Mtr - Fusing Mtr) */}
+                      <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 800 }}>
+                        {(() => {
+                          const targetM = parseFloat(String(c.totalMtr || c.consumption || '0').replace(/[^\d.]/g, '')) || 0;
+                          const printM = parseFloat(String(getValue(c, 'printMtr') || '0').replace(/[^\d.]/g, '')) || 0;
+                          const fusingM = parseFloat(String(getValue(c, 'fusingMtr') || '0').replace(/[^\d.]/g, '')) || 0;
+                          const delVal = getValue(c, 'deliveryMtr');
+                          const delM = parseFloat(String(delVal !== undefined && delVal !== '' ? delVal : (getCardDeliveryMtr(c) || '0')).replace(/[^\d.]/g, '')) || 0;
+
+                          if (!delM) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+                          const prevM = fusingM > 0 ? fusingM : (printM > 0 ? printM : targetM);
+                          if (!prevM) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+
+                          const diff = delM - prevM;
+                          const isExcess = diff > 0.05;
+                          const isShort = diff < -0.05;
+                          const prevStageName = fusingM > 0 ? 'Fusing' : (printM > 0 ? 'Print' : 'Job');
+
+                          return (
+                            <span
+                              title={`Delivery Mtr (${delM.toFixed(1)}m) - ${prevStageName} Mtr (${prevM.toFixed(1)}m) = ${diff > 0 ? '+' : ''}${diff.toFixed(1)}m`}
+                              style={{
+                                color: isExcess ? '#10b981' : (isShort ? '#ef4444' : '#94a3b8'),
+                                background: isExcess ? 'rgba(16, 185, 129, 0.1)' : (isShort ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.04)'),
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '0.74rem'
+                              }}
+                            >
+                              {diff > 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)} m
+                            </span>
+                          );
+                        })()}
+                      </td>
+
                       {/* Sync Status Indicator */}
                       <td style={{ ...tdStyle, textAlign: 'center' }}>
                         {isSaving ? (
@@ -1377,7 +1578,7 @@ export default function JobCardTracking({ onPreview }) {
                     {/* COLLAPSIBLE PRINT RUN HISTORY SUB-ROW (WHITE THEME) */}
                     {isExpanded && (
                       <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
-                        <td colSpan={15} style={{ padding: '0.85rem 1.2rem' }}>
+                        <td colSpan={19} style={{ padding: '0.85rem 1.2rem' }}>
                           <div style={{
                             background: '#ffffff',
                             border: '1px solid #cbd5e1',
@@ -1468,6 +1669,72 @@ export default function JobCardTracking({ onPreview }) {
                 );
               })}
             </tbody>
+            <tfoot style={{ borderTop: '2px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', fontWeight: 800 }}>
+              <tr>
+                <td colSpan={4} style={{ ...tdStyle, padding: '0.65rem 0.6rem', fontWeight: 900, color: 'var(--text-primary)', fontSize: '0.78rem' }}>
+                  TOTAL ({cards.length} JOB CARDS)
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'center', color: '#a78bfa', fontWeight: 900, fontSize: '0.78rem' }}>
+                  {cards.reduce((sum, c) => sum + (parseFloat(String(c.totalMtr || c.consumption || '0').replace(/[^\d.]/g, '')) || 0), 0).toFixed(1)} m
+                </td>
+                <td colSpan={2}></td>
+                <td style={{ ...tdStyle, textAlign: 'center', color: '#38bdf8', fontWeight: 900, fontSize: '0.78rem' }}>
+                  {cards.reduce((sum, c) => sum + (parseFloat(String(getValue(c, 'printMtr') || '0').replace(/[^\d.]/g, '')) || 0), 0).toFixed(1)} m
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 900, fontSize: '0.78rem' }}>
+                  {(() => {
+                    const jm = cards.reduce((sum, c) => sum + (parseFloat(String(c.totalMtr || c.consumption || '0').replace(/[^\d.]/g, '')) || 0), 0);
+                    const pm = cards.reduce((sum, c) => sum + (parseFloat(String(getValue(c, 'printMtr') || '0').replace(/[^\d.]/g, '')) || 0), 0);
+                    const diff = pm - jm;
+                    return (
+                      <span style={{ color: diff >= 0 ? '#10b981' : '#ef4444' }}>
+                        {diff > 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)} m
+                      </span>
+                    );
+                  })()}
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'center', color: '#d97706', fontWeight: 900, fontSize: '0.78rem' }}>
+                  {cards.reduce((sum, c) => {
+                    const jm = parseFloat(String(c.totalMtr || c.consumption || '0').replace(/[^\d.]/g, '')) || 0;
+                    const pm = parseFloat(String(getValue(c, 'printMtr') || '0').replace(/[^\d.]/g, '')) || 0;
+                    return sum + (getValue(c, 'printStatus') === 'Printing Done' ? 0 : Math.max(0, jm - pm));
+                  }, 0).toFixed(1)} m
+                </td>
+                <td colSpan={2}></td>
+                <td style={{ ...tdStyle, textAlign: 'center', color: '#ea580c', fontWeight: 900, fontSize: '0.78rem' }}>
+                  {cards.reduce((sum, c) => sum + (parseFloat(String(getValue(c, 'fusingMtr') || '0').replace(/[^\d.]/g, '')) || 0), 0).toFixed(1)} m
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 900, fontSize: '0.78rem' }}>
+                  {(() => {
+                    const pm = cards.reduce((sum, c) => sum + (parseFloat(String(getValue(c, 'printMtr') || '0').replace(/[^\d.]/g, '')) || 0), 0);
+                    const fm = cards.reduce((sum, c) => sum + (parseFloat(String(getValue(c, 'fusingMtr') || '0').replace(/[^\d.]/g, '')) || 0), 0);
+                    const diff = fm - pm;
+                    return (
+                      <span style={{ color: diff >= 0 ? '#10b981' : '#ef4444' }}>
+                        {diff > 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)} m
+                      </span>
+                    );
+                  })()}
+                </td>
+                <td colSpan={2}></td>
+                <td style={{ ...tdStyle, textAlign: 'center', color: '#059669', fontWeight: 900, fontSize: '0.78rem' }}>
+                  {cards.reduce((sum, c) => sum + (parseFloat(String(getValue(c, 'deliveryMtr') || getCardDeliveryMtr(c) || '0').replace(/[^\d.]/g, '')) || 0), 0).toFixed(1)} m
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 900, fontSize: '0.78rem' }}>
+                  {(() => {
+                    const fm = cards.reduce((sum, c) => sum + (parseFloat(String(getValue(c, 'fusingMtr') || '0').replace(/[^\d.]/g, '')) || 0), 0);
+                    const dm = cards.reduce((sum, c) => sum + (parseFloat(String(getValue(c, 'deliveryMtr') || getCardDeliveryMtr(c) || '0').replace(/[^\d.]/g, '')) || 0), 0);
+                    const diff = dm - fm;
+                    return (
+                      <span style={{ color: diff >= 0 ? '#10b981' : '#ef4444' }}>
+                        {diff > 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1)} m
+                      </span>
+                    );
+                  })()}
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
           </table>
         )}
       </div>
