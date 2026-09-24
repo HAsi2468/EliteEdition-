@@ -66,6 +66,13 @@ const getNextTaskNo = async () => {
  */
 const createDesignerTask = async (req, res) => {
   try {
+    if (req.user && req.user.role !== 'admin' && !req.user.isMainAdmin) {
+      const allowed = req.user.canInputNewDesign || req.user.permissions?.includes('input_new_design');
+      if (!allowed) {
+        return res.status(403).json({ error: 'Access denied: You do not have permission to input new designs.' });
+      }
+    }
+
     const body = { ...req.body };
 
     if (!body.designName && !body.title) {

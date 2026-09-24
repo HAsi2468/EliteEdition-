@@ -267,6 +267,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
   const userAssignedName = (currentUser?.designerName || currentUser?.name || '').trim();
   const isUserRestricted = !isUserAdmin;
   const isDesignerRestricted = isUserRestricted;
+  const canInputNewDesign = isUserAdmin || Boolean(currentUser?.canInputNewDesign) || currentUser?.permissions?.includes('input_new_design');
 
   // Dropdown options from settings
   const [printConfig, setPrintConfig] = useState({ designers: [], fabrics: [] });
@@ -448,6 +449,10 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
 
   // Create & Edit Task Handlers
   const handleOpenCreate = () => {
+    if (!canInputNewDesign) {
+      alert('You do not have permission to input new designs. Please contact an Administrator.');
+      return;
+    }
     setEditingId(null);
     setTaskFormData({
       ...initialTaskForm,
@@ -769,25 +774,27 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
             Refresh
           </button>
 
-          <button
-            onClick={handleOpenCreate}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              padding: '0.5rem 1.05rem',
-              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(37,99,235,0.25)',
-            }}
-          >
-            <Plus size={15} /> Input New Design
-          </button>
+          {canInputNewDesign && (
+            <button
+              onClick={handleOpenCreate}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.5rem 1.05rem',
+                background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(37,99,235,0.25)',
+              }}
+            >
+              <Plus size={15} /> Input New Design
+            </button>
+          )}
         </div>
       </div>
 
@@ -1067,7 +1074,9 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
               ? (userAssignedName
                   ? `No designs currently assigned to "${userAssignedName}". You only see designs where your name is assigned as Designer or Colour Matcher.`
                   : 'Your account is not linked to a Designer or Colour Matcher profile. Please ask an administrator to assign your profile in Admin Panel.')
-              : 'Try changing the date filter, clearing search, or creating a new design task with "+ Input New Design".'}
+              : (canInputNewDesign
+                  ? 'Try changing the date filter, clearing search, or creating a new design task with "+ Input New Design".'
+                  : 'No design tasks found matching the selected filters.')}
           </p>
         </div>
       ) : (

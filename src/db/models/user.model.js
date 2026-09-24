@@ -67,6 +67,7 @@ const userSchema = new mongoose.Schema(
 		canAdvanceJobStage: { type: Boolean, default: true },
 		canViewJobCosts: { type: Boolean, default: true },
 		canCreateDesigns: { type: Boolean, default: true },
+		canInputNewDesign: { type: Boolean, default: false },
 		canEditDesigns: { type: Boolean, default: true },
 		canDeleteDesigns: { type: Boolean, default: true },
 		canViewDesignCosts: { type: Boolean, default: true },
