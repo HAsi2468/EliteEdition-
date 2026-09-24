@@ -4,6 +4,58 @@ const logger = require('../config/logger');
 const { emitSocketEvent } = require('../utils/socketEmitHelper');
 
 /**
+ * Notify assigned designers / colour matchers via their personal socket rooms.
+ * Looks up users by name (designerName / colourMatches) and emits
+ * `designer-task-assigned` to each found user's personal room.
+ */
+const notifyAssignedUsers = async (req, task, isNew = true) => {
+  try {
+    const io = (req && req.app && (req.app.get('io') || req.app.get('socketio'))) || global.io;
+    if (!io) return;
+
+    // Collect all assigned people names
+    const allNames = [
+      ...(Array.isArray(task.designers) ? task.designers : []),
+      ...(Array.isArray(task.colourMatches) ? task.colourMatches : []),
+      ...(task.designerName ? task.designerName.split(',').map(s => s.trim()) : []),
+      ...(task.colourMatching ? task.colourMatching.split(',').map(s => s.trim()) : []),
+    ].filter(Boolean).map(n => n.trim()).filter(n => n.length > 1);
+
+    const uniqueNames = [...new Set(allNames)];
+    if (!uniqueNames.length) return;
+
+    // Build OR conditions to find matching users by name or username
+    const orConds = uniqueNames.map(name => ({
+      $or: [
+        { name: { $regex: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') } },
+        { username: { $regex: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') } },
+        { designerName: { $regex: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') } },
+      ]
+    }));
+
+    const matchedUsers = await db.User.find({ $or: orConds.flatMap(c => c.$or) }).select('_id name').lean();
+
+    const payload = {
+      taskId: task._id,
+      taskNo: task.taskNo || '',
+      designName: task.designName || task.title || 'New Design',
+      fabricName: task.fabricName || (Array.isArray(task.fabrics) ? task.fabrics.join(', ') : '') || '',
+      priority: task.priority || 'Medium',
+      isNew,
+      createdByName: task.createdByName || 'Admin',
+      date: task.date || new Date().toISOString().split('T')[0],
+    };
+
+    matchedUsers.forEach(user => {
+      io.to(`user_${user._id}`).emit('designer-task-assigned', payload);
+      logger.info(`[NotifyDesigner] Sent to user_${user._id} (${user.name}) — Task ${payload.taskNo}`);
+    });
+  } catch (err) {
+    logger.warn('[notifyAssignedUsers] Failed:', err.message);
+  }
+};
+
+/**
  * Detect media type from URL (image vs video vs generic link)
  */
 const detectLinkType = (url = '') => {
@@ -171,6 +223,9 @@ const createDesignerTask = async (req, res) => {
     const task = await db.DesignerTask.create(body);
 
     emitSocketEvent(req, 'designer-task-created', task);
+
+    // Notify each assigned designer / colour matcher individually
+    notifyAssignedUsers(req, task, true);
 
     return res.status(201).json({ success: true, data: task });
   } catch (err) {
@@ -421,10 +476,36 @@ const updateDesignerTask = async (req, res) => {
       body.sampleLinkType = detectLinkType(body.sampleLink);
     }
 
+    // Capture previous designers to detect newly assigned ones
+    const prevDesigners = new Set([
+      ...(task.designers || []),
+      ...(task.designerName ? task.designerName.split(',').map(s => s.trim()) : []),
+      ...(task.colourMatches || []),
+      ...(task.colourMatching ? task.colourMatching.split(',').map(s => s.trim()) : []),
+    ].map(n => n.trim().toLowerCase()));
+
     Object.assign(task, body);
     await task.save();
 
     emitSocketEvent(req, 'designer-task-updated', task);
+
+    // Check if new designers were added — notify only newly assigned people
+    const newDesigners = [
+      ...(Array.isArray(body.designers) ? body.designers : []),
+      ...(Array.isArray(body.colourMatches) ? body.colourMatches : []),
+    ].filter(n => n && !prevDesigners.has(n.trim().toLowerCase()));
+
+    if (newDesigners.length > 0) {
+      // Build a partial task object with only new assignees for targeted notification
+      const notifyTask = {
+        ...task.toObject(),
+        designers: newDesigners,
+        colourMatches: newDesigners,
+        designerName: newDesigners.join(', '),
+        colourMatching: newDesigners.join(', '),
+      };
+      notifyAssignedUsers(req, notifyTask, false);
+    }
 
     return res.status(200).json({ success: true, data: task });
   } catch (err) {
