@@ -24,6 +24,38 @@ const app = express();
 // Trust reverse proxy (Nginx) so client IP and rate limiting are properly identified
 app.set('trust proxy', 1);
 
+// ─── HOST GUARD ──────────────────────────────────────────────────────────────
+// Block all requests that do not originate from the official domain.
+// This prevents direct access to the Node.js process via raw IP:port.
+const ALLOWED_HOSTS = [
+  'erp.eliteedition.in',
+  'www.erp.eliteedition.in',
+  'localhost',
+  '127.0.0.1',
+];
+
+app.use((req, res, next) => {
+  // In test/dev mode skip the guard entirely
+  if (config.env !== 'production') return next();
+
+  const host = (req.headers['x-forwarded-host'] || req.headers['host'] || '').toLowerCase().split(':')[0].trim();
+
+  const isAllowed = ALLOWED_HOSTS.some(
+    (allowed) => host === allowed || host.endsWith('.' + allowed)
+  );
+
+  if (!isAllowed) {
+    // Return a plain 403 – no HTML, no redirect that could be followed
+    res.status(403).set('Content-Type', 'text/plain').end(
+      'Access Denied: Direct IP access is not permitted. Use https://erp.eliteedition.in'
+    );
+    return;
+  }
+
+  next();
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
 if (config.env !== 'test') {
 	app.use(morgan.successHandler);
 	app.use(morgan.errorHandler);
