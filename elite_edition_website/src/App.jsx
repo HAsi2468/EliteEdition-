@@ -1614,12 +1614,6 @@ export default function App() {
                       <Palette size={18} color="#2563eb" /><span>Designer Screen</span>
                     </button>
                   )}
-                  {/* Designer Pipeline */}
-                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('designer_module')) && (
-                    <button onClick={() => { setActiveTab('designer_module'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'designer_module' ? styles.navItemActive : {}) }}>
-                      <Layers size={18} color="#0284c7" /><span>Designer Pipeline</span>
-                    </button>
-                  )}
                   {/* 7. Print Settings */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) && (
                     <button onClick={() => { setActiveTab('jobcards_settings'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_settings' ? styles.navItemActive : {}) }}>
@@ -2034,9 +2028,6 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('designer_screen') || currentUser.permissions?.includes('designer_module')) &&
                       renderNavItem('designer_screen', 'Designer Screen', Palette, null, 'Designer')
                     }
-                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('designer_module')) &&
-                      renderNavItem('designer_module', 'Designer Pipeline', Layers, null, 'Pipeline')
-                    }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) &&
                       renderNavItem('jobcards_settings', 'Print Settings', Settings, null, 'Settings')
                     }
@@ -2254,10 +2245,8 @@ export default function App() {
             <UnicommerceHub />
           ) : activeTab === 'myntra' ? (
             <MyntraHub />
-          ) : activeTab === 'designer_screen' ? (
+          ) : activeTab === 'designer_screen' || activeTab === 'designer_module' || activeTab === 'designer' ? (
             <DesignerScreen currentUser={currentUser} isAdmin={currentUser?.role === 'admin'} onNavigate={(t) => setActiveTab(t)} />
-          ) : activeTab === 'designer_module' || activeTab === 'designer' ? (
-            <DesignerModule currentUser={currentUser} isAdmin={currentUser?.role === 'admin'} onNavigate={(t) => setActiveTab(t)} />
           ) : activeTab === 'admin' ? (
             <AdminPanel />
           ) : ['communication', 'workspace', 'task_management'].includes(activeTab) ? null : (

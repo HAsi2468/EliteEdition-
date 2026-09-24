@@ -2416,8 +2416,15 @@ export const api = {
     });
   },
 
-  async getDesignerStats() {
-    return request('/designer-tasks/stats');
+  async getDesignerStats(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '' && v !== 'All') {
+        query.append(k, v);
+      }
+    });
+    const qs = query.toString();
+    return request(`/designer-tasks/stats${qs ? `?${qs}` : ''}`);
   }
 };
 

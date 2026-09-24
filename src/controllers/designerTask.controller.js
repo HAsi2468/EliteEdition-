@@ -180,30 +180,51 @@ const getDesignerTasks = async (req, res) => {
 
     const andConditions = [];
 
-    // Designer filter (matches designerName string or designers array)
-    if (designerName && designerName.trim() && designerName !== 'All') {
-      const esc = designerName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Assigned User filter (matches if user is in Designer OR in Colour Matching)
+    const activeAssignedUser = (req.query.assignedUser || req.query.assignedName || '').trim();
+    if (activeAssignedUser === '__NO_NAME_ASSIGNED__') {
+      return res.status(200).json({ success: true, count: 0, total: 0, data: [] });
+    }
+
+    if (activeAssignedUser && activeAssignedUser !== 'All') {
+      const esc = activeAssignedUser.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const reg = new RegExp(esc, 'i');
       andConditions.push({
         $or: [
           { designerName: { $regex: reg } },
           { designers: { $in: [new RegExp(`^${esc}$`, 'i'), reg] } },
-          { designers: designerName.trim() },
-        ],
-      });
-    }
-
-    // Colour Matching filter (matches colourMatching string or colourMatches array)
-    if (colourMatching && colourMatching.trim() && colourMatching !== 'All') {
-      const esc = colourMatching.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const reg = new RegExp(esc, 'i');
-      andConditions.push({
-        $or: [
+          { designers: activeAssignedUser },
           { colourMatching: { $regex: reg } },
           { colourMatches: { $in: [new RegExp(`^${esc}$`, 'i'), reg] } },
-          { colourMatches: colourMatching.trim() },
+          { colourMatches: activeAssignedUser },
         ],
       });
+    } else {
+      // Designer filter (matches designerName string or designers array)
+      if (designerName && designerName.trim() && designerName !== 'All') {
+        const esc = designerName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const reg = new RegExp(esc, 'i');
+        andConditions.push({
+          $or: [
+            { designerName: { $regex: reg } },
+            { designers: { $in: [new RegExp(`^${esc}$`, 'i'), reg] } },
+            { designers: designerName.trim() },
+          ],
+        });
+      }
+
+      // Colour Matching filter (matches colourMatching string or colourMatches array)
+      if (colourMatching && colourMatching.trim() && colourMatching !== 'All') {
+        const esc = colourMatching.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const reg = new RegExp(esc, 'i');
+        andConditions.push({
+          $or: [
+            { colourMatching: { $regex: reg } },
+            { colourMatches: { $in: [new RegExp(`^${esc}$`, 'i'), reg] } },
+            { colourMatches: colourMatching.trim() },
+          ],
+        });
+      }
     }
 
     // Fabric filter (matches fabricName string or fabrics array)
@@ -533,23 +554,65 @@ const deleteDesignerTask = async (req, res) => {
  */
 const getDesignerStats = async (req, res) => {
   try {
+    const { assignedUser, assignedName, designerName } = req.query;
+    const matchStage = {};
+    const activeAssigned = (assignedUser || assignedName || '').trim();
+
+    if (activeAssigned === '__NO_NAME_ASSIGNED__') {
+      return res.status(200).json({
+        success: true,
+        data: {
+          total: 0, new: 0, assigned: 0, inProgress: 0, colourMatching: 0, sampleReady: 0, revision: 0, approved: 0, cancelled: 0,
+          drowStatus: {}, colourMatchingStatus: {}, finalDesignStatus: {}
+        }
+      });
+    }
+
+    if (activeAssigned && activeAssigned !== 'All') {
+      const esc = activeAssigned.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const reg = new RegExp(esc, 'i');
+      matchStage.$or = [
+        { designerName: { $regex: reg } },
+        { designers: { $in: [new RegExp(`^${esc}$`, 'i'), reg] } },
+        { designers: activeAssigned },
+        { colourMatching: { $regex: reg } },
+        { colourMatches: { $in: [new RegExp(`^${esc}$`, 'i'), reg] } },
+        { colourMatches: activeAssigned },
+      ];
+    } else if (designerName && designerName.trim() && designerName !== 'All') {
+      const esc = designerName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const reg = new RegExp(esc, 'i');
+      matchStage.$or = [
+        { designerName: { $regex: reg } },
+        { designers: { $in: [new RegExp(`^${esc}$`, 'i'), reg] } },
+        { designers: designerName.trim() },
+      ];
+    }
+
+    const pipeline = Object.keys(matchStage).length > 0 ? [{ $match: matchStage }] : [];
+
     const [statusStats, priorityStats, drowStats, cmStats, finalStats, totalCount] = await Promise.all([
       db.DesignerTask.aggregate([
+        ...pipeline,
         { $group: { _id: '$status', count: { $sum: 1 } } },
       ]),
       db.DesignerTask.aggregate([
+        ...pipeline,
         { $group: { _id: '$priority', count: { $sum: 1 } } },
       ]),
       db.DesignerTask.aggregate([
+        ...pipeline,
         { $group: { _id: '$drowDesignStatus', count: { $sum: 1 } } },
       ]),
       db.DesignerTask.aggregate([
+        ...pipeline,
         { $group: { _id: '$colourMatchingStatus', count: { $sum: 1 } } },
       ]),
       db.DesignerTask.aggregate([
+        ...pipeline,
         { $group: { _id: '$finalDesignStatus', count: { $sum: 1 } } },
       ]),
-      db.DesignerTask.countDocuments(),
+      db.DesignerTask.countDocuments(matchStage),
     ]);
 
     const statusMap = {};

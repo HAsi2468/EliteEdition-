@@ -28,7 +28,11 @@ import {
   Scissors,
   Download,
   Calendar,
-  ArrowRight
+  ArrowRight,
+  Edit2,
+  Trash2,
+  Link as LinkIcon,
+  Video as VideoIcon
 } from 'lucide-react';
 import { triggerPushNotification } from './NotificationToast';
 
@@ -59,35 +63,244 @@ export const PRIORITY_STYLES = {
   Low: { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', badge: '🟢' },
 };
 
+/**
+ * Modern multi-select tag picker with dropdown & custom input support
+ */
+function MultiSelectBox({
+  label,
+  icon: Icon,
+  options = [],
+  selected = [],
+  onChange,
+  tagTheme = { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' }
+}) {
+  const [customVal, setCustomVal] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
+
+  const availableOptions = useMemo(() => {
+    const set = new Set(selected.map(s => String(s).trim().toLowerCase()));
+    return options.filter(opt => opt && !set.has(String(opt).trim().toLowerCase()));
+  }, [options, selected]);
+
+  const handleSelect = (e) => {
+    const val = e.target.value;
+    if (val === '__custom__') {
+      setShowCustomInput(true);
+    } else if (val) {
+      if (!selected.includes(val)) {
+        onChange([...selected, val]);
+      }
+    }
+    e.target.value = '';
+  };
+
+  const handleAddCustom = () => {
+    const trimmed = customVal.trim();
+    if (trimmed && !selected.includes(trimmed)) {
+      onChange([...selected, trimmed]);
+    }
+    setCustomVal('');
+    setShowCustomInput(false);
+  };
+
+  const handleRemove = (itemToRemove) => {
+    onChange(selected.filter(item => item !== itemToRemove));
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          {Icon && <Icon size={13} color="#2563eb" />}
+          <span>{label}</span>
+          {selected.length > 0 && (
+            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '0 6px' }}>
+              {selected.length}
+            </span>
+          )}
+        </label>
+        {selected.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.68rem', cursor: 'pointer', padding: 0 }}
+          >
+            Clear all
+          </button>
+        )}
+      </div>
+
+      {selected.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', padding: '0.45rem', background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '8px' }}>
+          {selected.map((item, idx) => (
+            <span
+              key={idx}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.2rem 0.55rem',
+                background: tagTheme.bg,
+                color: tagTheme.color,
+                border: `1px solid ${tagTheme.border}`,
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                boxShadow: '0 1px 3px rgba(37,99,235,0.06)'
+              }}
+            >
+              <span>{item}</span>
+              <button
+                type="button"
+                onClick={() => handleRemove(item)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: '#ef4444'
+                }}
+                title={`Remove ${item}`}
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <select
+        value=""
+        onChange={handleSelect}
+        style={{
+          width: '100%',
+          fontSize: '0.85rem',
+          padding: '0.52rem 0.75rem',
+          background: '#ffffff',
+          color: '#0f172a',
+          border: '1px solid #cbd5e1',
+          borderRadius: '8px',
+          outline: 'none'
+        }}
+      >
+        <option value="">+ Add {label}...</option>
+        {availableOptions.map((opt, i) => (
+          <option key={i} value={opt}>{opt}</option>
+        ))}
+        <option value="__custom__">+ Enter Custom {label}...</option>
+      </select>
+
+      {showCustomInput && (
+        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.15rem' }}>
+          <input
+            type="text"
+            value={customVal}
+            onChange={e => setCustomVal(e.target.value)}
+            placeholder={`Enter custom ${label.toLowerCase()}...`}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddCustom();
+              } else if (e.key === 'Escape') {
+                setShowCustomInput(false);
+              }
+            }}
+            autoFocus
+            style={{
+              flex: 1,
+              fontSize: '0.82rem',
+              padding: '0.4rem 0.6rem',
+              border: '1.5px solid #2563eb',
+              borderRadius: '6px',
+              outline: 'none',
+              background: '#ffffff',
+              color: '#0f172a'
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleAddCustom}
+            style={{
+              padding: '0.4rem 0.75rem',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              background: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            Add
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowCustomInput(false); setCustomVal(''); }}
+            style={{
+              padding: '0.4rem 0.6rem',
+              fontSize: '0.78rem',
+              background: '#f1f5f9',
+              color: '#64748b',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DesignerScreen({ currentUser, isAdmin = false, onNavigate }) {
   const [tasks, setTasks] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // ── User Role & Strict Designer / Colour Matcher Access ─────────────────────
+  const isUserAdmin = isAdmin || currentUser?.role === 'admin' || currentUser?.isMainAdmin;
+  const userAssignedName = (currentUser?.designerName || currentUser?.name || '').trim();
+  const isUserRestricted = !isUserAdmin;
+
   // Dropdown options from settings
   const [printConfig, setPrintConfig] = useState({ designers: [], fabrics: [] });
-
-  // User Connected Designer Name
-  const userDesignerName = currentUser?.designerName || '';
-  const isDesignerRestricted = !isAdmin && Boolean(userDesignerName);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [datePreset, setDatePreset] = useState('all');
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
-  const [selectedDesigner, setSelectedDesigner] = useState(userDesignerName || 'All');
+  const [selectedDesigner, setSelectedDesigner] = useState('All');
   const [selectedFabric, setSelectedFabric] = useState('All');
   const [drowFilter, setDrowFilter] = useState('All');
   const [cmFilter, setCmFilter] = useState('All');
   const [finalFilter, setFinalFilter] = useState('All');
 
-  useEffect(() => {
-    if (isDesignerRestricted && userDesignerName) {
-      setSelectedDesigner(userDesignerName);
-    }
-  }, [userDesignerName, isDesignerRestricted]);
+  // Create / Edit Design Task Modal State
+  const initialTaskForm = {
+    date: new Date().toISOString().split('T')[0],
+    designName: '',
+    fabrics: [],
+    fabricName: '',
+    designers: [],
+    designerName: '',
+    colourMatches: [],
+    colourMatching: '',
+    priority: 'Medium',
+    sampleImage: '',
+    sampleLink: '',
+    notes: '',
+  };
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [taskFormData, setTaskFormData] = useState(initialTaskForm);
+  const [savingTask, setSavingTask] = useState(false);
+  const [uploadingSampleImage, setUploadingSampleImage] = useState(false);
 
   const activeDateRange = useMemo(
     () => getDatePresetRange(datePreset, customDateStart, customDateEnd),
@@ -114,20 +327,24 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
     if (!silent) setLoading(true);
     setError('');
     try {
-      const activeDesignerQuery = isDesignerRestricted ? userDesignerName : selectedDesigner;
+      const activeAssignedUserParam = isUserRestricted
+        ? (userAssignedName || '__NO_NAME_ASSIGNED__')
+        : (selectedDesigner !== 'All' ? selectedDesigner : '');
+
       const [cfg, resTasks, resStats] = await Promise.all([
         api.getPrintConfig().catch(() => ({})),
         api.getDesignerTasks({
           startDate: activeDateRange.dateStart || '',
           endDate: activeDateRange.dateEnd || '',
-          designerName: activeDesignerQuery,
+          assignedUser: isUserRestricted ? activeAssignedUserParam : undefined,
+          designerName: !isUserRestricted && selectedDesigner !== 'All' ? selectedDesigner : undefined,
           fabricName: selectedFabric,
           drowDesignStatus: drowFilter,
           colourMatchingStatus: cmFilter,
           finalDesignStatus: finalFilter,
           search: searchQuery,
         }),
-        api.getDesignerStats().catch(() => null),
+        api.getDesignerStats(isUserRestricted ? { assignedUser: activeAssignedUserParam } : {}).catch(() => null),
       ]);
 
       if (cfg) {
@@ -161,6 +378,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
     drowFilter,
     cmFilter,
     finalFilter,
+    userAssignedName,
   ]);
 
   // Real-time listener
@@ -176,19 +394,30 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
     drowFilter,
     cmFilter,
     finalFilter,
+    userAssignedName,
   ]);
 
-  // Client-side quick filter
+  // Client-side quick filter: STRICT isolation for non-admin users
   const filteredTasks = useMemo(() => {
     let result = tasks;
 
-    // If non-admin user is restricted to a designer, filter locally to their designs only
-    if (isDesignerRestricted && userDesignerName) {
-      const uDes = userDesignerName.toLowerCase();
+    // Strict non-admin user isolation: user MUST be in designers OR colourMatches
+    if (isUserRestricted) {
+      if (!userAssignedName) {
+        return []; // Non-admin without assigned profile cannot see any designs
+      }
+      const uTarget = userAssignedName.toLowerCase();
       result = result.filter(t => {
         const dStr = String(t.designerName || '').toLowerCase();
         const dArr = Array.isArray(t.designers) ? t.designers.map(s => String(s).toLowerCase()) : [];
-        return dStr.includes(uDes) || dArr.some(d => d.includes(uDes));
+        const isDesigner = dStr.includes(uTarget) || dArr.some(d => d.includes(uTarget));
+
+        const cmStr = String(t.colourMatching || '').toLowerCase();
+        const cmArr = Array.isArray(t.colourMatches) ? t.colourMatches.map(s => String(s).toLowerCase()) : [];
+        const isColourMatcher = cmStr.includes(uTarget) || cmArr.some(c => c.includes(uTarget));
+
+        // Design is ONLY visible if user is named in Designer OR Colour Matching
+        return isDesigner || isColourMatcher;
       });
     }
 
@@ -214,7 +443,132 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
         finSt.includes(q)
       );
     });
-  }, [tasks, searchQuery, isDesignerRestricted, userDesignerName]);
+  }, [tasks, searchQuery, isUserRestricted, userAssignedName]);
+
+  // Create & Edit Task Handlers
+  const handleOpenCreate = () => {
+    setEditingId(null);
+    setTaskFormData({
+      ...initialTaskForm,
+      date: new Date().toISOString().split('T')[0],
+      fabrics: [],
+      fabricName: '',
+      designers: isUserRestricted && userAssignedName ? [userAssignedName] : [],
+      designerName: isUserRestricted && userAssignedName ? userAssignedName : '',
+      colourMatches: [],
+      colourMatching: '',
+    });
+    setShowCreateModal(true);
+  };
+
+  const handleOpenEdit = (task) => {
+    setEditingId(task._id);
+    const taskFabrics = Array.isArray(task.fabrics) && task.fabrics.length > 0
+      ? task.fabrics
+      : (task.fabricName ? task.fabricName.split(',').map(s => s.trim()).filter(Boolean) : []);
+
+    const taskDesigners = Array.isArray(task.designers) && task.designers.length > 0
+      ? task.designers
+      : (task.designerName ? task.designerName.split(',').map(s => s.trim()).filter(Boolean) : []);
+
+    const taskColourMatches = Array.isArray(task.colourMatches) && task.colourMatches.length > 0
+      ? task.colourMatches
+      : (task.colourMatching ? task.colourMatching.split(',').map(s => s.trim()).filter(Boolean) : []);
+
+    setTaskFormData({
+      date: task.date || new Date().toISOString().split('T')[0],
+      designName: task.designName || '',
+      fabrics: taskFabrics,
+      fabricName: taskFabrics.join(', '),
+      designers: taskDesigners,
+      designerName: taskDesigners.join(', '),
+      colourMatches: taskColourMatches,
+      colourMatching: taskColourMatches.join(', '),
+      priority: task.priority || 'Medium',
+      sampleImage: task.sampleImage || '',
+      sampleLink: task.sampleLink || '',
+      notes: task.notes || '',
+    });
+    setShowCreateModal(true);
+  };
+
+  const handleDeleteTask = async (task) => {
+    if (!window.confirm(`Are you sure you want to delete design task "${task.taskNo} - ${task.designName}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await api.deleteDesignerTask(task._id);
+      triggerPushNotification('Task Deleted', `Design task ${task.taskNo} removed.`, 'warning');
+      loadData(true);
+    } catch (err) {
+      alert('Failed to delete task: ' + err.message);
+    }
+  };
+
+  const handleSampleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingSampleImage(true);
+    try {
+      const options = {
+        maxSizeMB: 1.5,
+        maxWidthOrHeight: 2048,
+        useWebWorker: true,
+      };
+      const compressedFile = await imageCompression(file, options);
+      const res = await api.uploadDesignerImage(compressedFile, 'sample_reference');
+      if (res && res.url) {
+        setTaskFormData(prev => ({ ...prev, sampleImage: res.url }));
+        triggerPushNotification('Sample Reference Uploaded', 'Stored securely on Cloudflare R2', 'success');
+      }
+    } catch (err) {
+      console.error('Sample image upload failed:', err);
+      alert('Failed to upload image to R2: ' + err.message);
+    } finally {
+      setUploadingSampleImage(false);
+    }
+  };
+
+  const handleSubmitTask = async (e) => {
+    e.preventDefault();
+    const finalDesignName = (taskFormData.designName && taskFormData.designName.trim())
+      ? taskFormData.designName.trim()
+      : `Design-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+
+    const fabricsList = taskFormData.fabrics || [];
+    const designersList = taskFormData.designers || [];
+    const colourMatchesList = taskFormData.colourMatches || [];
+
+    const submissionPayload = {
+      ...taskFormData,
+      designName: finalDesignName,
+      fabrics: fabricsList,
+      fabricName: fabricsList.join(', '),
+      designers: designersList,
+      designerName: designersList.join(', '),
+      colourMatches: colourMatchesList,
+      colourMatching: colourMatchesList.join(', ')
+    };
+
+    setSavingTask(true);
+    try {
+      if (editingId) {
+        await api.updateDesignerTask(editingId, submissionPayload);
+        triggerPushNotification('Design Task Updated', `Design "${finalDesignName}" updated.`, 'success');
+      } else {
+        await api.createDesignerTask(submissionPayload);
+        triggerPushNotification('Design Task Created', `New design task "${finalDesignName}" registered.`, 'success');
+      }
+      setShowCreateModal(false);
+      loadData(true);
+    } catch (err) {
+      console.error('Failed to save task:', err);
+      alert('Error saving task: ' + err.message);
+    } finally {
+      setSavingTask(false);
+    }
+  };
 
   // Open the Status & Image Modal
   const handleOpenStatusModal = (task, category, statusType, statusValue = '') => {
@@ -414,26 +768,25 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
             Refresh
           </button>
 
-          {onNavigate && (
-            <button
-              onClick={() => onNavigate('designer_module')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.5rem 0.95rem',
-                background: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                borderRadius: '8px',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                color: '#1d4ed8',
-                cursor: 'pointer',
-              }}
-            >
-              <Layers size={14} /> Pipeline & Admin View
-            </button>
-          )}
+          <button
+            onClick={handleOpenCreate}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0.5rem 1.05rem',
+              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(37,99,235,0.25)',
+            }}
+          >
+            <Plus size={15} /> Input New Design
+          </button>
         </div>
       </div>
 
@@ -603,7 +956,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
 
         {/* Designer Filter */}
         <div style={{ flex: '0 0 auto' }}>
-          {isDesignerRestricted ? (
+          {isUserRestricted ? (
             <div
               style={{
                 padding: '0.45rem 0.85rem',
@@ -617,10 +970,10 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                 alignItems: 'center',
                 gap: '0.4rem',
               }}
-              title="Locked to your assigned designs"
+              title="Locked to your assigned designs & colour matching tasks"
             >
               <User size={13} color="#2563eb" />
-              <span>My Designs: {userDesignerName}</span>
+              <span>👤 My Designs & C.M.: {userAssignedName || 'Not Configured'}</span>
             </div>
           ) : (
             <select
@@ -638,7 +991,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                 outline: 'none',
               }}
             >
-              <option value="All">👤 All Designers</option>
+              <option value="All">👤 All Designers & Staff</option>
               {printConfig.designers.map((d, i) => (
                 <option key={i} value={d}>{d}</option>
               ))}
@@ -709,7 +1062,11 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
           <Palette size={40} color="#94a3b8" style={{ margin: '0 auto 0.75rem' }} />
           <h3 style={{ margin: '0 0 0.4rem', fontSize: '1.1rem', color: '#334155' }}>No Design Tasks Found</h3>
           <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
-            Try changing the date filter, clearing search, or creating a design task in the Admin module.
+            {isUserRestricted
+              ? (userAssignedName
+                  ? `No designs currently assigned to "${userAssignedName}". You only see designs where your name is assigned as Designer or Colour Matcher.`
+                  : 'Your account is not linked to a Designer or Colour Matcher profile. Please ask an administrator to assign your profile in Admin Panel.')
+              : 'Try changing the date filter, clearing search, or creating a new design task with "+ Input New Design".'}
           </p>
         </div>
       ) : (
@@ -813,6 +1170,47 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
                       <History size={13} />
                       <span>{task.stageHistory?.length || 0}</span>
                     </button>
+
+                    {isUserAdmin && (
+                      <>
+                        <button
+                          onClick={() => handleOpenEdit(task)}
+                          title="Edit Design Task"
+                          style={{
+                            padding: '0.3rem 0.5rem',
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '6px',
+                            color: '#1d4ed8',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                          }}
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTask(task)}
+                          title="Delete Design Task"
+                          style={{
+                            padding: '0.3rem 0.5rem',
+                            background: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            borderRadius: '6px',
+                            color: '#dc2626',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                          }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -1873,6 +2271,341 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ─── Create / Edit Design Task Modal ─────────────────────────────── */}
+      {showCreateModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '1rem',
+          }}
+          onClick={() => setShowCreateModal(false)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '16px',
+              maxWidth: '680px',
+              width: '100%',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1px solid #cbd5e1',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '1.25rem 1.5rem',
+                borderBottom: '1px solid #e2e8f0',
+                background: '#f8fafc',
+                borderTopLeftRadius: '16px',
+                borderTopRightRadius: '16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    background: '#eff6ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#2563eb',
+                  }}
+                >
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                    {editingId ? 'Edit Design Task' : 'Input New Design'}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
+                    Assign designers, colour matching staff, fabrics & sample reference media
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '0.35rem',
+                  borderRadius: '6px',
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSubmitTask} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>
+                    Design Date
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={taskFormData.date}
+                    onChange={(e) => setTaskFormData((prev) => ({ ...prev, date: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '0.52rem 0.75rem',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.85rem',
+                      color: '#0f172a',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>
+                    Priority
+                  </label>
+                  <select
+                    value={taskFormData.priority}
+                    onChange={(e) => setTaskFormData((prev) => ({ ...prev, priority: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '0.52rem 0.75rem',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.85rem',
+                      color: '#0f172a',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="Urgent">🔴 Urgent</option>
+                    <option value="High">🟠 High</option>
+                    <option value="Medium">🟡 Medium</option>
+                    <option value="Low">🟢 Low</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>
+                  Design Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Spring Floral Pattern 01 (leave empty for auto-generated name)"
+                  value={taskFormData.designName}
+                  onChange={(e) => setTaskFormData((prev) => ({ ...prev, designName: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '0.52rem 0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.85rem',
+                    color: '#0f172a',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Multi-Select: Designers */}
+              <MultiSelectBox
+                label="Assigned Designers"
+                icon={User}
+                options={printConfig.designers || []}
+                selected={taskFormData.designers || []}
+                onChange={(selected) => setTaskFormData((prev) => ({ ...prev, designers: selected }))}
+                tagTheme={{ bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' }}
+              />
+
+              {/* Multi-Select: Colour Matching Staff */}
+              <MultiSelectBox
+                label="Colour Matching Staff"
+                icon={Palette}
+                options={printConfig.designers || []}
+                selected={taskFormData.colourMatches || []}
+                onChange={(selected) => setTaskFormData((prev) => ({ ...prev, colourMatches: selected }))}
+                tagTheme={{ bg: '#fdf2f8', color: '#db2777', border: '#fbcfe8' }}
+              />
+
+              {/* Multi-Select: Fabrics */}
+              <MultiSelectBox
+                label="Assigned Fabrics"
+                icon={Scissors}
+                options={printConfig.fabrics || []}
+                selected={taskFormData.fabrics || []}
+                onChange={(selected) => setTaskFormData((prev) => ({ ...prev, fabrics: selected }))}
+                tagTheme={{ bg: '#f0f9ff', color: '#0369a1', border: '#bae6fd' }}
+              />
+
+              {/* Sample Reference Image Upload (to Cloudflare R2) */}
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>
+                  Sample Reference Image (Stored in Cloudflare R2)
+                </label>
+                {taskFormData.sampleImage ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem', border: '1px solid #bfdbfe', background: '#eff6ff', borderRadius: '8px' }}>
+                    <img
+                      src={taskFormData.sampleImage}
+                      alt="Sample"
+                      style={{ width: '48px', height: '48px', borderRadius: '6px', objectFit: 'cover', border: '1px solid #cbd5e1' }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: 0, fontSize: '0.78rem', fontWeight: 700, color: '#1e40af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {taskFormData.sampleImage}
+                      </p>
+                      <span style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 700 }}>✓ Uploaded to R2</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setTaskFormData((prev) => ({ ...prev, sampleImage: '' }))}
+                      style={{
+                        padding: '0.3rem 0.5rem',
+                        background: '#fee2e2',
+                        color: '#dc2626',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      border: '2px dashed #93c5fd',
+                      borderRadius: '8px',
+                      padding: '1rem',
+                      textAlign: 'center',
+                      background: '#f8faff',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => document.getElementById('task-sample-file-input')?.click()}
+                  >
+                    <input
+                      id="task-sample-file-input"
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleSampleImageUpload}
+                    />
+                    <Upload size={22} color="#2563eb" style={{ margin: '0 auto 0.35rem' }} />
+                    <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: 700, color: '#1e40af' }}>
+                      {uploadingSampleImage ? 'Compressing & Uploading to R2...' : 'Click to select sample reference image'}
+                    </p>
+                    <p style={{ margin: '0.2rem 0 0', fontSize: '0.7rem', color: '#64748b' }}>
+                      JPG, PNG, WebP up to 10MB
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Sample Link or Reference Video */}
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>
+                  Sample Video / Reference URL (Optional)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://drive.google.com/... or YouTube / Figma link"
+                  value={taskFormData.sampleLink}
+                  onChange={(e) => setTaskFormData((prev) => ({ ...prev, sampleLink: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '0.52rem 0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.85rem',
+                    color: '#0f172a',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>
+                  Design Notes / Instructions (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Specific requirements, pantone codes, repeat instructions..."
+                  value={taskFormData.notes}
+                  onChange={(e) => setTaskFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '0.52rem 0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.85rem',
+                    color: '#0f172a',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              {/* Modal Actions */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  style={{
+                    padding: '0.55rem 1.1rem',
+                    background: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    color: '#475569',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingTask || uploadingSampleImage}
+                  style={{
+                    padding: '0.55rem 1.35rem',
+                    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    color: '#ffffff',
+                    cursor: (savingTask || uploadingSampleImage) ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 6px rgba(37,99,235,0.25)',
+                  }}
+                >
+                  {savingTask ? 'Saving Design Task...' : (editingId ? 'Update Design Task' : 'Create Design Task')}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
