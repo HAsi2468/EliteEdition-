@@ -68,16 +68,26 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
   // Dropdown options from settings
   const [printConfig, setPrintConfig] = useState({ designers: [], fabrics: [] });
 
+  // User Connected Designer Name
+  const userDesignerName = currentUser?.designerName || '';
+  const isDesignerRestricted = !isAdmin && Boolean(userDesignerName);
+
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [datePreset, setDatePreset] = useState('all');
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
-  const [selectedDesigner, setSelectedDesigner] = useState('All');
+  const [selectedDesigner, setSelectedDesigner] = useState(userDesignerName || 'All');
   const [selectedFabric, setSelectedFabric] = useState('All');
   const [drowFilter, setDrowFilter] = useState('All');
   const [cmFilter, setCmFilter] = useState('All');
   const [finalFilter, setFinalFilter] = useState('All');
+
+  useEffect(() => {
+    if (isDesignerRestricted && userDesignerName) {
+      setSelectedDesigner(userDesignerName);
+    }
+  }, [userDesignerName, isDesignerRestricted]);
 
   const activeDateRange = useMemo(
     () => getDatePresetRange(datePreset, customDateStart, customDateEnd),
@@ -104,12 +114,13 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
     if (!silent) setLoading(true);
     setError('');
     try {
+      const activeDesignerQuery = isDesignerRestricted ? userDesignerName : selectedDesigner;
       const [cfg, resTasks, resStats] = await Promise.all([
         api.getPrintConfig().catch(() => ({})),
         api.getDesignerTasks({
           startDate: activeDateRange.dateStart || '',
           endDate: activeDateRange.dateEnd || '',
-          designerName: selectedDesigner,
+          designerName: activeDesignerQuery,
           fabricName: selectedFabric,
           drowDesignStatus: drowFilter,
           colourMatchingStatus: cmFilter,
@@ -169,9 +180,21 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
 
   // Client-side quick filter
   const filteredTasks = useMemo(() => {
-    if (!searchQuery.trim()) return tasks;
+    let result = tasks;
+
+    // If non-admin user is restricted to a designer, filter locally to their designs only
+    if (isDesignerRestricted && userDesignerName) {
+      const uDes = userDesignerName.toLowerCase();
+      result = result.filter(t => {
+        const dStr = String(t.designerName || '').toLowerCase();
+        const dArr = Array.isArray(t.designers) ? t.designers.map(s => String(s).toLowerCase()) : [];
+        return dStr.includes(uDes) || dArr.some(d => d.includes(uDes));
+      });
+    }
+
+    if (!searchQuery.trim()) return result;
     const q = searchQuery.toLowerCase().trim();
-    return tasks.filter((t) => {
+    return result.filter((t) => {
       const taskNo = String(t.taskNo || '').toLowerCase();
       const designName = String(t.designName || '').toLowerCase();
       const designer = String(t.designerName || '').toLowerCase();
@@ -191,7 +214,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
         finSt.includes(q)
       );
     });
-  }, [tasks, searchQuery]);
+  }, [tasks, searchQuery, isDesignerRestricted, userDesignerName]);
 
   // Open the Status & Image Modal
   const handleOpenStatusModal = (task, category, statusType, statusValue = '') => {
@@ -578,28 +601,49 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
           />
         </div>
 
-        {/* Designer Dropdown Filter */}
+        {/* Designer Filter */}
         <div style={{ flex: '0 0 auto' }}>
-          <select
-            value={selectedDesigner}
-            onChange={(e) => setSelectedDesigner(e.target.value)}
-            style={{
-              padding: '0.48rem 0.75rem',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              fontSize: '0.82rem',
-              background: '#ffffff',
-              color: '#0f172a',
-              fontWeight: 600,
-              cursor: 'pointer',
-              outline: 'none',
-            }}
-          >
-            <option value="All">👤 All Designers</option>
-            {printConfig.designers.map((d, i) => (
-              <option key={i} value={d}>{d}</option>
-            ))}
-          </select>
+          {isDesignerRestricted ? (
+            <div
+              style={{
+                padding: '0.45rem 0.85rem',
+                borderRadius: '8px',
+                border: '1.5px solid #bfdbfe',
+                fontSize: '0.82rem',
+                background: '#eff6ff',
+                color: '#1d4ed8',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+              }}
+              title="Locked to your assigned designs"
+            >
+              <User size={13} color="#2563eb" />
+              <span>My Designs: {userDesignerName}</span>
+            </div>
+          ) : (
+            <select
+              value={selectedDesigner}
+              onChange={(e) => setSelectedDesigner(e.target.value)}
+              style={{
+                padding: '0.48rem 0.75rem',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                fontSize: '0.82rem',
+                background: '#ffffff',
+                color: '#0f172a',
+                fontWeight: 600,
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="All">👤 All Designers</option>
+              {printConfig.designers.map((d, i) => (
+                <option key={i} value={d}>{d}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Fabric Dropdown Filter */}
@@ -627,11 +671,11 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
         </div>
 
         {/* Reset Filters */}
-        {(datePreset !== 'all' || selectedDesigner !== 'All' || selectedFabric !== 'All' || drowFilter !== 'All' || cmFilter !== 'All' || finalFilter !== 'All' || searchQuery) && (
+        {(datePreset !== 'all' || (!isDesignerRestricted && selectedDesigner !== 'All') || selectedFabric !== 'All' || drowFilter !== 'All' || cmFilter !== 'All' || finalFilter !== 'All' || searchQuery) && (
           <button
             onClick={() => {
               setDatePreset('all');
-              setSelectedDesigner('All');
+              if (!isDesignerRestricted) setSelectedDesigner('All');
               setSelectedFabric('All');
               setDrowFilter('All');
               setCmFilter('All');

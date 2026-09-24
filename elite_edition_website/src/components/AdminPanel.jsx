@@ -75,6 +75,7 @@ export default function AdminPanel() {
   // Form & Modal State
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null); // null means "Add Mode"
+  const [availableDesigners, setAvailableDesigners] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -82,6 +83,7 @@ export default function AdminPanel() {
     role: 'user',
     isMainAdmin: false,
     department: 'General',
+    designerName: '',
     canManageTasks: true,
     canBroadcastChat: true,
     canExportReports: true,
@@ -233,6 +235,11 @@ export default function AdminPanel() {
 
   useEffect(() => {
     fetchUsers();
+    api.getPrintConfig().then(cfg => {
+      if (cfg && Array.isArray(cfg.designers)) {
+        setAvailableDesigners(cfg.designers);
+      }
+    }).catch(() => {});
   }, []);
 
   const fetchUsers = async () => {
@@ -414,6 +421,7 @@ export default function AdminPanel() {
       role: user.role || (user.permissions?.length === AVAILABLE_SCREENS.length ? 'admin' : 'user'),
       isMainAdmin: Boolean(user.isMainAdmin || user.email === 'harshitsidapara2468@gmail.com'),
       department: user.department || 'General',
+      designerName: user.designerName || '',
       status: user.status || 'Active',
       canManageTasks: user.canManageTasks !== undefined ? Boolean(user.canManageTasks) : true,
       canBroadcastChat: user.canBroadcastChat !== undefined ? Boolean(user.canBroadcastChat) : true,
@@ -459,6 +467,7 @@ export default function AdminPanel() {
       role: 'user',
       isMainAdmin: false,
       department: 'General',
+      designerName: '',
       status: 'Active',
       canManageTasks: true,
       canBroadcastChat: true,
@@ -506,6 +515,7 @@ export default function AdminPanel() {
       role: 'user',
       isMainAdmin: false,
       department: 'General',
+      designerName: '',
       status: 'Active',
       canManageTasks: true,
       canBroadcastChat: true,
@@ -951,19 +961,32 @@ export default function AdminPanel() {
                             </td>
                             <td>
                               <div style={{ color: '#334155', fontWeight: 600, fontSize: '0.82rem' }}>{u.email}</div>
-                              <span style={{
-                                display: 'inline-block',
-                                marginTop: '2px',
-                                fontSize: '0.68rem',
-                                fontWeight: 700,
-                                color: '#475569',
-                                background: '#f1f5f9',
-                                padding: '1px 6px',
-                                borderRadius: '4px',
-                                border: '1px solid #cbd5e1'
-                              }}>
-                                📁 {u.department || 'General'}
-                              </span>
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '2px' }}>
+                                <span style={{
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700,
+                                  color: '#475569',
+                                  background: '#f1f5f9',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  border: '1px solid #cbd5e1'
+                                }}>
+                                  📁 {u.department || 'General'}
+                                </span>
+                                {u.designerName && (
+                                  <span style={{
+                                    fontSize: '0.68rem',
+                                    fontWeight: 700,
+                                    color: '#1d4ed8',
+                                    background: '#eff6ff',
+                                    padding: '1px 6px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #bfdbfe'
+                                  }}>
+                                    🎨 {u.designerName}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td>
                               <span style={{
@@ -1325,6 +1348,24 @@ export default function AdminPanel() {
                           <option value="Active">🟢 Active Account</option>
                           <option value="Inactive">🔴 Inactive / Suspended</option>
                         </select>
+                      </div>
+
+                      <div style={styles.formGroup}>
+                        <label style={styles.label}>🎨 Connected Designer (Settings &rarr; Designers)</label>
+                        <select
+                          name="designerName"
+                          value={formData.designerName || ''}
+                          onChange={handleInputChange}
+                          style={styles.selectInput}
+                        >
+                          <option value="">-- None (Not a Designer) --</option>
+                          {availableDesigners.map((d, i) => (
+                            <option key={i} value={d}>👤 {d}</option>
+                          ))}
+                        </select>
+                        <span style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '3px', display: 'block' }}>
+                          When selected, user will see only their own designs on the Designer Screen.
+                        </span>
                       </div>
                     </div>
 

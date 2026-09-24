@@ -36,6 +36,11 @@ const userSchema = new mongoose.Schema(
 			type: String,
 			default: 'General',
 		},
+		designerName: {
+			type: String,
+			default: '',
+			trim: true,
+		},
 		canManageTasks: {
 			type: Boolean,
 			default: true,

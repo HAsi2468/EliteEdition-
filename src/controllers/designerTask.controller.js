@@ -178,22 +178,45 @@ const getDesignerTasks = async (req, res) => {
       if (endDate && endDate.trim()) filter.date.$lte = endDate.trim();
     }
 
-    // Designer filter (supports partial match for multiple designers)
+    const andConditions = [];
+
+    // Designer filter (matches designerName string or designers array)
     if (designerName && designerName.trim() && designerName !== 'All') {
       const esc = designerName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.designerName = { $regex: new RegExp(esc, 'i') };
+      const reg = new RegExp(esc, 'i');
+      andConditions.push({
+        $or: [
+          { designerName: { $regex: reg } },
+          { designers: { $in: [new RegExp(`^${esc}$`, 'i'), reg] } },
+          { designers: designerName.trim() },
+        ],
+      });
     }
 
-    // Colour Matching filter
+    // Colour Matching filter (matches colourMatching string or colourMatches array)
     if (colourMatching && colourMatching.trim() && colourMatching !== 'All') {
       const esc = colourMatching.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.colourMatching = { $regex: new RegExp(esc, 'i') };
+      const reg = new RegExp(esc, 'i');
+      andConditions.push({
+        $or: [
+          { colourMatching: { $regex: reg } },
+          { colourMatches: { $in: [new RegExp(`^${esc}$`, 'i'), reg] } },
+          { colourMatches: colourMatching.trim() },
+        ],
+      });
     }
 
-    // Fabric filter
+    // Fabric filter (matches fabricName string or fabrics array)
     if (fabricName && fabricName.trim() && fabricName !== 'All') {
       const esc = fabricName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.fabricName = { $regex: new RegExp(esc, 'i') };
+      const reg = new RegExp(esc, 'i');
+      andConditions.push({
+        $or: [
+          { fabricName: { $regex: reg } },
+          { fabrics: { $in: [new RegExp(`^${esc}$`, 'i'), reg] } },
+          { fabrics: fabricName.trim() },
+        ],
+      });
     }
 
     // Priority filter
@@ -220,17 +243,23 @@ const getDesignerTasks = async (req, res) => {
     // Text search filter
     if (search && search.trim()) {
       const q = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.$or = [
-        { taskNo: { $regex: q, $options: 'i' } },
-        { designName: { $regex: q, $options: 'i' } },
-        { designerName: { $regex: q, $options: 'i' } },
-        { fabricName: { $regex: q, $options: 'i' } },
-        { colourMatching: { $regex: q, $options: 'i' } },
-        { drowDesignStatus: { $regex: q, $options: 'i' } },
-        { colourMatchingStatus: { $regex: q, $options: 'i' } },
-        { finalDesignStatus: { $regex: q, $options: 'i' } },
-        { notes: { $regex: q, $options: 'i' } },
-      ];
+      andConditions.push({
+        $or: [
+          { taskNo: { $regex: q, $options: 'i' } },
+          { designName: { $regex: q, $options: 'i' } },
+          { designerName: { $regex: q, $options: 'i' } },
+          { fabricName: { $regex: q, $options: 'i' } },
+          { colourMatching: { $regex: q, $options: 'i' } },
+          { drowDesignStatus: { $regex: q, $options: 'i' } },
+          { colourMatchingStatus: { $regex: q, $options: 'i' } },
+          { finalDesignStatus: { $regex: q, $options: 'i' } },
+          { notes: { $regex: q, $options: 'i' } },
+        ],
+      });
+    }
+
+    if (andConditions.length > 0) {
+      filter.$and = andConditions;
     }
 
     const sort = {};

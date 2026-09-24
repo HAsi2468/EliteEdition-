@@ -322,16 +322,25 @@ export default function DesignerModule({ currentUser, isAdmin = false, onNavigat
     fabrics: []
   });
 
+  const userDesignerName = currentUser?.designerName || '';
+  const isDesignerRestricted = !isAdmin && Boolean(userDesignerName);
+
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [datePreset, setDatePreset] = useState('all');
   const [customDateStart, setCustomDateStart] = useState('');
   const [customDateEnd, setCustomDateEnd] = useState('');
   const [fabricFilter, setFabricFilter] = useState('All');
-  const [designerFilter, setDesignerFilter] = useState('All');
+  const [designerFilter, setDesignerFilter] = useState(userDesignerName || 'All');
   const [colourMatchFilter, setColourMatchFilter] = useState('All');
   const [stageFilter, setStageFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
+
+  useEffect(() => {
+    if (isDesignerRestricted && userDesignerName) {
+      setDesignerFilter(userDesignerName);
+    }
+  }, [userDesignerName, isDesignerRestricted]);
 
   const activeDateRange = useMemo(
     () => getDatePresetRange(datePreset, customDateStart, customDateEnd),
@@ -381,13 +390,14 @@ export default function DesignerModule({ currentUser, isAdmin = false, onNavigat
     if (!silent) setLoading(true);
     setError('');
     try {
+      const activeDesignerQuery = isDesignerRestricted ? userDesignerName : designerFilter;
       const [cfg, resTasks, resStats] = await Promise.all([
         api.getPrintConfig().catch(() => ({})),
         api.getDesignerTasks({
           startDate: activeDateRange.dateStart || '',
           endDate: activeDateRange.dateEnd || '',
           fabricName: fabricFilter,
-          designerName: designerFilter,
+          designerName: activeDesignerQuery,
           colourMatching: colourMatchFilter,
           status: stageFilter,
           priority: priorityFilter,
@@ -622,9 +632,21 @@ export default function DesignerModule({ currentUser, isAdmin = false, onNavigat
 
   // Filtered client-side list for search query
   const filteredTasks = useMemo(() => {
-    if (!searchQuery.trim()) return tasks;
+    let result = tasks;
+
+    // Restrict locally if user is linked to a designer and not admin
+    if (isDesignerRestricted && userDesignerName) {
+      const uDes = userDesignerName.toLowerCase();
+      result = result.filter(t => {
+        const dStr = String(t.designerName || '').toLowerCase();
+        const dArr = Array.isArray(t.designers) ? t.designers.map(s => String(s).toLowerCase()) : [];
+        return dStr.includes(uDes) || dArr.some(d => d.includes(uDes));
+      });
+    }
+
+    if (!searchQuery.trim()) return result;
     const q = searchQuery.toLowerCase().trim();
-    return tasks.filter(t => {
+    return result.filter(t => {
       const taskNo = (t.taskNo || '').toLowerCase();
       const designName = (t.designName || '').toLowerCase();
       const designerName = (t.designerName || (Array.isArray(t.designers) ? t.designers.join(' ') : '')).toLowerCase();
@@ -641,7 +663,7 @@ export default function DesignerModule({ currentUser, isAdmin = false, onNavigat
         notes.includes(q)
       );
     });
-  }, [tasks, searchQuery]);
+  }, [tasks, searchQuery, isDesignerRestricted, userDesignerName]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', width: '100%', boxSizing: 'border-box' }}>
@@ -893,16 +915,37 @@ export default function DesignerModule({ currentUser, isAdmin = false, onNavigat
 
           {/* Designer Filter Dropdown */}
           <div>
-            <select
-              value={designerFilter}
-              onChange={e => setDesignerFilter(e.target.value)}
-              style={{ width: '100%', fontSize: '0.82rem', height: '36px', padding: '0 0.6rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '6px' }}
-            >
-              <option value="All">All Designers</option>
-              {printConfig.designers.map((d, i) => (
-                <option key={i} value={d}>{d}</option>
-              ))}
-            </select>
+            {isDesignerRestricted ? (
+              <div
+                style={{
+                  height: '36px',
+                  padding: '0 0.75rem',
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  border: '1.5px solid #bfdbfe',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                }}
+                title="Locked to your assigned designs"
+              >
+                <span>👤 {userDesignerName}</span>
+              </div>
+            ) : (
+              <select
+                value={designerFilter}
+                onChange={e => setDesignerFilter(e.target.value)}
+                style={{ width: '100%', fontSize: '0.82rem', height: '36px', padding: '0 0.6rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              >
+                <option value="All">All Designers</option>
+                {printConfig.designers.map((d, i) => (
+                  <option key={i} value={d}>{d}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Colour Matching Filter Dropdown */}
