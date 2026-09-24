@@ -741,6 +741,8 @@ const mergeChallans = async (req, res) => {
         items.push({
           itemName,
           description: `Challan ${chNoStr} | Fabric: ${ch.fabricName || 'Fabric'}`,
+          fabric: ch.fabricName || '',
+          fabricName: ch.fabricName || '',
           jobNo: ch.jobNo || '',
           lotNo: ch.lotNo || '',
           partyChallan: ch.vendorChallanNo ? String(ch.vendorChallanNo) : (ch.partyChallan ? String(ch.partyChallan) : ''),

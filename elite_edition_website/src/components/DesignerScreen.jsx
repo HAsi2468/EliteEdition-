@@ -266,6 +266,7 @@ export default function DesignerScreen({ currentUser, isAdmin = false, onNavigat
   const isUserAdmin = isAdmin || currentUser?.role === 'admin' || currentUser?.isMainAdmin;
   const userAssignedName = (currentUser?.designerName || currentUser?.name || '').trim();
   const isUserRestricted = !isUserAdmin;
+  const isDesignerRestricted = isUserRestricted;
 
   // Dropdown options from settings
   const [printConfig, setPrintConfig] = useState({ designers: [], fabrics: [] });

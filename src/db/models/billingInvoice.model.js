@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const invoiceItemSchema = new mongoose.Schema({
   itemName: { type: String, required: true },
   description: { type: String, default: '' },
+  fabric: { type: String, default: '' },
+  fabricName: { type: String, default: '' },
   jobNo: { type: String, default: '' },
   lotNo: { type: String, default: '' },
   partyChallan: { type: String, default: '' },
