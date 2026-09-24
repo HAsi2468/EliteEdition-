@@ -55,6 +55,7 @@ export const AVAILABLE_SCREENS = [
   { id: 'jobcards_raw_materials', label: 'Elite Prints: Raw Materials', category: 'Elite Digital Print' },
   { id: 'jobcards_complain', label: 'Elite Prints: Complain Module', category: 'Elite Digital Print' },
   { id: 'jobcards_qa', label: 'Elite Prints: QA & Quality Checking', category: 'Elite Digital Print' },
+  { id: 'designer_module', label: 'Elite Prints: Designer Team Pipeline', category: 'Elite Digital Print' },
   { id: 'expense_dashboard', label: 'Elite Prints: Department Expenses', category: 'Elite Digital Print' },
   { id: 'jobcards_settings', label: 'Elite Prints: Print Settings', category: 'Elite Digital Print' },
 

@@ -2371,6 +2371,53 @@ export const api = {
     } catch (e) {
       return this.getCurrentUser();
     }
+  },
+
+  // ─── DESIGNER MODULE & TASKS ──────────────────────────────────────────────
+  async getDesignerTasks(params = {}) {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '' && v !== 'All') {
+        query.append(k, v);
+      }
+    });
+    const qs = query.toString();
+    return request(`/designer-tasks${qs ? `?${qs}` : ''}`);
+  },
+
+  async getDesignerTask(id) {
+    return request(`/designer-tasks/${id}`);
+  },
+
+  async createDesignerTask(data) {
+    return request('/designer-tasks', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async updateDesignerTask(id, data) {
+    return request(`/designer-tasks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async updateDesignerTaskStage(id, stageData) {
+    return request(`/designer-tasks/${id}/stage`, {
+      method: 'PUT',
+      body: JSON.stringify(stageData)
+    });
+  },
+
+  async deleteDesignerTask(id) {
+    return request(`/designer-tasks/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  async getDesignerStats() {
+    return request('/designer-tasks/stats');
   }
 };
 

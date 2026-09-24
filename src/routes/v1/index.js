@@ -63,5 +63,6 @@ router.use('/signed-documents', require('./signedDocument.route'));
 router.use('/clients', require('./client.route'));
 router.use('/costing', require('./costing.route'));
 router.use('/digital-print', require('./digitalPrintDashboard.route'));
+router.use('/designer-tasks', require('./designerTask.route'));
 
 module.exports = router;

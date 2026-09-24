@@ -37,6 +37,7 @@ const ReportsCenter = lazy(() => import('./components/ReportsCenter'));
 const UnicommerceHub = lazy(() => import('./components/UnicommerceHub'));
 const MyntraHub = lazy(() => import('./components/MyntraHub'));
 const ReturnsManager = lazy(() => import('./components/ReturnsManager'));
+import DesignerModule from './components/DesignerModule';
 import { 
   LogOut, 
   LayoutDashboard, 
@@ -276,7 +277,7 @@ export default function App() {
   // Department permission helpers
   // Department permission helpers
   const ELITE_ONLINE_PERMISSIONS = ['dashboard', 'elite_online', 'inventory', 'catalog', 'returns', 'sales', 'reports', 'unicommerce', 'myntra'];
-  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
+  const EDP_PERMISSIONS = ['jobcards', 'jobcards_status_dashboard', 'jobcards_status', 'jobcards_printing_log', 'jobcards_fabric', 'jobcards_billing', 'jobcards_costing', 'jobcards_engine', 'jobcards_list', 'jobcards_tracking', 'jobcards_catalogue', 'jobcards_master', 'designer_module', 'jobcards_settings', 'jobcards_raw_materials', 'jobcards_complain', 'jobcards_complaints', 'complaint_dashboard', 'complaint_create', 'jobcards_expense', 'jobcards_expenses', 'expense_dashboard', 'expense_create', 'jobcards_crm', 'crm_department', 'crm', 'jobcards_master_ai', 'master_ai_agent', 'jobcards_business_connection', 'business_connection'];
   const STITCHING_PERMISSIONS = [
     'stitching_jobcards', 'stitching_design', 'stitching_fabric', 'stitching_settings',
     'jobcards_stitching_challan', 'jobcards_stitching_settings', 'stitching'
@@ -1606,6 +1607,12 @@ export default function App() {
                       <BookOpen size={18} /><span>Design Catalog</span>
                     </button>
                   )}
+                  {/* Designer Team */}
+                  {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('designer_module')) && (
+                    <button onClick={() => { setActiveTab('designer_module'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'designer_module' ? styles.navItemActive : {}) }}>
+                      <Palette size={18} color="#ec4899" /><span>Designer Team</span>
+                    </button>
+                  )}
                   {/* 7. Print Settings */}
                   {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) && (
                     <button onClick={() => { setActiveTab('jobcards_settings'); setMobileMenuOpen(false); }} style={{ ...styles.navItem, ...(activeTab === 'jobcards_settings' ? styles.navItemActive : {}) }}>
@@ -2017,6 +2024,9 @@ export default function App() {
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_catalogue') || currentUser.permissions?.includes('jobcards_master')) &&
                       renderNavItem('jobcards_catalogue', 'Design Catalog', BookOpen, null, 'Catalog')
                     }
+                    {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('designer_module')) &&
+                      renderNavItem('designer_module', 'Designer Team', Palette, null, 'Designer')
+                    }
                     {(!currentUser || currentUser.role === 'admin' || currentUser.permissions?.includes('jobcards_settings')) &&
                       renderNavItem('jobcards_settings', 'Print Settings', Settings, null, 'Settings')
                     }
@@ -2234,6 +2244,8 @@ export default function App() {
             <UnicommerceHub />
           ) : activeTab === 'myntra' ? (
             <MyntraHub />
+          ) : activeTab === 'designer_module' || activeTab === 'designer' ? (
+            <DesignerModule currentUser={currentUser} isAdmin={currentUser?.role === 'admin'} />
           ) : activeTab === 'admin' ? (
             <AdminPanel />
           ) : ['communication', 'workspace', 'task_management'].includes(activeTab) ? null : (

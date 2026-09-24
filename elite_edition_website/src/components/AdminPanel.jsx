@@ -30,11 +30,13 @@ import {
   Settings,
   AlertCircle,
   FileCheck,
-  Users
+  Users,
+  Palette
 } from 'lucide-react';
 import { AVAILABLE_SCREENS } from '../config/screensConfig';
 import AdminSignedDocumentsApproval from './AdminSignedDocumentsApproval';
 import AdminClientDetails from './AdminClientDetails';
+import DesignerModule from './DesignerModule';
 
 
 export default function AdminPanel() {
@@ -684,6 +686,8 @@ export default function AdminPanel() {
             <h2 style={styles.pageTitle}>
               {activeSubTab === 'users'
                 ? 'Admin User Management'
+                : activeSubTab === 'designer'
+                ? 'Designer Team Pipeline & History'
                 : activeSubTab === 'clients'
                 ? 'Client Details & Accounts'
                 : activeSubTab === 'billing'
@@ -697,6 +701,8 @@ export default function AdminPanel() {
             <p style={styles.pageSubtitle}>
               {activeSubTab === 'users'
                 ? 'Create system users, set passwords, and manage screen-by-screen functionality credentials.'
+                : activeSubTab === 'designer'
+                ? 'Track design workflow stages, assign designers, preview media, and view full stage transition history.'
                 : activeSubTab === 'clients'
                 ? 'Manage client user accounts, company codes, credentials, and Cloudflare R2 profile images.'
                 : activeSubTab === 'billing'
@@ -719,6 +725,13 @@ export default function AdminPanel() {
           style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem' }}
         >
           <User size={16} /> User Accounts
+        </button>
+        <button
+          onClick={() => { setActiveSubTab('designer'); setError(''); setSuccess(''); }}
+          className={activeSubTab === 'designer' ? 'btn-primary' : 'btn-secondary'}
+          style={{ padding: '0.5rem 1.2rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+        >
+          <Palette size={16} /> Designer Team
         </button>
         <button
           onClick={() => { setActiveSubTab('clients'); setError(''); setSuccess(''); }}
@@ -2066,6 +2079,10 @@ export default function AdminPanel() {
 
       {activeSubTab === 'clients' && (
         <AdminClientDetails />
+      )}
+
+      {activeSubTab === 'designer' && (
+        <DesignerModule isAdmin={true} />
       )}
 
     </div>

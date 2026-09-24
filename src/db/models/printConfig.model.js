@@ -35,6 +35,10 @@ const printConfigSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    colourMatchings: {
+      type: [String],
+      default: [],
+    },
     operators: {
       type: [String],
       default: [],

@@ -160,7 +160,7 @@ const updatePrintConfig = async (req, res) => {
     }
 
     const validFields = [
-      'categories', 'passes', 'parties', 'widths', 'fabrics', 'designers', 'operators',
+      'categories', 'passes', 'parties', 'widths', 'fabrics', 'designers', 'colourMatchings', 'operators',
       'complaintCategories', 'complaint_subcategory',
       'paperTypes', 'billToOptions', 'shipToOptions', 'machines',
       'machine_profile', 'temperatures', 'speeds', 'startingJobNo', 'rawMaterials',
