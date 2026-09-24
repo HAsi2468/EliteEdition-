@@ -1420,6 +1420,55 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
     handleChallanJobChange(newVal);
   };
 
+  // Re-sync all details from current Job Card into Challan form
+  const handleResyncChallanFromJobCard = async () => {
+    if (!challanForm.jobNo) {
+      alert('Please enter or select a Job No first.');
+      return;
+    }
+    const rawTokens = String(challanForm.jobNo || '').split(',').map(s => s.trim()).filter(Boolean);
+    let matchedJobs = rawTokens.map(tok => findMatchingJobCard(tok)).filter(Boolean);
+
+    if (matchedJobs.length === 0 && rawTokens.length > 0) {
+      try {
+        const cleanNo = rawTokens[0].replace(/\D/g, '');
+        const res = await api.getJobCards({ search: cleanNo || rawTokens[0], limit: 20 });
+        if (res && res.data && res.data.length > 0) {
+          matchedJobs = res.data.filter(j => {
+            const jNum = String(j.jobNo || '').replace(/\D/g, '');
+            return jNum === cleanNo || String(j.jobNo).toUpperCase() === rawTokens[0].toUpperCase();
+          });
+          if (matchedJobs.length === 0) matchedJobs = [res.data[0]];
+        }
+      } catch (e) {
+        console.warn('API job card fetch failed:', e);
+      }
+    }
+
+    if (matchedJobs.length > 0) {
+      const combinedJobNo = Array.from(new Set(matchedJobs.map(j => j.jobNo))).join(', ');
+      const combinedDesigns = cleanDesignNameString(Array.from(new Set(matchedJobs.map(j => j.designNo || j.designName).filter(Boolean))).join(', '));
+      const combinedColors = Array.from(new Set(matchedJobs.map(j => j.colors || j.colourMatching).filter(Boolean))).join(', ');
+      const primaryJob = matchedJobs[0];
+
+      setChallanForm(prev => ({
+        ...prev,
+        jobNo: prev.jobNo?.includes(',') ? prev.jobNo : (combinedJobNo || prev.jobNo),
+        designNo: combinedDesigns || prev.designNo,
+        colour: combinedColors || prev.colour,
+        panna: primaryJob.panna || prev.panna,
+        fabricName: primaryJob.fabric || prev.fabricName,
+        partyName: primaryJob.party || prev.partyName,
+        billTo: primaryJob.billTo || prev.billTo || '',
+        shipTo: primaryJob.shipTo || prev.shipTo || '',
+      }));
+
+      triggerPushNotification('🔄 Challan Synced from Job Card', `Pulled latest details for Job #${primaryJob.jobNo}: Design "${combinedDesigns || '—'}", Colour "${combinedColors || '—'}", Fabric "${primaryJob.fabric || '—'}"`, 'success');
+    } else {
+      alert(`Could not find Job Card details for "${challanForm.jobNo}". Please verify Job No.`);
+    }
+  };
+
   // TP detail update
   const updateTpRow = (index, field, value) => {
     setChallanForm(prev => {
@@ -4540,13 +4589,39 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
 
                 {/* Job Selection & Interactive Pills */}
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
-                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>Job No(s) <span style={{ color: '#64748b', fontSize: '0.7rem' }}>(select multiple or type)</span></label>
-                    {challanForm.partyName && (
-                      <span style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: 700 }}>
-                        Party: {challanForm.partyName}
-                      </span>
-                    )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                      Job No(s) <span style={{ color: '#64748b', fontSize: '0.7rem' }}>(select multiple or type)</span>
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {challanForm.partyName && (
+                        <span style={{ fontSize: '0.7rem', color: '#0284c7', fontWeight: 700 }}>
+                          Party: {challanForm.partyName}
+                        </span>
+                      )}
+                      {challanForm.jobNo && (
+                        <button
+                          type="button"
+                          onClick={handleResyncChallanFromJobCard}
+                          style={{
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '4px',
+                            color: '#1d4ed8',
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            padding: '2px 7px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="Sync latest design, colour, fabric & party details from this Job Card"
+                        >
+                          <RefreshCw size={11} /> Sync from Job Card
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <input type="text" list="challan-jobs" value={challanForm.jobNo} onChange={e => handleChallanJobChange(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }} placeholder="e.g. JOB-2252, JOB-2253..." />
                   <datalist id="challan-jobs">
@@ -4581,6 +4656,46 @@ export default function FabricInventoryPanel({ department, onNavigateToBilling, 
                           </button>
                         );
                       })}
+                  </div>
+                </div>
+
+                {/* Design Name/No, Colour & Panna */}
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div style={{ flex: 1.4 }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                      Design No / Name
+                    </label>
+                    <input
+                      type="text"
+                      value={challanForm.designNo}
+                      onChange={e => setChallanForm({ ...challanForm, designNo: e.target.value })}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                      placeholder="e.g. ED-709, Floral Design..."
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                      Colour / Matching
+                    </label>
+                    <input
+                      type="text"
+                      value={challanForm.colour}
+                      onChange={e => setChallanForm({ ...challanForm, colour: e.target.value })}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box' }}
+                      placeholder="e.g. Red, Blue, Matching 1..."
+                    />
+                  </div>
+                  <div style={{ width: '85px' }}>
+                    <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.25rem', display: 'block' }}>
+                      Panna
+                    </label>
+                    <input
+                      type="text"
+                      value={challanForm.panna}
+                      onChange={e => setChallanForm({ ...challanForm, panna: e.target.value })}
+                      style={{ width: '100%', padding: '0.5rem 0.4rem', fontSize: '0.85rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', fontWeight: 600, boxSizing: 'border-box', textAlign: 'center' }}
+                      placeholder='58"'
+                    />
                   </div>
                 </div>
 

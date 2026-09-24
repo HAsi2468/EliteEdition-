@@ -64,17 +64,29 @@ const designerTaskSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    designers: {
+      type: [String],
+      default: [],
+    },
     fabricName: {
       type: String,
       default: '',
       trim: true,
       index: true,
     },
+    fabrics: {
+      type: [String],
+      default: [],
+    },
     colourMatching: {
       type: String,
       default: '',
       trim: true,
       index: true,
+    },
+    colourMatches: {
+      type: [String],
+      default: [],
     },
     priority: {
       type: String,

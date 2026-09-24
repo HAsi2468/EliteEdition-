@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { api } from '../services/api';
 import imageCompression from 'browser-image-compression';
+import DateRangePicker, { getDatePresetRange } from './DateRangePicker';
 import {
   Palette,
   Plus,
@@ -112,6 +113,203 @@ function getEmbedUrl(url = '') {
   return trimmed;
 }
 
+/**
+ * Modern multi-select tag picker with dropdown & custom input support
+ */
+function MultiSelectBox({
+  label,
+  icon: Icon,
+  options = [],
+  selected = [],
+  onChange,
+  tagTheme = { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' }
+}) {
+  const [customVal, setCustomVal] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
+
+  const availableOptions = useMemo(() => {
+    const set = new Set(selected.map(s => String(s).trim().toLowerCase()));
+    return options.filter(opt => opt && !set.has(String(opt).trim().toLowerCase()));
+  }, [options, selected]);
+
+  const handleSelect = (e) => {
+    const val = e.target.value;
+    if (val === '__custom__') {
+      setShowCustomInput(true);
+    } else if (val) {
+      if (!selected.includes(val)) {
+        onChange([...selected, val]);
+      }
+    }
+    e.target.value = '';
+  };
+
+  const handleAddCustom = () => {
+    const trimmed = customVal.trim();
+    if (trimmed && !selected.includes(trimmed)) {
+      onChange([...selected, trimmed]);
+    }
+    setCustomVal('');
+    setShowCustomInput(false);
+  };
+
+  const handleRemove = (itemToRemove) => {
+    onChange(selected.filter(item => item !== itemToRemove));
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' }}>
+      {/* Label and counter */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          {Icon && <Icon size={13} color="#2563eb" />}
+          <span>{label}</span>
+          {selected.length > 0 && (
+            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '0 6px' }}>
+              {selected.length}
+            </span>
+          )}
+        </label>
+        {selected.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.68rem', cursor: 'pointer', padding: 0 }}
+          >
+            Clear all
+          </button>
+        )}
+      </div>
+
+      {/* Selected Tags Chips */}
+      {selected.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', padding: '0.45rem', background: '#f8faff', border: '1px solid #dbeafe', borderRadius: '8px' }}>
+          {selected.map((item, idx) => (
+            <span
+              key={idx}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.2rem 0.55rem',
+                background: tagTheme.bg,
+                color: tagTheme.color,
+                border: `1px solid ${tagTheme.border}`,
+                borderRadius: '6px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                boxShadow: '0 1px 3px rgba(37,99,235,0.06)'
+              }}
+            >
+              <span>{item}</span>
+              <button
+                type="button"
+                onClick={() => handleRemove(item)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: '#ef4444'
+                }}
+                title={`Remove ${item}`}
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Selector Dropdown */}
+      <select
+        value=""
+        onChange={handleSelect}
+        style={{
+          width: '100%',
+          fontSize: '0.85rem',
+          padding: '0.52rem 0.75rem',
+          background: '#ffffff',
+          color: '#0f172a',
+          border: '1px solid #cbd5e1',
+          borderRadius: '8px',
+          outline: 'none'
+        }}
+      >
+        <option value="">+ Add {label}...</option>
+        {availableOptions.map((opt, i) => (
+          <option key={i} value={opt}>{opt}</option>
+        ))}
+        <option value="__custom__">+ Enter Custom {label}...</option>
+      </select>
+
+      {/* Inline Custom Input */}
+      {showCustomInput && (
+        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.15rem' }}>
+          <input
+            type="text"
+            value={customVal}
+            onChange={e => setCustomVal(e.target.value)}
+            placeholder={`Enter custom ${label.toLowerCase()}...`}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddCustom();
+              } else if (e.key === 'Escape') {
+                setShowCustomInput(false);
+              }
+            }}
+            autoFocus
+            style={{
+              flex: 1,
+              fontSize: '0.82rem',
+              padding: '0.4rem 0.6rem',
+              border: '1.5px solid #2563eb',
+              borderRadius: '6px',
+              outline: 'none',
+              background: '#ffffff',
+              color: '#0f172a'
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleAddCustom}
+            style={{
+              padding: '0.4rem 0.75rem',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              background: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            Add
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowCustomInput(false); setCustomVal(''); }}
+            style={{
+              padding: '0.4rem 0.6rem',
+              fontSize: '0.78rem',
+              background: '#f1f5f9',
+              color: '#64748b',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DesignerModule({ currentUser, isAdmin = false }) {
   const [tasks, setTasks] = useState([]);
   const [stats, setStats] = useState(null);
@@ -126,11 +324,19 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
+  const [datePreset, setDatePreset] = useState('all');
+  const [customDateStart, setCustomDateStart] = useState('');
+  const [customDateEnd, setCustomDateEnd] = useState('');
+  const [fabricFilter, setFabricFilter] = useState('All');
   const [designerFilter, setDesignerFilter] = useState('All');
   const [colourMatchFilter, setColourMatchFilter] = useState('All');
   const [stageFilter, setStageFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
+
+  const activeDateRange = useMemo(
+    () => getDatePresetRange(datePreset, customDateStart, customDateEnd),
+    [datePreset, customDateStart, customDateEnd]
+  );
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -145,8 +351,11 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
   const initialForm = {
     date: todayStr,
     designName: '',
-    designerName: '',
+    fabrics: [],
     fabricName: '',
+    designers: [],
+    designerName: '',
+    colourMatches: [],
     colourMatching: '',
     priority: 'Medium',
     sampleImage: '',
@@ -175,7 +384,9 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
       const [cfg, resTasks, resStats] = await Promise.all([
         api.getPrintConfig().catch(() => ({})),
         api.getDesignerTasks({
-          date: dateFilter,
+          startDate: activeDateRange.dateStart || '',
+          endDate: activeDateRange.dateEnd || '',
+          fabricName: fabricFilter,
           designerName: designerFilter,
           colourMatching: colourMatchFilter,
           status: stageFilter,
@@ -208,14 +419,14 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
 
   useEffect(() => {
     loadData();
-  }, [dateFilter, designerFilter, colourMatchFilter, stageFilter, priorityFilter]);
+  }, [activeDateRange.dateStart, activeDateRange.dateEnd, fabricFilter, designerFilter, colourMatchFilter, stageFilter, priorityFilter]);
 
   // Real-time listener
   useEffect(() => {
     const handleRefresh = () => loadData(true);
     window.addEventListener('elite-data-refresh', handleRefresh);
     return () => window.removeEventListener('elite-data-refresh', handleRefresh);
-  }, [dateFilter, designerFilter, colourMatchFilter, stageFilter, priorityFilter]);
+  }, [activeDateRange.dateStart, activeDateRange.dateEnd, fabricFilter, designerFilter, colourMatchFilter, stageFilter, priorityFilter]);
 
   // Handle Image Upload to Cloudflare R2
   const handleImageUpload = async (e) => {
@@ -273,19 +484,43 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
   // Open Create Modal
   const handleOpenCreate = () => {
     setEditingId(null);
-    setFormData({ ...initialForm, date: new Date().toISOString().split('T')[0] });
+    setFormData({
+      ...initialForm,
+      date: new Date().toISOString().split('T')[0],
+      fabrics: [],
+      fabricName: '',
+      designers: [],
+      designerName: '',
+      colourMatches: [],
+      colourMatching: ''
+    });
     setShowCreateModal(true);
   };
 
   // Open Edit Modal
   const handleOpenEdit = (task) => {
     setEditingId(task._id);
+    const taskFabrics = Array.isArray(task.fabrics) && task.fabrics.length > 0
+      ? task.fabrics
+      : (task.fabricName ? task.fabricName.split(',').map(s => s.trim()).filter(Boolean) : []);
+
+    const taskDesigners = Array.isArray(task.designers) && task.designers.length > 0
+      ? task.designers
+      : (task.designerName ? task.designerName.split(',').map(s => s.trim()).filter(Boolean) : []);
+
+    const taskColourMatches = Array.isArray(task.colourMatches) && task.colourMatches.length > 0
+      ? task.colourMatches
+      : (task.colourMatching ? task.colourMatching.split(',').map(s => s.trim()).filter(Boolean) : []);
+
     setFormData({
       date: task.date || todayStr,
       designName: task.designName || '',
-      designerName: task.designerName || '',
-      fabricName: task.fabricName || '',
-      colourMatching: task.colourMatching || '',
+      fabrics: taskFabrics,
+      fabricName: taskFabrics.join(', '),
+      designers: taskDesigners,
+      designerName: taskDesigners.join(', '),
+      colourMatches: taskColourMatches,
+      colourMatching: taskColourMatches.join(', '),
       priority: task.priority || 'Medium',
       sampleImage: task.sampleImage || '',
       sampleLink: task.sampleLink || '',
@@ -301,9 +536,19 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
       ? formData.designName.trim()
       : `Design-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
 
+    const fabricsList = formData.fabrics || [];
+    const designersList = formData.designers || [];
+    const colourMatchesList = formData.colourMatches || [];
+
     const submissionPayload = {
       ...formData,
-      designName: finalDesignName
+      designName: finalDesignName,
+      fabrics: fabricsList,
+      fabricName: fabricsList.join(', '),
+      designers: designersList,
+      designerName: designersList.join(', '),
+      colourMatches: colourMatchesList,
+      colourMatching: colourMatchesList.join(', ')
     };
 
     setSavingTask(true);
@@ -379,14 +624,23 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
   const filteredTasks = useMemo(() => {
     if (!searchQuery.trim()) return tasks;
     const q = searchQuery.toLowerCase().trim();
-    return tasks.filter(t =>
-      (t.taskNo || '').toLowerCase().includes(q) ||
-      (t.designName || '').toLowerCase().includes(q) ||
-      (t.designerName || '').toLowerCase().includes(q) ||
-      (t.fabricName || '').toLowerCase().includes(q) ||
-      (t.colourMatching || '').toLowerCase().includes(q) ||
-      (t.notes || '').toLowerCase().includes(q)
-    );
+    return tasks.filter(t => {
+      const taskNo = (t.taskNo || '').toLowerCase();
+      const designName = (t.designName || '').toLowerCase();
+      const designerName = (t.designerName || (Array.isArray(t.designers) ? t.designers.join(' ') : '')).toLowerCase();
+      const fabricName = (t.fabricName || (Array.isArray(t.fabrics) ? t.fabrics.join(' ') : '')).toLowerCase();
+      const colourMatching = (t.colourMatching || (Array.isArray(t.colourMatches) ? t.colourMatches.join(' ') : '')).toLowerCase();
+      const notes = (t.notes || '').toLowerCase();
+
+      return (
+        taskNo.includes(q) ||
+        designName.includes(q) ||
+        designerName.includes(q) ||
+        fabricName.includes(q) ||
+        colourMatching.includes(q) ||
+        notes.includes(q)
+      );
+    });
   }, [tasks, searchQuery]);
 
   return (
@@ -548,18 +802,21 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
             <span>History &amp; Stage Filters</span>
           </div>
 
-          {(dateFilter || designerFilter !== 'All' || colourMatchFilter !== 'All' || stageFilter !== 'All' || priorityFilter !== 'All' || searchQuery) && (
+          {(datePreset !== 'all' || customDateStart || customDateEnd || fabricFilter !== 'All' || designerFilter !== 'All' || colourMatchFilter !== 'All' || stageFilter !== 'All' || priorityFilter !== 'All' || searchQuery) && (
             <button
               type="button"
               onClick={() => {
-                setDateFilter('');
+                setDatePreset('all');
+                setCustomDateStart('');
+                setCustomDateEnd('');
+                setFabricFilter('All');
                 setDesignerFilter('All');
                 setColourMatchFilter('All');
                 setStageFilter('All');
                 setPriorityFilter('All');
                 setSearchQuery('');
               }}
-              style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+              style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
             >
               <X size={13} /> Reset All Filters
             </button>
@@ -580,26 +837,33 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
             />
           </div>
 
-          {/* Date Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0 0.5rem', height: '36px' }}>
-            <Calendar size={14} color="#2563eb" />
-            <input
-              type="date"
-              value={dateFilter}
-              onChange={e => setDateFilter(e.target.value)}
-              style={{ background: 'transparent', border: 'none', color: '#0f172a', fontSize: '0.8rem', outline: 'none', width: '100%' }}
-              title="Filter by Entry Date"
+          {/* Standard ERP DateRangePicker */}
+          <div>
+            <DateRangePicker
+              preset={datePreset}
+              onChange={({ preset: p }) => setDatePreset(p)}
+              customStart={customDateStart}
+              customEnd={customDateEnd}
+              onCustomChange={(s, e) => {
+                setCustomDateStart(s);
+                setCustomDateEnd(e);
+              }}
+              theme="light"
             />
-            {dateFilter && (
-              <button
-                type="button"
-                onClick={() => setDateFilter('')}
-                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 0 }}
-                title="Clear Date"
-              >
-                <X size={13} />
-              </button>
-            )}
+          </div>
+
+          {/* Fabric Filter Dropdown */}
+          <div>
+            <select
+              value={fabricFilter}
+              onChange={e => setFabricFilter(e.target.value)}
+              style={{ width: '100%', fontSize: '0.82rem', height: '36px', padding: '0 0.6rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+            >
+              <option value="All">All Fabrics</option>
+              {printConfig.fabrics.map((f, i) => (
+                <option key={i} value={f}>{f}</option>
+              ))}
+            </select>
           </div>
 
           {/* Designer Filter Dropdown */}
@@ -914,27 +1178,66 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                   </div>
                 </div>
 
-                {/* Attributes Grid (Designer, Fabric, Colour Matching) */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem 0.6rem', fontSize: '0.78rem', borderTop: '1px dashed #e2e8f0', paddingTop: '0.6rem' }}>
+                {/* Attributes (Designers, Fabrics, Colour Matching) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.78rem', borderTop: '1px dashed #e2e8f0', paddingTop: '0.6rem' }}>
+                  {/* Designers */}
                   <div>
-                    <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Designer</span>
-                    <span style={{ fontWeight: 700, color: task.designerName ? '#0f172a' : '#94a3b8' }}>
-                      {task.designerName || 'Unassigned'}
+                    <span style={{ fontSize: '0.64rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                      Designers
                     </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                      {(Array.isArray(task.designers) && task.designers.length > 0
+                        ? task.designers
+                        : (task.designerName ? task.designerName.split(',').map(s => s.trim()).filter(Boolean) : [])
+                      ).map((d, i) => (
+                        <span key={i} style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '1px 6px', fontSize: '0.72rem', fontWeight: 700 }}>
+                          👤 {d}
+                        </span>
+                      ))}
+                      {(!task.designers?.length && !task.designerName) && (
+                        <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.72rem' }}>Unassigned</span>
+                      )}
+                    </div>
                   </div>
 
+                  {/* Fabrics */}
                   <div>
-                    <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Fabric</span>
-                    <span style={{ fontWeight: 700, color: task.fabricName ? '#0284c7' : '#94a3b8' }}>
-                      {task.fabricName || '—'}
+                    <span style={{ fontSize: '0.64rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                      Fabrics
                     </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                      {(Array.isArray(task.fabrics) && task.fabrics.length > 0
+                        ? task.fabrics
+                        : (task.fabricName ? task.fabricName.split(',').map(s => s.trim()).filter(Boolean) : [])
+                      ).map((f, i) => (
+                        <span key={i} style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '4px', padding: '1px 6px', fontSize: '0.72rem', fontWeight: 700 }}>
+                          🧵 {f}
+                        </span>
+                      ))}
+                      {(!task.fabrics?.length && !task.fabricName) && (
+                        <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.72rem' }}>—</span>
+                      )}
+                    </div>
                   </div>
 
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <span style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase', display: 'block' }}>Colour Match</span>
-                    <span style={{ fontWeight: 700, color: task.colourMatching ? '#1d4ed8' : '#94a3b8' }}>
-                      {task.colourMatching || '—'}
+                  {/* Colour Match */}
+                  <div>
+                    <span style={{ fontSize: '0.64rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, display: 'block', marginBottom: '2px' }}>
+                      Colour Matching
                     </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                      {(Array.isArray(task.colourMatches) && task.colourMatches.length > 0
+                        ? task.colourMatches
+                        : (task.colourMatching ? task.colourMatching.split(',').map(s => s.trim()).filter(Boolean) : [])
+                      ).map((c, i) => (
+                        <span key={i} style={{ background: '#fdf2f8', color: '#be185d', border: '1px solid #fbcfe8', borderRadius: '4px', padding: '1px 6px', fontSize: '0.72rem', fontWeight: 700 }}>
+                          🎨 {c}
+                        </span>
+                      ))}
+                      {(!task.colourMatches?.length && !task.colourMatching) && (
+                        <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.72rem' }}>—</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1134,58 +1437,43 @@ export default function DesignerModule({ currentUser, isAdmin = false }) {
                 />
               </div>
 
-              {/* Row 3: Dropdowns from Settings (Fabric, Designer Name, Colour Match) */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.85rem' }}>
+              {/* Row 3: Multi-Selects from Settings (Fabric, Designer Name, Colour Match) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
                 
-                {/* Fabric Name Dropdown (from Settings -> Fabrics) */}
+                {/* Fabric Names Multi-Select (from Settings -> Fabrics) */}
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
-                    Fabric Name
-                  </label>
-                  <select
-                    value={formData.fabricName}
-                    onChange={e => setFormData({ ...formData, fabricName: e.target.value })}
-                    style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px' }}
-                  >
-                    <option value="">-- Select Fabric --</option>
-                    {printConfig.fabrics.map((f, i) => (
-                      <option key={i} value={f}>{f}</option>
-                    ))}
-                  </select>
+                  <MultiSelectBox
+                    label="Fabric Names"
+                    icon={Layers}
+                    options={printConfig.fabrics}
+                    selected={formData.fabrics || []}
+                    onChange={fabrics => setFormData({ ...formData, fabrics, fabricName: fabrics.join(', ') })}
+                    tagTheme={{ bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' }}
+                  />
                 </div>
 
-                {/* Designer Name Select Dropdown (from Settings -> Designers) */}
+                {/* Designer Names Multi-Select (from Settings -> Designers) */}
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
-                    Designer Name
-                  </label>
-                  <select
-                    value={formData.designerName}
-                    onChange={e => setFormData({ ...formData, designerName: e.target.value })}
-                    style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px' }}
-                  >
-                    <option value="">-- Select Designer --</option>
-                    {printConfig.designers.map((d, i) => (
-                      <option key={i} value={d}>{d}</option>
-                    ))}
-                  </select>
+                  <MultiSelectBox
+                    label="Designer Names"
+                    icon={User}
+                    options={printConfig.designers}
+                    selected={formData.designers || []}
+                    onChange={designers => setFormData({ ...formData, designers, designerName: designers.join(', ') })}
+                    tagTheme={{ bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' }}
+                  />
                 </div>
 
-                {/* Colour Match Dropdown (from Settings -> Designers) */}
+                {/* Colour Match Multi-Select (from Settings -> Designers) */}
                 <div>
-                  <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', textTransform: 'uppercase', display: 'block', marginBottom: '0.3rem' }}>
-                    Colour Match
-                  </label>
-                  <select
-                    value={formData.colourMatching}
-                    onChange={e => setFormData({ ...formData, colourMatching: e.target.value })}
-                    style={{ width: '100%', fontSize: '0.85rem', padding: '0.55rem 0.75rem', background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '8px' }}
-                  >
-                    <option value="">-- Select Colour Match --</option>
-                    {printConfig.designers.map((c, i) => (
-                      <option key={i} value={c}>{c}</option>
-                    ))}
-                  </select>
+                  <MultiSelectBox
+                    label="Colour Match"
+                    icon={Palette}
+                    options={printConfig.designers}
+                    selected={formData.colourMatches || []}
+                    onChange={colourMatches => setFormData({ ...formData, colourMatches, colourMatching: colourMatches.join(', ') })}
+                    tagTheme={{ bg: '#fdf2f8', color: '#be185d', border: '#fbcfe8' }}
+                  />
                 </div>
 
               </div>

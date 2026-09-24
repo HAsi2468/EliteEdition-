@@ -85,6 +85,25 @@ const createDesignerTask = async (req, res) => {
       }
     }
 
+    // Handle multiple fabrics, designers, colour matches
+    if (Array.isArray(body.fabrics)) {
+      body.fabricName = body.fabrics.filter(Boolean).join(', ');
+    } else if (body.fabricName) {
+      body.fabrics = body.fabricName.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    if (Array.isArray(body.designers)) {
+      body.designerName = body.designers.filter(Boolean).join(', ');
+    } else if (body.designerName) {
+      body.designers = body.designerName.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    if (Array.isArray(body.colourMatches)) {
+      body.colourMatching = body.colourMatches.filter(Boolean).join(', ');
+    } else if (body.colourMatching) {
+      body.colourMatches = body.colourMatching.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
     // Default date to today (YYYY-MM-DD)
     if (!body.date) {
       body.date = new Date().toISOString().split('T')[0];
@@ -147,28 +166,31 @@ const getDesignerTasks = async (req, res) => {
 
     const filter = {};
 
-    // Single Date filter
+    // Single Date or Date Range filter
     if (date && date.trim()) {
       filter.date = date.trim();
     } else if (startDate || endDate) {
       filter.date = {};
-      if (startDate) filter.date.$gte = startDate.trim();
-      if (endDate) filter.date.$lte = endDate.trim();
+      if (startDate && startDate.trim()) filter.date.$gte = startDate.trim();
+      if (endDate && endDate.trim()) filter.date.$lte = endDate.trim();
     }
 
-    // Designer filter
+    // Designer filter (supports partial match for multiple designers)
     if (designerName && designerName.trim() && designerName !== 'All') {
-      filter.designerName = { $regex: new RegExp(`^${designerName.trim()}$`, 'i') };
+      const esc = designerName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.designerName = { $regex: new RegExp(esc, 'i') };
     }
 
     // Colour Matching filter
     if (colourMatching && colourMatching.trim() && colourMatching !== 'All') {
-      filter.colourMatching = { $regex: new RegExp(`^${colourMatching.trim()}$`, 'i') };
+      const esc = colourMatching.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.colourMatching = { $regex: new RegExp(esc, 'i') };
     }
 
     // Fabric filter
     if (fabricName && fabricName.trim() && fabricName !== 'All') {
-      filter.fabricName = { $regex: new RegExp(`^${fabricName.trim()}$`, 'i') };
+      const esc = fabricName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.fabricName = { $regex: new RegExp(esc, 'i') };
     }
 
     // Priority filter
@@ -256,6 +278,25 @@ const updateDesignerTask = async (req, res) => {
 
     const editorName = req.user?.name || req.headers['x-user-name'] || 'Admin';
     const editorId = req.user?._id || req.headers['x-user-id'] || '';
+
+    // Handle multiple fabrics, designers, colour matches
+    if (Array.isArray(body.fabrics)) {
+      body.fabricName = body.fabrics.filter(Boolean).join(', ');
+    } else if (body.fabricName !== undefined) {
+      body.fabrics = body.fabricName ? body.fabricName.split(',').map(s => s.trim()).filter(Boolean) : [];
+    }
+
+    if (Array.isArray(body.designers)) {
+      body.designerName = body.designers.filter(Boolean).join(', ');
+    } else if (body.designerName !== undefined) {
+      body.designers = body.designerName ? body.designerName.split(',').map(s => s.trim()).filter(Boolean) : [];
+    }
+
+    if (Array.isArray(body.colourMatches)) {
+      body.colourMatching = body.colourMatches.filter(Boolean).join(', ');
+    } else if (body.colourMatching !== undefined) {
+      body.colourMatches = body.colourMatching ? body.colourMatching.split(',').map(s => s.trim()).filter(Boolean) : [];
+    }
 
     // If status changed, record in stageHistory
     if (body.status && body.status !== task.status) {

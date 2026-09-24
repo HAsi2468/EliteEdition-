@@ -949,6 +949,45 @@ const updateJobCard = async (req, res) => {
 
     const card = await db.JobCard.findByIdAndUpdate(targetId, body, { new:true, runValidators:true }).lean();
 
+    // Auto-sync updated job card attributes to any linked Delivery Challan
+    try {
+      const cleanJobNo = String(card.jobNo || '').replace(/^#?JOB\s*NO\.?\s*-\s*/i, '').trim();
+      if (cleanJobNo) {
+        const challanUpdate = {};
+        if (body.party !== undefined) challanUpdate.partyName = body.party;
+        if (body.designName !== undefined || body.designNo !== undefined) {
+          challanUpdate.designNo = body.designName || body.designNo || '';
+        }
+        if (body.colors !== undefined || body.colourMatching !== undefined) {
+          challanUpdate.colour = body.colors || body.colourMatching || '';
+        }
+        if (body.fabric !== undefined) challanUpdate.fabricName = body.fabric;
+        if (body.panna !== undefined) challanUpdate.panna = body.panna;
+        if (body.billTo !== undefined) challanUpdate.billTo = body.billTo;
+        if (body.shipTo !== undefined) challanUpdate.shipTo = body.shipTo;
+
+        if (Object.keys(challanUpdate).length > 0 && db.FabricChallan) {
+          const escNo = cleanJobNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regexExact = new RegExp(`(^|,\\s*)${escNo}(\\s*,|$)`, 'i');
+          const syncRes = await db.FabricChallan.updateMany(
+            {
+              $or: [
+                { jobNo: card.jobNo },
+                { jobNo: cleanJobNo },
+                { jobNo: { $regex: regexExact } }
+              ]
+            },
+            { $set: challanUpdate }
+          );
+          if (syncRes.modifiedCount > 0) {
+            logger.info('Auto-synced %d FabricChallan(s) with updated JobCard #%s', syncRes.modifiedCount, cleanJobNo);
+          }
+        }
+      }
+    } catch (chSyncErr) {
+      logger.warn('Failed to sync updated job card to FabricChallan: %s', chSyncErr.message);
+    }
+
     const edNo = card.designName || card.designNo || 'N/A';
     const efab = card.fabric || 'N/A';
     const emtr = card.totalMtr ? `${card.totalMtr}m` : '0m';
