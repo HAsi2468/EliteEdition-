@@ -7,7 +7,7 @@ import {
   Zap, Droplets, TrendingUp, BarChart3, ListFilter, PlayCircle
 } from 'lucide-react';
 import { triggerPushNotification, triggerGlobalDataRefresh } from './NotificationToast';
-import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD } from '../utils/dateUtils';
+import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY, toLocalYMD, formatForInputDate } from '../utils/dateUtils';
 import { matchSearchQuery } from '../utils/searchUtils';
 import { cleanDesignNameString } from '../utils/designUtils';
 import { triggerEliteAlert, triggerEliteConfirm } from './EliteModalDialog';
@@ -27,6 +27,8 @@ function isOlderThan36Hours(dateVal) {
 }
 
 const DEFAULT_MACHINES = [
+  'GRANDO',
+  'PRINTDOT',
   'Machine 1 (Grando)',
   'Machine 2 (Printdot)',
   'Homer 1',
@@ -68,6 +70,7 @@ export default function JobPrintingLog() {
 
   // Edit Mode state
   const [editingLogId, setEditingLogId] = useState(null);
+  const [editModalLog, setEditModalLog] = useState(null);
   const [activeView, setActiveView] = useState('log'); // 'log' | 'queue'
   const [queueFabricFilter, setQueueFabricFilter] = useState('All');
   const [queueSearch, setQueueSearch] = useState('');
@@ -868,9 +871,18 @@ export default function JobPrintingLog() {
         await api.updateJobPrintLog(editingLogId, payload);
         triggerPushNotification('✏️ Print Log Updated', `Updated print log for Job #${form.jobNo} (${form.meters} mtr)`, 'success');
         setEditingLogId(null);
+        await fetchLogs();
+        await fetchJobCards();
+        triggerGlobalDataRefresh('jobcards');
       } else {
         await api.createJobPrintLog(payload);
         triggerPushNotification('🖨️ Print Run Logged', `Logged ${form.meters} mtr for Job #${form.jobNo} on ${form.machineName} (${form.shift} Shift)`, 'success');
+        const targetDate = form.date || toLocalYMD();
+        setDateStart(targetDate);
+        setDateEnd(targetDate);
+        await fetchLogs(targetDate, targetDate);
+        await fetchJobCards();
+        triggerGlobalDataRefresh('jobcards');
       }
 
       // Clear meters & notes for next log entry, but keep selected job card & machine
@@ -879,14 +891,6 @@ export default function JobPrintingLog() {
         meters: '',
         notes: ''
       }));
-
-      const targetDate = form.date || toLocalYMD();
-      setDateStart(targetDate);
-      setDateEnd(targetDate);
-
-      await fetchLogs(targetDate, targetDate);
-      await fetchJobCards();
-      triggerGlobalDataRefresh('jobcards');
 
       if (viewingJobHistory && viewingJobHistory.jobNo === form.jobNo) {
         loadJobCardHistory(form.jobNo);
@@ -898,30 +902,81 @@ export default function JobPrintingLog() {
     }
   };
 
-  // Start Editing a Log Entry
-  const handleStartEdit = (log) => {
-    if (isOlderThan36Hours(log.created_date_time || log.createdAt || log.date)) {
-      alert("This log entry is older than 36 hours and can no longer be edited.");
+  // Open Dedicated Edit Modal for table row
+  const handleOpenEditModal = (log) => {
+    const matched = findMatchingJob(log.jobNo) || findMatchingJob(log.jobCardId);
+    setEditModalLog({
+      _id: log._id,
+      jobNo: log.jobNo || '',
+      jobCardId: log.jobCardId || (matched ? matched._id : ''),
+      machineName: log.machineName || machinesList[0] || 'GRANDO',
+      pass: log.pass || '1 PASS',
+      meters: log.meters !== undefined && log.meters !== null ? String(log.meters) : '',
+      date: formatForInputDate(log.date || log.created_date_time) || toLocalYMD(),
+      shift: log.shift || 'Morning',
+      operatorName: log.operatorName || '',
+      notes: log.notes || '',
+      matchedJob: matched
+    });
+  };
+
+  // Save changes from Dedicated Edit Modal
+  const handleSaveEditModal = async (e) => {
+    e.preventDefault();
+    if (!editModalLog) return;
+    if (!editModalLog.meters || parseFloat(editModalLog.meters) <= 0) {
+      triggerEliteAlert('Validation Error', 'Please enter a valid meter quantity greater than 0.', 'warning');
       return;
     }
+    if (!editModalLog.machineName) {
+      triggerEliteAlert('Validation Error', 'Please select or enter a printing machine.', 'warning');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        ...editModalLog,
+        meters: parseFloat(editModalLog.meters)
+      };
+
+      await api.updateJobPrintLog(editModalLog._id, payload);
+      triggerPushNotification('✏️ Print Log Updated', `Updated Job #${editModalLog.jobNo} (${editModalLog.meters} mtr) on ${editModalLog.machineName}`, 'success');
+
+      const updatedJobNo = editModalLog.jobNo;
+      const updatedCardId = editModalLog.jobCardId;
+      setEditModalLog(null);
+
+      // Preserve active filters & reload data in-place
+      await fetchLogs();
+      await fetchJobCards();
+      triggerGlobalDataRefresh('jobcards');
+
+      if (viewingJobHistory && (viewingJobHistory.jobNo === updatedJobNo || viewingJobHistory._id === updatedCardId)) {
+        loadJobCardHistory(updatedJobNo);
+      }
+    } catch (err) {
+      triggerEliteAlert('Update Failed', err.message || 'Failed to update print log entry.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Start Editing a Log Entry in top form
+  const handleStartEdit = (log) => {
+    setActiveView('log');
     setEditingLogId(log._id);
     const matched = findMatchingJob(log.jobNo) || findMatchingJob(log.jobCardId);
     if (matched) setSelectedJob(matched);
 
-    let parsedDate = new Date().toISOString().split('T')[0];
-    if (log.date) {
-      const d = new Date(log.date);
-      if (!isNaN(d.getTime())) {
-        parsedDate = d.toISOString().split('T')[0];
-      }
-    }
+    const parsedDate = formatForInputDate(log.date || log.created_date_time) || toLocalYMD();
 
     setForm({
       jobNo: log.jobNo || '',
       jobCardId: log.jobCardId || (matched ? matched._id : ''),
-      machineName: log.machineName || machinesList[0] || 'Machine 1',
-      pass: log.pass || '4 PASS',
-      meters: log.meters ? String(log.meters) : '',
+      machineName: log.machineName || machinesList[0] || 'GRANDO',
+      pass: log.pass || '1 PASS',
+      meters: log.meters !== undefined && log.meters !== null ? String(log.meters) : '',
       date: parsedDate,
       shift: log.shift || getAutoShift(),
       operatorName: log.operatorName || '',
@@ -938,10 +993,10 @@ export default function JobPrintingLog() {
     setForm({
       jobNo: '',
       jobCardId: '',
-      machineName: machinesList[0] || 'Machine 1',
-      pass: '4 PASS',
+      machineName: machinesList[0] || 'GRANDO',
+      pass: '1 PASS',
       meters: '',
-      date: new Date().toISOString().split('T')[0],
+      date: toLocalYMD(),
       shift: getAutoShift(),
       operatorName: accountFullName,
       notes: ''
@@ -1696,7 +1751,7 @@ export default function JobPrintingLog() {
                   required
                 >
                   <option value="">-- Select Machine --</option>
-                  {machinesList.map(m => (
+                  {Array.from(new Set([...machinesList, form.machineName, 'GRANDO', 'PRINTDOT'])).filter(Boolean).map(m => (
                     <option key={m} value={m}>{m}</option>
                   ))}
                 </select>
@@ -1939,7 +1994,7 @@ export default function JobPrintingLog() {
                         <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
                           {!isOlderThan36Hours(log.created_date_time || log.createdAt || log.date) && (
                             <button
-                              onClick={() => handleStartEdit(log)}
+                              onClick={() => handleOpenEditModal(log)}
                               style={{ padding: '0.3rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.3)', color: '#38bdf8', borderRadius: 4, cursor: 'pointer' }}
                               title="Edit Print Log Entry"
                             >
@@ -2223,12 +2278,22 @@ export default function JobPrintingLog() {
                       <td style={tdStyle}>{l.shift}</td>
                       <td style={tdStyle}>{l.operatorName || '—'}</td>
                       <td style={{ ...tdStyle, textAlign: 'center' }}>
-                        <button
-                          onClick={() => handleDeleteLog(l._id, l.jobNo)}
-                          style={{ padding: '0.2rem 0.5rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', borderRadius: 4, cursor: 'pointer', fontSize: '0.72rem' }}
-                        >
-                          Delete
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                          <button
+                            onClick={() => handleOpenEditModal(l)}
+                            style={{ padding: '0.2rem 0.5rem', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.25)', color: '#38bdf8', borderRadius: 4, cursor: 'pointer', fontSize: '0.72rem' }}
+                            title="Edit this run"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteLog(l._id, l.jobNo)}
+                            style={{ padding: '0.2rem 0.5rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', borderRadius: 4, cursor: 'pointer', fontSize: '0.72rem' }}
+                            title="Delete this run"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -2826,6 +2891,205 @@ export default function JobPrintingLog() {
         </div>
       )}
 
+      {/* ── 7. DEDICATED EDIT PRINT LOG ENTRY MODAL ── */}
+      {editModalLog && (
+        <div className="modal-overlay" onClick={() => setEditModalLog(null)}>
+          <div
+            className="modal-content"
+            style={{
+              maxWidth: 620,
+              padding: '1.5rem',
+              borderRadius: 14,
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              background: 'linear-gradient(180deg, #111827 0%, #0f172a 100%)',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.7), 0 0 20px rgba(56,189,248,0.15)'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.85rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(56,189,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
+                  <Edit2 size={18} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f8fafc', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    Edit Print Log Entry
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: 'rgba(56,189,248,0.2)', color: '#38bdf8' }}>
+                      #{editModalLog.jobNo}
+                    </span>
+                  </h3>
+                  <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: 3 }}>
+                    {editModalLog.matchedJob?.party ? `Client: ${editModalLog.matchedJob.party} • ` : ''}
+                    {editModalLog.matchedJob?.designName ? `Design: ${editModalLog.matchedJob.designName} • ` : ''}
+                    Total Job Mtr: {editModalLog.matchedJob?.totalMtr || editModalLog.matchedJob?.consumption || '—'}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditModalLog(null)}
+                className="btn-icon"
+                style={{ padding: '0.4rem', borderRadius: 6 }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditModal} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Row 1: Date, Shift, Pass */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={labelStyle}>DATE <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input
+                    type="date"
+                    value={editModalLog.date}
+                    onChange={e => setEditModalLog(prev => ({ ...prev, date: e.target.value }))}
+                    style={inputStyle}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>SHIFT <span style={{ color: '#ef4444' }}>*</span></label>
+                  <select
+                    value={editModalLog.shift}
+                    onChange={e => setEditModalLog(prev => ({ ...prev, shift: e.target.value }))}
+                    style={inputStyle}
+                  >
+                    <option value="Morning">Morning</option>
+                    <option value="Night">Night</option>
+                    <option value="General">General</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>PASS</label>
+                  <select
+                    value={editModalLog.pass}
+                    onChange={e => setEditModalLog(prev => ({ ...prev, pass: e.target.value }))}
+                    style={inputStyle}
+                  >
+                    {Array.from(new Set([...PASS_OPTIONS, editModalLog.pass])).filter(Boolean).map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 2: Job Card No, Machine, Meters Printed */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.1fr 1.2fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={labelStyle}>JOB CARD NO. <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input
+                    type="text"
+                    value={editModalLog.jobNo}
+                    onChange={e => {
+                      const val = e.target.value;
+                      const matched = findMatchingJob(val);
+                      setEditModalLog(prev => ({
+                        ...prev,
+                        jobNo: val,
+                        jobCardId: matched ? matched._id : prev.jobCardId,
+                        matchedJob: matched || prev.matchedJob
+                      }));
+                    }}
+                    style={{ ...inputStyle, fontWeight: 700 }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>PRINTING MACHINE <span style={{ color: '#ef4444' }}>*</span></label>
+                  <select
+                    value={editModalLog.machineName}
+                    onChange={e => setEditModalLog(prev => ({ ...prev, machineName: e.target.value }))}
+                    style={inputStyle}
+                    required
+                  >
+                    {Array.from(new Set([
+                      editModalLog.machineName,
+                      'GRANDO',
+                      'PRINTDOT',
+                      ...machinesList
+                    ])).filter(Boolean).map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>METERS PRINTED (MTR) <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={editModalLog.meters}
+                    onChange={e => setEditModalLog(prev => ({ ...prev, meters: e.target.value }))}
+                    style={{ ...inputStyle, fontSize: '0.95rem', fontWeight: 800, color: '#34d399' }}
+                    required
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {/* Row 3: Operator Name & Remarks */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={labelStyle}>OPERATOR NAME</label>
+                  <input
+                    type="text"
+                    list="edit-modal-operators-list"
+                    value={editModalLog.operatorName}
+                    onChange={e => setEditModalLog(prev => ({ ...prev, operatorName: e.target.value }))}
+                    placeholder="Operator name..."
+                    style={{ ...inputStyle, fontWeight: 600 }}
+                  />
+                  <datalist id="edit-modal-operators-list">
+                    {operatorsList.map(op => <option key={op} value={op} />)}
+                  </datalist>
+                </div>
+                <div>
+                  <label style={labelStyle}>REMARKS / NOTES</label>
+                  <input
+                    type="text"
+                    value={editModalLog.notes}
+                    onChange={e => setEditModalLog(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="Optional notes or roll info..."
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.75rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditModalLog(null)}
+                  className="btn-secondary"
+                  style={{ padding: '0.55rem 1.1rem', fontSize: '0.82rem' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="btn-primary"
+                  style={{
+                    padding: '0.55rem 1.35rem',
+                    fontSize: '0.82rem',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    boxShadow: '0 2px 10px rgba(2, 132, 199, 0.4)'
+                  }}
+                >
+                  <Check size={16} />
+                  {submitting ? 'Updating...' : 'Update Print Log Entry'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

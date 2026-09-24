@@ -2,13 +2,30 @@ const JobPrintLog = require('../db/models/jobPrintLog.model');
 const JobCard = require('../db/models/jobCard.model');
 
 // Helper to recalculate JobCard totals & status based on print logs
-async function syncJobCardPrintTotals(jobCardId) {
-  if (!jobCardId) return null;
-  const jobCard = await JobCard.findById(jobCardId);
+async function syncJobCardPrintTotals(jobCardId, jobNo) {
+  if (!jobCardId && !jobNo) return null;
+  let jobCard = null;
+  if (jobCardId) {
+    jobCard = await JobCard.findById(jobCardId);
+  }
+  if (!jobCard && jobNo) {
+    jobCard = await JobCard.findOne({ jobNo: String(jobNo).trim() });
+    if (!jobCard) {
+      const cleanNo = String(jobNo).replace(/^JOB\s*(NO\.?)?\s*-\s*/i, '').trim();
+      jobCard = await JobCard.findOne({ jobNo: new RegExp(cleanNo, 'i') });
+    }
+  }
   if (!jobCard) return null;
 
-  // Aggregate total printed meters from JobPrintLog collection
-  const logs = await JobPrintLog.find({ jobCardId }).sort({ date: -1, created_date_time: -1 });
+  const cleanNo = jobCard.jobNo.replace(/^JOB\s*(NO\.?)?\s*-\s*/i, '').trim();
+  const logs = await JobPrintLog.find({
+    $or: [
+      { jobCardId: jobCard._id },
+      { jobNo: jobCard.jobNo },
+      { jobNo: new RegExp(cleanNo, 'i') }
+    ]
+  }).sort({ date: -1, created_date_time: -1 });
+
   const totalPrintedMtr = logs.reduce((sum, log) => sum + (Number(log.meters) || 0), 0);
 
   // Parse target meters from Job Card totalMtr or consumption
@@ -94,7 +111,7 @@ const createPrintLog = async (req, res) => {
     await printLog.save();
 
     // Recalculate Job Card Rollup stats
-    const summary = await syncJobCardPrintTotals(targetJob._id);
+    const summary = await syncJobCardPrintTotals(targetJob._id, targetJob.jobNo);
 
     res.status(201).json({
       success: true,
@@ -253,25 +270,57 @@ const getJobCardPrintLogs = async (req, res) => {
 const updatePrintLog = async (req, res) => {
   try {
     const { id } = req.params;
-    const { machineName, pass, meters, date, operatorName, shift, notes } = req.body;
+    const { machineName, pass, meters, date, operatorName, shift, notes, jobNo, jobCardId } = req.body;
 
     const log = await JobPrintLog.findById(id);
     if (!log) {
       return res.status(404).json({ success: false, error: 'Print Log entry not found.' });
     }
 
-    if (machineName !== undefined) log.machineName = machineName.trim();
+    const oldJobCardId = log.jobCardId;
+    const oldJobNo = log.jobNo;
+
+    if (machineName !== undefined) log.machineName = String(machineName).trim();
     if (pass !== undefined) log.pass = pass;
     if (meters !== undefined) log.meters = Number(meters);
-    if (date !== undefined) log.date = new Date(date);
+    if (date !== undefined) {
+      const parsed = parseFlexibleDate(date);
+      if (parsed && !isNaN(parsed.getTime())) {
+        log.date = parsed;
+      }
+    }
     if (operatorName !== undefined) log.operatorName = operatorName;
-    if (shift !== undefined) log.shift = shift;
+    if (shift !== undefined) {
+      const s = String(shift).trim();
+      log.shift = ['Morning', 'Night', 'General', 'Day'].includes(s) ? s : 'General';
+    }
     if (notes !== undefined) log.notes = notes;
+
+    if (jobCardId) {
+      log.jobCardId = jobCardId;
+    }
+    if (jobNo && jobNo !== log.jobNo) {
+      log.jobNo = String(jobNo).trim();
+      const targetJob = await JobCard.findOne({ jobNo: log.jobNo });
+      if (targetJob) {
+        log.jobCardId = targetJob._id;
+      }
+    } else if (!log.jobCardId && log.jobNo) {
+      const targetJob = await JobCard.findOne({ jobNo: log.jobNo });
+      if (targetJob) {
+        log.jobCardId = targetJob._id;
+      }
+    }
 
     await log.save();
 
     // Sync Job Card totals
-    const summary = await syncJobCardPrintTotals(log.jobCardId);
+    const summary = await syncJobCardPrintTotals(log.jobCardId, log.jobNo);
+
+    // If job card was changed, also sync old job card
+    if (oldJobCardId && String(oldJobCardId) !== String(log.jobCardId)) {
+      await syncJobCardPrintTotals(oldJobCardId, oldJobNo);
+    }
 
     res.status(200).json({
       success: true,
@@ -296,10 +345,11 @@ const deletePrintLog = async (req, res) => {
     }
 
     const jobCardId = log.jobCardId;
+    const jobNo = log.jobNo;
     await JobPrintLog.findByIdAndDelete(id);
 
     // Sync Job Card totals
-    const summary = await syncJobCardPrintTotals(jobCardId);
+    const summary = await syncJobCardPrintTotals(jobCardId, jobNo);
 
     res.status(200).json({
       success: true,
