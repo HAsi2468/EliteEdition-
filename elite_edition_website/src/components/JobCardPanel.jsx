@@ -1176,7 +1176,7 @@ function JobCardForm({ card, onSave, onClose, department }) {
     }
   }, [card]);
 
-  // Sync selectedDesign if editing an existing card and auto-enrich missing fields
+  // Sync selectedDesign if editing an existing card (for reference / machine profiles / preview only, DO NOT overwrite user fields)
   useEffect(() => {
     if (card && (card.designName || card.designNo) && designsList.length > 0) {
       const raw = (card.designName || card.designNo || '').trim().toUpperCase();
@@ -1188,32 +1188,6 @@ function JobCardForm({ card, onSave, onClose, department }) {
       });
       if (matched) {
         setSelectedDesign(matched);
-        setForm(f => {
-          const pcsVal = parseFloat(f.pcs) || 0;
-          return {
-            ...f,
-            designer: f.designer || matched.designerName || '',
-            colourMatching: f.colourMatching || matched.colourMatching || '',
-            fabric: f.fabric || matched.fabricName || '',
-            category: f.category || matched.category || '',
-            temperature: f.temperature || matched.fusingTemp || '',
-            fusingTemp: f.fusingTemp || matched.fusingTemp || f.temperature || '',
-            speed: f.speed || matched.speed || '',
-            colors: f.colors || matched.colors || '',
-            panna: f.panna || matched.panna || '',
-            pass: f.pass || matched.pass || '',
-            paperType: f.paperType || matched.paperType || '',
-            imageUrl1: f.imageUrl1 || matched.imageUrl || matched.imageUrl2 || '',
-            consumption: f.consumption || (matched.totalMtr100 ? (matched.totalMtr100 / 100).toFixed(2) : (f.totalMtr && pcsVal > 0 ? (parseFloat(f.totalMtr) / pcsVal).toFixed(2) : '')),
-            totalMtr: f.totalMtr || (matched.totalMtr100 && pcsVal > 0 ? ((matched.totalMtr100 / 100) * pcsVal).toFixed(2) : (f.consumption && pcsVal > 0 ? (parseFloat(f.consumption) * pcsVal).toFixed(2) : '')),
-            top: f.top || (matched.top100 && pcsVal > 0 ? ((matched.top100 / 100) * pcsVal).toFixed(2) : ''),
-            sleeve: f.sleeve || (matched.sleeve100 && pcsVal > 0 ? ((matched.sleeve100 / 100) * pcsVal).toFixed(2) : ''),
-            bottom: f.bottom || (matched.bottom100 && pcsVal > 0 ? ((matched.bottom100 / 100) * pcsVal).toFixed(2) : ''),
-            dupatta: f.dupatta || (matched.dupatta100 && pcsVal > 0 ? ((matched.dupatta100 / 100) * pcsVal).toFixed(2) : ''),
-            cut: f.cut || (matched.cut100 ? matched.cut100.toString() : ''),
-            setCopy: f.setCopy || (matched.setCopy100 && pcsVal > 0 ? Math.round((matched.setCopy100 / 100) * pcsVal).toString() : ''),
-          };
-        });
       }
     }
   }, [card, designsList]);
@@ -1356,30 +1330,47 @@ function JobCardForm({ card, onSave, onClose, department }) {
   const onChange = e => {
     const { name, value } = e.target;
 
-    if (name === 'pcs' && selectedDesign) {
+    if (name === 'pcs') {
       const pcsVal = parseFloat(value) || 0;
-      const d = selectedDesign;
+      setForm(f => {
+        const isExisting = Boolean(card && card._id);
+        const consVal = parseFloat(f.consumption) || (selectedDesign?.totalMtr100 ? selectedDesign.totalMtr100 / 100 : 0);
+        const totalMtrVal = consVal > 0 && pcsVal > 0 ? (pcsVal * consVal).toFixed(2) : f.totalMtr;
 
-      const topVal = d.top100 ? (((d.top100 / 100) * pcsVal).toFixed(2)) : '';
-      const sleeveVal = d.sleeve100 ? (((d.sleeve100 / 100) * pcsVal).toFixed(2)) : '';
-      const bottomVal = d.bottom100 ? (((d.bottom100 / 100) * pcsVal).toFixed(2)) : '';
-      const dupattaVal = d.dupatta100 ? (((d.dupatta100 / 100) * pcsVal).toFixed(2)) : '';
-      const cutVal = d.cut100 ? d.cut100.toString() : ''; // Cut does not multiply by pcs
-      const consumptionVal = parseFloat(form.consumption) || (d.totalMtr100 ? d.totalMtr100 / 100 : 0);
-      const totalMtrVal = (pcsVal * consumptionVal).toFixed(2);
-      const setCopyVal = d.setCopy100 ? (Math.round((d.setCopy100 / 100) * pcsVal)) : '';
+        if (isExisting) {
+          // Editing existing job card: NEVER resurrect removed fields or override user-edited values
+          return {
+            ...f,
+            pcs: value,
+            totalMtr: totalMtrVal || f.totalMtr
+          };
+        }
 
-      setForm(f => ({
-        ...f,
-        pcs: value,
-        top: topVal || f.top,
-        sleeve: sleeveVal || f.sleeve,
-        bottom: bottomVal || f.bottom,
-        dupatta: dupattaVal || f.dupatta,
-        cut: cutVal || f.cut,
-        totalMtr: totalMtrVal || f.totalMtr,
-        setCopy: setCopyVal || f.setCopy,
-      }));
+        const d = selectedDesign;
+        if (!d) {
+          return {
+            ...f,
+            pcs: value,
+            totalMtr: totalMtrVal || f.totalMtr
+          };
+        }
+
+        const updates = {
+          ...f,
+          pcs: value,
+          totalMtr: totalMtrVal || f.totalMtr
+        };
+
+        // For new cards: only scale if field has not been explicitly cleared/removed
+        if (f.top !== '' && f.top !== undefined && d.top100) updates.top = ((d.top100 / 100) * pcsVal).toFixed(2);
+        if (f.sleeve !== '' && f.sleeve !== undefined && d.sleeve100) updates.sleeve = ((d.sleeve100 / 100) * pcsVal).toFixed(2);
+        if (f.bottom !== '' && f.bottom !== undefined && d.bottom100) updates.bottom = ((d.bottom100 / 100) * pcsVal).toFixed(2);
+        if (f.dupatta !== '' && f.dupatta !== undefined && d.dupatta100) updates.dupatta = ((d.dupatta100 / 100) * pcsVal).toFixed(2);
+        if (f.setCopy !== '' && f.setCopy !== undefined && d.setCopy100) updates.setCopy = Math.round((d.setCopy100 / 100) * pcsVal).toString();
+        if (f.cut !== '' && f.cut !== undefined && d.cut100) updates.cut = d.cut100.toString();
+
+        return updates;
+      });
     } else if (name === 'consumption') {
       const pcsVal = parseFloat(form.pcs) || 0;
       const consVal = parseFloat(value) || 0;
