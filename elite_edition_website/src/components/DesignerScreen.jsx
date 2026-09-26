@@ -2237,7 +2237,59 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
             if (embedded) {
               const heroImg = task.sampleImage || finalImgs[0] || stage3Imgs[0] || cmImgs[0] || drowImgs[0] || task.outputImage || (task.sampleLink && /\.(jpg|jpeg|png|webp|gif)/i.test(task.sampleLink) ? task.sampleLink : '');
-              const isInactive = task.status === 'Inactive' || task.status === 'Cancelled' || String(task.finalDesignStatus || '').toLowerCase().startsWith('reject');
+              const isApproved = task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE' || task.status === 'Approved';
+              const isRevision = String(task.finalDesignStatus || '').toLowerCase().startsWith('reject');
+
+              let processBadge = {
+                label: '1. Drawing',
+                color: '#0284c7',
+                bg: 'rgba(2, 132, 199, 0.12)',
+                border: '1px solid rgba(2, 132, 199, 0.3)',
+              };
+
+              if (isApproved) {
+                processBadge = {
+                  label: 'Approved',
+                  color: '#16a34a',
+                  bg: 'rgba(22, 163, 74, 0.12)',
+                  border: '1px solid rgba(22, 163, 74, 0.3)',
+                };
+              } else if (isRevision) {
+                processBadge = {
+                  label: 'Reject / Revisions',
+                  color: '#dc2626',
+                  bg: 'rgba(220, 38, 38, 0.12)',
+                  border: '1px solid rgba(220, 38, 38, 0.3)',
+                };
+              } else if (task.stage3Status === 'Hold') {
+                processBadge = {
+                  label: '3. Hold',
+                  color: '#ea580c',
+                  bg: 'rgba(234, 88, 12, 0.12)',
+                  border: '1px solid rgba(234, 88, 12, 0.3)',
+                };
+              } else if (task.stage3Status === 'Continue') {
+                processBadge = {
+                  label: '3. Continue',
+                  color: '#0284c7',
+                  bg: 'rgba(2, 132, 199, 0.12)',
+                  border: '1px solid rgba(2, 132, 199, 0.3)',
+                };
+              } else if (task.colourMatchingStatus) {
+                processBadge = {
+                  label: '2. Colour Match',
+                  color: '#db2777',
+                  bg: 'rgba(219, 39, 119, 0.12)',
+                  border: '1px solid rgba(219, 39, 119, 0.3)',
+                };
+              } else {
+                processBadge = {
+                  label: '1. Drawing',
+                  color: '#0284c7',
+                  bg: 'rgba(2, 132, 199, 0.12)',
+                  border: '1px solid rgba(2, 132, 199, 0.3)',
+                };
+              }
 
               return (
                 <div
@@ -2280,23 +2332,26 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     {allFabrics[0] || task.category || 'ALLOWER'}
                   </span>
 
-                  {/* Status badge (Top-Right) */}
+                  {/* Current Process / Stage badge (Top-Right) */}
                   <span
                     style={{
                       position: 'absolute',
                       top: 16,
                       right: 16,
-                      background: isInactive ? 'rgba(255,255,255,0.05)' : 'rgba(52,211,153,0.15)',
-                      color: isInactive ? 'var(--text-muted)' : '#34d399',
+                      background: processBadge.bg,
+                      color: processBadge.color,
                       fontSize: '0.65rem',
                       fontWeight: 800,
-                      padding: '2px 6px',
+                      padding: '2px 8px',
                       borderRadius: '4px',
-                      border: isInactive ? '1px solid var(--border-light)' : '1px solid rgba(52,211,153,0.3)',
+                      border: processBadge.border,
                       zIndex: 2,
+                      letterSpacing: '0.02em',
+                      textTransform: 'uppercase',
                     }}
+                    title={`Current Process: ${processBadge.label}`}
                   >
-                    {isInactive ? 'Inactive' : 'Active'}
+                    {processBadge.label}
                   </span>
 
                   {/* Main Image View (180px, #04070d, identical to Design Catalog Image) */}
