@@ -624,7 +624,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       // Filter by Party
       if (partyFilter && partyFilter !== 'All') {
         result = result.filter(t => {
-          const pList = Array.isArray(t.parties) ? t.parties : (t.partyName || t.party ? [t.partyName || t.party] : ['ELITE EON']);
+          const pList = Array.isArray(t.parties) ? t.parties : (t.partyName || t.party ? [t.partyName || t.party] : []);
           return pList.some(p => p && String(p).toLowerCase().includes(partyFilter.toLowerCase()));
         });
       }
@@ -1172,7 +1172,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
               </button>
             );
           })}
-        </div>
+          </div>
       )}
 
       {/* ─── Search & Filters Toolbar ───────────────────────────────────── */}
@@ -1241,8 +1241,13 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 onChange={(e) => setPartyFilter(e.target.value)}
                 style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem', height: '36px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', cursor: 'pointer' }}
               >
-                <option value="All">All Parties (Clients)</option>
-                {(printConfig.parties || []).map((p) => (
+                <option value="All">All Parties</option>
+                {Array.from(new Set([
+                  ...(printConfig.parties || []),
+                  ...tasks.flatMap(t =>
+                    Array.isArray(t.parties) ? t.parties : (t.partyName || t.party ? [t.partyName || t.party] : [])
+                  )
+                ])).filter(Boolean).sort().map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>
@@ -1722,7 +1727,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                             <ExternalLink size={14} /> Link
                           </a>
                         ) : (
-                          <span style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>—</span>
+                          <span style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>--</span>
                         )}
                       </td>
 
@@ -2049,7 +2054,86 @@ const DesignerScreen = forwardRef(function DesignerScreen(
         </div>
       ) : (
         /* ─── CARDS GRID VIEW ─────────────────────────────────────────── */
-        <div style={{ display: 'grid', gridTemplateColumns: embedded ? 'repeat(auto-fill, minmax(280px, 1fr))' : 'repeat(auto-fill, minmax(min(100%, 360px), 1fr))', gap: embedded ? '1.2rem' : '1.15rem' }}>
+        <div>
+          {/* Count + Sort Row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', padding: '0 0.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>
+                Total Samples:
+              </span>
+              <span style={{
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                color: '#ffffff',
+                background: '#2563eb',
+                padding: '2px 10px',
+                borderRadius: '20px',
+                minWidth: '28px',
+                textAlign: 'center',
+              }}>
+                {filteredTasks.length}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Sort:</span>
+              <button
+                type="button"
+                onClick={() => setSortBy('designName')}
+                style={{
+                  padding: '0.3rem 0.65rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: sortBy === 'designName' ? '#2563eb' : '#cbd5e1',
+                  background: sortBy === 'designName' ? '#eff6ff' : '#f8fafc',
+                  color: sortBy === 'designName' ? '#1d4ed8' : '#64748b',
+                }}
+              >
+                Name
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortBy('createdAt')}
+                style={{
+                  padding: '0.3rem 0.65rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: sortBy === 'createdAt' ? '#2563eb' : '#cbd5e1',
+                  background: sortBy === 'createdAt' ? '#eff6ff' : '#f8fafc',
+                  color: sortBy === 'createdAt' ? '#1d4ed8' : '#64748b',
+                }}
+              >
+                Date
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                title={sortOrder === 'asc' ? 'Currently Ascending - click for Descending' : 'Currently Descending - click for Ascending'}
+                style={{
+                  padding: '0.3rem 0.65rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  border: '1px solid #2563eb',
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.2rem',
+                }}
+              >
+                {sortOrder === 'asc' ? 'A' : 'D'}
+                <span style={{ fontSize: '0.7rem' }}>{sortOrder === 'asc' ? 'Asc' : 'Desc'}</span>
+              </button>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: embedded ? 'repeat(auto-fill, minmax(280px, 1fr))' : 'repeat(auto-fill, minmax(min(100%, 360px), 1fr))', gap: embedded ? '1.2rem' : '1.15rem' }}>
           {filteredTasks.map((task) => {
             const priorityConfig = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.Medium;
             const progress = getTaskStageProgress(task);
@@ -2172,26 +2256,28 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       </span>
                     </div>
 
-                    {/* Brand / Assigned Parties badge */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          color: '#10b981',
-                          fontWeight: 700,
-                          background: 'rgba(16, 185, 129, 0.12)',
-                          padding: '2px 7px',
-                          borderRadius: '4px',
-                          border: '1px solid rgba(16, 185, 129, 0.25)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                        }}
-                        title={`Party (Client): ${task.partyName || (Array.isArray(task.parties) && task.parties[0]) || 'ELITE EON'}`}
-                      >
-                        <span style={{ fontSize: '0.72rem' }}>🏢</span> {task.partyName || (Array.isArray(task.parties) && task.parties[0]) || 'ELITE EON'}
-                      </span>
-                    </div>
+                    {/* Brand / Assigned Parties badge -- only show if party data exists */}
+                    {(task.partyName || (Array.isArray(task.parties) && task.parties[0])) && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            color: '#10b981',
+                            fontWeight: 700,
+                            background: 'rgba(16, 185, 129, 0.12)',
+                            padding: '2px 7px',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(16, 185, 129, 0.25)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                          }}
+                          title={`Party (Client): ${task.partyName || (Array.isArray(task.parties) && task.parties[0])}`}
+                        >
+                          <span style={{ fontSize: '0.72rem' }}>🏢</span> {task.partyName || (Array.isArray(task.parties) && task.parties[0])}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Parameters grid identical to Image 1 */}
                     <div
@@ -2205,12 +2291,13 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       }}
                     >
                       {[
-                        ['Colour Match', allColourMatches.join(', ') || 'JAY'],
-                        ['Fabric', allFabrics.join(', ') || 'ARMANI 44'],
-                        ['Fusing Temp', task.fusingTemp || '235'],
-                        ['Speed', task.speed || '40'],
-                        ['Colors', task.colors || allColourMatches[0] || 'Yellow'],
-                        ['Panna/Pass', task.panna && task.pass ? `${task.panna}" / ${task.pass}P` : (task.panna ? `${task.panna}"` : '44" / 2 PassP')],
+                        ['Colour Match', allColourMatches.join(', ') || '--'],
+                        ['Fabric', allFabrics.join(', ') || '--'],
+                        ['Fusing Temp', task.fusingTemp || '--'],
+                        ['Speed', task.speed || '--'],
+                        ['Colors', task.colors || allColourMatches[0] || '--'],
+                        ['Panna/Pass', task.panna && task.pass ? `${task.panna}" / ${task.pass}P` : (task.panna ? `${task.panna}"` : '--')],
+                        ['Created By', task.createdBy || task.inputBy || allDesigners[0] || '--'],
                       ].map(([k, v]) => (
                         <div key={k} style={{ display: 'flex', flexDirection: 'column' }}>
                           <span style={{ fontSize: '0.65rem', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>{k}</span>
@@ -2235,7 +2322,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                             </div>
                           ) : (
                             <span style={{ color: 'var(--text-primary, #0f172a)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {v || '—'}
+                              {v || '--'}
                             </span>
                           )}
                         </div>
@@ -3145,6 +3232,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
             );
           })}
         </div>
+        </div>
       )}
 
       {/* ─── MODAL: UPDATE STATUS & MULTI-IMAGE UPLOAD TO CLOUDFLARE R2 ─── */}
@@ -3563,7 +3651,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   Audit Trail & History
                 </div>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
-                  {historyTask.taskNo} — {historyTask.designName}
+                  {historyTask.taskNo} -- {historyTask.designName}
                 </h3>
               </div>
               <button
