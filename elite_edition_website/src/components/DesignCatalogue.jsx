@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { api, getBaseUrl } from '../services/api';
 import {
   PlusCircle, Plus, Search, RefreshCw, Edit2, Trash2, X, Save, Image,
