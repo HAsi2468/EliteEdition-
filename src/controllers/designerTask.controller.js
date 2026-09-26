@@ -260,6 +260,7 @@ const getDesignerTasks = async (req, res) => {
       status,
       drowDesignStatus,
       colourMatchingStatus,
+      stage3Status,
       finalDesignStatus,
       search,
       sortBy = 'createdAt',
@@ -348,6 +349,9 @@ const getDesignerTasks = async (req, res) => {
     }
     if (colourMatchingStatus && colourMatchingStatus.trim() && colourMatchingStatus !== 'All') {
       filter.colourMatchingStatus = colourMatchingStatus.trim();
+    }
+    if (stage3Status && stage3Status.trim() && stage3Status !== 'All') {
+      filter.stage3Status = stage3Status.trim();
     }
     if (finalDesignStatus && finalDesignStatus.trim() && finalDesignStatus !== 'All') {
       filter.finalDesignStatus = finalDesignStatus.trim();
@@ -567,20 +571,24 @@ const updateTaskStage = async (req, res) => {
 
     // Detect category if not explicitly given
     if (!detectedCategory || detectedCategory === 'general') {
-      if (['START WORKING', 'REVIEW SAMPLE', 'FINAL SAMPLE'].includes(targetStage)) {
+      const stageUpper = String(targetStage || '').toUpperCase();
+      if (['START DESIGN', 'START WORKING', 'DROW FINAL SAMPLE'].includes(stageUpper)) {
         detectedCategory = 'drow_design';
         detectedStatusType = 'DROW DESIGN STATUS';
-      } else if (targetStage === 'COLOUR PANTON') {
+      } else if (['COLOUR PANTON', 'CM FINAL SAMPLE'].includes(stageUpper)) {
         detectedCategory = 'colour_matching';
         detectedStatusType = 'COLOUR MATCHING STATUS';
-      } else if (['REJECT SAMPLE drowning', 'REJECT SAMPLE FOR C.M.', 'APPROVED SAMPLE'].includes(targetStage)) {
+      } else if (['HOLD', 'CONTINUE'].includes(stageUpper)) {
+        detectedCategory = 'stage_3';
+        detectedStatusType = '3. STAGE 3 STATUS';
+      } else if (['REJECT', 'APPROVED', 'REJECT SAMPLE DROWNING', 'REJECT SAMPLE FOR C.M.', 'APPROVED SAMPLE'].includes(stageUpper)) {
         detectedCategory = 'final_design';
-        detectedStatusType = 'FINAL DESIGN STATUS';
+        detectedStatusType = '4. FINAL APPROVAL STATUS';
       }
     }
 
-    // 1. Drow Design Status
-    if (detectedCategory === 'drow_design' || detectedStatusType.toUpperCase().includes('DROW')) {
+    // 1. Drow Design Status ('Start Design' | 'Final Sample')
+    if (detectedCategory === 'drow_design' || (detectedStatusType && detectedStatusType.toUpperCase().includes('DROW'))) {
       if (targetStage) task.drowDesignStatus = targetStage;
       if (incomingImages.length > 0) {
         task.drowDesignImages = Array.from(new Set([...(task.drowDesignImages || []), ...incomingImages]));
@@ -590,8 +598,8 @@ const updateTaskStage = async (req, res) => {
       }
     }
 
-    // 2. Colour Matching Status
-    if (detectedCategory === 'colour_matching' || detectedStatusType.toUpperCase().includes('COLOUR')) {
+    // 2. Colour Matching Status ('Start Design' | 'Final Sample')
+    if (detectedCategory === 'colour_matching' || (detectedStatusType && (detectedStatusType.toUpperCase().includes('COLOUR') || detectedStatusType.toUpperCase().includes('COLOR')))) {
       if (targetStage) task.colourMatchingStatus = targetStage;
       if (incomingImages.length > 0) {
         task.colourMatchingImages = Array.from(new Set([...(task.colourMatchingImages || []), ...incomingImages]));
@@ -601,15 +609,24 @@ const updateTaskStage = async (req, res) => {
       }
     }
 
-    // 3. Final Design Status
-    if (detectedCategory === 'final_design' || detectedStatusType.toUpperCase().includes('FINAL')) {
+    // 3. Stage 3 Status ('Hold' | 'Continue')
+    if (detectedCategory === 'stage_3' || detectedCategory === 'stage3' || (detectedStatusType && (detectedStatusType.toUpperCase().includes('STAGE 3') || detectedStatusType.toUpperCase().includes('STAGE3') || detectedStatusType.toUpperCase().includes('GATE') || detectedStatusType.toUpperCase().includes('HOLD') || detectedStatusType.toUpperCase().includes('CONTINUE')))) {
+      if (targetStage) task.stage3Status = targetStage;
+      if (incomingImages.length > 0) {
+        task.stage3Images = Array.from(new Set([...(task.stage3Images || []), ...incomingImages]));
+      }
+    }
+
+    // 4. Final Design / Stage 4 Status ('Reject' | 'Approved')
+    if (detectedCategory === 'final_design' || detectedCategory === 'stage_4' || detectedCategory === 'stage4' || (detectedStatusType && (detectedStatusType.toUpperCase().includes('FINAL') || detectedStatusType.toUpperCase().includes('STAGE 4') || detectedStatusType.toUpperCase().includes('APPROVAL')))) {
       if (targetStage) task.finalDesignStatus = targetStage;
       if (incomingImages.length > 0) {
         task.finalDesignImages = Array.from(new Set([...(task.finalDesignImages || []), ...incomingImages]));
       }
-      if (targetStage === 'APPROVED SAMPLE') {
+      const stageUpper = String(targetStage).toUpperCase();
+      if (stageUpper === 'APPROVED' || stageUpper === 'APPROVED SAMPLE') {
         task.status = 'Approved';
-      } else if (targetStage.startsWith('REJECT')) {
+      } else if (stageUpper.startsWith('REJECT')) {
         task.status = 'Revision Requested';
       }
     }

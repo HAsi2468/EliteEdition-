@@ -38,25 +38,32 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { triggerPushNotification } from './NotificationToast';
+import DesignImage from './DesignImage';
+import { COLOR_NAMES, getColorHex } from '../utils/colors';
 
 // ─── Status Definitions ────────────────────────────────────────────────────────
+// Stage 1: Drow Design Status (2 options: Start Design, Final Sample)
 export const DROW_STATUS_OPTIONS = [
-  { id: 'START WORKING', label: 'START WORKING', color: '#0284c7', bg: '#eff6ff', border: '#bfdbfe', icon: Clock },
-  { id: 'REVIEW SAMPLE', label: 'REVIEW SAMPLE', color: '#d97706', bg: '#fffbeb', border: '#fde68a', icon: AlertTriangle },
-  { id: 'FINAL SAMPLE', label: 'FINAL SAMPLE', color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', icon: FileCheck },
+  { id: 'Start Design', label: 'Start Design', color: '#0284c7', bg: '#eff6ff', border: '#bfdbfe', icon: Clock },
+  { id: 'Final Sample', label: 'Final Sample', color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', icon: FileCheck },
 ];
 
+// Stage 2: Colour Matching Status (2 options: Start Design, Final Sample)
 export const COLOUR_MATCHING_OPTIONS = [
-  { id: 'COLOUR PANTON', label: 'COLOUR PANTON', color: '#db2777', bg: '#fdf2f8', border: '#fbcfe8', icon: Palette },
-  { id: 'REVIEW SAMPLE', label: 'REVIEW SAMPLE', color: '#d97706', bg: '#fffbeb', border: '#fde68a', icon: AlertTriangle },
-  { id: 'FINAL SAMPLE', label: 'FINAL SAMPLE', color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', icon: FileCheck },
+  { id: 'Start Design', label: 'Start Design', color: '#db2777', bg: '#fdf2f8', border: '#fbcfe8', icon: Palette },
+  { id: 'Final Sample', label: 'Final Sample', color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', icon: FileCheck },
 ];
 
+// Stage 3: Stage 3 Status (2 options: Hold, Continue)
+export const STAGE_3_OPTIONS = [
+  { id: 'Hold', label: 'Hold', color: '#ea580c', bg: '#fff7ed', border: '#ffedd5', icon: AlertTriangle },
+  { id: 'Continue', label: 'Continue', color: '#0284c7', bg: '#eff6ff', border: '#bfdbfe', icon: CheckCircle2 },
+];
+
+// Stage 4: Final Approval Status (2 options: Reject, Approved)
 export const FINAL_DESIGN_OPTIONS = [
-  { id: 'FINAL SAMPLE', label: 'FINAL SAMPLE', color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', icon: FileCheck },
-  { id: 'REJECT SAMPLE DRAWING', legacyId: 'REJECT SAMPLE drowning', label: 'REJECT DRAWING', color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: Ban },
-  { id: 'REJECT SAMPLE FOR C.M.', legacyId: 'REJECT SAMPLE FOR C.M.', label: 'REJECT C.M.', color: '#ea580c', bg: '#fff7ed', border: '#ffedd5', icon: RotateCcw },
-  { id: 'APPROVED SAMPLE', label: 'APPROVED SAMPLE', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', icon: CheckCircle2 },
+  { id: 'Reject', label: 'Reject', color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: Ban },
+  { id: 'Approved', label: 'Approved', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', icon: CheckCircle2 },
 ];
 
 export const PRIORITY_STYLES = {
@@ -313,11 +320,11 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     currentUser?.permissions?.includes('jobcards');
 
   // Dropdown options from settings
-  const [printConfig, setPrintConfig] = useState({ designers: [], fabrics: [] });
+  const [printConfig, setPrintConfig] = useState({ designers: [], fabrics: [], categories: [], parties: [] });
 
   // View Mode & Operational Stage Tabs
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
-  const [stageTab, setStageTab] = useState('ALL'); // 'ALL' | 'DROW' | 'CM' | 'PENDING_APPROVAL' | 'APPROVED' | 'REVISION'
+  const [stageTab, setStageTab] = useState('ALL'); // 'ALL' | 'DROW' | 'CM' | 'STAGE_3' | 'APPROVED' | 'REVISION'
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -328,7 +335,15 @@ const DesignerScreen = forwardRef(function DesignerScreen(
   const [selectedFabric, setSelectedFabric] = useState('All');
   const [drowFilter, setDrowFilter] = useState('All');
   const [cmFilter, setCmFilter] = useState('All');
+  const [stage3Filter, setStage3Filter] = useState('All');
   const [finalFilter, setFinalFilter] = useState('All');
+  const [sortBy, setSortBy] = useState('designName');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [colorFilter, setColorFilter] = useState('All');
+  const [partyFilter, setPartyFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('Active');
+  const [categories, setCategories] = useState([]);
 
   // Create / Edit Design Task Modal State
   const initialTaskForm = {
@@ -423,6 +438,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
           fabricName: selectedFabric,
           drowDesignStatus: drowFilter,
           colourMatchingStatus: cmFilter,
+          stage3Status: stage3Filter !== 'All' ? stage3Filter : undefined,
           finalDesignStatus: finalFilter,
           search: searchQuery,
         }),
@@ -430,10 +446,16 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       ]);
 
       if (cfg) {
+        const catList = Array.isArray(cfg.categories) && cfg.categories.length > 0
+          ? cfg.categories
+          : Array.isArray(cfg.fabrics) ? cfg.fabrics : [];
         setPrintConfig({
           designers: Array.isArray(cfg.designers) ? cfg.designers : [],
           fabrics: Array.isArray(cfg.fabrics) ? cfg.fabrics : [],
+          categories: catList,
+          parties: Array.isArray(cfg.parties) ? cfg.parties : [],
         });
+        setCategories(catList);
       }
 
       if (resTasks && resTasks.data) {
@@ -459,6 +481,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     selectedFabric,
     drowFilter,
     cmFilter,
+    stage3Filter,
     finalFilter,
     userAssignedName,
     primaryDesignerIdentifier,
@@ -476,6 +499,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     selectedFabric,
     drowFilter,
     cmFilter,
+    stage3Filter,
     finalFilter,
     userAssignedName,
     primaryDesignerIdentifier,
@@ -483,10 +507,10 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
   // Stage tab statistics based on current active list
   const stageCounts = useMemo(() => {
-    let drow = 0, cm = 0, pending = 0, approved = 0, revision = 0;
+    let drow = 0, cm = 0, stage3 = 0, approved = 0, revision = 0;
     let base = tasks;
     if (isUserRestricted) {
-      if (effectiveDesignerTokens.length === 0) return { all: 0, drow: 0, cm: 0, pending: 0, approved: 0, revision: 0 };
+      if (effectiveDesignerTokens.length === 0) return { all: 0, drow: 0, cm: 0, stage3: 0, approved: 0, revision: 0 };
       base = base.filter(t => {
         const checkMatch = (val) => {
           if (!val) return false;
@@ -499,21 +523,21 @@ const DesignerScreen = forwardRef(function DesignerScreen(
     }
 
     base.forEach(t => {
-      const isApproved = t.finalDesignStatus === 'APPROVED SAMPLE';
-      const isRevision = String(t.finalDesignStatus || '').startsWith('REJECT');
+      const isApproved = t.finalDesignStatus === 'Approved' || t.finalDesignStatus === 'APPROVED SAMPLE' || t.status === 'Approved';
+      const isRevision = String(t.finalDesignStatus || '').toLowerCase().startsWith('reject');
       if (isApproved) {
         approved++;
       } else if (isRevision) {
         revision++;
-      } else if (t.drowDesignStatus === 'FINAL SAMPLE' || t.colourMatchingStatus === 'FINAL SAMPLE') {
-        pending++;
-      } else if (t.colourMatchingStatus && t.colourMatchingStatus !== 'START WORKING') {
+      } else if (t.stage3Status) {
+        stage3++;
+      } else if (t.colourMatchingStatus) {
         cm++;
       } else {
         drow++;
       }
     });
-    return { all: base.length, drow, cm, pending, approved, revision };
+    return { all: base.length, drow, cm, stage3, approved, revision };
   }, [tasks, isUserRestricted, effectiveDesignerTokens]);
 
   // Client-side quick filter: STRICT isolation for non-admin users
@@ -541,49 +565,114 @@ const DesignerScreen = forwardRef(function DesignerScreen(
       });
     }
 
-    // Filter by Operational Stage Tab
-    if (stageTab !== 'ALL') {
+    // Filter by Operational Stage Tab (only in standalone mode)
+    if (!embedded && stageTab !== 'ALL') {
       result = result.filter(t => {
-        const isApproved = t.finalDesignStatus === 'APPROVED SAMPLE';
-        const isRevision = String(t.finalDesignStatus || '').startsWith('REJECT');
+        const isApproved = t.finalDesignStatus === 'Approved' || t.finalDesignStatus === 'APPROVED SAMPLE' || t.status === 'Approved';
+        const isRevision = String(t.finalDesignStatus || '').toLowerCase().startsWith('reject');
         if (stageTab === 'APPROVED') return isApproved;
         if (stageTab === 'REVISION') return isRevision;
-        if (stageTab === 'PENDING_APPROVAL') {
-          return !isApproved && !isRevision && (t.drowDesignStatus === 'FINAL SAMPLE' || t.colourMatchingStatus === 'FINAL SAMPLE');
+        if (stageTab === 'STAGE_3') {
+          return !isApproved && !isRevision && Boolean(t.stage3Status);
         }
         if (stageTab === 'CM') {
-          return !isApproved && !isRevision && t.colourMatchingStatus && t.colourMatchingStatus !== 'START WORKING';
+          return !isApproved && !isRevision && Boolean(t.colourMatchingStatus);
         }
         if (stageTab === 'DROW') {
-          return !isApproved && !isRevision && (t.drowDesignStatus === 'START WORKING' || t.drowDesignStatus === 'REVIEW SAMPLE' || !t.drowDesignStatus);
+          return !isApproved && !isRevision && (!t.colourMatchingStatus || t.drowDesignStatus);
         }
         return true;
       });
     }
 
-    if (!searchQuery.trim()) return result;
-    const q = searchQuery.toLowerCase().trim();
-    return result.filter((t) => {
-      const taskNo = String(t.taskNo || '').toLowerCase();
-      const designName = String(t.designName || '').toLowerCase();
-      const designer = String(t.designerName || '').toLowerCase();
-      const fabric = String(t.fabricName || '').toLowerCase();
-      const cm = String(t.colourMatching || '').toLowerCase();
-      const drowSt = String(t.drowDesignStatus || '').toLowerCase();
-      const cmSt = String(t.colourMatchingStatus || '').toLowerCase();
-      const finSt = String(t.finalDesignStatus || '').toLowerCase();
-      return (
-        taskNo.includes(q) ||
-        designName.includes(q) ||
-        designer.includes(q) ||
-        fabric.includes(q) ||
-        cm.includes(q) ||
-        drowSt.includes(q) ||
-        cmSt.includes(q) ||
-        finSt.includes(q)
-      );
+    // Filter by fabric
+    if (selectedFabric && selectedFabric !== 'All') {
+      result = result.filter(t => {
+        const fabrics = Array.isArray(t.fabrics) ? t.fabrics : (t.fabricName || '').split(',').map(s => s.trim());
+        return fabrics.some(f => f && f.toLowerCase() === selectedFabric.toLowerCase());
+      });
+    }
+
+    // Filter by designer
+    if (selectedDesigner && selectedDesigner !== 'All') {
+      result = result.filter(t => {
+        const designers = Array.isArray(t.designers) ? t.designers : (t.designerName || '').split(',').map(s => s.trim());
+        return designers.some(d => d && d.toLowerCase() === selectedDesigner.toLowerCase());
+      });
+    }
+
+    // Embedded Image 1 filters
+    if (embedded) {
+      // Filter by Category
+      if (categoryFilter && categoryFilter !== 'All') {
+        result = result.filter(t => {
+          const cat = t.category || (Array.isArray(t.fabrics) ? t.fabrics[0] : t.fabricName);
+          return cat && String(cat).toLowerCase() === categoryFilter.toLowerCase();
+        });
+      }
+
+      // Filter by Color
+      if (colorFilter && colorFilter !== 'All') {
+        result = result.filter(t => {
+          const cMatches = Array.isArray(t.colourMatches) ? t.colourMatches : (t.colourMatching ? [t.colourMatching] : []);
+          const col = t.colors ? [t.colors] : [];
+          const allC = [...cMatches, ...col];
+          return allC.some(c => c && String(c).toLowerCase().includes(colorFilter.toLowerCase()));
+        });
+      }
+
+      // Filter by Party
+      if (partyFilter && partyFilter !== 'All') {
+        result = result.filter(t => {
+          const pList = Array.isArray(t.parties) ? t.parties : (t.partyName || t.party ? [t.partyName || t.party] : ['ELITE EON']);
+          return pList.some(p => p && String(p).toLowerCase().includes(partyFilter.toLowerCase()));
+        });
+      }
+
+      // Filter by Status (Active / Inactive / All)
+      if (statusFilter && statusFilter !== 'All') {
+        result = result.filter(t => {
+          const isInactive = t.status === 'Inactive' || t.status === 'Cancelled' || String(t.finalDesignStatus || '').toLowerCase().startsWith('reject');
+          if (statusFilter === 'Active') return !isInactive;
+          if (statusFilter === 'Inactive') return isInactive;
+          return true;
+        });
+      }
+    }
+
+    // Search query
+    if (searchQuery && searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter((t) => {
+        const taskNo = String(t.taskNo || '').toLowerCase();
+        const designName = String(t.designName || '').toLowerCase();
+        const designer = String(t.designerName || '').toLowerCase();
+        const fabric = String(t.fabricName || '').toLowerCase();
+        const cm = String(t.colourMatching || '').toLowerCase();
+        const party = String(t.partyName || t.party || '').toLowerCase();
+        const notes = String(t.notes || '').toLowerCase();
+        return (
+          taskNo.includes(q) ||
+          designName.includes(q) ||
+          designer.includes(q) ||
+          fabric.includes(q) ||
+          cm.includes(q) ||
+          party.includes(q) ||
+          notes.includes(q)
+        );
+      });
+    }
+
+    return [...result].sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === 'date' || sortBy === 'createdAt') {
+        cmp = new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0);
+      } else {
+        cmp = (a.designName || '').localeCompare(b.designName || '', undefined, { numeric: true, sensitivity: 'base' });
+      }
+      return sortOrder === 'asc' ? cmp : -cmp;
     });
-  }, [tasks, searchQuery, stageTab, isUserRestricted, effectiveDesignerTokens]);
+  }, [tasks, searchQuery, stageTab, isUserRestricted, effectiveDesignerTokens, selectedFabric, selectedDesigner, sortBy, sortOrder, embedded, categoryFilter, colorFilter, partyFilter, statusFilter]);
 
   // Create & Edit Task Handlers
   const handleOpenCreate = () => {
@@ -732,6 +821,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
           ? task.drowDesignStatus
           : category === 'colour_matching'
           ? task.colourMatchingStatus
+          : (category === 'stage_3' || category === 'stage3')
+          ? task.stage3Status
           : task.finalDesignStatus,
       newStatus: statusValue,
     });
@@ -775,6 +866,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
         ? task.drowDesignStatus
         : category === 'colour_matching'
         ? task.colourMatchingStatus
+        : (category === 'stage_3' || category === 'stage3')
+        ? task.stage3Status
         : task.finalDesignStatus
     );
 
@@ -855,161 +948,34 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
   // Helper to compute workflow stage states for each task
   const getTaskStageProgress = (task) => {
-    const isFinalApproved = task.finalDesignStatus === 'APPROVED SAMPLE';
-    const isFinalRejectedDrow = task.finalDesignStatus === 'REJECT SAMPLE DRAWING' || task.finalDesignStatus === 'REJECT SAMPLE drowning';
-    const isFinalRejectedCM = task.finalDesignStatus === 'REJECT SAMPLE FOR C.M.';
+    const isFinalApproved = task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE' || task.status === 'Approved';
+    const isFinalRejected = String(task.finalDesignStatus || '').toLowerCase().startsWith('reject');
 
     let s1 = 'pending';
-    if (task.drowDesignStatus === 'FINAL SAMPLE') s1 = 'done';
+    if (task.drowDesignStatus === 'Final Sample' || task.drowDesignStatus === 'FINAL SAMPLE') s1 = 'done';
     else if (task.drowDesignStatus) s1 = 'active';
-    if (isFinalRejectedDrow) s1 = 'revision';
 
     let s2 = 'pending';
-    if (task.colourMatchingStatus === 'FINAL SAMPLE') s2 = 'done';
+    if (task.colourMatchingStatus === 'Final Sample' || task.colourMatchingStatus === 'FINAL SAMPLE') s2 = 'done';
     else if (task.colourMatchingStatus) s2 = 'active';
-    if (isFinalRejectedCM) s2 = 'revision';
 
     let s3 = 'pending';
-    if (isFinalApproved) s3 = 'approved';
-    else if (isFinalRejectedDrow || isFinalRejectedCM) s3 = 'revision';
-    else if (task.finalDesignStatus) s3 = 'active';
+    if (task.stage3Status === 'Continue') s3 = 'done';
+    else if (task.stage3Status === 'Hold') s3 = 'hold';
+    else if (task.stage3Status) s3 = 'active';
 
-    return { s1, s2, s3, isFinalApproved, isFinalRejectedDrow, isFinalRejectedCM };
+    let s4 = 'pending';
+    if (isFinalApproved) s4 = 'approved';
+    else if (isFinalRejected) s4 = 'rejected';
+    else if (task.finalDesignStatus) s4 = 'active';
+
+    return { s1, s2, s3, s4, isFinalApproved, isFinalRejected };
   };
 
   return (
-    <div style={{ padding: '1rem', maxWidth: '1600px', margin: '0 auto', color: '#0f172a', boxSizing: 'border-box' }}>
-      {/* ─── Top Header Bar ────────────────────────────────────────────── */}
-      {embedded ? (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '0.65rem',
-            marginBottom: '1rem',
-            paddingBottom: '0.65rem',
-            borderBottom: '1px solid #e2e8f0',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-            <span
-              style={{
-                fontSize: '0.75rem',
-                fontWeight: 800,
-                background: '#eff6ff',
-                color: '#1d4ed8',
-                border: '1px solid #bfdbfe',
-                borderRadius: '12px',
-                padding: '0.15rem 0.6rem',
-              }}
-            >
-              {filteredTasks.length} {filteredTasks.length === 1 ? 'Design' : 'Designs'}
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {/* View Mode Toggle (Cards / Table) */}
-            <div
-              style={{
-                display: 'inline-flex',
-                background: '#f1f5f9',
-                padding: '3px',
-                borderRadius: '10px',
-                border: '1px solid #cbd5e1',
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setViewMode('grid')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  padding: '0.35rem 0.7rem',
-                  borderRadius: '7px',
-                  border: 'none',
-                  fontSize: '0.76rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  background: viewMode === 'grid' ? '#ffffff' : 'transparent',
-                  color: viewMode === 'grid' ? '#2563eb' : '#64748b',
-                  boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.15s ease',
-                }}
-                title="Cards Grid View"
-              >
-                <LayoutGrid size={13} /> <span>Cards</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('table')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  padding: '0.35rem 0.7rem',
-                  borderRadius: '7px',
-                  border: 'none',
-                  fontSize: '0.76rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  background: viewMode === 'table' ? '#ffffff' : 'transparent',
-                  color: viewMode === 'table' ? '#2563eb' : '#64748b',
-                  boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.15s ease',
-                }}
-                title="High-Density Table View"
-              >
-                <List size={13} /> <span>Table</span>
-              </button>
-            </div>
-
-            <button
-              onClick={() => loadData(false)}
-              disabled={loading}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.42rem 0.8rem',
-                background: '#ffffff',
-                border: '1px solid #cbd5e1',
-                borderRadius: '8px',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                color: '#334155',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-              }}
-            >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-              <span>Refresh</span>
-            </button>
-
-            <button
-              onClick={handleOpenCreate}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.42rem 0.95rem',
-                background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(37,99,235,0.25)',
-              }}
-            >
-              <Plus size={14} /> <span>+ New Sample Design</span>
-            </button>
-          </div>
-        </div>
-      ) : (
+    <div style={{ padding: embedded ? '0' : '1rem', maxWidth: '1600px', margin: '0 auto', color: '#0f172a', boxSizing: 'border-box' }}>
+      {/* ─── Top Header Bar (Only visible in standalone mode) ─────────── */}
+      {!embedded && (
         <div
           style={{
             display: 'flex',
@@ -1148,148 +1114,306 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
 
 
-      {/* ─── Operational Stage Navigation Tabs ───────────────────────────── */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.4rem',
-          overflowX: 'auto',
-          paddingBottom: '0.35rem',
-          marginBottom: '1rem',
-          scrollbarWidth: 'thin',
-        }}
-      >
-        {[
-          { id: 'ALL', label: 'All Designs', count: stageCounts.all, color: '#1d4ed8', bg: '#eff6ff' },
-          { id: 'DROW', label: '1. Drawing', count: stageCounts.drow, color: '#0284c7', bg: '#f0f9ff' },
-          { id: 'CM', label: '2. Colour Match', count: stageCounts.cm, color: '#db2777', bg: '#fdf2f8' },
-          { id: 'PENDING_APPROVAL', label: '3. Pending Gate', count: stageCounts.pending, color: '#ca8a04', bg: '#fefce8' },
-          { id: 'APPROVED', label: 'Approved', count: stageCounts.approved, color: '#16a34a', bg: '#f0fdf4' },
-          { id: 'REVISION', label: 'Revisions', count: stageCounts.revision, color: '#dc2626', bg: '#fef2f2' },
-        ].map((tab) => {
-          const isActive = stageTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setStageTab(tab.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.45rem 0.85rem',
-                borderRadius: '8px',
-                border: isActive ? `1.5px solid ${tab.color}` : '1px solid #cbd5e1',
-                background: isActive ? tab.color : '#ffffff',
-                color: isActive ? '#ffffff' : '#475569',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                boxShadow: isActive ? `0 2px 8px ${tab.color}35` : 'none',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <span>{tab.label}</span>
-              <span
+      {/* ─── Operational Stage Navigation Tabs (Only in standalone mode) ── */}
+      {!embedded && (
+        <div
+          style={{
+            display: 'flex',
+            gap: '0.4rem',
+            overflowX: 'auto',
+            paddingBottom: '0.35rem',
+            marginBottom: '1rem',
+            scrollbarWidth: 'thin',
+          }}
+        >
+          {[
+            { id: 'ALL', label: 'All Designs', count: stageCounts.all, color: '#1d4ed8', bg: '#eff6ff' },
+            { id: 'DROW', label: '1. Drawing', count: stageCounts.drow, color: '#0284c7', bg: '#f0f9ff' },
+            { id: 'CM', label: '2. Colour Match', count: stageCounts.cm, color: '#db2777', bg: '#fdf2f8' },
+            { id: 'STAGE_3', label: '3. Hold / Continue', count: stageCounts.stage3, color: '#ea580c', bg: '#fff7ed' },
+            { id: 'APPROVED', label: 'Approved', count: stageCounts.approved, color: '#16a34a', bg: '#f0fdf4' },
+            { id: 'REVISION', label: 'Reject / Revisions', count: stageCounts.revision, color: '#dc2626', bg: '#fef2f2' },
+          ].map((tab) => {
+            const isActive = stageTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setStageTab(tab.id)}
                 style={{
-                  fontSize: '0.7rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: '8px',
+                  border: isActive ? `1.5px solid ${tab.color}` : '1px solid #cbd5e1',
+                  background: isActive ? tab.color : '#ffffff',
+                  color: isActive ? '#ffffff' : '#475569',
+                  fontSize: '0.78rem',
                   fontWeight: 800,
-                  padding: '0.1rem 0.45rem',
-                  borderRadius: '10px',
-                  background: isActive ? 'rgba(255, 255, 255, 0.25)' : tab.bg,
-                  color: isActive ? '#ffffff' : tab.color,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  boxShadow: isActive ? `0 2px 8px ${tab.color}35` : 'none',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                {tab.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ─── Search & Date Range Toolbar ───────────────────────────────── */}
-      <div
-        style={{
-          background: '#ffffff',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0',
-          padding: '0.85rem 1rem',
-          marginBottom: '1.25rem',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '0.75rem',
-          alignItems: 'center',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-        }}
-      >
-        {/* Search Input */}
-        <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '220px' }}>
-          <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search design, task #, fabric, designer..."
-            style={{
-              width: '100%',
-              padding: '0.48rem 0.75rem 0.48rem 2.1rem',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              fontSize: '0.82rem',
-              background: '#f8fafc',
-              color: '#0f172a',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
-            >
-              <X size={14} />
-            </button>
-          )}
+                <span>{tab.label}</span>
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    padding: '0.1rem 0.45rem',
+                    borderRadius: '10px',
+                    background: isActive ? 'rgba(255, 255, 255, 0.25)' : tab.bg,
+                    color: isActive ? '#ffffff' : tab.color,
+                  }}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
         </div>
+      )}
 
-        {/* Date Range Picker */}
-        <div style={{ flex: '0 0 auto' }}>
-          <DateRangePicker
-            datePreset={datePreset}
-            setDatePreset={setDatePreset}
-            customDateStart={customDateStart}
-            setCustomDateStart={setCustomDateStart}
-            customDateEnd={customDateEnd}
-            setCustomDateEnd={setCustomDateEnd}
-            theme="light"
-          />
-        </div>
-
-        {/* Designer Filter */}
-        <div style={{ flex: '0 0 auto' }}>
-          {isUserRestricted ? (
-            <div
-              style={{
-                padding: '0.45rem 0.85rem',
-                borderRadius: '8px',
-                border: '1.5px solid #bfdbfe',
-                fontSize: '0.82rem',
-                background: '#eff6ff',
-                color: '#1d4ed8',
-                fontWeight: 800,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-              }}
-              title="Locked to your assigned designs & colour matching tasks"
-            >
-              <User size={13} color="#2563eb" />
-              <span>👤 My Designs & C.M.: {userAssignedName || 'Not Configured'}</span>
+      {/* ─── Search & Filters Toolbar ───────────────────────────────────── */}
+      {embedded ? (
+        /* Single clean toolbar exactly matching Image 1 */
+        <div
+          className="glass-panel"
+          style={{
+            background: '#ffffff',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            padding: '0.75rem 1rem',
+            marginBottom: '1.25rem',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+          }}
+        >
+          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Search Input */}
+            <div style={{ position: 'relative', flex: '1 1 220px', minWidth: '200px' }}>
+              <label htmlFor="sample-search-field" style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 }}>
+                Search Design name, fabric, matching, designer
+              </label>
+              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                id="sample-search-field"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search Design name, fabric, matching, designer..."
+                style={{ paddingLeft: 32, width: '100%', fontSize: '0.85rem', height: '36px', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: '8px' }}
+              />
             </div>
-          ) : (
+
+            {/* Categories select filter */}
+            <div style={{ minWidth: 150 }}>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem', height: '36px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', cursor: 'pointer' }}
+              >
+                <option value="All">All Categories</option>
+                {Array.from(new Set([...categories, ...printConfig.fabrics])).filter(Boolean).map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Colors select filter */}
+            <div style={{ minWidth: 150 }}>
+              <select
+                value={colorFilter}
+                onChange={(e) => setColorFilter(e.target.value)}
+                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem', height: '36px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', cursor: 'pointer' }}
+              >
+                <option value="All">All Colors</option>
+                {COLOR_NAMES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Party (Client) select filter */}
+            <div style={{ minWidth: 160 }}>
+              <select
+                value={partyFilter}
+                onChange={(e) => setPartyFilter(e.target.value)}
+                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem', height: '36px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', cursor: 'pointer' }}
+              >
+                <option value="All">All Parties (Clients)</option>
+                {(printConfig.parties || []).map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Status Buttons: Active | Inactive | All */}
+            {['Active', 'Inactive', 'All'].map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setStatusFilter(s)}
+                style={{
+                  padding: '0.45rem 0.9rem',
+                  fontSize: '0.8rem',
+                  borderRadius: 'var(--radius-sm)',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: statusFilter === s ? 'var(--primary, #2563eb)' : '#cbd5e1',
+                  background: statusFilter === s ? 'rgba(37, 99, 235, 0.12)' : 'transparent',
+                  color: statusFilter === s ? '#1d4ed8' : '#64748b',
+                  transition: 'all 0.15s',
+                  height: '36px',
+                }}
+              >
+                {s}
+              </button>
+            ))}
+
+            {/* Sorting */}
+            <div style={{ minWidth: 140 }}>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{ width: '100%', padding: '0.45rem 0.7rem', fontSize: '0.85rem', height: '36px', border: '1px solid #cbd5e1', borderRadius: '8px', background: '#ffffff', cursor: 'pointer' }}
+              >
+                <option value="designName">Sort by Name</option>
+                <option value="createdAt">Sort by Date</option>
+              </select>
+            </div>
+
+            {/* Sort Order Button */}
+            <button
+              type="button"
+              onClick={() => setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+              style={{
+                padding: '0.45rem 0.9rem',
+                fontSize: '0.8rem',
+                borderRadius: 'var(--radius-sm)',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: '1px solid #cbd5e1',
+                background: 'transparent',
+                color: '#64748b',
+                transition: 'all 0.15s',
+                height: '36px',
+              }}
+            >
+              {sortOrder === 'asc' ? '▲ Asc' : '▼ Desc'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Standalone toolbar */
+        <div
+          style={{
+            background: '#ffffff',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            padding: '0.85rem 1rem',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
+            alignItems: 'center',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+          }}
+        >
+          {/* Search Input */}
+          <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '220px' }}>
+            <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search design, task #, fabric, designer..."
+              style={{
+                width: '100%',
+                padding: '0.48rem 0.75rem 0.48rem 2.1rem',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                fontSize: '0.82rem',
+                background: '#f8fafc',
+                color: '#0f172a',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Date Range Picker */}
+          <div style={{ flex: '0 0 auto' }}>
+            <DateRangePicker
+              datePreset={datePreset}
+              setDatePreset={setDatePreset}
+              customDateStart={customDateStart}
+              setCustomDateStart={setCustomDateStart}
+              customDateEnd={customDateEnd}
+              setCustomDateEnd={setCustomDateEnd}
+              theme="light"
+            />
+          </div>
+
+          {/* Designer Filter */}
+          <div style={{ flex: '0 0 auto' }}>
+            {isUserRestricted ? (
+              <div
+                style={{
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: '8px',
+                  border: '1.5px solid #bfdbfe',
+                  fontSize: '0.82rem',
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                }}
+                title="Locked to your assigned designs & colour matching tasks"
+              >
+                <User size={13} color="#2563eb" />
+                <span>👤 My Designs & C.M.: {userAssignedName || 'Not Configured'}</span>
+              </div>
+            ) : (
+              <select
+                value={selectedDesigner}
+                onChange={(e) => setSelectedDesigner(e.target.value)}
+                style={{
+                  padding: '0.48rem 0.75rem',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.82rem',
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                <option value="All">👤 All Designers & Staff</option>
+                {printConfig.designers.map((d, i) => (
+                  <option key={i} value={d}>{d}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Fabric Dropdown Filter */}
+          <div style={{ flex: '0 0 auto' }}>
             <select
-              value={selectedDesigner}
-              onChange={(e) => setSelectedDesigner(e.target.value)}
+              value={selectedFabric}
+              onChange={(e) => setSelectedFabric(e.target.value)}
               style={{
                 padding: '0.48rem 0.75rem',
                 borderRadius: '8px',
@@ -1302,66 +1426,43 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 outline: 'none',
               }}
             >
-              <option value="All">👤 All Designers & Staff</option>
-              {printConfig.designers.map((d, i) => (
-                <option key={i} value={d}>{d}</option>
+              <option value="All">🧵 All Fabrics</option>
+              {printConfig.fabrics.map((f, i) => (
+                <option key={i} value={f}>{f}</option>
               ))}
             </select>
+          </div>
+
+          {/* Reset Filters */}
+          {(datePreset !== 'all' || (!isDesignerRestricted && selectedDesigner !== 'All') || selectedFabric !== 'All' || drowFilter !== 'All' || cmFilter !== 'All' || finalFilter !== 'All' || stageTab !== 'ALL' || searchQuery) && (
+            <button
+              onClick={() => {
+                setDatePreset('all');
+                if (!isDesignerRestricted) setSelectedDesigner('All');
+                setSelectedFabric('All');
+                setDrowFilter('All');
+                setCmFilter('All');
+                setStage3Filter('All');
+                setFinalFilter('All');
+                setStageTab('ALL');
+                setSearchQuery('');
+              }}
+              style={{
+                padding: '0.45rem 0.75rem',
+                background: '#f1f5f9',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                color: '#64748b',
+                cursor: 'pointer',
+              }}
+            >
+              Reset Filters
+            </button>
           )}
         </div>
-
-        {/* Fabric Dropdown Filter */}
-        <div style={{ flex: '0 0 auto' }}>
-          <select
-            value={selectedFabric}
-            onChange={(e) => setSelectedFabric(e.target.value)}
-            style={{
-              padding: '0.48rem 0.75rem',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              fontSize: '0.82rem',
-              background: '#ffffff',
-              color: '#0f172a',
-              fontWeight: 600,
-              cursor: 'pointer',
-              outline: 'none',
-            }}
-          >
-            <option value="All">🧵 All Fabrics</option>
-            {printConfig.fabrics.map((f, i) => (
-              <option key={i} value={f}>{f}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Reset Filters */}
-        {(datePreset !== 'all' || (!isDesignerRestricted && selectedDesigner !== 'All') || selectedFabric !== 'All' || drowFilter !== 'All' || cmFilter !== 'All' || finalFilter !== 'All' || stageTab !== 'ALL' || searchQuery) && (
-          <button
-            onClick={() => {
-              setDatePreset('all');
-              if (!isDesignerRestricted) setSelectedDesigner('All');
-              setSelectedFabric('All');
-              setDrowFilter('All');
-              setCmFilter('All');
-              setFinalFilter('All');
-              setStageTab('ALL');
-              setSearchQuery('');
-            }}
-            style={{
-              padding: '0.45rem 0.75rem',
-              background: '#f1f5f9',
-              border: '1px solid #cbd5e1',
-              borderRadius: '8px',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              color: '#64748b',
-              cursor: 'pointer',
-            }}
-          >
-            Reset Filters
-          </button>
-        )}
-      </div>
+      )}
 
       {/* ─── Task Content: Cards Grid vs Table View ───────────────────────── */}
       {loading ? (
@@ -1524,7 +1625,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Assigned Team</th>
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>1. Drow Status</th>
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>2. Colour Match</th>
-                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>3. Final Approval</th>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>3. Hold / Continue</th>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>4. Final Approval</th>
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800, textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -1543,6 +1645,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
                   const drowImgs = task.drowDesignImages || [];
                   const cmImgs = task.colourMatchingImages || [];
+                  const stage3Imgs = task.stage3Images || [];
                   const finalImgs = task.finalDesignImages || [];
 
                   return (
@@ -1736,7 +1839,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                         </div>
                       </td>
 
-                      {/* 3. Final Approval */}
+                      {/* 3. Hold / Continue */}
                       <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                           {embedded ? (
@@ -1746,26 +1849,94 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                 borderRadius: '6px',
                                 fontSize: '0.7rem',
                                 fontWeight: 800,
-                                border: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                border: task.stage3Status === 'Continue'
+                                  ? '1px solid #bfdbfe'
+                                  : task.stage3Status === 'Hold'
+                                  ? '1px solid #fed7aa'
+                                  : '1px solid #e2e8f0',
+                                background: task.stage3Status === 'Continue'
+                                  ? '#eff6ff'
+                                  : task.stage3Status === 'Hold'
+                                  ? '#fff7ed'
+                                  : '#f8fafc',
+                                color: task.stage3Status === 'Continue'
+                                  ? '#0284c7'
+                                  : task.stage3Status === 'Hold'
+                                  ? '#ea580c'
+                                  : '#94a3b8',
+                              }}
+                            >
+                              {task.stage3Status || 'Pending'}
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleOpenStatusModal(task, 'stage_3', 'STAGE 3 STATUS', task.stage3Status)}
+                              style={{
+                                padding: '0.25rem 0.55rem',
+                                borderRadius: '6px',
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                border: task.stage3Status === 'Continue'
+                                  ? '1px solid #bfdbfe'
+                                  : task.stage3Status === 'Hold'
+                                  ? '1px solid #fed7aa'
+                                  : '1px dashed #cbd5e1',
+                                background: task.stage3Status === 'Continue'
+                                  ? '#eff6ff'
+                                  : task.stage3Status === 'Hold'
+                                  ? '#fff7ed'
+                                  : '#f8fafc',
+                                color: task.stage3Status === 'Continue'
+                                  ? '#0284c7'
+                                  : task.stage3Status === 'Hold'
+                                  ? '#ea580c'
+                                  : '#94a3b8',
+                              }}
+                            >
+                              {task.stage3Status || '+ Set Status'}
+                            </button>
+                          )}
+                          {stage3Imgs.length > 0 && (
+                            <button
+                              onClick={() => handleOpenLightbox(stage3Imgs, 0, `Stage 3 Proof: ${task.designName}`)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ea580c', fontSize: '0.72rem', fontWeight: 700, padding: 0 }}
+                              title={`${stage3Imgs.length} proof image(s)`}
+                            >
+                              ⏸️ {stage3Imgs.length}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 4. Final Approval */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          {embedded ? (
+                            <span
+                              style={{
+                                padding: '0.25rem 0.55rem',
+                                borderRadius: '6px',
+                                fontSize: '0.7rem',
+                                fontWeight: 800,
+                                border: task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
                                   ? '1.5px solid #16a34a'
-                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                  : String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
                                   ? '1.5px solid #dc2626'
                                   : '1px solid #e2e8f0',
-                                background: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                background: task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
                                   ? '#dcfce7'
-                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                  : String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
                                   ? '#fee2e2'
                                   : '#f8fafc',
-                                color: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                color: task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
                                   ? '#15803d'
-                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                  : String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
                                   ? '#b91c1c'
                                   : '#94a3b8',
                               }}
                             >
-                              {task.finalDesignStatus?.includes('drowning') || task.finalDesignStatus === 'REJECT SAMPLE DRAWING'
-                                ? 'REJECT DRAWING'
-                                : task.finalDesignStatus || 'Pending Gate'}
+                              {task.finalDesignStatus || 'Pending Gate'}
                             </span>
                           ) : (
                             <button
@@ -1776,26 +1947,24 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                                 fontSize: '0.7rem',
                                 fontWeight: 800,
                                 cursor: 'pointer',
-                                border: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                border: task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
                                   ? '1.5px solid #16a34a'
-                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                  : String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
                                   ? '1.5px solid #dc2626'
                                   : '1px dashed #cbd5e1',
-                                background: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                background: task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
                                   ? '#dcfce7'
-                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                  : String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
                                   ? '#fee2e2'
                                   : '#f8fafc',
-                                color: task.finalDesignStatus === 'APPROVED SAMPLE'
+                                color: task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
                                   ? '#15803d'
-                                  : String(task.finalDesignStatus || '').startsWith('REJECT')
+                                  : String(task.finalDesignStatus || '').toLowerCase().startsWith('reject')
                                   ? '#b91c1c'
                                   : '#94a3b8',
                               }}
                             >
-                              {task.finalDesignStatus?.includes('drowning') || task.finalDesignStatus === 'REJECT SAMPLE DRAWING'
-                                ? 'REJECT DRAWING'
-                                : task.finalDesignStatus || '+ Gate Review'}
+                              {task.finalDesignStatus || '+ Gate Review'}
                             </button>
                           )}
                           {finalImgs.length > 0 && (
@@ -1899,20 +2068,12 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
             const drowImgs = task.drowDesignImages || [];
             const cmImgs = task.colourMatchingImages || [];
+            const stage3Imgs = task.stage3Images || [];
             const finalImgs = task.finalDesignImages || [];
 
             if (embedded) {
-              const heroImg = task.sampleImage || finalImgs[0] || cmImgs[0] || drowImgs[0];
-              const allLightboxImages = [
-                ...(task.sampleImage ? [task.sampleImage] : []),
-                ...drowImgs,
-                ...cmImgs,
-                ...finalImgs,
-              ];
-              const uniqueLightboxImages = Array.from(new Set(allLightboxImages));
-
-              const isApproved = task.finalDesignStatus === 'APPROVED SAMPLE';
-              const isRejected = String(task.finalDesignStatus || '').startsWith('REJECT');
+              const heroImg = task.sampleImage || finalImgs[0] || stage3Imgs[0] || cmImgs[0] || drowImgs[0];
+              const isInactive = task.status === 'Inactive' || task.status === 'Cancelled' || String(task.finalDesignStatus || '').toLowerCase().startsWith('reject');
 
               return (
                 <div
@@ -1924,54 +2085,60 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     flexDirection: 'column',
                     gap: '0.8rem',
                     transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                    position: 'relative'
+                    position: 'relative',
+                    background: '#ffffff',
+                    borderRadius: '14px',
+                    border: '1px solid #e2e8f0',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = '';
+                    e.currentTarget.style.boxShadow = '';
+                  }}
                 >
-                  {/* Task No / Category badge (Top Left) */}
-                  <span style={{
-                    position: 'absolute', top: 16, left: 16,
-                    background: 'rgba(139,92,246,0.25)', color: '#a78bfa',
-                    fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px',
-                    textTransform: 'uppercase', letterSpacing: '0.02em', zIndex: 2
-                  }}>
-                    {task.taskNo || 'SAMPLE'}
+                  {/* Category badge (Top-Left) */}
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: 16,
+                      left: 16,
+                      background: 'rgba(139,92,246,0.25)',
+                      color: '#a78bfa',
+                      fontSize: '0.65rem',
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.02em',
+                      zIndex: 2,
+                    }}
+                  >
+                    {allFabrics[0] || task.category || 'ALLOWER'}
                   </span>
 
-                  {/* Status badge (Top Right) */}
-                  <span style={{
-                    position: 'absolute', top: 16, right: 16,
-                    background: isApproved
-                      ? 'rgba(52,211,153,0.15)'
-                      : isRejected
-                      ? 'rgba(239,68,68,0.15)'
-                      : 'rgba(59,130,246,0.15)',
-                    color: isApproved
-                      ? '#34d399'
-                      : isRejected
-                      ? '#f87171'
-                      : '#60a5fa',
-                    fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px',
-                    border: isApproved
-                      ? '1px solid rgba(52,211,153,0.3)'
-                      : isRejected
-                      ? '1px solid rgba(239,68,68,0.3)'
-                      : '1px solid rgba(59,130,246,0.3)',
-                    zIndex: 2
-                  }}>
-                    {isApproved
-                      ? 'Approved'
-                      : isRejected
-                      ? 'Rejected'
-                      : task.colourMatchingStatus
-                      ? 'Colour Match'
-                      : task.drowDesignStatus
-                      ? 'Drawing'
-                      : 'Active'}
+                  {/* Status badge (Top-Right) */}
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: 16,
+                      right: 16,
+                      background: isInactive ? 'rgba(255,255,255,0.05)' : 'rgba(52,211,153,0.15)',
+                      color: isInactive ? 'var(--text-muted)' : '#34d399',
+                      fontSize: '0.65rem',
+                      fontWeight: 800,
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      border: isInactive ? '1px solid var(--border-light)' : '1px solid rgba(52,211,153,0.3)',
+                      zIndex: 2,
+                    }}
+                  >
+                    {isInactive ? 'Inactive' : 'Active'}
                   </span>
 
-                  {/* Main Image View (180px, #04070d, identical to Design Catalog) */}
+                  {/* Main Image View (180px, #04070d, identical to Design Catalog Image 1) */}
                   <div
                     style={{
                       height: '180px',
@@ -1983,227 +2150,146 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       justifyContent: 'center',
                       position: 'relative',
                       border: '1px solid var(--border-light)',
-                      marginTop: '1.25rem'
+                      marginTop: '1.25rem',
                     }}
                   >
-                    {heroImg ? (
-                      <img
-                        src={heroImg}
-                        alt={task.designName}
-                        onClick={() => handleOpenLightbox(uniqueLightboxImages.length > 0 ? uniqueLightboxImages : [heroImg], 0, `Design: ${task.designName}`)}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'contain',
-                          cursor: 'pointer',
-                          transition: 'transform 0.2s ease',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.03)')}
-                        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-                        title="Click to view full image in lightbox"
-                      />
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: 'var(--text-muted)' }}>
-                        <Palette size={28} opacity={0.5} />
-                        <span style={{ fontSize: '0.72rem', fontWeight: 600 }}>No Image Uploaded</span>
-                      </div>
-                    )}
-
-                    {/* Secondary proof thumbnail if available */}
-                    {uniqueLightboxImages.length > 1 && uniqueLightboxImages[1] && (
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenLightbox(uniqueLightboxImages, 1, `Proof 2: ${task.designName}`);
-                        }}
-                        style={{
-                          position: 'absolute', bottom: 6, right: 6, width: '38px', height: '38px',
-                          border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', overflow: 'hidden',
-                          background: '#000', cursor: 'pointer', zIndex: 3, boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
-                        }}
-                        title="Click to view secondary proof image"
-                      >
-                        <img
-                          src={uniqueLightboxImages[1]}
-                          alt="Proof 2"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      </div>
-                    )}
+                    <DesignImage
+                      rawUrl={heroImg}
+                      designName={task.designName}
+                      category={allFabrics[0] || task.category || 'ALLOWER'}
+                      thumbnail={true}
+                      width={360}
+                      onZoom={(src) => handleOpenLightbox([src], 0, `Design: ${task.designName}`)}
+                      style={{ width: '100%', height: '100%' }}
+                    />
                   </div>
 
                   {/* Design Info */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary)' }}>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary, #2563eb)' }}>
                         {task.designName}
                       </span>
-                      {task.sampleLink && (
-                        <a
-                          href={task.sampleLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            fontSize: '0.72rem',
-                            color: '#3b82f6',
-                            fontWeight: 700,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            textDecoration: 'none',
-                            background: 'rgba(59,130,246,0.1)',
-                            padding: '2px 7px',
-                            borderRadius: '4px',
-                            border: '1px solid rgba(59,130,246,0.2)'
-                          }}
-                          title="Open Reference Link"
-                        >
-                          <ExternalLink size={12} /> Ref
-                        </a>
-                      )}
                     </div>
 
-                    {/* Notes if present */}
-                    {task.notes && (
-                      <div style={{
-                        fontSize: '0.72rem',
-                        color: 'var(--text-muted)',
-                        fontStyle: 'italic',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        "{task.notes}"
-                      </div>
-                    )}
+                    {/* Brand / Assigned Parties badge */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          color: '#10b981',
+                          fontWeight: 700,
+                          background: 'rgba(16, 185, 129, 0.12)',
+                          padding: '2px 7px',
+                          borderRadius: '4px',
+                          border: '1px solid rgba(16, 185, 129, 0.25)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                        }}
+                        title={`Party (Client): ${task.partyName || (Array.isArray(task.parties) && task.parties[0]) || 'ELITE EON'}`}
+                      >
+                        <span style={{ fontSize: '0.72rem' }}>🏢</span> {task.partyName || (Array.isArray(task.parties) && task.parties[0]) || 'ELITE EON'}
+                      </span>
+                    </div>
 
-                    {/* Parameters grid identical to Design Catalog */}
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: '0.3rem 0.5rem',
-                      fontSize: '0.78rem',
-                      borderTop: '1px dashed var(--border-light)',
-                      paddingTop: '0.5rem'
-                    }}>
+                    {/* Parameters grid identical to Image 1 */}
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '0.3rem 0.5rem',
+                        fontSize: '0.78rem',
+                        borderTop: '1px dashed var(--border-light, #cbd5e1)',
+                        paddingTop: '0.5rem',
+                      }}
+                    >
                       {[
-                        ['Fabric', allFabrics.join(', ') || '—'],
-                        ['Designer', allDesigners.join(', ') || '—'],
-                        ['Colour Match', allColourMatches.join(', ') || '—'],
-                        ['Date', task.date || '—'],
+                        ['Colour Match', allColourMatches.join(', ') || 'JAY'],
+                        ['Fabric', allFabrics.join(', ') || 'ARMANI 44'],
+                        ['Fusing Temp', task.fusingTemp || '235'],
+                        ['Speed', task.speed || '40'],
+                        ['Colors', task.colors || allColourMatches[0] || 'Yellow'],
+                        ['Panna/Pass', task.panna && task.pass ? `${task.panna}" / ${task.pass}P` : (task.panna ? `${task.panna}"` : '44" / 2 PassP')],
                       ].map(([k, v]) => (
                         <div key={k} style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{k}</span>
-                          <span style={{
-                            fontSize: '0.76rem',
-                            fontWeight: 700,
-                            color: 'var(--text-primary)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }} title={v}>
-                            {v}
-                          </span>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase' }}>{k}</span>
+                          {k === 'Colors' && v ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              {getColorHex(v) && (
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    width: '10px',
+                                    height: '10px',
+                                    borderRadius: '2px',
+                                    backgroundColor: getColorHex(v),
+                                    border: '1px solid rgba(0,0,0,0.15)',
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              )}
+                              <span style={{ color: 'var(--text-primary, #0f172a)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {v}
+                              </span>
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--text-primary, #0f172a)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {v || '—'}
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* Card Actions & Stage Proofs Strip */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '0.4rem',
-                    borderTop: '1px solid var(--border-light)',
-                    paddingTop: '0.6rem',
-                    marginTop: 'auto'
-                  }}>
-                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                      {uniqueLightboxImages.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenLightbox(uniqueLightboxImages, 0, `Proofs: ${task.designName}`)}
-                          style={{
-                            padding: '3px 8px',
-                            fontSize: '0.68rem',
-                            fontWeight: 700,
-                            background: 'rgba(59,130,246,0.1)',
-                            color: '#3b82f6',
-                            border: '1px solid rgba(59,130,246,0.25)',
-                            borderRadius: '5px',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px'
-                          }}
-                          title="View proofs in lightbox"
-                        >
-                          <ImageIcon size={11} /> {uniqueLightboxImages.length} Proof{uniqueLightboxImages.length > 1 ? 's' : ''}
-                        </button>
-                      )}
+                  {/* Actions identical to Design Catalog */}
+                  <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-light, #e2e8f0)', paddingTop: '0.7rem', marginTop: 'auto' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(task)}
+                      className="btn-secondary"
+                      style={{
+                        flex: 1,
+                        padding: '0.4rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        justifyContent: 'center',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        background: '#f8fafc',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        color: '#334155',
+                      }}
+                    >
+                      <Edit2 size={13} /> Edit Design
+                    </button>
+                    {isUserAdmin && (
                       <button
                         type="button"
-                        onClick={() => setHistoryTask(task)}
+                        onClick={() => handleDeleteTask(task)}
                         style={{
-                          padding: '3px 8px',
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          background: 'rgba(255,255,255,0.05)',
-                          color: 'var(--text-secondary)',
-                          border: '1px solid var(--border-light)',
-                          borderRadius: '5px',
+                          padding: '0.4rem 0.7rem',
+                          fontSize: '0.78rem',
+                          borderRadius: '6px',
+                          background: 'rgba(239,68,68,0.08)',
+                          border: '1px solid rgba(239,68,68,0.2)',
+                          color: '#f87171',
                           cursor: 'pointer',
-                          display: 'inline-flex',
+                          display: 'flex',
                           alignItems: 'center',
-                          gap: '3px'
+                          gap: '0.3rem',
+                          fontFamily: 'var(--font-sans)',
+                          transition: 'all 0.15s',
                         }}
-                        title="View stage history"
+                        title="Delete Design"
                       >
-                        <History size={11} /> History
+                        <Trash2 size={13} />
                       </button>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                      {canInputNewDesign && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(task)}
-                          style={{
-                            padding: '4px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text-muted)',
-                            cursor: 'pointer',
-                            borderRadius: '4px'
-                          }}
-                          title="Edit Task"
-                          onMouseEnter={(e) => (e.currentTarget.style.color = '#3b82f6')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
-                        >
-                          <Edit2 size={13} />
-                        </button>
-                      )}
-                      {isUserAdmin && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteTask(task)}
-                          style={{
-                            padding: '4px',
-                            background: 'transparent',
-                            border: 'none',
-                            color: 'var(--text-muted)',
-                            cursor: 'pointer',
-                            borderRadius: '4px'
-                          }}
-                          title="Delete Task"
-                          onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      )}
-                    </div>
+                    )}
                   </div>
                 </div>
               );
@@ -2269,17 +2355,32 @@ const DesignerScreen = forwardRef(function DesignerScreen(
 
                   <span style={{ color: '#cbd5e1' }}>──</span>
 
-                  {/* Step 3: Final Gate */}
+                  {/* Step 3: Hold / Continue */}
                   <div
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.25rem',
-                      color: progress.s3 === 'approved' ? '#16a34a' : progress.s3 === 'revision' ? '#dc2626' : progress.s3 === 'active' ? '#4f46e5' : '#94a3b8',
+                      color: progress.s3 === 'done' ? '#16a34a' : progress.s3 === 'hold' ? '#ea580c' : progress.s3 === 'active' ? '#0284c7' : '#94a3b8',
                     }}
                   >
-                    <span style={{ fontSize: '0.65rem' }}>{progress.s3 === 'approved' ? '✓' : '3'}</span>
-                    <span>{progress.s3 === 'approved' ? 'Approved' : 'Gate'}</span>
+                    <span style={{ fontSize: '0.65rem' }}>{progress.s3 === 'done' ? '✓' : progress.s3 === 'hold' ? '⏸' : '3'}</span>
+                    <span>{progress.s3 === 'hold' ? 'Hold' : progress.s3 === 'done' ? 'Continue' : 'Stage 3'}</span>
+                  </div>
+
+                  <span style={{ color: '#cbd5e1' }}>──</span>
+
+                  {/* Step 4: Final Approval */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      color: progress.s4 === 'approved' ? '#16a34a' : progress.s4 === 'rejected' ? '#dc2626' : progress.s4 === 'active' ? '#4f46e5' : '#94a3b8',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.65rem' }}>{progress.s4 === 'approved' ? '✓' : progress.s4 === 'rejected' ? '✕' : '4'}</span>
+                    <span>{progress.s4 === 'approved' ? 'Approved' : progress.s4 === 'rejected' ? 'Reject' : 'Approval'}</span>
                   </div>
                 </div>
 
@@ -2787,7 +2888,131 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   </div>
                 </div>
 
-                {/* ── STAGE 3: FINAL DESIGN STATUS ───────────────────────────────── */}
+                {/* ── STAGE 3: HOLD / CONTINUE STATUS ────────────────────────────── */}
+                <div
+                  style={{
+                    background: '#fffbf5',
+                    border: '1px solid #fed7aa',
+                    borderRadius: '10px',
+                    padding: '0.75rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#c2410c', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <AlertTriangle size={13} color="#ea580c" />
+                      <span>3. HOLD / CONTINUE STATUS</span>
+                    </div>
+                    {task.stage3Status ? (
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '6px',
+                          background:
+                            task.stage3Status === 'Continue'
+                              ? '#eff6ff'
+                              : '#fff7ed',
+                          color:
+                            task.stage3Status === 'Continue'
+                              ? '#0284c7'
+                              : '#ea580c',
+                          border: '1px solid rgba(0,0,0,0.06)',
+                        }}
+                      >
+                        {task.stage3Status}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic' }}>Pending</span>
+                    )}
+                  </div>
+
+                  {/* Quick Status Buttons */}
+                  {!embedded && (
+                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.45rem' }}>
+                      {STAGE_3_OPTIONS.map((opt) => {
+                        const isActive = task.stage3Status === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            onClick={() => handleOpenStatusModal(task, 'stage_3', 'STAGE 3 STATUS', opt.id)}
+                            style={{
+                              flex: '1 1 calc(50% - 0.35rem)',
+                              minWidth: '70px',
+                              padding: '0.32rem 0.45rem',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              border: isActive ? `1.5px solid ${opt.color}` : '1px solid #cbd5e1',
+                              background: isActive ? opt.bg : '#ffffff',
+                              color: isActive ? opt.color : '#475569',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.2rem',
+                              boxShadow: isActive ? `0 1px 4px ${opt.color}25` : 'none',
+                            }}
+                          >
+                            {isActive && <Check size={11} />}
+                            <span>{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Stored Images Gallery for Stage 3 */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.35rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
+                      {stage3Imgs.length > 0 ? (
+                        stage3Imgs.map((imgUrl, idx) => (
+                          <div
+                            key={idx}
+                            onClick={() => handleOpenLightbox(stage3Imgs, idx, `Stage 3 Proof: ${task.designName}`)}
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '5px',
+                              overflow: 'hidden',
+                              border: '1px solid #fed7aa',
+                              cursor: 'pointer',
+                              position: 'relative',
+                            }}
+                            title={`Stage 3 Image #${idx + 1} (stored in R2)`}
+                          >
+                            <img src={imgUrl} alt={`Stage 3 ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                        ))
+                      ) : (
+                        <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>No proofs uploaded</span>
+                      )}
+                    </div>
+
+                    {!embedded && (
+                      <button
+                        onClick={() => handleOpenStatusModal(task, 'stage_3', 'STAGE 3 STATUS', task.stage3Status)}
+                        style={{
+                          padding: '0.25rem 0.55rem',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          background: '#ffffff',
+                          border: '1px solid #fed7aa',
+                          borderRadius: '5px',
+                          color: '#c2410c',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                        }}
+                      >
+                        <Upload size={11} /> + Proof
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── STAGE 4: FINAL APPROVAL STATUS ───────────────────────────────── */}
                 <div
                   style={{
                     background: '#f9fdfa',
@@ -2799,7 +3024,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
                     <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <CheckCircle2 size={13} color="#16a34a" />
-                      <span>3. FINAL DESIGN STATUS</span>
+                      <span>4. FINAL APPROVAL STATUS</span>
                     </div>
                     {task.finalDesignStatus ? (
                       <span
@@ -2809,23 +3034,21 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                           padding: '0.15rem 0.5rem',
                           borderRadius: '6px',
                           background:
-                            task.finalDesignStatus === 'APPROVED SAMPLE'
+                            task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
                               ? '#dcfce7'
-                              : task.finalDesignStatus.startsWith('REJECT')
+                              : task.finalDesignStatus === 'Reject' || task.finalDesignStatus.startsWith('REJECT')
                               ? '#fee2e2'
                               : '#e0e7ff',
                           color:
-                            task.finalDesignStatus === 'APPROVED SAMPLE'
+                            task.finalDesignStatus === 'Approved' || task.finalDesignStatus === 'APPROVED SAMPLE'
                               ? '#15803d'
-                              : task.finalDesignStatus.startsWith('REJECT')
+                              : task.finalDesignStatus === 'Reject' || task.finalDesignStatus.startsWith('REJECT')
                               ? '#b91c1c'
                               : '#3730a3',
                           border: '1px solid rgba(0,0,0,0.06)',
                         }}
                       >
-                        {task.finalDesignStatus?.includes('drowning') || task.finalDesignStatus === 'REJECT SAMPLE DRAWING'
-                          ? 'REJECT DRAWING'
-                          : task.finalDesignStatus}
+                        {task.finalDesignStatus}
                       </span>
                     ) : (
                       <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic' }}>Pending Review</span>
@@ -2838,8 +3061,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                       {FINAL_DESIGN_OPTIONS.map((opt) => {
                         const isActive =
                           task.finalDesignStatus === opt.id ||
-                          (opt.legacyId && task.finalDesignStatus === opt.legacyId) ||
-                          (opt.id.includes('DRAWING') && task.finalDesignStatus?.includes('drowning'));
+                          (opt.id === 'Reject' && task.finalDesignStatus?.toLowerCase().startsWith('reject')) ||
+                          (opt.id === 'Approved' && (task.finalDesignStatus === 'APPROVED SAMPLE' || task.finalDesignStatus === 'Approved'));
                         const IconComp = opt.icon || CheckCircle2;
                         return (
                           <button
@@ -3063,6 +3286,8 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                     ? DROW_STATUS_OPTIONS
                     : activeModalData.category === 'colour_matching'
                     ? COLOUR_MATCHING_OPTIONS
+                    : (activeModalData.category === 'stage_3' || activeModalData.category === 'stage3')
+                    ? STAGE_3_OPTIONS
                     : FINAL_DESIGN_OPTIONS
                   ).map((opt) => {
                     const isSelected = activeModalData.newStatus === opt.id;

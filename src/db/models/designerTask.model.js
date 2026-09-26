@@ -161,7 +161,18 @@ const designerTaskSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
-    // 3. Final Design Status: 'FINAL SAMPLE' | 'REJECT SAMPLE drowning' | 'REJECT SAMPLE FOR C.M.' | 'APPROVED SAMPLE'
+    // 3. Stage 3 Status: 'Hold' | 'Continue'
+    stage3Status: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true,
+    },
+    stage3Images: {
+      type: [String],
+      default: [],
+    },
+    // 4. Final Design Status: 'Reject' | 'Approved'
     finalDesignStatus: {
       type: String,
       default: '',
