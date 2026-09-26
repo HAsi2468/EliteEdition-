@@ -1714,7 +1714,7 @@ const DesignerScreen = forwardRef(function DesignerScreen(
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8rem' }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Task # / Date</th>
+                  <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Date</th>
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Design & Priority</th>
                   <th style={{ padding: '0.85rem 0.75rem', fontWeight: 800 }}>Sample Ref</th>
                   <th style={{ padding: '0.85rem 1rem', fontWeight: 800 }}>Assigned Team</th>
@@ -1752,13 +1752,10 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                         transition: 'background 0.1s ease',
                       }}
                     >
-                      {/* Task # & Date */}
-                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'inline-block', fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', background: '#eff6ff', padding: '0.15rem 0.5rem', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
-                          {task.taskNo}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
-                          {task.date}
+                      {/* Date */}
+                      <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155' }}>
+                          {task.date || '--'}
                         </div>
                       </td>
 
@@ -2568,19 +2565,6 @@ const DesignerScreen = forwardRef(function DesignerScreen(
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                      <span
-                        style={{
-                          fontSize: '0.72rem',
-                          fontWeight: 800,
-                          color: '#2563eb',
-                          background: '#eff6ff',
-                          padding: '0.15rem 0.5rem',
-                          borderRadius: '6px',
-                          border: '1px solid #bfdbfe',
-                        }}
-                      >
-                        {task.taskNo}
-                      </span>
                       <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
                         {task.date}
                       </span>
